@@ -28,7 +28,8 @@ class InvoiceService
     private const ACC_VAT_OUTPUT  = '2120'; // ضريبة المخرجات
 
     public function __construct(
-        protected LedgerService $ledger
+        protected LedgerService $ledger,
+        protected InventoryService $inventory
     ) {}
 
     /**
@@ -143,9 +144,13 @@ class InvoiceService
                 'created_by'  => $invoice->created_by,
             ]);
 
+            // قيد تكلفة البضاعة المباعة للمنتجات المتابَعة مخزونياً (إن وُجدت)
+            $cogsEntry = $this->inventory->recordSaleCogs($invoice);
+
             $invoice->update([
                 'status'           => 'posted',
                 'journal_entry_id' => $entry->id,
+                'cogs_entry_id'    => $cogsEntry?->id,
             ]);
 
             return $invoice->fresh('lines');

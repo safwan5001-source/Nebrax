@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -14,15 +15,18 @@ class Product extends BaseModel
 
     protected $fillable = [
         'tenant_id', 'sku', 'name', 'name_en', 'type', 'unit',
-        'sale_price', 'purchase_price', 'tax_rate', 'track_inventory', 'is_active',
+        'sale_price', 'purchase_price', 'tax_rate', 'track_inventory',
+        'quantity_on_hand', 'avg_cost', 'is_active',
     ];
 
     protected $casts = [
-        'sale_price'      => 'integer',
-        'purchase_price'  => 'integer',
-        'tax_rate'        => 'integer',
-        'track_inventory' => 'boolean',
-        'is_active'       => 'boolean',
+        'sale_price'       => 'integer',
+        'purchase_price'   => 'integer',
+        'tax_rate'         => 'integer',
+        'track_inventory'  => 'boolean',
+        'quantity_on_hand' => 'integer',
+        'avg_cost'         => 'integer',
+        'is_active'        => 'boolean',
     ];
 
     protected $attributes = [
@@ -31,12 +35,19 @@ class Product extends BaseModel
         'sale_price'      => 0,
         'purchase_price'  => 0,
         'tax_rate'        => 15,
-        'track_inventory' => false,
-        'is_active'       => true,
+        'track_inventory'  => false,
+        'quantity_on_hand' => 0,
+        'avg_cost'         => 0,
+        'is_active'        => true,
     ];
 
     public function isService(): bool
     {
         return $this->type === 'service';
+    }
+
+    public function movements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
     }
 }

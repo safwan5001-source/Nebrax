@@ -16,7 +16,7 @@ class Invoice extends BaseModel
         'tenant_id', 'number', 'partner_id', 'type', 'payment_type',
         'invoice_date', 'due_date', 'status',
         'subtotal', 'tax_amount', 'total',
-        'notes', 'journal_entry_id', 'created_by',
+        'notes', 'journal_entry_id', 'cogs_entry_id', 'created_by',
     ];
 
     protected $casts = [
@@ -49,6 +49,11 @@ class Invoice extends BaseModel
     public function journalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
+    }
+
+    public function cogsEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntry::class, 'cogs_entry_id');
     }
 
     public function isDraft(): bool
