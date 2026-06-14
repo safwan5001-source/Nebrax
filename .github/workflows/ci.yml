@@ -30,6 +30,11 @@ jobs:
           extensions: mbstring, pdo_sqlite, sqlite3, bcmath, intl, fileinfo
           coverage: none
 
+      # Laravel 11 دخل الدعم الأمني فقط، فصارت إصداراته تحمل تنبيهات أمنية
+      # يحجبها Composer 2.10+ افتراضياً. نعطّل الحجب في بيئة CI المؤقتة فقط.
+      - name: السماح بتثبيت Laravel 11 (بيئة CI مؤقتة)
+        run: composer config --global policy.advisories.block false
+
       - name: إنشاء مشروع Laravel 11
         run: composer create-project "laravel/laravel:^11.0" "$APP_DIR" --prefer-dist --no-progress
 
