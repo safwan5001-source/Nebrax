@@ -23,15 +23,15 @@ jobs:
       - name: Checkout core (النواة)
         uses: actions/checkout@v4
 
-      - name: Setup PHP 8.2
+      - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
           extensions: mbstring, pdo_sqlite, sqlite3, bcmath, intl, fileinfo
           coverage: none
 
       - name: إنشاء مشروع Laravel 11
-        run: composer create-project "laravel/laravel:^11.0" "$APP_DIR" --prefer-dist --quiet
+        run: composer create-project "laravel/laravel:^11.0" "$APP_DIR" --prefer-dist --no-progress
 
       - name: تثبيت Sanctum
         working-directory: ${{ env.APP_DIR }}
