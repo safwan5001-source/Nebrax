@@ -1,0 +1,71 @@
+name: CI
+
+# يشغّل الاختبارات تلقائياً عند كل push و pull request.
+# يبني مشروع Laravel 11 مؤقتاً، يدمج نواة نبراس، ثم يشغّل php artisan test.
+# المستودع يبقى نظيفاً (نواة فقط) — البناء يحدث هنا، لا vendor/ في الريبو.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  test:
+    name: php artisan test (Laravel 11)
+    runs-on: ubuntu-latest
+
+    env:
+      COMPOSER_NO_INTERACTION: '1'
+      APP_DIR: ${{ runner.temp }}/nibras-app
+
+    steps:
+      - name: Checkout core (النواة)
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo_sqlite, sqlite3, bcmath, intl, fileinfo
+          coverage: none
+
+      - name: إنشاء مشروع Laravel 11
+        run: composer create-project "laravel/laravel:^11.0" "$APP_DIR" --prefer-dist --quiet
+
+      - name: تثبيت Sanctum
+        working-directory: ${{ env.APP_DIR }}
+        run: composer require laravel/sanctum --quiet
+
+      - name: دمج ملفات النواة
+        run: |
+          CORE="$GITHUB_WORKSPACE"
+          cd "$APP_DIR"
+          cp -r "$CORE/app/Models/"*.php                 app/Models/
+          mkdir -p app/Services/Accounting app/Services/Reporting app/Tenancy app/Http/Middleware tests/Feature
+          cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
+          cp -r "$CORE/app/Services/Reporting/"*.php      app/Services/Reporting/
+          cp -r "$CORE/app/Tenancy/"*.php                 app/Tenancy/
+          cp -r "$CORE/app/Http/Middleware/"*.php         app/Http/Middleware/
+          cp -r "$CORE/app/Providers/"*.php               app/Providers/
+          cp -r "$CORE/database/migrations/"*.php         database/migrations/
+          cp -r "$CORE/tests/Feature/"*.php               tests/Feature/
+
+      - name: تسجيل TenancyServiceProvider + حذف users migration الافتراضية
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          grep -q "TenancyServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
+          rm -f database/migrations/0001_01_01_000000_create_users_table.php
+
+      - name: إعداد قاعدة SQLite
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          touch database/database.sqlite
+          sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=sqlite|" .env
+          sed -i "/^DB_HOST=/d;/^DB_PORT=/d;/^DB_DATABASE=/d;/^DB_USERNAME=/d;/^DB_PASSWORD=/d" .env
+          php artisan migrate:fresh --force
+
+      - name: تشغيل الاختبارات
+        working-directory: ${{ env.APP_DIR }}
+        run: php artisan test

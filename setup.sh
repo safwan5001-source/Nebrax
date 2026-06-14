@@ -17,7 +17,7 @@ echo "  PHP $PHP_VER ✓"
 
 echo "▶ 2/6  إنشاء مشروع Laravel..."
 if [ ! -d "$APP_DIR" ]; then
-  composer create-project laravel/laravel "$APP_DIR" --quiet
+  composer create-project "laravel/laravel:^11.0" "$APP_DIR" --quiet
 fi
 cd "$APP_DIR"
 

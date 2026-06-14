@@ -115,24 +115,32 @@ class InvoiceService
         }
 
         return DB::transaction(function () use ($invoice) {
+            // إعادة احتساب الإجماليات من السطور (مصدر الحقيقة) قبل توليد القيد.
+            // يضمن أن القيد = السطور دائماً، ويوفّق رأس الفاتورة معها،
+            // فلا يمكن أن يتعارض total مع subtotal + tax_amount مهما عُبث بالرأس.
+            $invoice->loadMissing('lines');
+            $subtotal  = (int) $invoice->lines->sum('line_subtotal');
+            $taxAmount = (int) $invoice->lines->sum('line_tax');
+            $total     = $subtotal + $taxAmount;
+
             $debitCode = $invoice->payment_type === 'cash'
                 ? self::ACC_CASH
                 : self::ACC_RECEIVABLE;
 
             $lines = [[
                 'account_id'   => $this->accountId($debitCode),
-                'debit'        => $invoice->total,
+                'debit'        => $total,
                 'partner_type' => Partner::class,
                 'partner_id'   => $invoice->partner_id,
             ], [
                 'account_id' => $this->accountId(self::ACC_SALES),
-                'credit'     => $invoice->subtotal,
+                'credit'     => $subtotal,
             ]];
 
-            if ($invoice->tax_amount > 0) {
+            if ($taxAmount > 0) {
                 $lines[] = [
                     'account_id' => $this->accountId(self::ACC_VAT_OUTPUT),
-                    'credit'     => $invoice->tax_amount,
+                    'credit'     => $taxAmount,
                 ];
             }
 
@@ -149,6 +157,9 @@ class InvoiceService
 
             $invoice->update([
                 'status'           => 'posted',
+                'subtotal'         => $subtotal,
+                'tax_amount'       => $taxAmount,
+                'total'            => $total,
                 'journal_entry_id' => $entry->id,
                 'cogs_entry_id'    => $cogsEntry?->id,
             ]);

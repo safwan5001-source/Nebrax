@@ -114,6 +114,31 @@ class InvoiceTest extends TestCase
     }
 
     /** @test */
+    public function totals_are_derived_from_lines_even_if_the_header_is_tampered(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]] // 1150 صحيحة
+        );
+
+        // عبث مباشر بالرأس (محاكاة كسر الثابتة)
+        $invoice->update(['subtotal' => 1, 'tax_amount' => 1, 'total' => 999999]);
+
+        $posted = $this->invoices->post($invoice->fresh());
+
+        // الرأس صُحّح من السطور: total = subtotal + tax_amount دائماً
+        $this->assertSame(100000, $posted->subtotal);
+        $this->assertSame(15000,  $posted->tax_amount);
+        $this->assertSame(115000, $posted->total);
+        $this->assertSame($posted->total, $posted->subtotal + $posted->tax_amount);
+
+        // والقيد المتولّد متوازن ومطابق للسطور لا للرأس المعبوث
+        $entry = $posted->journalEntry()->with('lines')->first();
+        $this->assertEquals(115000, $entry->lines->sum('debit'));
+        $this->assertEquals(115000, $entry->lines->sum('credit'));
+    }
+
+    /** @test */
     public function it_rejects_posting_an_already_posted_invoice(): void
     {
         $invoice = $this->invoices->create(
