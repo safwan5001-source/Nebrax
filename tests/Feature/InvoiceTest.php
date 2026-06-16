@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\Invoice;
+use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
@@ -41,6 +43,76 @@ class InvoiceTest extends TestCase
 
         $this->customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
         $this->invoices = app(InvoiceService::class);
+    }
+
+    /** سطر القيد حسب كود الحساب (يتطلب تحميل lines.account). */
+    private function line(JournalEntry $entry, string $code): ?JournalLine
+    {
+        return $entry->lines->first(fn (JournalLine $l) => $l->account->code === $code);
+    }
+
+    /** @test */
+    public function cash_sale_entry_is_balanced_uses_correct_accounts_and_links_to_invoice(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]] // 1150
+        );
+        $posted = $this->invoices->post($invoice);
+
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)
+            ->where('source_id', $posted->id)
+            ->firstOrFail();
+
+        // (د) القيد مربوط بمصدره
+        $this->assertSame($posted->id, $entry->source_id);
+        $this->assertSame(Invoice::class, $entry->source_type);
+
+        // (أ) Σ مدين = Σ دائن
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(115000, $entry->lines->sum('debit'));
+
+        // (ب) الحسابات الصحيحة: نقدي يمدِّن 1110، الإيراد يُدائن 4110، الضريبة تُدائن 2120
+        $this->assertEquals(115000, $this->line($entry, '1110')->debit);
+        $this->assertEquals(100000, $this->line($entry, '4110')->credit);
+        $this->assertEquals(15000,  $this->line($entry, '2120')->credit);
+        $this->assertNull($this->line($entry, '1130')); // لا عملاء في البيع النقدي
+
+        // (ج) الإجماليات مشتقة من السطور
+        $this->assertEquals($posted->lines->sum('line_total'), $entry->lines->sum('debit'));
+        $this->assertSame($posted->total, $posted->subtotal + $posted->tax_amount);
+    }
+
+    /** @test */
+    public function credit_sale_entry_is_balanced_uses_1130_and_links_to_invoice(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 2, 'unit_price' => 100000, 'tax_rate' => 15]] // 2300
+        );
+        $posted = $this->invoices->post($invoice);
+
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)
+            ->where('source_id', $posted->id)
+            ->firstOrFail();
+
+        // (د) الربط بالمصدر
+        $this->assertSame($posted->id, $entry->source_id);
+
+        // (أ) التوازن
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(230000, $entry->lines->sum('debit'));
+
+        // (ب) آجل يمدِّن 1130 (لا 1110)، الإيراد 4110، الضريبة 2120
+        $this->assertEquals(230000, $this->line($entry, '1130')->debit);
+        $this->assertEquals(200000, $this->line($entry, '4110')->credit);
+        $this->assertEquals(30000,  $this->line($entry, '2120')->credit);
+        $this->assertNull($this->line($entry, '1110'));
+
+        // (ج) الإجماليات مشتقة من السطور
+        $this->assertEquals($posted->lines->sum('line_total'), $entry->lines->sum('debit'));
     }
 
     /** @test */

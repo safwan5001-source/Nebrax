@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Models\Partner;
+use App\Models\Payment;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
@@ -43,6 +46,85 @@ class PaymentTest extends TestCase
         $this->customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
         $this->supplier = Partner::create(['name' => 'مورد', 'type' => 'supplier']);
         $this->payments = app(PaymentService::class);
+    }
+
+    private function line(JournalEntry $entry, string $code): ?JournalLine
+    {
+        return $entry->lines->first(fn (JournalLine $l) => $l->account->code === $code);
+    }
+
+    private function entryFor(Payment $payment): JournalEntry
+    {
+        return JournalEntry::with('lines.account')
+            ->where('source_type', Payment::class)
+            ->where('source_id', $payment->id)
+            ->firstOrFail();
+    }
+
+    /** @test */
+    public function received_cash_payment_entry_is_balanced_uses_1110_1130_and_links_to_payment(): void
+    {
+        $payment = $this->payments->create([
+            'partner_id' => $this->customer->id, 'amount' => 115000, 'direction' => 'received', 'method' => 'cash',
+        ]);
+        $posted = $this->payments->post($payment);
+
+        $entry = $this->entryFor($posted);
+
+        // (د) الربط بالمصدر
+        $this->assertSame($posted->id, $entry->source_id);
+        $this->assertSame(Payment::class, $entry->source_type);
+
+        // (أ) التوازن
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(115000, $entry->lines->sum('debit'));
+
+        // (ب) قبض نقدي يمدِّن 1110 ويُدائن 1130 (مربوط بالطرف)
+        $this->assertEquals(115000, $this->line($entry, '1110')->debit);
+        $this->assertEquals(115000, $this->line($entry, '1130')->credit);
+        $this->assertEquals($this->customer->id, $this->line($entry, '1130')->partner_id);
+    }
+
+    /** @test */
+    public function received_bank_payment_entry_uses_1120_and_links_to_payment(): void
+    {
+        $payment = $this->payments->create([
+            'partner_id' => $this->customer->id, 'amount' => 80000, 'method' => 'bank',
+        ]);
+        $posted = $this->payments->post($payment);
+
+        $entry = $this->entryFor($posted);
+
+        $this->assertSame($posted->id, $entry->source_id);
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+
+        // قبض بنكي يمدِّن 1120 (لا 1110)
+        $this->assertEquals(80000, $this->line($entry, '1120')->debit);
+        $this->assertEquals(80000, $this->line($entry, '1130')->credit);
+        $this->assertNull($this->line($entry, '1110'));
+    }
+
+    /** @test */
+    public function paid_payment_entry_is_balanced_uses_2110_and_links_to_payment(): void
+    {
+        $payment = $this->payments->create([
+            'partner_id' => $this->supplier->id, 'amount' => 60000, 'direction' => 'paid', 'method' => 'cash',
+        ]);
+        $posted = $this->payments->post($payment);
+
+        $entry = $this->entryFor($posted);
+
+        // (د) الربط بالمصدر
+        $this->assertSame($posted->id, $entry->source_id);
+
+        // (أ) التوازن
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(60000, $entry->lines->sum('debit'));
+
+        // (ب) صرف يمدِّن 2110 (مربوط بالمورد) ويُدائن 1110
+        $this->assertEquals(60000, $this->line($entry, '2110')->debit);
+        $this->assertEquals($this->supplier->id, $this->line($entry, '2110')->partner_id);
+        $this->assertEquals(60000, $this->line($entry, '1110')->credit);
     }
 
     /** @test */
