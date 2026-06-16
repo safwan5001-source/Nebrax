@@ -334,6 +334,117 @@ class PaymentTest extends TestCase
         $this->collect($draft, 50000);
     }
 
+    /** فاتورة آجلة بإجمالي محدّد (وحدة واحدة بسعر معطى + 15%). */
+    private function postedInvoice(int $unitPrice): \App\Models\Invoice
+    {
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => $unitPrice, 'tax_rate' => 15]]
+        );
+        return app(InvoiceService::class)->post($invoice);
+    }
+
+    /** @test */
+    public function one_payment_allocated_across_two_invoices_settles_both(): void
+    {
+        $inv1 = $this->postedInvoice(100000); // 115000
+        $inv2 = $this->postedInvoice(100000); // 115000
+
+        $payment = $this->payments->create(
+            ['partner_id' => $this->customer->id, 'amount' => 230000],
+            [
+                ['invoice_id' => $inv1->id, 'amount' => 115000],
+                ['invoice_id' => $inv2->id, 'amount' => 115000],
+            ]
+        );
+        $posted = $this->payments->post($payment);
+
+        // قيد واحد متوازن: مدين الصندوق 2300 / دائن الذمم 2300
+        $entry = $posted->journalEntry()->with('lines.account')->first();
+        $this->assertCount(2, $entry->lines);
+        $this->assertEquals(230000, $entry->lines->sum('debit'));
+        $this->assertEquals(230000, $entry->lines->sum('credit'));
+        $this->assertSame($posted->id, $entry->source_id);
+
+        // الفاتورتان مدفوعتان بالكامل
+        $this->assertSame('paid', $inv1->refresh()->payment_status);
+        $this->assertSame('paid', $inv2->refresh()->payment_status);
+        $this->assertEquals(0, Account::where('code', '1130')->first()->balance->balance);
+    }
+
+    /** @test */
+    public function allocation_can_mix_full_and_partial_invoices(): void
+    {
+        $inv1 = $this->postedInvoice(100000); // 115000
+        $inv2 = $this->postedInvoice(100000); // 115000
+
+        $payment = $this->payments->create(
+            ['partner_id' => $this->customer->id, 'amount' => 150000],
+            [
+                ['invoice_id' => $inv1->id, 'amount' => 115000], // كامل
+                ['invoice_id' => $inv2->id, 'amount' => 35000],  // جزئي
+            ]
+        );
+        $this->payments->post($payment);
+
+        $this->assertSame('paid', $inv1->refresh()->payment_status);
+
+        $inv2->refresh();
+        $this->assertSame('partial', $inv2->payment_status);
+        $this->assertSame(35000, $inv2->paid_amount);
+        $this->assertSame(80000, $inv2->remaining());
+    }
+
+    /** @test */
+    public function allocations_must_sum_to_the_payment_amount(): void
+    {
+        $inv1 = $this->postedInvoice(100000);
+        $inv2 = $this->postedInvoice(100000);
+
+        $this->expectExceptionMessage('مجموع التخصيصات');
+        $this->payments->create(
+            ['partner_id' => $this->customer->id, 'amount' => 230000],
+            [
+                ['invoice_id' => $inv1->id, 'amount' => 115000],
+                ['invoice_id' => $inv2->id, 'amount' => 100000], // المجموع 215000 ≠ 230000
+            ]
+        );
+    }
+
+    /** @test */
+    public function an_allocation_cannot_exceed_its_invoice_remaining(): void
+    {
+        $inv1 = $this->postedInvoice(100000); // 115000
+        $inv2 = $this->postedInvoice(100000); // 115000
+
+        // المجموع 230000 = المبلغ، لكن تخصيص inv1 يتجاوز متبقّيه
+        $payment = $this->payments->create(
+            ['partner_id' => $this->customer->id, 'amount' => 230000],
+            [
+                ['invoice_id' => $inv1->id, 'amount' => 150000], // > 115000
+                ['invoice_id' => $inv2->id, 'amount' => 80000],
+            ]
+        );
+
+        $this->expectExceptionMessage('يتجاوز المتبقي');
+        $this->payments->post($payment);
+    }
+
+    /** @test */
+    public function allocated_invoice_must_belong_to_the_payment_partner(): void
+    {
+        $inv = $this->postedInvoice(100000);
+        $other = Partner::create(['name' => 'عميل آخر', 'type' => 'customer']);
+
+        $payment = $this->payments->create(
+            ['partner_id' => $other->id, 'amount' => 115000],
+            [['invoice_id' => $inv->id, 'amount' => 115000]]
+        );
+
+        $this->expectExceptionMessage('لا تخص طرف السند');
+        $this->payments->post($payment);
+    }
+
     /** @test */
     public function it_rejects_posting_an_already_posted_payment(): void
     {
