@@ -230,6 +230,110 @@ class PaymentTest extends TestCase
         $this->assertEquals(0, Account::where('code', '1130')->first()->balance->fresh()->balance);
     }
 
+    /** سند قبض على فاتورة بمبلغ محدّد. */
+    private function collect(\App\Models\Invoice $invoice, int $amount): Payment
+    {
+        return $this->payments->post($this->payments->create([
+            'partner_id' => $this->customer->id,
+            'invoice_id' => $invoice->id,
+            'amount'     => $amount,
+        ]));
+    }
+
+    private function creditInvoice(): \App\Models\Invoice
+    {
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 2, 'unit_price' => 100000, 'tax_rate' => 15]] // 2300
+        );
+        return app(InvoiceService::class)->post($invoice);
+    }
+
+    /** @test */
+    public function partial_payment_marks_invoice_partial_and_reduces_remaining(): void
+    {
+        $invoice = $this->creditInvoice();
+
+        $this->collect($invoice, 100000); // 1000 من 2300
+
+        $invoice->refresh();
+        $this->assertSame(100000, $invoice->paid_amount);
+        $this->assertSame('partial', $invoice->payment_status);
+        $this->assertSame(130000, $invoice->remaining());      // 1300 متبقٍ
+        $this->assertEquals(130000, Account::where('code', '1130')->first()->balance->balance);
+    }
+
+    /** @test */
+    public function full_payment_marks_invoice_paid_and_zeroes_remaining(): void
+    {
+        $invoice = $this->creditInvoice();
+
+        $this->collect($invoice, 230000); // كامل المبلغ
+
+        $invoice->refresh();
+        $this->assertSame(230000, $invoice->paid_amount);
+        $this->assertSame('paid', $invoice->payment_status);
+        $this->assertTrue($invoice->isFullyPaid());
+        $this->assertSame(0, $invoice->remaining());
+        $this->assertEquals(0, Account::where('code', '1130')->first()->balance->fresh()->balance);
+    }
+
+    /** @test */
+    public function two_partials_settle_invoice_from_unpaid_to_partial_to_paid(): void
+    {
+        $invoice = $this->creditInvoice();
+        $this->assertSame('unpaid', $invoice->payment_status);
+
+        $this->collect($invoice, 100000);
+        $this->assertSame('partial', $invoice->refresh()->payment_status);
+
+        $this->collect($invoice, 130000); // يكمل المبلغ
+        $invoice->refresh();
+        $this->assertSame('paid', $invoice->payment_status);
+        $this->assertSame(230000, $invoice->paid_amount);
+        $this->assertSame(0, $invoice->remaining());
+    }
+
+    /** @test */
+    public function overpayment_beyond_remaining_is_rejected(): void
+    {
+        $invoice = $this->creditInvoice();
+        $this->collect($invoice, 200000); // متبقٍ 30000
+
+        $this->expectExceptionMessage('يتجاوز المتبقي');
+        $this->collect($invoice, 50000);  // أكبر من المتبقي
+    }
+
+    /** @test */
+    public function overpayment_leaves_invoice_and_receivables_unchanged(): void
+    {
+        $invoice = $this->creditInvoice();
+
+        try {
+            $this->collect($invoice, 500000); // 5000 على 2300
+        } catch (\RuntimeException $e) {
+            // متوقع
+        }
+
+        $invoice->refresh();
+        $this->assertSame(0, $invoice->paid_amount);
+        $this->assertSame('unpaid', $invoice->payment_status);
+        // لا قيد ولا حركة على الذمم (التحقق قبل توليد القيد داخل المعاملة)
+        $this->assertEquals(230000, Account::where('code', '1130')->first()->balance->balance);
+    }
+
+    /** @test */
+    public function collecting_on_an_unposted_invoice_is_rejected(): void
+    {
+        $draft = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => 100000]]
+        ); // draft (لم يُرحَّل)
+
+        $this->expectExceptionMessage('غير مرحّلة');
+        $this->collect($draft, 50000);
+    }
+
     /** @test */
     public function it_rejects_posting_an_already_posted_payment(): void
     {

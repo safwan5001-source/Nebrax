@@ -3,6 +3,7 @@
 namespace App\Services\Accounting;
 
 use App\Models\Account;
+use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
@@ -71,6 +72,25 @@ class PaymentService
         }
 
         return DB::transaction(function () use ($payment) {
+            // تخصيص قبض على فاتورة مبيعات: تحقق من الترحيل ومن عدم تجاوز المتبقي.
+            $invoice = null;
+            if ($payment->direction === 'received' && $payment->invoice_id) {
+                $invoice = Invoice::lockForUpdate()->find($payment->invoice_id);
+
+                if ($invoice) {
+                    if (! $invoice->isPosted()) {
+                        throw new RuntimeException('لا يمكن التحصيل على فاتورة غير مرحّلة.');
+                    }
+
+                    $remaining = $invoice->total - $invoice->paid_amount;
+                    if ($payment->amount > $remaining) {
+                        throw new RuntimeException(
+                            "المبلغ المحصّل ({$payment->amount}) يتجاوز المتبقي على الفاتورة ({$remaining})."
+                        );
+                    }
+                }
+            }
+
             $cashCode = $payment->method === 'bank' ? self::ACC_BANK : self::ACC_CASH;
 
             if ($payment->direction === 'received') {
@@ -112,8 +132,29 @@ class PaymentService
                 'journal_entry_id' => $entry->id,
             ]);
 
+            // تحديث سداد الفاتورة وحالتها (unpaid → partial → paid)
+            if ($invoice) {
+                $newPaid = $invoice->paid_amount + $payment->amount;
+                $invoice->update([
+                    'paid_amount'    => $newPaid,
+                    'payment_status' => $this->paymentStatus($newPaid, $invoice->total),
+                ]);
+            }
+
             return $payment->fresh();
         });
+    }
+
+    /**
+     * حالة سداد الفاتورة حسب المسدَّد مقابل الإجمالي.
+     */
+    protected function paymentStatus(int $paid, int $total): string
+    {
+        if ($paid <= 0) {
+            return 'unpaid';
+        }
+
+        return $paid >= $total ? 'paid' : 'partial';
     }
 
     /**
