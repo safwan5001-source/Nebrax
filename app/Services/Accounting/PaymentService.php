@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\Purchase;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -40,8 +41,9 @@ class PaymentService
      * إنشاء سند قبض/صرف بحالة draft.
      *
      * @param  array  $data         ['partner_id'=>uuid, 'amount'=>int, 'direction'=>'received|paid',
-     *                               'method'=>'cash|bank', 'invoice_id'=>?, 'payment_date'=>?, 'notes'=>?, 'number'=>?]
-     * @param  array  $allocations  [['invoice_id'=>uuid, 'amount'=>int], ...] — للقبض على عدة فواتير
+     *                               'method'=>'cash|bank', 'invoice_id'=>?, 'purchase_id'=>?, 'payment_date'=>?, 'notes'=>?, 'number'=>?]
+     * @param  array  $allocations  قبض: [['invoice_id'=>uuid,'amount'=>int], ...]
+     *                              صرف: [['purchase_id'=>uuid,'amount'=>int], ...]
      */
     public function create(array $data, array $allocations = []): Payment
     {
@@ -53,35 +55,36 @@ class PaymentService
         $direction = $data['direction'] ?? 'received';
         $date      = $data['payment_date'] ?? now()->toDateString();
 
-        // التخصيص للقبض فقط: صريح، أو ضمنياً من invoice_id.
+        // المستند المستهدَف حسب الاتجاه: قبض→فاتورة مبيعات، صرف→فاتورة مشتريات.
+        [$targetClass, $key] = $direction === 'received'
+            ? [Invoice::class, 'invoice_id']
+            : [Purchase::class, 'purchase_id'];
+
+        // بناء التخصيصات: صريحة، أو ضمنياً من معرّف المستند المفرد.
+        $items = ! empty($allocations)
+            ? $allocations
+            : (! empty($data[$key]) ? [[$key => $data[$key], 'amount' => $amount]] : []);
+
         $allocs = [];
-        if ($direction === 'received') {
-            if (! empty($allocations)) {
-                $allocs = $allocations;
-            } elseif (! empty($data['invoice_id'])) {
-                $allocs = [['invoice_id' => $data['invoice_id'], 'amount' => $amount]];
+        $sum = 0;
+        foreach ($items as $a) {
+            $amt = (int) ($a['amount'] ?? 0);
+            if (empty($a[$key]) || $amt <= 0) {
+                throw new RuntimeException('كل تخصيص يحتاج مستنداً ومبلغاً موجباً.');
             }
+            $allocs[] = ['type' => $targetClass, 'id' => $a[$key], 'amount' => $amt];
+            $sum += $amt;
         }
 
-        if (! empty($allocs)) {
-            $sum = 0;
-            foreach ($allocs as $a) {
-                $amt = (int) ($a['amount'] ?? 0);
-                if (empty($a['invoice_id']) || $amt <= 0) {
-                    throw new RuntimeException('كل تخصيص يحتاج فاتورة ومبلغاً موجباً.');
-                }
-                $sum += $amt;
-            }
-            if ($sum !== $amount) {
-                throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
-            }
+        if (! empty($allocs) && $sum !== $amount) {
+            throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
         return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs) {
             $payment = Payment::create([
                 'number'       => $data['number'] ?? $this->nextNumber($direction, $date),
                 'partner_id'   => $data['partner_id'],
-                'invoice_id'   => count($allocs) === 1 ? $allocs[0]['invoice_id'] : null,
+                'invoice_id'   => $data['invoice_id'] ?? null, // مرجع اختياري للقبض
                 'direction'    => $direction,
                 'method'       => $data['method'] ?? 'cash',
                 'payment_date' => $date,
@@ -93,9 +96,10 @@ class PaymentService
 
             foreach ($allocs as $a) {
                 PaymentAllocation::create([
-                    'payment_id' => $payment->id,
-                    'invoice_id' => $a['invoice_id'],
-                    'amount'     => (int) $a['amount'],
+                    'payment_id'       => $payment->id,
+                    'allocatable_type' => $a['type'],
+                    'allocatable_id'   => $a['id'],
+                    'amount'           => $a['amount'],
                 ]);
             }
 
@@ -116,28 +120,34 @@ class PaymentService
             $allocations = $payment->allocations()->get();
 
             // التحقق من كل تخصيص قبل توليد القيد (لا أثر عند الرفض).
-            $invoices = [];
+            // المستند polymorphic: فاتورة مبيعات (قبض) أو فاتورة مشتريات (صرف).
+            $targets = [];
             foreach ($allocations as $alloc) {
-                $invoice = Invoice::lockForUpdate()->find($alloc->invoice_id);
+                $class  = $alloc->allocatable_type;
+                $target = $class::lockForUpdate()->find($alloc->allocatable_id);
 
-                if (! $invoice) {
-                    throw new RuntimeException('الفاتورة المخصَّصة غير موجودة.');
+                if (! $target) {
+                    throw new RuntimeException('المستند المخصَّص غير موجود.');
                 }
-                if (! $invoice->isPosted()) {
-                    throw new RuntimeException('لا يمكن التحصيل على فاتورة غير مرحّلة.');
+                if (! $target->isPosted()) {
+                    throw new RuntimeException(
+                        $payment->direction === 'received'
+                            ? 'لا يمكن التحصيل على فاتورة غير مرحّلة.'
+                            : 'لا يمكن السداد على فاتورة مشتريات غير مرحّلة.'
+                    );
                 }
-                if ($invoice->partner_id !== $payment->partner_id) {
+                if ($target->partner_id !== $payment->partner_id) {
                     throw new RuntimeException('الفاتورة المخصَّصة لا تخص طرف السند.');
                 }
 
-                $remaining = $invoice->total - $invoice->paid_amount;
+                $remaining = $target->total - $target->paid_amount;
                 if ($alloc->amount > $remaining) {
                     throw new RuntimeException(
                         "مبلغ التخصيص ({$alloc->amount}) يتجاوز المتبقي على الفاتورة ({$remaining})."
                     );
                 }
 
-                $invoices[$alloc->id] = $invoice;
+                $targets[$alloc->id] = $target;
             }
 
             $cashCode = $payment->method === 'bank' ? self::ACC_BANK : self::ACC_CASH;
@@ -181,13 +191,13 @@ class PaymentService
                 'journal_entry_id' => $entry->id,
             ]);
 
-            // تطبيق التخصيصات: تحديث سداد كل فاتورة وحالتها.
+            // تطبيق التخصيصات: تحديث سداد كل مستند وحالته.
             foreach ($allocations as $alloc) {
-                $invoice = $invoices[$alloc->id];
-                $newPaid = $invoice->paid_amount + $alloc->amount;
-                $invoice->update([
+                $target  = $targets[$alloc->id];
+                $newPaid = $target->paid_amount + $alloc->amount;
+                $target->update([
                     'paid_amount'    => $newPaid,
-                    'payment_status' => $this->paymentStatus($newPaid, $invoice->total),
+                    'payment_status' => $this->paymentStatus($newPaid, $target->total),
                 ]);
             }
 

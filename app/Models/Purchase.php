@@ -16,6 +16,7 @@ class Purchase extends BaseModel
         'tenant_id', 'number', 'partner_id', 'payment_type',
         'purchase_date', 'due_date', 'supplier_invoice_no', 'status',
         'subtotal', 'tax_amount', 'total',
+        'paid_amount', 'payment_status',
         'notes', 'journal_entry_id', 'created_by',
     ];
 
@@ -25,14 +26,17 @@ class Purchase extends BaseModel
         'subtotal'      => 'integer',
         'tax_amount'    => 'integer',
         'total'         => 'integer',
+        'paid_amount'   => 'integer',
     ];
 
     protected $attributes = [
-        'payment_type' => 'credit',
-        'status'       => 'draft',
-        'subtotal'     => 0,
-        'tax_amount'   => 0,
-        'total'        => 0,
+        'payment_type'   => 'credit',
+        'status'         => 'draft',
+        'subtotal'       => 0,
+        'tax_amount'     => 0,
+        'total'          => 0,
+        'paid_amount'    => 0,
+        'payment_status' => 'unpaid',
     ];
 
     public function lines(): HasMany
@@ -58,5 +62,21 @@ class Purchase extends BaseModel
     public function isPosted(): bool
     {
         return $this->status === 'posted';
+    }
+
+    /** المتبقي على الفاتورة للمورد (الإجمالي − المسدَّد). */
+    public function remaining(): int
+    {
+        return max(0, $this->total - $this->paid_amount);
+    }
+
+    public function isFullyPaid(): bool
+    {
+        return $this->payment_status === 'paid';
+    }
+
+    public function isPartiallyPaid(): bool
+    {
+        return $this->payment_status === 'partial';
     }
 }
