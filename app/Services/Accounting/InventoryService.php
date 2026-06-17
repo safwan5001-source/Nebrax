@@ -38,34 +38,8 @@ class InventoryService
      */
     public function receiveStock(Product $product, int $quantity, int $unitCost, array $meta = []): StockMovement
     {
-        if ($quantity <= 0 || $unitCost < 0) {
-            throw new RuntimeException('كمية الاستلام يجب أن تكون موجبة والتكلفة غير سالبة.');
-        }
-
         return DB::transaction(function () use ($product, $quantity, $unitCost, $meta) {
-            $date = $meta['date'] ?? now()->toDateString();
-
-            // متوسط متحرك: المتوسط الجديد = (قيمة المخزون القديمة + قيمة الوارد) ÷ الكمية الكلية
-            $oldQty   = $product->quantity_on_hand;
-            $oldValue = $oldQty * $product->avg_cost;
-            $newQty   = $oldQty + $quantity;
-            $newValue = $oldValue + ($quantity * $unitCost);
-            $newAvg   = $newQty > 0 ? intdiv($newValue, $newQty) : 0;
-
-            $movement = StockMovement::create([
-                'product_id'       => $product->id,
-                'type'             => 'in',
-                'quantity'         => $quantity,
-                'unit_cost'        => $unitCost,
-                'total_cost'       => $quantity * $unitCost,
-                'balance_quantity' => $newQty,
-                'source_type'      => $meta['source_type'] ?? null,
-                'source_id'        => $meta['source_id'] ?? null,
-                'movement_date'    => $date,
-                'notes'            => $meta['notes'] ?? 'استلام بضاعة',
-            ]);
-
-            $product->update(['quantity_on_hand' => $newQty, 'avg_cost' => $newAvg]);
+            $movement = $this->applyReceipt($product, $quantity, $unitCost, $meta);
 
             // قيد: مدين المخزون / دائن الحساب المقابل
             $offset = $meta['offset_account'] ?? self::ACC_PAYABLE;
@@ -81,7 +55,7 @@ class InventoryService
                     'partner_id'   => $meta['partner_id'] ?? null,
                 ],
             ], [
-                'entry_date'  => $date,
+                'entry_date'  => $movement->movement_date->toDateString(),
                 'description' => "استلام مخزون: {$product->name}",
                 'source_type' => StockMovement::class,
                 'source_id'   => $movement->id,
@@ -89,6 +63,44 @@ class InventoryService
 
             return $movement;
         });
+    }
+
+    /**
+     * إدخال بضاعة للمخزون (كمية + متوسط متحرك) **دون** توليد قيد محاسبي.
+     * يُستخدم عندما يكون القيد جزءاً من عملية أكبر (مثل فاتورة المشتريات)
+     * حتى لا يتكرّر الترحيل. يجب استدعاؤه ضمن معاملة الطرف المستدعي.
+     */
+    public function applyReceipt(Product $product, int $quantity, int $unitCost, array $meta = []): StockMovement
+    {
+        if ($quantity <= 0 || $unitCost < 0) {
+            throw new RuntimeException('كمية الاستلام يجب أن تكون موجبة والتكلفة غير سالبة.');
+        }
+
+        $date = $meta['date'] ?? now()->toDateString();
+
+        // متوسط متحرك: المتوسط الجديد = (قيمة المخزون القديمة + قيمة الوارد) ÷ الكمية الكلية
+        $oldQty   = $product->quantity_on_hand;
+        $oldValue = $oldQty * $product->avg_cost;
+        $newQty   = $oldQty + $quantity;
+        $newValue = $oldValue + ($quantity * $unitCost);
+        $newAvg   = $newQty > 0 ? intdiv($newValue, $newQty) : 0;
+
+        $movement = StockMovement::create([
+            'product_id'       => $product->id,
+            'type'             => 'in',
+            'quantity'         => $quantity,
+            'unit_cost'        => $unitCost,
+            'total_cost'       => $quantity * $unitCost,
+            'balance_quantity' => $newQty,
+            'source_type'      => $meta['source_type'] ?? null,
+            'source_id'        => $meta['source_id'] ?? null,
+            'movement_date'    => $date,
+            'notes'            => $meta['notes'] ?? 'استلام بضاعة',
+        ]);
+
+        $product->update(['quantity_on_hand' => $newQty, 'avg_cost' => $newAvg]);
+
+        return $movement;
     }
 
     /**
