@@ -104,6 +104,37 @@ class InventoryService
     }
 
     /**
+     * إخراج بضاعة من المخزون (تخفيض الكمية) **دون** توليد قيد محاسبي.
+     * يُستخدم عندما يكون القيد جزءاً من عملية أكبر (مثل مرتجع المشتريات).
+     * المتوسط لا يتغيّر عند الإخراج. يجب استدعاؤه ضمن معاملة الطرف المستدعي.
+     */
+    public function applyIssue(Product $product, int $quantity, int $unitCost, array $meta = []): StockMovement
+    {
+        if ($quantity <= 0 || $unitCost < 0) {
+            throw new RuntimeException('كمية الإخراج يجب أن تكون موجبة والتكلفة غير سالبة.');
+        }
+
+        $newQty = $product->quantity_on_hand - $quantity;
+
+        $movement = StockMovement::create([
+            'product_id'       => $product->id,
+            'type'             => 'out',
+            'quantity'         => $quantity,
+            'unit_cost'        => $unitCost,
+            'total_cost'       => $quantity * $unitCost,
+            'balance_quantity' => $newQty,
+            'source_type'      => $meta['source_type'] ?? null,
+            'source_id'        => $meta['source_id'] ?? null,
+            'movement_date'    => $meta['date'] ?? now()->toDateString(),
+            'notes'            => $meta['notes'] ?? 'إخراج بضاعة',
+        ]);
+
+        $product->update(['quantity_on_hand' => $newQty]);
+
+        return $movement;
+    }
+
+    /**
      * توليد قيد تكلفة البضاعة المباعة لفاتورة، وخفض المخزون للمنتجات المتابَعة.
      * يُستدعى من InvoiceService عند الترحيل. يُعيد قيد التكلفة أو null.
      */
