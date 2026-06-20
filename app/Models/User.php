@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Rbac;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -31,5 +32,11 @@ class User extends Authenticatable
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /** هل يملك المستخدم الصلاحية المطلوبة حسب دوره؟ */
+    public function hasPermission(string $permission): bool
+    {
+        return Rbac::allows($this->role, $permission);
     }
 }

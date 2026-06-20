@@ -38,22 +38,32 @@ jobs:
       - name: إنشاء مشروع Laravel 11
         run: composer create-project "laravel/laravel:^11.0" "$APP_DIR" --prefer-dist --no-progress
 
-      - name: تثبيت Sanctum
+      - name: تثبيت Sanctum + تفعيل مسارات API
         working-directory: ${{ env.APP_DIR }}
-        run: composer require laravel/sanctum --quiet
+        run: |
+          composer require laravel/sanctum --quiet
+          php artisan install:api --no-interaction --quiet || true
+          rm -f database/migrations/*_create_personal_access_tokens_table.php
 
-      - name: دمج ملفات النواة
+      - name: دمج ملفات النواة وطبقة الـ API
         run: |
           CORE="$GITHUB_WORKSPACE"
           cd "$APP_DIR"
-          cp -r "$CORE/app/Models/"*.php                 app/Models/
-          mkdir -p app/Services/Accounting app/Services/Reporting app/Tenancy app/Http/Middleware tests/Feature
+          mkdir -p app/Services/Accounting app/Services/Reporting app/Support \
+                   app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
+                   app/Http/Requests app/Http/Resources tests/Feature routes
+          cp -r "$CORE/app/Models/"*.php                  app/Models/
           cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
           cp -r "$CORE/app/Services/Reporting/"*.php      app/Services/Reporting/
+          cp -r "$CORE/app/Support/"*.php                 app/Support/
           cp -r "$CORE/app/Tenancy/"*.php                 app/Tenancy/
           cp -r "$CORE/app/Http/Middleware/"*.php         app/Http/Middleware/
+          cp -r "$CORE/app/Http/Controllers/Api/"*.php    app/Http/Controllers/Api/
+          cp -r "$CORE/app/Http/Requests/"*.php           app/Http/Requests/
+          cp -r "$CORE/app/Http/Resources/"*.php          app/Http/Resources/
           cp -r "$CORE/app/Providers/"*.php               app/Providers/
           cp -r "$CORE/database/migrations/"*.php         database/migrations/
+          cp -r "$CORE/routes/api.php"                    routes/api.php
           cp -r "$CORE/tests/Feature/"*.php               tests/Feature/
 
       - name: تسجيل TenancyServiceProvider + حذف users migration الافتراضية
