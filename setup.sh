@@ -21,18 +21,30 @@ if [ ! -d "$APP_DIR" ]; then
 fi
 cd "$APP_DIR"
 
-echo "▶ 3/6  تثبيت Sanctum (المصادقة)..."
+echo "▶ 3/6  تثبيت Sanctum + تفعيل مسارات API..."
 composer require laravel/sanctum --quiet
+php artisan install:api --no-interaction --quiet || true
+# لدينا جدول personal_access_tokens ضمن migration النواة — نحذف نسخة Sanctum المنشورة لتجنّب التكرار
+rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
 
-echo "▶ 4/6  دمج ملفات النواة..."
+echo "▶ 4/6  دمج ملفات النواة وطبقة الـ API..."
 # نسخ النماذج والخدمات والـ migrations فوق المشروع
 cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
-mkdir -p app/Services/Accounting app/Tenancy app/Http/Middleware tests/Feature
+mkdir -p app/Services/Accounting app/Services/Reporting app/Support \
+         app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
+         app/Http/Requests app/Http/Resources tests/Feature routes
 cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
+cp -r "$CORE_DIR/app/Services/Reporting/"*.php   app/Services/Reporting/
+cp -r "$CORE_DIR/app/Support/"*.php              app/Support/
 cp -r "$CORE_DIR/app/Tenancy/"*.php              app/Tenancy/
 cp -r "$CORE_DIR/app/Http/Middleware/"*.php      app/Http/Middleware/
+cp -r "$CORE_DIR/app/Http/Controllers/"*.php     app/Http/Controllers/ 2>/dev/null || true
+cp -r "$CORE_DIR/app/Http/Controllers/Api/"*.php app/Http/Controllers/Api/
+cp -r "$CORE_DIR/app/Http/Requests/"*.php        app/Http/Requests/
+cp -r "$CORE_DIR/app/Http/Resources/"*.php       app/Http/Resources/
 cp -r "$CORE_DIR/app/Providers/"*.php            app/Providers/
 cp -r "$CORE_DIR/database/migrations/"*.php      database/migrations/
+cp -r "$CORE_DIR/routes/api.php"                 routes/api.php
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/
 
 # تسجيل TenancyServiceProvider (حاسم للعزل) إن لم يكن مسجلاً
