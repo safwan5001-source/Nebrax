@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('accounts', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('parent_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->uuid('parent_id')->nullable(); // مفتاح ذاتي المرجع — يُضاف بعد إنشاء الجدول
             $table->string('code');                        // رقم الحساب (1010, 4010 ...)
             $table->string('name');                        // الاسم العربي
             $table->string('name_en')->nullable();
@@ -37,6 +37,11 @@ return new class extends Migration
             $table->index(['tenant_id', 'type']);
         });
 
+        // المفتاح الذاتي المرجع يُضاف بعد اكتمال الجدول (بعد إنشاء PK) — لازم لـ PostgreSQL
+        Schema::table('accounts', function (Blueprint $table) {
+            $table->foreign('parent_id')->references('id')->on('accounts')->nullOnDelete();
+        });
+
         // ═══════════════════════════════════════════════════════
         // القيود اليومية (Journal Entries) — رأس القيد
         // immutable بعد الترحيل
@@ -51,7 +56,7 @@ return new class extends Migration
             // المصدر الذي ولّد القيد (polymorphic): فاتورة، دفعة، مشترى...
             $table->string('source_type')->nullable();
             $table->uuid('source_id')->nullable();
-            $table->foreignUuid('reversal_of')->nullable()->constrained('journal_entries')->nullOnDelete();
+            $table->uuid('reversal_of')->nullable(); // مفتاح ذاتي المرجع — يُضاف بعد إنشاء الجدول
             $table->foreignUuid('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('posted_at')->nullable();
             $table->timestamps();
@@ -59,6 +64,11 @@ return new class extends Migration
             $table->unique(['tenant_id', 'number']);
             $table->index(['tenant_id', 'entry_date']);
             $table->index(['source_type', 'source_id']);
+        });
+
+        // المفتاح الذاتي المرجع (قيد عكسي) يُضاف بعد اكتمال الجدول — لازم لـ PostgreSQL
+        Schema::table('journal_entries', function (Blueprint $table) {
+            $table->foreign('reversal_of')->references('id')->on('journal_entries')->nullOnDelete();
         });
 
         // ═══════════════════════════════════════════════════════
