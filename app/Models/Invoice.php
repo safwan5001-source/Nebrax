@@ -19,6 +19,7 @@ class Invoice extends BaseModel
         'paid_amount', 'payment_status',
         'notes', 'journal_entry_id', 'cogs_entry_id', 'created_by',
         'zatca_qr', 'zatca_hash',
+        'zatca_uuid', 'zatca_icv', 'zatca_previous_hash', 'zatca_xml',
     ];
 
     protected $casts = [

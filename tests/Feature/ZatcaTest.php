@@ -119,13 +119,13 @@ class ZatcaTest extends TestCase
     }
 
     /** @test */
-    public function hash_is_present_and_deterministic_for_same_invoice(): void
+    public function stored_hash_is_the_sha256_of_the_stored_xml(): void
     {
         $posted = $this->postInvoice();
 
-        $regen = app(ZatcaService::class)->generateFor($posted);
-        $this->assertSame($posted->zatca_hash, $regen['hash']);
-        // SHA-256 بـ Base64 طوله 44 حرفاً
-        $this->assertSame(44, strlen($posted->zatca_hash));
+        // الهاش المخزَّن = Base64 لـ SHA-256 لمستند UBL المخزَّن
+        $expected = base64_encode(hash('sha256', $posted->zatca_xml, true));
+        $this->assertSame($expected, $posted->zatca_hash);
+        $this->assertSame(44, strlen($posted->zatca_hash)); // SHA-256 Base64
     }
 }

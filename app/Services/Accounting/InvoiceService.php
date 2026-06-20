@@ -156,21 +156,25 @@ class InvoiceService
             // قيد تكلفة البضاعة المباعة للمنتجات المتابَعة مخزونياً (إن وُجدت)
             $cogsEntry = $this->inventory->recordSaleCogs($invoice);
 
-            // توليد بيانات ZATCA من الإجماليات النهائية (المشتقة من السطور)
+            // توليد بيانات ZATCA (المرحلة 1+2) من الإجماليات النهائية المشتقة من السطور
             $invoice->subtotal   = $subtotal;
             $invoice->tax_amount = $taxAmount;
             $invoice->total      = $total;
-            $zatca = $this->zatca->generateFor($invoice);
+            $zatca = $this->zatca->buildFor($invoice);
 
             $invoice->update([
-                'status'           => 'posted',
-                'subtotal'         => $subtotal,
-                'tax_amount'       => $taxAmount,
-                'total'            => $total,
-                'journal_entry_id' => $entry->id,
-                'cogs_entry_id'    => $cogsEntry?->id,
-                'zatca_qr'         => $zatca['qr'],
-                'zatca_hash'       => $zatca['hash'],
+                'status'              => 'posted',
+                'subtotal'            => $subtotal,
+                'tax_amount'          => $taxAmount,
+                'total'               => $total,
+                'journal_entry_id'    => $entry->id,
+                'cogs_entry_id'       => $cogsEntry?->id,
+                'zatca_qr'            => $zatca['qr'],
+                'zatca_hash'          => $zatca['hash'],
+                'zatca_uuid'          => $zatca['uuid'],
+                'zatca_icv'           => $zatca['icv'],
+                'zatca_previous_hash' => $zatca['prev'],
+                'zatca_xml'           => $zatca['xml'],
             ]);
 
             return $invoice->fresh('lines');
