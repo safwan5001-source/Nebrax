@@ -18,6 +18,7 @@ class Invoice extends BaseModel
         'subtotal', 'tax_amount', 'total',
         'paid_amount', 'payment_status',
         'notes', 'journal_entry_id', 'cogs_entry_id', 'created_by',
+        'zatca_qr', 'zatca_hash',
     ];
 
     protected $casts = [

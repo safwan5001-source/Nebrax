@@ -29,7 +29,8 @@ class InvoiceService
 
     public function __construct(
         protected LedgerService $ledger,
-        protected InventoryService $inventory
+        protected InventoryService $inventory,
+        protected ZatcaService $zatca
     ) {}
 
     /**
@@ -155,6 +156,12 @@ class InvoiceService
             // قيد تكلفة البضاعة المباعة للمنتجات المتابَعة مخزونياً (إن وُجدت)
             $cogsEntry = $this->inventory->recordSaleCogs($invoice);
 
+            // توليد بيانات ZATCA من الإجماليات النهائية (المشتقة من السطور)
+            $invoice->subtotal   = $subtotal;
+            $invoice->tax_amount = $taxAmount;
+            $invoice->total      = $total;
+            $zatca = $this->zatca->generateFor($invoice);
+
             $invoice->update([
                 'status'           => 'posted',
                 'subtotal'         => $subtotal,
@@ -162,6 +169,8 @@ class InvoiceService
                 'total'            => $total,
                 'journal_entry_id' => $entry->id,
                 'cogs_entry_id'    => $cogsEntry?->id,
+                'zatca_qr'         => $zatca['qr'],
+                'zatca_hash'       => $zatca['hash'],
             ]);
 
             return $invoice->fresh('lines');
