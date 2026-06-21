@@ -109,6 +109,19 @@
     "cancel": "Cancel",
     "save": "Save & post"
   },
+  "partnerStatement": {
+    "back": "Back",
+    "title": "Account statement",
+    "opening": "Opening balance",
+    "closing": "Balance",
+    "date": "Date",
+    "number": "Entry",
+    "description": "Description",
+    "debit": "Debit",
+    "credit": "Credit",
+    "balance": "Balance",
+    "empty": "No movements"
+  },
   "reports": {
     "title": "Reports",
     "trial_balance": "Trial balance",
