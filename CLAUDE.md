@@ -5,8 +5,20 @@
 
 ## الحالة الحالية
 
-النواة المالية مكتملة ومختبَرة: محرك القيد المزدوج + عزل multi-tenant + دليل حسابات سعودي.
-الوحدات القادمة بالترتيب: الأطراف+المنتجات → الفوترة → المخزون → التقارير → ZATCA → POS/HR.
+**الـ backend مكتمل لـ v1 ومختبَر** (128 اختباراً على SQLite و PostgreSQL في CI):
+- النواة: محرك القيد المزدوج + عزل multi-tenant + دليل حسابات سعودي.
+- المستندات: الأطراف/المنتجات، الفوترة، المشتريات، المرتجعات (مبيعات/مشتريات).
+- النقد: المدفوعات (قبض/صرف) + التسوية + التخصيص polymorphic (متعدد الفواتير/المشتريات).
+- المخزون الدائم (متوسط متحرك) + قيد تكلفة البضاعة المباعة التلقائي.
+- التقارير: ميزان المراجعة، قائمة الدخل، الميزانية، كشف الأستاذ، كشف حساب الطرف، أعمار الديون.
+- ZATCA: المرحلة 1 (QR/TLV) + المرحلة 2 جزئياً (UUID + ICV + سلسلة هاش PIH + UBL).
+- REST API كامل (Sanctum + RBAC بالأدوار + عزل tenant) + طبقة الاشتراكات وحدود الخطط وتحصين المصادقة.
+
+**الواجهة (web/) قيد البناء** — Next.js 15، RTL، متصلة بالـ API: دخول، لوحة تحكم،
+الفواتير (قائمة/إنشاء/تفاصيل + ZATCA QR)، العملاء/الموردون (CRUD + كشف حساب)، المدفوعات، التقارير.
+
+**المؤجَّل بصراحة:** ZATCA م2 الكاملة (توقيع/CSID/إرسال — يحتاج شهادات وبيئة آمنة)،
+شاشتا المشتريات/المرتجعات في الواجهة، اختبارات آلية للواجهة، POS/HR.
 
 ## الـ Stack
 
@@ -28,14 +40,27 @@
 ## بنية الملفات الأساسية
 
 ```
-app/Models/            BaseModel, Tenant, User, Account, JournalEntry, JournalLine, AccountBalance
+app/Models/            BaseModel, Tenant, User, Account, JournalEntry, JournalLine, AccountBalance,
+                       Partner, Product, Invoice/InvoiceLine, Payment/PaymentAllocation,
+                       Purchase/PurchaseLine, ReturnDocument/ReturnLine, StockMovement
 app/Tenancy/           TenantContext, TenantScope, BelongsToTenant
-app/Services/Accounting/  LedgerService (المحرك), ChartOfAccountsSeeder
-app/Http/Middleware/   SetTenant
+app/Services/Accounting/  LedgerService (المحرك), ChartOfAccountsSeeder, InvoiceService,
+                          PaymentService, PurchaseService, ReturnService, InventoryService, ZatcaService
+app/Services/Reporting/   ReportService (ميزان/دخل/ميزانية/أستاذ/كشف طرف/أعمار)
+app/Support/           Money, Rbac, Plans, PlanGate
+app/Http/Middleware/   SetTenant, EnsurePermission, EnsureActiveSubscription, EnforcePlanLimit, ForceJsonResponse
+app/Http/Controllers/Api/  Auth, Partner, Product, Account, Invoice, Payment, Purchase, Return, Report
+app/Http/Requests/ · app/Http/Resources/   (تحقق المدخلات + تنسيق المخرجات)
 app/Providers/         TenancyServiceProvider
-database/migrations/   tenants_and_users, accounting_core
-tests/Feature/         LedgerTest
+routes/api.php         كل مسارات الـ REST API
+database/migrations/   000001..000013 (النواة + المستندات + المخزون + الاشتراكات + ZATCA)
+tests/Feature/         LedgerTest + اختبارات كل وحدة + اختبارات API (مصادقة/RBAC/عزل)
+web/                   واجهة Next.js 15 (انظر DESIGN_SYSTEM.md)
+.github/workflows/     ci.yml (php على sqlite+pgsql) · web-ci.yml (بناء Next.js)
 ```
+
+> **ملف `DESIGN_SYSTEM.md`** في الجذر = المرجع الإلزامي لتصميم الواجهة (مع هذا الملف).
+> **بيئة الاختبار:** المستودع نواة فقط؛ يُبنى مشروع Laravel كامل عبر `setup.sh`/CI لتشغيل الاختبارات.
 
 ## المحرك — العقد (Contract)
 
@@ -88,6 +113,14 @@ php artisan serve
    - ثم اكتب في الرسالة **القيد المحاسبي الناتج لكل عملية مالية جديدة** في الوحدة (الحسابات، المدين، الدائن) بصيغة **جدول واضح** للمراجعة قبل الموافقة على الدمج.
    - **لا تطلب فتح PR قبل عرض القيود الناتجة.**
 
+## الواجهة (web/) — قواعد موجزة
+
+- المرجع الإلزامي: **`DESIGN_SYSTEM.md`** (أداة محاسبية نظيفة كثيفة، الجداول هي البطل، لون هوية واحد، خطّان).
+- الستاك: Next.js 15 (App Router) + TS + Tailwind + مكوّنات بأسلوب shadcn، RTL أولاً، next-intl، next-themes.
+- تتصل بالـ REST API عبر `web/src/lib/api.ts` (Bearer token). الأرقام تُعرض من الهللات → ريال في طبقة العرض فقط.
+- التحقق: `npm run build` يجب أن ينجح؛ Web CI يفرضه على كل تغيير في `web/`.
+
 ## الخطوة التالية
 
-وحدة الفوترة: `Partner` (عميل/مورد) + `Product` + `Invoice` تولّد قيداً تلقائياً عبر `LedgerService`.
+استكمال تغطية الواجهة: شاشتا **المشتريات** و**المرتجعات** (الـ backend جاهز). ثم: اختبارات الواجهة،
+الإعدادات/الاشتراك، تصدير Excel/PDF، وZATCA المرحلة 2 الكاملة (عند توفّر الشهادات).
