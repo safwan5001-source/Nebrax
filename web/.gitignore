@@ -5,3 +5,6 @@
 next-env.d.ts
 .env.local
 *.tsbuildinfo
+
+# إعادة تضمين lockfile الواجهة (الجذر يستثنيه عالمياً) — لازم لـ npm ci في CI
+!package-lock.json
