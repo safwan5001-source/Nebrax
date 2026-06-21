@@ -57,6 +57,25 @@
     "cancel": "إلغاء",
     "create": "إنشاء"
   },
+  "invoiceDetail": {
+    "back": "رجوع",
+    "details": "تفاصيل الفاتورة",
+    "partner": "العميل",
+    "date": "التاريخ",
+    "payment_type": "نوع الدفع",
+    "cash": "نقدي",
+    "credit": "آجل",
+    "paid": "المسدّد",
+    "remaining": "المتبقي",
+    "zatca": "الفاتورة الإلكترونية (ZATCA)",
+    "zatca_pending": "يظهر رمز QR بعد ترحيل الفاتورة",
+    "lines": "السطور",
+    "description": "الوصف",
+    "qty": "الكمية",
+    "unit_price": "سعر الوحدة",
+    "tax": "الضريبة",
+    "not_found": "الفاتورة غير موجودة"
+  },
   "partners": {
     "title": "العملاء والموردون",
     "add": "إضافة طرف",
