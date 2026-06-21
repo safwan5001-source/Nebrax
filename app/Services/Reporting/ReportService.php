@@ -3,7 +3,11 @@
 namespace App\Services\Reporting;
 
 use App\Models\Account;
+use App\Models\Invoice;
 use App\Models\JournalLine;
+use App\Models\Partner;
+use App\Models\Purchase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -187,5 +191,183 @@ class ReportService
         usort($rows, fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']));
 
         return $rows;
+    }
+
+    /**
+     * كشف حساب (دفتر الأستاذ) لحساب معيّن: الحركات برصيد جارٍ حسب طبيعة الحساب.
+     *
+     * @param  array  $filters  ['from'=>'Y-m-d'?, 'to'=>'Y-m-d'?]
+     */
+    public function accountLedger(string $accountId, array $filters = []): array
+    {
+        $account = Account::findOrFail($accountId);
+        $from = $filters['from'] ?? null;
+        $to   = $filters['to'] ?? null;
+
+        $lines = $this->postedLines(fn ($q) => $q->where('journal_lines.account_id', $accountId));
+
+        $signed = fn (int $d, int $c) => $account->normal_balance === 'debit' ? $d - $c : $c - $d;
+
+        $opening = 0;
+        $rows = [];
+        foreach ($lines as $line) {
+            $date = $line->entry->entry_date->toDateString();
+            if ($from && $date < $from) {
+                $opening += $signed((int) $line->debit, (int) $line->credit);
+                continue;
+            }
+            if ($to && $date > $to) {
+                continue;
+            }
+            $rows[] = $line;
+        }
+
+        $running = $opening;
+        $mapped = [];
+        foreach ($rows as $line) {
+            $running += $signed((int) $line->debit, (int) $line->credit);
+            $mapped[] = [
+                'date'        => $line->entry->entry_date->toDateString(),
+                'number'      => $line->entry->number,
+                'description' => $line->entry->description,
+                'debit'       => (int) $line->debit,
+                'credit'      => (int) $line->credit,
+                'balance'     => $running,
+            ];
+        }
+
+        return [
+            'account'         => ['id' => $account->id, 'code' => $account->code, 'name' => $account->name, 'type' => $account->type],
+            'opening_balance' => $opening,
+            'rows'            => $mapped,
+            'closing_balance' => $running,
+        ];
+    }
+
+    /**
+     * كشف حساب طرف (عميل/مورد): حركاته برصيد جارٍ (موجب = الطرف مدين لنا).
+     *
+     * @param  array  $filters  ['from'=>'Y-m-d'?, 'to'=>'Y-m-d'?]
+     */
+    public function partnerStatement(string $partnerId, array $filters = []): array
+    {
+        $partner = Partner::findOrFail($partnerId);
+        $from = $filters['from'] ?? null;
+        $to   = $filters['to'] ?? null;
+
+        $lines = $this->postedLines(fn ($q) => $q
+            ->where('journal_lines.partner_type', Partner::class)
+            ->where('journal_lines.partner_id', $partnerId));
+
+        $opening = 0;
+        $rows = [];
+        foreach ($lines as $line) {
+            $date = $line->entry->entry_date->toDateString();
+            if ($from && $date < $from) {
+                $opening += (int) $line->debit - (int) $line->credit;
+                continue;
+            }
+            if ($to && $date > $to) {
+                continue;
+            }
+            $rows[] = $line;
+        }
+
+        $running = $opening;
+        $mapped = [];
+        foreach ($rows as $line) {
+            $running += (int) $line->debit - (int) $line->credit;
+            $mapped[] = [
+                'date'        => $line->entry->entry_date->toDateString(),
+                'number'      => $line->entry->number,
+                'description' => $line->entry->description,
+                'debit'       => (int) $line->debit,
+                'credit'      => (int) $line->credit,
+                'balance'     => $running,
+            ];
+        }
+
+        return [
+            'partner'         => ['id' => $partner->id, 'name' => $partner->name, 'type' => $partner->type],
+            'opening_balance' => $opening,
+            'rows'            => $mapped,
+            'closing_balance' => $running,
+        ];
+    }
+
+    /**
+     * أعمار الديون: المتبقي على المستندات غير المسدّدة موزّعاً على فترات عمرية لكل طرف.
+     *
+     * @param  string  $type  'receivable' (من الفواتير) | 'payable' (من المشتريات)
+     * @param  array   $filters  ['as_of'=>'Y-m-d'?]
+     */
+    public function aging(string $type, array $filters = []): array
+    {
+        $asOf = Carbon::parse($filters['as_of'] ?? now()->toDateString());
+
+        $documents = $type === 'payable'
+            ? Purchase::where('status', 'posted')->where('payment_status', '!=', 'paid')->get()
+            : Invoice::where('status', 'posted')->where('payment_status', '!=', 'paid')->get();
+
+        $dateField = $type === 'payable' ? 'purchase_date' : 'invoice_date';
+
+        $partners = Partner::whereIn('id', $documents->pluck('partner_id')->unique())->get()->keyBy('id');
+
+        $byPartner = [];
+        $totals = ['b0_30' => 0, 'b31_60' => 0, 'b61_90' => 0, 'b90_plus' => 0, 'total' => 0];
+
+        foreach ($documents as $doc) {
+            $remaining = $doc->total - $doc->paid_amount;
+            if ($remaining <= 0) {
+                continue;
+            }
+
+            $ref = $doc->due_date ?? $doc->{$dateField};
+            $days = Carbon::parse($ref)->diffInDays($asOf, false); // موجب = متأخّر
+
+            $bucket = match (true) {
+                $days <= 30 => 'b0_30',
+                $days <= 60 => 'b31_60',
+                $days <= 90 => 'b61_90',
+                default     => 'b90_plus',
+            };
+
+            $pid = $doc->partner_id;
+            $byPartner[$pid] ??= [
+                'partner_id' => $pid,
+                'name'       => $partners->get($pid)?->name,
+                'b0_30' => 0, 'b31_60' => 0, 'b61_90' => 0, 'b90_plus' => 0, 'total' => 0,
+            ];
+
+            $byPartner[$pid][$bucket] += $remaining;
+            $byPartner[$pid]['total'] += $remaining;
+            $totals[$bucket] += $remaining;
+            $totals['total'] += $remaining;
+        }
+
+        $rows = array_values($byPartner);
+        usort($rows, fn ($a, $b) => strcmp((string) $a['name'], (string) $b['name']));
+
+        return ['type' => $type, 'as_of' => $asOf->toDateString(), 'rows' => $rows, 'totals' => $totals];
+    }
+
+    /**
+     * سطور القيد المرحّلة (مرتّبة بتاريخ القيد) مع تطبيق شرط إضافي — مُعزَلة بالمستأجر.
+     *
+     * @return Collection<int, JournalLine>
+     */
+    protected function postedLines(callable $where): Collection
+    {
+        $query = JournalLine::query()
+            ->select('journal_lines.*')
+            ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
+            ->where('e.status', 'posted')
+            ->orderBy('e.entry_date')
+            ->orderBy('e.created_at')
+            ->with('entry');
+
+        $where($query);
+
+        return $query->get();
     }
 }
