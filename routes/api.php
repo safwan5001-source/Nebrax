@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
+use App\Http\Middleware\EnforcePlanLimit;
+use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\SetTenant;
@@ -19,14 +21,18 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
     // عام (بلا مصادقة)
     Route::post('register', [AuthController::class, 'register']);
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
     // محمي: مصادقة Sanctum + ضبط المستأجر (العزل التلقائي)
     Route::middleware(['auth:sanctum', SetTenant::class])->group(function () {
+        // متاح دائماً (حتى مع اشتراك منتهٍ) لرؤية الحالة والخروج
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
 
         $perm = fn (string $p) => EnsurePermission::class . ':' . $p;
+
+        // الموارد تتطلب اشتراكاً نشطاً
+        Route::middleware(EnsureActiveSubscription::class)->group(function () use ($perm) {
 
         // الأطراف
         Route::get('partners', [PartnerController::class, 'index'])->middleware($perm('partners.view'));
@@ -50,7 +56,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('invoices', [InvoiceController::class, 'index'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}', [InvoiceController::class, 'show'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}/zatca', [InvoiceController::class, 'zatca'])->middleware($perm('zatca.view'));
-        Route::post('invoices', [InvoiceController::class, 'store'])->middleware($perm('invoices.manage'));
+        Route::post('invoices', [InvoiceController::class, 'store'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
         Route::post('invoices/{id}/post', [InvoiceController::class, 'post'])->middleware($perm('invoices.manage'));
 
         // المدفوعات
@@ -78,5 +84,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('reports/account-ledger/{accountId}', [ReportController::class, 'accountLedger'])->middleware($perm('reports.view'));
         Route::get('reports/partner-statement/{partnerId}', [ReportController::class, 'partnerStatement'])->middleware($perm('reports.view'));
         Route::get('reports/aging/{type}', [ReportController::class, 'aging'])->middleware($perm('reports.view'));
+
+        }); // نهاية مجموعة الاشتراك النشط
     });
 });
