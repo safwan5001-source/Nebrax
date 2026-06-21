@@ -1,0 +1,46 @@
+{
+  "app": { "name": "Nibras" },
+  "nav": {
+    "dashboard": "Dashboard",
+    "invoices": "Invoices",
+    "partners": "Partners",
+    "payments": "Payments",
+    "reports": "Reports",
+    "soon": "Soon"
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Access your organization account",
+    "slug": "Organization ID",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "error": "Sign-in failed"
+  },
+  "topbar": { "greeting": "Welcome", "search": "Search…", "logout": "Sign out" },
+  "dashboard": {
+    "title": "Dashboard",
+    "revenue": "Total sales",
+    "net_income": "Net income",
+    "receivables": "Receivables",
+    "cash": "Cash & bank",
+    "revenue_vs_expense": "Revenue vs expenses",
+    "recent_invoices": "Recent invoices",
+    "expense": "Expenses"
+  },
+  "invoices": {
+    "title": "Invoices",
+    "number": "Number",
+    "partner": "Customer",
+    "date": "Date",
+    "total": "Total",
+    "status": "Status",
+    "payment_status": "Payment",
+    "search": "Search invoices…"
+  },
+  "status": {
+    "draft": "Draft", "posted": "Posted", "cancelled": "Cancelled",
+    "unpaid": "Unpaid", "partial": "Partial", "paid": "Paid"
+  },
+  "common": { "loading": "Loading…", "empty": "No data", "error": "An error occurred", "retry": "Retry" }
+}
