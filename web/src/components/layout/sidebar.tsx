@@ -17,7 +17,7 @@ const ITEMS: NavItem[] = [
   { href: '/dashboard', icon: LayoutDashboard, key: 'dashboard', enabled: true },
   { href: '/invoices', icon: FileText, key: 'invoices', enabled: true },
   { href: '/partners', icon: Users, key: 'partners', enabled: true },
-  { href: '/payments', icon: Wallet, key: 'payments', enabled: false },
+  { href: '/payments', icon: Wallet, key: 'payments', enabled: true },
   { href: '/reports', icon: BarChart3, key: 'reports', enabled: false },
 ];
 
