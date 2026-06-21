@@ -109,6 +109,26 @@
     "cancel": "Cancel",
     "save": "Save & post"
   },
+  "reports": {
+    "title": "Reports",
+    "trial_balance": "Trial balance",
+    "aging": "Aging",
+    "balanced": "Balanced",
+    "unbalanced": "Unbalanced",
+    "code": "Code",
+    "account": "Account",
+    "debit": "Debit",
+    "credit": "Credit",
+    "total": "Total",
+    "receivable": "Receivable",
+    "payable": "Payable",
+    "partner": "Partner",
+    "b0_30": "0-30 d",
+    "b31_60": "31-60",
+    "b61_90": "61-90",
+    "b90_plus": "90+",
+    "empty": "No balances"
+  },
   "partners": {
     "title": "Partners",
     "add": "Add partner",
