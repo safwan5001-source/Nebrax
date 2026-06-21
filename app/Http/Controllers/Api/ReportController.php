@@ -59,6 +59,74 @@ class ReportController extends ApiController
         ]);
     }
 
+    public function accountLedger(Request $request, string $accountId): JsonResponse
+    {
+        $ledger = $this->reports->accountLedger($accountId, $this->filters($request));
+
+        return response()->json([
+            'account'         => $ledger['account'],
+            'opening_balance' => Money::toRiyal($ledger['opening_balance']),
+            'rows'            => array_map(fn ($r) => [
+                'date'        => $r['date'],
+                'number'      => $r['number'],
+                'description' => $r['description'],
+                'debit'       => Money::toRiyal($r['debit']),
+                'credit'      => Money::toRiyal($r['credit']),
+                'balance'     => Money::toRiyal($r['balance']),
+            ], $ledger['rows']),
+            'closing_balance' => Money::toRiyal($ledger['closing_balance']),
+        ]);
+    }
+
+    public function partnerStatement(Request $request, string $partnerId): JsonResponse
+    {
+        $st = $this->reports->partnerStatement($partnerId, $this->filters($request));
+
+        return response()->json([
+            'partner'         => $st['partner'],
+            'opening_balance' => Money::toRiyal($st['opening_balance']),
+            'rows'            => array_map(fn ($r) => [
+                'date'        => $r['date'],
+                'number'      => $r['number'],
+                'description' => $r['description'],
+                'debit'       => Money::toRiyal($r['debit']),
+                'credit'      => Money::toRiyal($r['credit']),
+                'balance'     => Money::toRiyal($r['balance']),
+            ], $st['rows']),
+            'closing_balance' => Money::toRiyal($st['closing_balance']),
+        ]);
+    }
+
+    public function aging(Request $request, string $type): JsonResponse
+    {
+        abort_unless(in_array($type, ['receivable', 'payable'], true), 404);
+
+        $aging = $this->reports->aging($type, array_filter(['as_of' => $request->query('as_of')]));
+
+        $bucketize = fn (array $r) => [
+            'partner_id' => $r['partner_id'],
+            'name'       => $r['name'],
+            'b0_30'      => Money::toRiyal($r['b0_30']),
+            'b31_60'     => Money::toRiyal($r['b31_60']),
+            'b61_90'     => Money::toRiyal($r['b61_90']),
+            'b90_plus'   => Money::toRiyal($r['b90_plus']),
+            'total'      => Money::toRiyal($r['total']),
+        ];
+
+        return response()->json([
+            'type'   => $aging['type'],
+            'as_of'  => $aging['as_of'],
+            'rows'   => array_map($bucketize, $aging['rows']),
+            'totals' => [
+                'b0_30'    => Money::toRiyal($aging['totals']['b0_30']),
+                'b31_60'   => Money::toRiyal($aging['totals']['b31_60']),
+                'b61_90'   => Money::toRiyal($aging['totals']['b61_90']),
+                'b90_plus' => Money::toRiyal($aging['totals']['b90_plus']),
+                'total'    => Money::toRiyal($aging['totals']['total']),
+            ],
+        ]);
+    }
+
     private function filters(Request $request): array
     {
         return array_filter([
