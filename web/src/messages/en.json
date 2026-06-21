@@ -57,6 +57,25 @@
     "cancel": "Cancel",
     "create": "Create"
   },
+  "invoiceDetail": {
+    "back": "Back",
+    "details": "Invoice details",
+    "partner": "Customer",
+    "date": "Date",
+    "payment_type": "Payment type",
+    "cash": "Cash",
+    "credit": "Credit",
+    "paid": "Paid",
+    "remaining": "Remaining",
+    "zatca": "E-invoice (ZATCA)",
+    "zatca_pending": "QR appears after the invoice is posted",
+    "lines": "Lines",
+    "description": "Description",
+    "qty": "Qty",
+    "unit_price": "Unit price",
+    "tax": "Tax",
+    "not_found": "Invoice not found"
+  },
   "partners": {
     "title": "Partners",
     "add": "Add partner",

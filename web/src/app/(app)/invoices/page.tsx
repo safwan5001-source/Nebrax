@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
@@ -58,7 +59,11 @@ export default function InvoicesPage() {
       {
         accessorKey: 'number',
         header: t('number'),
-        cell: ({ row }) => <span className="num">{row.original.number}</span>,
+        cell: ({ row }) => (
+          <Link href={`/invoices/${row.original.id}`} className="num text-primary hover:underline">
+            {row.original.number}
+          </Link>
+        ),
       },
       {
         id: 'partner',
