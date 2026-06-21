@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Plus, Pencil } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
@@ -34,7 +35,15 @@ export default function PartnersPage() {
 
   const columns = useMemo<ColumnDef<Partner, unknown>[]>(
     () => [
-      { accessorKey: 'name', header: tp('name') },
+      {
+        accessorKey: 'name',
+        header: tp('name'),
+        cell: ({ row }) => (
+          <Link href={`/partners/${row.original.id}`} className="text-primary hover:underline">
+            {row.original.name}
+          </Link>
+        ),
+      },
       {
         accessorKey: 'type',
         header: tp('type'),

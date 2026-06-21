@@ -109,6 +109,19 @@
     "cancel": "إلغاء",
     "save": "حفظ وترحيل"
   },
+  "partnerStatement": {
+    "back": "رجوع",
+    "title": "كشف الحساب",
+    "opening": "رصيد افتتاحي",
+    "closing": "الرصيد",
+    "date": "التاريخ",
+    "number": "القيد",
+    "description": "البيان",
+    "debit": "مدين",
+    "credit": "دائن",
+    "balance": "الرصيد",
+    "empty": "لا توجد حركات"
+  },
   "reports": {
     "title": "التقارير",
     "trial_balance": "ميزان المراجعة",
