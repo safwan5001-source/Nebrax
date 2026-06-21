@@ -7,6 +7,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Accounting\ChartOfAccountsSeeder;
+use App\Support\PlanGate;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,12 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends ApiController
 {
+    /** مدة صلاحية التوكن (أيام). */
+    private const TOKEN_TTL_DAYS = 7;
+
+    /** مدة التجربة المجانية عند التسجيل (أيام). */
+    private const TRIAL_DAYS = 14;
+
     /**
      * تسجيل شركة جديدة + مالكها، وتهيئة دليل الحسابات، وإصدار توكن.
      */
@@ -22,9 +29,11 @@ class AuthController extends ApiController
         $data = $request->validated();
 
         $tenant = Tenant::create([
-            'name'       => $data['company_name'],
-            'slug'       => $data['slug'],
-            'vat_number' => $data['vat_number'] ?? null,
+            'name'          => $data['company_name'],
+            'slug'          => $data['slug'],
+            'vat_number'    => $data['vat_number'] ?? null,
+            'plan'          => 'free',
+            'trial_ends_at' => now()->addDays(self::TRIAL_DAYS),
         ]);
 
         app(TenantContext::class)->set($tenant->id);
@@ -39,7 +48,7 @@ class AuthController extends ApiController
         ]);
 
         return response()->json([
-            'token'  => $user->createToken('api')->plainTextToken,
+            'token'  => $this->issueToken($user),
             'user'   => $this->userPayload($user),
             'tenant' => ['id' => $tenant->id, 'name' => $tenant->name, 'slug' => $tenant->slug],
         ], 201);
@@ -60,9 +69,15 @@ class AuthController extends ApiController
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             abort(422, 'بيانات الدخول غير صحيحة.');
         }
+        if (! $user->is_active) {
+            abort(403, 'الحساب غير مفعّل.');
+        }
+        if (! PlanGate::subscriptionActive($tenant)) {
+            abort(403, 'اشتراك المؤسسة غير نشط أو منتهٍ.');
+        }
 
         return response()->json([
-            'token' => $user->createToken('api')->plainTextToken,
+            'token' => $this->issueToken($user),
             'user'  => $this->userPayload($user),
         ]);
     }
@@ -77,6 +92,11 @@ class AuthController extends ApiController
     public function me(Request $request): JsonResponse
     {
         return response()->json(['user' => $this->userPayload($request->user())]);
+    }
+
+    private function issueToken(User $user): string
+    {
+        return $user->createToken('api', ['*'], now()->addDays(self::TOKEN_TTL_DAYS))->plainTextToken;
     }
 
     private function userPayload(User $user): array
