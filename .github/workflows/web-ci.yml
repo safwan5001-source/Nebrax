@@ -1,0 +1,36 @@
+name: Web CI
+
+# يبني الواجهة ويفحص الأنواع عند كل تغيير في web/.
+on:
+  push:
+    branches: ['**']
+    paths: ['web/**', '.github/workflows/web-ci.yml']
+  pull_request:
+    branches: ['**']
+    paths: ['web/**', '.github/workflows/web-ci.yml']
+
+jobs:
+  build:
+    name: web build (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: تثبيت الاعتماديات (npm ci)
+        run: npm ci
+
+      - name: بناء الواجهة (يتضمن فحص أنواع TypeScript)
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
