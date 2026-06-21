@@ -18,7 +18,7 @@ const ITEMS: NavItem[] = [
   { href: '/invoices', icon: FileText, key: 'invoices', enabled: true },
   { href: '/partners', icon: Users, key: 'partners', enabled: true },
   { href: '/payments', icon: Wallet, key: 'payments', enabled: true },
-  { href: '/reports', icon: BarChart3, key: 'reports', enabled: false },
+  { href: '/reports', icon: BarChart3, key: 'reports', enabled: true },
 ];
 
 export function Sidebar() {
