@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
+import { Plus } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { CreateInvoiceDialog } from '@/components/invoices/create-invoice-dialog';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 
@@ -36,8 +39,10 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [partners, setPartners] = useState<Record<string, string>>({});
+  const [createOpen, setCreateOpen] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     Promise.all([api<{ data: Invoice[] }>('/invoices'), api<{ data: Partner[] }>('/partners')])
       .then(([inv, prt]) => {
         setInvoices(inv.data);
@@ -45,6 +50,8 @@ export default function InvoicesPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => load(), [load]);
 
   const columns = useMemo<ColumnDef<Invoice, unknown>[]>(
     () => [
@@ -87,7 +94,14 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus className="h-4 w-4" strokeWidth={1.8} />
+          {t('create')}
+        </Button>
+      </div>
+
       <DataTable
         columns={columns}
         data={invoices}
@@ -95,6 +109,8 @@ export default function InvoicesPage() {
         searchPlaceholder={t('search')}
         emptyLabel="لا توجد فواتير"
       />
+
+      <CreateInvoiceDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={load} />
     </div>
   );
 }
