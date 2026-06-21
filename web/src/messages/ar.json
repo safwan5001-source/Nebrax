@@ -1,0 +1,46 @@
+{
+  "app": { "name": "نبراس" },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "invoices": "الفواتير",
+    "partners": "العملاء والموردون",
+    "payments": "المدفوعات",
+    "reports": "التقارير",
+    "soon": "قريباً"
+  },
+  "login": {
+    "title": "تسجيل الدخول",
+    "subtitle": "ادخل إلى حساب مؤسستك",
+    "slug": "معرّف المؤسسة",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "submit": "دخول",
+    "error": "تعذّر تسجيل الدخول"
+  },
+  "topbar": { "greeting": "مرحباً", "search": "بحث…", "logout": "تسجيل الخروج" },
+  "dashboard": {
+    "title": "لوحة التحكم",
+    "revenue": "إجمالي المبيعات",
+    "net_income": "صافي الدخل",
+    "receivables": "ذمم العملاء",
+    "cash": "النقد والبنك",
+    "revenue_vs_expense": "الإيرادات مقابل المصروفات",
+    "recent_invoices": "أحدث الفواتير",
+    "expense": "المصروفات"
+  },
+  "invoices": {
+    "title": "الفواتير",
+    "number": "الرقم",
+    "partner": "العميل",
+    "date": "التاريخ",
+    "total": "الإجمالي",
+    "status": "الحالة",
+    "payment_status": "السداد",
+    "search": "بحث في الفواتير…"
+  },
+  "status": {
+    "draft": "مسودة", "posted": "مرحّلة", "cancelled": "ملغاة",
+    "unpaid": "غير مدفوعة", "partial": "جزئية", "paid": "مدفوعة"
+  },
+  "common": { "loading": "جارٍ التحميل…", "empty": "لا توجد بيانات", "error": "حدث خطأ", "retry": "إعادة المحاولة" }
+}

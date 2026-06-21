@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --text: #15181d;
+  --muted: #6b7280;
+  --border: #eceef1;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-soft: #eef3ff;
+  --positive: #16a34a;
+  --negative: #dc2626;
+  --warning: #d97706;
+  --font-sans: 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+.dark {
+  --background: #0e1014;
+  --surface: #181b20;
+  --text: #f3f4f6;
+  --muted: #9099a5;
+  --border: #262a31;
+  --primary: #4f8cff;
+  --primary-hover: #6ba0ff;
+  --primary-soft: #1b2740;
+  --positive: #16a34a;
+  --negative: #dc2626;
+  --warning: #d97706;
+}
+
+@layer base {
+  body {
+    background-color: var(--background);
+    color: var(--text);
+    font-family: var(--font-sans);
+  }
+  /* الأرقام المالية والأكواد بخط Mono ومحاذاة عمودية */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
