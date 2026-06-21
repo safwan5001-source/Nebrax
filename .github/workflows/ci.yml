@@ -2,6 +2,7 @@ name: CI
 
 # يشغّل الاختبارات تلقائياً عند كل push و pull request.
 # يبني مشروع Laravel 11 مؤقتاً، يدمج نواة نبراس، ثم يشغّل php artisan test.
+# يشغّل المجموعة على قاعدتين: SQLite (سريع) و PostgreSQL (الإنتاج) عبر matrix.
 # المستودع يبقى نظيفاً (نواة فقط) — البناء يحدث هنا، لا vendor/ في الريبو.
 
 on:
@@ -12,12 +13,32 @@ on:
 
 jobs:
   test:
-    name: php artisan test (Laravel 11)
+    name: php artisan test (L11, ${{ matrix.db }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [sqlite, pgsql]
 
     env:
       COMPOSER_NO_INTERACTION: '1'
       APP_DIR: /tmp/nibras-app
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nibras
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: nibras
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nibras"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout core (النواة)
@@ -27,7 +48,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, pdo_sqlite, sqlite3, bcmath, intl, fileinfo
+          extensions: mbstring, pdo_sqlite, sqlite3, pgsql, pdo_pgsql, bcmath, intl, fileinfo
           coverage: none
 
       # Laravel 11 دخل الدعم الأمني فقط، فصارت إصداراته تحمل تنبيهات أمنية
@@ -73,12 +94,17 @@ jobs:
             sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
           rm -f database/migrations/0001_01_01_000000_create_users_table.php
 
-      - name: إعداد قاعدة SQLite
+      - name: تهيئة قاعدة البيانات (${{ matrix.db }})
         working-directory: ${{ env.APP_DIR }}
         run: |
-          touch database/database.sqlite
-          sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=sqlite|" .env
           sed -i "/^DB_HOST=/d;/^DB_PORT=/d;/^DB_DATABASE=/d;/^DB_USERNAME=/d;/^DB_PASSWORD=/d" .env
+          if [ "${{ matrix.db }}" = "pgsql" ]; then
+            sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|" .env
+            printf "DB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=nibras\nDB_USERNAME=nibras\nDB_PASSWORD=secret\n" >> .env
+          else
+            sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=sqlite|" .env
+            touch database/database.sqlite
+          fi
           php artisan migrate:fresh --force
 
       - name: تشغيل الاختبارات
