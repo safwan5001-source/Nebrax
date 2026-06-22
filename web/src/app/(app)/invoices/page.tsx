@@ -113,6 +113,7 @@ export default function InvoicesPage() {
         loading={loading}
         searchPlaceholder={t('search')}
         emptyLabel="لا توجد فواتير"
+        exportName="invoices"
       />
 
       <CreateInvoiceDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={load} />

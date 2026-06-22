@@ -10,10 +10,11 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowUpDown, Search } from 'lucide-react';
+import { ArrowUpDown, Search, Download } from 'lucide-react';
 import { Table, THead, TBody, TR, TH, TD } from './ui/table';
-import { Input } from './ui/input';
+import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
+import { toCsv, downloadCsv } from '@/lib/export';
 
 interface DataTableProps<T> {
   columns: ColumnDef<T, unknown>[];
@@ -21,9 +22,10 @@ interface DataTableProps<T> {
   loading?: boolean;
   searchPlaceholder?: string;
   emptyLabel?: string;
+  exportName?: string;
 }
 
-export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyLabel }: DataTableProps<T>) {
+export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyLabel, exportName }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
 
@@ -38,6 +40,20 @@ export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyL
     getFilteredRowModel: getFilteredRowModel(),
   });
 
+  function exportCsv() {
+    const cols = table
+      .getAllLeafColumns()
+      .filter((c) => {
+        const def = c.columnDef as { accessorKey?: unknown; accessorFn?: unknown };
+        return def.accessorKey != null || def.accessorFn != null;
+      });
+    const headers = cols.map((c) => (typeof c.columnDef.header === 'string' ? c.columnDef.header : c.id));
+    const rows = table.getFilteredRowModel().rows.map((r) =>
+      cols.map((c) => r.getValue(c.id) as string | number | null | undefined)
+    );
+    downloadCsv(exportName ?? 'export', toCsv(headers, rows));
+  }
+
   return (
     <div className="rounded border border-border bg-surface">
       <div className="flex items-center gap-2 border-b border-border p-3">
@@ -48,6 +64,17 @@ export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyL
           placeholder={searchPlaceholder}
           className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
         />
+        <Button
+          variant="outline"
+          size="sm"
+          className="ms-auto"
+          onClick={exportCsv}
+          disabled={loading || data.length === 0}
+          title="تصدير CSV"
+        >
+          <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
+          CSV
+        </Button>
       </div>
 
       {loading ? (
