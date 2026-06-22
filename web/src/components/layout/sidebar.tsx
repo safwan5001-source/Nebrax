@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { LayoutDashboard, FileText, Users, Wallet, BarChart3, ShoppingCart, RotateCcw, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Wallet, BarChart3, ShoppingCart, RotateCcw, Settings, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
   href: string;
   icon: LucideIcon;
-  key: 'dashboard' | 'invoices' | 'purchases' | 'returns' | 'partners' | 'payments' | 'reports';
+  key: 'dashboard' | 'invoices' | 'purchases' | 'returns' | 'partners' | 'payments' | 'reports' | 'settings';
   enabled: boolean;
 }
 
@@ -21,6 +21,7 @@ const ITEMS: NavItem[] = [
   { href: '/partners', icon: Users, key: 'partners', enabled: true },
   { href: '/payments', icon: Wallet, key: 'payments', enabled: true },
   { href: '/reports', icon: BarChart3, key: 'reports', enabled: true },
+  { href: '/settings', icon: Settings, key: 'settings', enabled: true },
 ];
 
 export function Sidebar() {

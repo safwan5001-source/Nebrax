@@ -1,5 +1,7 @@
 {
-  "app": { "name": "Nibras" },
+  "app": {
+    "name": "Nibras"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "invoices": "Invoices",
@@ -8,7 +10,8 @@
     "partners": "Partners",
     "payments": "Payments",
     "reports": "Reports",
-    "soon": "Soon"
+    "soon": "Soon",
+    "settings": "Settings"
   },
   "login": {
     "title": "Sign in",
@@ -19,7 +22,11 @@
     "submit": "Sign in",
     "error": "Sign-in failed"
   },
-  "topbar": { "greeting": "Welcome", "search": "Search…", "logout": "Sign out" },
+  "topbar": {
+    "greeting": "Welcome",
+    "search": "Search…",
+    "logout": "Sign out"
+  },
   "dashboard": {
     "title": "Dashboard",
     "revenue": "Total sales",
@@ -227,8 +234,44 @@
     "cancel": "Cancel"
   },
   "status": {
-    "draft": "Draft", "posted": "Posted", "cancelled": "Cancelled",
-    "unpaid": "Unpaid", "partial": "Partial", "paid": "Paid"
+    "draft": "Draft",
+    "posted": "Posted",
+    "cancelled": "Cancelled",
+    "unpaid": "Unpaid",
+    "partial": "Partial",
+    "paid": "Paid"
   },
-  "common": { "loading": "Loading…", "empty": "No data", "error": "An error occurred", "retry": "Retry" }
+  "common": {
+    "loading": "Loading…",
+    "empty": "No data",
+    "error": "An error occurred",
+    "retry": "Retry"
+  },
+  "settings": {
+    "title": "Settings",
+    "subscription": "Subscription",
+    "account": "Account",
+    "active": "Active",
+    "expired": "Expired",
+    "plan": "Plan",
+    "trial_ends": "Trial ends",
+    "subscription_ends": "Subscription ends",
+    "invoices_usage": "Invoices this month",
+    "users_usage": "Users",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "plans": {
+      "free": "Free",
+      "basic": "Basic",
+      "pro": "Pro",
+      "enterprise": "Enterprise"
+    },
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "accountant": "Accountant",
+      "staff": "Staff"
+    }
+  }
 }

@@ -1,5 +1,7 @@
 {
-  "app": { "name": "نبراس" },
+  "app": {
+    "name": "نبراس"
+  },
   "nav": {
     "dashboard": "لوحة التحكم",
     "invoices": "الفواتير",
@@ -8,7 +10,8 @@
     "partners": "العملاء والموردون",
     "payments": "المدفوعات",
     "reports": "التقارير",
-    "soon": "قريباً"
+    "soon": "قريباً",
+    "settings": "الإعدادات"
   },
   "login": {
     "title": "تسجيل الدخول",
@@ -19,7 +22,11 @@
     "submit": "دخول",
     "error": "تعذّر تسجيل الدخول"
   },
-  "topbar": { "greeting": "مرحباً", "search": "بحث…", "logout": "تسجيل الخروج" },
+  "topbar": {
+    "greeting": "مرحباً",
+    "search": "بحث…",
+    "logout": "تسجيل الخروج"
+  },
   "dashboard": {
     "title": "لوحة التحكم",
     "revenue": "إجمالي المبيعات",
@@ -227,8 +234,44 @@
     "cancel": "إلغاء"
   },
   "status": {
-    "draft": "مسودة", "posted": "مرحّلة", "cancelled": "ملغاة",
-    "unpaid": "غير مدفوعة", "partial": "جزئية", "paid": "مدفوعة"
+    "draft": "مسودة",
+    "posted": "مرحّلة",
+    "cancelled": "ملغاة",
+    "unpaid": "غير مدفوعة",
+    "partial": "جزئية",
+    "paid": "مدفوعة"
   },
-  "common": { "loading": "جارٍ التحميل…", "empty": "لا توجد بيانات", "error": "حدث خطأ", "retry": "إعادة المحاولة" }
+  "common": {
+    "loading": "جارٍ التحميل…",
+    "empty": "لا توجد بيانات",
+    "error": "حدث خطأ",
+    "retry": "إعادة المحاولة"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "subscription": "الاشتراك",
+    "account": "الحساب",
+    "active": "نشط",
+    "expired": "منتهٍ",
+    "plan": "الخطة",
+    "trial_ends": "تنتهي التجربة",
+    "subscription_ends": "ينتهي الاشتراك",
+    "invoices_usage": "الفواتير هذا الشهر",
+    "users_usage": "المستخدمون",
+    "name": "الاسم",
+    "email": "البريد",
+    "role": "الدور",
+    "plans": {
+      "free": "مجانية",
+      "basic": "أساسية",
+      "pro": "احترافية",
+      "enterprise": "مؤسسات"
+    },
+    "roles": {
+      "owner": "مالك",
+      "admin": "مدير",
+      "accountant": "محاسب",
+      "staff": "موظف"
+    }
+  }
 }
