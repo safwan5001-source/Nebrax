@@ -97,6 +97,7 @@ export default function PartnersPage() {
         loading={loading}
         searchPlaceholder={tp('search')}
         emptyLabel={tp('empty')}
+        exportName="partners"
       />
 
       <PartnerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSaved={load} partner={editing} />

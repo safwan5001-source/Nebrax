@@ -84,7 +84,7 @@ export default function PaymentsPage() {
         </Button>
       </div>
 
-      <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} />
+      <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="payments" />
 
       <PaymentDialog open={open} onClose={() => setOpen(false)} onSaved={load} />
     </div>

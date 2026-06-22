@@ -71,7 +71,7 @@ export default function PurchasesPage() {
           {t('create')}
         </Button>
       </div>
-      <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} />
+      <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="purchases" />
       <CreatePurchaseDialog open={open} onClose={() => setOpen(false)} onCreated={load} />
     </div>
   );
