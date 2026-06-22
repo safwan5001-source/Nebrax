@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Printer } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -108,12 +108,16 @@ export default function InvoiceDetailPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/invoices')} aria-label={t('back')}>
+        <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/invoices')} aria-label={t('back')}>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
         </Button>
         <h1 className="num text-xl font-semibold text-text">{invoice.number}</h1>
         <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
         <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
+        <Button variant="outline" size="sm" className="no-print ms-auto" onClick={() => window.print()}>
+          <Printer className="h-4 w-4" strokeWidth={1.7} />
+          {t('print')}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

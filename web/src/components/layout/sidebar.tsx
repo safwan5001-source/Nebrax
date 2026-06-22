@@ -29,7 +29,7 @@ export function Sidebar() {
   const t = useTranslations('nav');
 
   return (
-    <aside className="flex w-[84px] shrink-0 flex-col items-center gap-1 border-e border-border bg-surface py-4">
+    <aside className="no-print flex w-[84px] shrink-0 flex-col items-center gap-1 border-e border-border bg-surface py-4">
       <div className="mb-4 flex h-9 w-9 items-center justify-center rounded bg-primary text-sm font-bold text-white">
         نـ
       </div>
