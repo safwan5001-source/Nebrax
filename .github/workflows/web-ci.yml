@@ -30,6 +30,9 @@ jobs:
       - name: تثبيت الاعتماديات (npm ci)
         run: npm ci
 
+      - name: اختبارات الواجهة (Vitest)
+        run: npm run test
+
       - name: بناء الواجهة (يتضمن فحص أنواع TypeScript)
         run: npm run build
         env:
