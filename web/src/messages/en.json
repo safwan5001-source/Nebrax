@@ -35,7 +35,8 @@
     "cash": "Cash & bank",
     "revenue_vs_expense": "Revenue vs expenses",
     "recent_invoices": "Recent invoices",
-    "expense": "Expenses"
+    "expense": "Expenses",
+    "invoice_status": "Invoice payment status"
   },
   "invoices": {
     "title": "Invoices",
@@ -83,7 +84,8 @@
     "qty": "Qty",
     "unit_price": "Unit price",
     "tax": "Tax",
-    "not_found": "Invoice not found"
+    "not_found": "Invoice not found",
+    "print": "Print"
   },
   "payments": {
     "title": "Payments",

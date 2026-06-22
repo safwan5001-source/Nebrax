@@ -7,12 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { Donut } from '@/components/charts/donut';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 
 interface IncomeStatement { total_revenue: string; total_expense: string; net_income: string }
 interface Account { code: string; name: string; balance: string }
-interface Invoice { id: string; number: string; invoice_date: string; total: string; status: string }
+interface Invoice { id: string; number: string; invoice_date: string; total: string; status: string; payment_status: string }
 
 export default function DashboardPage() {
   const t = useTranslations('dashboard');
@@ -44,6 +45,13 @@ export default function DashboardPage() {
   const revenue = Number(income?.total_revenue ?? 0);
   const expense = Number(income?.total_expense ?? 0);
   const maxRE = Math.max(revenue, expense, 1);
+
+  const payCount = (s: string) => invoices.filter((i) => i.payment_status === s).length;
+  const payeSegments = [
+    { label: ts('paid'), value: payCount('paid'), color: 'var(--positive)' },
+    { label: ts('partial'), value: payCount('partial'), color: 'var(--warning)' },
+    { label: ts('unpaid'), value: payCount('unpaid'), color: 'var(--muted)' },
+  ];
 
   const kpis = [
     { title: t('revenue'), value: income?.total_revenue, icon: TrendingUp },
@@ -77,8 +85,8 @@ export default function DashboardPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
           <CardHeader>
             <CardTitle>{t('revenue_vs_expense')}</CardTitle>
           </CardHeader>
@@ -94,7 +102,18 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('invoice_status')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? <Skeleton className="h-28 w-full" /> : <Donut segments={payeSegments} />}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        <Card>
           <CardHeader>
             <CardTitle>{t('recent_invoices')}</CardTitle>
           </CardHeader>

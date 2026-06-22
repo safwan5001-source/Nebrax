@@ -44,3 +44,18 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* الطباعة / حفظ PDF: إخفاء عناصر التطبيق وإظهار المحتوى فقط */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+}

@@ -19,7 +19,7 @@ export function Topbar() {
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
+    <header className="no-print flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
       <div className="flex items-center gap-2 rounded border border-border px-2.5 py-1.5">
         <Search className="h-4 w-4 text-muted" strokeWidth={1.6} />
         <input
