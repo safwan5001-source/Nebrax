@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\UserController;
 use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsurePermission;
@@ -78,6 +79,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('returns/{id}', [ReturnController::class, 'show'])->middleware($perm('returns.view'));
         Route::post('returns', [ReturnController::class, 'store'])->middleware($perm('returns.manage'));
         Route::post('returns/{id}/post', [ReturnController::class, 'post'])->middleware($perm('returns.manage'));
+
+        // إدارة المستخدمين (owner/admin)
+        Route::get('users', [UserController::class, 'index'])->middleware($perm('users.view'));
+        Route::post('users', [UserController::class, 'store'])->middleware($perm('users.manage'));
+        Route::put('users/{id}', [UserController::class, 'update'])->middleware($perm('users.manage'));
+        Route::delete('users/{id}', [UserController::class, 'destroy'])->middleware($perm('users.manage'));
 
         // التقارير
         Route::get('reports/trial-balance', [ReportController::class, 'trialBalance'])->middleware($perm('reports.view'));

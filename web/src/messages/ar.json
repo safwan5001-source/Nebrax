@@ -275,5 +275,22 @@
       "accountant": "محاسب",
       "staff": "موظف"
     }
+  },
+  "users": {
+    "title": "المستخدمون",
+    "add": "إضافة مستخدم",
+    "name": "الاسم",
+    "email": "البريد",
+    "password": "كلمة المرور",
+    "role": "الدور",
+    "remove": "حذف",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "roles": {
+      "owner": "مالك",
+      "admin": "مدير",
+      "accountant": "محاسب",
+      "staff": "موظف"
+    }
   }
 }
