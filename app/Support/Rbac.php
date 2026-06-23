@@ -18,11 +18,13 @@ class Rbac
             'payments.view', 'payments.manage',
             'purchases.view', 'purchases.manage',
             'returns.view', 'returns.manage',
+            'hr.view', 'hr.manage',
             'accounts.view', 'reports.view', 'zatca.view',
         ],
         'staff' => [
             'partners.view', 'products.view', 'invoices.view',
             'payments.view', 'purchases.view', 'returns.view',
+            'hr.view',
             'accounts.view', 'reports.view', 'zatca.view',
         ],
     ];

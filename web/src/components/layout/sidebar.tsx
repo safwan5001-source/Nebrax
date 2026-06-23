@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { LayoutDashboard, FileText, Users, Wallet, BarChart3, ShoppingCart, RotateCcw, Settings, Store, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Wallet, BarChart3, ShoppingCart, RotateCcw, Settings, Store, UserCog, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
   href: string;
   icon: LucideIcon;
-  key: 'dashboard' | 'pos' | 'invoices' | 'purchases' | 'returns' | 'partners' | 'payments' | 'reports' | 'settings';
+  key: 'dashboard' | 'pos' | 'invoices' | 'purchases' | 'returns' | 'partners' | 'payments' | 'hr' | 'reports' | 'settings';
   enabled: boolean;
 }
 
@@ -21,6 +21,7 @@ const ITEMS: NavItem[] = [
   { href: '/returns', icon: RotateCcw, key: 'returns', enabled: true },
   { href: '/partners', icon: Users, key: 'partners', enabled: true },
   { href: '/payments', icon: Wallet, key: 'payments', enabled: true },
+  { href: '/hr', icon: UserCog, key: 'hr', enabled: true },
   { href: '/reports', icon: BarChart3, key: 'reports', enabled: true },
   { href: '/settings', icon: Settings, key: 'settings', enabled: true },
 ];
