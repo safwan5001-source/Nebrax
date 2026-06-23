@@ -91,7 +91,12 @@ class AuthController extends ApiController
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(['user' => $this->userPayload($request->user())]);
+        $tenant = Tenant::find(app(TenantContext::class)->id());
+
+        return response()->json([
+            'user'    => $this->userPayload($request->user()),
+            'company' => $this->companyPayload($tenant),
+        ]);
     }
 
     private function issueToken(User $user): string
@@ -107,6 +112,22 @@ class AuthController extends ApiController
             'email'     => $user->email,
             'role'      => $user->role,
             'tenant_id' => $user->tenant_id,
+        ];
+    }
+
+    /** بيانات الشركة (البائع) لإظهارها في رأس المستندات كالفاتورة الضريبية. */
+    private function companyPayload(?Tenant $tenant): ?array
+    {
+        if (! $tenant) {
+            return null;
+        }
+
+        return [
+            'name'       => $tenant->name,
+            'vat_number' => $tenant->vat_number,
+            'cr_number'  => $tenant->cr_number,
+            'currency'   => $tenant->currency,
+            'country'    => $tenant->country,
         ];
     }
 }

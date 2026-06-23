@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 
@@ -64,21 +65,26 @@ export default function InvoiceDetailPage() {
   const ts = useTranslations('status');
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
-  const [partnerName, setPartnerName] = useState('—');
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const [zatca, setZatca] = useState<Zatca | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const partnerName = customer?.name ?? '—';
 
   useEffect(() => {
     setLoading(true);
     api<{ data: Invoice }>(`/invoices/${id}`)
       .then(async (r) => {
         setInvoice(r.data);
-        const [p, z] = await Promise.allSettled([
-          api<{ data: { name: string } }>(`/partners/${r.data.partner_id}`),
+        const [p, z, m] = await Promise.allSettled([
+          api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
+          api<{ company: Company }>(`/me`),
         ]);
-        if (p.status === 'fulfilled') setPartnerName(p.value.data.name);
+        if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
+        if (m.status === 'fulfilled') setCompany(m.value.company);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -193,6 +199,9 @@ export default function InvoiceDetailPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* مستند الفاتورة الضريبية A4 — يظهر عند الطباعة / حفظ PDF فقط */}
+      <InvoiceDocument invoice={invoice} company={company} customer={customer} qr={zatca?.qr ?? null} />
     </div>
   );
 }

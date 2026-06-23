@@ -89,6 +89,27 @@
     "not_found": "Invoice not found",
     "print": "Print"
   },
+  "invoiceDoc": {
+    "title": "Tax Invoice",
+    "title_en": "فاتورة ضريبية",
+    "bill_to": "Bill to",
+    "vat_number": "VAT number",
+    "cr_number": "CR number",
+    "number": "Invoice no.",
+    "date": "Date",
+    "payment_type": "Payment type",
+    "cash": "Cash",
+    "credit": "Credit",
+    "description": "Description",
+    "qty": "Qty",
+    "unit_price": "Unit price",
+    "tax": "Tax",
+    "total": "Total",
+    "subtotal": "Subtotal (excl. VAT)",
+    "vat": "VAT (15%)",
+    "grand_total": "Total (incl. VAT)",
+    "footer": "This is an electronic invoice issued per ZATCA (Zakat, Tax and Customs Authority) requirements."
+  },
   "payments": {
     "title": "Payments",
     "create": "Record payment",
