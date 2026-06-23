@@ -11,7 +11,8 @@
     "payments": "Payments",
     "reports": "Reports",
     "soon": "Soon",
-    "settings": "Settings"
+    "settings": "Settings",
+    "pos": "POS"
   },
   "login": {
     "title": "Sign in",
@@ -292,5 +293,20 @@
       "accountant": "Accountant",
       "staff": "Staff"
     }
+  },
+  "pos": {
+    "search_products": "Search product…",
+    "no_products": "No products — use a custom line",
+    "cart": "Cart",
+    "empty_cart": "Cart is empty",
+    "custom_line": "Custom line",
+    "custom_item": "Item",
+    "remove": "Remove",
+    "total": "Total",
+    "pay_cash": "Pay cash",
+    "receipt": "Receipt",
+    "receipt_done": "Sale completed",
+    "new_sale": "New sale",
+    "print": "Print"
   }
 }

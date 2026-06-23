@@ -11,7 +11,8 @@
     "payments": "المدفوعات",
     "reports": "التقارير",
     "soon": "قريباً",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "pos": "نقطة البيع"
   },
   "login": {
     "title": "تسجيل الدخول",
@@ -292,5 +293,20 @@
       "accountant": "محاسب",
       "staff": "موظف"
     }
+  },
+  "pos": {
+    "search_products": "بحث عن منتج…",
+    "no_products": "لا توجد منتجات — استخدم سطراً مخصّصاً",
+    "cart": "السلة",
+    "empty_cart": "السلة فارغة",
+    "custom_line": "سطر مخصّص",
+    "custom_item": "صنف",
+    "remove": "حذف",
+    "total": "الإجمالي",
+    "pay_cash": "دفع نقداً",
+    "receipt": "الإيصال",
+    "receipt_done": "تمّ البيع بنجاح",
+    "new_sale": "بيع جديد",
+    "print": "طباعة"
   }
 }
