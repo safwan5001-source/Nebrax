@@ -275,5 +275,22 @@
       "accountant": "Accountant",
       "staff": "Staff"
     }
+  },
+  "users": {
+    "title": "Users",
+    "add": "Add user",
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "role": "Role",
+    "remove": "Remove",
+    "cancel": "Cancel",
+    "save": "Save",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "accountant": "Accountant",
+      "staff": "Staff"
+    }
   }
 }

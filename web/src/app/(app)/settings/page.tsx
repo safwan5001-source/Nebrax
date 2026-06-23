@@ -1,12 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { UserDialog } from '@/components/users/user-dialog';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+
+interface TeamUser { id: string; name: string; email: string; role: string; is_active: boolean }
 
 interface Subscription {
   plan: string;
@@ -40,13 +46,29 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
 
 export default function SettingsPage() {
   const t = useTranslations('settings');
+  const tu = useTranslations('users');
   const [sub, setSub] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const user = currentUser();
+  const canManage = user?.role === 'owner' || user?.role === 'admin';
+
+  const [team, setTeam] = useState<TeamUser[]>([]);
+  const [userDialog, setUserDialog] = useState(false);
+
+  const loadTeam = useCallback(() => {
+    if (!canManage) return;
+    api<{ data: TeamUser[] }>('/users').then((r) => setTeam(r.data)).catch(() => {});
+  }, [canManage]);
 
   useEffect(() => {
     api<Subscription>('/subscription').then(setSub).finally(() => setLoading(false));
-  }, []);
+    loadTeam();
+  }, [loadTeam]);
+
+  async function removeUser(id: string) {
+    await api(`/users/${id}`, { method: 'DELETE' }).catch(() => {});
+    loadTeam();
+  }
 
   return (
     <div className="space-y-5">
@@ -112,6 +134,48 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {canManage && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{tu('title')}</CardTitle>
+            <Button size="sm" onClick={() => setUserDialog(true)}>
+              <Plus className="h-4 w-4" strokeWidth={1.8} />
+              {tu('add')}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>{tu('name')}</TH>
+                  <TH>{tu('email')}</TH>
+                  <TH>{tu('role')}</TH>
+                  <TH />
+                </TR>
+              </THead>
+              <TBody>
+                {team.map((u) => (
+                  <TR key={u.id}>
+                    <TD>{u.name}</TD>
+                    <TD className="num text-muted">{u.email}</TD>
+                    <TD><Badge tone="muted">{tu(`roles.${u.role}`)}</Badge></TD>
+                    <TD className="text-end">
+                      {u.id !== user?.id && (
+                        <Button variant="ghost" size="icon" aria-label={tu('remove')} onClick={() => removeUser(u.id)}>
+                          <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                        </Button>
+                      )}
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      <UserDialog open={userDialog} onClose={() => setUserDialog(false)} onSaved={loadTeam} />
     </div>
   );
 }
