@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\ReportController;
@@ -79,6 +81,20 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('returns/{id}', [ReturnController::class, 'show'])->middleware($perm('returns.view'));
         Route::post('returns', [ReturnController::class, 'store'])->middleware($perm('returns.manage'));
         Route::post('returns/{id}/post', [ReturnController::class, 'post'])->middleware($perm('returns.manage'));
+
+        // الموظفون (HR)
+        Route::get('employees', [EmployeeController::class, 'index'])->middleware($perm('hr.view'));
+        Route::get('employees/{id}', [EmployeeController::class, 'show'])->middleware($perm('hr.view'));
+        Route::post('employees', [EmployeeController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::put('employees/{id}', [EmployeeController::class, 'update'])->middleware($perm('hr.manage'));
+        Route::delete('employees/{id}', [EmployeeController::class, 'destroy'])->middleware($perm('hr.manage'));
+
+        // مسيّرات الرواتب
+        Route::get('payroll-runs', [PayrollController::class, 'index'])->middleware($perm('hr.view'));
+        Route::get('payroll-runs/{id}', [PayrollController::class, 'show'])->middleware($perm('hr.view'));
+        Route::post('payroll-runs', [PayrollController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::post('payroll-runs/{id}/post', [PayrollController::class, 'post'])->middleware($perm('hr.manage'));
+        Route::post('payroll-runs/{id}/pay', [PayrollController::class, 'pay'])->middleware($perm('hr.manage'));
 
         // إدارة المستخدمين (owner/admin)
         Route::get('users', [UserController::class, 'index'])->middleware($perm('users.view'));
