@@ -68,6 +68,17 @@ class ApiAuthTest extends TestCase
     }
 
     /** @test */
+    public function me_includes_company_seller_info_for_documents(): void
+    {
+        $auth = $this->registerTenant('acme', 'owner@acme.test');
+
+        $this->withToken($auth['token'])->getJson('/api/me')
+            ->assertOk()
+            ->assertJsonPath('company.name', 'شركة acme')
+            ->assertJsonPath('company.vat_number', '300000000000003');
+    }
+
+    /** @test */
     public function logout_revokes_the_token(): void
     {
         $auth = $this->registerTenant();

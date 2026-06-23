@@ -45,6 +45,11 @@
   }
 }
 
+/* عناصر تظهر عند الطباعة فقط (مستند PDF مخصّص كالفاتورة الضريبية) */
+.print-only {
+  display: none;
+}
+
 /* الطباعة / حفظ PDF: إخفاء عناصر التطبيق وإظهار المحتوى فقط */
 @media print {
   .no-print {
@@ -57,5 +62,29 @@
   main {
     padding: 0 !important;
     overflow: visible !important;
+  }
+
+  /* عند وجود مستند طباعة مخصّص (#print-root): لا يُطبع سواه */
+  body:has(#print-root) * {
+    visibility: hidden !important;
+  }
+  #print-root,
+  #print-root * {
+    visibility: visible !important;
+  }
+  #print-root {
+    display: block !important;
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    width: 100%;
+  }
+  .print-only {
+    display: block;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm;
   }
 }
