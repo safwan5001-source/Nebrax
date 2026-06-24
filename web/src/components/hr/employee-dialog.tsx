@@ -16,8 +16,10 @@ export interface Employee {
   name: string;
   national_id?: string | null;
   job_title?: string | null;
-  basic_salary: string; // ريال (نص)
-  allowances: string;   // ريال (نص)
+  basic_salary: string;     // ريال (نص)
+  allowances: string;       // ريال (نص)
+  gosi: string;             // ريال (نص)
+  other_deductions: string; // ريال (نص)
   is_active: boolean;
 }
 
@@ -34,7 +36,7 @@ export function EmployeeDialog({
 }) {
   const t = useTranslations('hr');
   const [form, setForm] = useState<Employee>(
-    employee ?? { id: '', name: '', national_id: '', job_title: '', basic_salary: '', allowances: '', is_active: true }
+    employee ?? { id: '', name: '', national_id: '', job_title: '', basic_salary: '', allowances: '', gosi: '', other_deductions: '', is_active: true }
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -51,6 +53,8 @@ export function EmployeeDialog({
       job_title: form.job_title || null,
       basic_salary: riyalToMinor(form.basic_salary), // ريال → هللات
       allowances: riyalToMinor(form.allowances || '0'),
+      gosi: riyalToMinor(form.gosi || '0'),
+      other_deductions: riyalToMinor(form.other_deductions || '0'),
       is_active: form.is_active,
     };
     try {
@@ -93,6 +97,16 @@ export function EmployeeDialog({
           <div className="space-y-1.5">
             <Label htmlFor="allowances">{t('allowances')}</Label>
             <Input id="allowances" inputMode="decimal" className="num text-end" value={form.allowances} onChange={(e) => set('allowances', e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="gosi">{t('gosi')}</Label>
+            <Input id="gosi" inputMode="decimal" className="num text-end" value={form.gosi} onChange={(e) => set('gosi', e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="other_deductions">{t('other_deductions')}</Label>
+            <Input id="other_deductions" inputMode="decimal" className="num text-end" value={form.other_deductions} onChange={(e) => set('other_deductions', e.target.value)} />
           </div>
         </div>
         <div className="space-y-1.5">

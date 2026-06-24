@@ -53,7 +53,13 @@ export default function HrPage() {
         id: 'gross',
         header: t('gross'),
         accessorFn: (r) => (r as Employee & { gross?: string }).gross ?? '0',
-        cell: ({ row }) => <div className="num text-end font-medium">{formatRiyal((row.original as Employee & { gross?: string }).gross)}</div>,
+        cell: ({ row }) => <div className="num text-end">{formatRiyal((row.original as Employee & { gross?: string }).gross)}</div>,
+      },
+      {
+        id: 'net',
+        header: t('net'),
+        accessorFn: (r) => (r as Employee & { net?: string }).net ?? '0',
+        cell: ({ row }) => <div className="num text-end font-medium">{formatRiyal((row.original as Employee & { net?: string }).net)}</div>,
       },
       {
         accessorKey: 'is_active',

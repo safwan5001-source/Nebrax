@@ -17,19 +17,24 @@ use RuntimeException;
  *
  *  - create(): يلتقط الموظفين النشطين في مسيّر شهري ويحسب الإجماليات من السطور.
  *  - post():   يولّد قيد الاستحقاق المتوازن عبر LedgerService:
- *                مدين  5120 الرواتب والأجور   (إجمالي الاستحقاق)
- *                دائن  2130 رواتب مستحقة       (الصافي المستحق للموظفين)
+ *                مدين  5120 الرواتب والأجور        (إجمالي الاستحقاق)
+ *                دائن  2130 رواتب مستحقة            (الصافي المستحق للموظفين)
+ *                دائن  2140 التأمينات مستحقة        (GOSI حصة الموظف، إن وُجدت)
+ *                دائن  2150 استقطاعات موظفين مستحقة (سُلف/أخرى، إن وُجدت)
  *  - pay():    يولّد قيد الصرف المتوازن عبر LedgerService:
  *                مدين  2130 رواتب مستحقة
  *                دائن  1110 الصندوق  أو  1120 البنك  (حسب طريقة الدفع)
  *
- *  net = gross في هذا الإصدار (لا استقطاعات بعد). لا كتابة مباشرة في
- *  journal_lines — كل قيد يمرّ عبر المحرك حصراً، ومربوط بمصدره PayrollRun.
+ *  الصافي = الإجمالي − GOSI − الاستقطاعات الأخرى. الخصوم تبقى مستحقة وتُسوّى
+ *  لاحقاً (لا تدخل قيد الصرف). لا كتابة مباشرة في journal_lines — كل قيد يمرّ
+ *  عبر المحرك حصراً، ومربوط بمصدره PayrollRun.
  */
 class PayrollService
 {
     private const ACC_SALARY_EXPENSE = '5120'; // الرواتب والأجور (مصروف)
     private const ACC_SALARY_PAYABLE = '2130'; // رواتب مستحقة (خصم)
+    private const ACC_GOSI_PAYABLE   = '2140'; // التأمينات الاجتماعية مستحقة (خصم)
+    private const ACC_DEDUCT_PAYABLE = '2150'; // استقطاعات موظفين مستحقة (خصم)
     private const ACC_CASH           = '1110'; // الصندوق
     private const ACC_BANK           = '1120'; // البنك
 
@@ -73,26 +78,41 @@ class PayrollService
                 'created_by'   => $data['created_by'] ?? null,
             ]);
 
-            $totalGross = $totalNet = 0;
+            $totalGross = $totalGosi = $totalOther = $totalNet = 0;
 
             foreach ($employees as $employee) {
                 $gross = (int) $employee->basic_salary + (int) $employee->allowances;
-                $net   = $gross; // لا استقطاعات في هذا الإصدار
+                $gosi  = (int) $employee->gosi;
+                $other = (int) $employee->other_deductions;
+                $net   = $gross - $gosi - $other;
+
+                if ($net < 0) {
+                    throw new RuntimeException("استقطاعات الموظف ({$employee->name}) تتجاوز إجمالي راتبه.");
+                }
 
                 PayrollItem::create([
-                    'payroll_run_id' => $run->id,
-                    'employee_id'    => $employee->id,
-                    'basic_salary'   => (int) $employee->basic_salary,
-                    'allowances'     => (int) $employee->allowances,
-                    'gross'          => $gross,
-                    'net'            => $net,
+                    'payroll_run_id'   => $run->id,
+                    'employee_id'      => $employee->id,
+                    'basic_salary'     => (int) $employee->basic_salary,
+                    'allowances'       => (int) $employee->allowances,
+                    'gosi'             => $gosi,
+                    'other_deductions' => $other,
+                    'gross'            => $gross,
+                    'net'              => $net,
                 ]);
 
                 $totalGross += $gross;
+                $totalGosi  += $gosi;
+                $totalOther += $other;
                 $totalNet   += $net;
             }
 
-            $run->update(['total_gross' => $totalGross, 'total_net' => $totalNet]);
+            $run->update([
+                'total_gross'            => $totalGross,
+                'total_gosi'             => $totalGosi,
+                'total_other_deductions' => $totalOther,
+                'total_net'              => $totalNet,
+            ]);
 
             return $run->load('items');
         });
@@ -111,16 +131,27 @@ class PayrollService
             // الإجماليات مشتقة من السطور (مصدر الحقيقة) قبل توليد القيد.
             $run->loadMissing('items');
             $totalGross = (int) $run->items->sum('gross');
+            $totalGosi  = (int) $run->items->sum('gosi');
+            $totalOther = (int) $run->items->sum('other_deductions');
             $totalNet   = (int) $run->items->sum('net');
 
             if ($totalGross <= 0) {
                 throw new RuntimeException('إجمالي المسيّر يجب أن يكون موجباً.');
             }
 
-            $entry = $this->ledger->post([
+            // مدين 5120 بالإجمالي، ودائن الصافي + الاستقطاعات (متوازن: الإجمالي = الصافي + الخصوم).
+            $lines = [
                 ['account_id' => $this->accountId(self::ACC_SALARY_EXPENSE), 'debit' => $totalGross],
                 ['account_id' => $this->accountId(self::ACC_SALARY_PAYABLE), 'credit' => $totalNet],
-            ], [
+            ];
+            if ($totalGosi > 0) {
+                $lines[] = ['account_id' => $this->accountId(self::ACC_GOSI_PAYABLE), 'credit' => $totalGosi];
+            }
+            if ($totalOther > 0) {
+                $lines[] = ['account_id' => $this->accountId(self::ACC_DEDUCT_PAYABLE), 'credit' => $totalOther];
+            }
+
+            $entry = $this->ledger->post($lines, [
                 'entry_date'  => $run->period_end->toDateString(),
                 'description' => "استحقاق رواتب {$run->number} ({$run->period})",
                 'source_type' => PayrollRun::class,
@@ -129,11 +160,13 @@ class PayrollService
             ]);
 
             $run->update([
-                'status'           => 'posted',
-                'total_gross'      => $totalGross,
-                'total_net'        => $totalNet,
-                'journal_entry_id' => $entry->id,
-                'posted_at'        => now(),
+                'status'                 => 'posted',
+                'total_gross'            => $totalGross,
+                'total_gosi'             => $totalGosi,
+                'total_other_deductions' => $totalOther,
+                'total_net'              => $totalNet,
+                'journal_entry_id'       => $entry->id,
+                'posted_at'              => now(),
             ]);
 
             return $run->fresh('items');

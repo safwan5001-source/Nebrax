@@ -51,14 +51,16 @@ class PayrollTest extends TestCase
         return $entry->lines->first(fn (JournalLine $l) => $l->account->code === $code);
     }
 
-    private function employee(int $basic, int $allowances = 0, bool $active = true): Employee
+    private function employee(int $basic, int $allowances = 0, bool $active = true, int $gosi = 0, int $other = 0): Employee
     {
         return Employee::create([
-            'employee_no'  => 'EMP-' . str_pad((string) (Employee::count() + 1), 5, '0', STR_PAD_LEFT),
-            'name'         => 'موظف',
-            'basic_salary' => $basic,
-            'allowances'   => $allowances,
-            'is_active'    => $active,
+            'employee_no'      => 'EMP-' . str_pad((string) (Employee::count() + 1), 5, '0', STR_PAD_LEFT),
+            'name'             => 'موظف',
+            'basic_salary'     => $basic,
+            'allowances'       => $allowances,
+            'gosi'             => $gosi,
+            'other_deductions' => $other,
+            'is_active'        => $active,
         ]);
     }
 
@@ -118,6 +120,59 @@ class PayrollTest extends TestCase
         $this->assertEquals($posted->items->sum('gross'), $entry->lines->sum('debit'));
 
         $this->assertTrue($posted->isPosted());
+    }
+
+    /** @test */
+    public function deductions_reduce_net_and_credit_2140_gosi_and_2150_other(): void
+    {
+        // أساسي 500000 + بدلات 100000 = 600000، GOSI 58500، سُلف 41500 → صافي 500000
+        $this->employee(500000, 100000, true, 58500, 41500);
+
+        $run = $this->payroll->create(['period' => '2025-06']);
+        $this->assertSame(600000, $run->total_gross);
+        $this->assertSame(58500, $run->total_gosi);
+        $this->assertSame(41500, $run->total_other_deductions);
+        $this->assertSame(500000, $run->total_net);
+
+        $posted = $this->payroll->post($run);
+        $entry = $posted->journalEntry()->with('lines.account')->first();
+
+        // متوازن: مدين 600000 = دائن (500000 + 58500 + 41500)
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(600000, $entry->lines->sum('debit'));
+
+        $this->assertEquals(600000, $this->line($entry, '5120')->debit);  // الإجمالي مصروف
+        $this->assertEquals(500000, $this->line($entry, '2130')->credit); // الصافي للموظفين
+        $this->assertEquals(58500,  $this->line($entry, '2140')->credit); // GOSI
+        $this->assertEquals(41500,  $this->line($entry, '2150')->credit); // استقطاعات أخرى
+    }
+
+    /** @test */
+    public function paying_settles_only_net_leaving_deduction_liabilities_outstanding(): void
+    {
+        $this->employee(600000, 0, true, 60000, 40000); // صافي 500000، خصوم 100000
+
+        $run = $this->payroll->post($this->payroll->create(['period' => '2025-06']));
+        $this->payroll->pay($run, 'bank');
+
+        // الصرف بالصافي فقط (البنك أصل: دائن 500000 ⇒ رصيد −500000)
+        $this->assertEquals(-500000, Account::where('code', '1120')->first()->balance->balance);
+        // 2130 رواتب مستحقة = صفر بعد الصرف، لكن 2140/2150 تبقى مستحقة
+        $this->assertEquals(0,     Account::where('code', '2130')->first()->balance->balance);
+        $this->assertEquals(60000, Account::where('code', '2140')->first()->balance->balance);
+        $this->assertEquals(40000, Account::where('code', '2150')->first()->balance->balance);
+
+        $tb = app(ReportService::class)->trialBalance();
+        $this->assertTrue($tb['balanced']);
+    }
+
+    /** @test */
+    public function it_rejects_an_employee_whose_deductions_exceed_gross(): void
+    {
+        $this->employee(100000, 0, true, 80000, 50000); // خصوم 130000 > 100000
+
+        $this->expectExceptionMessage('تتجاوز إجمالي راتبه');
+        $this->payroll->create(['period' => '2025-06']);
     }
 
     /** @test */

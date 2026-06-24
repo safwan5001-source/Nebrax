@@ -13,14 +13,16 @@ class PayrollItem extends BaseModel
 {
     protected $fillable = [
         'tenant_id', 'payroll_run_id', 'employee_id',
-        'basic_salary', 'allowances', 'gross', 'net',
+        'basic_salary', 'allowances', 'gosi', 'other_deductions', 'gross', 'net',
     ];
 
     protected $casts = [
-        'basic_salary' => 'integer',
-        'allowances'   => 'integer',
-        'gross'        => 'integer',
-        'net'          => 'integer',
+        'basic_salary'     => 'integer',
+        'allowances'       => 'integer',
+        'gosi'             => 'integer',
+        'other_deductions' => 'integer',
+        'gross'            => 'integer',
+        'net'              => 'integer',
     ];
 
     public function run(): BelongsTo

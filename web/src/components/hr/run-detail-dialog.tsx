@@ -14,6 +14,8 @@ interface Item {
   employee?: { id: string; name: string } | null;
   basic_salary: string;
   allowances: string;
+  gosi: string;
+  other_deductions: string;
   gross: string;
   net: string;
 }
@@ -24,6 +26,9 @@ export interface PayrollRun {
   status: string;
   pay_method?: string | null;
   total_gross: string;
+  total_gosi: string;
+  total_other_deductions: string;
+  total_deductions: string;
   total_net: string;
   items?: Item[];
 }
@@ -89,8 +94,9 @@ export function RunDetailDialog({
             <THead>
               <TR>
                 <TH>{t('emp_name')}</TH>
-                <TH className="text-end">{t('basic_salary')}</TH>
-                <TH className="text-end">{t('allowances')}</TH>
+                <TH className="text-end">{t('gross')}</TH>
+                <TH className="text-end">{t('gosi')}</TH>
+                <TH className="text-end">{t('other_deductions')}</TH>
                 <TH className="text-end">{t('net')}</TH>
               </TR>
             </THead>
@@ -98,8 +104,9 @@ export function RunDetailDialog({
               {(run.items ?? []).map((it) => (
                 <TR key={it.id}>
                   <TD>{it.employee?.name ?? '—'}</TD>
-                  <TD className="num text-end">{formatRiyal(it.basic_salary)}</TD>
-                  <TD className="num text-end">{formatRiyal(it.allowances)}</TD>
+                  <TD className="num text-end">{formatRiyal(it.gross)}</TD>
+                  <TD className="num text-end">{formatRiyal(it.gosi)}</TD>
+                  <TD className="num text-end">{formatRiyal(it.other_deductions)}</TD>
                   <TD className="num text-end font-medium">{formatRiyal(it.net)}</TD>
                 </TR>
               ))}
@@ -107,9 +114,19 @@ export function RunDetailDialog({
           </Table>
         </div>
 
-        <div className="flex items-center justify-between border-t border-border pt-3">
-          <span className="text-sm text-muted">{t('total_net')}</span>
-          <span className="num text-lg font-bold text-text">{formatRiyal(run.total_net)}</span>
+        <div className="space-y-1 border-t border-border pt-3 text-sm">
+          <div className="flex items-center justify-between text-muted">
+            <span>{t('gross')}</span>
+            <span className="num">{formatRiyal(run.total_gross)}</span>
+          </div>
+          <div className="flex items-center justify-between text-muted">
+            <span>{t('deductions')}</span>
+            <span className="num">{formatRiyal(run.total_deductions)}</span>
+          </div>
+          <div className="flex items-center justify-between border-t border-border pt-1">
+            <span className="font-semibold text-text">{t('total_net')}</span>
+            <span className="num text-lg font-bold text-text">{formatRiyal(run.total_net)}</span>
+          </div>
         </div>
 
         {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}

@@ -34,6 +34,8 @@ class ChartOfAccountsSeeder
                 ['2110', 'الموردون (الدائنون)', 'Accounts Payable', 'liability', false, []],
                 ['2120', 'ضريبة القيمة المضافة - مخرجات', 'VAT Output', 'liability', false, []],
                 ['2130', 'رواتب مستحقة', 'Accrued Salaries', 'liability', false, []],
+                ['2140', 'التأمينات الاجتماعية مستحقة', 'GOSI Payable', 'liability', false, []],
+                ['2150', 'استقطاعات موظفين مستحقة', 'Employee Deductions Payable', 'liability', false, []],
             ]],
         ]],
         ['3', 'حقوق الملكية', 'Equity', 'equity', true, [
