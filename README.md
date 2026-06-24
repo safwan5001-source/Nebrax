@@ -2,6 +2,8 @@
 
 نواة محاسبية production-grade: قيد مزدوج صارم + عزل multi-tenant تلقائي + دليل حسابات سعودي.
 
+> **الواجهة (Next.js) في `web/`.** لنشرها على Vercel اضبط **Root Directory = `web`** — انظر [`web/DEPLOY.md`](web/DEPLOY.md). الـ backend (Laravel/PHP) يُستضاف خارج Vercel.
+
 ## ما تم تسليمه
 | الملف | الدور |
 |------|------|
