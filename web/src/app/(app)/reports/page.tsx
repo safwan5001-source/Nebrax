@@ -1,14 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Printer, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { ReportDocument, type ReportColumn } from '@/components/reports/report-document';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { useCompany } from '@/lib/company';
+import { toCsv, downloadCsv } from '@/lib/export';
 
 type Tab = 'trial' | 'aging';
 
@@ -17,8 +21,18 @@ interface TrialBalance { rows: TrialRow[]; total_debit: string; total_credit: st
 interface AgingRow { partner_id: string; name: string; b0_30: string; b31_60: string; b61_90: string; b90_plus: string; total: string }
 interface Aging { type: string; as_of: string; rows: AgingRow[]; totals: Omit<AgingRow, 'partner_id' | 'name'> }
 
+interface ReportDoc {
+  title: string;
+  asOf?: string | null;
+  columns: ReportColumn[];
+  rows: string[][];
+  totalRow?: string[] | null;
+  exportName: string;
+}
+
 export default function ReportsPage() {
   const t = useTranslations('reports');
+  const company = useCompany();
   const [tab, setTab] = useState<Tab>('trial');
   const [agingType, setAgingType] = useState<'receivable' | 'payable'>('receivable');
   const [loading, setLoading] = useState(true);
@@ -36,9 +50,77 @@ export default function ReportsPage() {
 
   useEffect(() => load(), [load]);
 
+  // وصف التقرير الحالي (أعمدة + صفوف) لاستخدامه في PDF و CSV معاً.
+  const doc = useMemo<ReportDoc | null>(() => {
+    if (tab === 'trial') {
+      if (!trial) return null;
+      return {
+        title: t('trial_balance'),
+        columns: [
+          { label: t('code') },
+          { label: t('account') },
+          { label: t('debit'), align: 'end' },
+          { label: t('credit'), align: 'end' },
+        ],
+        rows: trial.rows.map((r) => [r.code, r.name, formatRiyal(r.debit), formatRiyal(r.credit)]),
+        totalRow: ['', t('total'), formatRiyal(trial.total_debit), formatRiyal(trial.total_credit)],
+        exportName: 'trial-balance',
+      };
+    }
+    if (!aging) return null;
+    return {
+      title: `${t('aging')} — ${t(agingType)}`,
+      asOf: aging.as_of,
+      columns: [
+        { label: t('partner') },
+        { label: t('b0_30'), align: 'end' },
+        { label: t('b31_60'), align: 'end' },
+        { label: t('b61_90'), align: 'end' },
+        { label: t('b90_plus'), align: 'end' },
+        { label: t('total'), align: 'end' },
+      ],
+      rows: aging.rows.map((r) => [
+        r.name,
+        formatRiyal(r.b0_30),
+        formatRiyal(r.b31_60),
+        formatRiyal(r.b61_90),
+        formatRiyal(r.b90_plus),
+        formatRiyal(r.total),
+      ]),
+      totalRow: [
+        t('total'),
+        formatRiyal(aging.totals.b0_30),
+        formatRiyal(aging.totals.b31_60),
+        formatRiyal(aging.totals.b61_90),
+        formatRiyal(aging.totals.b90_plus),
+        formatRiyal(aging.totals.total),
+      ],
+      exportName: `aging-${agingType}`,
+    };
+  }, [tab, agingType, trial, aging, t]);
+
+  function exportCsv() {
+    if (!doc) return;
+    const headers = doc.columns.map((c) => c.label);
+    const rows = [...doc.rows, ...(doc.totalRow ? [doc.totalRow] : [])];
+    downloadCsv(doc.exportName, toCsv(headers, rows));
+  }
+
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={!doc} onClick={exportCsv}>
+            <Download className="h-4 w-4" strokeWidth={1.7} />
+            {t('csv')}
+          </Button>
+          <Button variant="outline" size="sm" disabled={!doc} onClick={() => window.print()}>
+            <Printer className="h-4 w-4" strokeWidth={1.7} />
+            {t('pdf')}
+          </Button>
+        </div>
+      </div>
 
       <div className="flex gap-1">
         <Button variant={tab === 'trial' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('trial')}>
@@ -162,6 +244,18 @@ export default function ReportsPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* مستند التقرير A4 — يظهر عند الطباعة / حفظ PDF فقط */}
+      {doc && (
+        <ReportDocument
+          title={doc.title}
+          asOf={doc.asOf}
+          company={company}
+          columns={doc.columns}
+          rows={doc.rows}
+          totalRow={doc.totalRow}
+        />
       )}
     </div>
   );
