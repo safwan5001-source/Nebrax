@@ -15,24 +15,28 @@ class PayrollRun extends BaseModel
 {
     protected $fillable = [
         'tenant_id', 'number', 'period', 'period_start', 'period_end',
-        'status', 'pay_method', 'total_gross', 'total_net', 'notes',
-        'journal_entry_id', 'payment_journal_entry_id', 'created_by',
+        'status', 'pay_method', 'total_gross', 'total_gosi', 'total_other_deductions',
+        'total_net', 'notes', 'journal_entry_id', 'payment_journal_entry_id', 'created_by',
         'posted_at', 'paid_at',
     ];
 
     protected $casts = [
-        'period_start' => 'date',
-        'period_end'   => 'date',
-        'total_gross'  => 'integer',
-        'total_net'    => 'integer',
-        'posted_at'    => 'datetime',
-        'paid_at'      => 'datetime',
+        'period_start'           => 'date',
+        'period_end'             => 'date',
+        'total_gross'            => 'integer',
+        'total_gosi'             => 'integer',
+        'total_other_deductions' => 'integer',
+        'total_net'              => 'integer',
+        'posted_at'              => 'datetime',
+        'paid_at'                => 'datetime',
     ];
 
     protected $attributes = [
-        'status'      => 'draft',
-        'total_gross' => 0,
-        'total_net'   => 0,
+        'status'                 => 'draft',
+        'total_gross'            => 0,
+        'total_gosi'             => 0,
+        'total_other_deductions' => 0,
+        'total_net'              => 0,
     ];
 
     public function items(): HasMany
@@ -63,5 +67,11 @@ class PayrollRun extends BaseModel
     public function isPaid(): bool
     {
         return $this->status === 'paid';
+    }
+
+    /** إجمالي الاستقطاعات (GOSI + استقطاعات أخرى) بالهللات. */
+    public function totalDeductions(): int
+    {
+        return (int) $this->total_gosi + (int) $this->total_other_deductions;
     }
 }

@@ -17,10 +17,12 @@ class PayrollItemResource extends JsonResource
                 'id'   => $this->employee->id,
                 'name' => $this->employee->name,
             ]),
-            'basic_salary' => Money::toRiyal($this->basic_salary),
-            'allowances'   => Money::toRiyal($this->allowances),
-            'gross'        => Money::toRiyal($this->gross),
-            'net'          => Money::toRiyal($this->net),
+            'basic_salary'     => Money::toRiyal($this->basic_salary),
+            'allowances'       => Money::toRiyal($this->allowances),
+            'gosi'             => Money::toRiyal($this->gosi),
+            'other_deductions' => Money::toRiyal($this->other_deductions),
+            'gross'            => Money::toRiyal($this->gross),
+            'net'              => Money::toRiyal($this->net),
         ];
     }
 }
