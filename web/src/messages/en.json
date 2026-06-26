@@ -2,6 +2,28 @@
   "app": {
     "name": "Nibras"
   },
+  "landing": {
+    "tagline": "Multi-tenant cloud accounting system",
+    "hero_title": "Run your business accounting with confidence, from anywhere",
+    "hero_subtitle": "Nibras ERP brings together ZATCA-compliant e-invoicing, strict double-entry accounting, inventory, HR, and real-time reports — in an Arabic-first interface.",
+    "cta_login": "Sign in",
+    "cta_demo": "Try the demo",
+    "features_title": "Everything your business needs, in one place",
+    "features_subtitle": "Integrated modules running on a single accounting engine.",
+    "f_zatca_title": "E-invoicing (ZATCA)",
+    "f_zatca_desc": "Tax invoices compliant with both phases, QR code and PIH hash chain.",
+    "f_accounting_title": "Double-entry accounting",
+    "f_accounting_desc": "A strict double-entry engine, Saudi chart of accounts, unbreakable balanced entries.",
+    "f_sales_title": "Sales & POS",
+    "f_sales_desc": "Invoices and quotes, fast point of sale, and sales/purchase returns.",
+    "f_inventory_title": "Inventory & purchasing",
+    "f_inventory_desc": "Perpetual inventory with moving average and automatic COGS entries.",
+    "f_hr_title": "Human resources",
+    "f_hr_desc": "Employee management and monthly payroll with deductions (GOSI/advances).",
+    "f_reports_title": "Real-time reports",
+    "f_reports_desc": "Trial balance, income statement, balance sheet, ledger, and aging.",
+    "footer": "© 2026 Nibras ERP — Multi-tenant cloud accounting."
+  },
   "nav": {
     "dashboard": "Dashboard",
     "soon": "Soon",
@@ -66,7 +88,8 @@
     "submit": "Sign in",
     "error": "Sign-in failed",
     "demo": "Demo login",
-    "demo_hint": "For review & design only"
+    "demo_hint": "For review & design only",
+    "back_home": "Back to home"
   },
   "demo": {
     "banner": "Preview mode — demo data, not connected to any server",
