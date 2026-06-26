@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
+import { DemoBanner } from '@/components/layout/demo-banner';
 import { isAuthenticated } from '@/lib/auth';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -23,11 +25,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+    <div className="flex min-h-screen flex-col bg-background">
+      <DemoBanner />
+      <div className="flex min-h-0 flex-1">
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar onMenuClick={() => setSidebarOpen(true)} />
+          <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+        </div>
       </div>
     </div>
   );
