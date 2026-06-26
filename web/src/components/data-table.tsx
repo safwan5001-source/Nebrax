@@ -10,7 +10,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowUpDown, Search, Download } from 'lucide-react';
+import { ArrowUpDown, Search, Download, Inbox } from 'lucide-react';
 import { Table, THead, TBody, TR, TH, TD } from './ui/table';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
@@ -90,7 +90,10 @@ export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyL
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <p className="py-10 text-center text-muted">{emptyLabel}</p>
+        <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted">
+          <Inbox className="h-8 w-8 opacity-60" strokeWidth={1.5} />
+          <p className="text-sm">{emptyLabel}</p>
+        </div>
       ) : (
         <>
           {/* جدول كامل على الشاشات المتوسطة فأكبر */}

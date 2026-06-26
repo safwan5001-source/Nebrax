@@ -1,3 +1,6 @@
+import { isDemo } from './demo';
+import { mockApi } from './mock-data';
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
 export class ApiError extends Error {
@@ -22,11 +25,17 @@ export function setToken(token: string): void {
 export function clearToken(): void {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
+  localStorage.removeItem('demo');
 }
 
 type Options = Omit<RequestInit, 'body'> & { body?: unknown };
 
 export async function api<T = unknown>(path: string, options: Options = {}): Promise<T> {
+  // وضع المعاينة: لا اتصال بأي خادم — البيانات من الموجّه الوهمي.
+  if (isDemo()) {
+    return mockApi<T>(path, options.method ?? 'GET');
+  }
+
   const token = getToken();
   const headers: Record<string, string> = {
     Accept: 'application/json',

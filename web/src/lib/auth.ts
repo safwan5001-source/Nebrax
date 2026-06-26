@@ -1,6 +1,7 @@
 'use client';
 
 import { api, setToken, clearToken, getToken } from './api';
+import { isDemo } from './demo';
 
 export interface AuthUser {
   id: string;
@@ -36,5 +37,5 @@ export function currentUser(): AuthUser | null {
 }
 
 export function isAuthenticated(): boolean {
-  return getToken() !== null;
+  return getToken() !== null || isDemo();
 }

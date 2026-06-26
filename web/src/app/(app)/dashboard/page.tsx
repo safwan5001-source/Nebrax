@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { TrendingUp, TrendingDown, Users, Wallet } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, Wallet, FileText, type LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { Donut } from '@/components/charts/donut';
 import { api } from '@/lib/api';
+import { isDemo } from '@/lib/demo';
+import { mockDashboard } from '@/lib/mock-data';
 import { formatRiyal } from '@/lib/money';
 
 interface IncomeStatement { total_revenue: string; total_expense: string; net_income: string }
@@ -53,12 +55,21 @@ export default function DashboardPage() {
     { label: ts('unpaid'), value: payCount('unpaid'), color: 'var(--muted)' },
   ];
 
-  const kpis = [
+  type Kpi = { title: string; value: string | undefined; icon: LucideIcon; raw?: boolean };
+
+  const liveKpis: Kpi[] = [
     { title: t('revenue'), value: income?.total_revenue, icon: TrendingUp },
     { title: t('net_income'), value: income?.net_income, icon: TrendingUp },
     { title: t('receivables'), value: receivables, icon: Users },
     { title: t('cash'), value: cash, icon: Wallet },
   ];
+  const demoKpis: Kpi[] = [
+    { title: t('revenue'), value: mockDashboard.totalSales, icon: TrendingUp },
+    { title: t('overdue'), value: mockDashboard.overdue, icon: TrendingDown },
+    { title: t('cash'), value: mockDashboard.cash, icon: Wallet },
+    { title: t('invoice_count'), value: String(mockDashboard.invoiceCount), icon: FileText, raw: true },
+  ];
+  const kpis = isDemo() ? demoKpis : liveKpis;
 
   return (
     <div className="space-y-6">
@@ -77,7 +88,9 @@ export default function DashboardPage() {
                 {loading ? (
                   <Skeleton className="h-7 w-28" />
                 ) : (
-                  <div className="num text-lg font-semibold text-text">{formatRiyal(k.value)}</div>
+                  <div className="num text-lg font-semibold text-text">
+                    {k.raw ? k.value : formatRiyal(k.value)}
+                  </div>
                 )}
               </CardContent>
             </Card>

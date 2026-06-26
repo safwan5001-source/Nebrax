@@ -6,10 +6,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { login } from '@/lib/auth';
+import { enableDemo } from '@/lib/demo';
 import { ApiError } from '@/lib/api';
 
 const schema = z.object({
@@ -38,6 +40,11 @@ export default function LoginPage() {
     } catch (e) {
       setServerError(e instanceof ApiError ? e.message : t('error'));
     }
+  }
+
+  function enterDemo() {
+    enableDemo();
+    router.replace('/dashboard');
   }
 
   return (
@@ -78,6 +85,14 @@ export default function LoginPage() {
             {t('submit')}
           </Button>
         </form>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <Button type="button" variant="outline" className="w-full text-muted" onClick={enterDemo}>
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.7} />
+            {t('demo')}
+          </Button>
+          <p className="mt-1.5 text-center text-xs text-muted">{t('demo_hint')}</p>
+        </div>
       </div>
     </main>
   );

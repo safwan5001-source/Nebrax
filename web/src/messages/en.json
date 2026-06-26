@@ -63,7 +63,13 @@
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",
-    "error": "Sign-in failed"
+    "error": "Sign-in failed",
+    "demo": "Demo login",
+    "demo_hint": "For review & design only"
+  },
+  "demo": {
+    "banner": "Preview mode — demo data, not connected to any server",
+    "close": "Close"
   },
   "topbar": {
     "greeting": "Welcome",
@@ -79,7 +85,9 @@
     "revenue_vs_expense": "Revenue vs expenses",
     "recent_invoices": "Recent invoices",
     "expense": "Expenses",
-    "invoice_status": "Invoice payment status"
+    "invoice_status": "Invoice payment status",
+    "overdue": "Overdue",
+    "invoice_count": "Invoice count"
   },
   "invoices": {
     "title": "Invoices",
