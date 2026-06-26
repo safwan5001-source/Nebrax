@@ -6,6 +6,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 
@@ -50,6 +51,8 @@ export function RunDetailDialog({
 }) {
   const t = useTranslations('hr');
   const ts = useTranslations('status');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [run, setRun] = useState<PayrollRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -69,10 +72,11 @@ export function RunDetailDialog({
     setError(null);
     try {
       const r = await api<{ data: PayrollRun }>(`/payroll-runs/${run.id}/${path}`, { method: 'POST', body });
+      success(tc('updated'));
       setRun(r.data);
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّرت العملية');
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setBusy(false);
     }

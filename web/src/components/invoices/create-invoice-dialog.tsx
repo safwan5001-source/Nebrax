@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
@@ -26,6 +27,8 @@ export function CreateInvoiceDialog({
   onCreated: () => void;
 }) {
   const t = useTranslations('invoiceForm');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [paymentType, setPaymentType] = useState('cash');
@@ -72,12 +75,13 @@ export function CreateInvoiceDialog({
       if (postNow) {
         await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
       }
+      success(tc('created'));
       // إعادة الضبط
       setLines([emptyLine()]);
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّر إنشاء الفاتورة');
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
     }

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
@@ -23,6 +24,8 @@ export function PaymentDialog({
   onSaved: () => void;
 }) {
   const t = useTranslations('paymentForm');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
 
@@ -85,13 +88,14 @@ export function PaymentDialog({
     try {
       const created = await api<{ data: { id: string } }>('/payments', { method: 'POST', body });
       await api(`/payments/${created.data.id}/post`, { method: 'POST' });
+      success(tc('created'));
       setPartnerId('');
       setAmount('');
       setDocId('');
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّر تسجيل الدفعة');
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
     }

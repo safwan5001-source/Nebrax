@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 
 export function UserDialog({
@@ -19,6 +20,8 @@ export function UserDialog({
   onSaved: () => void;
 }) {
   const t = useTranslations('users');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'staff' });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -31,11 +34,12 @@ export function UserDialog({
     setError(null);
     try {
       await api('/users', { method: 'POST', body: form });
+      success(tc('created'));
       setForm({ name: '', email: '', password: '', role: 'staff' });
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّر إضافة المستخدم');
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
     }

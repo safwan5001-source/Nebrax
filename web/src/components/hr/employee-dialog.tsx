@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { riyalToMinor } from '@/lib/money';
 
@@ -35,6 +36,8 @@ export function EmployeeDialog({
   employee?: Employee | null;
 }) {
   const t = useTranslations('hr');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [form, setForm] = useState<Employee>(
     employee ?? { id: '', name: '', national_id: '', job_title: '', basic_salary: '', allowances: '', gosi: '', other_deductions: '', is_active: true }
   );
@@ -60,13 +63,15 @@ export function EmployeeDialog({
     try {
       if (employee?.id) {
         await api(`/employees/${employee.id}`, { method: 'PUT', body });
+        success(tc('updated'));
       } else {
         await api('/employees', { method: 'POST', body });
+        success(tc('created'));
       }
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّر الحفظ');
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
     }

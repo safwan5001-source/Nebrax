@@ -54,6 +54,12 @@ export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyL
     downloadCsv(exportName ?? 'export', toCsv(headers, rows));
   }
 
+  const rows = table.getRowModel().rows;
+  const headerLabels: Record<string, string> = {};
+  table.getAllLeafColumns().forEach((c) => {
+    if (typeof c.columnDef.header === 'string') headerLabels[c.id] = c.columnDef.header;
+  });
+
   return (
     <div className="rounded border border-border bg-surface">
       <div className="flex items-center gap-2 border-b border-border p-3">
@@ -83,46 +89,64 @@ export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyL
             <Skeleton key={i} className="h-8 w-full" />
           ))}
         </div>
+      ) : rows.length === 0 ? (
+        <p className="py-10 text-center text-muted">{emptyLabel}</p>
       ) : (
-        <Table>
-          <THead>
-            {table.getHeaderGroups().map((hg) => (
-              <TR key={hg.id}>
-                {hg.headers.map((header) => (
-                  <TH key={header.id}>
-                    {header.isPlaceholder ? null : (
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 hover:text-text"
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getCanSort() && <ArrowUpDown className="h-3 w-3" strokeWidth={1.6} />}
-                      </button>
-                    )}
-                  </TH>
+        <>
+          {/* جدول كامل على الشاشات المتوسطة فأكبر */}
+          <div className="hidden md:block">
+            <Table>
+              <THead>
+                {table.getHeaderGroups().map((hg) => (
+                  <TR key={hg.id}>
+                    {hg.headers.map((header) => (
+                      <TH key={header.id}>
+                        {header.isPlaceholder ? null : (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 hover:text-text"
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getCanSort() && <ArrowUpDown className="h-3 w-3" strokeWidth={1.6} />}
+                          </button>
+                        )}
+                      </TH>
+                    ))}
+                  </TR>
                 ))}
-              </TR>
+              </THead>
+              <TBody>
+                {rows.map((row) => (
+                  <TR key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TD key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TD>
+                    ))}
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </div>
+
+          {/* بطاقات على الجوال (مبدأ التخطيط #6) */}
+          <ul className="divide-y divide-border md:hidden">
+            {rows.map((row) => (
+              <li key={row.id} className="flex flex-col gap-1.5 p-3.5">
+                {row.getVisibleCells().map((cell) => {
+                  const header = headerLabels[cell.column.id];
+                  return (
+                    <div key={cell.id} className="flex items-baseline justify-between gap-3">
+                      {header ? <span className="shrink-0 text-xs text-muted">{header}</span> : <span />}
+                      <span className="min-w-0 text-end text-sm">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </span>
+                    </div>
+                  );
+                })}
+              </li>
             ))}
-          </THead>
-          <TBody>
-            {table.getRowModel().rows.length === 0 ? (
-              <TR>
-                <TD colSpan={columns.length} className="py-10 text-center text-muted">
-                  {emptyLabel}
-                </TD>
-              </TR>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TR key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TD key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TD>
-                  ))}
-                </TR>
-              ))
-            )}
-          </TBody>
-        </Table>
+          </ul>
+        </>
       )}
     </div>
   );

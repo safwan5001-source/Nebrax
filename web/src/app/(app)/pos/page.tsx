@@ -6,6 +6,7 @@ import { Plus, Minus, Trash2, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
@@ -17,6 +18,8 @@ interface CartLine { key: string; productId: string | null; description: string;
 
 export default function PosPage() {
   const t = useTranslations('pos');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -84,10 +87,11 @@ export default function PosPage() {
       });
       await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
       const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
+      success(tc('updated'));
       setReceipt({ number: created.data.number, total: created.data.total, qr: z.qr });
       setCart([]);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'تعذّر إتمام البيع');
+      setError(e instanceof ApiError ? e.message : tc('saveFailed'));
     } finally {
       setPaying(false);
     }
