@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 
 export interface Partner {
@@ -30,6 +31,8 @@ export function PartnerDialog({
   partner?: Partner | null;
 }) {
   const tp = useTranslations('partners');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [form, setForm] = useState<Partner>(
     partner ?? { id: '', name: '', type: 'customer', email: '', phone: '', city: '' }
   );
@@ -52,13 +55,15 @@ export function PartnerDialog({
     try {
       if (partner?.id) {
         await api(`/partners/${partner.id}`, { method: 'PUT', body });
+        success(tc('updated'));
       } else {
         await api('/partners', { method: 'POST', body });
+        success(tc('created'));
       }
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّر الحفظ');
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
     }

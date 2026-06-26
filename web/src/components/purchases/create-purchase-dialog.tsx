@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
@@ -26,6 +27,8 @@ export function CreatePurchaseDialog({
   onCreated: () => void;
 }) {
   const t = useTranslations('purchaseForm');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [suppliers, setSuppliers] = useState<Partner[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [paymentType, setPaymentType] = useState('credit');
@@ -67,11 +70,12 @@ export function CreatePurchaseDialog({
         body: { partner_id: partnerId, payment_type: paymentType, items },
       });
       if (postNow) await api(`/purchases/${created.data.id}/post`, { method: 'POST' });
+      success(tc('created'));
       setLines([emptyLine()]);
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّر إنشاء فاتورة المشتريات');
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
     }

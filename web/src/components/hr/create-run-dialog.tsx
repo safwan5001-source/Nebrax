@@ -6,6 +6,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 
 // الفترة بصيغة YYYY-MM، افتراضياً الشهر الحالي.
@@ -24,6 +25,8 @@ export function CreateRunDialog({
   onCreated: () => void;
 }) {
   const t = useTranslations('hr');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [period, setPeriod] = useState(currentPeriod());
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -34,10 +37,11 @@ export function CreateRunDialog({
     setError(null);
     try {
       await api('/payroll-runs', { method: 'POST', body: { period } });
+      success(tc('created'));
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّر الإنشاء');
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
     }

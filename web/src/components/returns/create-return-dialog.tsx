@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
@@ -26,6 +27,8 @@ export function CreateReturnDialog({
   onCreated: () => void;
 }) {
   const t = useTranslations('returnForm');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [type, setType] = useState<'sales' | 'purchase'>('sales');
   const [partners, setPartners] = useState<Partner[]>([]);
   const [partnerId, setPartnerId] = useState('');
@@ -74,11 +77,12 @@ export function CreateReturnDialog({
         body: { type, partner_id: partnerId, payment_type: paymentType, items },
       });
       if (postNow) await api(`/returns/${created.data.id}/post`, { method: 'POST' });
+      success(tc('created'));
       setLines([emptyLine()]);
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّر إنشاء المرتجع');
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
     }

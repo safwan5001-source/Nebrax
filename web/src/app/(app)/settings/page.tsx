@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { UserDialog } from '@/components/users/user-dialog';
+import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 
@@ -47,6 +48,8 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
 export default function SettingsPage() {
   const t = useTranslations('settings');
   const tu = useTranslations('users');
+  const tc = useTranslations('common');
+  const { success } = useToast();
   const [sub, setSub] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const user = currentUser();
@@ -67,6 +70,7 @@ export default function SettingsPage() {
 
   async function removeUser(id: string) {
     await api(`/users/${id}`, { method: 'DELETE' }).catch(() => {});
+    success(tc('deleted'));
     loadTeam();
   }
 
