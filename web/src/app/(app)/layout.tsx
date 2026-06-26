@@ -10,6 +10,7 @@ import { isAuthenticated } from '@/lib/auth';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -27,10 +28,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col bg-background">
       <DemoBanner />
       <div className="flex min-h-0 flex-1">
-        <Sidebar />
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar />
-          <main className="flex-1 overflow-auto p-6">{children}</main>
+          <Topbar onMenuClick={() => setSidebarOpen(true)} />
+          <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6">{children}</main>
         </div>
       </div>
     </div>

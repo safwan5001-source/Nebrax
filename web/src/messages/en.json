@@ -5,6 +5,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "soon": "Soon",
+    "close": "Close menu",
     "groups": {
       "sales": "Sales",
       "customers": "Customers",
@@ -74,7 +75,8 @@
   "topbar": {
     "greeting": "Welcome",
     "search": "Search…",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "menu": "Menu"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -87,7 +89,12 @@
     "expense": "Expenses",
     "invoice_status": "Invoice payment status",
     "overdue": "Overdue",
-    "invoice_count": "Invoice count"
+    "invoice_count": "Invoice count",
+    "quick_actions": "Quick actions",
+    "qa_invoice": "New invoice",
+    "qa_partner": "New customer",
+    "qa_payment": "Record payment",
+    "qa_reports": "Reports"
   },
   "invoices": {
     "title": "Invoices",

@@ -2,7 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { TrendingUp, TrendingDown, Users, Wallet, FileText, type LucideIcon } from 'lucide-react';
+import Link from 'next/link';
+import {
+  TrendingUp,
+  TrendingDown,
+  Users,
+  Wallet,
+  FileText,
+  FilePlus,
+  UserPlus,
+  CreditCard,
+  BarChart3,
+  type LucideIcon,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,11 +23,18 @@ import { Donut } from '@/components/charts/donut';
 import { api } from '@/lib/api';
 import { isDemo } from '@/lib/demo';
 import { mockDashboard } from '@/lib/mock-data';
-import { formatRiyal } from '@/lib/money';
+import { formatRiyal, formatRiyalShort } from '@/lib/money';
 
 interface IncomeStatement { total_revenue: string; total_expense: string; net_income: string }
 interface Account { code: string; name: string; balance: string }
 interface Invoice { id: string; number: string; invoice_date: string; total: string; status: string; payment_status: string }
+
+const QUICK_ACTIONS: { href: string; key: string; icon: LucideIcon }[] = [
+  { href: '/invoices', key: 'qa_invoice', icon: FilePlus },
+  { href: '/partners', key: 'qa_partner', icon: UserPlus },
+  { href: '/payments', key: 'qa_payment', icon: CreditCard },
+  { href: '/reports', key: 'qa_reports', icon: BarChart3 },
+];
 
 export default function DashboardPage() {
   const t = useTranslations('dashboard');
@@ -75,27 +94,46 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {kpis.map((k) => {
           const Icon = k.icon;
           return (
             <Card key={k.title}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>{k.title}</CardTitle>
-                <Icon className="h-4 w-4 text-muted" strokeWidth={1.7} />
+                <Icon className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
               </CardHeader>
               <CardContent>
                 {loading ? (
                   <Skeleton className="h-7 w-28" />
                 ) : (
                   <div className="num text-lg font-semibold text-text">
-                    {k.raw ? k.value : formatRiyal(k.value)}
+                    {k.raw ? k.value : formatRiyalShort(k.value)}
                   </div>
                 )}
               </CardContent>
             </Card>
           );
         })}
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-sm font-medium text-muted">{t('quick_actions')}</h2>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {QUICK_ACTIONS.map((a) => {
+            const Icon = a.icon;
+            return (
+              <Link
+                key={a.href}
+                href={a.href}
+                className="flex items-center gap-2.5 rounded border border-border bg-surface px-3.5 py-3 text-sm text-text transition-colors hover:border-primary hover:text-primary"
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0 text-muted" strokeWidth={1.7} />
+                <span className="truncate">{t(a.key)}</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
