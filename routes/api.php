@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
@@ -53,6 +54,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('products', [ProductController::class, 'store'])->middleware($perm('products.manage'));
         Route::put('products/{id}', [ProductController::class, 'update'])->middleware($perm('products.manage'));
         Route::delete('products/{id}', [ProductController::class, 'destroy'])->middleware($perm('products.manage'));
+
+        // تقرير المخزون (قراءة فقط — لا أثر محاسبي)
+        Route::get('inventory', [InventoryController::class, 'index'])->middleware($perm('products.view'));
+        Route::get('inventory/{productId}/movements', [InventoryController::class, 'movements'])->middleware($perm('products.view'));
 
         // دليل الحسابات (قراءة)
         Route::get('accounts', [AccountController::class, 'index'])->middleware($perm('accounts.view'));

@@ -484,6 +484,10 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/employees') return resolve({ data: mockEmployees });
   if (clean === '/payroll-runs') return resolve({ data: mockPayrollRuns });
 
+  if (clean === '/inventory') return resolve(mockInventory());
+  const movementsMatch = clean.match(/^\/inventory\/([^/]+)\/movements$/);
+  if (movementsMatch) return resolve(mockMovements(movementsMatch[1]));
+
   if (clean === '/reports/income-statement') return resolve(mockIncomeStatement);
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);
   const agingMatch = clean.match(/^\/reports\/aging\/([^/]+)$/);
@@ -529,6 +533,35 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   function resolve<R>(value: R): Promise<T> {
     return Promise.resolve(value as unknown as T);
   }
+}
+
+// تقرير المخزون من المنتجات المتتبَّعة (القيمة = الكمية × متوسط التكلفة).
+function mockInventory() {
+  const items = mockProducts
+    .filter((p) => p.track_inventory)
+    .map((p) => ({
+      id: p.id,
+      sku: p.sku,
+      name: p.name,
+      unit: p.unit,
+      quantity_on_hand: p.quantity_on_hand,
+      avg_cost: p.avg_cost,
+      stock_value: (p.quantity_on_hand * Number(p.avg_cost)).toFixed(2),
+    }));
+  const total = items.reduce((s, i) => s + Number(i.stock_value), 0).toFixed(2);
+  return { data: items, total_value: total };
+}
+
+function mockMovements(productId: string) {
+  const p = mockProducts.find((x) => x.id === productId);
+  if (!p || !p.track_inventory) return { data: [] };
+  const cost = Number(p.avg_cost);
+  return {
+    data: [
+      { id: 'mv1', type: 'in', quantity: p.quantity_on_hand + 5, unit_cost: p.avg_cost, total_cost: ((p.quantity_on_hand + 5) * cost).toFixed(2), balance_quantity: p.quantity_on_hand + 5, movement_date: '2026-06-01', notes: 'رصيد افتتاحي' },
+      { id: 'mv2', type: 'out', quantity: 5, unit_cost: p.avg_cost, total_cost: (5 * cost).toFixed(2), balance_quantity: p.quantity_on_hand, movement_date: '2026-06-15', notes: 'صرف/بيع' },
+    ],
+  };
 }
 
 // إجمالي فاتورة من جسم الطلب (السطور بالهللات) → ريال نصّي.

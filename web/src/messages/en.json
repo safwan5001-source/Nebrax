@@ -77,7 +77,8 @@
     "reports": "Reports",
     "settings": "Settings",
     "payments": "Payments",
-    "returns": "Returns"
+    "returns": "Returns",
+    "stockBalances": "Stock balances"
   },
   "login": {
     "title": "Sign in",
@@ -524,5 +525,26 @@
     "receipt_done": "Sale completed",
     "new_sale": "New sale",
     "print": "Print"
+  },
+  "inventory": {
+    "title": "Stock balances",
+    "total_value": "Total stock value",
+    "sku": "SKU",
+    "name": "Item",
+    "unit": "Unit",
+    "qty": "Qty",
+    "avg_cost": "Avg cost",
+    "stock_value": "Stock value",
+    "movements": "Movements",
+    "empty": "No tracked items",
+    "search": "Search…",
+    "type": "Type",
+    "date": "Date",
+    "balance": "Balance",
+    "in": "In",
+    "out": "Out",
+    "adjustment": "Adjustment",
+    "close": "Close",
+    "notes": "Notes"
   }
 }
