@@ -161,16 +161,43 @@ export const mockZatca = {
   icv: 118,
 };
 
-// ── المنتجات (لنقطة البيع) ─────────────────────────────────────────────────
-export const mockProducts = [
-  { id: 'pr1', name: 'ساعة عمل استشارية', sale_price: '250.00', tax_rate: 15 },
-  { id: 'pr2', name: 'جهاز قياس رقمي', sale_price: '1200.00', tax_rate: 15 },
-  { id: 'pr3', name: 'كرتون ورق A4', sale_price: '95.00', tax_rate: 15 },
-  { id: 'pr4', name: 'حبر طابعة ليزر', sale_price: '180.00', tax_rate: 15 },
-  { id: 'pr5', name: 'كرسي مكتب دوّار', sale_price: '650.00', tax_rate: 15 },
-  { id: 'pr6', name: 'طاولة اجتماعات', sale_price: '2300.00', tax_rate: 15 },
-  { id: 'pr7', name: 'رخصة برنامج سنوية', sale_price: '1500.00', tax_rate: 15 },
-  { id: 'pr8', name: 'عقد صيانة شهري', sale_price: '400.00', tax_rate: 15 },
+// ── المنتجات (إدارة المنتجات + نقطة البيع) ──────────────────────────────────
+export interface MockProduct {
+  id: string;
+  sku: string | null;
+  name: string;
+  name_en: string | null;
+  type: string;
+  unit: string;
+  sale_price: string;
+  purchase_price: string;
+  tax_rate: number;
+  track_inventory: boolean;
+  quantity_on_hand: number;
+  avg_cost: string;
+  is_active: boolean;
+}
+
+function product(
+  id: string, sku: string, name: string, type: string, unit: string,
+  sale: number, purchase: number, track: boolean, qty: number, avg: number, active = true
+): MockProduct {
+  return {
+    id, sku, name, name_en: null, type, unit,
+    sale_price: sale.toFixed(2), purchase_price: purchase.toFixed(2), tax_rate: 15,
+    track_inventory: track, quantity_on_hand: qty, avg_cost: avg.toFixed(2), is_active: active,
+  };
+}
+
+export const mockProducts: MockProduct[] = [
+  product('pr1', 'SKU-001', 'ساعة عمل استشارية', 'service', 'hour', 250, 0, false, 0, 0),
+  product('pr2', 'SKU-002', 'جهاز قياس رقمي', 'good', 'piece', 1200, 800, true, 35, 760),
+  product('pr3', 'SKU-003', 'كرتون ورق A4', 'good', 'carton', 95, 60, true, 240, 58),
+  product('pr4', 'SKU-004', 'حبر طابعة ليزر', 'good', 'piece', 180, 110, true, 80, 105),
+  product('pr5', 'SKU-005', 'كرسي مكتب دوّار', 'good', 'piece', 650, 420, true, 18, 410),
+  product('pr6', 'SKU-006', 'طاولة اجتماعات', 'good', 'piece', 2300, 1500, true, 6, 1480),
+  product('pr7', 'SKU-007', 'رخصة برنامج سنوية', 'service', 'license', 1500, 0, false, 0, 0),
+  product('pr8', 'SKU-008', 'عقد صيانة شهري', 'service', 'service', 400, 0, false, 0, 0, false),
 ];
 
 // مجمّع إجماليات مستند من سطوره (الإجماليات مشتقّة لا مُدخلة).
