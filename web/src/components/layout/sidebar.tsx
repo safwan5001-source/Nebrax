@@ -75,8 +75,8 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/invoices', icon: FileText, key: 'invoicesManage', built: true },
       { href: '/invoices/new', icon: FilePlus, key: 'invoiceCreate', built: true },
-      { href: '/quotes', icon: ClipboardList, key: 'quotesManage' },
-      { href: '/quotes/new', icon: FilePlus2, key: 'quoteCreate' },
+      { href: '/quotes', icon: ClipboardList, key: 'quotesManage', built: true },
+      { href: '/quotes/new', icon: FilePlus2, key: 'quoteCreate', built: true },
       { href: '/credit-notes', icon: FileMinus, key: 'creditNotes' },
       { href: '/returns', icon: Undo2, key: 'salesReturns', built: true },
       { href: '/recurring-invoices', icon: CalendarClock, key: 'recurringInvoices' },
