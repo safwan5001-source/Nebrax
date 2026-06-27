@@ -597,5 +597,33 @@
     "invoice_prefix": "Invoice number prefix",
     "default_terms": "Default terms",
     "save": "Save settings"
+  },
+  "creditNotes": {
+    "title": "Credit notes",
+    "create": "Create credit note",
+    "number": "Number",
+    "partner": "Customer",
+    "date": "Date",
+    "status": "Status",
+    "total": "Total",
+    "search": "Search credit notes…",
+    "empty": "No credit notes",
+    "draft": "Draft",
+    "posted": "Posted",
+    "cancelled": "Cancelled",
+    "new_title": "New credit note",
+    "details": "Credit note details",
+    "reason": "Reason",
+    "refund_type": "Type",
+    "refund_credit": "Reduce customer balance",
+    "refund_cash": "Cash refund",
+    "lines": "Lines",
+    "post": "Post",
+    "not_found": "Credit note not found",
+    "back": "Back",
+    "print": "Print",
+    "subtotal": "Subtotal",
+    "tax_total": "Total tax",
+    "save": "Save credit note"
   }
 }

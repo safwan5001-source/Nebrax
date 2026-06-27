@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InvoiceController;
@@ -79,6 +80,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('quotes/{id}', [QuoteController::class, 'update'])->middleware($perm('invoices.manage'));
         Route::delete('quotes/{id}', [QuoteController::class, 'destroy'])->middleware($perm('invoices.manage'));
         Route::post('quotes/{id}/convert', [QuoteController::class, 'convert'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
+
+        // الإشعارات الدائنة (مستند مالي؛ الترحيل يولّد قيداً عكسياً)
+        Route::get('credit-notes', [CreditNoteController::class, 'index'])->middleware($perm('invoices.view'));
+        Route::get('credit-notes/{id}', [CreditNoteController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::post('credit-notes', [CreditNoteController::class, 'store'])->middleware($perm('invoices.manage'));
+        Route::post('credit-notes/{id}/post', [CreditNoteController::class, 'post'])->middleware($perm('invoices.manage'));
 
         // المدفوعات
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));
