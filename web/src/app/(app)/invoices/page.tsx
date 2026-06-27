@@ -8,7 +8,6 @@ import { Plus } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CreateInvoiceDialog } from '@/components/invoices/create-invoice-dialog';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 
@@ -40,7 +39,6 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [partners, setPartners] = useState<Record<string, string>>({});
-  const [createOpen, setCreateOpen] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -101,10 +99,12 @@ export default function InvoicesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" strokeWidth={1.8} />
-          {t('create')}
-        </Button>
+        <Link href="/invoices/new">
+          <Button>
+            <Plus className="h-4 w-4" strokeWidth={1.8} />
+            {t('create')}
+          </Button>
+        </Link>
       </div>
 
       <DataTable
@@ -115,8 +115,6 @@ export default function InvoicesPage() {
         emptyLabel="لا توجد فواتير"
         exportName="invoices"
       />
-
-      <CreateInvoiceDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={load} />
     </div>
   );
 }
