@@ -78,7 +78,16 @@
     "settings": "الإعدادات",
     "payments": "المدفوعات",
     "returns": "المرتجعات",
-    "stockBalances": "أرصدة المخزون"
+    "stockBalances": "أرصدة المخزون",
+    "invoicesManage": "إدارة الفواتير",
+    "invoiceCreate": "إنشاء فاتورة",
+    "quotesManage": "إدارة عروض الأسعار",
+    "quoteCreate": "إنشاء عرض سعر",
+    "creditNotes": "إشعارات دائنة",
+    "salesReturns": "الفواتير المرتجعة",
+    "recurringInvoices": "الفواتير الدورية",
+    "customerPayments": "مدفوعات العملاء",
+    "salesSettings": "إعدادات المبيعات"
   },
   "login": {
     "title": "تسجيل الدخول",

@@ -78,7 +78,16 @@
     "settings": "Settings",
     "payments": "Payments",
     "returns": "Returns",
-    "stockBalances": "Stock balances"
+    "stockBalances": "Stock balances",
+    "invoicesManage": "Manage invoices",
+    "invoiceCreate": "Create invoice",
+    "quotesManage": "Manage quotes",
+    "quoteCreate": "Create quote",
+    "creditNotes": "Credit notes",
+    "salesReturns": "Returned invoices",
+    "recurringInvoices": "Recurring invoices",
+    "customerPayments": "Customer payments",
+    "salesSettings": "Sales settings"
   },
   "login": {
     "title": "Sign in",
