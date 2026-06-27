@@ -441,7 +441,16 @@
       "admin": "Admin",
       "accountant": "Accountant",
       "staff": "Staff"
-    }
+    },
+    "company": "Company profile",
+    "company_name": "Company name",
+    "vat_number": "VAT number",
+    "cr_number": "CR number",
+    "currency": "Currency",
+    "country": "Country",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel"
   },
   "users": {
     "title": "Users",

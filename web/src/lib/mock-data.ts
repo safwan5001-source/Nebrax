@@ -150,6 +150,8 @@ export const mockCompany = {
   name: 'نبراس الطموح للتجارة',
   vat_number: '310122393500003',
   cr_number: '2050123456',
+  currency: 'SAR',
+  country: 'SA',
   address: 'حي الفيصلية، الدمام',
   city: 'الدمام',
 };
