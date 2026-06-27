@@ -8,10 +8,14 @@ import {
   LayoutDashboard,
   FileText,
   Store,
-  Percent,
   CalendarClock,
-  Target,
-  QrCode,
+  FilePlus,
+  FilePlus2,
+  ClipboardList,
+  FileMinus,
+  Undo2,
+  CreditCard,
+  SlidersHorizontal,
   Users,
   Award,
   BadgeCheck,
@@ -69,12 +73,15 @@ const GROUPS: NavGroup[] = [
   {
     title: 'sales',
     items: [
-      { href: '/invoices', icon: FileText, key: 'invoices', built: true },
-      { href: '/pos', icon: Store, key: 'pos', built: true },
-      { href: '/discounts', icon: Percent, key: 'discounts' },
-      { href: '/installments', icon: CalendarClock, key: 'installments' },
-      { href: '/commissions', icon: Target, key: 'commissions' },
-      { href: '/zatca', icon: QrCode, key: 'einvoice' },
+      { href: '/invoices', icon: FileText, key: 'invoicesManage', built: true },
+      { href: '/invoices/new', icon: FilePlus, key: 'invoiceCreate', built: true },
+      { href: '/quotes', icon: ClipboardList, key: 'quotesManage' },
+      { href: '/quotes/new', icon: FilePlus2, key: 'quoteCreate' },
+      { href: '/credit-notes', icon: FileMinus, key: 'creditNotes' },
+      { href: '/returns', icon: Undo2, key: 'salesReturns', built: true },
+      { href: '/recurring-invoices', icon: CalendarClock, key: 'recurringInvoices' },
+      { href: '/payments', icon: CreditCard, key: 'customerPayments', built: true },
+      { href: '/sales-settings', icon: SlidersHorizontal, key: 'salesSettings' },
     ],
   },
   {
@@ -210,6 +217,20 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             )}
             <LayoutDashboard className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
             {t('dashboard')}
+          </Link>
+
+          {/* نقطة البيع — قسم مستقل */}
+          <Link
+            href="/pos"
+            onClick={onClose}
+            className={cn(
+              'relative mb-3 flex h-9 items-center gap-2.5 rounded px-2.5 text-sm text-muted hover:bg-primary-soft hover:text-primary',
+              isActive('/pos') && 'bg-primary-soft font-medium text-primary'
+            )}
+          >
+            {isActive('/pos') && <span className="absolute inset-y-1.5 start-0 w-0.5 rounded bg-primary" />}
+            <Store className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
+            {t('pos')}
           </Link>
 
           {GROUPS.map((group) => {
