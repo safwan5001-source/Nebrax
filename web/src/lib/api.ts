@@ -33,7 +33,7 @@ type Options = Omit<RequestInit, 'body'> & { body?: unknown };
 export async function api<T = unknown>(path: string, options: Options = {}): Promise<T> {
   // وضع المعاينة: لا اتصال بأي خادم — البيانات من الموجّه الوهمي.
   if (isDemo()) {
-    return mockApi<T>(path, options.method ?? 'GET');
+    return mockApi<T>(path, options.method ?? 'GET', options.body);
   }
 
   const token = getToken();

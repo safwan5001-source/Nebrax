@@ -161,24 +161,306 @@ export const mockZatca = {
   icv: 118,
 };
 
+// ── المنتجات (لنقطة البيع) ─────────────────────────────────────────────────
+export const mockProducts = [
+  { id: 'pr1', name: 'ساعة عمل استشارية', sale_price: '250.00', tax_rate: 15 },
+  { id: 'pr2', name: 'جهاز قياس رقمي', sale_price: '1200.00', tax_rate: 15 },
+  { id: 'pr3', name: 'كرتون ورق A4', sale_price: '95.00', tax_rate: 15 },
+  { id: 'pr4', name: 'حبر طابعة ليزر', sale_price: '180.00', tax_rate: 15 },
+  { id: 'pr5', name: 'كرسي مكتب دوّار', sale_price: '650.00', tax_rate: 15 },
+  { id: 'pr6', name: 'طاولة اجتماعات', sale_price: '2300.00', tax_rate: 15 },
+  { id: 'pr7', name: 'رخصة برنامج سنوية', sale_price: '1500.00', tax_rate: 15 },
+  { id: 'pr8', name: 'عقد صيانة شهري', sale_price: '400.00', tax_rate: 15 },
+];
+
+// مجمّع إجماليات مستند من سطوره (الإجماليات مشتقّة لا مُدخلة).
+function docTotals(lines: MockLine[]) {
+  const subtotal = lines.reduce((s, l) => s + Number(l.line_subtotal), 0);
+  const tax = lines.reduce((s, l) => s + Number(l.line_tax), 0);
+  return { subtotal: subtotal.toFixed(2), tax_amount: tax.toFixed(2), total: (subtotal + tax).toFixed(2) };
+}
+
+// ── المشتريات ──────────────────────────────────────────────────────────────
+export interface MockPurchase {
+  id: string;
+  number: string;
+  partner_id: string;
+  payment_type: string;
+  status: string;
+  payment_status: string;
+  purchase_date: string;
+  supplier_invoice_no: string | null;
+  subtotal: string;
+  tax_amount: string;
+  total: string;
+  paid_amount: string;
+  remaining: string;
+  lines: MockLine[];
+}
+
+function purchase(
+  id: string, number: string, partner_id: string, date: string,
+  status: string, payment_status: string, supplierInv: string | null, lines: MockLine[]
+): MockPurchase {
+  const { subtotal, tax_amount, total } = docTotals(lines);
+  const paid = payment_status === 'paid' ? Number(total) : payment_status === 'partial' ? Math.round(Number(total) * 50) / 100 : 0;
+  return {
+    id, number, partner_id, payment_type: payment_status === 'paid' ? 'cash' : 'credit',
+    status, payment_status, purchase_date: date, supplier_invoice_no: supplierInv,
+    subtotal, tax_amount, total, paid_amount: paid.toFixed(2), remaining: (Number(total) - paid).toFixed(2), lines,
+  };
+}
+
+export const mockPurchases: MockPurchase[] = [
+  purchase('pu-42', 'PUR-2026-0042', 'p3', '2026-06-19', 'posted', 'paid', 'S-9921', [line('l1', 'مواد خام بلاستيك (طن)', 10, 600)]),
+  purchase('pu-41', 'PUR-2026-0041', 'p5', '2026-06-15', 'posted', 'partial', 'S-8842', [line('l1', 'خدمة شحن حاويات', 1, 4000)]),
+  purchase('pu-40', 'PUR-2026-0040', 'p4', '2026-05-30', 'posted', 'unpaid', 'S-8810', [line('l1', 'قطع غيار معدّات', 20, 150)]),
+  purchase('pu-39', 'PUR-2026-0039', 'p2', '2026-06-22', 'draft', 'unpaid', null, [line('l1', 'أدوات مكتبية', 1, 1200)]),
+];
+
+// ── المرتجعات ──────────────────────────────────────────────────────────────
+export interface MockReturn {
+  id: string;
+  number: string;
+  type: 'sales' | 'purchase';
+  partner_id: string;
+  payment_type: string;
+  status: string;
+  return_date: string;
+  subtotal: string;
+  tax_amount: string;
+  total: string;
+  lines: MockLine[];
+}
+
+function returnDoc(
+  id: string, number: string, type: 'sales' | 'purchase', partner_id: string,
+  date: string, status: string, lines: MockLine[]
+): MockReturn {
+  const { subtotal, tax_amount, total } = docTotals(lines);
+  return { id, number, type, partner_id, payment_type: 'cash', status, return_date: date, subtotal, tax_amount, total, lines };
+}
+
+export const mockReturns: MockReturn[] = [
+  returnDoc('re-7', 'RET-2026-0007', 'sales', 'p1', '2026-06-21', 'posted', [line('l1', 'مرتجع بضاعة تالفة', 2, 500)]),
+  returnDoc('re-6', 'RET-2026-0006', 'purchase', 'p3', '2026-06-17', 'posted', [line('l1', 'مواد معيبة مرتجعة للمورد', 5, 600)]),
+  returnDoc('re-5', 'RET-2026-0005', 'sales', 'p5', '2026-06-10', 'posted', [line('l1', 'خدمة ملغاة', 1, 3700)]),
+  returnDoc('re-4', 'RET-2026-0004', 'sales', 'p2', '2026-05-25', 'draft', [line('l1', 'مرتجع جزئي', 1, 800)]),
+];
+
+// ── المدفوعات ──────────────────────────────────────────────────────────────
+export const mockPayments = [
+  { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
+  { id: 'pm-50', number: 'PMT-2026-0050', partner_id: 'p2', direction: 'received', method: 'cash', payment_date: '2026-06-22', amount: '6325.00' },
+  { id: 'pm-49', number: 'PMT-2026-0049', partner_id: 'p3', direction: 'paid', method: 'bank', payment_date: '2026-06-20', amount: '6900.00' },
+  { id: 'pm-48', number: 'PMT-2026-0048', partner_id: 'p5', direction: 'received', method: 'bank', payment_date: '2026-06-18', amount: '21275.00' },
+  { id: 'pm-47', number: 'PMT-2026-0047', partner_id: 'p4', direction: 'paid', method: 'cash', payment_date: '2026-06-12', amount: '3450.00' },
+  { id: 'pm-46', number: 'PMT-2026-0046', partner_id: 'p6', direction: 'received', method: 'bank', payment_date: '2026-06-08', amount: '4600.00' },
+];
+
+// ── الموارد البشرية ────────────────────────────────────────────────────────
+export interface MockEmployee {
+  id: string;
+  employee_no: string;
+  name: string;
+  national_id: string;
+  job_title: string;
+  basic_salary: string;
+  allowances: string;
+  gosi: string;
+  other_deductions: string;
+  is_active: boolean;
+  gross: string;
+  net: string;
+}
+
+function employee(
+  id: string, no: string, name: string, job: string,
+  basic: number, allow: number, gosi: number, other: number, active = true
+): MockEmployee {
+  const gross = basic + allow;
+  const net = gross - gosi - other;
+  return {
+    id, employee_no: no, name, national_id: `10${no.slice(-6)}0`, job_title: job,
+    basic_salary: basic.toFixed(2), allowances: allow.toFixed(2), gosi: gosi.toFixed(2),
+    other_deductions: other.toFixed(2), is_active: active, gross: gross.toFixed(2), net: net.toFixed(2),
+  };
+}
+
+export const mockEmployees: MockEmployee[] = [
+  employee('em-1', 'EMP-001', 'أحمد العتيبي', 'مدير مالي', 18000, 4000, 1800, 0),
+  employee('em-2', 'EMP-002', 'سارة القحطاني', 'محاسبة', 9000, 1500, 900, 0),
+  employee('em-3', 'EMP-003', 'خالد الدوسري', 'أمين مستودع', 6000, 800, 600, 200),
+  employee('em-4', 'EMP-004', 'منى الشمري', 'موظفة مبيعات', 7000, 2000, 700, 0),
+  employee('em-5', 'EMP-005', 'فهد المطيري', 'فني صيانة', 5500, 700, 550, 150),
+  employee('em-6', 'EMP-006', 'نورة الغامدي', 'موظفة استقبال', 4500, 500, 450, 0, false),
+];
+
+export interface MockRun {
+  id: string;
+  number: string;
+  period: string;
+  status: string;
+  pay_method: string | null;
+  total_gross: string;
+  total_gosi: string;
+  total_other_deductions: string;
+  total_deductions: string;
+  total_net: string;
+  items: {
+    id: string;
+    employee: { id: string; name: string };
+    basic_salary: string;
+    allowances: string;
+    gosi: string;
+    other_deductions: string;
+    gross: string;
+    net: string;
+  }[];
+}
+
+function payrollRun(id: string, number: string, period: string, status: string, payMethod: string | null): MockRun {
+  const items = mockEmployees.map((e) => ({
+    id: `${id}-${e.id}`,
+    employee: { id: e.id, name: e.name },
+    basic_salary: e.basic_salary,
+    allowances: e.allowances,
+    gosi: e.gosi,
+    other_deductions: e.other_deductions,
+    gross: e.gross,
+    net: e.net,
+  }));
+  const sum = (k: 'gross' | 'gosi' | 'other_deductions' | 'net') =>
+    items.reduce((s, it) => s + Number(it[k]), 0);
+  const gross = sum('gross');
+  const gosi = sum('gosi');
+  const other = sum('other_deductions');
+  return {
+    id, number, period, status, pay_method: payMethod,
+    total_gross: gross.toFixed(2), total_gosi: gosi.toFixed(2), total_other_deductions: other.toFixed(2),
+    total_deductions: (gosi + other).toFixed(2), total_net: sum('net').toFixed(2), items,
+  };
+}
+
+export const mockPayrollRuns: MockRun[] = [
+  payrollRun('run-06', 'PR-2026-06', '2026-06', 'posted', null),
+  payrollRun('run-05', 'PR-2026-05', '2026-05', 'paid', 'bank'),
+  payrollRun('run-04', 'PR-2026-04', '2026-04', 'paid', 'bank'),
+];
+
+// ── المستخدمون والاشتراك ───────────────────────────────────────────────────
+export const mockUsers = [
+  { id: DEMO_USER.id, name: DEMO_USER.name, email: DEMO_USER.email, role: 'owner', is_active: true },
+  { id: 'us-2', name: 'سارة القحطاني', email: 'sara@nibras.sa', role: 'accountant', is_active: true },
+  { id: 'us-3', name: 'خالد الدوسري', email: 'khalid@nibras.sa', role: 'staff', is_active: true },
+];
+
+export const mockSubscription = {
+  plan: 'pro',
+  active: true,
+  trial_ends_at: null as string | null,
+  subscription_ends_at: '2026-12-31',
+  limits: { invoices_per_month: 1000, users: 10 },
+  usage: { invoices_this_month: 147, users: 3 },
+};
+
+// ── التقارير ───────────────────────────────────────────────────────────────
+export const mockTrialBalance = {
+  rows: [
+    { code: '1110', name: 'الصندوق', debit: '54320.00', credit: '0.00' },
+    { code: '1120', name: 'البنك', debit: '163520.00', credit: '0.00' },
+    { code: '1130', name: 'العملاء', debit: '63200.00', credit: '0.00' },
+    { code: '1140', name: 'المخزون', debit: '85000.00', credit: '0.00' },
+    { code: '1150', name: 'ضريبة المدخلات', debit: '12400.00', credit: '0.00' },
+    { code: '2110', name: 'الموردون', debit: '0.00', credit: '41250.00' },
+    { code: '2120', name: 'ضريبة المخرجات', debit: '0.00', credit: '33960.00' },
+    { code: '2130', name: 'رواتب مستحقة', debit: '0.00', credit: '5350.00' },
+    { code: '3110', name: 'رأس المال', debit: '0.00', credit: '138000.00' },
+    { code: '4110', name: 'إيرادات المبيعات', debit: '0.00', credit: '482500.00' },
+    { code: '5110', name: 'تكلفة البضاعة المباعة', debit: '264660.00', credit: '0.00' },
+    { code: '5120', name: 'الرواتب والأجور', debit: '54150.00', credit: '0.00' },
+    { code: '5140', name: 'الوقود', debit: '3810.00', credit: '0.00' },
+  ],
+  total_debit: '701060.00',
+  total_credit: '701060.00',
+  balanced: true,
+};
+
+function agingFor(type: string) {
+  if (type === 'payable') {
+    return {
+      type, as_of: '2026-06-26',
+      rows: [
+        { partner_id: 'p3', name: 'مصنع الشرق للبلاستيك', b0_30: '3450.00', b31_60: '0.00', b61_90: '0.00', b90_plus: '0.00', total: '3450.00' },
+        { partner_id: 'p5', name: 'شركة البحر الأحمر اللوجستية', b0_30: '0.00', b31_60: '2300.00', b61_90: '0.00', b90_plus: '0.00', total: '2300.00' },
+      ],
+      totals: { b0_30: '3450.00', b31_60: '2300.00', b61_90: '0.00', b90_plus: '0.00', total: '5750.00' },
+    };
+  }
+  return {
+    type: 'receivable', as_of: '2026-06-26',
+    rows: [
+      { partner_id: 'p2', name: 'شركة الواحة للمقاولات', b0_30: '6325.00', b31_60: '0.00', b61_90: '0.00', b90_plus: '6612.50', total: '12937.50' },
+      { partner_id: 'p3', name: 'مصنع الشرق للبلاستيك', b0_30: '0.00', b31_60: '8280.00', b61_90: '0.00', b90_plus: '0.00', total: '8280.00' },
+      { partner_id: 'p6', name: 'مؤسسة الفيصل للأجهزة', b0_30: '5200.00', b31_60: '0.00', b61_90: '0.00', b90_plus: '0.00', total: '5200.00' },
+    ],
+    totals: { b0_30: '11525.00', b31_60: '8280.00', b61_90: '0.00', b90_plus: '6612.50', total: '26417.50' },
+  };
+}
+
+function partnerStatement(id: string) {
+  const p = mockPartners.find((x) => x.id === id) ?? mockPartners[0];
+  return {
+    partner: { id: p.id, name: p.name, type: p.type },
+    opening_balance: '0.00',
+    rows: [
+      { date: '2026-06-01', number: 'INV-2026-0117', description: 'فاتورة مبيعات', debit: '12650.00', credit: '0.00', balance: '12650.00' },
+      { date: '2026-06-22', number: 'PMT-2026-0050', description: 'دفعة مستلمة', debit: '0.00', credit: '6325.00', balance: '6325.00' },
+    ],
+    closing_balance: '6325.00',
+  };
+}
+
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
-export function mockApi<T = unknown>(path: string, method = 'GET'): Promise<T> {
+export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const clean = path.split('?')[0];
   const m = method.toUpperCase();
 
   // الطفرات (إنشاء/تعديل/حذف/ترحيل) — نجاح صوري دون أي أثر فعلي.
   if (m !== 'GET') {
     if (clean === '/logout') return resolve(null);
+    // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
+    if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
+    // إجراءات مسيّر الرواتب (ترحيل/صرف): نُعيد المسيّر المطابق ليُحدَّث العرض.
+    const runAction = clean.match(/^\/payroll-runs\/([^/]+)\/(post|pay)$/);
+    if (runAction) {
+      const run = mockPayrollRuns.find((r) => r.id === runAction[1]) ?? mockPayrollRuns[0];
+      return resolve({ data: run });
+    }
     return resolve({ data: { id: 'demo-new' } });
   }
 
   if (clean === '/me') return resolve({ user: DEMO_USER, company: mockCompany });
-  if (clean === '/reports/income-statement') return resolve(mockIncomeStatement);
+  if (clean === '/subscription') return resolve(mockSubscription);
+  if (clean === '/users') return resolve({ data: mockUsers });
+  if (clean === '/products') return resolve({ data: mockProducts });
   if (clean === '/accounts') return resolve({ data: mockAccounts });
   if (clean === '/partners') return resolve({ data: mockPartners });
   if (clean === '/invoices') return resolve({ data: mockInvoices });
+  if (clean === '/purchases') return resolve({ data: mockPurchases });
+  if (clean === '/returns') return resolve({ data: mockReturns });
+  if (clean === '/payments') return resolve({ data: mockPayments });
+  if (clean === '/employees') return resolve({ data: mockEmployees });
+  if (clean === '/payroll-runs') return resolve({ data: mockPayrollRuns });
+
+  if (clean === '/reports/income-statement') return resolve(mockIncomeStatement);
+  if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);
+  const agingMatch = clean.match(/^\/reports\/aging\/([^/]+)$/);
+  if (agingMatch) return resolve(agingFor(agingMatch[1]));
+  const stmtMatch = clean.match(/^\/reports\/partner-statement\/([^/]+)$/);
+  if (stmtMatch) return resolve(partnerStatement(stmtMatch[1]));
 
   const partnerMatch = clean.match(/^\/partners\/([^/]+)$/);
   if (partnerMatch) {
@@ -194,10 +476,38 @@ export function mockApi<T = unknown>(path: string, method = 'GET'): Promise<T> {
     return resolve({ data: found });
   }
 
+  const purchaseMatch = clean.match(/^\/purchases\/([^/]+)$/);
+  if (purchaseMatch) {
+    const found = mockPurchases.find((p) => p.id === purchaseMatch[1]) ?? mockPurchases[0];
+    return resolve({ data: found });
+  }
+
+  const returnMatch = clean.match(/^\/returns\/([^/]+)$/);
+  if (returnMatch) {
+    const found = mockReturns.find((r) => r.id === returnMatch[1]) ?? mockReturns[0];
+    return resolve({ data: found });
+  }
+
+  const runMatch = clean.match(/^\/payroll-runs\/([^/]+)$/);
+  if (runMatch) {
+    const found = mockPayrollRuns.find((r) => r.id === runMatch[1]) ?? mockPayrollRuns[0];
+    return resolve({ data: found });
+  }
+
   // افتراضي: لا بيانات بعد (حالة فارغة).
   return resolve({ data: [] });
 
   function resolve<R>(value: R): Promise<T> {
     return Promise.resolve(value as unknown as T);
   }
+}
+
+// إجمالي فاتورة من جسم الطلب (السطور بالهللات) → ريال نصّي.
+function invoiceTotalFromBody(body: unknown): string {
+  const items = (body as { items?: { quantity?: number; unit_price?: number; tax_rate?: number }[] } | undefined)?.items ?? [];
+  const minor = items.reduce((s, it) => {
+    const sub = (it.quantity ?? 0) * (it.unit_price ?? 0);
+    return s + sub + Math.round((sub * (it.tax_rate ?? 0)) / 100);
+  }, 0);
+  return (minor / 100).toFixed(2);
 }
