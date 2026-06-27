@@ -8,6 +8,7 @@ export interface Company {
   vat_number?: string | null;
   cr_number?: string | null;
   currency?: string | null;
+  country?: string | null;
 }
 
 /** يجلب بيانات الشركة (البائع) من /me لاستخدامها في رؤوس المستندات. */

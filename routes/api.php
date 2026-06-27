@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
@@ -95,6 +96,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('payroll-runs', [PayrollController::class, 'store'])->middleware($perm('hr.manage'));
         Route::post('payroll-runs/{id}/post', [PayrollController::class, 'post'])->middleware($perm('hr.manage'));
         Route::post('payroll-runs/{id}/pay', [PayrollController::class, 'pay'])->middleware($perm('hr.manage'));
+
+        // إعدادات الشركة (owner/admin) — تحديث ملف فقط، لا أثر محاسبي
+        Route::put('company', [CompanyController::class, 'update'])->middleware($perm('company.manage'));
 
         // إدارة المستخدمين (owner/admin)
         Route::get('users', [UserController::class, 'index'])->middleware($perm('users.view'));

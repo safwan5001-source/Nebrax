@@ -441,7 +441,16 @@
       "admin": "مدير",
       "accountant": "محاسب",
       "staff": "موظف"
-    }
+    },
+    "company": "ملف الشركة",
+    "company_name": "اسم الشركة",
+    "vat_number": "الرقم الضريبي",
+    "cr_number": "السجل التجاري",
+    "currency": "العملة",
+    "country": "الدولة",
+    "edit": "تعديل",
+    "save": "حفظ",
+    "cancel": "إلغاء"
   },
   "users": {
     "title": "المستخدمون",

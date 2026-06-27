@@ -2,16 +2,18 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { UserDialog } from '@/components/users/user-dialog';
+import { CompanyDialog } from '@/components/settings/company-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import type { Company } from '@/lib/company';
 
 interface TeamUser { id: string; name: string; email: string; role: string; is_active: boolean }
 
@@ -57,16 +59,23 @@ export default function SettingsPage() {
 
   const [team, setTeam] = useState<TeamUser[]>([]);
   const [userDialog, setUserDialog] = useState(false);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [companyDialog, setCompanyDialog] = useState(false);
 
   const loadTeam = useCallback(() => {
     if (!canManage) return;
     api<{ data: TeamUser[] }>('/users').then((r) => setTeam(r.data)).catch(() => {});
   }, [canManage]);
 
+  const loadCompany = useCallback(() => {
+    api<{ company: Company }>('/me').then((r) => setCompany(r.company)).catch(() => {});
+  }, []);
+
   useEffect(() => {
     api<Subscription>('/subscription').then(setSub).finally(() => setLoading(false));
     loadTeam();
-  }, [loadTeam]);
+    loadCompany();
+  }, [loadTeam, loadCompany]);
 
   async function removeUser(id: string) {
     await api(`/users/${id}`, { method: 'DELETE' }).catch(() => {});
@@ -139,6 +148,42 @@ export default function SettingsPage() {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>{t('company')}</CardTitle>
+          {canManage && company && (
+            <Button variant="outline" size="sm" onClick={() => setCompanyDialog(true)}>
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.7} />
+              {t('edit')}
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          {!company ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              <div className="flex justify-between">
+                <dt className="text-muted">{t('company_name')}</dt>
+                <dd className="text-text">{company.name}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted">{t('vat_number')}</dt>
+                <dd className="num text-text">{company.vat_number ?? '—'}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted">{t('cr_number')}</dt>
+                <dd className="num text-text">{company.cr_number ?? '—'}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted">{t('currency')}</dt>
+                <dd className="num text-text">{company.currency ?? '—'}</dd>
+              </div>
+            </dl>
+          )}
+        </CardContent>
+      </Card>
+
       {canManage && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -180,6 +225,9 @@ export default function SettingsPage() {
       )}
 
       <UserDialog open={userDialog} onClose={() => setUserDialog(false)} onSaved={loadTeam} />
+      {companyDialog && (
+        <CompanyDialog open onClose={() => setCompanyDialog(false)} onSaved={loadCompany} company={company} />
+      )}
     </div>
   );
 }
