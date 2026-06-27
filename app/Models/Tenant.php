@@ -18,13 +18,14 @@ class Tenant extends Model
 
     protected $fillable = [
         'name', 'slug', 'vat_number', 'cr_number', 'currency', 'country',
-        'timezone', 'plan', 'feature_flags', 'plan_limits',
+        'timezone', 'plan', 'feature_flags', 'plan_limits', 'settings',
         'trial_ends_at', 'subscription_ends_at', 'is_active',
     ];
 
     protected $casts = [
         'feature_flags'        => 'array',
         'plan_limits'          => 'array',
+        'settings'             => 'array',
         'is_active'            => 'boolean',
         'trial_ends_at'        => 'datetime',
         'subscription_ends_at' => 'datetime',

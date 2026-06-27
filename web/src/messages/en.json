@@ -585,5 +585,17 @@
     "tax_total": "Total tax",
     "save": "Save quote",
     "cancel": "Cancel"
+  },
+  "salesSettings": {
+    "title": "Sales settings",
+    "subtitle": "Defaults used across invoices and quotes",
+    "default_tax_rate": "Default tax rate %",
+    "default_payment_type": "Default payment type",
+    "cash": "Cash",
+    "credit": "Credit",
+    "quote_validity_days": "Quote validity (days)",
+    "invoice_prefix": "Invoice number prefix",
+    "default_terms": "Default terms",
+    "save": "Save settings"
   }
 }

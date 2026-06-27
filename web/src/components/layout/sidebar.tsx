@@ -81,7 +81,7 @@ const GROUPS: NavGroup[] = [
       { href: '/returns', icon: Undo2, key: 'salesReturns', built: true },
       { href: '/recurring-invoices', icon: CalendarClock, key: 'recurringInvoices' },
       { href: '/payments', icon: CreditCard, key: 'customerPayments', built: true },
-      { href: '/sales-settings', icon: SlidersHorizontal, key: 'salesSettings' },
+      { href: '/sales-settings', icon: SlidersHorizontal, key: 'salesSettings', built: true },
     ],
   },
   {

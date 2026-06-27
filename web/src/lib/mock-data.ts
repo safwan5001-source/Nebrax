@@ -417,6 +417,14 @@ export const mockUsers = [
   { id: 'us-3', name: 'خالد الدوسري', email: 'khalid@nibras.sa', role: 'staff', is_active: true },
 ];
 
+export const mockSalesSettings = {
+  default_tax_rate: 15,
+  default_payment_type: 'credit',
+  quote_validity_days: 14,
+  invoice_prefix: 'INV',
+  default_terms: 'الدفع خلال 30 يوماً من تاريخ الفاتورة.',
+};
+
 export const mockSubscription = {
   plan: 'pro',
   active: true,
@@ -506,6 +514,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
 
   if (clean === '/me') return resolve({ user: DEMO_USER, company: mockCompany });
   if (clean === '/subscription') return resolve(mockSubscription);
+  if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
   if (clean === '/users') return resolve({ data: mockUsers });
   if (clean === '/products') return resolve({ data: mockProducts });
   if (clean === '/accounts') return resolve({ data: mockAccounts });
