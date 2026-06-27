@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
+use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Middleware\EnforcePlanLimit;
@@ -113,6 +114,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // إعدادات الشركة (owner/admin) — تحديث ملف فقط، لا أثر محاسبي
         Route::put('company', [CompanyController::class, 'update'])->middleware($perm('company.manage'));
+
+        // إعدادات المبيعات (تفضيلات غير محاسبية)
+        Route::get('sales-settings', [SalesSettingsController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::put('sales-settings', [SalesSettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // إدارة المستخدمين (owner/admin)
         Route::get('users', [UserController::class, 'index'])->middleware($perm('users.view'));
