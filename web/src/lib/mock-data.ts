@@ -339,6 +339,43 @@ export const mockCreditNotes: MockCreditNote[] = [
   creditNote('cn-1', 'CN-2026-0001', 'p2', '2026-06-10', 'credit', 'draft', 'بضاعة ناقصة', [line('l1', 'نقص في التوريد', 2, 300)]),
 ];
 
+// ── الفواتير الدورية ───────────────────────────────────────────────────────
+export interface MockRecurring {
+  id: string;
+  title: string | null;
+  partner_id: string;
+  payment_type: string;
+  frequency: string;
+  start_date: string;
+  next_run_date: string;
+  end_date: string | null;
+  active: boolean;
+  generated_count: number;
+  subtotal: string;
+  tax_amount: string;
+  total: string;
+  notes: string | null;
+  lines: MockLine[];
+}
+
+function recurring(
+  id: string, title: string, partner_id: string, frequency: string,
+  start: string, next: string, count: number, lines: MockLine[]
+): MockRecurring {
+  const { subtotal, tax_amount, total } = docTotals(lines);
+  return {
+    id, title, partner_id, payment_type: 'credit', frequency,
+    start_date: start, next_run_date: next, end_date: null, active: true,
+    generated_count: count, subtotal, tax_amount, total, notes: null, lines,
+  };
+}
+
+export const mockRecurring: MockRecurring[] = [
+  recurring('rc-1', 'اشتراك خدمة سحابية شهري', 'p1', 'monthly', '2026-01-01', '2026-07-01', 6, [line('l1', 'اشتراك شهري', 1, 1500)]),
+  recurring('rc-2', 'عقد صيانة ربع سنوي', 'p4', 'quarterly', '2026-01-01', '2026-07-01', 2, [line('l1', 'صيانة دورية', 1, 4000)]),
+  recurring('rc-3', 'إيجار وحدة سنوي', 'p5', 'yearly', '2026-01-01', '2027-01-01', 1, [line('l1', 'إيجار سنوي', 1, 60000)]),
+];
+
 // ── المدفوعات ──────────────────────────────────────────────────────────────
 export const mockPayments = [
   { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
@@ -551,6 +588,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/invoices') return resolve({ data: mockInvoices });
   if (clean === '/quotes') return resolve({ data: mockQuotes });
   if (clean === '/credit-notes') return resolve({ data: mockCreditNotes });
+  if (clean === '/recurring-invoices') return resolve({ data: mockRecurring });
   if (clean === '/purchases') return resolve({ data: mockPurchases });
   if (clean === '/returns') return resolve({ data: mockReturns });
   if (clean === '/payments') return resolve({ data: mockPayments });
@@ -591,6 +629,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const creditNoteMatch = clean.match(/^\/credit-notes\/([^/]+)$/);
   if (creditNoteMatch) {
     const found = mockCreditNotes.find((c) => c.id === creditNoteMatch[1]) ?? mockCreditNotes[0];
+    return resolve({ data: found });
+  }
+
+  const recurringMatch = clean.match(/^\/recurring-invoices\/([^/]+)$/);
+  if (recurringMatch) {
+    const found = mockRecurring.find((r) => r.id === recurringMatch[1]) ?? mockRecurring[0];
     return resolve({ data: found });
   }
 

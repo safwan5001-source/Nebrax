@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\QuoteController;
+use App\Http\Controllers\Api\RecurringInvoiceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\SalesSettingsController;
@@ -86,6 +87,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('credit-notes/{id}', [CreditNoteController::class, 'show'])->middleware($perm('invoices.view'));
         Route::post('credit-notes', [CreditNoteController::class, 'store'])->middleware($perm('invoices.manage'));
         Route::post('credit-notes/{id}/post', [CreditNoteController::class, 'post'])->middleware($perm('invoices.manage'));
+
+        // الفواتير الدورية (قالب + جدولة؛ التوليد ينتج فاتورة draft)
+        Route::get('recurring-invoices', [RecurringInvoiceController::class, 'index'])->middleware($perm('invoices.view'));
+        Route::get('recurring-invoices/{id}', [RecurringInvoiceController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::post('recurring-invoices', [RecurringInvoiceController::class, 'store'])->middleware($perm('invoices.manage'));
+        Route::delete('recurring-invoices/{id}', [RecurringInvoiceController::class, 'destroy'])->middleware($perm('invoices.manage'));
+        Route::post('recurring-invoices/{id}/generate', [RecurringInvoiceController::class, 'generate'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
 
         // المدفوعات
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));

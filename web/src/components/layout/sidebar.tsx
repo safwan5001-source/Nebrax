@@ -79,7 +79,7 @@ const GROUPS: NavGroup[] = [
       { href: '/quotes/new', icon: FilePlus2, key: 'quoteCreate', built: true },
       { href: '/credit-notes', icon: FileMinus, key: 'creditNotes', built: true },
       { href: '/returns', icon: Undo2, key: 'salesReturns', built: true },
-      { href: '/recurring-invoices', icon: CalendarClock, key: 'recurringInvoices' },
+      { href: '/recurring-invoices', icon: CalendarClock, key: 'recurringInvoices', built: true },
       { href: '/payments', icon: CreditCard, key: 'customerPayments', built: true },
       { href: '/sales-settings', icon: SlidersHorizontal, key: 'salesSettings', built: true },
     ],
