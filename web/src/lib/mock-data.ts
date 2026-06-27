@@ -310,6 +310,35 @@ export const mockQuotes: MockQuote[] = [
   quote('qu-10', 'QUO-2026-0010', 'p2', '2026-06-12', '2026-06-26', 'draft', [line('l1', 'استشارة وتدريب', 10, 250)]),
 ];
 
+// ── الإشعارات الدائنة ──────────────────────────────────────────────────────
+export interface MockCreditNote {
+  id: string;
+  number: string;
+  partner_id: string;
+  refund_type: string;
+  status: string;
+  note_date: string;
+  subtotal: string;
+  tax_amount: string;
+  total: string;
+  reason: string | null;
+  lines: MockLine[];
+}
+
+function creditNote(
+  id: string, number: string, partner_id: string, date: string,
+  refundType: string, status: string, reason: string, lines: MockLine[]
+): MockCreditNote {
+  const { subtotal, tax_amount, total } = docTotals(lines);
+  return { id, number, partner_id, refund_type: refundType, status, note_date: date, subtotal, tax_amount, total, reason, lines };
+}
+
+export const mockCreditNotes: MockCreditNote[] = [
+  creditNote('cn-3', 'CN-2026-0003', 'p1', '2026-06-22', 'credit', 'posted', 'خصم تسوية على فاتورة', [line('l1', 'تسوية سعر', 1, 800)]),
+  creditNote('cn-2', 'CN-2026-0002', 'p5', '2026-06-15', 'cash', 'posted', 'استرداد جزئي', [line('l1', 'استرداد خدمة', 1, 1500)]),
+  creditNote('cn-1', 'CN-2026-0001', 'p2', '2026-06-10', 'credit', 'draft', 'بضاعة ناقصة', [line('l1', 'نقص في التوريد', 2, 300)]),
+];
+
 // ── المدفوعات ──────────────────────────────────────────────────────────────
 export const mockPayments = [
   { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
@@ -521,6 +550,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/partners') return resolve({ data: mockPartners });
   if (clean === '/invoices') return resolve({ data: mockInvoices });
   if (clean === '/quotes') return resolve({ data: mockQuotes });
+  if (clean === '/credit-notes') return resolve({ data: mockCreditNotes });
   if (clean === '/purchases') return resolve({ data: mockPurchases });
   if (clean === '/returns') return resolve({ data: mockReturns });
   if (clean === '/payments') return resolve({ data: mockPayments });
@@ -555,6 +585,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const quoteMatch = clean.match(/^\/quotes\/([^/]+)$/);
   if (quoteMatch) {
     const found = mockQuotes.find((q) => q.id === quoteMatch[1]) ?? mockQuotes[0];
+    return resolve({ data: found });
+  }
+
+  const creditNoteMatch = clean.match(/^\/credit-notes\/([^/]+)$/);
+  if (creditNoteMatch) {
+    const found = mockCreditNotes.find((c) => c.id === creditNoteMatch[1]) ?? mockCreditNotes[0];
     return resolve({ data: found });
   }
 
