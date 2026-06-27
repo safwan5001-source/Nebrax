@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\SubscriptionController;
@@ -69,6 +70,14 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('invoices/{id}/zatca', [InvoiceController::class, 'zatca'])->middleware($perm('zatca.view'));
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
         Route::post('invoices/{id}/post', [InvoiceController::class, 'post'])->middleware($perm('invoices.manage'));
+
+        // عروض الأسعار (مستند غير محاسبي؛ التحويل ينشئ فاتورة draft)
+        Route::get('quotes', [QuoteController::class, 'index'])->middleware($perm('invoices.view'));
+        Route::get('quotes/{id}', [QuoteController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::post('quotes', [QuoteController::class, 'store'])->middleware($perm('invoices.manage'));
+        Route::put('quotes/{id}', [QuoteController::class, 'update'])->middleware($perm('invoices.manage'));
+        Route::delete('quotes/{id}', [QuoteController::class, 'destroy'])->middleware($perm('invoices.manage'));
+        Route::post('quotes/{id}/convert', [QuoteController::class, 'convert'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
 
         // المدفوعات
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));

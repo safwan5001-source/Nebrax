@@ -277,6 +277,39 @@ export const mockReturns: MockReturn[] = [
   returnDoc('re-4', 'RET-2026-0004', 'sales', 'p2', '2026-05-25', 'draft', [line('l1', 'مرتجع جزئي', 1, 800)]),
 ];
 
+// ── عروض الأسعار ───────────────────────────────────────────────────────────
+export interface MockQuote {
+  id: string;
+  number: string;
+  partner_id: string;
+  status: string;
+  quote_date: string;
+  valid_until: string | null;
+  subtotal: string;
+  tax_amount: string;
+  total: string;
+  notes: string | null;
+  converted_invoice_id: string | null;
+  lines: MockLine[];
+}
+
+function quote(
+  id: string, number: string, partner_id: string, date: string, validUntil: string,
+  status: string, lines: MockLine[]
+): MockQuote {
+  const { subtotal, tax_amount, total } = docTotals(lines);
+  return {
+    id, number, partner_id, status, quote_date: date, valid_until: validUntil,
+    subtotal, tax_amount, total, notes: null, converted_invoice_id: null, lines,
+  };
+}
+
+export const mockQuotes: MockQuote[] = [
+  quote('qu-12', 'QUO-2026-0012', 'p1', '2026-06-23', '2026-07-07', 'sent', [line('l1', 'توريد وتركيب أجهزة', 4, 1200)]),
+  quote('qu-11', 'QUO-2026-0011', 'p4', '2026-06-20', '2026-07-04', 'accepted', [line('l1', 'عقد صيانة سنوي', 1, 18000)]),
+  quote('qu-10', 'QUO-2026-0010', 'p2', '2026-06-12', '2026-06-26', 'draft', [line('l1', 'استشارة وتدريب', 10, 250)]),
+];
+
 // ── المدفوعات ──────────────────────────────────────────────────────────────
 export const mockPayments = [
   { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
@@ -478,6 +511,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/accounts') return resolve({ data: mockAccounts });
   if (clean === '/partners') return resolve({ data: mockPartners });
   if (clean === '/invoices') return resolve({ data: mockInvoices });
+  if (clean === '/quotes') return resolve({ data: mockQuotes });
   if (clean === '/purchases') return resolve({ data: mockPurchases });
   if (clean === '/returns') return resolve({ data: mockReturns });
   if (clean === '/payments') return resolve({ data: mockPayments });
@@ -506,6 +540,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const invoiceMatch = clean.match(/^\/invoices\/([^/]+)$/);
   if (invoiceMatch) {
     const found = mockInvoices.find((i) => i.id === invoiceMatch[1]) ?? mockInvoices[0];
+    return resolve({ data: found });
+  }
+
+  const quoteMatch = clean.match(/^\/quotes\/([^/]+)$/);
+  if (quoteMatch) {
+    const found = mockQuotes.find((q) => q.id === quoteMatch[1]) ?? mockQuotes[0];
     return resolve({ data: found });
   }
 
