@@ -87,7 +87,13 @@
     "salesReturns": "Returned invoices",
     "recurringInvoices": "Recurring invoices",
     "customerPayments": "Customer payments",
-    "salesSettings": "Sales settings"
+    "salesSettings": "Sales settings",
+    "customersManage": "Manage customers",
+    "customerCreate": "Add new customer",
+    "appointments": "Appointments",
+    "contactList": "Contact list",
+    "crm": "Customer relations (CRM)",
+    "customerSettings": "Customer settings"
   },
   "login": {
     "title": "Sign in",
@@ -382,7 +388,9 @@
     "search": "Search…",
     "empty": "No partners",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "new_title": "New customer",
+    "back": "Back"
   },
   "status": {
     "draft": "Draft",
