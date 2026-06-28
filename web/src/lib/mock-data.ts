@@ -376,6 +376,13 @@ export const mockRecurring: MockRecurring[] = [
   recurring('rc-3', 'إيجار وحدة سنوي', 'p5', 'yearly', '2026-01-01', '2027-01-01', 1, [line('l1', 'إيجار سنوي', 1, 60000)]),
 ];
 
+// ── المواعيد ───────────────────────────────────────────────────────────────
+export const mockAppointments = [
+  { id: 'ap-1', partner_id: 'p1', title: 'اجتماع متابعة العقد', appointment_at: '2026-07-02T10:00:00', duration_minutes: 60, status: 'scheduled', location: 'مكتب الدمام', notes: null },
+  { id: 'ap-2', partner_id: 'p4', title: 'عرض المنتجات الجديدة', appointment_at: '2026-06-28T13:30:00', duration_minutes: 45, status: 'scheduled', location: 'عبر الهاتف', notes: null },
+  { id: 'ap-3', partner_id: 'p2', title: 'توقيع اتفاقية', appointment_at: '2026-06-20T09:00:00', duration_minutes: 30, status: 'done', location: 'الخبر', notes: 'تم بنجاح' },
+];
+
 // ── المدفوعات ──────────────────────────────────────────────────────────────
 export const mockPayments = [
   { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
@@ -583,6 +590,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
   if (clean === '/users') return resolve({ data: mockUsers });
   if (clean === '/products') return resolve({ data: mockProducts });
+  if (clean === '/appointments') return resolve({ data: mockAppointments });
   if (clean === '/accounts') return resolve({ data: mockAccounts });
   if (clean === '/partners') return resolve({ data: mockPartners });
   if (clean === '/invoices') return resolve({ data: mockInvoices });
