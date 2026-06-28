@@ -686,5 +686,21 @@
     "empty": "No appointments",
     "save": "Save",
     "cancel": "Cancel"
+  },
+  "contacts": {
+    "title": "Contact list",
+    "create": "Add contact",
+    "edit": "Edit contact",
+    "name": "Name",
+    "customer": "Customer",
+    "none": "None",
+    "job_title": "Job title",
+    "email": "Email",
+    "phone": "Phone",
+    "notes": "Notes",
+    "search": "Search…",
+    "empty": "No contacts",
+    "save": "Save",
+    "cancel": "Cancel"
   }
 }

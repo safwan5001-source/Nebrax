@@ -88,7 +88,7 @@ const GROUPS: NavGroup[] = [
       { href: '/partners', icon: Users, key: 'customersManage', built: true },
       { href: '/partners/new', icon: UserPlus, key: 'customerCreate', built: true },
       { href: '/appointments', icon: CalendarCheck, key: 'appointments', built: true },
-      { href: '/contacts', icon: Contact, key: 'contactList' },
+      { href: '/contacts', icon: Contact, key: 'contactList', built: true },
       { href: '/crm', icon: Handshake, key: 'crm' },
       { href: '/customer-settings', icon: SlidersHorizontal, key: 'customerSettings' },
     ],

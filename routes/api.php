@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InventoryController;
@@ -57,6 +58,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('appointments', [AppointmentController::class, 'store'])->middleware($perm('partners.manage'));
         Route::put('appointments/{id}', [AppointmentController::class, 'update'])->middleware($perm('partners.manage'));
         Route::delete('appointments/{id}', [AppointmentController::class, 'destroy'])->middleware($perm('partners.manage'));
+
+        // جهات الاتصال (غير محاسبية)
+        Route::get('contacts', [ContactController::class, 'index'])->middleware($perm('partners.view'));
+        Route::get('contacts/{id}', [ContactController::class, 'show'])->middleware($perm('partners.view'));
+        Route::post('contacts', [ContactController::class, 'store'])->middleware($perm('partners.manage'));
+        Route::put('contacts/{id}', [ContactController::class, 'update'])->middleware($perm('partners.manage'));
+        Route::delete('contacts/{id}', [ContactController::class, 'destroy'])->middleware($perm('partners.manage'));
 
         Route::delete('partners/{id}', [PartnerController::class, 'destroy'])->middleware($perm('partners.manage'));
 
