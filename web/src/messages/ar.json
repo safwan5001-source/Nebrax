@@ -87,7 +87,13 @@
     "salesReturns": "الفواتير المرتجعة",
     "recurringInvoices": "الفواتير الدورية",
     "customerPayments": "مدفوعات العملاء",
-    "salesSettings": "إعدادات المبيعات"
+    "salesSettings": "إعدادات المبيعات",
+    "customersManage": "إدارة العملاء",
+    "customerCreate": "إضافة عميل جديد",
+    "appointments": "المواعيد",
+    "contactList": "قائمة الاتصال",
+    "crm": "إدارة علاقات العملاء",
+    "customerSettings": "إعدادات العميل"
   },
   "login": {
     "title": "تسجيل الدخول",
@@ -382,7 +388,9 @@
     "search": "بحث…",
     "empty": "لا توجد أطراف",
     "save": "حفظ",
-    "cancel": "إلغاء"
+    "cancel": "إلغاء",
+    "new_title": "عميل جديد",
+    "back": "رجوع"
   },
   "status": {
     "draft": "مسودة",
