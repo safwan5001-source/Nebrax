@@ -702,5 +702,28 @@
     "empty": "No contacts",
     "save": "Save",
     "cancel": "Cancel"
+  },
+  "crm": {
+    "title": "Customer relations (CRM)",
+    "create": "Add activity",
+    "edit": "Edit activity",
+    "subject": "Subject",
+    "customer": "Customer",
+    "none": "None",
+    "type": "Type",
+    "call": "Call",
+    "meeting": "Meeting",
+    "email": "Email",
+    "note": "Note",
+    "task": "Task",
+    "when": "Date & time",
+    "status": "Status",
+    "open": "Open",
+    "done": "Done",
+    "notes": "Details",
+    "search": "Search…",
+    "empty": "No activities",
+    "save": "Save",
+    "cancel": "Cancel"
   }
 }
