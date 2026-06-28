@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RecurringInvoiceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
+use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
@@ -158,6 +159,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // إعدادات المبيعات (تفضيلات غير محاسبية)
         Route::get('sales-settings', [SalesSettingsController::class, 'show'])->middleware($perm('invoices.view'));
         Route::put('sales-settings', [SalesSettingsController::class, 'update'])->middleware($perm('company.manage'));
+
+        // أقسام إعدادات المبيعات المتعددة (حالات/تصميمات/قوائم أسعار/شحن…)
+        Route::get('sales-config/{section}', [SalesConfigController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::put('sales-config/{section}', [SalesConfigController::class, 'update'])->middleware($perm('company.manage'));
 
         // إعدادات العميل (تفضيلات غير محاسبية)
         Route::get('customer-settings', [CustomerSettingsController::class, 'show'])->middleware($perm('partners.view'));

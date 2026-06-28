@@ -504,6 +504,31 @@ export const mockUsers = [
   { id: 'us-3', name: 'خالد الدوسري', email: 'khalid@nibras.sa', role: 'staff', is_active: true },
 ];
 
+export const mockSalesConfig: Record<string, unknown> = {
+  statuses: [
+    { name: 'مسودة', color: '#6B7280' },
+    { name: 'مرحّلة', color: '#2563EB' },
+    { name: 'مدفوعة', color: '#16A34A' },
+    { name: 'ملغاة', color: '#DC2626' },
+  ],
+  fields: [
+    { label: 'رقم أمر الشراء', type: 'text' },
+    { label: 'تاريخ التسليم', type: 'date' },
+  ],
+  pricelists: [
+    { name: 'قائمة التجزئة', adjustment: 0 },
+    { name: 'قائمة الجملة', adjustment: -10 },
+  ],
+  sources: [{ name: 'المتجر الإلكتروني' }, { name: 'الفرع الرئيسي' }, { name: 'مندوب المبيعات' }],
+  shipping: [
+    { name: 'توصيل داخل المدينة', rate: 25 },
+    { name: 'شحن بين المدن', rate: 60 },
+  ],
+  einvoice: { enabled: true, phase: '2', vat_number: '310122393500003' },
+  designs: { template: 'classic', show_logo: true, accent_color: '#2563EB', footer_text: 'شكراً لتعاملكم معنا' },
+  orders: { auto_convert: false, require_approval: true, prefix: 'SO' },
+};
+
 export const mockCustomerSettings = {
   default_type: 'customer',
   default_city: 'الدمام',
@@ -611,6 +636,8 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/subscription') return resolve(mockSubscription);
   if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
   if (clean === '/customer-settings') return resolve({ data: mockCustomerSettings });
+  const salesConfigMatch = clean.match(/^\/sales-config\/([^/]+)$/);
+  if (salesConfigMatch) return resolve({ data: mockSalesConfig[salesConfigMatch[1]] ?? [] });
   if (clean === '/users') return resolve({ data: mockUsers });
   if (clean === '/products') return resolve({ data: mockProducts });
   if (clean === '/appointments') return resolve({ data: mockAppointments });
