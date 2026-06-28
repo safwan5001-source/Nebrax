@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CreditNoteController;
+use App\Http\Controllers\Api\CrmActivityController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InvoiceController;
@@ -65,6 +66,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('contacts', [ContactController::class, 'store'])->middleware($perm('partners.manage'));
         Route::put('contacts/{id}', [ContactController::class, 'update'])->middleware($perm('partners.manage'));
         Route::delete('contacts/{id}', [ContactController::class, 'destroy'])->middleware($perm('partners.manage'));
+
+        // سجلّ علاقات العملاء (CRM) — غير محاسبي
+        Route::get('crm-activities', [CrmActivityController::class, 'index'])->middleware($perm('partners.view'));
+        Route::get('crm-activities/{id}', [CrmActivityController::class, 'show'])->middleware($perm('partners.view'));
+        Route::post('crm-activities', [CrmActivityController::class, 'store'])->middleware($perm('partners.manage'));
+        Route::put('crm-activities/{id}', [CrmActivityController::class, 'update'])->middleware($perm('partners.manage'));
+        Route::delete('crm-activities/{id}', [CrmActivityController::class, 'destroy'])->middleware($perm('partners.manage'));
 
         Route::delete('partners/{id}', [PartnerController::class, 'destroy'])->middleware($perm('partners.manage'));
 

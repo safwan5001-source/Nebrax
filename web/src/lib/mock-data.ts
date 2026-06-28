@@ -376,6 +376,13 @@ export const mockRecurring: MockRecurring[] = [
   recurring('rc-3', 'إيجار وحدة سنوي', 'p5', 'yearly', '2026-01-01', '2027-01-01', 1, [line('l1', 'إيجار سنوي', 1, 60000)]),
 ];
 
+// ── سجلّ علاقات العملاء (CRM) ──────────────────────────────────────────────
+export const mockCrmActivities = [
+  { id: 'cr-1', partner_id: 'p1', type: 'call', subject: 'متابعة عرض السعر', activity_at: '2026-06-26T11:00:00', status: 'done', notes: 'مهتم، سيردّ الأسبوع القادم' },
+  { id: 'cr-2', partner_id: 'p4', type: 'meeting', subject: 'اجتماع تجديد العقد', activity_at: '2026-07-03T09:30:00', status: 'open', notes: null },
+  { id: 'cr-3', partner_id: 'p2', type: 'task', subject: 'إرسال كتالوج المنتجات', activity_at: '2026-06-29T08:00:00', status: 'open', notes: null },
+];
+
 // ── جهات الاتصال ───────────────────────────────────────────────────────────
 export const mockContacts = [
   { id: 'ct-1', partner_id: 'p1', name: 'سعد المالكي', job_title: 'مدير المشتريات', email: 'saad@gulf-trade.sa', phone: '0551112233', notes: null },
@@ -599,6 +606,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/products') return resolve({ data: mockProducts });
   if (clean === '/appointments') return resolve({ data: mockAppointments });
   if (clean === '/contacts') return resolve({ data: mockContacts });
+  if (clean === '/crm-activities') return resolve({ data: mockCrmActivities });
   if (clean === '/accounts') return resolve({ data: mockAccounts });
   if (clean === '/partners') return resolve({ data: mockPartners });
   if (clean === '/invoices') return resolve({ data: mockInvoices });
