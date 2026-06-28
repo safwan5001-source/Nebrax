@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   FileText,
   Store,
+  Clock,
   CalendarClock,
   FilePlus,
   FilePlus2,
@@ -80,6 +81,15 @@ const GROUPS: NavGroup[] = [
       { href: '/recurring-invoices', icon: CalendarClock, key: 'recurringInvoices', built: true },
       { href: '/payments', icon: CreditCard, key: 'customerPayments', built: true },
       { href: '/sales-settings', icon: SlidersHorizontal, key: 'salesSettings', built: true },
+    ],
+  },
+  {
+    title: 'pos',
+    items: [
+      { href: '/pos', icon: Store, key: 'posStart', built: true },
+      { href: '/pos/sessions', icon: Clock, key: 'posSessions' },
+      { href: '/pos/report', icon: Receipt, key: 'posReport' },
+      { href: '/pos/settings', icon: SlidersHorizontal, key: 'posSettings' },
     ],
   },
   {
@@ -216,20 +226,6 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             )}
             <LayoutDashboard className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
             {t('dashboard')}
-          </Link>
-
-          {/* نقطة البيع — قسم مستقل */}
-          <Link
-            href="/pos"
-            onClick={onClose}
-            className={cn(
-              'relative mb-3 flex h-9 items-center gap-2.5 rounded px-2.5 text-sm text-muted hover:bg-primary-soft hover:text-primary',
-              isActive('/pos') && 'bg-primary-soft font-medium text-primary'
-            )}
-          >
-            {isActive('/pos') && <span className="absolute inset-y-1.5 start-0 w-0.5 rounded bg-primary" />}
-            <Store className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
-            {t('pos')}
           </Link>
 
           {GROUPS.map((group) => {

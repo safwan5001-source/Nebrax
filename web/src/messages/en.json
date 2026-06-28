@@ -36,7 +36,8 @@
       "hr": "Human Resources",
       "operations": "Operations",
       "logistics": "Logistics",
-      "system": "System"
+      "system": "System",
+      "pos": "Point of Sale"
     },
     "invoices": "Invoices & Quotes",
     "pos": "POS",
@@ -93,7 +94,11 @@
     "appointments": "Appointments",
     "contactList": "Contact list",
     "crm": "Customer relations (CRM)",
-    "customerSettings": "Customer settings"
+    "customerSettings": "Customer settings",
+    "posStart": "Start selling",
+    "posSessions": "Sessions",
+    "posReport": "POS report",
+    "posSettings": "POS settings"
   },
   "login": {
     "title": "Sign in",
