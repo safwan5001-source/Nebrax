@@ -725,5 +725,18 @@
     "empty": "No activities",
     "save": "Save",
     "cancel": "Cancel"
+  },
+  "customerSettings": {
+    "title": "Customer settings",
+    "subtitle": "Defaults used when adding customers",
+    "default_type": "Default type",
+    "customer": "Customer",
+    "supplier": "Supplier",
+    "both": "Both",
+    "default_city": "Default city",
+    "payment_terms_days": "Payment terms (days)",
+    "require_tax_number": "Require VAT number",
+    "loyalty_enabled": "Enable loyalty points",
+    "save": "Save settings"
   }
 }
