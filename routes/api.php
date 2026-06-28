@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\CrmActivityController;
+use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InvoiceController;
@@ -157,6 +158,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // إعدادات المبيعات (تفضيلات غير محاسبية)
         Route::get('sales-settings', [SalesSettingsController::class, 'show'])->middleware($perm('invoices.view'));
         Route::put('sales-settings', [SalesSettingsController::class, 'update'])->middleware($perm('company.manage'));
+
+        // إعدادات العميل (تفضيلات غير محاسبية)
+        Route::get('customer-settings', [CustomerSettingsController::class, 'show'])->middleware($perm('partners.view'));
+        Route::put('customer-settings', [CustomerSettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // إدارة المستخدمين (owner/admin)
         Route::get('users', [UserController::class, 'index'])->middleware($perm('users.view'));

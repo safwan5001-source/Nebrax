@@ -90,7 +90,7 @@ const GROUPS: NavGroup[] = [
       { href: '/appointments', icon: CalendarCheck, key: 'appointments', built: true },
       { href: '/contacts', icon: Contact, key: 'contactList', built: true },
       { href: '/crm', icon: Handshake, key: 'crm', built: true },
-      { href: '/customer-settings', icon: SlidersHorizontal, key: 'customerSettings' },
+      { href: '/customer-settings', icon: SlidersHorizontal, key: 'customerSettings', built: true },
     ],
   },
   {

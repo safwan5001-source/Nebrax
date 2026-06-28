@@ -725,5 +725,18 @@
     "empty": "لا توجد أنشطة",
     "save": "حفظ",
     "cancel": "إلغاء"
+  },
+  "customerSettings": {
+    "title": "إعدادات العميل",
+    "subtitle": "قيم افتراضية تُستخدم عند إضافة العملاء",
+    "default_type": "النوع الافتراضي",
+    "customer": "عميل",
+    "supplier": "مورد",
+    "both": "كلاهما",
+    "default_city": "المدينة الافتراضية",
+    "payment_terms_days": "مهلة السداد (أيام)",
+    "require_tax_number": "إلزام الرقم الضريبي",
+    "loyalty_enabled": "تفعيل نقاط الولاء",
+    "save": "حفظ الإعدادات"
   }
 }
