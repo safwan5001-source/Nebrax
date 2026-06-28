@@ -25,13 +25,13 @@ const GROUPS: Group[] = [
     title: 'g_invoices',
     items: [
       { key: 'c_invoices', href: '/sales-settings/invoices', icon: FileText },
-      { key: 'c_statuses', href: null, icon: ListChecks },
-      { key: 'c_einvoice', href: null, icon: QrCode },
-      { key: 'c_designs', href: null, icon: LayoutTemplate },
-      { key: 'c_fields', href: null, icon: ListPlus },
-      { key: 'c_pricelists', href: null, icon: Tags },
-      { key: 'c_sources', href: null, icon: Tag },
-      { key: 'c_shipping', href: null, icon: Truck },
+      { key: 'c_statuses', href: '/sales-settings/statuses', icon: ListChecks },
+      { key: 'c_einvoice', href: '/sales-settings/einvoice', icon: QrCode },
+      { key: 'c_designs', href: '/sales-settings/designs', icon: LayoutTemplate },
+      { key: 'c_fields', href: '/sales-settings/fields', icon: ListPlus },
+      { key: 'c_pricelists', href: '/sales-settings/pricelists', icon: Tags },
+      { key: 'c_sources', href: '/sales-settings/sources', icon: Tag },
+      { key: 'c_shipping', href: '/sales-settings/shipping', icon: Truck },
     ],
   },
   {
@@ -40,7 +40,7 @@ const GROUPS: Group[] = [
   },
   {
     title: 'g_orders',
-    items: [{ key: 'c_orders', href: null, icon: ShoppingCart }],
+    items: [{ key: 'c_orders', href: '/sales-settings/orders', icon: ShoppingCart }],
   },
 ];
 
