@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CreditNoteController;
@@ -50,6 +51,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('partners/{id}', [PartnerController::class, 'show'])->middleware($perm('partners.view'));
         Route::post('partners', [PartnerController::class, 'store'])->middleware($perm('partners.manage'));
         Route::put('partners/{id}', [PartnerController::class, 'update'])->middleware($perm('partners.manage'));
+        // مواعيد العملاء (غير محاسبية)
+        Route::get('appointments', [AppointmentController::class, 'index'])->middleware($perm('partners.view'));
+        Route::get('appointments/{id}', [AppointmentController::class, 'show'])->middleware($perm('partners.view'));
+        Route::post('appointments', [AppointmentController::class, 'store'])->middleware($perm('partners.manage'));
+        Route::put('appointments/{id}', [AppointmentController::class, 'update'])->middleware($perm('partners.manage'));
+        Route::delete('appointments/{id}', [AppointmentController::class, 'destroy'])->middleware($perm('partners.manage'));
+
         Route::delete('partners/{id}', [PartnerController::class, 'destroy'])->middleware($perm('partners.manage'));
 
         // المنتجات

@@ -667,5 +667,24 @@
     "subtotal": "Subtotal",
     "tax_total": "Total tax",
     "save": "Save template"
+  },
+  "appointments": {
+    "title": "Appointments",
+    "create": "Add appointment",
+    "edit": "Edit appointment",
+    "customer": "Customer",
+    "none": "None",
+    "when": "Date & time",
+    "duration": "Duration (min)",
+    "status": "Status",
+    "scheduled": "Scheduled",
+    "done": "Done",
+    "cancelled": "Cancelled",
+    "location": "Location",
+    "notes": "Notes",
+    "search": "Search…",
+    "empty": "No appointments",
+    "save": "Save",
+    "cancel": "Cancel"
   }
 }
