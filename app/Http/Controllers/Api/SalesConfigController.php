@@ -27,6 +27,7 @@ class SalesConfigController extends ApiController
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'show_logo' => true, 'accent_color' => '#2563EB', 'footer_text' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
+        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'allow_discount' => true, 'receipt_footer' => ''],
     ];
 
     public function show(string $section): JsonResponse

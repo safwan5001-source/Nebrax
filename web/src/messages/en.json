@@ -800,5 +800,48 @@
     "require_tax_number": "Require VAT number",
     "loyalty_enabled": "Enable loyalty points",
     "save": "Save settings"
+  },
+  "posSessions": {
+    "title": "POS sessions",
+    "open": "Open session",
+    "close": "Close session",
+    "number": "Number",
+    "status": "Status",
+    "open_status": "Open",
+    "closed_status": "Closed",
+    "opening_balance": "Opening balance",
+    "closing_balance": "Counted",
+    "expected": "Expected",
+    "difference": "Difference",
+    "opened_at": "Opened at",
+    "closed_at": "Closed at",
+    "counted": "Counted cash in drawer",
+    "no_open": "No open session — open one to start selling.",
+    "search": "Search…",
+    "empty": "No sessions",
+    "save": "Save",
+    "cancel": "Cancel",
+    "open_title": "Open new session",
+    "close_title": "Close session"
+  },
+  "posReport": {
+    "title": "POS report",
+    "subtitle": "Summary of posted cash sales.",
+    "total_sales": "Total cash sales",
+    "count": "Invoice count",
+    "avg": "Average invoice",
+    "recent": "Recent POS invoices",
+    "number": "Number",
+    "date": "Date",
+    "total": "Total",
+    "empty": "No cash sales yet"
+  },
+  "posSettings": {
+    "title": "POS settings",
+    "subtitle": "Configure the sale screen and receipt behavior.",
+    "default_customer": "Default customer",
+    "print_receipt": "Auto-print receipt",
+    "allow_discount": "Allow discount",
+    "receipt_footer": "Receipt footer text"
   }
 }

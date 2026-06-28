@@ -27,11 +27,13 @@ export function ConfigForm({
   title,
   description,
   fields,
+  backHref = '/sales-settings',
 }: {
   section: string;
   title: string;
   description?: string;
   fields: FormField[];
+  backHref?: string;
 }) {
   const t = useTranslations('salesSettings');
   const tc = useTranslations('common');
@@ -70,7 +72,7 @@ export function ConfigForm({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/sales-settings')} aria-label={t('back')}>
+        <Button variant="ghost" size="icon" onClick={() => router.push(backHref)} aria-label={t('back')}>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
         </Button>
         <h1 className="text-xl font-semibold text-text">{title}</h1>
