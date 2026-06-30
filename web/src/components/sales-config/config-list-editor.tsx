@@ -47,7 +47,7 @@ export function ConfigListEditor({
   }, [section]);
 
   const emptyRow = (): Row =>
-    Object.fromEntries(fields.map((f) => [f.key, f.type === 'color' ? '#2563EB' : f.type === 'select' ? (f.options?.[0]?.value ?? '') : '']));
+    Object.fromEntries(fields.map((f) => [f.key, f.type === 'color' ? '#1E40AF' : f.type === 'select' ? (f.options?.[0]?.value ?? '') : '']));
 
   const setCell = (i: number, key: string, v: string) =>
     setRows((rs) => (rs ? rs.map((r, idx) => (idx === i ? { ...r, [key]: v } : r)) : rs));
