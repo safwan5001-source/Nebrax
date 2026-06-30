@@ -898,5 +898,47 @@
       "bank": "Bank transfer",
       "credit": "On credit (payable)"
     }
+  },
+  "assets": {
+    "title": "Assets",
+    "create": "New asset",
+    "new_title": "Register fixed asset",
+    "details": "Asset details",
+    "search": "Search…",
+    "empty": "No assets yet",
+    "number": "No.",
+    "name": "Asset name",
+    "account": "Asset account",
+    "choose_account": "Choose fixed-asset account",
+    "date": "Acquisition date",
+    "cost": "Cost",
+    "cost_label": "Cost (pre-tax)",
+    "tax": "Tax rate %",
+    "tax_total": "Tax",
+    "total": "Total",
+    "salvage": "Salvage value",
+    "life": "Useful life (months)",
+    "monthly_dep": "Monthly depreciation",
+    "accumulated": "Accumulated dep.",
+    "book_value": "Book value",
+    "payment_method": "Payment method",
+    "vendor": "Vendor",
+    "none": "None",
+    "status": "Status",
+    "active": "Active",
+    "draft": "Draft",
+    "disposed": "Disposed",
+    "post": "Post acquisition",
+    "depreciate": "Depreciate month",
+    "post_success": "Asset acquisition posted and journal entry generated",
+    "depreciate_success": "Depreciation posted and journal entry generated",
+    "need_cost": "Enter a positive cost",
+    "save": "Save",
+    "back": "Back",
+    "method": {
+      "cash": "Cash",
+      "bank": "Bank transfer",
+      "credit": "On credit (payable)"
+    }
   }
 }

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
@@ -100,6 +101,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware($perm('expenses.view'));
         Route::post('expenses', [ExpenseController::class, 'store'])->middleware($perm('expenses.manage'));
         Route::post('expenses/{id}/post', [ExpenseController::class, 'post'])->middleware($perm('expenses.manage'));
+
+        // الأصول الثابتة (اقتناء + إهلاك؛ كلاهما يولّد قيداً متوازناً)
+        Route::get('assets', [AssetController::class, 'index'])->middleware($perm('assets.view'));
+        Route::get('assets/{id}', [AssetController::class, 'show'])->middleware($perm('assets.view'));
+        Route::post('assets', [AssetController::class, 'store'])->middleware($perm('assets.manage'));
+        Route::post('assets/{id}/post', [AssetController::class, 'post'])->middleware($perm('assets.manage'));
+        Route::post('assets/{id}/depreciate', [AssetController::class, 'depreciate'])->middleware($perm('assets.manage'));
 
         // الفواتير
         Route::get('invoices', [InvoiceController::class, 'index'])->middleware($perm('invoices.view'));

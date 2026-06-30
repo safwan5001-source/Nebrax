@@ -20,12 +20,13 @@ class Rbac
             'returns.view', 'returns.manage',
             'hr.view', 'hr.manage',
             'expenses.view', 'expenses.manage',
+            'assets.view', 'assets.manage',
             'accounts.view', 'reports.view', 'zatca.view',
         ],
         'staff' => [
             'partners.view', 'products.view', 'invoices.view',
             'payments.view', 'purchases.view', 'returns.view',
-            'hr.view', 'expenses.view',
+            'hr.view', 'expenses.view', 'assets.view',
             'accounts.view', 'reports.view', 'zatca.view',
         ],
     ];

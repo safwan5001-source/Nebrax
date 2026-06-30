@@ -200,6 +200,7 @@ export const mockAccounts: MockAccount[] = [
   acc('5130', 'الإيجار', 'Rent', 'expense', false, '48000.00'),
   acc('5140', 'الوقود والمحروقات', 'Fuel', 'expense', false, '14300.00'),
   acc('5150', 'مصروفات عامة', 'General Expenses', 'expense', false, '9750.00'),
+  acc('5160', 'الإهلاك', 'Depreciation', 'expense', false, '18500.00'),
 ];
 
 export const mockCompany = {
@@ -431,6 +432,49 @@ export const mockExpenses: MockExpense[] = [
   expense('exp-3', 'EXP-2026-00003', '5140', 'الوقود والمحروقات', '2026-06-20', 'cash', 'posted', 1850, 15, 'تعبئة وقود الأسطول'),
   expense('exp-2', 'EXP-2026-00002', '5150', 'مصروفات عامة', '2026-06-14', 'credit', 'posted', 3200, 15, 'قرطاسية ولوازم مكتبية'),
   expense('exp-1', 'EXP-2026-00001', '5120', 'الرواتب والأجور', '2026-06-01', 'bank', 'draft', 48000, 0, 'رواتب يونيو (مسودة)'),
+];
+
+// ── الأصول الثابتة (الحسابات) ────────────────────────────────────────────────
+export interface MockAsset {
+  id: string;
+  number: string;
+  name: string;
+  account_id: string;
+  account_code: string;
+  account_name: string;
+  partner_id: string | null;
+  acquisition_date: string;
+  payment_method: 'cash' | 'bank' | 'credit';
+  cost: string;
+  tax_rate: number;
+  tax_amount: string;
+  total: string;
+  salvage_value: string;
+  useful_life_months: number;
+  accumulated_depreciation: string;
+  book_value: string;
+  status: string;
+}
+
+function asset(
+  id: string, number: string, name: string, code: string, accName: string, date: string,
+  method: MockAsset['payment_method'], status: string, cost: number, rate: number,
+  salvage: number, life: number, accumulated: number,
+): MockAsset {
+  const tax = Math.round((cost * rate) / 100);
+  return {
+    id, number, name, account_id: `a${code}`, account_code: code, account_name: accName,
+    partner_id: method === 'credit' ? 'p3' : null, acquisition_date: date, payment_method: method,
+    cost: cost.toFixed(2), tax_rate: rate, tax_amount: tax.toFixed(2), total: (cost + tax).toFixed(2),
+    salvage_value: salvage.toFixed(2), useful_life_months: life,
+    accumulated_depreciation: accumulated.toFixed(2), book_value: (cost - accumulated).toFixed(2), status,
+  };
+}
+
+export const mockAssets: MockAsset[] = [
+  asset('fa-3', 'FA-2026-00003', 'سيارة توصيل هيونداي', '1220', 'وسائل النقل', '2026-01-15', 'bank', 'active', 120000, 15, 12000, 60, 18000),
+  asset('fa-2', 'FA-2026-00002', 'خط إنتاج تعبئة', '1210', 'المعدات والآليات', '2026-03-01', 'credit', 'active', 45000, 15, 5000, 48, 5000),
+  asset('fa-1', 'FA-2026-00001', 'أثاث مكتبي', '1210', 'المعدات والآليات', '2026-06-10', 'cash', 'draft', 8000, 15, 0, 36, 0),
 ];
 
 // ── الفواتير الدورية ───────────────────────────────────────────────────────
@@ -730,6 +774,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       const total = (amt + Math.round((amt * Number(b.tax_rate ?? 0)) / 100)) / 100;
       return resolve({ data: { id: 'demo-exp', number: 'EXP-2026-00005', status: 'draft', total: total.toFixed(2) } });
     }
+    // إنشاء أصل: نُعيد إجمالاً محسوباً من التكلفة والضريبة (مسودة).
+    if (clean === '/assets') {
+      const b = (body ?? {}) as { cost?: number; tax_rate?: number };
+      const c = Number(b.cost ?? 0);
+      const total = (c + Math.round((c * Number(b.tax_rate ?? 0)) / 100)) / 100;
+      return resolve({ data: { id: 'demo-asset', number: 'FA-2026-00004', status: 'draft', total: total.toFixed(2) } });
+    }
     // إجراءات مسيّر الرواتب (ترحيل/صرف): نُعيد المسيّر المطابق ليُحدَّث العرض.
     const runAction = clean.match(/^\/payroll-runs\/([^/]+)\/(post|pay)$/);
     if (runAction) {
@@ -753,6 +804,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/crm-activities') return resolve({ data: mockCrmActivities });
   if (clean === '/accounts') return resolve({ data: mockAccounts });
   if (clean === '/expenses') return resolve({ data: mockExpenses });
+  if (clean === '/assets') return resolve({ data: mockAssets });
   if (clean === '/partners') return resolve({ data: mockPartners });
   if (clean === '/invoices') return resolve({ data: mockInvoices });
   if (clean === '/quotes') return resolve({ data: mockQuotes });
