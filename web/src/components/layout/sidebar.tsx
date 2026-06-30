@@ -87,9 +87,9 @@ const GROUPS: NavGroup[] = [
     title: 'pos',
     items: [
       { href: '/pos', icon: Store, key: 'posStart', built: true },
-      { href: '/pos/sessions', icon: Clock, key: 'posSessions' },
-      { href: '/pos/report', icon: Receipt, key: 'posReport' },
-      { href: '/pos/settings', icon: SlidersHorizontal, key: 'posSettings' },
+      { href: '/pos/sessions', icon: Clock, key: 'posSessions', built: true },
+      { href: '/pos/report', icon: Receipt, key: 'posReport', built: true },
+      { href: '/pos/settings', icon: SlidersHorizontal, key: 'posSettings', built: true },
     ],
   },
   {

@@ -527,7 +527,13 @@ export const mockSalesConfig: Record<string, unknown> = {
   einvoice: { enabled: true, phase: '2', vat_number: '310122393500003' },
   designs: { template: 'classic', show_logo: true, accent_color: '#2563EB', footer_text: 'شكراً لتعاملكم معنا' },
   orders: { auto_convert: false, require_approval: true, prefix: 'SO' },
+  pos: { default_customer: 'عميل نقدي (POS)', print_receipt: true, allow_discount: true, receipt_footer: 'شكراً لزيارتكم' },
 };
+
+export const mockPosSessions = [
+  { id: 'ps-2', number: 'POS-2026-0002', status: 'open', opening_balance: '500.00', closing_balance: null, expected_balance: null, difference: null, opened_at: '2026-06-28T08:00:00', closed_at: null },
+  { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00' },
+];
 
 export const mockCustomerSettings = {
   default_type: 'customer',
@@ -640,6 +646,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (salesConfigMatch) return resolve({ data: mockSalesConfig[salesConfigMatch[1]] ?? [] });
   if (clean === '/users') return resolve({ data: mockUsers });
   if (clean === '/products') return resolve({ data: mockProducts });
+  if (clean === '/pos-sessions') return resolve({ data: mockPosSessions });
   if (clean === '/appointments') return resolve({ data: mockAppointments });
   if (clean === '/contacts') return resolve({ data: mockContacts });
   if (clean === '/crm-activities') return resolve({ data: mockCrmActivities });
