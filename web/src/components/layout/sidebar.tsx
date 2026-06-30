@@ -119,7 +119,7 @@ const GROUPS: NavGroup[] = [
     title: 'accounting',
     items: [
       { href: '/accounts', icon: BookOpen, key: 'accounts', built: true },
-      { href: '/expenses', icon: Receipt, key: 'expenses' },
+      { href: '/expenses', icon: Receipt, key: 'expenses', built: true },
       { href: '/assets', icon: Building2, key: 'assets' },
       { href: '/cost-centers', icon: Network, key: 'costCenters' },
       { href: '/cheques', icon: ScrollText, key: 'cheques' },
