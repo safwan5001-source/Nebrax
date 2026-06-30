@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\CrmActivityController;
 use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
@@ -93,6 +94,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // دليل الحسابات (قراءة)
         Route::get('accounts', [AccountController::class, 'index'])->middleware($perm('accounts.view'));
         Route::get('accounts/{id}', [AccountController::class, 'show'])->middleware($perm('accounts.view'));
+
+        // المصروفات (مستند مالي؛ الترحيل يولّد قيداً متوازناً)
+        Route::get('expenses', [ExpenseController::class, 'index'])->middleware($perm('expenses.view'));
+        Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware($perm('expenses.view'));
+        Route::post('expenses', [ExpenseController::class, 'store'])->middleware($perm('expenses.manage'));
+        Route::post('expenses/{id}/post', [ExpenseController::class, 'post'])->middleware($perm('expenses.manage'));
 
         // الفواتير
         Route::get('invoices', [InvoiceController::class, 'index'])->middleware($perm('invoices.view'));

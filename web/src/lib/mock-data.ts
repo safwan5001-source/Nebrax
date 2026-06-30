@@ -395,6 +395,44 @@ export const mockCreditNotes: MockCreditNote[] = [
   creditNote('cn-1', 'CN-2026-0001', 'p2', '2026-06-10', 'credit', 'draft', 'بضاعة ناقصة', [line('l1', 'نقص في التوريد', 2, 300)]),
 ];
 
+// ── المصروفات (الحسابات) ────────────────────────────────────────────────────
+export interface MockExpense {
+  id: string;
+  number: string;
+  account_id: string;
+  account_code: string;
+  account_name: string;
+  partner_id: string | null;
+  expense_date: string;
+  payment_method: 'cash' | 'bank' | 'credit';
+  description: string | null;
+  amount: string;
+  tax_rate: number;
+  tax_amount: string;
+  total: string;
+  status: string;
+}
+
+function expense(
+  id: string, number: string, code: string, name: string, date: string,
+  method: MockExpense['payment_method'], status: string, amount: number, rate: number, description: string,
+): MockExpense {
+  const tax = Math.round((amount * rate) / 100);
+  return {
+    id, number, account_id: `a${code}`, account_code: code, account_name: name,
+    partner_id: method === 'credit' ? 'p3' : null, expense_date: date, payment_method: method,
+    description, amount: amount.toFixed(2), tax_rate: rate, tax_amount: tax.toFixed(2),
+    total: (amount + tax).toFixed(2), status,
+  };
+}
+
+export const mockExpenses: MockExpense[] = [
+  expense('exp-4', 'EXP-2026-00004', '5130', 'الإيجار', '2026-06-25', 'bank', 'posted', 12000, 15, 'إيجار المعرض - يونيو'),
+  expense('exp-3', 'EXP-2026-00003', '5140', 'الوقود والمحروقات', '2026-06-20', 'cash', 'posted', 1850, 15, 'تعبئة وقود الأسطول'),
+  expense('exp-2', 'EXP-2026-00002', '5150', 'مصروفات عامة', '2026-06-14', 'credit', 'posted', 3200, 15, 'قرطاسية ولوازم مكتبية'),
+  expense('exp-1', 'EXP-2026-00001', '5120', 'الرواتب والأجور', '2026-06-01', 'bank', 'draft', 48000, 0, 'رواتب يونيو (مسودة)'),
+];
+
 // ── الفواتير الدورية ───────────────────────────────────────────────────────
 export interface MockRecurring {
   id: string;
@@ -685,6 +723,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     if (clean === '/logout') return resolve(null);
     // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
     if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
+    // إنشاء مصروف: نُعيد إجمالاً محسوباً من المبلغ والضريبة (مسودة).
+    if (clean === '/expenses') {
+      const b = (body ?? {}) as { amount?: number; tax_rate?: number };
+      const amt = Number(b.amount ?? 0);
+      const total = (amt + Math.round((amt * Number(b.tax_rate ?? 0)) / 100)) / 100;
+      return resolve({ data: { id: 'demo-exp', number: 'EXP-2026-00005', status: 'draft', total: total.toFixed(2) } });
+    }
     // إجراءات مسيّر الرواتب (ترحيل/صرف): نُعيد المسيّر المطابق ليُحدَّث العرض.
     const runAction = clean.match(/^\/payroll-runs\/([^/]+)\/(post|pay)$/);
     if (runAction) {
@@ -707,6 +752,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/contacts') return resolve({ data: mockContacts });
   if (clean === '/crm-activities') return resolve({ data: mockCrmActivities });
   if (clean === '/accounts') return resolve({ data: mockAccounts });
+  if (clean === '/expenses') return resolve({ data: mockExpenses });
   if (clean === '/partners') return resolve({ data: mockPartners });
   if (clean === '/invoices') return resolve({ data: mockInvoices });
   if (clean === '/quotes') return resolve({ data: mockQuotes });

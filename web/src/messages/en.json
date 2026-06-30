@@ -863,5 +863,40 @@
       "revenue": "Revenue",
       "expense": "Expenses"
     }
+  },
+  "expenses": {
+    "title": "Expenses",
+    "create": "New expense",
+    "new_title": "Record expense",
+    "details": "Expense details",
+    "search": "Search…",
+    "empty": "No expenses yet",
+    "number": "No.",
+    "account": "Expense account",
+    "choose_account": "Choose expense account",
+    "date": "Date",
+    "amount": "Amount (pre-tax)",
+    "tax": "Tax rate %",
+    "payment_method": "Payment method",
+    "vendor": "Vendor",
+    "none": "None",
+    "description": "Description",
+    "subtotal": "Amount",
+    "tax_total": "Tax",
+    "total": "Total",
+    "status": "Status",
+    "posted": "Posted",
+    "draft": "Draft",
+    "cancelled": "Cancelled",
+    "post": "Post",
+    "post_success": "Expense posted and journal entry generated",
+    "need_amount": "Enter a positive amount",
+    "save": "Save",
+    "back": "Back",
+    "method": {
+      "cash": "Cash",
+      "bank": "Bank transfer",
+      "credit": "On credit (payable)"
+    }
   }
 }
