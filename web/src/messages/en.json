@@ -843,5 +843,25 @@
     "print_receipt": "Auto-print receipt",
     "allow_discount": "Allow discount",
     "receipt_footer": "Receipt footer text"
+  },
+  "accounts": {
+    "title": "Chart of accounts",
+    "subtitle": "Standard Saudi chart of accounts and current balances.",
+    "search": "Search by code or name…",
+    "account": "Account",
+    "nature": "Nature",
+    "balance": "Balance",
+    "total": "Total",
+    "debit": "Debit",
+    "credit": "Credit",
+    "empty": "No accounts",
+    "error": "Failed to load accounts",
+    "types": {
+      "asset": "Assets",
+      "liability": "Liabilities",
+      "equity": "Equity",
+      "revenue": "Revenue",
+      "expense": "Expenses"
+    }
   }
 }

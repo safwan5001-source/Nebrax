@@ -138,12 +138,68 @@ export const mockIncomeStatement = {
   net_income: '217840.00',
 };
 
-export const mockAccounts = [
-  { code: '1110', name: 'الصندوق', balance: '54320.00' },
-  { code: '1120', name: 'البنك', balance: '163520.00' },
-  { code: '1130', name: 'العملاء', balance: '63200.00' },
-  { code: '4110', name: 'إيرادات المبيعات', balance: '482500.00' },
-  { code: '5110', name: 'تكلفة البضاعة المباعة', balance: '264660.00' },
+// دليل الحسابات السعودي القياسي (يطابق ChartOfAccountsSeeder) — شجرة 3 مستويات.
+// المجموعات (is_group) لا تقبل قيوداً ولا رصيد مباشر؛ الأوراق تحمل الأرصدة.
+export interface MockAccount {
+  id: string;
+  code: string;
+  name: string;
+  name_en: string;
+  type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  normal_balance: 'debit' | 'credit';
+  is_group: boolean;
+  balance: string;
+}
+
+const acc = (
+  code: string,
+  name: string,
+  name_en: string,
+  type: MockAccount['type'],
+  is_group: boolean,
+  balance = '0.00',
+): MockAccount => ({
+  id: `a${code}`,
+  code,
+  name,
+  name_en,
+  type,
+  normal_balance: type === 'asset' || type === 'expense' ? 'debit' : 'credit',
+  is_group,
+  balance,
+});
+
+export const mockAccounts: MockAccount[] = [
+  acc('1', 'الأصول', 'Assets', 'asset', true),
+  acc('11', 'الأصول المتداولة', 'Current Assets', 'asset', true),
+  acc('1110', 'الصندوق', 'Cash', 'asset', false, '54320.00'),
+  acc('1120', 'البنك', 'Bank', 'asset', false, '163520.00'),
+  acc('1130', 'العملاء (المدينون)', 'Accounts Receivable', 'asset', false, '63200.00'),
+  acc('1140', 'المخزون', 'Inventory', 'asset', false, '88400.00'),
+  acc('1150', 'ضريبة القيمة المضافة - مدخلات', 'VAT Input', 'asset', false, '12150.00'),
+  acc('12', 'الأصول الثابتة', 'Fixed Assets', 'asset', true),
+  acc('1210', 'المعدات والآليات', 'Equipment', 'asset', false, '45000.00'),
+  acc('1220', 'وسائل النقل', 'Vehicles', 'asset', false, '120000.00'),
+  acc('1230', 'مجمع الإهلاك', 'Accumulated Depreciation', 'asset', false, '-18500.00'),
+  acc('2', 'الخصوم', 'Liabilities', 'liability', true),
+  acc('21', 'الخصوم المتداولة', 'Current Liabilities', 'liability', true),
+  acc('2110', 'الموردون (الدائنون)', 'Accounts Payable', 'liability', false, '47800.00'),
+  acc('2120', 'ضريبة القيمة المضافة - مخرجات', 'VAT Output', 'liability', false, '21300.00'),
+  acc('2130', 'رواتب مستحقة', 'Accrued Salaries', 'liability', false, '18000.00'),
+  acc('2140', 'التأمينات الاجتماعية مستحقة', 'GOSI Payable', 'liability', false, '6400.00'),
+  acc('2150', 'استقطاعات موظفين مستحقة', 'Employee Deductions Payable', 'liability', false, '2100.00'),
+  acc('3', 'حقوق الملكية', 'Equity', 'equity', true),
+  acc('3110', 'رأس المال', 'Capital', 'equity', false, '300000.00'),
+  acc('3120', 'الأرباح المرحّلة', 'Retained Earnings', 'equity', false, '85000.00'),
+  acc('4', 'الإيرادات', 'Revenue', 'revenue', true),
+  acc('4110', 'إيرادات المبيعات', 'Sales Revenue', 'revenue', false, '482500.00'),
+  acc('4120', 'إيرادات الخدمات', 'Service Revenue', 'revenue', false, '36000.00'),
+  acc('5', 'المصروفات', 'Expenses', 'expense', true),
+  acc('5110', 'تكلفة البضاعة المباعة', 'COGS', 'expense', false, '264660.00'),
+  acc('5120', 'الرواتب والأجور', 'Salaries', 'expense', false, '96000.00'),
+  acc('5130', 'الإيجار', 'Rent', 'expense', false, '48000.00'),
+  acc('5140', 'الوقود والمحروقات', 'Fuel', 'expense', false, '14300.00'),
+  acc('5150', 'مصروفات عامة', 'General Expenses', 'expense', false, '9750.00'),
 ];
 
 export const mockCompany = {
