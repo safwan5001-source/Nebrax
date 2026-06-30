@@ -507,7 +507,7 @@ export const mockUsers = [
 export const mockSalesConfig: Record<string, unknown> = {
   statuses: [
     { name: 'مسودة', color: '#6B7280' },
-    { name: 'مرحّلة', color: '#2563EB' },
+    { name: 'مرحّلة', color: '#1E40AF' },
     { name: 'مدفوعة', color: '#16A34A' },
     { name: 'ملغاة', color: '#DC2626' },
   ],
@@ -525,7 +525,7 @@ export const mockSalesConfig: Record<string, unknown> = {
     { name: 'شحن بين المدن', rate: 60 },
   ],
   einvoice: { enabled: true, phase: '2', vat_number: '310122393500003' },
-  designs: { template: 'classic', show_logo: true, accent_color: '#2563EB', footer_text: 'شكراً لتعاملكم معنا' },
+  designs: { template: 'classic', show_logo: true, accent_color: '#1E40AF', footer_text: 'شكراً لتعاملكم معنا' },
   orders: { auto_convert: false, require_approval: true, prefix: 'SO' },
   pos: { default_customer: 'عميل نقدي (POS)', print_receipt: true, allow_discount: true, receipt_footer: 'شكراً لزيارتكم' },
 };
