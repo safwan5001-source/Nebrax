@@ -55,6 +55,7 @@ class ExpenseService
                 'number'         => $data['number'] ?? $this->nextNumber($date),
                 'account_id'     => $data['account_id'],
                 'partner_id'     => $data['partner_id'] ?? null,
+                'cost_center_id' => $data['cost_center_id'] ?? null,
                 'expense_date'   => $date,
                 'payment_method' => $data['payment_method'] ?? 'cash',
                 'description'    => $data['description'] ?? null,
@@ -83,8 +84,8 @@ class ExpenseService
             $tax    = $this->calcTax($amount, (int) $expense->tax_rate);
             $total  = $amount + $tax;
 
-            // مدين حساب المصروف + مدين ضريبة المدخلات / دائن نقد أو بنك أو موردون
-            $lines = [['account_id' => $expense->account_id, 'debit' => $amount]];
+            // مدين حساب المصروف (موسوماً بمركز التكلفة) + مدين ضريبة المدخلات / دائن نقد أو بنك أو موردون
+            $lines = [['account_id' => $expense->account_id, 'debit' => $amount, 'cost_center_id' => $expense->cost_center_id]];
             if ($tax > 0) {
                 $lines[] = ['account_id' => $this->accountId(self::ACC_INPUT_VAT), 'debit' => $tax];
             }

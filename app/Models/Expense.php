@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Expense extends BaseModel
 {
     protected $fillable = [
-        'tenant_id', 'number', 'account_id', 'partner_id', 'expense_date',
+        'tenant_id', 'number', 'account_id', 'partner_id', 'cost_center_id', 'expense_date',
         'payment_method', 'description', 'amount', 'tax_rate', 'tax_amount',
         'total', 'status', 'journal_entry_id', 'created_by',
     ];

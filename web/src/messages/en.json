@@ -891,6 +891,8 @@
     "post": "Post",
     "post_success": "Expense posted and journal entry generated",
     "need_amount": "Enter a positive amount",
+    "cost_center": "Cost center",
+    "no_center": "No cost center",
     "save": "Save",
     "back": "Back",
     "method": {
@@ -898,6 +900,22 @@
       "bank": "Bank transfer",
       "credit": "On credit (payable)"
     }
+  },
+  "costCenters": {
+    "title": "Cost centers",
+    "add": "New cost center",
+    "edit": "Edit cost center",
+    "search": "Search…",
+    "empty": "No cost centers yet",
+    "code": "Code",
+    "name": "Name",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "delete": "Delete",
+    "confirm_delete": "Delete this cost center?",
+    "save": "Save",
+    "cancel": "Cancel"
   },
   "assets": {
     "title": "Assets",

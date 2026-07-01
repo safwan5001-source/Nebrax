@@ -17,6 +17,7 @@ class ExpenseResource extends JsonResource
             'account_code'   => $this->whenLoaded('account', fn () => $this->account->code),
             'account_name'   => $this->whenLoaded('account', fn () => $this->account->name),
             'partner_id'     => $this->partner_id,
+            'cost_center_id' => $this->cost_center_id,
             'expense_date'   => optional($this->expense_date)->toDateString(),
             'payment_method' => $this->payment_method,
             'description'    => $this->description,

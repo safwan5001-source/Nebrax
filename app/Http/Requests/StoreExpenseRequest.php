@@ -16,6 +16,7 @@ class StoreExpenseRequest extends FormRequest
         return [
             'account_id'     => ['required', 'uuid'],
             'partner_id'     => ['nullable', 'uuid'],
+            'cost_center_id' => ['nullable', 'uuid'],
             'expense_date'   => ['nullable', 'date'],
             'payment_method' => ['nullable', 'in:cash,bank,credit'],
             'description'    => ['nullable', 'string', 'max:500'],
