@@ -58,6 +58,7 @@ class LedgerService
                     'description'      => $line['description'] ?? null,
                     'partner_type'     => $line['partner_type'] ?? null,
                     'partner_id'       => $line['partner_id'] ?? null,
+                    'cost_center_id'   => $line['cost_center_id'] ?? null,
                 ]);
 
                 $this->applyToBalance(
@@ -101,6 +102,7 @@ class LedgerService
                     'description'      => "عكس: {$line->description}",
                     'partner_type'     => $line->partner_type,
                     'partner_id'       => $line->partner_id,
+                    'cost_center_id'   => $line->cost_center_id,
                 ]);
 
                 $this->applyToBalance($line->account_id, $line->credit, $line->debit);

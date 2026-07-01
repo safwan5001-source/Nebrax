@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('number');                                   // EXP-2025-00001
             $table->foreignUuid('account_id')->constrained('accounts')->restrictOnDelete(); // حساب المصروف (نوع expense)
             $table->foreignUuid('partner_id')->nullable()->constrained('partners')->nullOnDelete(); // المورّد (اختياري)
+            $table->uuid('cost_center_id')->nullable();                 // مركز التكلفة (بُعد تحليلي)
             $table->date('expense_date');
             $table->enum('payment_method', ['cash', 'bank', 'credit'])->default('cash');
             $table->string('description')->nullable();

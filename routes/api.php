@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\CostCenterController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\CrmActivityController;
 use App\Http\Controllers\Api\CustomerSettingsController;
@@ -108,6 +109,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('assets', [AssetController::class, 'store'])->middleware($perm('assets.manage'));
         Route::post('assets/{id}/post', [AssetController::class, 'post'])->middleware($perm('assets.manage'));
         Route::post('assets/{id}/depreciate', [AssetController::class, 'depreciate'])->middleware($perm('assets.manage'));
+
+        // مراكز التكلفة (بيانات رئيسية — بُعد تحليلي للقيود)
+        Route::get('cost-centers', [CostCenterController::class, 'index'])->middleware($perm('cost_centers.view'));
+        Route::post('cost-centers', [CostCenterController::class, 'store'])->middleware($perm('cost_centers.manage'));
+        Route::put('cost-centers/{id}', [CostCenterController::class, 'update'])->middleware($perm('cost_centers.manage'));
+        Route::delete('cost-centers/{id}', [CostCenterController::class, 'destroy'])->middleware($perm('cost_centers.manage'));
 
         // الفواتير
         Route::get('invoices', [InvoiceController::class, 'index'])->middleware($perm('invoices.view'));

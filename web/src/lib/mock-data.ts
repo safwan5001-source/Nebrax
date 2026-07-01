@@ -434,6 +434,21 @@ export const mockExpenses: MockExpense[] = [
   expense('exp-1', 'EXP-2026-00001', '5120', 'الرواتب والأجور', '2026-06-01', 'bank', 'draft', 48000, 0, 'رواتب يونيو (مسودة)'),
 ];
 
+// ── مراكز التكلفة (الحسابات) ─────────────────────────────────────────────────
+export interface MockCostCenter {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+}
+
+export const mockCostCenters: MockCostCenter[] = [
+  { id: 'cc-1', code: 'CC-DMM', name: 'فرع الدمام', is_active: true },
+  { id: 'cc-2', code: 'CC-KHB', name: 'فرع الخبر', is_active: true },
+  { id: 'cc-3', code: 'CC-JBL', name: 'فرع الجبيل', is_active: true },
+  { id: 'cc-4', code: 'CC-ADM', name: 'الإدارة العامة', is_active: false },
+];
+
 // ── الأصول الثابتة (الحسابات) ────────────────────────────────────────────────
 export interface MockAsset {
   id: string;
@@ -805,6 +820,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/accounts') return resolve({ data: mockAccounts });
   if (clean === '/expenses') return resolve({ data: mockExpenses });
   if (clean === '/assets') return resolve({ data: mockAssets });
+  if (clean === '/cost-centers') return resolve({ data: mockCostCenters });
   if (clean === '/partners') return resolve({ data: mockPartners });
   if (clean === '/invoices') return resolve({ data: mockInvoices });
   if (clean === '/quotes') return resolve({ data: mockQuotes });

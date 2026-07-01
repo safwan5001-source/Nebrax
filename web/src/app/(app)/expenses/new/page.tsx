@@ -21,6 +21,7 @@ interface Account {
   is_group: boolean;
 }
 interface Partner { id: string; name: string; type?: string }
+interface CostCenter { id: string; code: string; name: string; is_active: boolean }
 
 export default function NewExpensePage() {
   const t = useTranslations('expenses');
@@ -30,8 +31,10 @@ export default function NewExpensePage() {
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [centers, setCenters] = useState<CostCenter[]>([]);
   const [accountId, setAccountId] = useState('');
   const [partnerId, setPartnerId] = useState('');
+  const [centerId, setCenterId] = useState('');
   const [amount, setAmount] = useState('');
   const [tax, setTax] = useState('15');
   const [method, setMethod] = useState('cash');
@@ -48,6 +51,7 @@ export default function NewExpensePage() {
       if (expenseAccounts[0]) setAccountId((a) => a || expenseAccounts[0].id);
     });
     api<{ data: Partner[] }>('/partners').then((r) => setPartners(r.data)).catch(() => {});
+    api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
   }, []);
 
   const amountMinor = riyalToMinor(amount);
@@ -69,6 +73,7 @@ export default function NewExpensePage() {
         body: {
           account_id: accountId,
           partner_id: method === 'credit' && partnerId ? partnerId : null,
+          cost_center_id: centerId || null,
           amount: amountMinor,
           tax_rate: Number(tax) || 0,
           payment_method: method,
@@ -135,6 +140,15 @@ export default function NewExpensePage() {
               <Label htmlFor="date">{t('date')}</Label>
               <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
+            {centers.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="center">{t('cost_center')}</Label>
+                <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
+                  <option value="">{t('no_center')}</option>
+                  {centers.map((c) => (<option key={c.id} value={c.id}>{c.code} — {c.name}</option>))}
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="desc">{t('description')}</Label>
               <Input id="desc" value={description} onChange={(e) => setDescription(e.target.value)} />

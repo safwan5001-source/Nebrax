@@ -8,7 +8,7 @@ class JournalLine extends BaseModel
 {
     protected $fillable = [
         'tenant_id', 'journal_entry_id', 'account_id',
-        'debit', 'credit', 'description', 'partner_type', 'partner_id',
+        'debit', 'credit', 'description', 'partner_type', 'partner_id', 'cost_center_id',
     ];
 
     protected $casts = [
@@ -24,5 +24,10 @@ class JournalLine extends BaseModel
     public function entry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
+    }
+
+    public function costCenter(): BelongsTo
+    {
+        return $this->belongsTo(CostCenter::class);
     }
 }
