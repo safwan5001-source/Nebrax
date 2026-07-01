@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
   Search, Barcode, SlidersHorizontal, Star, Package, ImageIcon, Plus, Minus, Trash2,
@@ -41,6 +42,7 @@ function stockTone(qty: number) {
 export default function PosPage() {
   const t = useTranslations('pos');
   const tc = useTranslations('common');
+  const router = useRouter();
   const { success } = useToast();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -331,8 +333,8 @@ export default function PosPage() {
   );
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-background">
-      <PosTopbar cashier={cashier} branch={branch} />
+    <div className="flex h-full flex-col overflow-hidden bg-background">
+      <PosTopbar cashier={cashier} branch={branch} onEndSession={() => router.push('/dashboard')} />
 
       {step === 'payment' ? (
         <PosPayment
