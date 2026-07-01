@@ -52,6 +52,7 @@ class ChartOfAccountsSeeder
             ['5130', 'الإيجار', 'Rent', 'expense', false, []],
             ['5140', 'الوقود والمحروقات', 'Fuel', 'expense', false, []],
             ['5150', 'مصروفات عامة', 'General Expenses', 'expense', false, []],
+            ['5160', 'الإهلاك', 'Depreciation', 'expense', false, []],
         ]],
     ];
 
