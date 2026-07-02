@@ -181,7 +181,18 @@
     "save_draft": "Save as draft",
     "save_post": "Save & post",
     "back": "Back",
-    "need_line": "Add at least one line with a valid price"
+    "need_line": "Add at least one line with a valid price",
+    "customer_section": "Customer & payment",
+    "meta_section": "Invoice details",
+    "invoice_number": "Invoice number",
+    "auto_number": "Generated automatically on save",
+    "due_date": "Due date",
+    "payment_terms": "Payment terms",
+    "days": "days",
+    "item": "Item",
+    "total_with_vat": "Total incl. VAT",
+    "summary_title": "Invoice summary",
+    "summary_hint": "Totals are derived from the lines — never entered manually."
   },
   "invoiceDetail": {
     "back": "Back",
