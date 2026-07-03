@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { riyalToMinor } from '@/lib/money';
 
 export default function NewPartnerPage() {
   const t = useTranslations('partners');
@@ -21,6 +22,7 @@ export default function NewPartnerPage() {
   const [form, setForm] = useState({
     name: '', name_en: '', type: 'customer', phone: '', address: '', city: '',
     vat_number: '', cr_number: '', code: '', email: '', is_active: true,
+    opening_balance: '', opening_balance_date: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -45,6 +47,8 @@ export default function NewPartnerPage() {
           cr_number: form.cr_number || null,
           code: form.code || null,
           email: form.email || null,
+          opening_balance: form.opening_balance !== '' ? riyalToMinor(form.opening_balance) : null,
+          opening_balance_date: form.opening_balance_date || null,
           is_active: form.is_active,
         },
       });
@@ -129,6 +133,15 @@ export default function NewPartnerPage() {
                 <Label htmlFor="email">{t('email')}</Label>
                 <Input id="email" type="email" dir="ltr" value={form.email} onChange={(e) => set('email', e.target.value)} />
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ob">{t('opening_balance')}</Label>
+                <Input id="ob" inputMode="decimal" className="num text-end" placeholder="0.00" value={form.opening_balance} onChange={(e) => set('opening_balance', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="obd">{t('opening_balance_date')}</Label>
+                <Input id="obd" type="date" dir="ltr" value={form.opening_balance_date} onChange={(e) => set('opening_balance_date', e.target.value)} />
+              </div>
+              <p className="text-[11px] text-muted sm:col-span-2">{t('opening_balance_hint')}</p>
               <div className="space-y-1.5 sm:col-span-2">
                 <label className="flex items-center gap-2 pt-1 text-sm text-text">
                   <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />

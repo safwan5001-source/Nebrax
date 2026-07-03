@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StorePartnerRequest;
 use App\Http\Resources\PartnerResource;
 use App\Models\Partner;
+use App\Services\Accounting\PartnerService;
 use Illuminate\Http\JsonResponse;
 
 class PartnerController extends ApiController
 {
+    public function __construct(protected PartnerService $partners) {}
+
     public function index(): JsonResponse
     {
         return PartnerResource::collection(Partner::latest()->get())->response();
@@ -16,7 +19,15 @@ class PartnerController extends ApiController
 
     public function store(StorePartnerRequest $request): JsonResponse
     {
-        $partner = Partner::create($request->validated());
+        $data = $request->validated();
+        $partner = Partner::create($data); // opening_balance ليس عموداً — يحرسه fillable
+
+        // رصيد افتتاحي (قيد ذمة الطرف مقابل 3130) عند تحديده.
+        $this->domain(fn () => $this->partners->recordOpeningBalance(
+            $partner,
+            (int) ($data['opening_balance'] ?? 0),
+            $data['opening_balance_date'] ?? null,
+        ));
 
         return (new PartnerResource($partner))->response()->setStatusCode(201);
     }

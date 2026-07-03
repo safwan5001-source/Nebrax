@@ -24,6 +24,8 @@ class StorePartnerRequest extends FormRequest
             'phone'      => ['nullable', 'string', 'max:255'],
             'address'    => ['nullable', 'string', 'max:255'],
             'city'       => ['nullable', 'string', 'max:255'],
+            'opening_balance'      => ['nullable', 'integer', 'min:0'], // هللات — فعل (قيد) لا عمود
+            'opening_balance_date' => ['nullable', 'date'],
             'is_active'  => ['boolean'],
         ];
     }
