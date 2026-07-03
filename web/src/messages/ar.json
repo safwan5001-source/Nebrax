@@ -424,7 +424,17 @@
     "save": "حفظ",
     "cancel": "إلغاء",
     "new_title": "عميل جديد",
-    "back": "رجوع"
+    "back": "رجوع",
+    "customer_details": "بيانات العميل",
+    "account_details": "بيانات الحساب",
+    "name_en": "الاسم (إنجليزي)",
+    "code": "رقم الكود",
+    "vat_number": "الرقم الضريبي",
+    "cr_number": "السجل التجاري / الرقم الموحد",
+    "address": "العنوان",
+    "status_label": "الحالة",
+    "active": "نشط",
+    "vat_hint": "15 خانة"
   },
   "status": {
     "draft": "مسودة",
