@@ -7,14 +7,29 @@ use App\Http\Resources\PartnerResource;
 use App\Models\Partner;
 use App\Services\Accounting\PartnerService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PartnerController extends ApiController
 {
     public function __construct(protected PartnerService $partners) {}
 
-    public function index(): JsonResponse
+    /**
+     * قائمة الأطراف مع فلترة اختيارية بالدور:
+     *   ?type=customer  → العملاء (customer + both)
+     *   ?type=supplier  → الموردون (supplier + both)
+     * الطرف كيان واحد؛ الفلترة عرضية فقط لفصل شاشتَي العملاء والمشتريات.
+     */
+    public function index(Request $request): JsonResponse
     {
-        return PartnerResource::collection(Partner::latest()->get())->response();
+        $query = Partner::latest();
+
+        match ($request->query('type')) {
+            'customer' => $query->whereIn('type', ['customer', 'both']),
+            'supplier' => $query->whereIn('type', ['supplier', 'both']),
+            default    => null,
+        };
+
+        return PartnerResource::collection($query->get())->response();
     }
 
     public function store(StorePartnerRequest $request): JsonResponse

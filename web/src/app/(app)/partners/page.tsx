@@ -20,18 +20,12 @@ export default function PartnersPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api<{ data: Partner[] }>('/partners')
+    api<{ data: Partner[] }>('/partners?type=customer')
       .then((r) => setData(r.data))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => load(), [load]);
-
-  const typeTone: Record<string, 'neutral' | 'positive' | 'muted'> = {
-    customer: 'neutral',
-    supplier: 'positive',
-    both: 'muted',
-  };
 
   const columns = useMemo<ColumnDef<Partner, unknown>[]>(
     () => [
@@ -45,9 +39,9 @@ export default function PartnersPage() {
         ),
       },
       {
-        accessorKey: 'type',
-        header: tp('type'),
-        cell: ({ row }) => <Badge tone={typeTone[row.original.type] ?? 'muted'}>{tp(row.original.type)}</Badge>,
+        accessorKey: 'entity_type',
+        header: tp('entity_type'),
+        cell: ({ row }) => <Badge tone="muted">{tp(row.original.entity_type ?? 'commercial')}</Badge>,
       },
       { accessorKey: 'city', header: tp('city'), cell: ({ row }) => row.original.city ?? '—' },
       {

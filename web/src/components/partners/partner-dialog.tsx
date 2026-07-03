@@ -14,6 +14,7 @@ export interface Partner {
   id: string;
   name: string;
   type: string;
+  entity_type?: string;
   email?: string | null;
   phone?: string | null;
   city?: string | null;
@@ -34,7 +35,7 @@ export function PartnerDialog({
   const tc = useTranslations('common');
   const { success } = useToast();
   const [form, setForm] = useState<Partner>(
-    partner ?? { id: '', name: '', type: 'customer', email: '', phone: '', city: '' }
+    partner ?? { id: '', name: '', type: 'customer', entity_type: 'commercial', email: '', phone: '', city: '' }
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -47,7 +48,8 @@ export function PartnerDialog({
     setError(null);
     const body = {
       name: form.name,
-      type: form.type,
+      type: form.type || 'customer', // شاشة العملاء تُنشئ عملاء؛ المورّد يُدار في المشتريات
+      entity_type: form.entity_type || 'commercial',
       email: form.email || null,
       phone: form.phone || null,
       city: form.city || null,
@@ -77,11 +79,10 @@ export function PartnerDialog({
           <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} required />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="type">{tp('type')}</Label>
-          <Select id="type" value={form.type} onChange={(e) => set('type', e.target.value)}>
-            <option value="customer">{tp('customer')}</option>
-            <option value="supplier">{tp('supplier')}</option>
-            <option value="both">{tp('both')}</option>
+          <Label htmlFor="entity_type">{tp('entity_type')}</Label>
+          <Select id="entity_type" value={form.entity_type ?? 'commercial'} onChange={(e) => set('entity_type', e.target.value)}>
+            <option value="commercial">{tp('commercial')}</option>
+            <option value="individual">{tp('individual')}</option>
           </Select>
         </div>
         <div className="grid grid-cols-2 gap-3">
