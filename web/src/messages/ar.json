@@ -373,7 +373,18 @@
     "debit": "مدين",
     "credit": "دائن",
     "balance": "الرصيد",
-    "empty": "لا توجد حركات"
+    "empty": "لا توجد حركات",
+    "profile": "بيانات العميل",
+    "contact": "التواصل",
+    "address_block": "العنوان الوطني",
+    "account_block": "الحساب",
+    "credit_limit": "الحد الائتماني",
+    "credit_used": "المستخدَم",
+    "credit_available": "المتاح",
+    "credit_period": "المدة الائتمانية",
+    "days": "يوم",
+    "no_limit": "بلا حد",
+    "not_set": "—"
   },
   "reports": {
     "title": "التقارير",

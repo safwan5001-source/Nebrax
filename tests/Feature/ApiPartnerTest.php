@@ -39,6 +39,31 @@ class ApiPartnerTest extends TestCase
     }
 
     /** @test */
+    public function partner_profile_fields_round_trip_and_credit_limit_is_returned_in_riyal(): void
+    {
+        $token = $this->registerTenant()['token'];
+
+        $id = $this->withToken($token)->postJson('/api/partners', [
+            'name' => 'عميل مميّز', 'type' => 'customer',
+            'classification' => 'VIP', 'mobile' => '0551234567',
+            'building_no' => '1234', 'street' => 'الملك فهد', 'district' => 'العليا',
+            'postal_code' => '12211', 'country' => 'SA',
+            'credit_limit' => 250000, // 2500.00 هللة
+            'credit_period' => 30,
+        ])->assertCreated()['data']['id'];
+
+        $this->withToken($token)->getJson("/api/partners/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.classification', 'VIP')
+            ->assertJsonPath('data.mobile', '0551234567')
+            ->assertJsonPath('data.building_no', '1234')
+            ->assertJsonPath('data.district', 'العليا')
+            ->assertJsonPath('data.country', 'SA')
+            ->assertJsonPath('data.credit_limit', '2500.00') // بالريال لا الهللات
+            ->assertJsonPath('data.credit_period', 30);
+    }
+
+    /** @test */
     public function creating_a_partner_validates_input(): void
     {
         $token = $this->registerTenant()['token'];

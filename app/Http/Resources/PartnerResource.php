@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,7 +29,7 @@ class PartnerResource extends JsonResource
             'postal_code'  => $this->postal_code,
             'country'      => $this->country,
             'classification' => $this->classification,
-            'credit_limit'  => $this->credit_limit,
+            'credit_limit'  => $this->credit_limit !== null ? Money::toRiyal($this->credit_limit) : null,
             'credit_period' => $this->credit_period,
             'is_active'  => $this->is_active,
         ];
