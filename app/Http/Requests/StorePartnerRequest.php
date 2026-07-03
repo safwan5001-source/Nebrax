@@ -17,6 +17,7 @@ class StorePartnerRequest extends FormRequest
             'name'       => ['required', 'string', 'max:255'],
             'name_en'    => ['nullable', 'string', 'max:255'],
             'type'       => ['required', 'in:customer,supplier,both'],
+            'entity_type' => ['nullable', 'in:individual,commercial'],
             'code'       => ['nullable', 'string', 'max:255'],
             'vat_number' => ['nullable', 'string', 'size:15'],
             'cr_number'  => ['nullable', 'string', 'max:255'],

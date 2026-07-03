@@ -53,6 +53,16 @@ class PartnerProductTest extends TestCase
     }
 
     /** @test */
+    public function partner_entity_type_defaults_to_commercial_and_accepts_individual(): void
+    {
+        $business = Partner::create(['name' => 'منشأة', 'type' => 'customer']);
+        $this->assertSame('commercial', Partner::find($business->id)->entity_type); // الافتراضي
+
+        $person = Partner::create(['name' => 'فرد', 'type' => 'customer', 'entity_type' => 'individual']);
+        $this->assertSame('individual', Partner::find($person->id)->entity_type);
+    }
+
+    /** @test */
     public function it_stores_a_partner_classification(): void
     {
         $partner = Partner::create(['name' => 'عميل مميّز', 'type' => 'customer', 'classification' => 'VIP']);

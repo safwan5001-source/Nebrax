@@ -13,7 +13,7 @@ class Partner extends BaseModel
     use SoftDeletes;
 
     protected $fillable = [
-        'tenant_id', 'code', 'type', 'name', 'name_en',
+        'tenant_id', 'code', 'type', 'entity_type', 'name', 'name_en',
         'vat_number', 'cr_number', 'email', 'phone', 'mobile', 'address', 'city',
         'building_no', 'street', 'district', 'postal_code', 'country',
         'classification', 'credit_limit', 'credit_period', 'is_active',
@@ -26,8 +26,9 @@ class Partner extends BaseModel
     ];
 
     protected $attributes = [
-        'type'      => 'customer',
-        'is_active' => true,
+        'type'        => 'customer',
+        'entity_type' => 'commercial',
+        'is_active'   => true,
     ];
 
     public function isCustomer(): bool
