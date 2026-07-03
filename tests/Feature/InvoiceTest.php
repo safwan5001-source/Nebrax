@@ -274,4 +274,24 @@ class InvoiceTest extends TestCase
             [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
         );
     }
+
+    /** @test */
+    public function posting_an_invoice_tags_the_revenue_line_with_the_cost_center(): void
+    {
+        $center = \App\Models\CostCenter::create(['code' => 'CC-01', 'name' => 'فرع الدمام']);
+
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'cost_center_id' => $center->id],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $posted = $this->invoices->post($invoice);
+
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)->where('source_id', $posted->id)->firstOrFail();
+
+        // سطر الإيراد (4110) موسوم بمركز التكلفة؛ سطرا النقد والضريبة غير موسومين.
+        $this->assertSame($center->id, $this->line($entry, '4110')->cost_center_id);
+        $this->assertNull($this->line($entry, '1110')->cost_center_id);
+        $this->assertNull($this->line($entry, '2120')->cost_center_id);
+    }
 }
