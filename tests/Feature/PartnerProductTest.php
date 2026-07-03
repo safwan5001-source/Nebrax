@@ -2,9 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Services\Accounting\ChartOfAccountsSeeder;
+use App\Services\Accounting\PartnerService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -128,6 +132,51 @@ class PartnerProductTest extends TestCase
         $this->assertSame(40, $stored->profit_margin);
         $this->assertSame('مميز,جديد', $stored->tags);
         $this->assertSame('سري', $stored->internal_notes);
+    }
+
+    private function line(JournalEntry $entry, string $code): ?JournalLine
+    {
+        return $entry->lines->first(fn (JournalLine $l) => $l->account->code === $code);
+    }
+
+    /** @test */
+    public function a_customer_opening_balance_debits_receivables_tagged_to_the_partner(): void
+    {
+        app(ChartOfAccountsSeeder::class)->seed($this->tenant->id);
+        $customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
+
+        $entry = app(PartnerService::class)->recordOpeningBalance($customer, 50000); // 500.00
+
+        $entry = JournalEntry::with('lines.account')->findOrFail($entry->id);
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $ar = $this->line($entry, '1130');
+        $this->assertEquals(50000, $ar->debit);              // العملاء مدين
+        $this->assertEquals(50000, $this->line($entry, '3130')->credit); // الأرصدة الافتتاحية
+        $this->assertEquals(Partner::class, $ar->partner_type); // مربوط بالطرف (لكشف الحساب)
+        $this->assertEquals($customer->id, $ar->partner_id);
+    }
+
+    /** @test */
+    public function a_supplier_opening_balance_credits_payables(): void
+    {
+        app(ChartOfAccountsSeeder::class)->seed($this->tenant->id);
+        $supplier = Partner::create(['name' => 'مورّد', 'type' => 'supplier']);
+
+        $entry = app(PartnerService::class)->recordOpeningBalance($supplier, 80000);
+
+        $entry = JournalEntry::with('lines.account')->findOrFail($entry->id);
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(80000, $this->line($entry, '2110')->credit); // الموردون دائن
+        $this->assertEquals(80000, $this->line($entry, '3130')->debit);  // الأرصدة الافتتاحية
+    }
+
+    /** @test */
+    public function a_zero_opening_balance_posts_nothing(): void
+    {
+        app(ChartOfAccountsSeeder::class)->seed($this->tenant->id);
+        $customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
+
+        $this->assertNull(app(PartnerService::class)->recordOpeningBalance($customer, 0));
     }
 
     /** @test */
