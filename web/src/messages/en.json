@@ -456,7 +456,13 @@
     "search": "Search products…",
     "empty": "No products",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "new_title": "Add product",
+    "back": "Back",
+    "item_details": "Item details",
+    "pricing_details": "Pricing details",
+    "inventory_mgmt": "Inventory management",
+    "more_options": "More options"
   },
   "common": {
     "loading": "Loading…",

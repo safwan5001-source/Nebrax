@@ -456,7 +456,13 @@
     "search": "بحث في المنتجات…",
     "empty": "لا توجد منتجات",
     "save": "حفظ",
-    "cancel": "إلغاء"
+    "cancel": "إلغاء",
+    "new_title": "إضافة منتج",
+    "back": "رجوع",
+    "item_details": "تفاصيل البند",
+    "pricing_details": "تفاصيل التسعير",
+    "inventory_mgmt": "إدارة المخزون",
+    "more_options": "خيارات أكثر"
   },
   "common": {
     "loading": "جارٍ التحميل…",
