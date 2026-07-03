@@ -26,8 +26,9 @@ return new class extends Migration
             $table->enum('status', ['draft', 'posted', 'cancelled'])->default('draft');
             $table->bigInteger('subtotal')->default(0);            // إجمالي السطور قبل الخصم والضريبة
             $table->bigInteger('discount')->default(0);            // خصم على مستوى الفاتورة (يخفّض الإيراد والضريبة)
-            $table->bigInteger('tax_amount')->default(0);          // الضريبة بعد الخصم
-            $table->bigInteger('total')->default(0);               // = subtotal − discount + tax_amount
+            $table->bigInteger('shipping')->default(0);            // رسوم الشحن (قبل الضريبة) — إيراد 4130
+            $table->bigInteger('tax_amount')->default(0);          // ضريبة السلع (بعد الخصم) + ضريبة الشحن
+            $table->bigInteger('total')->default(0);               // = subtotal − discount + shipping + tax_amount
             $table->string('notes')->nullable();
             // القيد الذي ولّدته الفاتورة عند الترحيل
             $table->foreignUuid('journal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();

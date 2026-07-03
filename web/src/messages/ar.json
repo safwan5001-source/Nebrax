@@ -192,6 +192,8 @@
     "item": "البند",
     "total_with_vat": "الإجمالي مع الضريبة",
     "discount": "الخصم",
+    "discount_shipping": "الخصم والشحن",
+    "shipping": "الشحن",
     "discount_mode": "نوع الخصم",
     "discount_amount": "مبلغ ثابت",
     "discount_percent": "نسبة مئوية %",

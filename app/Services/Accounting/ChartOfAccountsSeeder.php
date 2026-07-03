@@ -45,6 +45,7 @@ class ChartOfAccountsSeeder
         ['4', 'الإيرادات', 'Revenue', 'revenue', true, [
             ['4110', 'إيرادات المبيعات', 'Sales Revenue', 'revenue', false, []],
             ['4120', 'إيرادات الخدمات', 'Service Revenue', 'revenue', false, []],
+            ['4130', 'إيرادات الشحن', 'Shipping Revenue', 'revenue', false, []],
         ]],
         ['5', 'المصروفات', 'Expenses', 'expense', true, [
             ['5110', 'تكلفة البضاعة المباعة', 'COGS', 'expense', false, []],
