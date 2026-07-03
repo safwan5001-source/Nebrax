@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Plus, Trash2, FileText, Users, ShoppingCart, StickyNote } from 'lucide-react';
+import { ArrowRight, Plus, Trash2, FileText, Users, ShoppingCart, StickyNote, Tag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,8 @@ export default function NewInvoicePage() {
   const [dueDate, setDueDate] = useState('');
   const [terms, setTerms] = useState('');
   const [notes, setNotes] = useState('');
+  const [discountMode, setDiscountMode] = useState<'amount' | 'percent'>('amount');
+  const [discountInput, setDiscountInput] = useState('');
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -78,13 +80,19 @@ export default function NewInvoicePage() {
     setLine(key, { productId: p.id, description: p.name, price: p.sale_price, tax: String(p.tax_rate) });
   }
 
-  // معاينة الإجماليات (هللات) — بلا float.
+  // معاينة الإجماليات (هللات) — بلا float. الخصم يخفّض الأساس والضريبة تناسبياً (net method، مطابق للـ backend).
   const subMinor = lines.reduce((s, l) => s + (Number(l.qty) || 0) * riyalToMinor(l.price), 0);
-  const taxMinor = lines.reduce((s, l) => {
+  const taxGrossMinor = lines.reduce((s, l) => {
     const sub = (Number(l.qty) || 0) * riyalToMinor(l.price);
     return s + Math.round((sub * (Number(l.tax) || 0)) / 100);
   }, 0);
-  const totalMinor = subMinor + taxMinor;
+  const rawDiscount = discountMode === 'percent'
+    ? Math.floor((subMinor * (Number(discountInput) || 0)) / 100)
+    : riyalToMinor(discountInput);
+  const discountMinor = Math.max(0, Math.min(rawDiscount, subMinor));
+  const netMinor = subMinor - discountMinor;
+  const taxMinor = subMinor > 0 ? Math.floor((taxGrossMinor * netMinor) / subMinor) : 0;
+  const totalMinor = netMinor + taxMinor;
 
   const canSave = useMemo(() => !!partnerId && !saving, [partnerId, saving]);
 
@@ -104,7 +112,7 @@ export default function NewInvoicePage() {
     try {
       const created = await api<{ data: { id: string } }>('/invoices', {
         method: 'POST',
-        body: { partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null, notes: notes || null, items },
+        body: { partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null, discount: discountMinor, notes: notes || null, items },
       });
       if (post) await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
       success(tc('created'));
@@ -226,6 +234,29 @@ export default function NewInvoicePage() {
             </CardContent>
           </Card>
 
+          {/* الخصم على مستوى الفاتورة */}
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('discount')}</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
+                <div className="space-y-1.5">
+                  <Label htmlFor="dmode">{t('discount_mode')}</Label>
+                  <Select id="dmode" value={discountMode} onChange={(e) => setDiscountMode(e.target.value as 'amount' | 'percent')}>
+                    <option value="amount">{t('discount_amount')}</option>
+                    <option value="percent">{t('discount_percent')}</option>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="dval">{discountMode === 'percent' ? t('discount_percent') : t('discount_amount')}</Label>
+                  <div className="relative">
+                    <Input id="dval" inputMode="decimal" className="num text-end pe-12" placeholder="0" value={discountInput} onChange={(e) => setDiscountInput(e.target.value)} />
+                    <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">{discountMode === 'percent' ? '%' : '﷼'}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* الملاحظات */}
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><StickyNote className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('notes')}</CardTitle></CardHeader>
@@ -247,6 +278,9 @@ export default function NewInvoicePage() {
             <CardHeader><CardTitle>{t('summary_title')}</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between text-muted"><span>{t('subtotal')}</span><span className="num">{formatRiyal(subMinor / 100)}</span></div>
+              {discountMinor > 0 && (
+                <div className="flex justify-between text-muted"><span>{t('discount')}</span><span className="num text-positive">-{formatRiyal(discountMinor / 100)}</span></div>
+              )}
               <div className="flex justify-between text-muted"><span>{t('tax_total')}</span><span className="num">{formatRiyal(taxMinor / 100)}</span></div>
               <div className="flex items-baseline justify-between border-t border-border pt-2">
                 <span className="font-semibold text-text">{t('total')}</span>

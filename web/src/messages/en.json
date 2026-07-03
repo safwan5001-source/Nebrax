@@ -191,8 +191,12 @@
     "days": "days",
     "item": "Item",
     "total_with_vat": "Total incl. VAT",
+    "discount": "Discount",
+    "discount_mode": "Discount type",
+    "discount_amount": "Fixed amount",
+    "discount_percent": "Percentage %",
     "summary_title": "Invoice summary",
-    "summary_hint": "Totals are derived from the lines — never entered manually."
+    "summary_hint": "Totals are derived from the lines — never entered manually. Discount reduces revenue and VAT."
   },
   "invoiceDetail": {
     "back": "Back",

@@ -229,4 +229,49 @@ class InvoiceTest extends TestCase
         $this->expectExceptionMessage('سطر واحد على الأقل');
         $this->invoices->create(['partner_id' => $this->customer->id], []);
     }
+
+    /** @test */
+    public function an_invoice_discount_reduces_the_taxable_base_and_totals(): void
+    {
+        // 1000 + 15% ضريبة، خصم 200 على مستوى الفاتورة → صافي 800، ضريبة 120، إجمالي 920.
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'discount' => 20000],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $this->assertSame(100000, $invoice->subtotal);   // إجمالي السطور قبل الخصم
+        $this->assertSame(20000,  $invoice->discount);
+        $this->assertSame(12000,  $invoice->tax_amount);  // 15% على 800
+        $this->assertSame(92000,  $invoice->total);       // 800 + 120
+    }
+
+    /** @test */
+    public function a_discounted_cash_sale_posts_a_balanced_entry_with_net_revenue(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'discount' => 20000],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $posted = $this->invoices->post($invoice);
+
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)->where('source_id', $posted->id)->firstOrFail();
+
+        // متوازن: مدين 920 = دائن (800 مبيعات + 120 ضريبة)
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(92000, $entry->lines->sum('debit'));
+        $this->assertEquals(92000, $this->line($entry, '1110')->debit);  // الصندوق بالإجمالي بعد الخصم
+        $this->assertEquals(80000, $this->line($entry, '4110')->credit); // الإيراد الصافي (بعد الخصم)
+        $this->assertEquals(12000, $this->line($entry, '2120')->credit); // الضريبة على الصافي
+    }
+
+    /** @test */
+    public function it_rejects_a_discount_larger_than_the_subtotal(): void
+    {
+        $this->expectExceptionMessage('الخصم لا يمكن أن يتجاوز');
+        $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'discount' => 150000],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+    }
 }

@@ -90,10 +90,14 @@ class InvoiceService
                 $taxTotal += $lineTax;
             }
 
+            // خصم على مستوى الفاتورة (net method): يخفّض الإيراد والضريبة تناسبياً.
+            [$discount, $taxAmount, $total] = $this->applyDiscount($subtotal, $taxTotal, (int) ($data['discount'] ?? 0));
+
             $invoice->update([
                 'subtotal'   => $subtotal,
-                'tax_amount' => $taxTotal,
-                'total'      => $subtotal + $taxTotal,
+                'discount'   => $discount,
+                'tax_amount' => $taxAmount,
+                'total'      => $total,
             ]);
 
             return $invoice->load('lines');
@@ -121,8 +125,11 @@ class InvoiceService
             // فلا يمكن أن يتعارض total مع subtotal + tax_amount مهما عُبث بالرأس.
             $invoice->loadMissing('lines');
             $subtotal  = (int) $invoice->lines->sum('line_subtotal');
-            $taxAmount = (int) $invoice->lines->sum('line_tax');
-            $total     = $subtotal + $taxAmount;
+            $taxGross  = (int) $invoice->lines->sum('line_tax');
+
+            // تطبيق خصم الفاتورة على الأساس المشتقّ من السطور (net method).
+            [$discount, $taxAmount, $total] = $this->applyDiscount($subtotal, $taxGross, (int) $invoice->discount);
+            $netSales = $subtotal - $discount;
 
             $debitCode = $invoice->payment_type === 'cash'
                 ? self::ACC_CASH
@@ -135,7 +142,7 @@ class InvoiceService
                 'partner_id'   => $invoice->partner_id,
             ], [
                 'account_id' => $this->accountId(self::ACC_SALES),
-                'credit'     => $subtotal,
+                'credit'     => $netSales,
             ]];
 
             if ($taxAmount > 0) {
@@ -165,6 +172,7 @@ class InvoiceService
             $invoice->update([
                 'status'              => 'posted',
                 'subtotal'            => $subtotal,
+                'discount'            => $discount,
                 'tax_amount'          => $taxAmount,
                 'total'               => $total,
                 'journal_entry_id'    => $entry->id,
@@ -187,6 +195,26 @@ class InvoiceService
     protected function calcTax(int $base, int $rate): int
     {
         return intdiv($base * $rate + 50, 100);
+    }
+
+    /**
+     * تطبيق خصم على مستوى الفاتورة (net method): يخفّض الإيراد الخاضع والضريبة تناسبياً.
+     * الضريبة الصافية = الضريبة الإجمالية × (الأساس بعد الخصم ÷ الأساس قبله) — بلا float.
+     * خصم = 0 يُرجع القيم كما هي (توافق رجعي كامل).
+     *
+     * @return array{0:int,1:int,2:int}  [discount, taxNet, total]
+     */
+    protected function applyDiscount(int $subtotal, int $taxGross, int $discount): array
+    {
+        $discount = max(0, $discount);
+        if ($discount > $subtotal) {
+            throw new RuntimeException('الخصم لا يمكن أن يتجاوز إجمالي السطور.');
+        }
+
+        $net    = $subtotal - $discount;
+        $taxNet = $subtotal > 0 ? intdiv($taxGross * $net, $subtotal) : 0;
+
+        return [$discount, $taxNet, $net + $taxNet];
     }
 
     /**
