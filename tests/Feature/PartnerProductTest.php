@@ -53,6 +53,14 @@ class PartnerProductTest extends TestCase
     }
 
     /** @test */
+    public function it_stores_a_partner_classification(): void
+    {
+        $partner = Partner::create(['name' => 'عميل مميّز', 'type' => 'customer', 'classification' => 'VIP']);
+
+        $this->assertSame('VIP', Partner::find($partner->id)->classification);
+    }
+
+    /** @test */
     public function partner_type_both_is_customer_and_supplier(): void
     {
         $partner = Partner::create(['name' => 'طرف مزدوج', 'type' => 'both']);

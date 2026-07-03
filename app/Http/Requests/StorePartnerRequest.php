@@ -24,6 +24,7 @@ class StorePartnerRequest extends FormRequest
             'phone'      => ['nullable', 'string', 'max:255'],
             'address'    => ['nullable', 'string', 'max:255'],
             'city'       => ['nullable', 'string', 'max:255'],
+            'classification' => ['nullable', 'string', 'max:255'],
             'credit_limit'  => ['nullable', 'integer', 'min:0'],   // هللات — 0/غياب = بلا حد
             'credit_period' => ['nullable', 'integer', 'min:0', 'max:3650'], // أيام
             'opening_balance'      => ['nullable', 'integer', 'min:0'], // هللات — فعل (قيد) لا عمود

@@ -22,6 +22,7 @@ export default function NewPartnerPage() {
   const [form, setForm] = useState({
     name: '', name_en: '', type: 'customer', phone: '', address: '', city: '',
     vat_number: '', cr_number: '', code: '', email: '', is_active: true,
+    classification: '',
     opening_balance: '', opening_balance_date: '',
     credit_limit: '', credit_period: '',
   });
@@ -48,6 +49,7 @@ export default function NewPartnerPage() {
           cr_number: form.cr_number || null,
           code: form.code || null,
           email: form.email || null,
+          classification: form.classification || null,
           opening_balance: form.opening_balance !== '' ? riyalToMinor(form.opening_balance) : null,
           opening_balance_date: form.opening_balance_date || null,
           credit_limit: form.credit_limit !== '' ? riyalToMinor(form.credit_limit) : null,
@@ -118,6 +120,16 @@ export default function NewPartnerPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="cr">{t('cr_number')}</Label>
                 <Input id="cr" dir="ltr" className="num" value={form.cr_number} onChange={(e) => set('cr_number', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="classification">{t('classification')}</Label>
+                <Input id="classification" list="partner-classifications" placeholder={t('classification_hint')} value={form.classification} onChange={(e) => set('classification', e.target.value)} />
+                <datalist id="partner-classifications">
+                  <option value="VIP" />
+                  <option value={t('cls_wholesale')} />
+                  <option value={t('cls_retail')} />
+                  <option value={t('cls_government')} />
+                </datalist>
               </div>
             </div>
           </CardContent>
