@@ -14,6 +14,7 @@ import { api, ApiError } from '@/lib/api';
 import { riyalToMinor } from '@/lib/money';
 
 interface Partner { id: string; name: string; type?: string }
+interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
 
 export default function NewProductPage() {
   const t = useTranslations('products');
@@ -44,12 +45,23 @@ export default function NewProductPage() {
   const [profitMargin, setProfitMargin] = useState('');
   const [tags, setTags] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+  const [revenueAccounts, setRevenueAccounts] = useState<Account[]>([]);
+  const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
+  const [salesAccountId, setSalesAccountId] = useState('');
+  const [cogsAccountId, setCogsAccountId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api<{ data: Partner[] }>('/partners')
       .then((r) => setSuppliers(r.data.filter((p) => p.type === 'supplier' || p.type === 'both')))
+      .catch(() => {});
+    api<{ data: Account[] }>('/accounts')
+      .then((r) => {
+        const leaf = r.data.filter((a) => !a.is_group);
+        setRevenueAccounts(leaf.filter((a) => a.type === 'revenue'));
+        setExpenseAccounts(leaf.filter((a) => a.type === 'expense'));
+      })
       .catch(() => {});
   }, []);
 
@@ -75,6 +87,8 @@ export default function NewProductPage() {
           brand: brand || null,
           reorder_level: trackInventory && reorderLevel !== '' ? Number(reorderLevel) || 0 : null,
           supplier_id: supplierId || null,
+          sales_account_id: salesAccountId || null,
+          cogs_account_id: cogsAccountId || null,
           min_sale_price: minSalePrice !== '' ? riyalToMinor(minSalePrice) : null,
           discount: discount !== '' ? Number(discount) || 0 : null,
           discount_type: discount !== '' ? discountType : null,
@@ -205,6 +219,24 @@ export default function NewProductPage() {
                   </Select>
                 </div>
               </div>
+              {revenueAccounts.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="sales_acc">{t('sales_account')}</Label>
+                  <Select id="sales_acc" value={salesAccountId} onChange={(e) => setSalesAccountId(e.target.value)}>
+                    <option value="">{t('default_account')}</option>
+                    {revenueAccounts.map((a) => (<option key={a.id} value={a.id}>{a.code} — {a.name}</option>))}
+                  </Select>
+                </div>
+              )}
+              {expenseAccounts.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="cogs_acc">{t('cogs_account')}</Label>
+                  <Select id="cogs_acc" value={cogsAccountId} onChange={(e) => setCogsAccountId(e.target.value)}>
+                    <option value="">{t('default_account')}</option>
+                    {expenseAccounts.map((a) => (<option key={a.id} value={a.id}>{a.code} — {a.name}</option>))}
+                  </Select>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

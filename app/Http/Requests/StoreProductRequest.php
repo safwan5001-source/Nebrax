@@ -25,6 +25,8 @@ class StoreProductRequest extends FormRequest
             'brand'           => ['nullable', 'string', 'max:255'],
             'reorder_level'   => ['nullable', 'integer', 'min:0'],
             'supplier_id'     => ['nullable', 'uuid'],
+            'sales_account_id' => ['nullable', 'uuid'],
+            'cogs_account_id' => ['nullable', 'uuid'],
             'min_sale_price'  => ['nullable', 'integer', 'min:0'],
             'discount'        => ['nullable', 'integer', 'min:0'],
             'discount_type'   => ['nullable', 'in:percent,amount'],

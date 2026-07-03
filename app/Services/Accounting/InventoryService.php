@@ -143,6 +143,8 @@ class InventoryService
         $invoice->loadMissing('lines.product');
 
         $totalCogs = 0;
+        $cogsByAccount = []; // account_id => amount (تجاوز حساب التكلفة لكل منتج)
+        $defaultCogs = $this->accountId(self::ACC_COGS);
 
         foreach ($invoice->lines as $line) {
             $product = $line->product;
@@ -170,17 +172,22 @@ class InventoryService
 
             $product->update(['quantity_on_hand' => $newQty]);
             $totalCogs += $cost;
+            $cogsAcct = $product->cogs_account_id ?: $defaultCogs;
+            $cogsByAccount[$cogsAcct] = ($cogsByAccount[$cogsAcct] ?? 0) + $cost;
         }
 
         if ($totalCogs <= 0) {
             return null;
         }
 
-        // قيد: مدين تكلفة البضاعة المباعة / دائن المخزون
-        return $this->ledger->post([
-            ['account_id' => $this->accountId(self::ACC_COGS),      'debit'  => $totalCogs],
-            ['account_id' => $this->accountId(self::ACC_INVENTORY), 'credit' => $totalCogs],
-        ], [
+        // قيد: مدين تكلفة البضاعة المباعة (لكل حساب منتج) / دائن المخزون
+        $lines = [];
+        foreach ($cogsByAccount as $acct => $amount) {
+            $lines[] = ['account_id' => $acct, 'debit' => $amount];
+        }
+        $lines[] = ['account_id' => $this->accountId(self::ACC_INVENTORY), 'credit' => $totalCogs];
+
+        return $this->ledger->post($lines, [
             'entry_date'  => $invoice->invoice_date->toDateString(),
             'description' => "تكلفة بضاعة مباعة {$invoice->number}",
             'source_type' => Invoice::class,

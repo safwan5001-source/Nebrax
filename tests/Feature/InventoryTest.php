@@ -126,6 +126,28 @@ class InventoryTest extends TestCase
     }
 
     /** @test */
+    public function cogs_uses_the_products_custom_cogs_account(): void
+    {
+        $custom = Account::where('code', '5150')->firstOrFail(); // مصروفات عامة كحساب تكلفة مخصّص
+        $product = Product::create([
+            'name' => 'بضاعة', 'sale_price' => 10000, 'track_inventory' => true, 'cogs_account_id' => $custom->id,
+        ]);
+        $this->inventory->receiveStock($product, 10, 4000); // متوسط 4000
+
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['product_id' => $product->id, 'quantity' => 5, 'unit_price' => 10000, 'tax_rate' => 15]]
+        );
+        $posted = app(InvoiceService::class)->post($invoice);
+
+        $cogs = JournalEntry::with('lines.account')->findOrFail($posted->cogs_entry_id);
+        $this->assertEquals($cogs->lines->sum('debit'), $cogs->lines->sum('credit'));
+        $this->assertEquals(20000, $this->line($cogs, '5150')->debit);  // التكلفة على الحساب المخصّص
+        $this->assertNull($this->line($cogs, '5110'));                   // لا على الافتراضي
+        $this->assertEquals(20000, $this->line($cogs, '1140')->credit);
+    }
+
+    /** @test */
     public function receiving_stock_updates_quantity_cost_and_ledger(): void
     {
         $product = $this->trackedProduct();

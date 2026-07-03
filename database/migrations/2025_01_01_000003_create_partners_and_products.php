@@ -47,6 +47,8 @@ return new class extends Migration
             $table->string('brand')->nullable();                   // الماركة
             $table->unsignedInteger('reorder_level')->nullable();  // حد التنبيه عند نقص المخزون
             $table->uuid('supplier_id')->nullable();               // المورّد الافتراضي (مرجعي)
+            $table->uuid('sales_account_id')->nullable();          // حساب إيراد المبيعات (تجاوز 4110)
+            $table->uuid('cogs_account_id')->nullable();           // حساب تكلفة المبيعات (تجاوز 5110)
             $table->bigInteger('min_sale_price')->nullable();      // أقل سعر بيع (هللات — استرشادي)
             $table->bigInteger('discount')->nullable();            // خصم افتراضي (استرشادي)
             $table->enum('discount_type', ['percent', 'amount'])->nullable(); // نوع الخصم
