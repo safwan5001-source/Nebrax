@@ -24,6 +24,8 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->string('address')->nullable();
             $table->string('city')->nullable();
+            $table->bigInteger('credit_limit')->nullable();        // الحد الائتماني (هللات) — يمنع تجاوز رصيد العميل الآجل
+            $table->unsignedSmallInteger('credit_period')->nullable(); // المدة الائتمانية (أيام) — تُشتقّ منها تواريخ الاستحقاق
             $table->boolean('is_active')->default(true);
             $table->timestamps();
             $table->softDeletes();
