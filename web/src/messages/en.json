@@ -445,6 +445,8 @@
     "category": "Category",
     "brand": "Brand",
     "reorder_level": "Low-stock alert at",
+    "initial_quantity": "Opening quantity",
+    "initial_quantity_hint": "Valued at purchase price as opening stock (debit inventory / credit opening balances).",
     "supplier": "Supplier",
     "no_supplier": "No supplier",
     "sales_account": "Sales account",

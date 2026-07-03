@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
+use App\Services\Accounting\InventoryService;
 use Illuminate\Http\JsonResponse;
 
 class ProductController extends ApiController
 {
+    public function __construct(protected InventoryService $inventory) {}
+
     public function index(): JsonResponse
     {
         return ProductResource::collection(Product::latest()->get())->response();
@@ -16,9 +19,13 @@ class ProductController extends ApiController
 
     public function store(StoreProductRequest $request): JsonResponse
     {
-        $product = Product::create($request->validated());
+        $data = $request->validated();
+        $product = Product::create($data); // initial_quantity ليست عموداً — يحرسها fillable
 
-        return (new ProductResource($product))->response()->setStatusCode(201);
+        // رصيد افتتاحي (قيد مدين 1140 / دائن 3130) عند تحديد كمية ابتدائية لمنتج متتبَّع.
+        $this->domain(fn () => $this->inventory->recordOpeningStock($product, (int) ($data['initial_quantity'] ?? 0)));
+
+        return (new ProductResource($product->fresh()))->response()->setStatusCode(201);
     }
 
     public function show(string $id): JsonResponse

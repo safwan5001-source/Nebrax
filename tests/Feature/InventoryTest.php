@@ -126,6 +126,33 @@ class InventoryTest extends TestCase
     }
 
     /** @test */
+    public function opening_stock_debits_inventory_and_credits_opening_equity(): void
+    {
+        $product = Product::create(['name' => 'بضاعة', 'sale_price' => 10000, 'purchase_price' => 4000, 'track_inventory' => true]);
+        $movement = $this->inventory->recordOpeningStock($product, 10); // 10 × 4000 = 40000
+
+        $this->assertNotNull($movement);
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', StockMovement::class)->where('source_id', $movement->id)->firstOrFail();
+
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(40000, $this->line($entry, '1140')->debit);  // المخزون
+        $this->assertEquals(40000, $this->line($entry, '3130')->credit); // الأرصدة الافتتاحية
+        $this->assertSame(10, $product->fresh()->quantity_on_hand);
+        $this->assertSame(4000, $product->fresh()->avg_cost);
+    }
+
+    /** @test */
+    public function opening_stock_is_skipped_without_cost_or_tracking(): void
+    {
+        $noCost = Product::create(['name' => 'أ', 'sale_price' => 1, 'purchase_price' => 0, 'track_inventory' => true]);
+        $this->assertNull($this->inventory->recordOpeningStock($noCost, 5));
+
+        $untracked = Product::create(['name' => 'ب', 'sale_price' => 1, 'purchase_price' => 4000, 'track_inventory' => false]);
+        $this->assertNull($this->inventory->recordOpeningStock($untracked, 5));
+    }
+
+    /** @test */
     public function cogs_uses_the_products_custom_cogs_account(): void
     {
         $custom = Account::where('code', '5150')->firstOrFail(); // مصروفات عامة كحساب تكلفة مخصّص

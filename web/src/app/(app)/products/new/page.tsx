@@ -35,6 +35,7 @@ export default function NewProductPage() {
   const [category, setCategory] = useState('');
   const [brand, setBrand] = useState('');
   const [reorderLevel, setReorderLevel] = useState('');
+  const [initialQty, setInitialQty] = useState('');
   const [trackInventory, setTrackInventory] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [suppliers, setSuppliers] = useState<Partner[]>([]);
@@ -86,6 +87,7 @@ export default function NewProductPage() {
           category: category || null,
           brand: brand || null,
           reorder_level: trackInventory && reorderLevel !== '' ? Number(reorderLevel) || 0 : null,
+          initial_quantity: trackInventory && initialQty !== '' ? Number(initialQty) || 0 : null,
           supplier_id: supplierId || null,
           sales_account_id: salesAccountId || null,
           cogs_account_id: cogsAccountId || null,
@@ -250,9 +252,16 @@ export default function NewProductPage() {
               {t('track_inventory')}
             </label>
             {trackInventory && (
-              <div className="space-y-1.5">
-                <Label htmlFor="reorder">{t('reorder_level')}</Label>
-                <Input id="reorder" type="number" min={0} dir="ltr" className="num text-end sm:w-40" placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="initial_qty">{t('initial_quantity')}</Label>
+                  <Input id="initial_qty" type="number" min={0} dir="ltr" className="num text-end" placeholder="0" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} />
+                  <p className="text-[11px] text-muted">{t('initial_quantity_hint')}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reorder">{t('reorder_level')}</Label>
+                  <Input id="reorder" type="number" min={0} dir="ltr" className="num text-end" placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
+                </div>
               </div>
             )}
           </CardContent>
