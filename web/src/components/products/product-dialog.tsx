@@ -19,6 +19,10 @@ export interface Product {
   name_en: string | null;
   type: string;
   unit: string;
+  description: string | null;
+  category: string | null;
+  brand: string | null;
+  reorder_level: number | null;
   sale_price: string;
   purchase_price: string;
   tax_rate: number;
@@ -35,6 +39,10 @@ interface FormState {
   name_en: string;
   type: string;
   unit: string;
+  description: string;
+  category: string;
+  brand: string;
+  reorder_level: string;
   sale_price: string;
   purchase_price: string;
   tax_rate: string;
@@ -44,12 +52,14 @@ interface FormState {
 
 const emptyForm = (): FormState => ({
   name: '', sku: '', barcode: '', name_en: '', type: 'good', unit: 'piece',
+  description: '', category: '', brand: '', reorder_level: '',
   sale_price: '', purchase_price: '', tax_rate: '15', track_inventory: false, is_active: true,
 });
 
 function fromProduct(p: Product): FormState {
   return {
     name: p.name, sku: p.sku ?? '', barcode: p.barcode ?? '', name_en: p.name_en ?? '', type: p.type, unit: p.unit,
+    description: p.description ?? '', category: p.category ?? '', brand: p.brand ?? '', reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
     sale_price: p.sale_price, purchase_price: p.purchase_price, tax_rate: String(p.tax_rate),
     track_inventory: p.track_inventory, is_active: p.is_active,
   };
@@ -86,6 +96,10 @@ export function ProductDialog({
       barcode: form.barcode || null,
       type: form.type,
       unit: form.unit || null,
+      description: form.description || null,
+      category: form.category || null,
+      brand: form.brand || null,
+      reorder_level: form.track_inventory && form.reorder_level !== '' ? Number(form.reorder_level) || 0 : null,
       sale_price: riyalToMinor(form.sale_price),
       purchase_price: riyalToMinor(form.purchase_price),
       tax_rate: Number(form.tax_rate) || 0,
@@ -139,6 +153,18 @@ export function ProductDialog({
             <Label htmlFor="unit">{t('unit')}</Label>
             <Input id="unit" value={form.unit} onChange={(e) => set('unit', e.target.value)} />
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="category">{t('category')}</Label>
+            <Input id="category" value={form.category} onChange={(e) => set('category', e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="brand">{t('brand')}</Label>
+            <Input id="brand" value={form.brand} onChange={(e) => set('brand', e.target.value)} />
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label htmlFor="description">{t('description')}</Label>
+            <textarea id="description" rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary" />
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
@@ -166,6 +192,13 @@ export function ProductDialog({
             {t('active')}
           </label>
         </div>
+
+        {form.track_inventory && (
+          <div className="space-y-1.5">
+            <Label htmlFor="reorder">{t('reorder_level')}</Label>
+            <Input id="reorder" className="num text-end w-40" type="number" min={0} value={form.reorder_level} onChange={(e) => set('reorder_level', e.target.value)} />
+          </div>
+        )}
 
         {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 

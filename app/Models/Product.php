@@ -15,11 +15,13 @@ class Product extends BaseModel
 
     protected $fillable = [
         'tenant_id', 'sku', 'barcode', 'name', 'name_en', 'type', 'unit',
+        'description', 'category', 'brand', 'reorder_level',
         'sale_price', 'purchase_price', 'tax_rate', 'track_inventory',
         'quantity_on_hand', 'avg_cost', 'is_active',
     ];
 
     protected $casts = [
+        'reorder_level'    => 'integer',
         'sale_price'       => 'integer',
         'purchase_price'   => 'integer',
         'tax_rate'         => 'integer',

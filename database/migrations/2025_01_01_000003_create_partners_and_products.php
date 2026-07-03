@@ -42,6 +42,10 @@ return new class extends Migration
             $table->string('sku')->nullable();                     // رمز المنتج
             $table->string('barcode')->nullable();                 // الباركود (مسح ضوئي في POS)
             $table->string('name');
+            $table->text('description')->nullable();                // وصف المنتج
+            $table->string('category')->nullable();                // التصنيف
+            $table->string('brand')->nullable();                   // الماركة
+            $table->unsignedInteger('reorder_level')->nullable();  // حد التنبيه عند نقص المخزون
             $table->string('name_en')->nullable();
             $table->enum('type', ['good', 'service'])->default('good');
             $table->string('unit')->default('piece');              // وحدة القياس
