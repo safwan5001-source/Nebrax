@@ -945,7 +945,7 @@ function mockMovements(productId: string) {
 
 // إجمالي فاتورة من جسم الطلب (السطور بالهللات) → ريال نصّي.
 function invoiceTotalFromBody(body: unknown): string {
-  const b = body as { items?: { quantity?: number; unit_price?: number; tax_rate?: number; discount?: number }[]; discount?: number; shipping?: number } | undefined;
+  const b = body as { items?: { quantity?: number; unit_price?: number; tax_rate?: number; discount?: number }[]; discount?: number; shipping?: number; adjustment?: number } | undefined;
   const items = b?.items ?? [];
   // صافي كل سطر بعد خصم السطر.
   const lineNet = (it: { quantity?: number; unit_price?: number; discount?: number }) => {
@@ -960,5 +960,6 @@ function invoiceTotalFromBody(body: unknown): string {
   const goodsTax = subtotal > 0 ? Math.floor((taxGross * net) / subtotal) : 0;
   const shipping = Math.max(0, Number(b?.shipping ?? 0));
   const shippingTax = Math.round((shipping * 15) / 100);
-  return ((net + shipping + goodsTax + shippingTax) / 100).toFixed(2);
+  const adjustment = Number(b?.adjustment ?? 0);
+  return ((net + shipping + goodsTax + shippingTax + adjustment) / 100).toFixed(2);
 }

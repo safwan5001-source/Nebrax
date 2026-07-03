@@ -26,6 +26,7 @@ class InvoiceService
     private const ACC_RECEIVABLE  = '1130'; // العملاء (بيع آجل)
     private const ACC_SALES       = '4110'; // إيرادات المبيعات
     private const ACC_SHIPPING    = '4130'; // إيرادات الشحن
+    private const ACC_ADJUSTMENT  = '5170'; // فروق التقريب والتسويات
     private const ACC_VAT_OUTPUT  = '2120'; // ضريبة المخرجات
     private const VAT_RATE        = 15;     // نسبة ضريبة القيمة المضافة للشحن
 
@@ -60,6 +61,7 @@ class InvoiceService
                 'cost_center_id' => $data['cost_center_id'] ?? null,
                 'salesperson_id' => $data['salesperson_id'] ?? null,
                 'shipping'     => max(0, (int) ($data['shipping'] ?? 0)),
+                'adjustment'   => (int) ($data['adjustment'] ?? 0),
                 'status'       => 'draft',
                 'notes'        => $data['notes'] ?? null,
                 'created_by'   => $data['created_by'] ?? null,
@@ -108,12 +110,19 @@ class InvoiceService
             $shipping    = max(0, (int) ($data['shipping'] ?? 0));
             $shippingVat = $shipping > 0 ? $this->calcTax($shipping, self::VAT_RATE) : 0;
             $taxAmount   = $goodsVat + $shippingVat;
-            $total       = ($subtotal - $discount) + $shipping + $taxAmount;
+
+            // التسوية/التقريب (+/−، غير خاضعة للضريبة) تُعدّل الإجمالي النهائي.
+            $adjustment  = (int) ($data['adjustment'] ?? 0);
+            $total       = ($subtotal - $discount) + $shipping + $taxAmount + $adjustment;
+            if ($total < 0) {
+                throw new RuntimeException('التسوية تجعل إجمالي الفاتورة سالباً.');
+            }
 
             $invoice->update([
                 'subtotal'   => $subtotal,
                 'discount'   => $discount,
                 'shipping'   => $shipping,
+                'adjustment' => $adjustment,
                 'tax_amount' => $taxAmount,
                 'total'      => $total,
             ]);
@@ -154,7 +163,13 @@ class InvoiceService
             $shipping    = max(0, (int) $invoice->shipping);
             $shippingVat = $shipping > 0 ? $this->calcTax($shipping, self::VAT_RATE) : 0;
             $taxAmount   = $goodsVat + $shippingVat;
-            $total       = $netSales + $shipping + $taxAmount;
+
+            // التسوية/التقريب (+/−، غير خاضعة للضريبة).
+            $adjustment  = (int) $invoice->adjustment;
+            $total       = $netSales + $shipping + $taxAmount + $adjustment;
+            if ($total < 0) {
+                throw new RuntimeException('التسوية تجعل إجمالي الفاتورة سالباً.');
+            }
 
             $debitCode = $invoice->payment_type === 'cash'
                 ? self::ACC_CASH
@@ -186,6 +201,15 @@ class InvoiceService
                 ];
             }
 
+            // فرق التسوية يوازن القيد: موجب = ربح (دائن)، سالب = خسارة (مدين) على 5170.
+            if ($adjustment !== 0) {
+                $lines[] = [
+                    'account_id' => $this->accountId(self::ACC_ADJUSTMENT),
+                    'debit'      => $adjustment < 0 ? -$adjustment : 0,
+                    'credit'     => $adjustment > 0 ? $adjustment : 0,
+                ];
+            }
+
             $entry = $this->ledger->post($lines, [
                 'entry_date'  => $invoice->invoice_date->toDateString(),
                 'description' => "فاتورة مبيعات {$invoice->number}",
@@ -208,6 +232,7 @@ class InvoiceService
                 'subtotal'            => $subtotal,
                 'discount'            => $discount,
                 'shipping'            => $shipping,
+                'adjustment'          => $adjustment,
                 'tax_amount'          => $taxAmount,
                 'total'               => $total,
                 'journal_entry_id'    => $entry->id,
