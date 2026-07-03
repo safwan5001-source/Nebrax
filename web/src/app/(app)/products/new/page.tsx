@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Package, Tag, Warehouse, SlidersHorizontal } from 'lucide-react';
+import { ArrowRight, Package, Tag, Warehouse, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ export default function NewProductPage() {
   const [name, setName] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [sku, setSku] = useState('');
+  const [barcode, setBarcode] = useState('');
   const [type, setType] = useState('good');
   const [unit, setUnit] = useState('piece');
   const [salePrice, setSalePrice] = useState('');
@@ -43,6 +44,7 @@ export default function NewProductPage() {
           name,
           name_en: nameEn || null,
           sku: sku || null,
+          barcode: barcode || null,
           type,
           unit: unit || null,
           sale_price: riyalToMinor(salePrice),
@@ -102,6 +104,15 @@ export default function NewProductPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="unit">{t('unit')}</Label>
                 <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="barcode">{t('barcode')}</Label>
+                <div className="flex gap-2">
+                  <Input id="barcode" dir="ltr" className="num" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
+                  <Button type="button" variant="outline" size="icon" aria-label={t('generate_barcode')} onClick={() => setBarcode('2' + String(Date.now()).slice(-12))}>
+                    <RefreshCw className="h-4 w-4" strokeWidth={1.7} />
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>

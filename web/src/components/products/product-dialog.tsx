@@ -14,6 +14,7 @@ import { riyalToMinor } from '@/lib/money';
 export interface Product {
   id: string;
   sku: string | null;
+  barcode: string | null;
   name: string;
   name_en: string | null;
   type: string;
@@ -30,6 +31,7 @@ export interface Product {
 interface FormState {
   name: string;
   sku: string;
+  barcode: string;
   name_en: string;
   type: string;
   unit: string;
@@ -41,13 +43,13 @@ interface FormState {
 }
 
 const emptyForm = (): FormState => ({
-  name: '', sku: '', name_en: '', type: 'good', unit: 'piece',
+  name: '', sku: '', barcode: '', name_en: '', type: 'good', unit: 'piece',
   sale_price: '', purchase_price: '', tax_rate: '15', track_inventory: false, is_active: true,
 });
 
 function fromProduct(p: Product): FormState {
   return {
-    name: p.name, sku: p.sku ?? '', name_en: p.name_en ?? '', type: p.type, unit: p.unit,
+    name: p.name, sku: p.sku ?? '', barcode: p.barcode ?? '', name_en: p.name_en ?? '', type: p.type, unit: p.unit,
     sale_price: p.sale_price, purchase_price: p.purchase_price, tax_rate: String(p.tax_rate),
     track_inventory: p.track_inventory, is_active: p.is_active,
   };
@@ -81,6 +83,7 @@ export function ProductDialog({
       name: form.name,
       name_en: form.name_en || null,
       sku: form.sku || null,
+      barcode: form.barcode || null,
       type: form.type,
       unit: form.unit || null,
       sale_price: riyalToMinor(form.sale_price),
@@ -117,6 +120,10 @@ export function ProductDialog({
           <div className="space-y-1.5">
             <Label htmlFor="sku">{t('sku')}</Label>
             <Input id="sku" dir="ltr" value={form.sku} onChange={(e) => set('sku', e.target.value)} />
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label htmlFor="barcode">{t('barcode')}</Label>
+            <Input id="barcode" dir="ltr" className="num" value={form.barcode} onChange={(e) => set('barcode', e.target.value)} />
           </div>
         </div>
 

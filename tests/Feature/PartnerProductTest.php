@@ -88,6 +88,14 @@ class PartnerProductTest extends TestCase
     }
 
     /** @test */
+    public function it_stores_a_product_barcode(): void
+    {
+        $product = Product::create(['name' => 'صنف', 'sale_price' => 5000, 'barcode' => '6281000123457']);
+
+        $this->assertSame('6281000123457', Product::find($product->id)->barcode);
+    }
+
+    /** @test */
     public function products_are_isolated_between_tenants(): void
     {
         Product::create(['name' => 'منتج أول', 'sale_price' => 5000]);
