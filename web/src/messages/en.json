@@ -374,6 +374,11 @@
   "reports": {
     "title": "Reports",
     "trial_balance": "Trial balance",
+    "cost_profit": "Cost-center profitability",
+    "center": "Cost center",
+    "revenue": "Revenue",
+    "expense": "Expense",
+    "profit": "Profit",
     "aging": "Aging",
     "balanced": "Balanced",
     "unbalanced": "Unbalanced",

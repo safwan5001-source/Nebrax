@@ -3,6 +3,7 @@
 namespace App\Services\Reporting;
 
 use App\Models\Account;
+use App\Models\CostCenter;
 use App\Models\Invoice;
 use App\Models\JournalLine;
 use App\Models\Partner;
@@ -90,6 +91,82 @@ class ReportService
             'total_revenue' => $totalRevenue,
             'total_expense' => $totalExpense,
             'net_income'    => $totalRevenue - $totalExpense,
+        ];
+    }
+
+    /**
+     * الربحية بمركز التكلفة: لكل مركز، صافي الإيراد − صافي المصروف = الربح.
+     * يُحسب من سطور القيود الموسومة بمركز التكلفة (حسابات الإيراد والمصروف فقط).
+     *
+     * @param  array  $filters  ['from'=>'Y-m-d'?, 'to'=>'Y-m-d'?]
+     * @return array{rows: array<int, array>, total_revenue: int, total_expense: int, total_profit: int}
+     */
+    public function costCenterProfitability(array $filters = []): array
+    {
+        $from = $filters['from'] ?? null;
+        $to   = $filters['to'] ?? null;
+
+        $sums = JournalLine::query()
+            ->selectRaw('cost_center_id, account_id, SUM(debit) as total_debit, SUM(credit) as total_credit')
+            ->whereNotNull('cost_center_id')
+            ->whereHas('entry', function ($q) use ($from, $to) {
+                $q->where('status', 'posted');
+                if ($from) {
+                    $q->whereDate('entry_date', '>=', $from);
+                }
+                if ($to) {
+                    $q->whereDate('entry_date', '<=', $to);
+                }
+            })
+            ->groupBy('cost_center_id', 'account_id')
+            ->get();
+
+        $accounts = Account::whereIn('id', $sums->pluck('account_id')->unique())->get()->keyBy('id');
+
+        // تجميع لكل مركز: الإيراد (دائن − مدين على حسابات الإيراد)، المصروف (مدين − دائن على المصروف).
+        $agg = [];
+        foreach ($sums as $s) {
+            $account = $accounts->get($s->account_id);
+            if ($account === null) {
+                continue;
+            }
+            $debit  = (int) $s->total_debit;
+            $credit = (int) $s->total_credit;
+            $ccId   = $s->cost_center_id;
+            $agg[$ccId] ??= ['revenue' => 0, 'expense' => 0];
+
+            if ($account->type === 'revenue') {
+                $agg[$ccId]['revenue'] += $credit - $debit;
+            } elseif ($account->type === 'expense') {
+                $agg[$ccId]['expense'] += $debit - $credit;
+            }
+        }
+
+        $rows = [];
+        $totalRevenue = $totalExpense = 0;
+
+        foreach (CostCenter::orderBy('code')->get() as $cc) {
+            $revenue = $agg[$cc->id]['revenue'] ?? 0;
+            $expense = $agg[$cc->id]['expense'] ?? 0;
+
+            $rows[] = [
+                'cost_center_id' => $cc->id,
+                'code'           => $cc->code,
+                'name'           => $cc->name,
+                'revenue'        => $revenue,
+                'expense'        => $expense,
+                'profit'         => $revenue - $expense,
+            ];
+
+            $totalRevenue += $revenue;
+            $totalExpense += $expense;
+        }
+
+        return [
+            'rows'          => $rows,
+            'total_revenue' => $totalRevenue,
+            'total_expense' => $totalExpense,
+            'total_profit'  => $totalRevenue - $totalExpense,
         ];
     }
 

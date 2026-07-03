@@ -735,6 +735,18 @@ export const mockTrialBalance = {
   balanced: true,
 };
 
+export const mockCostCenterProfit = {
+  rows: [
+    { cost_center_id: 'cc-1', code: 'CC-DMM', name: 'فرع الدمام', revenue: '210000.00', expense: '84300.00', profit: '125700.00' },
+    { cost_center_id: 'cc-2', code: 'CC-KHB', name: 'فرع الخبر', revenue: '148000.00', expense: '96500.00', profit: '51500.00' },
+    { cost_center_id: 'cc-3', code: 'CC-JBL', name: 'فرع الجبيل', revenue: '124500.00', expense: '132000.00', profit: '-7500.00' },
+    { cost_center_id: 'cc-4', code: 'CC-ADM', name: 'الإدارة العامة', revenue: '0.00', expense: '18750.00', profit: '-18750.00' },
+  ],
+  total_revenue: '482500.00',
+  total_expense: '331550.00',
+  total_profit: '150950.00',
+};
+
 function agingFor(type: string) {
   if (type === 'payable') {
     return {
@@ -838,6 +850,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
 
   if (clean === '/reports/income-statement') return resolve(mockIncomeStatement);
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);
+  if (clean === '/reports/cost-center-profitability') return resolve(mockCostCenterProfit);
   const agingMatch = clean.match(/^\/reports\/aging\/([^/]+)$/);
   if (agingMatch) return resolve(agingFor(agingMatch[1]));
   const stmtMatch = clean.match(/^\/reports\/partner-statement\/([^/]+)$/);

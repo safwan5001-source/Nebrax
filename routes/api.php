@@ -209,6 +209,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('reports/account-ledger/{accountId}', [ReportController::class, 'accountLedger'])->middleware($perm('reports.view'));
         Route::get('reports/partner-statement/{partnerId}', [ReportController::class, 'partnerStatement'])->middleware($perm('reports.view'));
         Route::get('reports/aging/{type}', [ReportController::class, 'aging'])->middleware($perm('reports.view'));
+        Route::get('reports/cost-center-profitability', [ReportController::class, 'costCenterProfitability'])->middleware($perm('reports.view'));
 
         }); // نهاية مجموعة الاشتراك النشط
     });
