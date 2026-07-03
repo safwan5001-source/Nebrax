@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,8 @@ export interface Product {
   profit_margin: number | null;
   tags: string | null;
   internal_notes: string | null;
+  sales_account_id: string | null;
+  cogs_account_id: string | null;
   sale_price: string;
   purchase_price: string;
   tax_rate: number;
@@ -55,6 +57,8 @@ interface FormState {
   profit_margin: string;
   tags: string;
   internal_notes: string;
+  sales_account_id: string;
+  cogs_account_id: string;
   sale_price: string;
   purchase_price: string;
   tax_rate: string;
@@ -62,10 +66,13 @@ interface FormState {
   is_active: boolean;
 }
 
+interface Acct { id: string; code: string; name: string; type: string; is_group: boolean }
+
 const emptyForm = (): FormState => ({
   name: '', sku: '', barcode: '', name_en: '', type: 'good', unit: 'piece',
   description: '', category: '', brand: '', reorder_level: '',
   min_sale_price: '', discount: '', discount_type: 'percent', profit_margin: '', tags: '', internal_notes: '',
+  sales_account_id: '', cogs_account_id: '',
   sale_price: '', purchase_price: '', tax_rate: '15', track_inventory: false, is_active: true,
 });
 
@@ -75,6 +82,7 @@ function fromProduct(p: Product): FormState {
     description: p.description ?? '', category: p.category ?? '', brand: p.brand ?? '', reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
     min_sale_price: p.min_sale_price ?? '', discount: p.discount != null ? String(p.discount) : '', discount_type: p.discount_type ?? 'percent',
     profit_margin: p.profit_margin != null ? String(p.profit_margin) : '', tags: p.tags ?? '', internal_notes: p.internal_notes ?? '',
+    sales_account_id: p.sales_account_id ?? '', cogs_account_id: p.cogs_account_id ?? '',
     sale_price: p.sale_price, purchase_price: p.purchase_price, tax_rate: String(p.tax_rate),
     track_inventory: p.track_inventory, is_active: p.is_active,
   };
@@ -95,7 +103,20 @@ export function ProductDialog({
   const tc = useTranslations('common');
   const { success } = useToast();
   const [form, setForm] = useState<FormState>(product ? fromProduct(product) : emptyForm());
+  const [revenueAccounts, setRevenueAccounts] = useState<Acct[]>([]);
+  const [expenseAccounts, setExpenseAccounts] = useState<Acct[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    api<{ data: Acct[] }>('/accounts')
+      .then((r) => {
+        const leaf = r.data.filter((a) => !a.is_group);
+        setRevenueAccounts(leaf.filter((a) => a.type === 'revenue'));
+        setExpenseAccounts(leaf.filter((a) => a.type === 'expense'));
+      })
+      .catch(() => {});
+  }, [open]);
   const [saving, setSaving] = useState(false);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -121,6 +142,8 @@ export function ProductDialog({
       profit_margin: form.profit_margin !== '' ? Number(form.profit_margin) || 0 : null,
       tags: form.tags || null,
       internal_notes: form.internal_notes || null,
+      sales_account_id: form.sales_account_id || null,
+      cogs_account_id: form.cogs_account_id || null,
       sale_price: riyalToMinor(form.sale_price),
       purchase_price: riyalToMinor(form.purchase_price),
       tax_rate: Number(form.tax_rate) || 0,
@@ -223,6 +246,25 @@ export function ProductDialog({
             </div>
           </div>
         </div>
+
+        {(revenueAccounts.length > 0 || expenseAccounts.length > 0) && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="sales_acc">{t('sales_account')}</Label>
+              <Select id="sales_acc" value={form.sales_account_id} onChange={(e) => set('sales_account_id', e.target.value)}>
+                <option value="">{t('default_account')}</option>
+                {revenueAccounts.map((a) => (<option key={a.id} value={a.id}>{a.code} — {a.name}</option>))}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cogs_acc">{t('cogs_account')}</Label>
+              <Select id="cogs_acc" value={form.cogs_account_id} onChange={(e) => set('cogs_account_id', e.target.value)}>
+                <option value="">{t('default_account')}</option>
+                {expenseAccounts.map((a) => (<option key={a.id} value={a.id}>{a.code} — {a.name}</option>))}
+              </Select>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">

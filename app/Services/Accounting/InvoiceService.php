@@ -150,7 +150,7 @@ class InvoiceService
             // إعادة احتساب الإجماليات من السطور (مصدر الحقيقة) قبل توليد القيد.
             // يضمن أن القيد = السطور دائماً، ويوفّق رأس الفاتورة معها،
             // فلا يمكن أن يتعارض total مع subtotal + tax_amount مهما عُبث بالرأس.
-            $invoice->loadMissing('lines');
+            $invoice->loadMissing('lines.product');
             // إجمالي الفاتورة = مجموع صافي السطور (بعد خصم كل سطر).
             $subtotal  = (int) $invoice->lines->sum(fn ($l) => (int) $l->line_subtotal - (int) $l->line_discount);
             $taxGross  = (int) $invoice->lines->sum('line_tax');
@@ -180,11 +180,33 @@ class InvoiceService
                 'debit'        => $total,
                 'partner_type' => Partner::class,
                 'partner_id'   => $invoice->partner_id,
-            ], [
-                'account_id'     => $this->accountId(self::ACC_SALES),
-                'credit'         => $netSales,
-                'cost_center_id' => $invoice->cost_center_id, // وسم الإيراد بمركز التكلفة
             ]];
+
+            // تقسيم الإيراد الصافي حسب حساب مبيعات كل منتج (افتراضياً 4110)، مع بقايا التقريب على الافتراضي.
+            $defaultSales = $this->accountId(self::ACC_SALES);
+            $revByAccount = [];
+            $allocated    = 0;
+            foreach ($invoice->lines as $line) {
+                $lineNet = (int) $line->line_subtotal - (int) $line->line_discount;
+                $rev     = $subtotal > 0 ? intdiv($lineNet * $netSales, $subtotal) : 0;
+                $acct    = $line->product?->sales_account_id ?: $defaultSales;
+                $revByAccount[$acct] = ($revByAccount[$acct] ?? 0) + $rev;
+                $allocated += $rev;
+            }
+            $remainder = $netSales - $allocated; // ≥ 0 (intdiv يقرّب لأسفل) — يُسنَد للحساب الافتراضي
+            if ($remainder !== 0) {
+                $revByAccount[$defaultSales] = ($revByAccount[$defaultSales] ?? 0) + $remainder;
+            }
+            foreach ($revByAccount as $acct => $amount) {
+                if ($amount === 0) {
+                    continue;
+                }
+                $lines[] = [
+                    'account_id'     => $acct,
+                    'credit'         => $amount,
+                    'cost_center_id' => $invoice->cost_center_id, // وسم الإيراد بمركز التكلفة
+                ];
+            }
 
             if ($shipping > 0) {
                 $lines[] = [

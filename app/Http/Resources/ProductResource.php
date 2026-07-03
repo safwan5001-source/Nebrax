@@ -21,6 +21,8 @@ class ProductResource extends JsonResource
             'brand'            => $this->brand,
             'reorder_level'    => $this->reorder_level,
             'supplier_id'      => $this->supplier_id,
+            'sales_account_id' => $this->sales_account_id,
+            'cogs_account_id'  => $this->cogs_account_id,
             'min_sale_price'   => $this->min_sale_price !== null ? Money::toRiyal($this->min_sale_price) : null,
             'discount'         => $this->discount,
             'discount_type'    => $this->discount_type,

@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\Partner;
+use App\Models\Product;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
@@ -388,6 +389,26 @@ class InvoiceTest extends TestCase
         );
 
         $this->assertSame($emp->id, $invoice->salesperson_id);
+    }
+
+    /** @test */
+    public function invoice_revenue_uses_the_products_custom_sales_account(): void
+    {
+        $salesAccount = Account::where('code', '4120')->firstOrFail(); // إيرادات الخدمات كحساب مبيعات مخصّص
+        $product = Product::create(['name' => 'خدمة', 'sale_price' => 100000, 'sales_account_id' => $salesAccount->id]);
+
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $posted = $this->invoices->post($invoice);
+
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)->where('source_id', $posted->id)->firstOrFail();
+
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(100000, $this->line($entry, '4120')->credit); // الإيراد على الحساب المخصّص
+        $this->assertNull($this->line($entry, '4110'));                    // لا على الافتراضي
     }
 
     /** @test */
