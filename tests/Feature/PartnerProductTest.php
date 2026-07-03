@@ -61,6 +61,24 @@ class PartnerProductTest extends TestCase
     }
 
     /** @test */
+    public function it_stores_partner_national_address_and_mobile(): void
+    {
+        $partner = Partner::create([
+            'name' => 'عميل', 'type' => 'customer',
+            'mobile' => '0551234567', 'building_no' => '1234', 'street' => 'الملك فهد',
+            'district' => 'العليا', 'postal_code' => '12211', 'country' => 'SA',
+        ]);
+
+        $stored = Partner::find($partner->id);
+        $this->assertSame('0551234567', $stored->mobile);
+        $this->assertSame('1234', $stored->building_no);
+        $this->assertSame('الملك فهد', $stored->street);
+        $this->assertSame('العليا', $stored->district);
+        $this->assertSame('12211', $stored->postal_code);
+        $this->assertSame('SA', $stored->country);
+    }
+
+    /** @test */
     public function partner_type_both_is_customer_and_supplier(): void
     {
         $partner = Partner::create(['name' => 'طرف مزدوج', 'type' => 'both']);

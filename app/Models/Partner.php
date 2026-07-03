@@ -14,7 +14,8 @@ class Partner extends BaseModel
 
     protected $fillable = [
         'tenant_id', 'code', 'type', 'name', 'name_en',
-        'vat_number', 'cr_number', 'email', 'phone', 'address', 'city',
+        'vat_number', 'cr_number', 'email', 'phone', 'mobile', 'address', 'city',
+        'building_no', 'street', 'district', 'postal_code', 'country',
         'classification', 'credit_limit', 'credit_period', 'is_active',
     ];
 

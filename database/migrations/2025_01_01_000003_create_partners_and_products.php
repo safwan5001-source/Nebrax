@@ -22,8 +22,14 @@ return new class extends Migration
             $table->string('cr_number')->nullable();               // السجل التجاري
             $table->string('email')->nullable();
             $table->string('phone')->nullable();
+            $table->string('mobile')->nullable();                  // جوال منفصل عن الهاتف
             $table->string('address')->nullable();
             $table->string('city')->nullable();
+            $table->string('building_no')->nullable();             // رقم المبنى (العنوان الوطني — ZATCA)
+            $table->string('street')->nullable();                  // الشارع
+            $table->string('district')->nullable();                // الحي
+            $table->string('postal_code')->nullable();             // الرمز البريدي
+            $table->string('country')->nullable();                 // البلد (ISO مثل SA)
             $table->string('classification')->nullable();          // تصنيف الطرف (VIP/جملة/تجزئة…) — للتقارير والتجزئة
             $table->bigInteger('credit_limit')->nullable();        // الحد الائتماني (هللات) — يمنع تجاوز رصيد العميل الآجل
             $table->unsignedSmallInteger('credit_period')->nullable(); // المدة الائتمانية (أيام) — تُشتقّ منها تواريخ الاستحقاق

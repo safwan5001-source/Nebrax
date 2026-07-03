@@ -445,7 +445,14 @@
     "classification_hint": "e.g. VIP, Wholesale, Retail…",
     "cls_wholesale": "Wholesale",
     "cls_retail": "Retail",
-    "cls_government": "Government"
+    "cls_government": "Government",
+    "mobile": "Mobile",
+    "national_address": "National address",
+    "building_no": "Building no.",
+    "street": "Street",
+    "district": "District",
+    "postal_code": "Postal code",
+    "country": "Country"
   },
   "status": {
     "draft": "Draft",

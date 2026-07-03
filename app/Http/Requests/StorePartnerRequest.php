@@ -22,8 +22,14 @@ class StorePartnerRequest extends FormRequest
             'cr_number'  => ['nullable', 'string', 'max:255'],
             'email'      => ['nullable', 'email', 'max:255'],
             'phone'      => ['nullable', 'string', 'max:255'],
+            'mobile'     => ['nullable', 'string', 'max:255'],
             'address'    => ['nullable', 'string', 'max:255'],
             'city'       => ['nullable', 'string', 'max:255'],
+            'building_no'  => ['nullable', 'string', 'max:255'],
+            'street'       => ['nullable', 'string', 'max:255'],
+            'district'     => ['nullable', 'string', 'max:255'],
+            'postal_code'  => ['nullable', 'string', 'max:255'],
+            'country'      => ['nullable', 'string', 'max:255'],
             'classification' => ['nullable', 'string', 'max:255'],
             'credit_limit'  => ['nullable', 'integer', 'min:0'],   // هللات — 0/غياب = بلا حد
             'credit_period' => ['nullable', 'integer', 'min:0', 'max:3650'], // أيام
