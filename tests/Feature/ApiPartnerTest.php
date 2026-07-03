@@ -64,6 +64,27 @@ class ApiPartnerTest extends TestCase
     }
 
     /** @test */
+    public function the_partner_index_filters_by_role(): void
+    {
+        $token = $this->registerTenant()['token'];
+
+        foreach ([['ع', 'customer'], ['م', 'supplier'], ['ك', 'both']] as [$name, $type]) {
+            $this->withToken($token)->postJson('/api/partners', ['name' => $name, 'type' => $type])->assertCreated();
+        }
+
+        // العملاء = customer + both
+        $customers = $this->withToken($token)->getJson('/api/partners?type=customer')->assertOk()->json('data');
+        $this->assertEqualsCanonicalizing(['customer', 'both'], array_column($customers, 'type'));
+
+        // الموردون = supplier + both
+        $suppliers = $this->withToken($token)->getJson('/api/partners?type=supplier')->assertOk()->json('data');
+        $this->assertEqualsCanonicalizing(['supplier', 'both'], array_column($suppliers, 'type'));
+
+        // بلا فلتر = الكل
+        $this->withToken($token)->getJson('/api/partners')->assertOk()->assertJsonCount(3, 'data');
+    }
+
+    /** @test */
     public function creating_a_partner_validates_input(): void
     {
         $token = $this->registerTenant()['token'];

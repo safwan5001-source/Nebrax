@@ -862,7 +862,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/expenses') return resolve({ data: mockExpenses });
   if (clean === '/assets') return resolve({ data: mockAssets });
   if (clean === '/cost-centers') return resolve({ data: mockCostCenters });
-  if (clean === '/partners') return resolve({ data: mockPartners });
+  if (clean === '/partners') {
+    const role = new URLSearchParams(path.split('?')[1] ?? '').get('type');
+    const list = role === 'customer' ? mockPartners.filter((p) => p.type === 'customer' || p.type === 'both')
+      : role === 'supplier' ? mockPartners.filter((p) => p.type === 'supplier' || p.type === 'both')
+      : mockPartners;
+    return resolve({ data: list });
+  }
   if (clean === '/invoices') return resolve({ data: mockInvoices });
   if (clean === '/quotes') return resolve({ data: mockQuotes });
   if (clean === '/credit-notes') return resolve({ data: mockCreditNotes });

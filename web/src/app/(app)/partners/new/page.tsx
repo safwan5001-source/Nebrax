@@ -102,14 +102,6 @@ export default function NewPartnerPage() {
                 <Input id="name_en" dir="ltr" value={form.name_en} onChange={(e) => set('name_en', e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="type">{t('type')}</Label>
-                <Select id="type" value={form.type} onChange={(e) => set('type', e.target.value)}>
-                  <option value="customer">{t('customer')}</option>
-                  <option value="supplier">{t('supplier')}</option>
-                  <option value="both">{t('both')}</option>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
                 <Label htmlFor="entity_type">{t('entity_type')}</Label>
                 <Select id="entity_type" value={form.entity_type} onChange={(e) => set('entity_type', e.target.value)}>
                   <option value="commercial">{t('commercial')}</option>
