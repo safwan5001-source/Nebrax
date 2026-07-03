@@ -197,6 +197,9 @@
     "discount_percent": "Percentage %",
     "cost_center": "Cost center",
     "no_center": "No cost center",
+    "line_discount_short": "Disc.",
+    "salesperson": "Salesperson",
+    "no_salesperson": "None",
     "summary_title": "Invoice summary",
     "summary_hint": "Totals are derived from the lines — never entered manually. Discount reduces revenue and VAT."
   },

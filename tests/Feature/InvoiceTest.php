@@ -276,6 +276,57 @@ class InvoiceTest extends TestCase
     }
 
     /** @test */
+    public function a_line_discount_reduces_the_line_taxable_base_and_invoice_totals(): void
+    {
+        // سطر 1000 بخصم سطر 200 → صافي 800، ضريبة 120، إجمالي 920.
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15, 'discount' => 20000]]
+        );
+
+        $line = $invoice->lines->first();
+        $this->assertSame(100000, $line->line_subtotal); // قبل الخصم
+        $this->assertSame(20000,  $line->line_discount);
+        $this->assertSame(12000,  $line->line_tax);       // 15% على 800
+        $this->assertSame(92000,  $line->line_total);     // 800 + 120
+
+        $this->assertSame(80000, $invoice->subtotal);     // صافي السطر
+        $this->assertSame(12000, $invoice->tax_amount);
+        $this->assertSame(92000, $invoice->total);
+
+        $posted = $this->invoices->post($invoice);
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)->where('source_id', $posted->id)->firstOrFail();
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(92000, $this->line($entry, '1110')->debit);
+        $this->assertEquals(80000, $this->line($entry, '4110')->credit);
+        $this->assertEquals(12000, $this->line($entry, '2120')->credit);
+    }
+
+    /** @test */
+    public function it_rejects_a_line_discount_larger_than_the_line(): void
+    {
+        $this->expectExceptionMessage('خصم السطر لا يمكن أن يتجاوز');
+        $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'discount' => 150000]]
+        );
+    }
+
+    /** @test */
+    public function an_invoice_stores_the_salesperson(): void
+    {
+        $emp = \App\Models\Employee::create(['employee_no' => 'EMP-0001', 'name' => 'مندوب', 'job_title' => 'مبيعات']);
+
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'salesperson_id' => $emp->id],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $this->assertSame($emp->id, $invoice->salesperson_id);
+    }
+
+    /** @test */
     public function posting_an_invoice_tags_the_revenue_line_with_the_cost_center(): void
     {
         $center = \App\Models\CostCenter::create(['code' => 'CC-01', 'name' => 'فرع الدمام']);

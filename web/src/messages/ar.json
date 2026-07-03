@@ -197,6 +197,9 @@
     "discount_percent": "نسبة مئوية %",
     "cost_center": "مركز التكلفة",
     "no_center": "بدون مركز تكلفة",
+    "line_discount_short": "خصم",
+    "salesperson": "مسؤول المبيعات",
+    "no_salesperson": "بدون",
     "summary_title": "ملخّص الفاتورة",
     "summary_hint": "الإجماليات تُشتقّ تلقائياً من السطور — لا تُدخل يدوياً. الخصم يخفّض الإيراد والضريبة."
   },

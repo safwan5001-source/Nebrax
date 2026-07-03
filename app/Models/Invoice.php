@@ -14,7 +14,7 @@ class Invoice extends BaseModel
 {
     protected $fillable = [
         'tenant_id', 'number', 'partner_id', 'type', 'payment_type',
-        'invoice_date', 'due_date', 'cost_center_id', 'status',
+        'invoice_date', 'due_date', 'cost_center_id', 'salesperson_id', 'status',
         'subtotal', 'discount', 'tax_amount', 'total',
         'paid_amount', 'payment_status',
         'notes', 'journal_entry_id', 'cogs_entry_id', 'created_by',

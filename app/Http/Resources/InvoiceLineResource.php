@@ -18,6 +18,7 @@ class InvoiceLineResource extends JsonResource
             'unit_price'    => Money::toRiyal($this->unit_price),
             'tax_rate'      => $this->tax_rate,
             'line_subtotal' => Money::toRiyal($this->line_subtotal),
+            'line_discount' => Money::toRiyal($this->line_discount),
             'line_tax'      => Money::toRiyal($this->line_tax),
             'line_total'    => Money::toRiyal($this->line_total),
         ];
