@@ -22,6 +22,7 @@ return new class extends Migration
             $table->date('invoice_date');
             $table->date('due_date')->nullable();
             $table->uuid('cost_center_id')->nullable();            // مركز التكلفة (بُعد تحليلي — يوسم سطر الإيراد)
+            $table->uuid('salesperson_id')->nullable();            // مسؤول المبيعات (مرجعي — بلا أثر محاسبي)
             $table->enum('status', ['draft', 'posted', 'cancelled'])->default('draft');
             $table->bigInteger('subtotal')->default(0);            // إجمالي السطور قبل الخصم والضريبة
             $table->bigInteger('discount')->default(0);            // خصم على مستوى الفاتورة (يخفّض الإيراد والضريبة)
@@ -50,8 +51,9 @@ return new class extends Migration
             $table->integer('quantity')->default(1);               // كمية (وحدات صحيحة)
             $table->bigInteger('unit_price')->default(0);          // سعر الوحدة (هللات)
             $table->unsignedSmallInteger('tax_rate')->default(15); // نسبة الضريبة %
-            $table->bigInteger('line_subtotal')->default(0);       // quantity × unit_price
-            $table->bigInteger('line_tax')->default(0);            // الضريبة على السطر
+            $table->bigInteger('line_subtotal')->default(0);       // quantity × unit_price (قبل خصم السطر)
+            $table->bigInteger('line_discount')->default(0);       // خصم على مستوى السطر (يخفّض الأساس الخاضع)
+            $table->bigInteger('line_tax')->default(0);            // الضريبة على (line_subtotal − line_discount)
             $table->bigInteger('line_total')->default(0);          // الإجمالي شامل الضريبة
             $table->timestamps();
 

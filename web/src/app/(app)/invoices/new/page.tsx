@@ -16,10 +16,11 @@ import { formatRiyal, riyalToMinor } from '@/lib/money';
 interface Partner { id: string; name: string }
 interface Product { id: string; name: string; sale_price: string; tax_rate: number; is_active: boolean }
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
-interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string }
+interface Employee { id: string; name: string }
+interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string; disc: string }
 
 let lineSeq = 0;
-const newLine = (): Line => ({ key: `l${++lineSeq}`, productId: null, description: '', qty: '1', price: '', tax: '15' });
+const newLine = (): Line => ({ key: `l${++lineSeq}`, productId: null, description: '', qty: '1', price: '', tax: '15', disc: '' });
 
 /** يضيف عدداً من الأيام إلى تاريخ YYYY-MM-DD ويعيد YYYY-MM-DD (بلا مناطق زمنية). */
 function addDays(date: string, days: number): string {
@@ -39,8 +40,10 @@ export default function NewInvoicePage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [centers, setCenters] = useState<CostCenter[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [centerId, setCenterId] = useState('');
+  const [salespersonId, setSalespersonId] = useState('');
   const [paymentType, setPaymentType] = useState('cash');
   const [date, setDate] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -60,6 +63,7 @@ export default function NewInvoicePage() {
     });
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
     api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
+    api<{ data: Employee[] }>('/employees').then((r) => setEmployees(r.data)).catch(() => {});
   }, []);
 
   // شروط الدفع (أيام) تشتقّ تاريخ الاستحقاق من تاريخ الفاتورة.
@@ -84,12 +88,13 @@ export default function NewInvoicePage() {
     setLine(key, { productId: p.id, description: p.name, price: p.sale_price, tax: String(p.tax_rate) });
   }
 
-  // معاينة الإجماليات (هللات) — بلا float. الخصم يخفّض الأساس والضريبة تناسبياً (net method، مطابق للـ backend).
-  const subMinor = lines.reduce((s, l) => s + (Number(l.qty) || 0) * riyalToMinor(l.price), 0);
-  const taxGrossMinor = lines.reduce((s, l) => {
-    const sub = (Number(l.qty) || 0) * riyalToMinor(l.price);
-    return s + Math.round((sub * (Number(l.tax) || 0)) / 100);
-  }, 0);
+  // معاينة الإجماليات (هللات) — بلا float. خصم السطر يخفّض أساسه؛ خصم الفاتورة يخفّض الأساس والضريبة تناسبياً (مطابق للـ backend).
+  const lineNetMinor = (l: Line) => {
+    const gross = (Number(l.qty) || 0) * riyalToMinor(l.price);
+    return gross - Math.min(riyalToMinor(l.disc), gross);
+  };
+  const subMinor = lines.reduce((s, l) => s + lineNetMinor(l), 0);
+  const taxGrossMinor = lines.reduce((s, l) => s + Math.round((lineNetMinor(l) * (Number(l.tax) || 0)) / 100), 0);
   const rawDiscount = discountMode === 'percent'
     ? Math.floor((subMinor * (Number(discountInput) || 0)) / 100)
     : riyalToMinor(discountInput);
@@ -103,20 +108,24 @@ export default function NewInvoicePage() {
   async function submit(post: boolean) {
     const items = lines
       .filter((l) => riyalToMinor(l.price) > 0)
-      .map((l) => ({
-        product_id: l.productId,
-        description: l.description || null,
-        quantity: Number(l.qty) || 1,
-        unit_price: riyalToMinor(l.price),
-        tax_rate: Number(l.tax) || 0,
-      }));
+      .map((l) => {
+        const gross = (Number(l.qty) || 1) * riyalToMinor(l.price);
+        return {
+          product_id: l.productId,
+          description: l.description || null,
+          quantity: Number(l.qty) || 1,
+          unit_price: riyalToMinor(l.price),
+          tax_rate: Number(l.tax) || 0,
+          discount: Math.min(riyalToMinor(l.disc), gross),
+        };
+      });
     if (items.length === 0) { setError(t('need_line')); return; }
     setSaving(true);
     setError(null);
     try {
       const created = await api<{ data: { id: string } }>('/invoices', {
         method: 'POST',
-        body: { partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null, cost_center_id: centerId || null, discount: discountMinor, notes: notes || null, items },
+        body: { partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null, cost_center_id: centerId || null, salesperson_id: salespersonId || null, discount: discountMinor, notes: notes || null, items },
       });
       if (post) await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
       success(tc('created'));
@@ -201,6 +210,15 @@ export default function NewInvoicePage() {
                     </Select>
                   </div>
                 )}
+                {employees.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sp">{t('salesperson')}</Label>
+                    <Select id="sp" value={salespersonId} onChange={(e) => setSalespersonId(e.target.value)}>
+                      <option value="">{t('no_salesperson')}</option>
+                      {employees.map((e2) => (<option key={e2.id} value={e2.id}>{e2.name}</option>))}
+                    </Select>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -216,28 +234,30 @@ export default function NewInvoicePage() {
             <CardContent className="space-y-2">
               <div className="hidden grid-cols-12 gap-2 px-1 text-[11px] font-medium text-muted md:grid">
                 <div className="col-span-3">{t('item')}</div>
-                <div className="col-span-3">{t('description')}</div>
+                <div className="col-span-2">{t('description')}</div>
                 <div className="col-span-2 text-end">{t('price')}</div>
                 <div className="col-span-1 text-end">{t('qty')}</div>
+                <div className="col-span-1 text-end">{t('line_discount_short')}</div>
                 <div className="col-span-1 text-end">{t('tax')}</div>
                 <div className="col-span-1 text-end">{t('total_with_vat')}</div>
                 <div className="col-span-1" />
               </div>
 
               {lines.map((l) => {
-                const lineTotal = (Number(l.qty) || 0) * riyalToMinor(l.price);
-                const lineTax = Math.round((lineTotal * (Number(l.tax) || 0)) / 100);
+                const net = lineNetMinor(l);
+                const lineTax = Math.round((net * (Number(l.tax) || 0)) / 100);
                 return (
                   <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded-lg border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
                     <Select className="col-span-2 md:col-span-3" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
                       <option value="">{t('manual')}</option>
                       {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                     </Select>
-                    <Input className="col-span-2 md:col-span-3" placeholder={t('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
+                    <Input className="col-span-2 md:col-span-2" placeholder={t('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
                     <Input className="num text-end md:col-span-2" inputMode="decimal" placeholder={t('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
                     <Input className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
+                    <Input className="num text-end md:col-span-1" inputMode="decimal" placeholder="0" value={l.disc} onChange={(e) => setLine(l.key, { disc: e.target.value })} />
                     <Input className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
-                    <div className="num col-span-1 text-end text-sm text-text md:col-span-1">{formatRiyal((lineTotal + lineTax) / 100)}</div>
+                    <div className="num col-span-1 text-end text-sm text-text md:col-span-1">{formatRiyal((net + lineTax) / 100)}</div>
                     <Button type="button" variant="ghost" size="icon" className="col-span-1 ms-auto md:col-span-1" aria-label={t('remove_line')} onClick={() => removeLine(l.key)}>
                       <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
                     </Button>

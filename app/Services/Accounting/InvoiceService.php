@@ -56,6 +56,7 @@ class InvoiceService
                 'invoice_date' => $date,
                 'due_date'     => $data['due_date'] ?? null,
                 'cost_center_id' => $data['cost_center_id'] ?? null,
+                'salesperson_id' => $data['salesperson_id'] ?? null,
                 'status'       => 'draft',
                 'notes'        => $data['notes'] ?? null,
                 'created_by'   => $data['created_by'] ?? null,
@@ -67,13 +68,18 @@ class InvoiceService
                 $qty       = (int) ($item['quantity'] ?? 1);
                 $unitPrice = (int) ($item['unit_price'] ?? 0);
                 $rate      = (int) ($item['tax_rate'] ?? 15);
+                $lineDisc  = (int) ($item['discount'] ?? 0);
 
                 if ($qty <= 0 || $unitPrice < 0) {
                     throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
                 }
 
-                $lineSubtotal = $qty * $unitPrice;
-                $lineTax      = $this->calcTax($lineSubtotal, $rate);
+                $lineSubtotal = $qty * $unitPrice;                 // إجمالي السطر قبل خصم السطر
+                if ($lineDisc < 0 || $lineDisc > $lineSubtotal) {
+                    throw new RuntimeException('خصم السطر لا يمكن أن يتجاوز إجمالي السطر.');
+                }
+                $lineNet = $lineSubtotal - $lineDisc;               // الأساس الخاضع بعد خصم السطر
+                $lineTax = $this->calcTax($lineNet, $rate);
 
                 InvoiceLine::create([
                     'invoice_id'    => $invoice->id,
@@ -83,11 +89,12 @@ class InvoiceService
                     'unit_price'    => $unitPrice,
                     'tax_rate'      => $rate,
                     'line_subtotal' => $lineSubtotal,
+                    'line_discount' => $lineDisc,
                     'line_tax'      => $lineTax,
-                    'line_total'    => $lineSubtotal + $lineTax,
+                    'line_total'    => $lineNet + $lineTax,
                 ]);
 
-                $subtotal += $lineSubtotal;
+                $subtotal += $lineNet;                             // إجمالي الفاتورة = مجموع صافي السطور
                 $taxTotal += $lineTax;
             }
 
@@ -125,7 +132,8 @@ class InvoiceService
             // يضمن أن القيد = السطور دائماً، ويوفّق رأس الفاتورة معها،
             // فلا يمكن أن يتعارض total مع subtotal + tax_amount مهما عُبث بالرأس.
             $invoice->loadMissing('lines');
-            $subtotal  = (int) $invoice->lines->sum('line_subtotal');
+            // إجمالي الفاتورة = مجموع صافي السطور (بعد خصم كل سطر).
+            $subtotal  = (int) $invoice->lines->sum(fn ($l) => (int) $l->line_subtotal - (int) $l->line_discount);
             $taxGross  = (int) $invoice->lines->sum('line_tax');
 
             // تطبيق خصم الفاتورة على الأساس المشتقّ من السطور (net method).

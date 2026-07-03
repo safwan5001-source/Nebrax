@@ -932,13 +932,15 @@ function mockMovements(productId: string) {
 
 // إجمالي فاتورة من جسم الطلب (السطور بالهللات) → ريال نصّي.
 function invoiceTotalFromBody(body: unknown): string {
-  const b = body as { items?: { quantity?: number; unit_price?: number; tax_rate?: number }[]; discount?: number } | undefined;
+  const b = body as { items?: { quantity?: number; unit_price?: number; tax_rate?: number; discount?: number }[]; discount?: number } | undefined;
   const items = b?.items ?? [];
-  const subtotal = items.reduce((s, it) => s + (it.quantity ?? 0) * (it.unit_price ?? 0), 0);
-  const taxGross = items.reduce((s, it) => {
-    const sub = (it.quantity ?? 0) * (it.unit_price ?? 0);
-    return s + Math.round((sub * (it.tax_rate ?? 0)) / 100);
-  }, 0);
+  // صافي كل سطر بعد خصم السطر.
+  const lineNet = (it: { quantity?: number; unit_price?: number; discount?: number }) => {
+    const gross = (it.quantity ?? 0) * (it.unit_price ?? 0);
+    return gross - Math.max(0, Math.min(Number(it.discount ?? 0), gross));
+  };
+  const subtotal = items.reduce((s, it) => s + lineNet(it), 0);
+  const taxGross = items.reduce((s, it) => s + Math.round((lineNet(it) * (it.tax_rate ?? 0)) / 100), 0);
   // الخصم على مستوى الفاتورة (net method) — مطابق للـ backend.
   const discount = Math.max(0, Math.min(Number(b?.discount ?? 0), subtotal));
   const net = subtotal - discount;

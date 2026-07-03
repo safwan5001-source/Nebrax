@@ -20,9 +20,11 @@ class StoreInvoiceRequest extends FormRequest
             'due_date'            => ['nullable', 'date'],
             'discount'            => ['nullable', 'integer', 'min:0'], // هللات — خصم على مستوى الفاتورة
             'cost_center_id'      => ['nullable', 'uuid'],
+            'salesperson_id'      => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
+            'items.*.discount'    => ['nullable', 'integer', 'min:0'], // هللات — خصم على مستوى السطر
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1'],
             'items.*.unit_price'  => ['required', 'integer', 'min:0'], // هللات

@@ -13,7 +13,7 @@ class InvoiceLine extends BaseModel
     protected $fillable = [
         'tenant_id', 'invoice_id', 'product_id', 'description',
         'quantity', 'unit_price', 'tax_rate',
-        'line_subtotal', 'line_tax', 'line_total',
+        'line_subtotal', 'line_discount', 'line_tax', 'line_total',
     ];
 
     protected $casts = [
@@ -21,6 +21,7 @@ class InvoiceLine extends BaseModel
         'unit_price'    => 'integer',
         'tax_rate'      => 'integer',
         'line_subtotal' => 'integer',
+        'line_discount' => 'integer',
         'line_tax'      => 'integer',
         'line_total'    => 'integer',
     ];
