@@ -15,6 +15,7 @@ import { formatRiyal, riyalToMinor } from '@/lib/money';
 
 interface Partner { id: string; name: string }
 interface Product { id: string; name: string; sale_price: string; tax_rate: number; is_active: boolean }
+interface CostCenter { id: string; code: string; name: string; is_active: boolean }
 interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string }
 
 let lineSeq = 0;
@@ -37,7 +38,9 @@ export default function NewInvoicePage() {
 
   const [partners, setPartners] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [centers, setCenters] = useState<CostCenter[]>([]);
   const [partnerId, setPartnerId] = useState('');
+  const [centerId, setCenterId] = useState('');
   const [paymentType, setPaymentType] = useState('cash');
   const [date, setDate] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -56,6 +59,7 @@ export default function NewInvoicePage() {
       if (r.data[0]) setPartnerId((p) => p || r.data[0].id);
     });
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
+    api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
   }, []);
 
   // شروط الدفع (أيام) تشتقّ تاريخ الاستحقاق من تاريخ الفاتورة.
@@ -112,7 +116,7 @@ export default function NewInvoicePage() {
     try {
       const created = await api<{ data: { id: string } }>('/invoices', {
         method: 'POST',
-        body: { partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null, discount: discountMinor, notes: notes || null, items },
+        body: { partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null, cost_center_id: centerId || null, discount: discountMinor, notes: notes || null, items },
       });
       if (post) await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
       success(tc('created'));
@@ -188,6 +192,15 @@ export default function NewInvoicePage() {
                   <Label htmlFor="due">{t('due_date')}</Label>
                   <Input id="due" type="date" dir="ltr" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 </div>
+                {centers.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="center">{t('cost_center')}</Label>
+                    <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
+                      <option value="">{t('no_center')}</option>
+                      {centers.map((c) => (<option key={c.id} value={c.id}>{c.code} — {c.name}</option>))}
+                    </Select>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

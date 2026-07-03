@@ -195,6 +195,8 @@
     "discount_mode": "Discount type",
     "discount_amount": "Fixed amount",
     "discount_percent": "Percentage %",
+    "cost_center": "Cost center",
+    "no_center": "No cost center",
     "summary_title": "Invoice summary",
     "summary_hint": "Totals are derived from the lines — never entered manually. Discount reduces revenue and VAT."
   },

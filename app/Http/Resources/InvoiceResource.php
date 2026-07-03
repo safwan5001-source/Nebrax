@@ -18,6 +18,7 @@ class InvoiceResource extends JsonResource
             'status'         => $this->status,
             'payment_status' => $this->payment_status,
             'invoice_date'   => optional($this->invoice_date)->toDateString(),
+            'cost_center_id' => $this->cost_center_id,
             'subtotal'       => Money::toRiyal($this->subtotal),
             'discount'       => Money::toRiyal($this->discount),
             'tax_amount'     => Money::toRiyal($this->tax_amount),

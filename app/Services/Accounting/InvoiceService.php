@@ -55,6 +55,7 @@ class InvoiceService
                 'payment_type' => $data['payment_type'] ?? 'cash',
                 'invoice_date' => $date,
                 'due_date'     => $data['due_date'] ?? null,
+                'cost_center_id' => $data['cost_center_id'] ?? null,
                 'status'       => 'draft',
                 'notes'        => $data['notes'] ?? null,
                 'created_by'   => $data['created_by'] ?? null,
@@ -141,8 +142,9 @@ class InvoiceService
                 'partner_type' => Partner::class,
                 'partner_id'   => $invoice->partner_id,
             ], [
-                'account_id' => $this->accountId(self::ACC_SALES),
-                'credit'     => $netSales,
+                'account_id'     => $this->accountId(self::ACC_SALES),
+                'credit'         => $netSales,
+                'cost_center_id' => $invoice->cost_center_id, // وسم الإيراد بمركز التكلفة
             ]];
 
             if ($taxAmount > 0) {

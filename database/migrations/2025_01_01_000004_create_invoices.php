@@ -21,6 +21,7 @@ return new class extends Migration
             $table->enum('payment_type', ['cash', 'credit'])->default('cash'); // نقدي | آجل
             $table->date('invoice_date');
             $table->date('due_date')->nullable();
+            $table->uuid('cost_center_id')->nullable();            // مركز التكلفة (بُعد تحليلي — يوسم سطر الإيراد)
             $table->enum('status', ['draft', 'posted', 'cancelled'])->default('draft');
             $table->bigInteger('subtotal')->default(0);            // إجمالي السطور قبل الخصم والضريبة
             $table->bigInteger('discount')->default(0);            // خصم على مستوى الفاتورة (يخفّض الإيراد والضريبة)
