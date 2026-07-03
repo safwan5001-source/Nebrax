@@ -16,12 +16,16 @@ class Product extends BaseModel
     protected $fillable = [
         'tenant_id', 'sku', 'barcode', 'name', 'name_en', 'type', 'unit',
         'description', 'category', 'brand', 'reorder_level',
+        'supplier_id', 'min_sale_price', 'discount', 'discount_type', 'profit_margin', 'tags', 'internal_notes',
         'sale_price', 'purchase_price', 'tax_rate', 'track_inventory',
         'quantity_on_hand', 'avg_cost', 'is_active',
     ];
 
     protected $casts = [
         'reorder_level'    => 'integer',
+        'min_sale_price'   => 'integer',
+        'discount'         => 'integer',
+        'profit_margin'    => 'integer',
         'sale_price'       => 'integer',
         'purchase_price'   => 'integer',
         'tax_rate'         => 'integer',

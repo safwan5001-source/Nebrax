@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Package, Tag, Warehouse, SlidersHorizontal, RefreshCw } from 'lucide-react';
@@ -12,6 +12,8 @@ import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { riyalToMinor } from '@/lib/money';
+
+interface Partner { id: string; name: string; type?: string }
 
 export default function NewProductPage() {
   const t = useTranslations('products');
@@ -34,8 +36,22 @@ export default function NewProductPage() {
   const [reorderLevel, setReorderLevel] = useState('');
   const [trackInventory, setTrackInventory] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [suppliers, setSuppliers] = useState<Partner[]>([]);
+  const [supplierId, setSupplierId] = useState('');
+  const [minSalePrice, setMinSalePrice] = useState('');
+  const [discount, setDiscount] = useState('');
+  const [discountType, setDiscountType] = useState('percent');
+  const [profitMargin, setProfitMargin] = useState('');
+  const [tags, setTags] = useState('');
+  const [internalNotes, setInternalNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api<{ data: Partner[] }>('/partners')
+      .then((r) => setSuppliers(r.data.filter((p) => p.type === 'supplier' || p.type === 'both')))
+      .catch(() => {});
+  }, []);
 
   async function submit() {
     if (!name.trim()) { setError(tc('saveFailed')); return; }
@@ -58,6 +74,13 @@ export default function NewProductPage() {
           category: category || null,
           brand: brand || null,
           reorder_level: trackInventory && reorderLevel !== '' ? Number(reorderLevel) || 0 : null,
+          supplier_id: supplierId || null,
+          min_sale_price: minSalePrice !== '' ? riyalToMinor(minSalePrice) : null,
+          discount: discount !== '' ? Number(discount) || 0 : null,
+          discount_type: discount !== '' ? discountType : null,
+          profit_margin: profitMargin !== '' ? Number(profitMargin) || 0 : null,
+          tags: tags || null,
+          internal_notes: internalNotes || null,
           track_inventory: trackInventory,
           is_active: isActive,
         },
@@ -130,6 +153,15 @@ export default function NewProductPage() {
                 <Label htmlFor="brand">{t('brand')}</Label>
                 <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} />
               </div>
+              {suppliers.length > 0 && (
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="supplier">{t('supplier')}</Label>
+                  <Select id="supplier" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+                    <option value="">{t('no_supplier')}</option>
+                    {suppliers.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="description">{t('description')}</Label>
                 <textarea id="description" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-16 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-muted focus:border-primary" />
@@ -155,6 +187,24 @@ export default function NewProductPage() {
                 <Label htmlFor="tax_rate">{t('tax_rate')}</Label>
                 <Input id="tax_rate" type="number" min={0} max={100} dir="ltr" className="num text-end" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="min_sale">{t('min_sale_price')}</Label>
+                <Input id="min_sale" inputMode="decimal" className="num text-end" placeholder="0.00" value={minSalePrice} onChange={(e) => setMinSalePrice(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="margin">{t('profit_margin')}</Label>
+                <Input id="margin" type="number" min={0} dir="ltr" className="num text-end" value={profitMargin} onChange={(e) => setProfitMargin(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="disc">{t('discount')}</Label>
+                <div className="flex gap-2">
+                  <Input id="disc" type="number" min={0} dir="ltr" className="num text-end" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                  <Select className="w-24" value={discountType} onChange={(e) => setDiscountType(e.target.value)}>
+                    <option value="percent">%</option>
+                    <option value="amount">﷼</option>
+                  </Select>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -179,7 +229,15 @@ export default function NewProductPage() {
         {/* خيارات أكثر */}
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('more_options')}</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="tags">{t('tags')}</Label>
+              <Input id="tags" placeholder={t('tags_hint')} value={tags} onChange={(e) => setTags(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="notes">{t('internal_notes')}</Label>
+              <textarea id="notes" rows={2} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary" />
+            </div>
             <label className="flex items-center gap-2 text-sm text-text">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
               {t('active')}

@@ -24,6 +24,13 @@ class StoreProductRequest extends FormRequest
             'category'        => ['nullable', 'string', 'max:255'],
             'brand'           => ['nullable', 'string', 'max:255'],
             'reorder_level'   => ['nullable', 'integer', 'min:0'],
+            'supplier_id'     => ['nullable', 'uuid'],
+            'min_sale_price'  => ['nullable', 'integer', 'min:0'],
+            'discount'        => ['nullable', 'integer', 'min:0'],
+            'discount_type'   => ['nullable', 'in:percent,amount'],
+            'profit_margin'   => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'tags'            => ['nullable', 'string', 'max:500'],
+            'internal_notes'  => ['nullable', 'string', 'max:2000'],
             // الأسعار بالهللات (minor units) كأعداد صحيحة
             'sale_price'      => ['required', 'integer', 'min:0'],
             'purchase_price'  => ['nullable', 'integer', 'min:0'],
