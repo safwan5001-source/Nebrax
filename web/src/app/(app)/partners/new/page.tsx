@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, User, Wallet } from 'lucide-react';
+import { ArrowRight, User, Wallet, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,9 +20,10 @@ export default function NewPartnerPage() {
   const { success } = useToast();
 
   const [form, setForm] = useState({
-    name: '', name_en: '', type: 'customer', phone: '', address: '', city: '',
+    name: '', name_en: '', type: 'customer', phone: '', mobile: '', address: '', city: '',
     vat_number: '', cr_number: '', code: '', email: '', is_active: true,
     classification: '',
+    building_no: '', street: '', district: '', postal_code: '', country: '',
     opening_balance: '', opening_balance_date: '',
     credit_limit: '', credit_period: '',
   });
@@ -43,8 +44,14 @@ export default function NewPartnerPage() {
           name_en: form.name_en || null,
           type: form.type,
           phone: form.phone || null,
+          mobile: form.mobile || null,
           address: form.address || null,
           city: form.city || null,
+          building_no: form.building_no || null,
+          street: form.street || null,
+          district: form.district || null,
+          postal_code: form.postal_code || null,
+          country: form.country || null,
           vat_number: form.vat_number || null,
           cr_number: form.cr_number || null,
           code: form.code || null,
@@ -106,12 +113,12 @@ export default function NewPartnerPage() {
                 <Input id="phone" dir="ltr" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
               </div>
               <div className="space-y-1.5">
+                <Label htmlFor="mobile">{t('mobile')}</Label>
+                <Input id="mobile" dir="ltr" value={form.mobile} onChange={(e) => set('mobile', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
                 <Label htmlFor="city">{t('city')}</Label>
                 <Input id="city" value={form.city} onChange={(e) => set('city', e.target.value)} />
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="address">{t('address')}</Label>
-                <Input id="address" value={form.address} onChange={(e) => set('address', e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="vat">{t('vat_number')}</Label>
@@ -171,6 +178,39 @@ export default function NewPartnerPage() {
                   <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
                   {t('active')}
                 </label>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* العنوان الوطني */}
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('national_address')}</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                <Label htmlFor="address">{t('address')}</Label>
+                <Input id="address" value={form.address} onChange={(e) => set('address', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="building_no">{t('building_no')}</Label>
+                <Input id="building_no" dir="ltr" className="num" value={form.building_no} onChange={(e) => set('building_no', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="street">{t('street')}</Label>
+                <Input id="street" value={form.street} onChange={(e) => set('street', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="district">{t('district')}</Label>
+                <Input id="district" value={form.district} onChange={(e) => set('district', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="postal_code">{t('postal_code')}</Label>
+                <Input id="postal_code" dir="ltr" className="num" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="country">{t('country')}</Label>
+                <Input id="country" dir="ltr" placeholder="SA" value={form.country} onChange={(e) => set('country', e.target.value)} />
               </div>
             </div>
           </CardContent>

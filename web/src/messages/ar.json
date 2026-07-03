@@ -445,7 +445,14 @@
     "classification_hint": "مثل: VIP، جملة، تجزئة…",
     "cls_wholesale": "جملة",
     "cls_retail": "تجزئة",
-    "cls_government": "حكومي"
+    "cls_government": "حكومي",
+    "mobile": "الجوال",
+    "national_address": "العنوان الوطني",
+    "building_no": "رقم المبنى",
+    "street": "الشارع",
+    "district": "الحي",
+    "postal_code": "الرمز البريدي",
+    "country": "البلد"
   },
   "status": {
     "draft": "مسودة",
