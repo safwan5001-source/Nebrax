@@ -440,7 +440,12 @@
     "opening_balance_hint": "Posts an entry: customer debits AR 1130 (supplier credits AP 2110) against opening balances 3130.",
     "credit_limit": "Credit limit",
     "credit_period": "Credit period (days)",
-    "credit_limit_hint": "Maximum outstanding credit allowed; posting a credit invoice above it is rejected. Leave empty for no limit."
+    "credit_limit_hint": "Maximum outstanding credit allowed; posting a credit invoice above it is rejected. Leave empty for no limit.",
+    "classification": "Classification",
+    "classification_hint": "e.g. VIP, Wholesale, Retail…",
+    "cls_wholesale": "Wholesale",
+    "cls_retail": "Retail",
+    "cls_government": "Government"
   },
   "status": {
     "draft": "Draft",
