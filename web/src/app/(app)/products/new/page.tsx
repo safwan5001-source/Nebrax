@@ -28,6 +28,10 @@ export default function NewProductPage() {
   const [salePrice, setSalePrice] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [taxRate, setTaxRate] = useState('15');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
+  const [brand, setBrand] = useState('');
+  const [reorderLevel, setReorderLevel] = useState('');
   const [trackInventory, setTrackInventory] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +54,10 @@ export default function NewProductPage() {
           sale_price: riyalToMinor(salePrice),
           purchase_price: riyalToMinor(purchasePrice),
           tax_rate: Number(taxRate) || 0,
+          description: description || null,
+          category: category || null,
+          brand: brand || null,
+          reorder_level: trackInventory && reorderLevel !== '' ? Number(reorderLevel) || 0 : null,
           track_inventory: trackInventory,
           is_active: isActive,
         },
@@ -114,6 +122,18 @@ export default function NewProductPage() {
                   </Button>
                 </div>
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="category">{t('category')}</Label>
+                <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="brand">{t('brand')}</Label>
+                <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="description">{t('description')}</Label>
+                <textarea id="description" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-16 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-muted focus:border-primary" />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -142,11 +162,17 @@ export default function NewProductPage() {
         {/* إدارة المخزون */}
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('inventory_mgmt')}</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <label className="flex items-center gap-2 text-sm text-text">
               <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} />
               {t('track_inventory')}
             </label>
+            {trackInventory && (
+              <div className="space-y-1.5">
+                <Label htmlFor="reorder">{t('reorder_level')}</Label>
+                <Input id="reorder" type="number" min={0} dir="ltr" className="num text-end sm:w-40" placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
+              </div>
+            )}
           </CardContent>
         </Card>
 

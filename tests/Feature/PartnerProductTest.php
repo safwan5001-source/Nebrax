@@ -96,6 +96,21 @@ class PartnerProductTest extends TestCase
     }
 
     /** @test */
+    public function it_stores_product_catalog_fields(): void
+    {
+        $product = Product::create([
+            'name' => 'صنف', 'sale_price' => 5000,
+            'description' => 'وصف تفصيلي', 'category' => 'مشروبات', 'brand' => 'نوفا', 'reorder_level' => 20,
+        ]);
+
+        $stored = Product::find($product->id);
+        $this->assertSame('وصف تفصيلي', $stored->description);
+        $this->assertSame('مشروبات', $stored->category);
+        $this->assertSame('نوفا', $stored->brand);
+        $this->assertSame(20, $stored->reorder_level);
+    }
+
+    /** @test */
     public function products_are_isolated_between_tenants(): void
     {
         Product::create(['name' => 'منتج أول', 'sale_price' => 5000]);
