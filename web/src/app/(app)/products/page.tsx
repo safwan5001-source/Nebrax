@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Plus, Pencil } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
@@ -70,10 +71,12 @@ export default function ProductsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <Button onClick={() => { setEditing(null); setDialog(true); }}>
-          <Plus className="h-4 w-4" strokeWidth={1.8} />
-          {t('add')}
-        </Button>
+        <Link href="/products/new">
+          <Button>
+            <Plus className="h-4 w-4" strokeWidth={1.8} />
+            {t('add')}
+          </Button>
+        </Link>
       </div>
 
       <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="products" />
