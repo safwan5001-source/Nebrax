@@ -439,6 +439,8 @@
     "add": "Add product",
     "edit": "Edit product",
     "sku": "SKU",
+    "barcode": "Barcode",
+    "generate_barcode": "Generate barcode",
     "name": "Name",
     "name_en": "Name (English)",
     "type": "Type",

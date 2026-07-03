@@ -224,6 +224,7 @@ export const mockZatca = {
 export interface MockProduct {
   id: string;
   sku: string | null;
+  barcode: string | null;
   name: string;
   name_en: string | null;
   type: string;
@@ -242,7 +243,7 @@ function product(
   sale: number, purchase: number, track: boolean, qty: number, avg: number, active = true
 ): MockProduct {
   return {
-    id, sku, name, name_en: null, type, unit,
+    id, sku, barcode: sku ? '2' + sku.replace(/\D/g, '').padStart(12, '0') : null, name, name_en: null, type, unit,
     sale_price: sale.toFixed(2), purchase_price: purchase.toFixed(2), tax_rate: 15,
     track_inventory: track, quantity_on_hand: qty, avg_cost: avg.toFixed(2), is_active: active,
   };

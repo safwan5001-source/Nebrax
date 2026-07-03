@@ -17,6 +17,7 @@ class StoreProductRequest extends FormRequest
             'name'            => ['required', 'string', 'max:255'],
             'name_en'         => ['nullable', 'string', 'max:255'],
             'sku'             => ['nullable', 'string', 'max:255'],
+            'barcode'         => ['nullable', 'string', 'max:255'],
             'type'            => ['required', 'in:good,service'],
             'unit'            => ['nullable', 'string', 'max:255'],
             // الأسعار بالهللات (minor units) كأعداد صحيحة

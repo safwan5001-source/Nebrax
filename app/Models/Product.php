@@ -14,7 +14,7 @@ class Product extends BaseModel
     use SoftDeletes;
 
     protected $fillable = [
-        'tenant_id', 'sku', 'name', 'name_en', 'type', 'unit',
+        'tenant_id', 'sku', 'barcode', 'name', 'name_en', 'type', 'unit',
         'sale_price', 'purchase_price', 'tax_rate', 'track_inventory',
         'quantity_on_hand', 'avg_cost', 'is_active',
     ];

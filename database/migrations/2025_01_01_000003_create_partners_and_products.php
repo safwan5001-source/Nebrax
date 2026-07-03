@@ -40,6 +40,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('sku')->nullable();                     // رمز المنتج
+            $table->string('barcode')->nullable();                 // الباركود (مسح ضوئي في POS)
             $table->string('name');
             $table->string('name_en')->nullable();
             $table->enum('type', ['good', 'service'])->default('good');
