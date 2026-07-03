@@ -15,6 +15,12 @@ class ApiAuthTest extends TestCase
     use InteractsWithApi;
 
     /** @test */
+    public function the_health_endpoint_is_public_and_ok(): void
+    {
+        $this->getJson('/api/health')->assertOk()->assertJson(['status' => 'ok']);
+    }
+
+    /** @test */
     public function register_creates_a_tenant_and_returns_a_token(): void
     {
         $res = $this->postJson('/api/register', [
