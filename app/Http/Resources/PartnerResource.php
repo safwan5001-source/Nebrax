@@ -21,6 +21,8 @@ class PartnerResource extends JsonResource
             'phone'      => $this->phone,
             'address'    => $this->address,
             'city'       => $this->city,
+            'credit_limit'  => $this->credit_limit,
+            'credit_period' => $this->credit_period,
             'is_active'  => $this->is_active,
         ];
     }

@@ -14,11 +14,14 @@ class Partner extends BaseModel
 
     protected $fillable = [
         'tenant_id', 'code', 'type', 'name', 'name_en',
-        'vat_number', 'cr_number', 'email', 'phone', 'address', 'city', 'is_active',
+        'vat_number', 'cr_number', 'email', 'phone', 'address', 'city',
+        'credit_limit', 'credit_period', 'is_active',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'     => 'boolean',
+        'credit_limit'  => 'integer',
+        'credit_period' => 'integer',
     ];
 
     protected $attributes = [

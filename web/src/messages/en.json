@@ -437,7 +437,10 @@
     "vat_hint": "15 digits",
     "opening_balance": "Opening balance",
     "opening_balance_date": "Opening balance date",
-    "opening_balance_hint": "Posts an entry: customer debits AR 1130 (supplier credits AP 2110) against opening balances 3130."
+    "opening_balance_hint": "Posts an entry: customer debits AR 1130 (supplier credits AP 2110) against opening balances 3130.",
+    "credit_limit": "Credit limit",
+    "credit_period": "Credit period (days)",
+    "credit_limit_hint": "Maximum outstanding credit allowed; posting a credit invoice above it is rejected. Leave empty for no limit."
   },
   "status": {
     "draft": "Draft",

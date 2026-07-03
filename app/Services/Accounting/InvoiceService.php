@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
+use App\Models\JournalLine;
 use App\Models\Partner;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -171,6 +172,9 @@ class InvoiceService
                 throw new RuntimeException('التسوية تجعل إجمالي الفاتورة سالباً.');
             }
 
+            // حراسة الحد الائتماني: فاتورة آجلة لا يجوز أن تدفع رصيد العميل فوق حدّه.
+            $this->assertWithinCreditLimit($invoice, $total);
+
             $debitCode = $invoice->payment_type === 'cash'
                 ? self::ACC_CASH
                 : self::ACC_RECEIVABLE;
@@ -269,6 +273,43 @@ class InvoiceService
 
             return $invoice->fresh('lines');
         });
+    }
+
+    /**
+     * حراسة الحد الائتماني للعميل قبل ترحيل فاتورة آجلة.
+     * الحد = 0/غياب ⇒ بلا سقف (توافق رجعي كامل: لا يتأثر أي سلوك قائم).
+     * السقف يُقاس على رصيد العملاء (1130) المربوط بالطرف: (مدين − دائن) + إجمالي هذه الفاتورة.
+     */
+    protected function assertWithinCreditLimit(Invoice $invoice, int $total): void
+    {
+        if ($invoice->payment_type !== 'credit') {
+            return; // البيع النقدي لا يُنشئ ذمّة
+        }
+
+        $partner = $invoice->partner()->first();
+        $limit   = (int) ($partner?->credit_limit ?? 0);
+        if ($limit <= 0) {
+            return; // بلا حد محدَّد
+        }
+
+        $receivableId = $this->accountId(self::ACC_RECEIVABLE);
+        $lines = JournalLine::query()
+            ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
+            ->where('e.status', 'posted')
+            ->where('journal_lines.account_id', $receivableId)
+            ->where('journal_lines.partner_type', Partner::class)
+            ->where('journal_lines.partner_id', $invoice->partner_id);
+
+        $outstanding = (int) $lines->sum('journal_lines.debit') - (int) $lines->sum('journal_lines.credit');
+
+        if ($outstanding + $total > $limit) {
+            throw new RuntimeException(sprintf(
+                'ترحيل الفاتورة يتجاوز الحد الائتماني للعميل (الرصيد %s + الفاتورة %s > الحد %s هللة).',
+                $outstanding,
+                $total,
+                $limit,
+            ));
+        }
     }
 
     /**

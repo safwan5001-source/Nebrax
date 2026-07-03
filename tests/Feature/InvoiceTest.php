@@ -430,4 +430,65 @@ class InvoiceTest extends TestCase
         $this->assertNull($this->line($entry, '1110')->cost_center_id);
         $this->assertNull($this->line($entry, '2120')->cost_center_id);
     }
+
+    /** @test */
+    public function a_credit_sale_within_the_customer_credit_limit_posts_normally(): void
+    {
+        $this->customer->update(['credit_limit' => 200000]); // 2000.00
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]] // إجمالي 1150 < الحد
+        );
+
+        $posted = $this->invoices->post($invoice);
+
+        $this->assertTrue($posted->isPosted());
+    }
+
+    /** @test */
+    public function a_credit_sale_exceeding_the_customer_credit_limit_is_rejected(): void
+    {
+        $this->customer->update(['credit_limit' => 100000]); // 1000.00
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]] // 1150 > الحد
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->invoices->post($invoice);
+    }
+
+    /** @test */
+    public function the_credit_limit_accumulates_with_the_existing_receivable_balance(): void
+    {
+        $this->customer->update(['credit_limit' => 200000]); // 2000.00
+
+        // فاتورة آجلة أولى (1150) تُبقي الرصيد المتبقّي دون الحد.
+        $first = $this->invoices->post($this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        ));
+        $this->assertTrue($first->isPosted());
+
+        // فاتورة ثانية مماثلة: 1150 + 1150 = 2300 > 2000 ⇒ تُرفض بالتراكم.
+        $second = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $this->expectException(\RuntimeException::class);
+        $this->invoices->post($second);
+    }
+
+    /** @test */
+    public function a_cash_sale_ignores_the_credit_limit(): void
+    {
+        $this->customer->update(['credit_limit' => 1]); // حد ضئيل جداً
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $posted = $this->invoices->post($invoice); // نقدي لا يُنشئ ذمّة ⇒ لا يتأثر بالحد
+        $this->assertTrue($posted->isPosted());
+    }
 }

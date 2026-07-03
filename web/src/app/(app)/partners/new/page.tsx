@@ -23,6 +23,7 @@ export default function NewPartnerPage() {
     name: '', name_en: '', type: 'customer', phone: '', address: '', city: '',
     vat_number: '', cr_number: '', code: '', email: '', is_active: true,
     opening_balance: '', opening_balance_date: '',
+    credit_limit: '', credit_period: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -49,6 +50,8 @@ export default function NewPartnerPage() {
           email: form.email || null,
           opening_balance: form.opening_balance !== '' ? riyalToMinor(form.opening_balance) : null,
           opening_balance_date: form.opening_balance_date || null,
+          credit_limit: form.credit_limit !== '' ? riyalToMinor(form.credit_limit) : null,
+          credit_period: form.credit_period !== '' ? Number(form.credit_period) : null,
           is_active: form.is_active,
         },
       });
@@ -142,6 +145,15 @@ export default function NewPartnerPage() {
                 <Input id="obd" type="date" dir="ltr" value={form.opening_balance_date} onChange={(e) => set('opening_balance_date', e.target.value)} />
               </div>
               <p className="text-[11px] text-muted sm:col-span-2">{t('opening_balance_hint')}</p>
+              <div className="space-y-1.5">
+                <Label htmlFor="climit">{t('credit_limit')}</Label>
+                <Input id="climit" inputMode="decimal" className="num text-end" placeholder="0.00" value={form.credit_limit} onChange={(e) => set('credit_limit', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cperiod">{t('credit_period')}</Label>
+                <Input id="cperiod" inputMode="numeric" className="num text-end" placeholder="0" value={form.credit_period} onChange={(e) => set('credit_period', e.target.value)} />
+              </div>
+              <p className="text-[11px] text-muted sm:col-span-2">{t('credit_limit_hint')}</p>
               <div className="space-y-1.5 sm:col-span-2">
                 <label className="flex items-center gap-2 pt-1 text-sm text-text">
                   <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
