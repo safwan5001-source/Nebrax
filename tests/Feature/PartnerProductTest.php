@@ -111,6 +111,26 @@ class PartnerProductTest extends TestCase
     }
 
     /** @test */
+    public function it_stores_product_extra_fields(): void
+    {
+        $supplier = Partner::create(['name' => 'مورّد', 'type' => 'supplier']);
+        $product = Product::create([
+            'name' => 'صنف', 'sale_price' => 5000,
+            'supplier_id' => $supplier->id, 'min_sale_price' => 3000, 'discount' => 5,
+            'discount_type' => 'percent', 'profit_margin' => 40, 'tags' => 'مميز,جديد', 'internal_notes' => 'سري',
+        ]);
+
+        $stored = Product::find($product->id);
+        $this->assertSame($supplier->id, $stored->supplier_id);
+        $this->assertSame(3000, $stored->min_sale_price);
+        $this->assertSame(5, $stored->discount);
+        $this->assertSame('percent', $stored->discount_type);
+        $this->assertSame(40, $stored->profit_margin);
+        $this->assertSame('مميز,جديد', $stored->tags);
+        $this->assertSame('سري', $stored->internal_notes);
+    }
+
+    /** @test */
     public function products_are_isolated_between_tenants(): void
     {
         Product::create(['name' => 'منتج أول', 'sale_price' => 5000]);

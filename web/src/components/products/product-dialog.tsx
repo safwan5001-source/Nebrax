@@ -23,6 +23,12 @@ export interface Product {
   category: string | null;
   brand: string | null;
   reorder_level: number | null;
+  min_sale_price: string | null;
+  discount: number | null;
+  discount_type: string | null;
+  profit_margin: number | null;
+  tags: string | null;
+  internal_notes: string | null;
   sale_price: string;
   purchase_price: string;
   tax_rate: number;
@@ -43,6 +49,12 @@ interface FormState {
   category: string;
   brand: string;
   reorder_level: string;
+  min_sale_price: string;
+  discount: string;
+  discount_type: string;
+  profit_margin: string;
+  tags: string;
+  internal_notes: string;
   sale_price: string;
   purchase_price: string;
   tax_rate: string;
@@ -53,6 +65,7 @@ interface FormState {
 const emptyForm = (): FormState => ({
   name: '', sku: '', barcode: '', name_en: '', type: 'good', unit: 'piece',
   description: '', category: '', brand: '', reorder_level: '',
+  min_sale_price: '', discount: '', discount_type: 'percent', profit_margin: '', tags: '', internal_notes: '',
   sale_price: '', purchase_price: '', tax_rate: '15', track_inventory: false, is_active: true,
 });
 
@@ -60,6 +73,8 @@ function fromProduct(p: Product): FormState {
   return {
     name: p.name, sku: p.sku ?? '', barcode: p.barcode ?? '', name_en: p.name_en ?? '', type: p.type, unit: p.unit,
     description: p.description ?? '', category: p.category ?? '', brand: p.brand ?? '', reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
+    min_sale_price: p.min_sale_price ?? '', discount: p.discount != null ? String(p.discount) : '', discount_type: p.discount_type ?? 'percent',
+    profit_margin: p.profit_margin != null ? String(p.profit_margin) : '', tags: p.tags ?? '', internal_notes: p.internal_notes ?? '',
     sale_price: p.sale_price, purchase_price: p.purchase_price, tax_rate: String(p.tax_rate),
     track_inventory: p.track_inventory, is_active: p.is_active,
   };
@@ -100,6 +115,12 @@ export function ProductDialog({
       category: form.category || null,
       brand: form.brand || null,
       reorder_level: form.track_inventory && form.reorder_level !== '' ? Number(form.reorder_level) || 0 : null,
+      min_sale_price: form.min_sale_price !== '' ? riyalToMinor(form.min_sale_price) : null,
+      discount: form.discount !== '' ? Number(form.discount) || 0 : null,
+      discount_type: form.discount !== '' ? form.discount_type : null,
+      profit_margin: form.profit_margin !== '' ? Number(form.profit_margin) || 0 : null,
+      tags: form.tags || null,
+      internal_notes: form.internal_notes || null,
       sale_price: riyalToMinor(form.sale_price),
       purchase_price: riyalToMinor(form.purchase_price),
       tax_rate: Number(form.tax_rate) || 0,
@@ -179,6 +200,38 @@ export function ProductDialog({
           <div className="space-y-1.5">
             <Label htmlFor="tax_rate">{t('tax_rate')}</Label>
             <Input id="tax_rate" className="num text-end" type="number" min={0} max={100} value={form.tax_rate} onChange={(e) => set('tax_rate', e.target.value)} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="min_sale">{t('min_sale_price')}</Label>
+            <Input id="min_sale" className="num text-end" inputMode="decimal" value={form.min_sale_price} onChange={(e) => set('min_sale_price', e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="margin">{t('profit_margin')}</Label>
+            <Input id="margin" className="num text-end" type="number" min={0} value={form.profit_margin} onChange={(e) => set('profit_margin', e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="disc">{t('discount')}</Label>
+            <div className="flex gap-1.5">
+              <Input id="disc" className="num text-end" type="number" min={0} value={form.discount} onChange={(e) => set('discount', e.target.value)} />
+              <Select className="w-16" value={form.discount_type} onChange={(e) => set('discount_type', e.target.value)}>
+                <option value="percent">%</option>
+                <option value="amount">﷼</option>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="tags">{t('tags')}</Label>
+            <Input id="tags" placeholder={t('tags_hint')} value={form.tags} onChange={(e) => set('tags', e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="internal_notes">{t('internal_notes')}</Label>
+            <Input id="internal_notes" value={form.internal_notes} onChange={(e) => set('internal_notes', e.target.value)} />
           </div>
         </div>
 

@@ -46,6 +46,13 @@ return new class extends Migration
             $table->string('category')->nullable();                // التصنيف
             $table->string('brand')->nullable();                   // الماركة
             $table->unsignedInteger('reorder_level')->nullable();  // حد التنبيه عند نقص المخزون
+            $table->uuid('supplier_id')->nullable();               // المورّد الافتراضي (مرجعي)
+            $table->bigInteger('min_sale_price')->nullable();      // أقل سعر بيع (هللات — استرشادي)
+            $table->bigInteger('discount')->nullable();            // خصم افتراضي (استرشادي)
+            $table->enum('discount_type', ['percent', 'amount'])->nullable(); // نوع الخصم
+            $table->unsignedSmallInteger('profit_margin')->nullable(); // هامش الربح % (استرشادي)
+            $table->string('tags')->nullable();                    // وسوم (مفصولة بفواصل)
+            $table->text('internal_notes')->nullable();            // ملاحظات داخلية
             $table->string('name_en')->nullable();
             $table->enum('type', ['good', 'service'])->default('good');
             $table->string('unit')->default('piece');              // وحدة القياس

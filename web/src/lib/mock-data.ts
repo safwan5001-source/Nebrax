@@ -233,6 +233,13 @@ export interface MockProduct {
   category: string | null;
   brand: string | null;
   reorder_level: number | null;
+  supplier_id: string | null;
+  min_sale_price: string | null;
+  discount: number | null;
+  discount_type: string | null;
+  profit_margin: number | null;
+  tags: string | null;
+  internal_notes: string | null;
   sale_price: string;
   purchase_price: string;
   tax_rate: number;
@@ -249,6 +256,7 @@ function product(
   return {
     id, sku, barcode: sku ? '2' + sku.replace(/\D/g, '').padStart(12, '0') : null, name, name_en: null, type, unit,
     description: null, category: null, brand: null, reorder_level: track ? 10 : null,
+    supplier_id: null, min_sale_price: null, discount: null, discount_type: null, profit_margin: null, tags: null, internal_notes: null,
     sale_price: sale.toFixed(2), purchase_price: purchase.toFixed(2), tax_rate: 15,
     track_inventory: track, quantity_on_hand: qty, avg_cost: avg.toFixed(2), is_active: active,
   };
