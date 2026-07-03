@@ -38,6 +38,9 @@ use Illuminate\Support\Facades\Route;
 // كل مسارات الـ API ترجع JSON موحّداً (بما فيها الأخطاء).
 Route::middleware(ForceJsonResponse::class)->group(function () {
 
+    // فحص صحّة للنشر (بلا مصادقة) — تستخدمه منصّة الاستضافة
+    Route::get('health', fn () => ['status' => 'ok']);
+
     // عام (بلا مصادقة)
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');

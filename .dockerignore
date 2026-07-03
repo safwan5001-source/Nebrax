@@ -1,0 +1,9 @@
+# سياق بناء الـ backend لا يحتاج الواجهة ولا أدوات التطوير
+web/
+node_modules/
+.git/
+.github/
+docs/
+*.md
+!deploy/*.md
+.claude/

@@ -1,0 +1,51 @@
+# ════════════════════════════════════════════════════════════════
+#  Render Blueprint — نبراس ERP (Backend)
+#  ينشر خدمة ويب (Docker) + قاعدة PostgreSQL مُدارة، ويربط المتغيّرات.
+#  الاستخدام: Render Dashboard → New → Blueprint → اربط هذا المستودع.
+#  ثم اضبط APP_KEY و FRONTEND_URL (المشار إليهما بـ sync:false).
+# ════════════════════════════════════════════════════════════════
+databases:
+  - name: nibras-db
+    databaseName: nibras
+    plan: free
+    region: frankfurt
+
+services:
+  - type: web
+    name: nibras-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_KEY
+        sync: false               # ولّده: php artisan key:generate --show
+      - key: FRONTEND_URL
+        sync: false               # نطاق الواجهة على Vercel (مثل https://nibras.vercel.app)
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: nibras-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: nibras-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: nibras-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: nibras-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: nibras-db
+          property: password
