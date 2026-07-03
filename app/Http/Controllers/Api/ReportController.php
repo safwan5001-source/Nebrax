@@ -97,6 +97,25 @@ class ReportController extends ApiController
         ]);
     }
 
+    public function costCenterProfitability(Request $request): JsonResponse
+    {
+        $r = $this->reports->costCenterProfitability($this->filters($request));
+
+        return response()->json([
+            'rows' => array_map(fn ($row) => [
+                'cost_center_id' => $row['cost_center_id'],
+                'code'           => $row['code'],
+                'name'           => $row['name'],
+                'revenue'        => Money::toRiyal($row['revenue']),
+                'expense'        => Money::toRiyal($row['expense']),
+                'profit'         => Money::toRiyal($row['profit']),
+            ], $r['rows']),
+            'total_revenue' => Money::toRiyal($r['total_revenue']),
+            'total_expense' => Money::toRiyal($r['total_expense']),
+            'total_profit'  => Money::toRiyal($r['total_profit']),
+        ]);
+    }
+
     public function aging(Request $request, string $type): JsonResponse
     {
         abort_unless(in_array($type, ['receivable', 'payable'], true), 404);

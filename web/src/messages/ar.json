@@ -374,6 +374,11 @@
   "reports": {
     "title": "التقارير",
     "trial_balance": "ميزان المراجعة",
+    "cost_profit": "الربحية بمركز التكلفة",
+    "center": "مركز التكلفة",
+    "revenue": "الإيراد",
+    "expense": "المصروف",
+    "profit": "الربح",
     "aging": "أعمار الديون",
     "balanced": "متوازن",
     "unbalanced": "غير متوازن",

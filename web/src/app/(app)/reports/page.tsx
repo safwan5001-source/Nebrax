@@ -14,12 +14,14 @@ import { formatRiyal } from '@/lib/money';
 import { useCompany } from '@/lib/company';
 import { toCsv, downloadCsv } from '@/lib/export';
 
-type Tab = 'trial' | 'aging';
+type Tab = 'trial' | 'costcenter' | 'aging';
 
 interface TrialRow { code: string; name: string; debit: string; credit: string }
 interface TrialBalance { rows: TrialRow[]; total_debit: string; total_credit: string; balanced: boolean }
 interface AgingRow { partner_id: string; name: string; b0_30: string; b31_60: string; b61_90: string; b90_plus: string; total: string }
 interface Aging { type: string; as_of: string; rows: AgingRow[]; totals: Omit<AgingRow, 'partner_id' | 'name'> }
+interface CcRow { cost_center_id: string; code: string; name: string; revenue: string; expense: string; profit: string }
+interface Profitability { rows: CcRow[]; total_revenue: string; total_expense: string; total_profit: string }
 
 interface ReportDoc {
   title: string;
@@ -38,11 +40,14 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [trial, setTrial] = useState<TrialBalance | null>(null);
   const [aging, setAging] = useState<Aging | null>(null);
+  const [cc, setCc] = useState<Profitability | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
     if (tab === 'trial') {
       api<TrialBalance>('/reports/trial-balance').then(setTrial).finally(() => setLoading(false));
+    } else if (tab === 'costcenter') {
+      api<Profitability>('/reports/cost-center-profitability').then(setCc).finally(() => setLoading(false));
     } else {
       api<Aging>(`/reports/aging/${agingType}`).then(setAging).finally(() => setLoading(false));
     }
@@ -65,6 +70,22 @@ export default function ReportsPage() {
         rows: trial.rows.map((r) => [r.code, r.name, formatRiyal(r.debit), formatRiyal(r.credit)]),
         totalRow: ['', t('total'), formatRiyal(trial.total_debit), formatRiyal(trial.total_credit)],
         exportName: 'trial-balance',
+      };
+    }
+    if (tab === 'costcenter') {
+      if (!cc) return null;
+      return {
+        title: t('cost_profit'),
+        columns: [
+          { label: t('code') },
+          { label: t('center') },
+          { label: t('revenue'), align: 'end' },
+          { label: t('expense'), align: 'end' },
+          { label: t('profit'), align: 'end' },
+        ],
+        rows: cc.rows.map((r) => [r.code, r.name, formatRiyal(r.revenue), formatRiyal(r.expense), formatRiyal(r.profit)]),
+        totalRow: ['', t('total'), formatRiyal(cc.total_revenue), formatRiyal(cc.total_expense), formatRiyal(cc.total_profit)],
+        exportName: 'cost-center-profitability',
       };
     }
     if (!aging) return null;
@@ -97,7 +118,7 @@ export default function ReportsPage() {
       ],
       exportName: `aging-${agingType}`,
     };
-  }, [tab, agingType, trial, aging, t]);
+  }, [tab, agingType, trial, aging, cc, t]);
 
   function exportCsv() {
     if (!doc) return;
@@ -125,6 +146,9 @@ export default function ReportsPage() {
       <div className="flex gap-1">
         <Button variant={tab === 'trial' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('trial')}>
           {t('trial_balance')}
+        </Button>
+        <Button variant={tab === 'costcenter' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('costcenter')}>
+          {t('cost_profit')}
         </Button>
         <Button variant={tab === 'aging' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('aging')}>
           {t('aging')}
@@ -169,6 +193,56 @@ export default function ReportsPage() {
                     <TD className="num text-end">{formatRiyal(trial.total_debit)}</TD>
                     <TD className="num text-end">{formatRiyal(trial.total_credit)}</TD>
                   </TR>
+                </TBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      ) : tab === 'costcenter' ? (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{t('cost_profit')}</CardTitle>
+            {cc && (
+              <Badge tone={Number(cc.total_profit) >= 0 ? 'positive' : 'negative'}>{formatRiyal(cc.total_profit)}</Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            {loading || !cc ? (
+              <Skeleton className="h-40 w-full" />
+            ) : (
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>{t('code')}</TH>
+                    <TH>{t('center')}</TH>
+                    <TH className="text-end">{t('revenue')}</TH>
+                    <TH className="text-end">{t('expense')}</TH>
+                    <TH className="text-end">{t('profit')}</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {cc.rows.length === 0 ? (
+                    <TR><TD colSpan={5} className="py-8 text-center text-muted">{t('empty')}</TD></TR>
+                  ) : (
+                    cc.rows.map((r) => (
+                      <TR key={r.cost_center_id}>
+                        <TD className="num">{r.code}</TD>
+                        <TD>{r.name}</TD>
+                        <TD className="num text-end">{formatRiyal(r.revenue)}</TD>
+                        <TD className="num text-end">{formatRiyal(r.expense)}</TD>
+                        <TD className={'num text-end font-medium ' + (Number(r.profit) < 0 ? 'text-negative' : Number(r.profit) > 0 ? 'text-positive' : '')}>{formatRiyal(r.profit)}</TD>
+                      </TR>
+                    ))
+                  )}
+                  {cc.rows.length > 0 && (
+                    <TR className="font-semibold">
+                      <TD />
+                      <TD>{t('total')}</TD>
+                      <TD className="num text-end">{formatRiyal(cc.total_revenue)}</TD>
+                      <TD className="num text-end">{formatRiyal(cc.total_expense)}</TD>
+                      <TD className="num text-end">{formatRiyal(cc.total_profit)}</TD>
+                    </TR>
+                  )}
                 </TBody>
               </Table>
             )}
