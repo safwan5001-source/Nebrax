@@ -38,6 +38,7 @@ class StoreProductRequest extends FormRequest
             'purchase_price'  => ['nullable', 'integer', 'min:0'],
             'tax_rate'        => ['nullable', 'integer', 'min:0', 'max:100'],
             'track_inventory' => ['boolean'],
+            'initial_quantity' => ['nullable', 'integer', 'min:0'], // رصيد افتتاحي (فعل، ليس عموداً)
             'is_active'       => ['boolean'],
         ];
     }

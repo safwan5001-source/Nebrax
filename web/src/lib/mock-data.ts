@@ -191,6 +191,7 @@ export const mockAccounts: MockAccount[] = [
   acc('3', 'حقوق الملكية', 'Equity', 'equity', true),
   acc('3110', 'رأس المال', 'Capital', 'equity', false, '300000.00'),
   acc('3120', 'الأرباح المرحّلة', 'Retained Earnings', 'equity', false, '85000.00'),
+  acc('3130', 'الأرصدة الافتتاحية', 'Opening Balances', 'equity', false, '0.00'),
   acc('4', 'الإيرادات', 'Revenue', 'revenue', true),
   acc('4110', 'إيرادات المبيعات', 'Sales Revenue', 'revenue', false, '482500.00'),
   acc('4120', 'إيرادات الخدمات', 'Service Revenue', 'revenue', false, '36000.00'),

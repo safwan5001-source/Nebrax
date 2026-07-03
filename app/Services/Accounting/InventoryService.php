@@ -25,6 +25,7 @@ class InventoryService
 {
     private const ACC_INVENTORY = '1140'; // المخزون
     private const ACC_COGS       = '5110'; // تكلفة البضاعة المباعة
+    private const ACC_OPENING    = '3130'; // الأرصدة الافتتاحية (حقوق ملكية)
     private const ACC_PAYABLE    = '2110'; // الموردون (الحساب المقابل الافتراضي للاستلام)
 
     public function __construct(
@@ -138,6 +139,24 @@ class InventoryService
      * توليد قيد تكلفة البضاعة المباعة لفاتورة، وخفض المخزون للمنتجات المتابَعة.
      * يُستدعى من InvoiceService عند الترحيل. يُعيد قيد التكلفة أو null.
      */
+    /**
+     * رصيد افتتاحي للمنتج عند إنشائه: مدين 1140 المخزون / دائن 3130 الأرصدة الافتتاحية،
+     * بقيمة الكمية × سعر الشراء. يضبط الرصيد ومتوسط التكلفة عبر receiveStock.
+     * يتطلّب منتجاً متتبَّعاً بكمية موجبة وسعر شراء موجب (لتقييم المخزون).
+     */
+    public function recordOpeningStock(Product $product, int $quantity): ?StockMovement
+    {
+        $unitCost = (int) $product->purchase_price;
+        if (! $product->track_inventory || $quantity <= 0 || $unitCost <= 0) {
+            return null;
+        }
+
+        return $this->receiveStock($product, $quantity, $unitCost, [
+            'offset_account' => self::ACC_OPENING,
+            'notes'          => 'رصيد افتتاحي',
+        ]);
+    }
+
     public function recordSaleCogs(Invoice $invoice): ?\App\Models\JournalEntry
     {
         $invoice->loadMissing('lines.product');

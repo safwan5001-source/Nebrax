@@ -41,6 +41,7 @@ class ChartOfAccountsSeeder
         ['3', 'حقوق الملكية', 'Equity', 'equity', true, [
             ['3110', 'رأس المال', 'Capital', 'equity', false, []],
             ['3120', 'الأرباح المرحّلة', 'Retained Earnings', 'equity', false, []],
+            ['3130', 'الأرصدة الافتتاحية', 'Opening Balances', 'equity', false, []],
         ]],
         ['4', 'الإيرادات', 'Revenue', 'revenue', true, [
             ['4110', 'إيرادات المبيعات', 'Sales Revenue', 'revenue', false, []],
