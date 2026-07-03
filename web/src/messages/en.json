@@ -373,7 +373,18 @@
     "debit": "Debit",
     "credit": "Credit",
     "balance": "Balance",
-    "empty": "No movements"
+    "empty": "No movements",
+    "profile": "Customer profile",
+    "contact": "Contact",
+    "address_block": "National address",
+    "account_block": "Account",
+    "credit_limit": "Credit limit",
+    "credit_used": "Used",
+    "credit_available": "Available",
+    "credit_period": "Credit period",
+    "days": "days",
+    "no_limit": "No limit",
+    "not_set": "—"
   },
   "reports": {
     "title": "Reports",

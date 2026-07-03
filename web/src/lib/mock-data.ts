@@ -12,10 +12,21 @@ export interface MockPartner {
   phone: string | null;
   city: string | null;
   vat_number: string | null;
+  mobile?: string | null;
+  code?: string | null;
+  address?: string | null;
+  building_no?: string | null;
+  street?: string | null;
+  district?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  classification?: string | null;
+  credit_limit?: string | null;   // بالريال كنص (مثل موارد الـ API)
+  credit_period?: number | null;
 }
 
 export const mockPartners: MockPartner[] = [
-  { id: 'p1', name: 'مؤسسة الخليج للتجارة', type: 'customer', email: 'info@gulf-trade.sa', phone: '0138012345', city: 'الدمام', vat_number: '311111111100003' },
+  { id: 'p1', name: 'مؤسسة الخليج للتجارة', type: 'customer', email: 'info@gulf-trade.sa', phone: '0138012345', mobile: '0551234567', city: 'الدمام', vat_number: '311111111100003', code: 'C-001', classification: 'VIP', credit_limit: '150000.00', credit_period: 30, building_no: '3421', street: 'طريق الملك فهد', district: 'العليا', postal_code: '32233', country: 'SA' },
   { id: 'p2', name: 'شركة الواحة للمقاولات', type: 'customer', email: 'accounts@alwaha.sa', phone: '0138023456', city: 'الخبر', vat_number: '312222222200003' },
   { id: 'p3', name: 'مصنع الشرق للبلاستيك', type: 'customer', email: 'sales@east-plast.sa', phone: '0138034567', city: 'الجبيل', vat_number: '313333333300003' },
   { id: 'p4', name: 'مؤسسة نجد للتوريدات', type: 'customer', email: 'po@najd-supply.sa', phone: '0138045678', city: 'الظهران', vat_number: '314444444400003' },
