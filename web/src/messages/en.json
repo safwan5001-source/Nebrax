@@ -192,6 +192,8 @@
     "item": "Item",
     "total_with_vat": "Total incl. VAT",
     "discount": "Discount",
+    "discount_shipping": "Discount & shipping",
+    "shipping": "Shipping",
     "discount_mode": "Discount type",
     "discount_amount": "Fixed amount",
     "discount_percent": "Percentage %",

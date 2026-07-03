@@ -25,7 +25,9 @@ class InvoiceService
     private const ACC_CASH        = '1110'; // الصندوق (بيع نقدي)
     private const ACC_RECEIVABLE  = '1130'; // العملاء (بيع آجل)
     private const ACC_SALES       = '4110'; // إيرادات المبيعات
+    private const ACC_SHIPPING    = '4130'; // إيرادات الشحن
     private const ACC_VAT_OUTPUT  = '2120'; // ضريبة المخرجات
+    private const VAT_RATE        = 15;     // نسبة ضريبة القيمة المضافة للشحن
 
     public function __construct(
         protected LedgerService $ledger,
@@ -57,6 +59,7 @@ class InvoiceService
                 'due_date'     => $data['due_date'] ?? null,
                 'cost_center_id' => $data['cost_center_id'] ?? null,
                 'salesperson_id' => $data['salesperson_id'] ?? null,
+                'shipping'     => max(0, (int) ($data['shipping'] ?? 0)),
                 'status'       => 'draft',
                 'notes'        => $data['notes'] ?? null,
                 'created_by'   => $data['created_by'] ?? null,
@@ -99,11 +102,18 @@ class InvoiceService
             }
 
             // خصم على مستوى الفاتورة (net method): يخفّض الإيراد والضريبة تناسبياً.
-            [$discount, $taxAmount, $total] = $this->applyDiscount($subtotal, $taxTotal, (int) ($data['discount'] ?? 0));
+            [$discount, $goodsVat] = $this->applyDiscount($subtotal, $taxTotal, (int) ($data['discount'] ?? 0));
+
+            // الشحن: إيراد خاضع للضريبة يُضاف فوق السلع.
+            $shipping    = max(0, (int) ($data['shipping'] ?? 0));
+            $shippingVat = $shipping > 0 ? $this->calcTax($shipping, self::VAT_RATE) : 0;
+            $taxAmount   = $goodsVat + $shippingVat;
+            $total       = ($subtotal - $discount) + $shipping + $taxAmount;
 
             $invoice->update([
                 'subtotal'   => $subtotal,
                 'discount'   => $discount,
+                'shipping'   => $shipping,
                 'tax_amount' => $taxAmount,
                 'total'      => $total,
             ]);
@@ -137,8 +147,14 @@ class InvoiceService
             $taxGross  = (int) $invoice->lines->sum('line_tax');
 
             // تطبيق خصم الفاتورة على الأساس المشتقّ من السطور (net method).
-            [$discount, $taxAmount, $total] = $this->applyDiscount($subtotal, $taxGross, (int) $invoice->discount);
+            [$discount, $goodsVat] = $this->applyDiscount($subtotal, $taxGross, (int) $invoice->discount);
             $netSales = $subtotal - $discount;
+
+            // الشحن: إيراد خاضع للضريبة يُضاف فوق السلع.
+            $shipping    = max(0, (int) $invoice->shipping);
+            $shippingVat = $shipping > 0 ? $this->calcTax($shipping, self::VAT_RATE) : 0;
+            $taxAmount   = $goodsVat + $shippingVat;
+            $total       = $netSales + $shipping + $taxAmount;
 
             $debitCode = $invoice->payment_type === 'cash'
                 ? self::ACC_CASH
@@ -154,6 +170,14 @@ class InvoiceService
                 'credit'         => $netSales,
                 'cost_center_id' => $invoice->cost_center_id, // وسم الإيراد بمركز التكلفة
             ]];
+
+            if ($shipping > 0) {
+                $lines[] = [
+                    'account_id'     => $this->accountId(self::ACC_SHIPPING),
+                    'credit'         => $shipping,
+                    'cost_center_id' => $invoice->cost_center_id,
+                ];
+            }
 
             if ($taxAmount > 0) {
                 $lines[] = [
@@ -183,6 +207,7 @@ class InvoiceService
                 'status'              => 'posted',
                 'subtotal'            => $subtotal,
                 'discount'            => $discount,
+                'shipping'            => $shipping,
                 'tax_amount'          => $taxAmount,
                 'total'               => $total,
                 'journal_entry_id'    => $entry->id,

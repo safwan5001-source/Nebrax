@@ -314,6 +314,31 @@ class InvoiceTest extends TestCase
     }
 
     /** @test */
+    public function shipping_adds_taxable_revenue_on_a_separate_account(): void
+    {
+        // سلع 1000 + 15% + شحن 100 + 15% → إجمالي 1150 + 115 = 1265.
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'shipping' => 10000],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $this->assertSame(100000, $invoice->subtotal);
+        $this->assertSame(10000,  $invoice->shipping);
+        $this->assertSame(16500,  $invoice->tax_amount); // 15000 سلع + 1500 شحن
+        $this->assertSame(126500, $invoice->total);       // 100000 + 10000 + 16500
+
+        $posted = $this->invoices->post($invoice);
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)->where('source_id', $posted->id)->firstOrFail();
+
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(126500, $this->line($entry, '1110')->debit);
+        $this->assertEquals(100000, $this->line($entry, '4110')->credit); // إيراد السلع
+        $this->assertEquals(10000,  $this->line($entry, '4130')->credit); // إيراد الشحن
+        $this->assertEquals(16500,  $this->line($entry, '2120')->credit); // إجمالي الضريبة
+    }
+
+    /** @test */
     public function an_invoice_stores_the_salesperson(): void
     {
         $emp = \App\Models\Employee::create(['employee_no' => 'EMP-0001', 'name' => 'مندوب', 'job_title' => 'مبيعات']);
