@@ -424,7 +424,17 @@
     "save": "Save",
     "cancel": "Cancel",
     "new_title": "New customer",
-    "back": "Back"
+    "back": "Back",
+    "customer_details": "Customer details",
+    "account_details": "Account details",
+    "name_en": "Name (English)",
+    "code": "Code",
+    "vat_number": "VAT number",
+    "cr_number": "CR / unified number",
+    "address": "Address",
+    "status_label": "Status",
+    "active": "Active",
+    "vat_hint": "15 digits"
   },
   "status": {
     "draft": "Draft",
