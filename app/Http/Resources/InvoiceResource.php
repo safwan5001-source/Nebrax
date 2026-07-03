@@ -23,6 +23,7 @@ class InvoiceResource extends JsonResource
             'subtotal'       => Money::toRiyal($this->subtotal),
             'discount'       => Money::toRiyal($this->discount),
             'shipping'       => Money::toRiyal($this->shipping),
+            'adjustment'     => Money::toRiyal($this->adjustment),
             'tax_amount'     => Money::toRiyal($this->tax_amount),
             'total'          => Money::toRiyal($this->total),
             'paid_amount'    => Money::toRiyal($this->paid_amount),

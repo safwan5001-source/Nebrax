@@ -20,6 +20,7 @@ class StoreInvoiceRequest extends FormRequest
             'due_date'            => ['nullable', 'date'],
             'discount'            => ['nullable', 'integer', 'min:0'], // هللات — خصم على مستوى الفاتورة
             'shipping'            => ['nullable', 'integer', 'min:0'], // هللات — رسوم الشحن (قبل الضريبة)
+            'adjustment'          => ['nullable', 'integer'],          // هللات — تسوية/تقريب (+/−)
             'cost_center_id'      => ['nullable', 'uuid'],
             'salesperson_id'      => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],

@@ -52,6 +52,7 @@ export default function NewInvoicePage() {
   const [discountMode, setDiscountMode] = useState<'amount' | 'percent'>('amount');
   const [discountInput, setDiscountInput] = useState('');
   const [shippingInput, setShippingInput] = useState('');
+  const [adjustmentInput, setAdjustmentInput] = useState('');
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -106,7 +107,9 @@ export default function NewInvoicePage() {
   const shippingMinor = Math.max(0, riyalToMinor(shippingInput));
   const shippingTaxMinor = Math.round((shippingMinor * 15) / 100);
   const taxMinor = goodsTaxMinor + shippingTaxMinor;
-  const totalMinor = netMinor + shippingMinor + taxMinor;
+  // التسوية/التقريب (+/−، غير خاضعة للضريبة).
+  const adjustmentMinor = riyalToMinor(adjustmentInput);
+  const totalMinor = netMinor + shippingMinor + taxMinor + adjustmentMinor;
 
   const canSave = useMemo(() => !!partnerId && !saving, [partnerId, saving]);
 
@@ -130,7 +133,7 @@ export default function NewInvoicePage() {
     try {
       const created = await api<{ data: { id: string } }>('/invoices', {
         method: 'POST',
-        body: { partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null, cost_center_id: centerId || null, salesperson_id: salespersonId || null, discount: discountMinor, shipping: shippingMinor, notes: notes || null, items },
+        body: { partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null, cost_center_id: centerId || null, salesperson_id: salespersonId || null, discount: discountMinor, shipping: shippingMinor, adjustment: adjustmentMinor, notes: notes || null, items },
       });
       if (post) await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
       success(tc('created'));
@@ -276,7 +279,7 @@ export default function NewInvoicePage() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('discount_shipping')}</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="dmode">{t('discount_mode')}</Label>
                   <Select id="dmode" value={discountMode} onChange={(e) => setDiscountMode(e.target.value as 'amount' | 'percent')}>
@@ -298,7 +301,15 @@ export default function NewInvoicePage() {
                     <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">﷼</span>
                   </div>
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="adj">{t('adjustment')}</Label>
+                  <div className="relative">
+                    <Input id="adj" inputMode="decimal" dir="ltr" className="num text-end pe-12" placeholder="0" value={adjustmentInput} onChange={(e) => setAdjustmentInput(e.target.value)} />
+                    <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">﷼</span>
+                  </div>
+                </div>
               </div>
+              <p className="mt-2 text-[11px] text-muted">{t('adjustment_hint')}</p>
             </CardContent>
           </Card>
 
@@ -330,6 +341,9 @@ export default function NewInvoicePage() {
                 <div className="flex justify-between text-muted"><span>{t('shipping')}</span><span className="num">{formatRiyal(shippingMinor / 100)}</span></div>
               )}
               <div className="flex justify-between text-muted"><span>{t('tax_total')}</span><span className="num">{formatRiyal(taxMinor / 100)}</span></div>
+              {adjustmentMinor !== 0 && (
+                <div className="flex justify-between text-muted"><span>{t('adjustment')}</span><span className="num">{adjustmentMinor > 0 ? '+' : ''}{formatRiyal(adjustmentMinor / 100)}</span></div>
+              )}
               <div className="flex items-baseline justify-between border-t border-border pt-2">
                 <span className="font-semibold text-text">{t('total')}</span>
                 <span className="num text-2xl font-bold text-primary-hover">{formatRiyal(totalMinor / 100)}</span>

@@ -339,6 +339,45 @@ class InvoiceTest extends TestCase
     }
 
     /** @test */
+    public function a_positive_adjustment_posts_a_gain_and_balances(): void
+    {
+        // 1000 + 15% = 1150، تسوية +0.17 (تقريب لأعلى) → إجمالي 1150.17.
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'adjustment' => 17],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $this->assertSame(17,     $invoice->adjustment);
+        $this->assertSame(115017, $invoice->total);
+
+        $posted = $this->invoices->post($invoice);
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)->where('source_id', $posted->id)->firstOrFail();
+
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(115017, $this->line($entry, '1110')->debit);   // العميل يدفع المُقرَّب
+        $this->assertEquals(17,     $this->line($entry, '5170')->credit);  // فرق التقريب ربح (دائن)
+    }
+
+    /** @test */
+    public function a_negative_adjustment_posts_a_loss_and_balances(): void
+    {
+        // 1000 + 15% = 1150، تسوية −0.50 → إجمالي 1149.50.
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'adjustment' => -50],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $this->assertSame(114950, $invoice->total);
+
+        $posted = $this->invoices->post($invoice);
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)->where('source_id', $posted->id)->firstOrFail();
+
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(114950, $this->line($entry, '1110')->debit);   // العميل يدفع أقل
+        $this->assertEquals(50,     $this->line($entry, '5170')->debit);   // فرق التقريب خسارة (مدين)
+    }
+
+    /** @test */
     public function an_invoice_stores_the_salesperson(): void
     {
         $emp = \App\Models\Employee::create(['employee_no' => 'EMP-0001', 'name' => 'مندوب', 'job_title' => 'مبيعات']);
