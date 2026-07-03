@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('code')->nullable();                    // كود الطرف (اختياري)
             $table->enum('type', ['customer', 'supplier', 'both'])->default('customer');
+            $table->enum('entity_type', ['individual', 'commercial'])->default('commercial'); // فردي/تجاري
             $table->string('name');                                // الاسم
             $table->string('name_en')->nullable();
             $table->string('vat_number', 15)->nullable();          // الرقم الضريبي

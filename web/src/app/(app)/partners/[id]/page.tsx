@@ -21,7 +21,7 @@ interface Statement {
   closing_balance: string;
 }
 interface Partner {
-  id: string; code: string | null; type: string; name: string; name_en: string | null;
+  id: string; code: string | null; type: string; entity_type: string; name: string; name_en: string | null;
   vat_number: string | null; cr_number: string | null; email: string | null;
   phone: string | null; mobile: string | null;
   address: string | null; city: string | null;
@@ -72,6 +72,7 @@ export default function PartnerStatementPage() {
         </Button>
         <h1 className="text-xl font-semibold text-text">{data?.partner.name ?? '…'}</h1>
         {data && <Badge tone="neutral">{tp(data.partner.type)}</Badge>}
+        {partner?.entity_type && <Badge tone="muted">{tp(partner.entity_type)}</Badge>}
         {partner?.classification && <Badge tone="muted">{partner.classification}</Badge>}
       </div>
 

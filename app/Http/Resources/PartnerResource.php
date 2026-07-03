@@ -13,7 +13,8 @@ class PartnerResource extends JsonResource
         return [
             'id'         => $this->id,
             'code'       => $this->code,
-            'type'       => $this->type,
+            'type'        => $this->type,
+            'entity_type' => $this->entity_type,
             'name'       => $this->name,
             'name_en'    => $this->name_en,
             'vat_number' => $this->vat_number,

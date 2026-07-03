@@ -20,7 +20,7 @@ export default function NewPartnerPage() {
   const { success } = useToast();
 
   const [form, setForm] = useState({
-    name: '', name_en: '', type: 'customer', phone: '', mobile: '', address: '', city: '',
+    name: '', name_en: '', type: 'customer', entity_type: 'commercial', phone: '', mobile: '', address: '', city: '',
     vat_number: '', cr_number: '', code: '', email: '', is_active: true,
     classification: '',
     building_no: '', street: '', district: '', postal_code: '', country: '',
@@ -43,6 +43,7 @@ export default function NewPartnerPage() {
           name: form.name,
           name_en: form.name_en || null,
           type: form.type,
+          entity_type: form.entity_type,
           phone: form.phone || null,
           mobile: form.mobile || null,
           address: form.address || null,
@@ -106,6 +107,13 @@ export default function NewPartnerPage() {
                   <option value="customer">{t('customer')}</option>
                   <option value="supplier">{t('supplier')}</option>
                   <option value="both">{t('both')}</option>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="entity_type">{t('entity_type')}</Label>
+                <Select id="entity_type" value={form.entity_type} onChange={(e) => set('entity_type', e.target.value)}>
+                  <option value="commercial">{t('commercial')}</option>
+                  <option value="individual">{t('individual')}</option>
                 </Select>
               </div>
               <div className="space-y-1.5">
