@@ -33,7 +33,14 @@ export async function logout(): Promise<void> {
 export function currentUser(): AuthUser | null {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem('user');
-  return raw ? (JSON.parse(raw) as AuthUser) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    // قيمة تالفة في localStorage — ننظّفها بدل انهيار العرض
+    clearToken();
+    return null;
+  }
 }
 
 export function isAuthenticated(): boolean {

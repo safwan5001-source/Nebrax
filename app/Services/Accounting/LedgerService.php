@@ -83,6 +83,12 @@ class LedgerService
         }
 
         return DB::transaction(function () use ($entry, $date, $reason) {
+            // قفل القيد وإعادة فحص حالته — يمنع عكس القيد نفسه مرتين تزامنياً.
+            $entry = JournalEntry::lockForUpdate()->findOrFail($entry->id);
+            if (! $entry->isPosted()) {
+                throw new RuntimeException('لا يمكن عكس قيد غير مرحّل.');
+            }
+
             $reversal = JournalEntry::create([
                 'number'      => $this->nextNumber($date ?? now()->toDateString()),
                 'entry_date'  => $date ?? now()->toDateString(),

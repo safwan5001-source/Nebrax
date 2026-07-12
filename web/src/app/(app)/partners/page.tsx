@@ -94,7 +94,8 @@ export default function PartnersPage() {
         exportName="partners"
       />
 
-      <PartnerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSaved={load} partner={editing} />
+      {/* key يعيد تركيب الحوار عند تغيّر الهدف — وإلا بقي النموذج على حالته الأولى (فارغاً) وكتبها فوق البيانات */}
+      <PartnerDialog key={editing?.id ?? 'new'} open={dialogOpen} onClose={() => setDialogOpen(false)} onSaved={load} partner={editing} />
     </div>
   );
 }

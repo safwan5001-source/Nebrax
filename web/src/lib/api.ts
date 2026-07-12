@@ -52,6 +52,10 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
 
   if (res.status === 401 && typeof window !== 'undefined') {
     clearToken();
+    // جلسة منتهية: نعيد المستخدم لشاشة الدخول بدل واجهة «مصادَقة» كل نداء فيها يفشل
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.assign('/login');
+    }
   }
 
   if (!res.ok) {

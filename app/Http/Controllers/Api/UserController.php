@@ -23,6 +23,23 @@ class UserController extends ApiController
         return app(TenantContext::class)->id();
     }
 
+    /**
+     * حراسة دور المالك: منح دور owner أو المساس بحساب owner قائم حكرٌ على owner.
+     * يمنع تصعيد admin نفسه (أو غيره) إلى مالك، أو تعديل/حذف المالك من دونه.
+     */
+    private function guardOwnerRole(Request $request, ?User $target = null, ?string $newRole = null): void
+    {
+        $actorIsOwner = $request->user()->role === 'owner';
+
+        if ($newRole === 'owner' && ! $actorIsOwner) {
+            abort(403, 'منح دور المالك حكر على المالك.');
+        }
+
+        if ($target && $target->role === 'owner' && ! $actorIsOwner) {
+            abort(403, 'لا يمكن تعديل حساب المالك إلا من مالك.');
+        }
+    }
+
     public function index(): JsonResponse
     {
         $users = User::where('tenant_id', $this->tenantId())->latest()->get();
@@ -33,6 +50,7 @@ class UserController extends ApiController
     public function store(StoreUserRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $this->guardOwnerRole($request, null, $data['role'] ?? null);
         $tenantId = $this->tenantId();
 
         // فرض حدّ الخطة لعدد المستخدمين
@@ -63,6 +81,7 @@ class UserController extends ApiController
     {
         $user = User::where('tenant_id', $this->tenantId())->findOrFail($id);
         $data = $request->validated();
+        $this->guardOwnerRole($request, $user, $data['role'] ?? null);
 
         if (empty($data['password'])) {
             unset($data['password']);
@@ -79,7 +98,9 @@ class UserController extends ApiController
             abort(422, 'لا يمكنك حذف حسابك الخاص.');
         }
 
-        User::where('tenant_id', $this->tenantId())->findOrFail($id)->delete();
+        $user = User::where('tenant_id', $this->tenantId())->findOrFail($id);
+        $this->guardOwnerRole($request, $user);
+        $user->delete();
 
         return response()->json(['message' => 'تم الحذف.']);
     }

@@ -7,6 +7,7 @@ const formatter = new Intl.NumberFormat('en-US', {
 
 export function formatRiyal(value: string | number | null | undefined): string {
   const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return '—'; // لا نعرض "NaN ﷼" عند قيمة شاذة
   return `${formatter.format(n)} ﷼`;
 }
 
@@ -26,14 +27,31 @@ export function isNegative(value: string | number | null | undefined): boolean {
   return Number(value ?? 0) < 0;
 }
 
-// تحويل مبلغ ريال نصّي ("1000.50") إلى هللات (bigint) — بلا float.
-// الـ API يستقبل المبالغ بالهللات.
+// تحويل مبلغ ريال نصّي ("1000.50") إلى هللات — أعداد صحيحة بلا float.
+// يطبّع الأرقام العربية-الهندية ويتسامح مع فواصل الآلاف، ويرفض أي مدخل مشوّه
+// بإرجاع NaN (بدل تحويله صمتاً إلى 0 أو مبلغ خاطئ) — الـ API يستقبل المبالغ بالهللات.
 export function riyalToMinor(input: string | number): number {
-  const s = String(input).trim();
+  let s = String(input).trim();
   if (!s) return 0;
+
+  // تطبيع: أرقام عربية-هندية → لاتينية، فاصلة عشرية عربية → نقطة، إزالة فواصل الآلاف والمسافات
+  s = s
+    .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[٫]/g, '.')
+    .replace(/[,٬\s]/g, '');
+
+  if (!/^-?\d+(\.\d{1,2})?$/.test(s) || s.replace('-', '').replace('.', '').length > 15) {
+    return NaN; // مدخل مشوّه أو أكبر من النطاق الآمن — على النموذج رفضه لا إرساله
+  }
+
   const neg = s.startsWith('-');
   const [intPart, decRaw = ''] = s.replace('-', '').split('.');
   const dec = (decRaw + '00').slice(0, 2);
-  const minor = (Number(intPart || '0') || 0) * 100 + (Number(dec) || 0);
+  const minor = parseInt(intPart || '0', 10) * 100 + parseInt(dec, 10);
   return neg ? -minor : minor;
+}
+
+// صلاحية مدخل مبلغ: يقبله riyalToMinor دون رفض.
+export function isValidRiyal(input: string | number): boolean {
+  return Number.isFinite(riyalToMinor(input));
 }

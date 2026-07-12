@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StoreInvoiceRequest;
 use App\Http\Resources\InvoiceResource;
+use App\Models\CostCenter;
+use App\Models\Employee;
 use App\Models\Invoice;
 use App\Models\Partner;
+use App\Models\Product;
 use App\Services\Accounting\InvoiceService;
 use Illuminate\Http\JsonResponse;
 
@@ -22,8 +25,11 @@ class InvoiceController extends ApiController
     {
         $data = $request->validated();
 
-        // عزل: الطرف يجب أن يخص المستأجر الحالي (وإلا 404)
+        // عزل: كل المراجع يجب أن تخص المستأجر الحالي (تصدّ حقن معرّفات مستأجرين آخرين)
         Partner::findOrFail($data['partner_id']);
+        $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
+        $this->assertTenantOwned(Employee::class, $data['salesperson_id'] ?? null, 'مسؤول المبيعات');
+        $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $invoice = $this->domain(fn () => $this->invoices->create($data, $data['items']));
 

@@ -20,7 +20,7 @@ class StoreExpenseRequest extends FormRequest
             'expense_date'   => ['nullable', 'date'],
             'payment_method' => ['nullable', 'in:cash,bank,credit'],
             'description'    => ['nullable', 'string', 'max:500'],
-            'amount'         => ['required', 'integer', 'min:1'], // هللات
+            'amount'         => ['required', 'integer', 'min:1', 'max:100000000000'], // هللات
             'tax_rate'       => ['nullable', 'integer', 'min:0', 'max:100'],
         ];
     }

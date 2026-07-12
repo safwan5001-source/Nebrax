@@ -42,7 +42,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
     Route::get('health', fn () => ['status' => 'ok']);
 
     // عام (بلا مصادقة)
-    Route::post('register', [AuthController::class, 'register']);
+    Route::post('register', [AuthController::class, 'register'])->middleware('throttle:register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
     // محمي: مصادقة Sanctum + ضبط المستأجر (العزل التلقائي)

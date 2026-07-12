@@ -6,6 +6,7 @@ use App\Http\Requests\StoreQuoteRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\QuoteResource;
 use App\Models\Partner;
+use App\Models\Product;
 use App\Models\Quote;
 use App\Services\Accounting\QuoteService;
 use Illuminate\Http\JsonResponse;
@@ -24,6 +25,7 @@ class QuoteController extends ApiController
     {
         $data = $request->validated();
         Partner::findOrFail($data['partner_id']); // عزل: الطرف يخص المستأجر
+        $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $quote = $this->domain(fn () => $this->quotes->create($data, $data['items']));
 
@@ -56,6 +58,7 @@ class QuoteController extends ApiController
     public function convert(Request $request, string $id): JsonResponse
     {
         $quote = Quote::findOrFail($id);
+        $request->validate(['payment_type' => ['nullable', 'in:cash,credit']]);
         $paymentType = $request->input('payment_type', 'credit');
 
         $invoice = $this->domain(fn () => $this->quotes->convert($quote, $paymentType));

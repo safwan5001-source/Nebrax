@@ -127,6 +127,12 @@ class ReturnService
         }
 
         return DB::transaction(function () use ($return) {
+            // قفل الصف وإعادة فحص الحالة — يمنع الترحيل المزدوج المتزامن.
+            $return = ReturnDocument::lockForUpdate()->findOrFail($return->id);
+            if (! $return->isDraft()) {
+                throw new RuntimeException('لا يمكن ترحيل مرتجع غير مسوّد (draft).');
+            }
+
             return $return->isSales()
                 ? $this->postSalesReturn($return)
                 : $this->postPurchaseReturn($return);

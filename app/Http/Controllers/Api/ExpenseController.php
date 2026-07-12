@@ -6,6 +6,7 @@ use App\Http\Requests\StoreExpenseRequest;
 use App\Http\Resources\ExpenseResource;
 use App\Models\Expense;
 use App\Models\Partner;
+use App\Models\CostCenter;
 use App\Services\Accounting\ExpenseService;
 use Illuminate\Http\JsonResponse;
 
@@ -24,6 +25,8 @@ class ExpenseController extends ApiController
         if (! empty($data['partner_id'])) {
             Partner::findOrFail($data['partner_id']); // عزل: المورّد يخص المستأجر
         }
+
+        $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
 
         $expense = $this->domain(fn () => $this->expenses->create($data));
 

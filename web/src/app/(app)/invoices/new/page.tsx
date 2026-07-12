@@ -114,17 +114,24 @@ export default function NewInvoicePage() {
   const canSave = useMemo(() => !!partnerId && !saving, [partnerId, saving]);
 
   async function submit(post: boolean) {
+    // نفس منطق المعاينة تماماً: كمية فارغة/صفر = سطر مستبعد (لا يُفوتَر خفيةً بكمية 1)،
+    // والمدخل المشوّه (NaN من riyalToMinor) يُرفض بدل إسقاط السطر صمتاً.
+    if (lines.some((l) => l.price !== '' && !Number.isFinite(riyalToMinor(l.price)))) {
+      setError(tc('saveFailed'));
+      return;
+    }
     const items = lines
-      .filter((l) => riyalToMinor(l.price) > 0)
+      .filter((l) => (Number(l.qty) || 0) > 0 && riyalToMinor(l.price) > 0)
       .map((l) => {
-        const gross = (Number(l.qty) || 1) * riyalToMinor(l.price);
+        const qty = Math.floor(Number(l.qty));
+        const gross = qty * riyalToMinor(l.price);
         return {
           product_id: l.productId,
           description: l.description || null,
-          quantity: Number(l.qty) || 1,
+          quantity: qty,
           unit_price: riyalToMinor(l.price),
           tax_rate: Number(l.tax) || 0,
-          discount: Math.min(riyalToMinor(l.disc), gross),
+          discount: Math.min(Number.isFinite(riyalToMinor(l.disc)) ? riyalToMinor(l.disc) : 0, gross),
         };
       });
     if (items.length === 0) { setError(t('need_line')); return; }

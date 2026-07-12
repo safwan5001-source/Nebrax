@@ -117,6 +117,12 @@ class PaymentService
         }
 
         return DB::transaction(function () use ($payment) {
+            // قفل الصف وإعادة فحص الحالة — يمنع الترحيل المزدوج المتزامن.
+            $payment = Payment::lockForUpdate()->findOrFail($payment->id);
+            if (! $payment->isDraft()) {
+                throw new RuntimeException('لا يمكن ترحيل سند غير مسوّد (draft).');
+            }
+
             $allocations = $payment->allocations()->get();
 
             // التحقق من كل تخصيص قبل توليد القيد (لا أثر عند الرفض).

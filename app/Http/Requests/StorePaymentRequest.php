@@ -15,7 +15,7 @@ class StorePaymentRequest extends FormRequest
     {
         return [
             'partner_id'             => ['required', 'uuid'],
-            'amount'                 => ['required', 'integer', 'min:1'], // هللات
+            'amount'                 => ['required', 'integer', 'min:1', 'max:100000000000'], // هللات
             'direction'              => ['required', 'in:received,paid'],
             'method'                 => ['required', 'in:cash,bank'],
             'payment_date'           => ['nullable', 'date'],
