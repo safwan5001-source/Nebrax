@@ -8,6 +8,7 @@ use App\Models\Partner;
 use App\Services\Accounting\PartnerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PartnerController extends ApiController
 {
@@ -35,14 +36,20 @@ class PartnerController extends ApiController
     public function store(StorePartnerRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $partner = Partner::create($data); // opening_balance ليس عموداً — يحرسه fillable
 
-        // رصيد افتتاحي (قيد ذمة الطرف مقابل 3130) عند تحديده.
-        $this->domain(fn () => $this->partners->recordOpeningBalance(
-            $partner,
-            (int) ($data['opening_balance'] ?? 0),
-            $data['opening_balance_date'] ?? null,
-        ));
+        // ذرّية: إنشاء الطرف وقيد الرصيد الافتتاحي معاملة واحدة —
+        // فشل القيد يُرجع الطرف كله (لا طرف يتيم بلا قيده).
+        $partner = $this->domain(fn () => DB::transaction(function () use ($data) {
+            $partner = Partner::create($data); // opening_balance ليس عموداً — يحرسه fillable
+
+            $this->partners->recordOpeningBalance(
+                $partner,
+                (int) ($data['opening_balance'] ?? 0),
+                $data['opening_balance_date'] ?? null,
+            );
+
+            return $partner;
+        }));
 
         return (new PartnerResource($partner))->response()->setStatusCode(201);
     }

@@ -45,6 +45,7 @@ class PayrollController extends ApiController
 
     public function pay(Request $request, string $id): JsonResponse
     {
+        $request->validate(['method' => ['nullable', 'in:cash,bank']]);
         $method = $request->input('method', 'bank');
         $run = PayrollRun::findOrFail($id);
         $paid = $this->domain(fn () => $this->payroll->pay($run, $method));

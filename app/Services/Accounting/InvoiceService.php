@@ -148,6 +148,13 @@ class InvoiceService
         }
 
         return DB::transaction(function () use ($invoice) {
+            // قفل الصف وإعادة فحص الحالة داخل المعاملة — يمنع الترحيل المزدوج المتزامن
+            // (طلبان متوازيان يريان draft معاً ⇒ قيدان وخصم مخزون مرتان).
+            $invoice = Invoice::lockForUpdate()->findOrFail($invoice->id);
+            if (! $invoice->isDraft()) {
+                throw new RuntimeException('لا يمكن ترحيل فاتورة غير مسوّدة (draft).');
+            }
+
             // إعادة احتساب الإجماليات من السطور (مصدر الحقيقة) قبل توليد القيد.
             // يضمن أن القيد = السطور دائماً، ويوفّق رأس الفاتورة معها،
             // فلا يمكن أن يتعارض total مع subtotal + tax_amount مهما عُبث بالرأس.
@@ -286,7 +293,8 @@ class InvoiceService
             return; // البيع النقدي لا يُنشئ ذمّة
         }
 
-        $partner = $invoice->partner()->first();
+        // قفل صف العميل يسلسل فواتيره الآجلة المتزامنة، فلا تعبر فاتورتان الحد معاً.
+        $partner = Partner::lockForUpdate()->find($invoice->partner_id);
         $limit   = (int) ($partner?->credit_limit ?? 0);
         if ($limit <= 0) {
             return; // بلا حد محدَّد
@@ -295,7 +303,7 @@ class InvoiceService
         $receivableId = $this->accountId(self::ACC_RECEIVABLE);
         $lines = JournalLine::query()
             ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
-            ->where('e.status', 'posted')
+            ->whereIn('e.status', ['posted', 'reversed']) // المعكوس يبقى في الدفاتر
             ->where('journal_lines.account_id', $receivableId)
             ->where('journal_lines.partner_type', Partner::class)
             ->where('journal_lines.partner_id', $invoice->partner_id);

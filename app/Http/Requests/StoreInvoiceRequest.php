@@ -18,18 +18,18 @@ class StoreInvoiceRequest extends FormRequest
             'payment_type'        => ['required', 'in:cash,credit'],
             'invoice_date'        => ['nullable', 'date'],
             'due_date'            => ['nullable', 'date'],
-            'discount'            => ['nullable', 'integer', 'min:0'], // هللات — خصم على مستوى الفاتورة
-            'shipping'            => ['nullable', 'integer', 'min:0'], // هللات — رسوم الشحن (قبل الضريبة)
-            'adjustment'          => ['nullable', 'integer'],          // هللات — تسوية/تقريب (+/−)
+            'discount'            => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — خصم على مستوى الفاتورة
+            'shipping'            => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — رسوم الشحن (قبل الضريبة)
+            'adjustment'          => ['nullable', 'integer', 'min:-100000000000', 'max:100000000000'],          // هللات — تسوية/تقريب (+/−)
             'cost_center_id'      => ['nullable', 'uuid'],
             'salesperson_id'      => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
-            'items.*.discount'    => ['nullable', 'integer', 'min:0'], // هللات — خصم على مستوى السطر
+            'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — خصم على مستوى السطر
             'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity'    => ['required', 'integer', 'min:1'],
-            'items.*.unit_price'  => ['required', 'integer', 'min:0'], // هللات
+            'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
+            'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'], // هللات
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
         ];
     }

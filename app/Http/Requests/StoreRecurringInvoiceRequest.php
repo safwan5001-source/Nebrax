@@ -25,8 +25,8 @@ class StoreRecurringInvoiceRequest extends FormRequest
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
             'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity'    => ['required', 'integer', 'min:1'],
-            'items.*.unit_price'  => ['required', 'integer', 'min:0'], // هللات
+            'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
+            'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'], // هللات
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
         ];
     }

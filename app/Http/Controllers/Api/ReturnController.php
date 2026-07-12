@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreReturnRequest;
 use App\Http\Resources\ReturnResource;
 use App\Models\Partner;
+use App\Models\Product;
 use App\Models\ReturnDocument;
 use App\Services\Accounting\ReturnService;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,7 @@ class ReturnController extends ApiController
         $data = $request->validated();
 
         Partner::findOrFail($data['partner_id']); // عزل الطرف
+        $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $return = $this->domain(fn () => $this->returns->create($data, $data['items']));
 

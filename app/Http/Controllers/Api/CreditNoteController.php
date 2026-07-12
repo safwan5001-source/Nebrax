@@ -6,6 +6,7 @@ use App\Http\Requests\StoreCreditNoteRequest;
 use App\Http\Resources\CreditNoteResource;
 use App\Models\CreditNote;
 use App\Models\Partner;
+use App\Models\Product;
 use App\Services\Accounting\CreditNoteService;
 use Illuminate\Http\JsonResponse;
 
@@ -22,6 +23,7 @@ class CreditNoteController extends ApiController
     {
         $data = $request->validated();
         Partner::findOrFail($data['partner_id']); // عزل: الطرف يخص المستأجر
+        $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $note = $this->domain(fn () => $this->creditNotes->create($data, $data['items']));
 

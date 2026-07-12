@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Tenancy\TenantContext;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -20,6 +23,8 @@ class TenancyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        // محدِّد مستقل للتسجيل — الـ throttle الافتراضي يتشارك عدّاد الـ IP نفسه
+        // بين المسارات، فيستهلك التسجيلُ محاولاتِ الدخول والعكس.
+        RateLimiter::for('register', fn (Request $request) => Limit::perMinute(3)->by('register|' . $request->ip()));
     }
 }

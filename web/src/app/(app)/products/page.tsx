@@ -81,7 +81,8 @@ export default function ProductsPage() {
 
       <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="products" />
 
-      <ProductDialog open={dialog} onClose={() => setDialog(false)} onSaved={load} product={editing} />
+      {/* key يعيد تركيب الحوار عند تغيّر الهدف — وإلا بقي النموذج على حالته الأولى (فارغاً) وكتبها فوق البيانات */}
+      <ProductDialog key={editing?.id ?? 'new'} open={dialog} onClose={() => setDialog(false)} onSaved={load} product={editing} />
     </div>
   );
 }

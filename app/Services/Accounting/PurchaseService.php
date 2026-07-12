@@ -117,6 +117,12 @@ class PurchaseService
         }
 
         return DB::transaction(function () use ($purchase) {
+            // قفل الصف وإعادة فحص الحالة — يمنع الترحيل المزدوج المتزامن.
+            $purchase = Purchase::lockForUpdate()->findOrFail($purchase->id);
+            if (! $purchase->isDraft()) {
+                throw new RuntimeException('لا يمكن ترحيل فاتورة مشتريات غير مسوّدة (draft).');
+            }
+
             // الإجماليات مشتقة من السطور (مصدر الحقيقة) قبل توليد القيد.
             $purchase->loadMissing('lines.product');
 

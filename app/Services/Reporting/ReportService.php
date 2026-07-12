@@ -110,7 +110,7 @@ class ReportService
             ->selectRaw('cost_center_id, account_id, SUM(debit) as total_debit, SUM(credit) as total_credit')
             ->whereNotNull('cost_center_id')
             ->whereHas('entry', function ($q) use ($from, $to) {
-                $q->where('status', 'posted');
+                $q->whereIn('status', ['posted', 'reversed']); // المعكوس يبقى في الدفاتر (الأصل + العاكس = صفر)
                 if ($from) {
                     $q->whereDate('entry_date', '>=', $from);
                 }
@@ -178,6 +178,10 @@ class ReportService
      */
     public function balanceSheet(array $filters = []): array
     {
+        // الميزانية أرصدة تراكمية «حتى تاريخ» — فلتر from يبتر رأس المال والأرصدة
+        // الافتتاحية فيُخِلّ بالمعادلة. يُتجاهَل هنا (يبقى سارياً في قائمة الدخل المستقلة).
+        unset($filters['from']);
+
         $movements = $this->movementsByAccount($filters);
 
         // الأصول طبيعتها مدينة (net)؛ الخصوم وحقوق الملكية دائنة (−net)
@@ -218,7 +222,7 @@ class ReportService
         $sums = JournalLine::query()
             ->selectRaw('account_id, SUM(debit) as total_debit, SUM(credit) as total_credit')
             ->whereHas('entry', function ($q) use ($from, $to) {
-                $q->where('status', 'posted');
+                $q->whereIn('status', ['posted', 'reversed']); // المعكوس يبقى في الدفاتر (الأصل + العاكس = صفر)
                 if ($from) {
                     $q->whereDate('entry_date', '>=', $from);
                 }
@@ -438,7 +442,7 @@ class ReportService
         $query = JournalLine::query()
             ->select('journal_lines.*')
             ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
-            ->where('e.status', 'posted')
+            ->whereIn('e.status', ['posted', 'reversed']) // المعكوس يبقى في الدفاتر (الأصل + العاكس = صفر)
             ->orderBy('e.entry_date')
             ->orderBy('e.created_at')
             ->with('entry');
