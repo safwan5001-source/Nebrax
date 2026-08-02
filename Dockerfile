@@ -14,7 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # pdo_sqlite لأوامر الترحيل وقت البناء (Laravel skeleton يفترض sqlite افتراضياً).
 RUN docker-php-ext-install pdo_pgsql pdo_sqlite mbstring bcmath zip opcache
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+# composer 2.7: يسبق حجب Composer 2.8 للحزم المُعلَّمة بتنبيهات أمنية
+# (كل إصدارات laravel/framework 11.x مُعلَّمة حالياً، فـ 2.8 يرفض تثبيتها ويفشل البناء)
+COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
 # COMPOSER_MEMORY_LIMIT=-1 يمنع نفاد ذاكرة composer أثناء البناء (أشيع فشل)
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
