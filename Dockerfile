@@ -5,16 +5,20 @@
 # ════════════════════════════════════════════════════════════════
 FROM php:8.3-cli
 
-# اعتماديات النظام + إضافات PHP للإنتاج (PostgreSQL, bcmath, zip, opcache)
+# اعتماديات النظام (libonig-dev لـ mbstring، libpq-dev لـ pgsql، libzip-dev لـ zip)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git unzip zip libpq-dev libzip-dev libonig-dev \
-    && docker-php-ext-install pdo pdo_pgsql pgsql bcmath zip opcache \
     && rm -rf /var/lib/apt/lists/*
+
+# إضافات PHP للإنتاج — pdo مضمّن أصلاً. mbstring إلزامي لـ Laravel وغير مضمّن في الصورة.
+RUN docker-php-ext-install pdo_pgsql mbstring bcmath zip opcache
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# COMPOSER_MEMORY_LIMIT=-1 يمنع نفاد ذاكرة composer أثناء البناء (أشيع فشل)
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
-    COMPOSER_NO_INTERACTION=1
+    COMPOSER_NO_INTERACTION=1 \
+    COMPOSER_MEMORY_LIMIT=-1
 
 # النواة إلى /core، ثم تجميع تطبيق Laravel كامل في /app
 COPY . /core
