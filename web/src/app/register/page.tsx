@@ -7,28 +7,30 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { LangToggle } from '@/components/layout/lang-toggle';
-import { login } from '@/lib/auth';
-import { enableDemo } from '@/lib/demo';
+import { register as registerTenant } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 
 const schema = z.object({
-  slug: z.string().min(1),
+  company_name: z.string().min(1),
+  slug: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/),
+  name: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(1),
+  password: z.string().min(8),
+  vat_number: z.string().length(15).or(z.literal('')).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
 
 const BRAND_BULLETS = ['f_zatca_title', 'f_accounting_title', 'f_reports_title'];
 
-export default function LoginPage() {
-  const t = useTranslations('login');
+export default function RegisterPage() {
+  const t = useTranslations('register');
   const tl = useTranslations('landing');
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -41,16 +43,18 @@ export default function LoginPage() {
   async function onSubmit(values: FormValues) {
     setServerError(null);
     try {
-      await login(values.slug, values.email, values.password);
+      await registerTenant({
+        company_name: values.company_name,
+        slug: values.slug,
+        name: values.name,
+        email: values.email,
+        password: values.password,
+        vat_number: values.vat_number || null,
+      });
       router.replace('/dashboard');
     } catch (e) {
       setServerError(e instanceof ApiError ? e.message : t('error'));
     }
-  }
-
-  function enterDemo() {
-    enableDemo();
-    router.replace('/dashboard');
   }
 
   return (
@@ -95,7 +99,7 @@ export default function LoginPage() {
             {t('back_home')}
           </Link>
 
-          {/* الشعار على الجوال (لوحة الهوية مخفية) */}
+          {/* الشعار على الجوال */}
           <div className="mb-5 flex items-center gap-2 lg:hidden">
             <div className="flex h-9 w-9 items-center justify-center rounded bg-primary text-sm font-bold text-white">
               نـ
@@ -108,19 +112,36 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
             <div className="space-y-1.5">
+              <Label htmlFor="company_name">{t('company_name')}</Label>
+              <Input id="company_name" placeholder={t('company_name_ph')} {...register('company_name')} />
+              {errors.company_name && <p className="text-xs text-negative">{t('company_name')}</p>}
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="slug">{t('slug')}</Label>
               <Input id="slug" dir="ltr" placeholder="nibras" {...register('slug')} />
-              {errors.slug && <p className="text-xs text-negative">{t('slug')}</p>}
+              <p className="text-[11px] text-muted">{t('slug_hint')}</p>
+              {errors.slug && <p className="text-xs text-negative">{t('slug_invalid')}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="name">{t('name')}</Label>
+              <Input id="name" placeholder={t('name_ph')} {...register('name')} />
+              {errors.name && <p className="text-xs text-negative">{t('name')}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="email">{t('email')}</Label>
-              <Input id="email" type="email" dir="ltr" placeholder="owner@nibras.test" {...register('email')} />
+              <Input id="email" type="email" dir="ltr" placeholder="owner@nibras.sa" {...register('email')} />
               {errors.email && <p className="text-xs text-negative">{t('email')}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">{t('password')}</Label>
               <Input id="password" type="password" dir="ltr" {...register('password')} />
-              {errors.password && <p className="text-xs text-negative">{t('password')}</p>}
+              <p className="text-[11px] text-muted">{t('password_hint')}</p>
+              {errors.password && <p className="text-xs text-negative">{t('password_hint')}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="vat_number">{t('vat_number')}</Label>
+              <Input id="vat_number" dir="ltr" className="num" maxLength={15} placeholder={t('vat_ph')} {...register('vat_number')} />
+              {errors.vat_number && <p className="text-xs text-negative">{t('vat_invalid')}</p>}
             </div>
 
             {serverError && (
@@ -132,20 +153,12 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-muted">
-            {t('no_account')}{' '}
-            <Link href="/register" className="font-medium text-primary hover:underline">
-              {t('register_link')}
+          <p className="mt-4 border-t border-border pt-4 text-center text-sm text-muted">
+            {t('have_account')}{' '}
+            <Link href="/login" className="font-medium text-primary hover:underline">
+              {t('login_link')}
             </Link>
           </p>
-
-          <div className="mt-4 border-t border-border pt-4">
-            <Button type="button" variant="outline" className="w-full text-muted" onClick={enterDemo}>
-              <ArrowLeft className="h-4 w-4" strokeWidth={1.7} />
-              {t('demo')}
-            </Button>
-            <p className="mt-1.5 text-center text-xs text-muted">{t('demo_hint')}</p>
-          </div>
         </div>
       </div>
     </main>

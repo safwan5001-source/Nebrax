@@ -110,7 +110,9 @@
     "error": "Sign-in failed",
     "demo": "Demo login",
     "demo_hint": "For review & design only",
-    "back_home": "Back to home"
+    "back_home": "Back to home",
+    "no_account": "Don't have an account?",
+    "register_link": "Create a new company"
   },
   "demo": {
     "banner": "Preview mode — demo data, not connected to any server",
@@ -1103,5 +1105,27 @@
       "bank": "Bank transfer",
       "credit": "On credit (payable)"
     }
+  },
+  "register": {
+    "title": "Create a new company",
+    "subtitle": "Get started with Nibras in minutes",
+    "company_name": "Company name",
+    "company_name_ph": "Nibras Trading Est.",
+    "slug": "Company ID",
+    "slug_hint": "Letters, numbers and dashes only — you use it to sign in later.",
+    "slug_invalid": "ID: letters/numbers/dashes only.",
+    "name": "Your name (owner)",
+    "name_ph": "Safwan",
+    "email": "Email",
+    "password": "Password",
+    "password_hint": "At least 8 characters.",
+    "vat_number": "VAT number (optional)",
+    "vat_ph": "15 digits",
+    "vat_invalid": "VAT number must be 15 digits.",
+    "submit": "Create account",
+    "error": "Could not create account",
+    "have_account": "Already have an account?",
+    "login_link": "Sign in",
+    "back_home": "Back to home"
   }
 }

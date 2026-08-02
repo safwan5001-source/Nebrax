@@ -1,7 +1,7 @@
 'use client';
 
 import { api, setToken, clearToken, getToken } from './api';
-import { isDemo } from './demo';
+import { isDemo, disableDemo } from './demo';
 
 export interface AuthUser {
   id: string;
@@ -15,6 +15,27 @@ export async function login(slug: string, email: string, password: string): Prom
   const res = await api<{ token: string; user: AuthUser }>('/login', {
     method: 'POST',
     body: { slug, email, password },
+  });
+  setToken(res.token);
+  localStorage.setItem('user', JSON.stringify(res.user));
+  return res.user;
+}
+
+export interface RegisterPayload {
+  company_name: string;
+  slug: string;
+  vat_number?: string | null;
+  name: string;
+  email: string;
+  password: string;
+}
+
+// تسجيل مؤسسة جديدة: ينشئ المستأجر + المالك + دليل الحسابات، ويعيد توكن الدخول.
+export async function register(payload: RegisterPayload): Promise<AuthUser> {
+  disableDemo(); // تسجيل حقيقي — نخرج من وضع المعاينة إن كان مفعّلاً
+  const res = await api<{ token: string; user: AuthUser }>('/register', {
+    method: 'POST',
+    body: payload,
   });
   setToken(res.token);
   localStorage.setItem('user', JSON.stringify(res.user));
