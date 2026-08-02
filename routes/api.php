@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\CrmActivityController;
 use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
@@ -39,7 +40,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(ForceJsonResponse::class)->group(function () {
 
     // فحص صحّة للنشر (بلا مصادقة) — تستخدمه منصّة الاستضافة
-    Route::get('health', fn () => ['status' => 'ok']);
+    Route::get('health', HealthController::class);
 
     // عام (بلا مصادقة)
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:register');

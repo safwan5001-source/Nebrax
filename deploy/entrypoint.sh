@@ -13,13 +13,21 @@ if [ -z "${APP_KEY:-}" ]; then
   php artisan key:generate --force
 fi
 
-# تخزين الإعداد والمسارات (يسرّع الإقلاع؛ يتم الآن بعد توفّر متغيّرات البيئة)
-php artisan config:cache
-php artisan route:cache
+# تخزين الإعداد والمسارات (يسرّع الإقلاع؛ يتم الآن بعد توفّر متغيّرات البيئة).
+# غير حاسم للإقلاع: إن فشل التخزين (مثلاً مسار closure) نُكمل بلا cache بدل إسقاط الخدمة.
+php artisan config:cache || echo "⚠ config:cache تخطّي"
+php artisan route:cache  || echo "⚠ route:cache تخطّي"
 
-# انتظار قاعدة البيانات ثم ترحيل المخطط (immutable — يضيف الجداول الناقصة فقط)
+# ترحيل المخطط (immutable — يضيف الجداول الناقصة فقط)، مع إعادة محاولة
+# لتفادي فشل الاتصال البارد بقاعدة مُدارة لحظة أول إقلاع.
 echo "▶ ترحيل قاعدة البيانات..."
-php artisan migrate --force
+for attempt in 1 2 3 4 5; do
+  if php artisan migrate --force; then
+    break
+  fi
+  echo "⚠ فشل الترحيل (محاولة ${attempt}/5) — إعادة بعد 5ث..."
+  sleep 5
+done
 
 # الخادم: PHP built-in خلف بروكسي المنصة على المنفذ المحقون
 PORT="${PORT:-8000}"
