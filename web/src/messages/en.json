@@ -1115,7 +1115,7 @@
     "subtitle": "Get started with Nibras in minutes",
     "company_name": "Company name",
     "company_name_ph": "Nibras Trading Est.",
-    "slug": "Company ID",
+    "slug": "Login page",
     "slug_hint": "Letters, numbers and dashes only — you use it to sign in later.",
     "slug_invalid": "ID: letters/numbers/dashes only.",
     "name": "Your name (owner)",
@@ -1133,6 +1133,8 @@
     "back_home": "Back to home",
     "show_pw": "Show password",
     "hide_pw": "Hide password",
-    "terms": "By creating an account you agree to the Terms and Privacy Policy."
+    "terms": "By creating an account you agree to the Terms and Privacy Policy.",
+    "phone": "Mobile number",
+    "phone_invalid": "Enter a valid mobile number."
   }
 }

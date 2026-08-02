@@ -41,8 +41,9 @@ class AuthController extends ApiController
 
         $user = User::create([
             'tenant_id' => $tenant->id,
-            'name'      => $data['name'],
+            'name'      => $data['name'] ?? $data['company_name'], // يُشتق من الاسم التجاري إن غاب
             'email'     => $data['email'],
+            'phone'     => $data['phone'] ?? null,
             'password'  => $data['password'],
             'role'      => 'owner',
         ]);

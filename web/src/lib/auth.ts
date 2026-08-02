@@ -25,10 +25,11 @@ export async function login(email: string, password: string): Promise<AuthUser> 
 export interface RegisterPayload {
   company_name: string;
   slug: string;
-  vat_number?: string | null;
-  name: string;
   email: string;
   password: string;
+  phone?: string | null;
+  name?: string | null;
+  vat_number?: string | null;
 }
 
 // تسجيل مؤسسة جديدة: ينشئ المستأجر + المالك + دليل الحسابات، ويعيد توكن الدخول.

@@ -17,11 +17,10 @@ import { ApiError } from '@/lib/api';
 
 const schema = z.object({
   company_name: z.string().min(1),
-  slug: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/),
-  name: z.string().min(1),
   email: z.string().email(),
+  phone: z.string().min(6),
+  slug: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/),
   password: z.string().min(8),
-  vat_number: z.string().length(15).or(z.literal('')).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -43,10 +42,9 @@ export default function RegisterPage() {
       await registerTenant({
         company_name: values.company_name,
         slug: values.slug,
-        name: values.name,
         email: values.email,
         password: values.password,
-        vat_number: values.vat_number || null,
+        phone: '+966' + values.phone.replace(/^0+/, ''),
       });
       router.replace('/dashboard');
     } catch (e) {
@@ -76,18 +74,14 @@ export default function RegisterPage() {
           <p className="mt-1 text-center text-sm text-muted">{t('subtitle')}</p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-3">
+            {/* الاسم التجاري */}
             <Input
               aria-label={t('company_name')}
               className="h-11 text-base"
               placeholder={t('company_name') + ' *'}
               {...register('company_name')}
             />
-            <Input
-              aria-label={t('name')}
-              className="h-11 text-base"
-              placeholder={t('name') + ' *'}
-              {...register('name')}
-            />
+            {/* البريد الإلكتروني */}
             <Input
               aria-label={t('email')}
               type="email"
@@ -96,7 +90,22 @@ export default function RegisterPage() {
               placeholder={t('email') + ' *'}
               {...register('email')}
             />
-            {/* معرّف المؤسسة مع لاحقة النطاق (مثل دفترة) */}
+            {/* رقم الجوال مع مفتاح الدولة */}
+            <div className="flex h-11 items-center overflow-hidden rounded border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/40">
+              <span className="shrink-0 border-e border-border bg-background px-3 text-sm text-muted" dir="ltr">
+                🇸🇦 +966
+              </span>
+              <input
+                aria-label={t('phone')}
+                dir="ltr"
+                inputMode="numeric"
+                className="num h-full w-full bg-transparent px-3 text-base text-text placeholder:text-muted focus:outline-none"
+                placeholder={t('phone') + ' *'}
+                {...register('phone')}
+              />
+            </div>
+            {errors.phone && <p className="text-xs text-negative">{t('phone_invalid')}</p>}
+            {/* صفحة الدخول (المعرّف) بلاحقة نطاق */}
             <div className="flex h-11 items-center overflow-hidden rounded border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/40">
               <span className="shrink-0 border-e border-border bg-background px-3 text-sm text-muted" dir="ltr">
                 .nebrax.app
@@ -110,6 +119,7 @@ export default function RegisterPage() {
               />
             </div>
             {errors.slug && <p className="text-xs text-negative">{t('slug_invalid')}</p>}
+            {/* كلمة المرور */}
             <div className="relative">
               <Input
                 aria-label={t('password')}
@@ -129,15 +139,6 @@ export default function RegisterPage() {
               </button>
             </div>
             {errors.password && <p className="text-xs text-negative">{t('password_hint')}</p>}
-            <Input
-              aria-label={t('vat_number')}
-              dir="ltr"
-              className="num h-11 text-base"
-              maxLength={15}
-              placeholder={t('vat_number')}
-              {...register('vat_number')}
-            />
-            {errors.vat_number && <p className="text-xs text-negative">{t('vat_invalid')}</p>}
 
             {serverError && (
               <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{serverError}</p>
