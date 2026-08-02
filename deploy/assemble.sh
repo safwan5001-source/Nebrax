@@ -18,7 +18,8 @@ cd "$APP_DIR"
 
 echo "▶ 2/4  Sanctum + تفعيل طبقة الـ API..."
 composer require laravel/sanctum --no-interaction
-php artisan install:api --no-interaction || true
+# --without-migration-prompt: لا نرحّل وقت البناء (الترحيل الحقيقي في entrypoint على pgsql)
+php artisan install:api --no-interaction --without-migration-prompt || true
 # جدول personal_access_tokens مضمَّن في migration النواة — نحذف نسخة Sanctum لتجنّب التكرار
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
 
