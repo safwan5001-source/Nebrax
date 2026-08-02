@@ -5,9 +5,9 @@
 # ════════════════════════════════════════════════════════════════
 FROM php:8.3-cli
 
-# اعتماديات النظام (libonig-dev لـ mbstring، libpq-dev لـ pgsql، libzip-dev لـ zip)
+# اعتماديات النظام: libonig-dev(mbstring) · libpq-dev(pgsql) · libzip-dev(zip) · libsqlite3-dev(pdo_sqlite)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git unzip zip libpq-dev libzip-dev libonig-dev \
+        git unzip zip libpq-dev libzip-dev libonig-dev libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # إضافات PHP — pdo مضمّن أصلاً. mbstring إلزامي لـ Laravel وغير مضمّن.
