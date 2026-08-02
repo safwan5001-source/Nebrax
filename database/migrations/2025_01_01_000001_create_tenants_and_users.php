@@ -43,7 +43,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'email']);        // البريد فريد داخل المستأجر فقط
+            $table->unique('email');                       // البريد فريد عالمياً (الدخول بالبريد وحده)
             $table->index('tenant_id');
         });
 

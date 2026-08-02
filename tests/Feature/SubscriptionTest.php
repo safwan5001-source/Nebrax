@@ -70,7 +70,7 @@ class SubscriptionTest extends TestCase
         ]);
 
         $this->postJson('/api/login', [
-            'slug' => 'nibras', 'email' => 'owner@nibras.test', 'password' => 'password123',
+            'email' => 'owner@nibras.test', 'password' => 'password123',
         ])->assertForbidden();
     }
 
@@ -86,7 +86,7 @@ class SubscriptionTest extends TestCase
         ]);
 
         $this->postJson('/api/login', [
-            'slug' => 'nibras', 'email' => 'staff@nibras.test', 'password' => 'password123',
+            'email' => 'staff@nibras.test', 'password' => 'password123',
         ])->assertForbidden();
     }
 
@@ -109,7 +109,7 @@ class SubscriptionTest extends TestCase
         $this->registerTenant('nibras', 'owner@nibras.test');
 
         $attempt = fn () => $this->postJson('/api/login', [
-            'slug' => 'nibras', 'email' => 'owner@nibras.test', 'password' => 'wrong',
+            'email' => 'owner@nibras.test', 'password' => 'wrong',
         ]);
 
         for ($i = 0; $i < 5; $i++) {

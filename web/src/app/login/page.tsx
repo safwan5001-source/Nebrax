@@ -17,7 +17,6 @@ import { enableDemo } from '@/lib/demo';
 import { ApiError } from '@/lib/api';
 
 const schema = z.object({
-  slug: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(1),
 });
@@ -38,7 +37,7 @@ export default function LoginPage() {
   async function onSubmit(values: FormValues) {
     setServerError(null);
     try {
-      await login(values.slug, values.email, values.password);
+      await login(values.email, values.password);
       router.replace('/dashboard');
     } catch (e) {
       setServerError(e instanceof ApiError ? e.message : t('error'));
@@ -73,13 +72,6 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-3">
             <Input
-              aria-label={t('slug')}
-              dir="ltr"
-              className="h-11 text-base"
-              placeholder={t('slug') + ' *'}
-              {...register('slug')}
-            />
-            <Input
               aria-label={t('email')}
               type="email"
               dir="ltr"
@@ -106,7 +98,7 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {(errors.slug || errors.email || errors.password) && (
+            {(errors.email || errors.password) && (
               <p className="text-xs text-negative">{t('required_hint')}</p>
             )}
             {serverError && (

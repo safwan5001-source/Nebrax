@@ -55,16 +55,14 @@ class AuthController extends ApiController
     }
 
     /**
-     * دخول ضمن مستأجر محدّد (بالـ slug) — مُعزَل صراحةً بالـ tenant_id.
+     * دخول بالبريد وكلمة المرور فقط — البريد فريد عالمياً فيُستنتَج منه المستأجر.
+     * (User لا يرث BaseModel، فالاستعلام عالمي بلا نطاق مستأجر.)
      */
     public function login(LoginRequest $request): JsonResponse
     {
         $data = $request->validated();
 
-        $tenant = Tenant::where('slug', $data['slug'])->first();
-        $user = $tenant
-            ? User::where('tenant_id', $tenant->id)->where('email', $data['email'])->first()
-            : null;
+        $user = User::where('email', $data['email'])->first();
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             abort(422, 'بيانات الدخول غير صحيحة.');
@@ -72,6 +70,8 @@ class AuthController extends ApiController
         if (! $user->is_active) {
             abort(403, 'الحساب غير مفعّل.');
         }
+
+        $tenant = Tenant::find($user->tenant_id);
         if (! PlanGate::subscriptionActive($tenant)) {
             abort(403, 'اشتراك المؤسسة غير نشط أو منتهٍ.');
         }

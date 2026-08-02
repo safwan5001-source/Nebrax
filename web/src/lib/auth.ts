@@ -11,10 +11,11 @@ export interface AuthUser {
   tenant_id: string;
 }
 
-export async function login(slug: string, email: string, password: string): Promise<AuthUser> {
+// الدخول بالبريد وكلمة المرور فقط — البريد فريد عالمياً فيُستنتَج منه المستأجر.
+export async function login(email: string, password: string): Promise<AuthUser> {
   const res = await api<{ token: string; user: AuthUser }>('/login', {
     method: 'POST',
-    body: { slug, email, password },
+    body: { email, password },
   });
   setToken(res.token);
   localStorage.setItem('user', JSON.stringify(res.user));
