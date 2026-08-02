@@ -11,6 +11,7 @@ use App\Support\PlanGate;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends ApiController
@@ -28,25 +29,31 @@ class AuthController extends ApiController
     {
         $data = $request->validated();
 
-        $tenant = Tenant::create([
-            'name'          => $data['company_name'],
-            'slug'          => $data['slug'],
-            'vat_number'    => $data['vat_number'] ?? null,
-            'plan'          => 'free',
-            'trial_ends_at' => now()->addDays(self::TRIAL_DAYS),
-        ]);
+        // ذرّية: المستأجر + دليل الحسابات + المالك في معاملة واحدة —
+        // فشل أي خطوة لا يترك مستأجراً يتيماً بلا مالك (كان يحدث قبل).
+        [$tenant, $user] = DB::transaction(function () use ($data) {
+            $tenant = Tenant::create([
+                'name'          => $data['company_name'],
+                'slug'          => $data['slug'],
+                'vat_number'    => $data['vat_number'] ?? null,
+                'plan'          => 'free',
+                'trial_ends_at' => now()->addDays(self::TRIAL_DAYS),
+            ]);
 
-        app(TenantContext::class)->set($tenant->id);
-        app(ChartOfAccountsSeeder::class)->seed($tenant->id);
+            app(TenantContext::class)->set($tenant->id);
+            app(ChartOfAccountsSeeder::class)->seed($tenant->id);
 
-        $user = User::create([
-            'tenant_id' => $tenant->id,
-            'name'      => $data['name'] ?? $data['company_name'], // يُشتق من الاسم التجاري إن غاب
-            'email'     => $data['email'],
-            'phone'     => $data['phone'] ?? null,
-            'password'  => $data['password'],
-            'role'      => 'owner',
-        ]);
+            $user = User::create([
+                'tenant_id' => $tenant->id,
+                'name'      => $data['name'] ?? $data['company_name'], // يُشتق من الاسم التجاري إن غاب
+                'email'     => $data['email'],
+                'phone'     => $data['phone'] ?? null,
+                'password'  => $data['password'],
+                'role'      => 'owner',
+            ]);
+
+            return [$tenant, $user];
+        });
 
         return response()->json([
             'token'  => $this->issueToken($user),
