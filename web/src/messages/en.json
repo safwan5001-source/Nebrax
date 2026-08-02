@@ -112,7 +112,11 @@
     "demo_hint": "For review & design only",
     "back_home": "Back to home",
     "no_account": "Don't have an account?",
-    "register_link": "Create a new company"
+    "register_link": "Create a new company",
+    "or": "or",
+    "show_pw": "Show password",
+    "hide_pw": "Hide password",
+    "required_hint": "Please fill the required fields correctly."
   },
   "demo": {
     "banner": "Preview mode — demo data, not connected to any server",
@@ -1126,6 +1130,9 @@
     "error": "Could not create account",
     "have_account": "Already have an account?",
     "login_link": "Sign in",
-    "back_home": "Back to home"
+    "back_home": "Back to home",
+    "show_pw": "Show password",
+    "hide_pw": "Hide password",
+    "terms": "By creating an account you agree to the Terms and Privacy Policy."
   }
 }
