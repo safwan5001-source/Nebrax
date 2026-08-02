@@ -12,19 +12,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { LangToggle } from '@/components/layout/lang-toggle';
-import { login } from '@/lib/auth';
-import { enableDemo } from '@/lib/demo';
+import { register as registerTenant } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 
 const schema = z.object({
+  company_name: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(1),
+  phone: z.string().min(6),
+  slug: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/),
+  password: z.string().min(8),
 });
 
 type FormValues = z.infer<typeof schema>;
 
-export default function LoginPage() {
-  const t = useTranslations('login');
+export default function RegisterPage() {
+  const t = useTranslations('register');
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
@@ -37,16 +39,17 @@ export default function LoginPage() {
   async function onSubmit(values: FormValues) {
     setServerError(null);
     try {
-      await login(values.email, values.password);
+      await registerTenant({
+        company_name: values.company_name,
+        slug: values.slug,
+        email: values.email,
+        password: values.password,
+        phone: '+966' + values.phone.replace(/^0+/, ''),
+      });
       router.replace('/dashboard');
     } catch (e) {
       setServerError(e instanceof ApiError ? e.message : t('error'));
     }
-  }
-
-  function enterDemo() {
-    enableDemo();
-    router.replace('/dashboard');
   }
 
   return (
@@ -56,7 +59,7 @@ export default function LoginPage() {
         <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md py-10">
         {/* الشعار */}
         <Link href="/" className="mb-6 flex items-center justify-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-base font-bold text-white">
@@ -71,6 +74,14 @@ export default function LoginPage() {
           <p className="mt-1 text-center text-sm text-muted">{t('subtitle')}</p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-3">
+            {/* الاسم التجاري */}
+            <Input
+              aria-label={t('company_name')}
+              className="h-11 text-base"
+              placeholder={t('company_name') + ' *'}
+              {...register('company_name')}
+            />
+            {/* البريد الإلكتروني */}
             <Input
               aria-label={t('email')}
               type="email"
@@ -79,6 +90,36 @@ export default function LoginPage() {
               placeholder={t('email') + ' *'}
               {...register('email')}
             />
+            {/* رقم الجوال مع مفتاح الدولة */}
+            <div className="flex h-11 items-center overflow-hidden rounded border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/40">
+              <span className="shrink-0 border-e border-border bg-background px-3 text-sm text-muted" dir="ltr">
+                🇸🇦 +966
+              </span>
+              <input
+                aria-label={t('phone')}
+                dir="ltr"
+                inputMode="numeric"
+                className="num h-full w-full bg-transparent px-3 text-base text-text placeholder:text-muted focus:outline-none"
+                placeholder={t('phone') + ' *'}
+                {...register('phone')}
+              />
+            </div>
+            {errors.phone && <p className="text-xs text-negative">{t('phone_invalid')}</p>}
+            {/* صفحة الدخول (المعرّف) بلاحقة نطاق */}
+            <div className="flex h-11 items-center overflow-hidden rounded border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/40">
+              <span className="shrink-0 border-e border-border bg-background px-3 text-sm text-muted" dir="ltr">
+                .nebrax.app
+              </span>
+              <input
+                aria-label={t('slug')}
+                dir="ltr"
+                className="h-full w-full bg-transparent px-3 text-base text-text placeholder:text-muted focus:outline-none"
+                placeholder={t('slug') + ' *'}
+                {...register('slug')}
+              />
+            </div>
+            {errors.slug && <p className="text-xs text-negative">{t('slug_invalid')}</p>}
+            {/* كلمة المرور */}
             <div className="relative">
               <Input
                 aria-label={t('password')}
@@ -97,10 +138,8 @@ export default function LoginPage() {
                 {showPw ? <EyeOff className="h-4 w-4" strokeWidth={1.7} /> : <Eye className="h-4 w-4" strokeWidth={1.7} />}
               </button>
             </div>
+            {errors.password && <p className="text-xs text-negative">{t('password_hint')}</p>}
 
-            {(errors.email || errors.password) && (
-              <p className="text-xs text-negative">{t('required_hint')}</p>
-            )}
             {serverError && (
               <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{serverError}</p>
             )}
@@ -108,25 +147,15 @@ export default function LoginPage() {
             <Button type="submit" className="h-11 w-full text-base" disabled={isSubmitting}>
               {t('submit')}
             </Button>
+            <p className="text-center text-[11px] text-muted">{t('terms')}</p>
           </form>
-
-          <div className="mt-5 flex items-center gap-3">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted">{t('or')}</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <Button type="button" variant="outline" className="mt-4 h-11 w-full text-muted" onClick={enterDemo}>
-            {t('demo')}
-          </Button>
-          <p className="mt-1.5 text-center text-xs text-muted">{t('demo_hint')}</p>
         </div>
 
         {/* روابط أسفل البطاقة */}
         <p className="mt-6 text-center text-sm text-muted">
-          {t('no_account')}{' '}
-          <Link href="/register" className="font-medium text-primary hover:underline">
-            {t('register_link')}
+          {t('have_account')}{' '}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            {t('login_link')}
           </Link>
         </p>
         <p className="mt-2 text-center">

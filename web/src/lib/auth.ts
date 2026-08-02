@@ -1,7 +1,7 @@
 'use client';
 
 import { api, setToken, clearToken, getToken } from './api';
-import { isDemo } from './demo';
+import { isDemo, disableDemo } from './demo';
 
 export interface AuthUser {
   id: string;
@@ -11,10 +11,33 @@ export interface AuthUser {
   tenant_id: string;
 }
 
-export async function login(slug: string, email: string, password: string): Promise<AuthUser> {
+// الدخول بالبريد وكلمة المرور فقط — البريد فريد عالمياً فيُستنتَج منه المستأجر.
+export async function login(email: string, password: string): Promise<AuthUser> {
   const res = await api<{ token: string; user: AuthUser }>('/login', {
     method: 'POST',
-    body: { slug, email, password },
+    body: { email, password },
+  });
+  setToken(res.token);
+  localStorage.setItem('user', JSON.stringify(res.user));
+  return res.user;
+}
+
+export interface RegisterPayload {
+  company_name: string;
+  slug: string;
+  email: string;
+  password: string;
+  phone?: string | null;
+  name?: string | null;
+  vat_number?: string | null;
+}
+
+// تسجيل مؤسسة جديدة: ينشئ المستأجر + المالك + دليل الحسابات، ويعيد توكن الدخول.
+export async function register(payload: RegisterPayload): Promise<AuthUser> {
+  disableDemo(); // تسجيل حقيقي — نخرج من وضع المعاينة إن كان مفعّلاً
+  const res = await api<{ token: string; user: AuthUser }>('/register', {
+    method: 'POST',
+    body: payload,
   });
   setToken(res.token);
   localStorage.setItem('user', JSON.stringify(res.user));

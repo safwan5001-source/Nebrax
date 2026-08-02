@@ -43,8 +43,33 @@ class ApiAuthTest extends TestCase
         $this->registerTenant('nibras', 'owner@nibras.test');
 
         $this->postJson('/api/login', [
-            'slug' => 'nibras', 'email' => 'owner@nibras.test', 'password' => 'password123',
+            'email' => 'owner@nibras.test', 'password' => 'password123',
         ])->assertOk()->assertJsonStructure(['token', 'user']);
+    }
+
+    /** @test */
+    public function login_works_by_email_only_and_resolves_the_tenant(): void
+    {
+        $this->registerTenant('alpha', 'a@x.test');
+        $this->registerTenant('beta', 'b@x.test');
+
+        // الدخول بالبريد وحده (بلا معرّف) يجد المستأجر الصحيح
+        $res = $this->postJson('/api/login', ['email' => 'b@x.test', 'password' => 'password123'])
+            ->assertOk()->assertJsonStructure(['token', 'user']);
+
+        $this->withToken($res['token'])->getJson('/api/me')
+            ->assertOk()->assertJsonPath('user.email', 'b@x.test');
+    }
+
+    /** @test */
+    public function registration_rejects_a_duplicate_email_across_tenants(): void
+    {
+        $this->registerTenant('alpha', 'dup@x.test');
+
+        $this->postJson('/api/register', [
+            'company_name' => 'شركة ثانية', 'slug' => 'beta', 'name' => 'مالك',
+            'email' => 'dup@x.test', 'password' => 'password123',
+        ])->assertStatus(422)->assertJsonValidationErrors(['email']);
     }
 
     /** @test */
@@ -53,7 +78,7 @@ class ApiAuthTest extends TestCase
         $this->registerTenant('nibras', 'owner@nibras.test');
 
         $this->postJson('/api/login', [
-            'slug' => 'nibras', 'email' => 'owner@nibras.test', 'password' => 'wrong',
+            'email' => 'owner@nibras.test', 'password' => 'wrong',
         ])->assertStatus(422);
     }
 

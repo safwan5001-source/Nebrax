@@ -60,9 +60,9 @@ class UserController extends ApiController
             abort(422, "تجاوزت حدّ خطتك ({$limit} مستخدمين). رقِّ خطتك للمزيد.");
         }
 
-        // البريد فريد داخل المؤسسة
-        if (User::where('tenant_id', $tenantId)->where('email', $data['email'])->exists()) {
-            abort(422, 'البريد الإلكتروني مستخدم بالفعل في هذه المؤسسة.');
+        // البريد فريد عالمياً (الدخول بالبريد وحده)
+        if (User::where('email', $data['email'])->exists()) {
+            abort(422, 'البريد الإلكتروني مستخدم بالفعل.');
         }
 
         $user = User::create([

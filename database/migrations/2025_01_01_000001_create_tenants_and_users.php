@@ -34,6 +34,7 @@ return new class extends Migration
             $table->foreignUuid('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->string('name');
             $table->string('email');
+            $table->string('phone')->nullable();           // جوال المالك (للتواصل/الحساب)
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('role')->default('staff');     // owner | admin | accountant | staff
@@ -43,7 +44,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'email']);        // البريد فريد داخل المستأجر فقط
+            $table->unique('email');                       // البريد فريد عالمياً (الدخول بالبريد وحده)
             $table->index('tenant_id');
         });
 
