@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { Donut } from '@/components/charts/donut';
+import { Sparkline } from '@/components/charts/sparkline';
 import { api } from '@/lib/api';
 import { isDemo } from '@/lib/demo';
 import { mockDashboard } from '@/lib/mock-data';
@@ -74,19 +75,43 @@ export default function DashboardPage() {
     { label: ts('unpaid'), value: payCount('unpaid'), color: 'var(--muted)' },
   ];
 
-  type Kpi = { title: string; value: string | undefined; icon: LucideIcon; raw?: boolean };
+  // سلاسل اتجاه آخر 7 أيام — مشتقّة من الفواتير المحمّلة فعلاً (لا نداء API إضافي).
+  // النافذة تنتهي عند أحدث تاريخ فاتورة في البيانات، فتصمد أمام أي فجوة زمنية.
+  const spark = useMemo(() => {
+    const series = (valueOf: (i: Invoice) => number): number[] => {
+      const days = 7;
+      const buckets = new Array(days).fill(0) as number[];
+      if (invoices.length === 0) return buckets;
+      const maxTs = invoices.reduce((m, i) => Math.max(m, Date.parse(i.invoice_date)), 0);
+      for (const inv of invoices) {
+        const diff = Math.floor((maxTs - Date.parse(inv.invoice_date)) / 86_400_000);
+        if (diff >= 0 && diff < days) buckets[days - 1 - diff] += valueOf(inv);
+      }
+      return buckets;
+    };
+    const unpaid = (i: Invoice) => (i.payment_status !== 'paid' ? Number(i.total) : 0);
+    return {
+      revenue: series((i) => Number(i.total)),      // كل مبيعات اليوم
+      receivable: series(unpaid),                    // ذمم اليوم (غير المسدّد)
+      cash: series((i) => (i.payment_status === 'paid' ? Number(i.total) : 0)), // محصّل اليوم
+      count: series(() => 1),                        // عدد فواتير اليوم
+    };
+  }, [invoices]);
 
+  type Kpi = { title: string; value: string | undefined; icon: LucideIcon; raw?: boolean; trend?: number[]; tone?: string };
+
+  const netTone = Number(income?.net_income ?? 0) >= 0 ? 'var(--positive)' : 'var(--negative)';
   const liveKpis: Kpi[] = [
-    { title: t('revenue'), value: income?.total_revenue, icon: TrendingUp },
-    { title: t('net_income'), value: income?.net_income, icon: TrendingUp },
-    { title: t('receivables'), value: receivables, icon: Users },
-    { title: t('cash'), value: cash, icon: Wallet },
+    { title: t('revenue'), value: income?.total_revenue, icon: TrendingUp, trend: spark.revenue, tone: 'var(--positive)' },
+    { title: t('net_income'), value: income?.net_income, icon: TrendingUp, trend: spark.revenue, tone: netTone },
+    { title: t('receivables'), value: receivables, icon: Users, trend: spark.receivable, tone: 'var(--primary)' },
+    { title: t('cash'), value: cash, icon: Wallet, trend: spark.cash, tone: 'var(--primary)' },
   ];
   const demoKpis: Kpi[] = [
-    { title: t('revenue'), value: mockDashboard.totalSales, icon: TrendingUp },
-    { title: t('overdue'), value: mockDashboard.overdue, icon: TrendingDown },
-    { title: t('cash'), value: mockDashboard.cash, icon: Wallet },
-    { title: t('invoice_count'), value: String(mockDashboard.invoiceCount), icon: FileText, raw: true },
+    { title: t('revenue'), value: mockDashboard.totalSales, icon: TrendingUp, trend: spark.revenue, tone: 'var(--positive)' },
+    { title: t('overdue'), value: mockDashboard.overdue, icon: TrendingDown, trend: spark.receivable, tone: 'var(--warning)' },
+    { title: t('cash'), value: mockDashboard.cash, icon: Wallet, trend: spark.cash, tone: 'var(--primary)' },
+    { title: t('invoice_count'), value: String(mockDashboard.invoiceCount), icon: FileText, raw: true, trend: spark.count, tone: 'var(--primary)' },
   ];
   const kpis = isDemo() ? demoKpis : liveKpis;
 
@@ -107,8 +132,13 @@ export default function DashboardPage() {
                 {loading ? (
                   <Skeleton className="h-7 w-28" />
                 ) : (
-                  <div className="num text-lg font-semibold text-text">
-                    {k.raw ? k.value : formatRiyalShort(k.value)}
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="num text-lg font-semibold text-text">
+                      {k.raw ? k.value : formatRiyalShort(k.value)}
+                    </div>
+                    {k.trend && (
+                      <Sparkline data={k.trend} color={k.tone} label={t('spark_label')} className="mb-0.5" />
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -126,7 +156,7 @@ export default function DashboardPage() {
               <Link
                 key={a.href}
                 href={a.href}
-                className="flex items-center gap-2.5 rounded border border-border bg-surface px-3.5 py-3 text-sm text-text transition-colors hover:border-primary hover:text-primary"
+                className="flex items-center gap-2.5 rounded border border-border bg-surface px-4 py-3 text-sm text-text transition-colors hover:border-primary hover:text-primary"
               >
                 <Icon className="h-[18px] w-[18px] shrink-0 text-muted" strokeWidth={1.7} />
                 <span className="truncate">{t(a.key)}</span>
