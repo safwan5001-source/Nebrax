@@ -27,12 +27,37 @@ async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<
     }
   }
 
-  const canvas = await html2canvas(el, {
-    scale: 2,
-    backgroundColor: '#ffffff',
-    useCORS: true,
-    windowWidth: el.scrollWidth,
-  });
+  // تحييد تصغير المعاينة (DocumentScaler) أثناء الالتقاط: html2canvas يقرأ العنصر
+  // بحجمه المعروض المُصغَّر فيلتقطه مقصوصاً وبأبعاد خاطئة (صفحات كثيرة). نُلغي
+  // التحويل مؤقّتاً فيُصوَّر بحجمه الطبيعي (210mm)، ثم نُعيد الحالة.
+  const inner = el.closest<HTMLElement>('.doc-scaler-inner');
+  const outer = el.closest<HTMLElement>('.doc-scaler-outer');
+  const restore: Array<[HTMLElement, string | null]> = [];
+  if (inner) {
+    restore.push([inner, inner.getAttribute('style')]);
+    inner.style.transform = 'none';
+    inner.style.width = 'auto';
+  }
+  if (outer) {
+    restore.push([outer, outer.getAttribute('style')]);
+    outer.style.height = 'auto';
+    outer.style.overflow = 'visible';
+  }
+
+  let canvas: HTMLCanvasElement;
+  try {
+    canvas = await html2canvas(el, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      windowWidth: el.scrollWidth,
+    });
+  } finally {
+    for (const [node, style] of restore) {
+      if (style === null) node.removeAttribute('style');
+      else node.setAttribute('style', style);
+    }
+  }
   const img = canvas.toDataURL('image/png');
   const pw = paper.widthMm;
   const imgH = (canvas.height * pw) / canvas.width;
