@@ -33,7 +33,8 @@
 `searchPlaceholder`, `emptyLabel`, `exportName`.
 
 ### القدرات (مُنفَّذة)
-- **فرز** (`getSortedRowModel`) — نقر رأس العمود.
+- **فرز** (`getSortedRowModel`) — نقر رأس العمود، مع **مؤشّر اتّجاه** (سهم ↑/↓ للعمود
+  المفروز، سهم مزدوج باهت للقابل للفرز) و**إبراز العمود النشط** (`text-primary`) و`aria-sort`.
 - **بحث عام** (`globalFilter` + `getFilteredRowModel`) — حقل بحث أعلى الجدول.
 - **تصدير CSV** (`exportCsv` → `toCsv`/`downloadCsv`) — متوافق مع Excel (BOM UTF-8).
 - **حالة تحميل:** Skeleton.

@@ -10,11 +10,12 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowUpDown, Search, Download, Inbox } from 'lucide-react';
+import { ArrowUp, ArrowDown, ChevronsUpDown, Search, Download, Inbox } from 'lucide-react';
 import { Table, THead, TBody, TR, TH, TD } from './ui/table';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { toCsv, downloadCsv } from '@/lib/export';
+import { cn } from '@/lib/utils';
 
 interface DataTableProps<T> {
   columns: ColumnDef<T, unknown>[];
@@ -102,20 +103,38 @@ export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyL
               <THead>
                 {table.getHeaderGroups().map((hg) => (
                   <TR key={hg.id}>
-                    {hg.headers.map((header) => (
-                      <TH key={header.id}>
-                        {header.isPlaceholder ? null : (
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 hover:text-text"
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                            {header.column.getCanSort() && <ArrowUpDown className="h-3 w-3" strokeWidth={1.6} />}
-                          </button>
-                        )}
-                      </TH>
-                    ))}
+                    {hg.headers.map((header) => {
+                      const sorted = header.column.getIsSorted(); // false | 'asc' | 'desc'
+                      const SortIcon = sorted === 'asc' ? ArrowUp : sorted === 'desc' ? ArrowDown : ChevronsUpDown;
+                      return (
+                        <TH
+                          key={header.id}
+                          aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
+                        >
+                          {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                            <button
+                              type="button"
+                              onClick={header.column.getToggleSortingHandler()}
+                              className={cn(
+                                'inline-flex cursor-pointer select-none items-center gap-1 rounded transition-colors hover:text-text',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                                sorted && 'text-primary'
+                              )}
+                            >
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                              <SortIcon
+                                className={cn('h-3 w-3 transition-opacity', sorted ? 'opacity-100' : 'opacity-40')}
+                                strokeWidth={1.7}
+                              />
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center">
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </span>
+                          )}
+                        </TH>
+                      );
+                    })}
                   </TR>
                 ))}
               </THead>
