@@ -27,6 +27,7 @@ export function ThermalReceipt({
   widthMm,
 }: DocumentTemplateProps & { widthMm: number }) {
   const t = useTranslations('invoiceDoc');
+  const dt = useTranslations('documentTypes');
   const rule = 'my-2 border-t border-dashed border-gray-400';
 
   return (
@@ -36,7 +37,7 @@ export function ThermalReceipt({
         {model.seller.vatNumber && (
           <div className="num text-[10px] text-gray-600">{t('vat_number')}: {model.seller.vatNumber}</div>
         )}
-        <div className="mt-1 text-[12px] font-bold" style={{ color: 'var(--doc-brand)' }}>{t('title')}</div>
+        <div className="mt-1 text-[12px] font-bold" style={{ color: 'var(--doc-brand)' }}>{dt(model.type)}</div>
       </div>
 
       <div className={rule} />
