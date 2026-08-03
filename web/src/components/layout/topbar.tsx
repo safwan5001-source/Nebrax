@@ -30,8 +30,8 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         <Menu className="h-5 w-5" strokeWidth={1.7} />
       </Button>
 
-      <div className="hidden items-center gap-2 rounded border border-border px-2.5 py-1.5 sm:flex">
-        <Search className="h-4 w-4 text-muted" strokeWidth={1.6} />
+      <div className="hidden h-9 items-center gap-2 rounded border border-border px-3 focus-within:ring-2 focus-within:ring-primary/40 sm:flex">
+        <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.6} />
         <input
           placeholder={t('search')}
           className="w-40 bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
@@ -39,7 +39,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="ms-auto flex items-center gap-1">
-        <div className="mx-2 hidden text-sm sm:block">
+        <div className="me-2 hidden text-sm sm:block">
           <span className="text-muted">{t('greeting')}، </span>
           <span className="font-medium text-text">{user?.name ?? '—'}</span>
         </div>

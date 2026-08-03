@@ -26,7 +26,8 @@ Anatomy: `fixed inset-y-0 start-0 z-50 flex w-64 flex-col border-e border-border
 
 `h-14 border-b border-border bg-surface px-4`, عناصر:
 - زر `☰` (`lg:hidden`) لفتح درج الشريط.
-- صندوق بحث (`sm:flex`).
+- صندوق بحث (`sm:flex`) بتوكنز الحقل القياسية (`h-9 rounded px-3`) + حلقة تركيز
+  `focus-within:ring-2 focus-within:ring-primary/40` (قاعدة `tokens/color.md` §5).
 - تحية باسم المستخدم (`sm:block`).
 - `LangToggle` · `ThemeToggle` · زر خروج.
 
