@@ -34,9 +34,9 @@ export interface Customer {
 }
 
 /**
- * مستند فاتورة ضريبية A4 (RTL) للطباعة / حفظ PDF عبر المتصفح.
- * يُعرض داخل #print-root.print-only — مخفيّ على الشاشة، يظهر عند الطباعة فقط.
- * العربية يرسمها المتصفح أصلاً (نص قابل للتحديد، لا صورة).
+ * مستند فاتورة ضريبية A4 (RTL) — تصميم احترافي.
+ * يُعرَض داخل #print-root.print-only: مخفيّ على الشاشة، يظهر عند الطباعة،
+ * ويُلتقَط أيضاً لتوليد PDF (lib/pdf.ts). العربية يرسمها المتصفح.
  */
 export function InvoiceDocument({
   invoice,
@@ -50,107 +50,130 @@ export function InvoiceDocument({
   qr: string | null;
 }) {
   const t = useTranslations('invoiceDoc');
+  const brand = '#1e40af';
+
+  const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) =>
+    value ? (
+      <div className="flex justify-between gap-3 py-0.5">
+        <span className="text-gray-500">{label}</span>
+        <span className="font-medium text-black">{value}</span>
+      </div>
+    ) : null;
 
   return (
     <div id="print-root" className="print-only">
-      <div className="mx-auto max-w-[210mm] bg-white p-6 text-[12px] leading-relaxed text-black">
-        {/* الرأس: البائع + عنوان المستند */}
-        <div className="flex items-start justify-between border-b-2 border-black pb-3">
-          <div>
-            <div className="text-lg font-bold">{company?.name ?? '—'}</div>
-            {company?.vat_number && (
-              <div>
-                {t('vat_number')}: <span className="num">{company.vat_number}</span>
-              </div>
-            )}
-            {company?.cr_number && (
-              <div>
-                {t('cr_number')}: <span className="num">{company.cr_number}</span>
-              </div>
-            )}
-          </div>
-          <div className="text-end">
-            <div className="text-base font-bold">{t('title')}</div>
-            <div className="text-[11px] text-gray-600">{t('title_en')}</div>
-          </div>
-        </div>
-
-        {/* بيانات الفاتورة + العميل */}
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <div>
-            <div className="mb-1 font-semibold">{t('bill_to')}</div>
-            <div>{customer?.name ?? '—'}</div>
-            {customer?.vat_number && (
-              <div>
-                {t('vat_number')}: <span className="num">{customer.vat_number}</span>
-              </div>
-            )}
-            {customer?.city && <div>{customer.city}</div>}
-          </div>
-          <div className="text-end">
-            <div>
-              {t('number')}: <span className="num font-semibold">{invoice.number}</span>
+      <div className="mx-auto flex min-h-[277mm] max-w-[210mm] flex-col bg-white p-8 text-[12px] leading-relaxed text-black">
+        {/* ═══ الترويسة ═══ */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-xl text-xl font-bold text-white"
+              style={{ background: brand }}
+            >
+              نـ
             </div>
             <div>
-              {t('date')}: <span className="num">{invoice.invoice_date}</span>
+              <div className="text-lg font-bold text-black">{company?.name ?? '—'}</div>
+              <div className="text-[11px] text-gray-500">{t('brand_tagline')}</div>
             </div>
-            <div>
-              {t('payment_type')}: {invoice.payment_type === 'cash' ? t('cash') : t('credit')}
+          </div>
+          <div className="text-end">
+            <div className="text-xl font-bold" style={{ color: brand }}>
+              {t('title')}
+            </div>
+            <div className="text-[11px] text-gray-500">{t('title_en')}</div>
+            <div className="mt-2 inline-block rounded-md bg-gray-100 px-3 py-1">
+              <span className="text-gray-500">{t('number')}: </span>
+              <span className="num font-bold text-black">{invoice.number}</span>
             </div>
           </div>
         </div>
 
-        {/* السطور */}
-        <table className="mt-4 w-full border-collapse text-[11px]">
+        <div className="mt-4 h-1 rounded" style={{ background: brand }} />
+
+        {/* ═══ البائع / المشتري / بيانات المستند ═══ */}
+        <div className="mt-5 grid grid-cols-3 gap-4">
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">{t('seller')}</div>
+            <div className="font-semibold text-black">{company?.name ?? '—'}</div>
+            <InfoRow label={t('vat_number')} value={company?.vat_number ? <span className="num">{company.vat_number}</span> : null} />
+            <InfoRow label={t('cr_number')} value={company?.cr_number ? <span className="num">{company.cr_number}</span> : null} />
+          </div>
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">{t('bill_to')}</div>
+            <div className="font-semibold text-black">{customer?.name ?? '—'}</div>
+            <InfoRow label={t('vat_number')} value={customer?.vat_number ? <span className="num">{customer.vat_number}</span> : null} />
+            <InfoRow label={t('city')} value={customer?.city} />
+          </div>
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">{t('meta')}</div>
+            <InfoRow label={t('date')} value={<span className="num">{invoice.invoice_date}</span>} />
+            <InfoRow label={t('payment_type')} value={invoice.payment_type === 'cash' ? t('cash') : t('credit')} />
+          </div>
+        </div>
+
+        {/* ═══ السطور ═══ */}
+        <table className="mt-5 w-full border-collapse text-[11px]">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="border border-gray-400 p-1.5 text-start">{t('description')}</th>
-              <th className="border border-gray-400 p-1.5 text-end">{t('qty')}</th>
-              <th className="border border-gray-400 p-1.5 text-end">{t('unit_price')}</th>
-              <th className="border border-gray-400 p-1.5 text-end">{t('tax')}</th>
-              <th className="border border-gray-400 p-1.5 text-end">{t('total')}</th>
+            <tr style={{ background: brand, color: '#fff' }}>
+              <th className="p-2 text-start font-semibold">#</th>
+              <th className="p-2 text-start font-semibold">{t('description')}</th>
+              <th className="p-2 text-end font-semibold">{t('qty')}</th>
+              <th className="p-2 text-end font-semibold">{t('unit_price')}</th>
+              <th className="p-2 text-end font-semibold">{t('tax')}</th>
+              <th className="p-2 text-end font-semibold">{t('total')}</th>
             </tr>
           </thead>
           <tbody>
-            {invoice.lines.map((l) => (
-              <tr key={l.id}>
-                <td className="border border-gray-400 p-1.5">{l.description ?? '—'}</td>
-                <td className="num border border-gray-400 p-1.5 text-end">{l.quantity}</td>
-                <td className="num border border-gray-400 p-1.5 text-end">{formatRiyal(l.unit_price)}</td>
-                <td className="num border border-gray-400 p-1.5 text-end">{formatRiyal(l.line_tax)}</td>
-                <td className="num border border-gray-400 p-1.5 text-end">{formatRiyal(l.line_total)}</td>
+            {invoice.lines.map((l, i) => (
+              <tr key={l.id} className={i % 2 ? 'bg-gray-50' : ''}>
+                <td className="num border-b border-gray-200 p-2 text-gray-500">{i + 1}</td>
+                <td className="border-b border-gray-200 p-2">{l.description ?? '—'}</td>
+                <td className="num border-b border-gray-200 p-2 text-end">{l.quantity}</td>
+                <td className="num border-b border-gray-200 p-2 text-end">{formatRiyal(l.unit_price)}</td>
+                <td className="num border-b border-gray-200 p-2 text-end">{formatRiyal(l.line_tax)}</td>
+                <td className="num border-b border-gray-200 p-2 text-end font-medium">{formatRiyal(l.line_total)}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        {/* الإجماليات + رمز ZATCA */}
-        <div className="mt-4 flex items-start justify-between gap-4">
-          {qr ? (
-            <div className="rounded border border-gray-300 p-2">
-              <QRCodeSVG value={qr} size={104} level="M" />
-            </div>
-          ) : (
-            <div />
-          )}
-          <div className="w-1/2 max-w-[260px] space-y-1">
-            <div className="flex justify-between">
+        {/* ═══ QR + الإجماليات ═══ */}
+        <div className="mt-5 flex items-start justify-between gap-6">
+          <div className="flex flex-col items-center gap-1">
+            {qr ? (
+              <>
+                <div className="rounded-lg border border-gray-200 p-2">
+                  <QRCodeSVG value={qr} size={110} level="M" />
+                </div>
+                <div className="text-[9px] text-gray-400">{t('zatca_note')}</div>
+              </>
+            ) : (
+              <div />
+            )}
+          </div>
+          <div className="w-[46%] max-w-[280px] overflow-hidden rounded-lg border border-gray-200">
+            <div className="flex justify-between px-3 py-1.5 text-gray-600">
               <span>{t('subtotal')}</span>
               <span className="num">{formatRiyal(invoice.subtotal)}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between border-t border-gray-100 px-3 py-1.5 text-gray-600">
               <span>{t('vat')}</span>
               <span className="num">{formatRiyal(invoice.tax_amount)}</span>
             </div>
-            <div className="flex justify-between border-t-2 border-black pt-1 font-bold">
+            <div
+              className="flex items-baseline justify-between px-3 py-2.5 font-bold text-white"
+              style={{ background: brand }}
+            >
               <span>{t('grand_total')}</span>
-              <span className="num">{formatRiyal(invoice.total)}</span>
+              <span className="num text-base">{formatRiyal(invoice.total)}</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 border-t border-gray-300 pt-2 text-center text-[10px] text-gray-500">
-          {t('footer')}
+        {/* ═══ التذييل ═══ */}
+        <div className="mt-auto pt-6">
+          <div className="rounded-lg bg-gray-50 p-3 text-center text-[10px] text-gray-500">{t('footer')}</div>
         </div>
       </div>
     </div>
