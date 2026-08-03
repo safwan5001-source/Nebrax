@@ -24,6 +24,13 @@ class SalesConfigController extends ApiController
         'pricelists' => [],
         'sources'    => [],
         'shipping'   => [],
+        // تعريفات الضرائب (تفضيل غير محاسبي): الاسم، النسبة %، ومتضمَّن في السعر أم لا.
+        // المجموعة السعودية القياسية افتراضياً. لا يمسّ محرّك القيود.
+        'taxes'      => [
+            ['name' => 'VAT', 'rate' => 15, 'inclusive' => false],
+            ['name' => 'Zero Rated', 'rate' => 0, 'inclusive' => false],
+            ['name' => 'Tax Free', 'rate' => 0, 'inclusive' => false],
+        ],
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'show_logo' => true, 'accent_color' => '#2563EB', 'footer_text' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],

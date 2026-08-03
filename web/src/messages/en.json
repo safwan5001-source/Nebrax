@@ -122,6 +122,22 @@
     "banner": "Preview mode — demo data, not connected to any server",
     "close": "Close"
   },
+  "taxSettings": {
+    "title": "Tax settings",
+    "hint": "Define your taxes and rates, and whether each is included in the price or added on top.",
+    "add": "Add",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Tax settings saved",
+    "save_failed": "Could not save settings",
+    "empty": "No taxes defined yet.",
+    "name": "Tax",
+    "rate": "Rate",
+    "inclusive_col": "Included in price?",
+    "inclusive": "Included",
+    "exclusive": "Not included",
+    "remove": "Remove"
+  },
   "topbar": {
     "greeting": "Welcome",
     "search": "Search…",

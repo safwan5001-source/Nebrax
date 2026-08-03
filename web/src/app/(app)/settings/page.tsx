@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { UserDialog } from '@/components/users/user-dialog';
 import { CompanyDialog } from '@/components/settings/company-dialog';
+import { TaxSettingsCard } from '@/components/settings/tax-settings-card';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
@@ -183,6 +184,8 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <TaxSettingsCard canManage={canManage} />
 
       {canManage && (
         <Card>

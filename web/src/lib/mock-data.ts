@@ -706,6 +706,11 @@ export const mockSalesConfig: Record<string, unknown> = {
     { name: 'توصيل داخل المدينة', rate: 25 },
     { name: 'شحن بين المدن', rate: 60 },
   ],
+  taxes: [
+    { name: 'VAT', rate: 15, inclusive: false },
+    { name: 'Zero Rated', rate: 0, inclusive: false },
+    { name: 'Tax Free', rate: 0, inclusive: false },
+  ],
   einvoice: { enabled: true, phase: '2', vat_number: '310122393500003' },
   designs: { template: 'classic', show_logo: true, accent_color: '#1E40AF', footer_text: 'شكراً لتعاملكم معنا' },
   orders: { auto_convert: false, require_approval: true, prefix: 'SO' },
