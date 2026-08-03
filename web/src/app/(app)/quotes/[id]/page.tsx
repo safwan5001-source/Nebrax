@@ -3,15 +3,19 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Printer, FileCheck } from 'lucide-react';
+import { ArrowRight, Printer, Download, FileCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
+import { QuoteDocument, type QuoteCompany, type QuoteCustomer } from '@/components/quotes/quote-document';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { documentExporter, printDocument } from '@/modules/documents/services/export';
+import { getTemplate } from '@/modules/documents/registry/templates';
+import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import type { ThemeId } from '@/modules/documents/types';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
 interface Quote {
@@ -20,7 +24,6 @@ interface Quote {
   subtotal: string; tax_amount: string; total: string; notes: string | null;
   converted_invoice_id: string | null; lines: Line[];
 }
-interface Party { id: string; name: string }
 
 const statusTone: Record<string, 'positive' | 'warning' | 'muted' | 'negative' | 'neutral'> = {
   draft: 'muted', sent: 'neutral', accepted: 'positive', rejected: 'negative', converted: 'positive',
@@ -30,22 +33,40 @@ export default function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const t = useTranslations('quotes');
-  const tf = useTranslations('invoiceForm');
+  const td = useTranslations('invoiceDetail');
   const tc = useTranslations('common');
-  const { success } = useToast();
+  const { success, error: errorToast } = useToast();
 
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [partner, setPartner] = useState<Party | null>(null);
+  const [customer, setCustomer] = useState<QuoteCustomer | null>(null);
+  const [company, setCompany] = useState<QuoteCompany | null>(null);
   const [loading, setLoading] = useState(true);
   const [converting, setConverting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [templateId, setTemplateId] = useState<string>('tax-invoice-classic');
+  const [themeId, setThemeId] = useState<ThemeId | null>(null);
+  const [footerText, setFooterText] = useState<string | null>(null);
+  const [showLogo, setShowLogo] = useState(true);
 
   function load() {
     setLoading(true);
     api<{ data: Quote }>(`/quotes/${id}`)
       .then(async (r) => {
         setQuote(r.data);
-        const p = await api<{ data: Party }>(`/partners/${r.data.partner_id}`).catch(() => null);
-        if (p) setPartner(p.data);
+        const [p, m, d] = await Promise.allSettled([
+          api<{ data: QuoteCustomer }>(`/partners/${r.data.partner_id}`),
+          api<{ company: QuoteCompany }>(`/me`),
+          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean } }>(`/sales-config/designs`),
+        ]);
+        if (p.status === 'fulfilled') setCustomer(p.value.data);
+        if (m.status === 'fulfilled') setCompany(m.value.company);
+        if (d.status === 'fulfilled') {
+          const dg = d.value.data ?? {};
+          setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
+          if (dg.theme) setThemeId(dg.theme as ThemeId);
+          setFooterText(dg.footer_text ?? null);
+          setShowLogo(dg.show_logo !== false);
+        }
       })
       .finally(() => setLoading(false));
   }
@@ -60,7 +81,7 @@ export default function QuoteDetailPage() {
       router.push(`/invoices/${inv.data.id}`);
     } catch (e) {
       setConverting(false);
-      alert(e instanceof ApiError ? e.message : tc('saveFailed'));
+      errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
     }
   }
 
@@ -70,11 +91,28 @@ export default function QuoteDetailPage() {
   if (!quote) return <div className="text-muted">{t('not_found')}</div>;
 
   const info: [string, React.ReactNode][] = [
-    [t('partner'), partner?.name ?? '—'],
+    [t('partner'), customer?.name ?? '—'],
     [t('date'), <span key="d" className="num">{quote.quote_date}</span>],
     [t('valid_until'), <span key="v" className="num">{quote.valid_until ?? '—'}</span>],
     [t('total'), <span key="t" className="num font-semibold">{formatRiyal(quote.total)}</span>],
   ];
+
+  const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
+  const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+
+  async function handleDownloadPdf() {
+    const el = document.getElementById('print-root');
+    if (!el || !quote) return;
+    setBusy(true);
+    try {
+      await documentExporter.download({ element: el, fileName: quote.number, paper });
+      success(td('downloaded_ok'));
+    } catch {
+      errorToast(td('export_failed'));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -84,7 +122,7 @@ export default function QuoteDetailPage() {
         </Button>
         <h1 className="num text-xl font-semibold text-text">{quote.number}</h1>
         <Badge tone={statusTone[quote.status] ?? 'muted'}>{t(quote.status)}</Badge>
-        <div className="no-print ms-auto flex gap-2">
+        <div className="no-print ms-auto flex flex-wrap gap-2">
           {quote.converted_invoice_id ? (
             <Button variant="outline" size="sm" onClick={() => router.push(`/invoices/${quote.converted_invoice_id}`)}>
               <FileCheck className="h-4 w-4" strokeWidth={1.7} />
@@ -96,7 +134,11 @@ export default function QuoteDetailPage() {
               {t('convert')}
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={busy}>
+            <Download className="h-4 w-4" strokeWidth={1.7} />
+            {busy ? td('generating') : td('download_pdf')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
@@ -115,31 +157,21 @@ export default function QuoteDetailPage() {
         </CardContent>
       </Card>
 
+      {/* معاينة مستند عرض السعر (مرئية + مصدر الطباعة/الـ PDF) عبر محرّك المستندات. */}
       <Card>
-        <CardHeader><CardTitle>{t('lines')}</CardTitle></CardHeader>
-        <CardContent>
-          <Table>
-            <THead>
-              <TR>
-                <TH>{tf('description')}</TH>
-                <TH className="text-end">{tf('qty')}</TH>
-                <TH className="text-end">{tf('price')}</TH>
-                <TH className="text-end">{tf('tax')}</TH>
-                <TH className="text-end">{t('total')}</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {quote.lines.map((l) => (
-                <TR key={l.id}>
-                  <TD>{l.description ?? '—'}</TD>
-                  <TD className="num text-end">{l.quantity}</TD>
-                  <TD className="num text-end">{formatRiyal(l.unit_price)}</TD>
-                  <TD className="num text-end">{formatRiyal(l.line_tax)}</TD>
-                  <TD className="num text-end">{formatRiyal(l.line_total)}</TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
+        <CardHeader className="no-print"><CardTitle>{td('preview')}</CardTitle></CardHeader>
+        <CardContent className="print:p-0">
+          <div className="overflow-x-auto rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
+            <QuoteDocument
+              quote={quote}
+              company={company}
+              customer={customer}
+              templateId={templateId}
+              themeId={themeId}
+              footerText={footerText}
+              showLogo={showLogo}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>

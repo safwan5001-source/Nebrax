@@ -307,6 +307,14 @@
     "retry": "إعادة المحاولة",
     "template": "القالب"
   },
+  "documentTypes": {
+    "tax_invoice": "فاتورة ضريبية",
+    "quotation": "عرض سعر"
+  },
+  "documentTypesAlt": {
+    "tax_invoice": "Tax Invoice",
+    "quotation": "Quotation"
+  },
   "invoiceTemplates": {
     "classic": "كلاسيكي",
     "modern": "عصري",
