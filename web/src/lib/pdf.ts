@@ -1,8 +1,16 @@
 // توليد PDF من عنصر مستند HTML (html2canvas + jsPDF)، مع تنزيل ومشاركة كملف.
 // المكتبتان تُستورَدان ديناميكياً فلا تُثقلان الحزمة الأساسية.
-// العنصر مرئيّ على الشاشة (#print-root)؛ يُلتقَط في مكانه بعرض A4 كامل.
+// العنصر مرئيّ على الشاشة (#print-root)؛ يُلتقَط في مكانه ويُقاس حسب حجم الورق.
 
-async function elementToPdfBlob(el: HTMLElement): Promise<Blob> {
+/** أبعاد الورق بالمليمتر. heightMm ≤ 0 = ارتفاع مفتوح (إيصال حراري، صفحة واحدة). */
+export interface PdfPaper {
+  widthMm: number;
+  heightMm: number;
+}
+
+const A4: PdfPaper = { widthMm: 210, heightMm: 297 };
+
+async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<Blob> {
   const [{ default: html2canvas }, jspdf] = await Promise.all([
     import('html2canvas'),
     import('jspdf'),
@@ -16,11 +24,19 @@ async function elementToPdfBlob(el: HTMLElement): Promise<Blob> {
     windowWidth: el.scrollWidth,
   });
   const img = canvas.toDataURL('image/png');
-  const pdf = new JsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-  const pw = pdf.internal.pageSize.getWidth(); // 210
-  const ph = pdf.internal.pageSize.getHeight(); // 297
+  const pw = paper.widthMm;
   const imgH = (canvas.height * pw) / canvas.width;
 
+  // ارتفاع مفتوح (حراري): صفحة واحدة بمقاس المحتوى، بلا ترقيم صفحات.
+  if (paper.heightMm <= 0) {
+    const pdf = new JsPDF({ unit: 'mm', format: [pw, imgH], orientation: 'portrait' });
+    pdf.addImage(img, 'PNG', 0, 0, pw, imgH);
+    return pdf.output('blob');
+  }
+
+  // ورق ثابت (A4/Letter/Legal): ترقيم صفحات بارتفاع الصفحة.
+  const ph = paper.heightMm;
+  const pdf = new JsPDF({ unit: 'mm', format: [pw, ph], orientation: pw > ph ? 'landscape' : 'portrait' });
   let heightLeft = imgH;
   let position = 0;
   pdf.addImage(img, 'PNG', 0, position, pw, imgH);
@@ -43,9 +59,9 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** يولّد PDF من العنصر ويُنزّله. */
-export async function downloadPdf(el: HTMLElement, filename: string): Promise<void> {
-  const blob = await elementToPdfBlob(el);
+/** يولّد PDF من العنصر ويُنزّله (بحجم الورق المحدَّد أو A4). */
+export async function downloadPdf(el: HTMLElement, filename: string, paper?: PdfPaper): Promise<void> {
+  const blob = await elementToPdfBlob(el, paper);
   triggerDownload(blob, filename);
 }
 
@@ -53,8 +69,8 @@ export async function downloadPdf(el: HTMLElement, filename: string): Promise<vo
  * يولّد PDF ويشاركه كملف عبر Web Share API (واتساب/بريد…).
  * يُعيد 'shared' عند النجاح، 'downloaded' عند عدم دعم مشاركة الملفات (تراجع للتنزيل).
  */
-export async function sharePdf(el: HTMLElement, filename: string, title: string): Promise<'shared' | 'downloaded'> {
-  const blob = await elementToPdfBlob(el);
+export async function sharePdf(el: HTMLElement, filename: string, title: string, paper?: PdfPaper): Promise<'shared' | 'downloaded'> {
+  const blob = await elementToPdfBlob(el, paper);
   const name = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
   const file = new File([blob], name, { type: 'application/pdf' });
   const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };

@@ -17,6 +17,7 @@ import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import type { ThemeId } from '@/modules/documents/types';
+import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { exportXlsx } from '@/lib/xlsx';
 
 interface Line {
@@ -147,13 +148,16 @@ export default function InvoiceDetailPage() {
   ];
 
   const doc = () => document.getElementById('print-root');
+  // حجم ورق القالب المختار (A4 افتراضياً، أو الحراري) — يوجّه الـ PDF والطباعة.
+  const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
+  const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
 
   async function handleDownloadPdf() {
     const el = doc();
     if (!el || !invoice) return;
     setBusy('pdf');
     try {
-      await documentExporter.download({ element: el, fileName: invoice.number });
+      await documentExporter.download({ element: el, fileName: invoice.number, paper });
       success(t('downloaded_ok'));
     } catch {
       errorToast(t('export_failed'));
@@ -167,7 +171,7 @@ export default function InvoiceDetailPage() {
     if (!el || !invoice) return;
     setBusy('share');
     try {
-      const r = await documentExporter.share({ element: el, fileName: invoice.number, title: invoice.number });
+      const r = await documentExporter.share({ element: el, fileName: invoice.number, title: invoice.number, paper });
       success(r === 'shared' ? t('shared_ok') : t('downloaded_ok'));
     } catch (e) {
       if ((e as Error)?.name !== 'AbortError') errorToast(t('export_failed')); // إلغاء المستخدم لا يُعدّ خطأ
@@ -228,7 +232,7 @@ export default function InvoiceDetailPage() {
             <Share2 className="h-4 w-4" strokeWidth={1.7} />
             {busy === 'share' ? t('generating') : t('share')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument()} disabled={!!busy}>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
