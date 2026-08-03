@@ -315,11 +315,13 @@
   },
   "documentTypes": {
     "tax_invoice": "Tax Invoice",
-    "quotation": "Quotation"
+    "quotation": "Quotation",
+    "credit_note": "Credit Note"
   },
   "documentTypesAlt": {
     "tax_invoice": "فاتورة ضريبية",
-    "quotation": "عرض سعر"
+    "quotation": "عرض سعر",
+    "credit_note": "إشعار دائن"
   },
   "invoiceTemplates": {
     "classic": "Classic",
