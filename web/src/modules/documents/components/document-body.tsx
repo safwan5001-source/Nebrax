@@ -16,6 +16,8 @@ import { DocBarcode } from './sections/doc-barcode';
 import { DocParties } from './sections/doc-parties';
 import { DocItemsTable } from './sections/doc-items-table';
 import { DocSummary } from './sections/doc-summary';
+import { DocNotes } from './sections/doc-notes';
+import { DocTerms } from './sections/doc-terms';
 import { DocFooter } from './sections/doc-footer';
 
 /** الأقسام الظاهرة افتراضياً (فاتورة ضريبية كاملة). */
@@ -34,6 +36,8 @@ function isVisible(key: DocSectionKey, s: TemplateSectionsConfig): boolean {
     case 'parties': return s.seller || s.buyer || s.meta;
     case 'items': return s.items;
     case 'summary': return s.summary;
+    case 'notes': return s.notes;
+    case 'terms': return s.terms;
     case 'footer': return s.footer;
   }
 }
@@ -51,6 +55,8 @@ function renderSection(
     case 'parties': return <DocParties model={model} />;
     case 'items': return <DocItemsTable model={model} formatMoney={formatMoney} />;
     case 'summary': return <DocSummary model={model} formatMoney={formatMoney} showQr={s.qr} />;
+    case 'notes': return <DocNotes model={model} />;
+    case 'terms': return <DocTerms model={model} />;
     case 'footer': return <DocFooter model={model} />;
   }
 }

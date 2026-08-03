@@ -145,6 +145,7 @@
     "theme": "Theme",
     "show_logo": "Show logo",
     "footer": "Footer text",
+    "terms": "Terms & Conditions",
     "logo_upload": "Upload logo",
     "remove_logo": "Remove",
     "logo_size": "Size",
@@ -167,6 +168,8 @@
     "parties": "Parties",
     "items": "Items",
     "summary": "Totals",
+    "notes": "Notes",
+    "terms": "Terms",
     "footer": "Footer"
   },
   "themeColors": {
@@ -362,6 +365,8 @@
     "vat": "VAT (15%)",
     "grand_total": "Total (incl. VAT)",
     "footer": "This is an electronic invoice issued per ZATCA (Zakat, Tax and Customs Authority) requirements.",
+    "notes": "Notes",
+    "terms": "Terms & Conditions",
     "brand_tagline": "Nibras accounting system",
     "seller": "Seller",
     "meta": "Invoice details",

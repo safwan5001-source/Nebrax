@@ -18,6 +18,7 @@ export interface SourceQuote {
   subtotal: string;
   tax_amount: string;
   total: string;
+  notes?: string | null;
   lines: SourceQuoteLine[];
 }
 
@@ -32,8 +33,9 @@ export function buildQuoteDocumentModel(input: {
   footerText?: string | null;
   logoUrl?: string | null;
   logoHeight?: number | null;
+  terms?: string | null;
 }): DocumentModel {
-  const { quote, company, customer, footerText, logoUrl, logoHeight } = input;
+  const { quote, company, customer, footerText, logoUrl, logoHeight, terms } = input;
 
   return {
     type: 'quotation',
@@ -74,5 +76,7 @@ export function buildQuoteDocumentModel(input: {
     },
     qr: null,
     footerText: footerText && footerText.trim() !== '' ? footerText : null,
+    notes: quote.notes ?? null,
+    terms: terms && terms.trim() !== '' ? terms : null,
   };
 }

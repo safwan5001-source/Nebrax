@@ -712,7 +712,7 @@ export const mockSalesConfig: Record<string, unknown> = {
     { name: 'Tax Free', rate: 0, inclusive: false },
   ],
   einvoice: { enabled: true, phase: '2', vat_number: '310122393500003' },
-  designs: { template: 'classic', theme: 'blue', show_logo: true, logo: '', logo_height: 56, sections: [], accent_color: '#1E40AF', footer_text: 'شكراً لتعاملكم معنا' },
+  designs: { template: 'classic', theme: 'blue', show_logo: true, logo: '', logo_height: 56, sections: [], accent_color: '#1E40AF', footer_text: 'شكراً لتعاملكم معنا', terms_text: 'السداد خلال 30 يوماً من تاريخ الفاتورة.' },
   orders: { auto_convert: false, require_approval: true, prefix: 'SO' },
   pos: { default_customer: 'عميل نقدي (POS)', print_receipt: true, allow_discount: true, receipt_footer: 'شكراً لزيارتكم' },
 };

@@ -21,6 +21,7 @@ export interface SourceInvoice {
   subtotal: string;
   tax_amount: string;
   total: string;
+  notes?: string | null;
   lines: SourceInvoiceLine[];
 }
 export interface SourceCompany {
@@ -48,8 +49,10 @@ export function buildInvoiceDocumentModel(input: {
   /** شعار مرفوع (data URL) وارتفاعه بالبكسل — من إعدادات التصاميم. */
   logoUrl?: string | null;
   logoHeight?: number | null;
+  /** الشروط والأحكام — من إعدادات التصاميم. */
+  terms?: string | null;
 }): DocumentModel {
-  const { invoice, company, customer, qr, footerText, logoUrl, logoHeight } = input;
+  const { invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms } = input;
 
   return {
     type: 'tax_invoice',
@@ -89,5 +92,7 @@ export function buildInvoiceDocumentModel(input: {
     },
     qr: qr ? { value: qr } : null,
     footerText: footerText && footerText.trim() !== '' ? footerText : null,
+    notes: invoice.notes ?? null,
+    terms: terms && terms.trim() !== '' ? terms : null,
   };
 }
