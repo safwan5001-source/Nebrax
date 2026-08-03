@@ -17,6 +17,16 @@ async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<
   ]);
   const JsPDF = jspdf.jsPDF;
 
+  // انتظار تحميل الخطوط (IBM Plex Sans Arabic) قبل الالتقاط — يمنع تشوّه تشكيل
+  // العربية عند سقوط html2canvas إلى خطّ احتياطي لا يصل الحروف.
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    try {
+      await document.fonts.ready;
+    } catch {
+      /* تجاهل — نُكمل الالتقاط */
+    }
+  }
+
   const canvas = await html2canvas(el, {
     scale: 2,
     backgroundColor: '#ffffff',

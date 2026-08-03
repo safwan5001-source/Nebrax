@@ -16,6 +16,7 @@ import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
+import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import type { ThemeId } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { exportXlsx } from '@/lib/xlsx';
@@ -311,19 +312,21 @@ export default function InvoiceDetailPage() {
           </Dropdown>
         </CardHeader>
         <CardContent className="print:p-0">
-          <div className="overflow-x-auto rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
-            <InvoiceDocument
-              invoice={invoice}
-              company={company}
-              customer={customer}
-              qr={zatca?.qr ?? null}
-              templateId={templateId}
-              themeId={themeId}
-              footerText={footerText}
-              showLogo={showLogo}
-              logoUrl={logoUrl}
-              logoHeight={logoHeight}
-            />
+          <div className="rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
+            <DocumentScaler>
+              <InvoiceDocument
+                invoice={invoice}
+                company={company}
+                customer={customer}
+                qr={zatca?.qr ?? null}
+                templateId={templateId}
+                themeId={themeId}
+                footerText={footerText}
+                showLogo={showLogo}
+                logoUrl={logoUrl}
+                logoHeight={logoHeight}
+              />
+            </DocumentScaler>
           </div>
         </CardContent>
       </Card>

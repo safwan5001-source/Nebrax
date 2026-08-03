@@ -15,6 +15,7 @@ import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import type { ThemeId } from '@/modules/documents/types';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
@@ -157,18 +158,20 @@ export default function CreditNoteDetailPage() {
       <Card>
         <CardHeader className="no-print"><CardTitle>{td('preview')}</CardTitle></CardHeader>
         <CardContent className="print:p-0">
-          <div className="overflow-x-auto rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
-            <CreditNoteDocument
-              note={note}
-              company={company}
-              customer={customer}
-              templateId={templateId}
-              themeId={themeId}
-              footerText={footerText}
-              showLogo={showLogo}
-              logoUrl={logoUrl}
-              logoHeight={logoHeight}
-            />
+          <div className="rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
+            <DocumentScaler>
+              <CreditNoteDocument
+                note={note}
+                company={company}
+                customer={customer}
+                templateId={templateId}
+                themeId={themeId}
+                footerText={footerText}
+                showLogo={showLogo}
+                logoUrl={logoUrl}
+                logoHeight={logoHeight}
+              />
+            </DocumentScaler>
           </div>
         </CardContent>
       </Card>
