@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { downloadPdf, sharePdf } from '@/lib/pdf';
+import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { exportXlsx } from '@/lib/xlsx';
 
 interface Line {
@@ -136,7 +136,7 @@ export default function InvoiceDetailPage() {
     if (!el || !invoice) return;
     setBusy('pdf');
     try {
-      await downloadPdf(el, invoice.number);
+      await documentExporter.download({ element: el, fileName: invoice.number });
       success(t('downloaded_ok'));
     } catch {
       errorToast(t('export_failed'));
@@ -150,7 +150,7 @@ export default function InvoiceDetailPage() {
     if (!el || !invoice) return;
     setBusy('share');
     try {
-      const r = await sharePdf(el, invoice.number, invoice.number);
+      const r = await documentExporter.share({ element: el, fileName: invoice.number, title: invoice.number });
       success(r === 'shared' ? t('shared_ok') : t('downloaded_ok'));
     } catch (e) {
       if ((e as Error)?.name !== 'AbortError') errorToast(t('export_failed')); // إلغاء المستخدم لا يُعدّ خطأ
@@ -211,7 +211,7 @@ export default function InvoiceDetailPage() {
             <Share2 className="h-4 w-4" strokeWidth={1.7} />
             {busy === 'share' ? t('generating') : t('share')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!!busy}>
+          <Button variant="outline" size="sm" onClick={() => printDocument()} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
