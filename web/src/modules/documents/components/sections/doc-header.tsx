@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import type { DocumentModel } from '../../types';
 
 /** ترويسة المستند: الشعار + اسم البائع + عنوان المستند ورقمه + شريط الهوية. */
-export function DocHeader({ model }: { model: DocumentModel }) {
+export function DocHeader({ model, showLogo = true }: { model: DocumentModel; showLogo?: boolean }) {
   const t = useTranslations('invoiceDoc');
   const { seller, meta } = model;
 
@@ -12,12 +12,14 @@ export function DocHeader({ model }: { model: DocumentModel }) {
     <>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div
-            className="flex h-14 w-14 items-center justify-center rounded-xl text-xl font-bold"
-            style={{ background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' }}
-          >
-            {seller.logoText ?? 'نـ'}
-          </div>
+          {showLogo && (
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-xl text-xl font-bold"
+              style={{ background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' }}
+            >
+              {seller.logoText ?? 'نـ'}
+            </div>
+          )}
           <div>
             <div className="text-lg font-bold text-black">{seller.name || '—'}</div>
             <div className="text-[11px] text-gray-500">{seller.tagline ?? t('brand_tagline')}</div>

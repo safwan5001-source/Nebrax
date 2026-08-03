@@ -43,8 +43,10 @@ export function buildInvoiceDocumentModel(input: {
   company: SourceCompany | null;
   customer: SourceCustomer | null;
   qr: string | null;
+  /** نصّ تذييل مخصّص (من إعدادات التصاميم)؛ يتراجع لنصّ الترجمة حين فارغ. */
+  footerText?: string | null;
 }): DocumentModel {
-  const { invoice, company, customer, qr } = input;
+  const { invoice, company, customer, qr, footerText } = input;
 
   return {
     type: 'tax_invoice',
@@ -81,5 +83,6 @@ export function buildInvoiceDocumentModel(input: {
       total: riyalToMinor(invoice.total),
     },
     qr: qr ? { value: qr } : null,
+    footerText: footerText && footerText.trim() !== '' ? footerText : null,
   };
 }

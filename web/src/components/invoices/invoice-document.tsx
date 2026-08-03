@@ -1,5 +1,6 @@
 'use client';
 
+import type { ThemeId } from '@/modules/documents/types';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { getTheme } from '@/modules/documents/themes';
 import { makeMoneyFormatter } from '@/modules/documents/utils/currency';
@@ -26,6 +27,10 @@ export function InvoiceDocument({
   customer,
   qr,
   templateId,
+  themeId,
+  footerText,
+  showLogo = true,
+  rootId,
 }: {
   invoice: InvoiceDoc;
   company: Company | null;
@@ -33,12 +38,28 @@ export function InvoiceDocument({
   qr: string | null;
   /** معرّف القالب من السجلّ؛ يتراجع للافتراضي إن غاب أو كان غير معروف. */
   templateId?: string | null;
+  /** ثيم مخصّص يتجاوز ثيم القالب الافتراضي (من إعدادات التصاميم). */
+  themeId?: ThemeId | null;
+  /** نصّ تذييل مخصّص. */
+  footerText?: string | null;
+  /** إظهار شعار البائع. */
+  showLogo?: boolean;
+  /** null لمعاينة لا تخطف الطباعة (كمعاينة الإعدادات). */
+  rootId?: string | null;
 }) {
   const descriptor = getTemplate(templateId);
   const Template = descriptor.component;
-  const model = buildInvoiceDocumentModel({ invoice, company, customer, qr });
-  const theme = getTheme(descriptor.defaultTheme);
+  const model = buildInvoiceDocumentModel({ invoice, company, customer, qr, footerText });
+  const theme = getTheme(themeId ?? descriptor.defaultTheme);
   const formatMoney = makeMoneyFormatter(model.currency);
 
-  return <Template model={model} theme={theme} formatMoney={formatMoney} />;
+  return (
+    <Template
+      model={model}
+      theme={theme}
+      formatMoney={formatMoney}
+      sections={{ logo: showLogo }}
+      rootId={rootId}
+    />
+  );
 }

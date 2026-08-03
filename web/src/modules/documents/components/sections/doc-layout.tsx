@@ -16,17 +16,20 @@ export function DocLayout({
   direction,
   directionSample,
   style = CLASSIC_STYLE,
+  rootId = 'print-root',
   children,
 }: {
   theme: DocumentTheme;
   direction: Direction;
   directionSample?: string | null;
   style?: TemplateStyle;
+  /** 'print-root' لمصدر الطباعة/PDF، أو null لمعاينة لا تخطف الطباعة. */
+  rootId?: string | null;
   children: React.ReactNode;
 }) {
   const dir = resolveDirection(direction, directionSample);
   return (
-    <div id="print-root" dir={dir} style={themeCssVars(theme)}>
+    <div id={rootId ?? undefined} dir={dir} style={themeCssVars(theme)}>
       <DocStyleProvider value={style}>
         <div
           className={cn(
