@@ -26,6 +26,7 @@ export function DocumentBody({
   formatMoney,
   sections,
   style,
+  rootId,
 }: DocumentTemplateProps & { style: TemplateStyle }) {
   const s = { ...DEFAULT_SECTIONS, ...sections };
 
@@ -35,8 +36,9 @@ export function DocumentBody({
       direction={model.direction}
       directionSample={model.seller.name || model.buyer.name}
       style={style}
+      rootId={rootId}
     >
-      {s.header && <DocHeader model={model} />}
+      {s.header && <DocHeader model={model} showLogo={s.logo} />}
       {(s.seller || s.buyer || s.meta) && <DocParties model={model} />}
       {s.items && <DocItemsTable model={model} formatMoney={formatMoney} />}
       {s.summary && <DocSummary model={model} formatMoney={formatMoney} showQr={s.qr} />}

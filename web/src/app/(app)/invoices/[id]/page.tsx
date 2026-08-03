@@ -16,6 +16,7 @@ import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
+import type { ThemeId } from '@/modules/documents/types';
 import { exportXlsx } from '@/lib/xlsx';
 
 interface Line {
@@ -77,6 +78,9 @@ export default function InvoiceDetailPage() {
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share' | 'excel'>(null);
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
+  const [themeId, setThemeId] = useState<ThemeId | null>(null);
+  const [footerText, setFooterText] = useState<string | null>(null);
+  const [showLogo, setShowLogo] = useState(true);
   const tt = useTranslations('invoiceTemplates');
 
   const partnerName = customer?.name ?? '—';
@@ -91,13 +95,19 @@ export default function InvoiceDetailPage() {
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
-          api<{ data: { template?: string } }>(`/sales-config/designs`),
+          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean } }>(`/sales-config/designs`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
         if (m.status === 'fulfilled') setCompany(m.value.company);
-        // القالب الافتراضي من إعدادات التصاميم (يتراجع للافتراضي إن غاب/غير معروف).
-        if (d.status === 'fulfilled') setTemplateId(getTemplate(`tax-invoice-${d.value.data?.template ?? ''}`).id);
+        // القالب والهوية الافتراضية من إعدادات التصاميم (تتراجع للافتراضي إن غابت).
+        if (d.status === 'fulfilled') {
+          const dg = d.value.data ?? {};
+          setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
+          if (dg.theme) setThemeId(dg.theme as ThemeId);
+          setFooterText(dg.footer_text ?? null);
+          setShowLogo(dg.show_logo !== false);
+        }
       })
       .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
       .finally(() => setLoading(false));
@@ -294,7 +304,16 @@ export default function InvoiceDetailPage() {
         </CardHeader>
         <CardContent className="print:p-0">
           <div className="overflow-x-auto rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
-            <InvoiceDocument invoice={invoice} company={company} customer={customer} qr={zatca?.qr ?? null} templateId={templateId} />
+            <InvoiceDocument
+              invoice={invoice}
+              company={company}
+              customer={customer}
+              qr={zatca?.qr ?? null}
+              templateId={templateId}
+              themeId={themeId}
+              footerText={footerText}
+              showLogo={showLogo}
+            />
           </div>
         </CardContent>
       </Card>

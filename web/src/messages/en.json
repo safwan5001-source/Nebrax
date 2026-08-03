@@ -138,6 +138,29 @@
     "exclusive": "Not included",
     "remove": "Remove"
   },
+  "designSettings": {
+    "title": "Designs & branding",
+    "hint": "Choose the template, theme, logo and footer — applied by default to your invoices. Preview live below.",
+    "template": "Template",
+    "theme": "Theme",
+    "show_logo": "Show logo",
+    "footer": "Footer text",
+    "yes": "Yes",
+    "no": "No",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Design settings saved",
+    "save_failed": "Could not save settings",
+    "preview": "Live preview"
+  },
+  "themeColors": {
+    "blue": "Blue",
+    "green": "Green",
+    "orange": "Orange",
+    "purple": "Purple",
+    "gray": "Gray",
+    "black": "Black"
+  },
   "topbar": {
     "greeting": "Welcome",
     "search": "Search…",

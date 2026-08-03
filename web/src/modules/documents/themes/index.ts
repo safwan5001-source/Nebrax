@@ -17,6 +17,14 @@ const THEME_TOKENS: Record<Exclude<ThemeId, 'custom'>, ThemeTokens> = {
 
 export const DEFAULT_THEME: ThemeId = 'blue';
 
+/** الثيمات القابلة للاختيار في الواجهة (عدا custom). */
+export const THEME_IDS: ThemeId[] = ['blue', 'green', 'orange', 'purple', 'gray', 'black'];
+
+/** لون الهوية لثيم (لعرض نقطة اللون في المنتقي). */
+export function themeSwatch(id: ThemeId): string {
+  return getTheme(id).tokens.brand;
+}
+
 export function getTheme(id: ThemeId, custom?: ThemeTokens): DocumentTheme {
   if (id === 'custom' && custom) return { id: 'custom', tokens: custom };
   const tokens = THEME_TOKENS[id as Exclude<ThemeId, 'custom'>] ?? THEME_TOKENS.blue;

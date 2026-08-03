@@ -167,6 +167,11 @@ export interface DocumentTemplateProps {
   /** منسّق مبلغ (وحدات صغرى) → نصّ العملة. */
   formatMoney: (minor: number) => string;
   sections?: Partial<TemplateSectionsConfig>;
+  /**
+   * معرّف عنصر الجذر: 'print-root' (افتراضي) لمصدر الطباعة/التصدير،
+   * أو `null` لمعاينة لا تخطف الطباعة (كمعاينة الإعدادات).
+   */
+  rootId?: string | null;
 }
 
 /** بيانات تسجيل قالب في السجلّ (Template Registry). */
