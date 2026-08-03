@@ -31,6 +31,9 @@ interface DesignsConfig {
   logo_height: number; // بكسل
   footer_text: string;
   terms_text: string;
+  bank_text: string;  // بيانات بنكية
+  stamp: string;      // صورة الختم (data URL)
+  signature: string;  // صورة التوقيع (data URL)
   sections?: DocSectionLayoutItem[]; // تخطيط الأقسام (مصمّم المستند)
   accent_color?: string;
 }
@@ -54,7 +57,7 @@ const SAMPLE = {
   customer: { name: 'عميل تجريبي', vat_number: '310000000000003', city: 'الرياض' },
 };
 
-const DEFAULTS: DesignsConfig = { template: 'classic', theme: 'blue', show_logo: true, logo: '', logo_height: 56, footer_text: '', terms_text: '', accent_color: '#2563EB' };
+const DEFAULTS: DesignsConfig = { template: 'classic', theme: 'blue', show_logo: true, logo: '', logo_height: 56, footer_text: '', terms_text: '', bank_text: '', stamp: '', signature: '', accent_color: '#2563EB' };
 
 /**
  * إعدادات التصاميم/الهوية — اختيار القالب والثيم والشعار والتذييل مع **معاينة حيّة**،
@@ -68,8 +71,11 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
   const [cfg, setCfg] = useState<DesignsConfig | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const stampRef = useRef<HTMLInputElement>(null);
+  const signRef = useRef<HTMLInputElement>(null);
 
-  async function onPickLogo(file: File | undefined) {
+  /** يرفع صورة (شعار/ختم/توقيع) ويحفظها كـ data URL مصغّر في المفتاح المعطى. */
+  async function onPickImage(file: File | undefined, key: 'logo' | 'stamp' | 'signature') {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       errorToast(t('logo_invalid'));
@@ -77,7 +83,7 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
     }
     try {
       const dataUrl = await fileToResizedDataUrl(file, 320);
-      patch({ logo: dataUrl });
+      patch({ [key]: dataUrl });
     } catch {
       errorToast(t('logo_invalid'));
     }
@@ -187,7 +193,7 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => { void onPickLogo(e.target.files?.[0]); e.target.value = ''; }}
+                      onChange={(e) => { void onPickImage(e.target.files?.[0], 'logo'); e.target.value = ''; }}
                     />
                     <Button variant="outline" size="sm" disabled={!canManage} onClick={() => fileRef.current?.click()}>
                       <Upload className="h-4 w-4" strokeWidth={1.7} />
@@ -234,6 +240,61 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
               />
             </div>
 
+            {/* البيانات البنكية — نصّ يظهر في المستند عند تفعيل قسمه في المصمّم. */}
+            <div className="space-y-1.5">
+              <Label htmlFor="bank">{t('bank')}</Label>
+              <textarea
+                id="bank"
+                rows={2}
+                disabled={!canManage}
+                value={cfg.bank_text}
+                onChange={(e) => patch({ bank_text: e.target.value })}
+                className="min-h-16 w-full resize-y rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                placeholder={t('bank_placeholder')}
+              />
+            </div>
+
+            {/* الختم والتوقيع — صور تظهر عند تفعيل قسميهما في المصمّم. */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {([
+                { key: 'stamp' as const, ref: stampRef, label: t('stamp'), hint: t('stamp_hint') },
+                { key: 'signature' as const, ref: signRef, label: t('signature'), hint: t('signature_hint') },
+              ]).map((img) => (
+                <div key={img.key} className="rounded-lg border border-border p-3">
+                  <div className="mb-2 text-xs font-medium text-muted">{img.label}</div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-background">
+                      {cfg[img.key] ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- data URL
+                        <img src={cfg[img.key]} alt={img.key} className="max-h-full max-w-full object-contain" />
+                      ) : (
+                        <span className="text-[10px] text-muted">{img.hint}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={img.ref}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => { void onPickImage(e.target.files?.[0], img.key); e.target.value = ''; }}
+                      />
+                      <Button variant="outline" size="sm" disabled={!canManage} onClick={() => img.ref.current?.click()}>
+                        <Upload className="h-4 w-4" strokeWidth={1.7} />
+                        {t('logo_upload')}
+                      </Button>
+                      {cfg[img.key] && (
+                        <Button variant="ghost" size="sm" disabled={!canManage} onClick={() => patch({ [img.key]: '' })}>
+                          <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                          {t('remove_logo')}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* مصمّم الأقسام: سحب لإعادة الترتيب + إظهار/إخفاء (dnd-kit). */}
             <div className="rounded-lg border border-border p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -259,6 +320,9 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
                     themeId={cfg.theme}
                     footerText={cfg.footer_text}
                     terms={cfg.terms_text}
+                    bank={cfg.bank_text}
+                    stampUrl={cfg.stamp}
+                    signatureUrl={cfg.signature}
                     showLogo={cfg.show_logo}
                     logoUrl={cfg.logo}
                     logoHeight={cfg.logo_height}

@@ -51,8 +51,12 @@ export function buildInvoiceDocumentModel(input: {
   logoHeight?: number | null;
   /** الشروط والأحكام — من إعدادات التصاميم. */
   terms?: string | null;
+  /** بيانات بنكية/ختم/توقيع — من إعدادات التصاميم. */
+  bank?: string | null;
+  stampUrl?: string | null;
+  signatureUrl?: string | null;
 }): DocumentModel {
-  const { invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms } = input;
+  const { invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
 
   return {
     type: 'tax_invoice',
@@ -94,5 +98,8 @@ export function buildInvoiceDocumentModel(input: {
     footerText: footerText && footerText.trim() !== '' ? footerText : null,
     notes: invoice.notes ?? null,
     terms: terms && terms.trim() !== '' ? terms : null,
+    bank: bank && bank.trim() !== '' ? bank : null,
+    stampUrl: stampUrl && stampUrl.trim() !== '' ? stampUrl : null,
+    signatureUrl: signatureUrl && signatureUrl.trim() !== '' ? signatureUrl : null,
   };
 }
