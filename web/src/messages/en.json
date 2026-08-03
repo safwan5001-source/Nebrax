@@ -234,7 +234,14 @@
     "unit_price": "Unit price",
     "tax": "Tax",
     "not_found": "Invoice not found",
-    "print": "Print"
+    "print": "Print",
+    "download_pdf": "Download PDF",
+    "share": "Share",
+    "excel": "Excel",
+    "generating": "Generating…",
+    "shared_ok": "Shared",
+    "downloaded_ok": "Downloaded",
+    "export_failed": "Export failed"
   },
   "invoiceDoc": {
     "title": "Tax Invoice",
@@ -255,7 +262,12 @@
     "subtotal": "Subtotal (excl. VAT)",
     "vat": "VAT (15%)",
     "grand_total": "Total (incl. VAT)",
-    "footer": "This is an electronic invoice issued per ZATCA (Zakat, Tax and Customs Authority) requirements."
+    "footer": "This is an electronic invoice issued per ZATCA (Zakat, Tax and Customs Authority) requirements.",
+    "brand_tagline": "Nibras accounting system",
+    "seller": "Seller",
+    "meta": "Invoice details",
+    "city": "City",
+    "zatca_note": "QR code (ZATCA)"
   },
   "payments": {
     "title": "Payments",

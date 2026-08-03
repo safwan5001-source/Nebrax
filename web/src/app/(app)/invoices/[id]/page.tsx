@@ -4,15 +4,18 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
-import { ArrowRight, Printer } from 'lucide-react';
+import { ArrowRight, Printer, Download, Share2, FileSpreadsheet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { downloadPdf, sharePdf } from '@/lib/pdf';
+import { exportXlsx } from '@/lib/xlsx';
 
 interface Line {
   id: string;
@@ -63,12 +66,14 @@ export default function InvoiceDetailPage() {
   const t = useTranslations('invoiceDetail');
   const ti = useTranslations('invoices');
   const ts = useTranslations('status');
+  const { success, error: errorToast } = useToast();
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [zatca, setZatca] = useState<Zatca | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<null | 'pdf' | 'share' | 'excel'>(null);
 
   const partnerName = customer?.name ?? '—';
 
@@ -111,19 +116,93 @@ export default function InvoiceDetailPage() {
     [t('remaining'), <span key="r" className="num">{formatRiyal(invoice.remaining)}</span>],
   ];
 
+  const doc = () => document.getElementById('print-root');
+
+  async function handleDownloadPdf() {
+    const el = doc();
+    if (!el || !invoice) return;
+    setBusy('pdf');
+    try {
+      await downloadPdf(el, invoice.number);
+      success(t('downloaded_ok'));
+    } catch {
+      errorToast(t('export_failed'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleShare() {
+    const el = doc();
+    if (!el || !invoice) return;
+    setBusy('share');
+    try {
+      const r = await sharePdf(el, invoice.number, invoice.number);
+      success(r === 'shared' ? t('shared_ok') : t('downloaded_ok'));
+    } catch (e) {
+      if ((e as Error)?.name !== 'AbortError') errorToast(t('export_failed')); // إلغاء المستخدم لا يُعدّ خطأ
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleExcel() {
+    if (!invoice) return;
+    setBusy('excel');
+    try {
+      await exportXlsx(invoice.number, {
+        meta: [
+          [ti('number'), invoice.number],
+          [t('date'), invoice.invoice_date],
+          [t('partner'), partnerName],
+          [t('paid'), Number(invoice.paid_amount)],
+          [t('remaining'), Number(invoice.remaining)],
+        ],
+        columns: [t('description'), t('qty'), t('unit_price'), t('tax'), ti('total')],
+        rows: invoice.lines.map((l) => [
+          l.description ?? '—',
+          l.quantity,
+          Number(l.unit_price),
+          Number(l.line_tax),
+          Number(l.line_total),
+        ]),
+        sheetName: 'Invoice',
+      });
+      success(t('downloaded_ok'));
+    } catch {
+      errorToast(t('export_failed'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/invoices')} aria-label={t('back')}>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
         </Button>
         <h1 className="num text-xl font-semibold text-text">{invoice.number}</h1>
         <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
         <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
-        <Button variant="outline" size="sm" className="no-print ms-auto" onClick={() => window.print()}>
-          <Printer className="h-4 w-4" strokeWidth={1.7} />
-          {t('print')}
-        </Button>
+        <div className="no-print ms-auto flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExcel} disabled={!!busy}>
+            <FileSpreadsheet className="h-4 w-4" strokeWidth={1.7} />
+            {t('excel')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={!!busy}>
+            <Download className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'pdf' ? t('generating') : t('download_pdf')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleShare} disabled={!!busy}>
+            <Share2 className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'share' ? t('generating') : t('share')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!!busy}>
+            <Printer className="h-4 w-4" strokeWidth={1.7} />
+            {t('print')}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
