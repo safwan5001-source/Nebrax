@@ -17,6 +17,7 @@ export function QuoteDocument({
   templateId,
   themeId,
   footerText,
+  terms,
   showLogo = true,
   logoUrl,
   logoHeight,
@@ -29,13 +30,14 @@ export function QuoteDocument({
   templateId?: string | null;
   themeId?: ThemeId | null;
   footerText?: string | null;
+  terms?: string | null;
   showLogo?: boolean;
   logoUrl?: string | null;
   logoHeight?: number | null;
   layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
 }) {
-  const model = buildQuoteDocumentModel({ quote, company, customer, footerText, logoUrl, logoHeight });
+  const model = buildQuoteDocumentModel({ quote, company, customer, footerText, logoUrl, logoHeight, terms });
   return (
     <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />
   );

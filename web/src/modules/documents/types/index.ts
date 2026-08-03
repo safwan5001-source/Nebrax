@@ -100,6 +100,10 @@ export interface DocumentModel {
   totals: DocumentTotals;
   qr?: DocumentQr | null;
   footerText?: string | null;
+  /** ملاحظات المستند (من السجلّ نفسه). */
+  notes?: string | null;
+  /** الشروط والأحكام (من إعدادات التصاميم). */
+  terms?: string | null;
 }
 
 /** توكنز الثيم (تُسقَط إلى متغيّرات CSS). */
@@ -165,7 +169,7 @@ export interface TemplateStyle {
 }
 
 /** مفاتيح الأقسام القابلة للترتيب/الإظهار في مصمّم المستند. */
-export type DocSectionKey = 'header' | 'barcode' | 'parties' | 'items' | 'summary' | 'footer';
+export type DocSectionKey = 'header' | 'barcode' | 'parties' | 'items' | 'summary' | 'notes' | 'terms' | 'footer';
 
 /** عنصر تخطيط: قسم + ظهوره. ترتيب المصفوفة = ترتيب العرض. */
 export interface DocSectionLayoutItem {
@@ -174,7 +178,7 @@ export interface DocSectionLayoutItem {
 }
 
 /** الترتيب الافتراضي للأقسام (يطابق التركيب الأصلي). */
-export const DEFAULT_SECTION_ORDER: DocSectionKey[] = ['header', 'barcode', 'parties', 'items', 'summary', 'footer'];
+export const DEFAULT_SECTION_ORDER: DocSectionKey[] = ['header', 'barcode', 'parties', 'items', 'summary', 'notes', 'terms', 'footer'];
 
 /** خصائص كل قالب — يستقبل النموذج ومنسّق العملة والثيم والإعداد. */
 export interface DocumentTemplateProps {

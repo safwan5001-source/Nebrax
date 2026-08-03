@@ -17,6 +17,7 @@ export interface SourceCreditNote {
   subtotal: string;
   tax_amount: string;
   total: string;
+  reason?: string | null;
   lines: SourceCreditNoteLine[];
 }
 
@@ -28,8 +29,9 @@ export function buildCreditNoteDocumentModel(input: {
   footerText?: string | null;
   logoUrl?: string | null;
   logoHeight?: number | null;
+  terms?: string | null;
 }): DocumentModel {
-  const { note, company, customer, footerText, logoUrl, logoHeight } = input;
+  const { note, company, customer, footerText, logoUrl, logoHeight, terms } = input;
 
   return {
     type: 'credit_note',
@@ -65,5 +67,7 @@ export function buildCreditNoteDocumentModel(input: {
     },
     qr: null,
     footerText: footerText && footerText.trim() !== '' ? footerText : null,
+    notes: note.reason ?? null,
+    terms: terms && terms.trim() !== '' ? terms : null,
   };
 }

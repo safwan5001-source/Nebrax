@@ -30,6 +30,7 @@ interface DesignsConfig {
   logo: string;        // data URL أو فارغ
   logo_height: number; // بكسل
   footer_text: string;
+  terms_text: string;
   sections?: DocSectionLayoutItem[]; // تخطيط الأقسام (مصمّم المستند)
   accent_color?: string;
 }
@@ -43,6 +44,7 @@ const SAMPLE = {
     subtotal: '1000.00',
     tax_amount: '150.00',
     total: '1150.00',
+    notes: 'ملاحظة تجريبية تظهر عند تفعيل قسم الملاحظات.',
     lines: [
       { id: 's1', description: 'خدمة استشارية', quantity: 1, unit_price: '1000.00', tax_rate: 15, line_tax: '150.00', line_total: '1150.00' },
       { id: 's2', description: 'اشتراك سنوي', quantity: 2, unit_price: '250.00', tax_rate: 15, line_tax: '75.00', line_total: '575.00' },
@@ -52,7 +54,7 @@ const SAMPLE = {
   customer: { name: 'عميل تجريبي', vat_number: '310000000000003', city: 'الرياض' },
 };
 
-const DEFAULTS: DesignsConfig = { template: 'classic', theme: 'blue', show_logo: true, logo: '', logo_height: 56, footer_text: '', accent_color: '#2563EB' };
+const DEFAULTS: DesignsConfig = { template: 'classic', theme: 'blue', show_logo: true, logo: '', logo_height: 56, footer_text: '', terms_text: '', accent_color: '#2563EB' };
 
 /**
  * إعدادات التصاميم/الهوية — اختيار القالب والثيم والشعار والتذييل مع **معاينة حيّة**،
@@ -218,6 +220,20 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
               </div>
             </div>
 
+            {/* الشروط والأحكام — نصّ يظهر في المستند عند تفعيل قسمه في المصمّم. */}
+            <div className="space-y-1.5">
+              <Label htmlFor="terms">{t('terms')}</Label>
+              <textarea
+                id="terms"
+                rows={2}
+                disabled={!canManage}
+                value={cfg.terms_text}
+                onChange={(e) => patch({ terms_text: e.target.value })}
+                className="min-h-16 w-full resize-y rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                placeholder={t('terms')}
+              />
+            </div>
+
             {/* مصمّم الأقسام: سحب لإعادة الترتيب + إظهار/إخفاء (dnd-kit). */}
             <div className="rounded-lg border border-border p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -242,6 +258,7 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
                     templateId={templateId}
                     themeId={cfg.theme}
                     footerText={cfg.footer_text}
+                    terms={cfg.terms_text}
                     showLogo={cfg.show_logo}
                     logoUrl={cfg.logo}
                     logoHeight={cfg.logo_height}
