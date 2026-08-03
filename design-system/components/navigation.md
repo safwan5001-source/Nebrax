@@ -30,10 +30,19 @@ Anatomy: `fixed inset-y-0 start-0 z-50 flex w-64 flex-col border-e border-border
 - زر `☰` (`lg:hidden`) لفتح درج الشريط.
 - صندوق بحث (`sm:flex`) بتوكنز الحقل القياسية (`h-9 rounded px-3`) + حلقة تركيز
   `focus-within:ring-2 focus-within:ring-primary/40` (قاعدة `tokens/color.md` §5).
-- تحية باسم المستخدم (`sm:block`).
-- `LangToggle` · `ThemeToggle` · زر خروج.
+- **قائمة إنشاء سريع** (`+`) → فاتورة/عرض سعر/عميل جديد (روابط لمسارات قائمة).
+- `LangToggle` · `ThemeToggle` (مبدّلان لحظيّان، لا قوائم).
+- **قائمة المستخدم** (صورة رمزية بالحرف الأول + الاسم) → الإعدادات · تسجيل الخروج.
 
 قاعدة: الرأس ثابت (لا يمرّر)، محايد، بلا ألوان — أدوات عامة فقط.
+
+### Dropdown (`ui/dropdown.tsx`)
+
+قائمة منسدلة عامة قابلة لإعادة الاستخدام بنفس مبدأ الشريط الجانبي: **واحدة مفتوحة فقط**
+في كل لحظة (سجلّ `closers` عام يُغلق سواها عند الفتح). تُغلق أيضاً بالنقر خارجها أو `Escape`،
+وتنفتح/تنغلق بانتقال خفيف (`transition duration-150`). ارتفاع القائمة `shadow-md`
+(`tokens/radius-elevation-zindex.md` §2 — القوائم المنسدلة)، `z-50`. عناصرها `role="menuitem"`
+وخارج ترتيب التنقّل عند الإغلاق (`tabIndex=-1`)؛ الزرّ `aria-haspopup="menu"` + `aria-expanded`.
 
 ## Command Palette (⌘K) — مقترح v2.0 (غير مُنفَّذ)
 

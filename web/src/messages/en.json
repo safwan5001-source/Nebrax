@@ -126,7 +126,13 @@
     "greeting": "Welcome",
     "search": "Search…",
     "logout": "Sign out",
-    "menu": "Menu"
+    "menu": "Menu",
+    "account": "Account",
+    "settings": "Settings",
+    "create": "Quick create",
+    "new_invoice": "New invoice",
+    "new_quote": "New quote",
+    "new_customer": "New customer"
   },
   "dashboard": {
     "title": "Dashboard",

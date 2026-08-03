@@ -126,7 +126,13 @@
     "greeting": "مرحباً",
     "search": "بحث…",
     "logout": "تسجيل الخروج",
-    "menu": "القائمة"
+    "menu": "القائمة",
+    "account": "الحساب",
+    "settings": "الإعدادات",
+    "create": "إنشاء سريع",
+    "new_invoice": "فاتورة جديدة",
+    "new_quote": "عرض سعر جديد",
+    "new_customer": "عميل جديد"
   },
   "dashboard": {
     "title": "لوحة التحكم",
