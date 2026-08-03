@@ -27,6 +27,8 @@ export function InvoiceDocument({
   themeId,
   footerText,
   showLogo = true,
+  logoUrl,
+  logoHeight,
   rootId,
 }: {
   invoice: InvoiceDoc;
@@ -37,9 +39,11 @@ export function InvoiceDocument({
   themeId?: ThemeId | null;
   footerText?: string | null;
   showLogo?: boolean;
+  logoUrl?: string | null;
+  logoHeight?: number | null;
   rootId?: string | null;
 }) {
-  const model = buildInvoiceDocumentModel({ invoice, company, customer, qr, footerText });
+  const model = buildInvoiceDocumentModel({ invoice, company, customer, qr, footerText, logoUrl, logoHeight });
   return (
     <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} rootId={rootId} />
   );

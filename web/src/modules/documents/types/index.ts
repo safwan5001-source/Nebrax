@@ -48,7 +48,8 @@ export interface DocumentParty {
 /** البائع = طرف + هوية بصرية اختيارية. */
 export interface DocumentSeller extends DocumentParty {
   logoText?: string | null; // نص شعار احتياطي حين لا توجد صورة
-  logoUrl?: string | null;
+  logoUrl?: string | null;  // صورة الشعار (data URL أو رابط)
+  logoHeight?: number | null; // ارتفاع عرض الشعار بالبكسل
   tagline?: string | null;
 }
 

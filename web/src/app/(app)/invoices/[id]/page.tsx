@@ -82,6 +82,8 @@ export default function InvoiceDetailPage() {
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
   const [showLogo, setShowLogo] = useState(true);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoHeight, setLogoHeight] = useState<number | null>(null);
   const tt = useTranslations('invoiceTemplates');
 
   const partnerName = customer?.name ?? '—';
@@ -96,7 +98,7 @@ export default function InvoiceDetailPage() {
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean } }>(`/sales-config/designs`),
+          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number } }>(`/sales-config/designs`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
@@ -108,6 +110,8 @@ export default function InvoiceDetailPage() {
           if (dg.theme) setThemeId(dg.theme as ThemeId);
           setFooterText(dg.footer_text ?? null);
           setShowLogo(dg.show_logo !== false);
+          setLogoUrl(dg.logo ?? null);
+          setLogoHeight(dg.logo_height ?? null);
         }
       })
       .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
@@ -317,6 +321,8 @@ export default function InvoiceDetailPage() {
               themeId={themeId}
               footerText={footerText}
               showLogo={showLogo}
+              logoUrl={logoUrl}
+              logoHeight={logoHeight}
             />
           </div>
         </CardContent>

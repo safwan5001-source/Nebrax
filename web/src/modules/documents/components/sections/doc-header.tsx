@@ -16,14 +16,23 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
     <>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          {showLogo && (
-            <div
-              className="flex h-14 w-14 items-center justify-center rounded-xl text-xl font-bold"
-              style={{ background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' }}
-            >
-              {seller.logoText ?? 'نـ'}
-            </div>
-          )}
+          {showLogo &&
+            (seller.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL؛ لا يناسبه next/image
+              <img
+                src={seller.logoUrl}
+                alt={seller.name}
+                className="w-auto object-contain"
+                style={{ height: `${seller.logoHeight ?? 56}px` }}
+              />
+            ) : (
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-xl text-xl font-bold"
+                style={{ background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' }}
+              >
+                {seller.logoText ?? 'نـ'}
+              </div>
+            ))}
           <div>
             <div className="text-lg font-bold text-black">{seller.name || '—'}</div>
             <div className="text-[11px] text-gray-500">{seller.tagline ?? t('brand_tagline')}</div>

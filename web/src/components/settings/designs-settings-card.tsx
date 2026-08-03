@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Upload, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument } from '@/components/invoices/invoice-document';
 import { api } from '@/lib/api';
+import { fileToResizedDataUrl } from '@/lib/image';
 import { listTemplates } from '@/modules/documents/registry/templates';
 import { THEME_IDS, themeSwatch } from '@/modules/documents/themes';
 import type { ThemeId } from '@/modules/documents/types';
@@ -20,6 +22,8 @@ interface DesignsConfig {
   template: string;
   theme: ThemeId;
   show_logo: boolean;
+  logo: string;        // data URL أو فارغ
+  logo_height: number; // بكسل
   footer_text: string;
   accent_color?: string;
 }
@@ -42,7 +46,7 @@ const SAMPLE = {
   customer: { name: 'عميل تجريبي', vat_number: '310000000000003', city: 'الرياض' },
 };
 
-const DEFAULTS: DesignsConfig = { template: 'classic', theme: 'blue', show_logo: true, footer_text: '', accent_color: '#2563EB' };
+const DEFAULTS: DesignsConfig = { template: 'classic', theme: 'blue', show_logo: true, logo: '', logo_height: 56, footer_text: '', accent_color: '#2563EB' };
 
 /**
  * إعدادات التصاميم/الهوية — اختيار القالب والثيم والشعار والتذييل مع **معاينة حيّة**،
@@ -55,6 +59,21 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
   const { success, error: errorToast } = useToast();
   const [cfg, setCfg] = useState<DesignsConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function onPickLogo(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      errorToast(t('logo_invalid'));
+      return;
+    }
+    try {
+      const dataUrl = await fileToResizedDataUrl(file, 320);
+      patch({ logo: dataUrl });
+    } catch {
+      errorToast(t('logo_invalid'));
+    }
+  }
 
   useEffect(() => {
     api<{ data: Partial<DesignsConfig> }>('/sales-config/designs')
@@ -142,6 +161,57 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
               ))}
             </div>
 
+            {/* شعار الشركة: رفع + معاينة مصغّرة + إزالة + ضبط المقاس. */}
+            <div className="rounded-lg border border-border p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-background">
+                  {cfg.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- data URL
+                    <img src={cfg.logo} alt="logo" className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <span className="text-[10px] text-muted">{t('no_logo')}</span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => { void onPickLogo(e.target.files?.[0]); e.target.value = ''; }}
+                    />
+                    <Button variant="outline" size="sm" disabled={!canManage} onClick={() => fileRef.current?.click()}>
+                      <Upload className="h-4 w-4" strokeWidth={1.7} />
+                      {t('logo_upload')}
+                    </Button>
+                    {cfg.logo && (
+                      <Button variant="ghost" size="sm" disabled={!canManage} onClick={() => patch({ logo: '' })}>
+                        <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                        {t('remove_logo')}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted">{t('logo_hint')}</p>
+                </div>
+                <div className="ms-auto flex items-center gap-2">
+                  <Label htmlFor="lh" className="text-xs text-muted">{t('logo_size')}</Label>
+                  <input
+                    id="lh"
+                    type="range"
+                    min={24}
+                    max={96}
+                    step={4}
+                    disabled={!canManage || !cfg.logo}
+                    value={cfg.logo_height}
+                    onChange={(e) => patch({ logo_height: Number(e.target.value) })}
+                    className="w-32 accent-primary disabled:opacity-50"
+                  />
+                  <span className="num w-10 text-xs text-text">{cfg.logo_height}px</span>
+                </div>
+              </div>
+            </div>
+
             {/* معاينة حيّة — rootId=null فلا تخطف الطباعة. */}
             <div>
               <div className="mb-2 text-xs font-medium text-muted">{t('preview')}</div>
@@ -155,6 +225,8 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
                   themeId={cfg.theme}
                   footerText={cfg.footer_text}
                   showLogo={cfg.show_logo}
+                  logoUrl={cfg.logo}
+                  logoHeight={cfg.logo_height}
                   rootId={null}
                 />
               </div>
