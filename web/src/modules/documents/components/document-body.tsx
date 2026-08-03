@@ -18,6 +18,9 @@ import { DocItemsTable } from './sections/doc-items-table';
 import { DocSummary } from './sections/doc-summary';
 import { DocNotes } from './sections/doc-notes';
 import { DocTerms } from './sections/doc-terms';
+import { DocBank } from './sections/doc-bank';
+import { DocStamp } from './sections/doc-stamp';
+import { DocSignature } from './sections/doc-signature';
 import { DocFooter } from './sections/doc-footer';
 
 /** الأقسام الظاهرة افتراضياً (فاتورة ضريبية كاملة). */
@@ -38,6 +41,9 @@ function isVisible(key: DocSectionKey, s: TemplateSectionsConfig): boolean {
     case 'summary': return s.summary;
     case 'notes': return s.notes;
     case 'terms': return s.terms;
+    case 'bank': return s.bank;
+    case 'stamp': return s.stamp;
+    case 'signature': return s.signature;
     case 'footer': return s.footer;
   }
 }
@@ -57,6 +63,9 @@ function renderSection(
     case 'summary': return <DocSummary model={model} formatMoney={formatMoney} showQr={s.qr} />;
     case 'notes': return <DocNotes model={model} />;
     case 'terms': return <DocTerms model={model} />;
+    case 'bank': return <DocBank model={model} />;
+    case 'stamp': return <DocStamp model={model} />;
+    case 'signature': return <DocSignature model={model} />;
     case 'footer': return <DocFooter model={model} />;
   }
 }

@@ -34,8 +34,11 @@ export function buildQuoteDocumentModel(input: {
   logoUrl?: string | null;
   logoHeight?: number | null;
   terms?: string | null;
+  bank?: string | null;
+  stampUrl?: string | null;
+  signatureUrl?: string | null;
 }): DocumentModel {
-  const { quote, company, customer, footerText, logoUrl, logoHeight, terms } = input;
+  const { quote, company, customer, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
 
   return {
     type: 'quotation',
@@ -78,5 +81,8 @@ export function buildQuoteDocumentModel(input: {
     footerText: footerText && footerText.trim() !== '' ? footerText : null,
     notes: quote.notes ?? null,
     terms: terms && terms.trim() !== '' ? terms : null,
+    bank: bank && bank.trim() !== '' ? bank : null,
+    stampUrl: stampUrl && stampUrl.trim() !== '' ? stampUrl : null,
+    signatureUrl: signatureUrl && signatureUrl.trim() !== '' ? signatureUrl : null,
   };
 }

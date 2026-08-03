@@ -104,6 +104,12 @@ export interface DocumentModel {
   notes?: string | null;
   /** الشروط والأحكام (من إعدادات التصاميم). */
   terms?: string | null;
+  /** البيانات البنكية (نصّ، من إعدادات التصاميم). */
+  bank?: string | null;
+  /** ختم الشركة (data URL، من إعدادات التصاميم). */
+  stampUrl?: string | null;
+  /** التوقيع (data URL، من إعدادات التصاميم). */
+  signatureUrl?: string | null;
 }
 
 /** توكنز الثيم (تُسقَط إلى متغيّرات CSS). */
@@ -169,7 +175,9 @@ export interface TemplateStyle {
 }
 
 /** مفاتيح الأقسام القابلة للترتيب/الإظهار في مصمّم المستند. */
-export type DocSectionKey = 'header' | 'barcode' | 'parties' | 'items' | 'summary' | 'notes' | 'terms' | 'footer';
+export type DocSectionKey =
+  | 'header' | 'barcode' | 'parties' | 'items' | 'summary'
+  | 'notes' | 'terms' | 'bank' | 'stamp' | 'signature' | 'footer';
 
 /** عنصر تخطيط: قسم + ظهوره. ترتيب المصفوفة = ترتيب العرض. */
 export interface DocSectionLayoutItem {
@@ -178,7 +186,10 @@ export interface DocSectionLayoutItem {
 }
 
 /** الترتيب الافتراضي للأقسام (يطابق التركيب الأصلي). */
-export const DEFAULT_SECTION_ORDER: DocSectionKey[] = ['header', 'barcode', 'parties', 'items', 'summary', 'notes', 'terms', 'footer'];
+export const DEFAULT_SECTION_ORDER: DocSectionKey[] = [
+  'header', 'barcode', 'parties', 'items', 'summary',
+  'notes', 'terms', 'bank', 'stamp', 'signature', 'footer',
+];
 
 /** خصائص كل قالب — يستقبل النموذج ومنسّق العملة والثيم والإعداد. */
 export interface DocumentTemplateProps {

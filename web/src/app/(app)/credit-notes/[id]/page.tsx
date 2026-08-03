@@ -48,6 +48,9 @@ export default function CreditNoteDetailPage() {
   const [logoHeight, setLogoHeight] = useState<number | null>(null);
   const [layout, setLayout] = useState<DocSectionLayoutItem[] | null>(null);
   const [termsText, setTermsText] = useState<string | null>(null);
+  const [bankText, setBankText] = useState<string | null>(null);
+  const [stampUrl, setStampUrl] = useState<string | null>(null);
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -57,7 +60,7 @@ export default function CreditNoteDetailPage() {
         const [p, m, d] = await Promise.allSettled([
           api<{ data: CreditNoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: CreditNoteCompany }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string } }>(`/sales-config/designs`),
+          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
@@ -71,6 +74,9 @@ export default function CreditNoteDetailPage() {
           setLogoHeight(dg.logo_height ?? null);
           setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
           setTermsText(dg.terms_text ?? null);
+          setBankText(dg.bank_text ?? null);
+          setStampUrl(dg.stamp ?? null);
+          setSignatureUrl(dg.signature ?? null);
         }
       })
       .finally(() => setLoading(false));
@@ -172,6 +178,9 @@ export default function CreditNoteDetailPage() {
                 themeId={themeId}
                 footerText={footerText}
                 terms={termsText}
+                bank={bankText}
+                stampUrl={stampUrl}
+                signatureUrl={signatureUrl}
                 showLogo={showLogo}
                 logoUrl={logoUrl}
                 logoHeight={logoHeight}

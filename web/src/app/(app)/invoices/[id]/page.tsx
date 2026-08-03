@@ -88,6 +88,9 @@ export default function InvoiceDetailPage() {
   const [logoHeight, setLogoHeight] = useState<number | null>(null);
   const [layout, setLayout] = useState<DocSectionLayoutItem[] | null>(null);
   const [termsText, setTermsText] = useState<string | null>(null);
+  const [bankText, setBankText] = useState<string | null>(null);
+  const [stampUrl, setStampUrl] = useState<string | null>(null);
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const tt = useTranslations('invoiceTemplates');
 
   const partnerName = customer?.name ?? '—';
@@ -102,7 +105,7 @@ export default function InvoiceDetailPage() {
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string } }>(`/sales-config/designs`),
+          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
@@ -118,6 +121,9 @@ export default function InvoiceDetailPage() {
           setLogoHeight(dg.logo_height ?? null);
           setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
           setTermsText(dg.terms_text ?? null);
+          setBankText(dg.bank_text ?? null);
+          setStampUrl(dg.stamp ?? null);
+          setSignatureUrl(dg.signature ?? null);
         }
       })
       .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
@@ -328,6 +334,9 @@ export default function InvoiceDetailPage() {
                 themeId={themeId}
                 footerText={footerText}
                 terms={termsText}
+                bank={bankText}
+                stampUrl={stampUrl}
+                signatureUrl={signatureUrl}
                 showLogo={showLogo}
                 logoUrl={logoUrl}
                 logoHeight={logoHeight}

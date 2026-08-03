@@ -30,8 +30,11 @@ export function buildCreditNoteDocumentModel(input: {
   logoUrl?: string | null;
   logoHeight?: number | null;
   terms?: string | null;
+  bank?: string | null;
+  stampUrl?: string | null;
+  signatureUrl?: string | null;
 }): DocumentModel {
-  const { note, company, customer, footerText, logoUrl, logoHeight, terms } = input;
+  const { note, company, customer, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
 
   return {
     type: 'credit_note',
@@ -69,5 +72,8 @@ export function buildCreditNoteDocumentModel(input: {
     footerText: footerText && footerText.trim() !== '' ? footerText : null,
     notes: note.reason ?? null,
     terms: terms && terms.trim() !== '' ? terms : null,
+    bank: bank && bank.trim() !== '' ? bank : null,
+    stampUrl: stampUrl && stampUrl.trim() !== '' ? stampUrl : null,
+    signatureUrl: signatureUrl && signatureUrl.trim() !== '' ? signatureUrl : null,
   };
 }
