@@ -1,14 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api';
+import { Dialog } from '@/components/ui/dialog';
+import { useToast } from '@/components/ui/toast';
+import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 
 interface Invoice {
@@ -36,10 +39,14 @@ const payTone: Record<string, 'positive' | 'warning' | 'muted'> = {
 export default function InvoicesPage() {
   const t = useTranslations('invoices');
   const ts = useTranslations('status');
+  const router = useRouter();
+  const { success, error: errorToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [partners, setPartners] = useState<Record<string, string>>({});
+  const [toDelete, setToDelete] = useState<Invoice | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -54,6 +61,21 @@ export default function InvoicesPage() {
   }, [t]);
 
   useEffect(() => load(), [load]);
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await api(`/invoices/${toDelete.id}`, { method: 'DELETE' });
+      success(t('deleted'));
+      setToDelete(null);
+      load();
+    } catch (e) {
+      errorToast(e instanceof ApiError ? e.message : t('delete_failed'));
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const columns = useMemo<ColumnDef<Invoice, unknown>[]>(
     () => [
@@ -94,8 +116,44 @@ export default function InvoicesPage() {
           <Badge tone={payTone[row.original.payment_status] ?? 'muted'}>{ts(row.original.payment_status)}</Badge>
         ),
       },
+      {
+        id: 'actions',
+        header: '',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const inv = row.original;
+          const isDraft = inv.status === 'draft';
+          return (
+            <div className="flex items-center justify-end gap-0.5">
+              <Button variant="ghost" size="icon" aria-label={t('view')} onClick={() => router.push(`/invoices/${inv.id}`)}>
+                <Eye className="h-4 w-4" strokeWidth={1.7} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t('edit')}
+                disabled={!isDraft}
+                title={isDraft ? t('edit') : t('posted_locked')}
+                onClick={() => router.push(`/invoices/${inv.id}/edit`)}
+              >
+                <Pencil className="h-4 w-4" strokeWidth={1.7} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t('delete')}
+                disabled={!isDraft}
+                title={isDraft ? t('delete') : t('posted_locked')}
+                onClick={() => setToDelete(inv)}
+              >
+                <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
+              </Button>
+            </div>
+          );
+        },
+      },
     ],
-    [partners, t, ts]
+    [partners, t, ts, router]
   );
 
   return (
@@ -127,6 +185,18 @@ export default function InvoicesPage() {
           exportName="invoices"
         />
       )}
+
+      <Dialog open={!!toDelete} onClose={() => (deleting ? null : setToDelete(null))} title={t('delete_title')}>
+        <p className="text-sm text-text">
+          {t('delete_confirm')} <span className="num font-medium">{toDelete?.number}</span>؟
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setToDelete(null)} disabled={deleting}>{t('retry_cancel')}</Button>
+          <Button variant="danger" onClick={confirmDelete} disabled={deleting}>
+            {deleting ? t('generating_delete') : t('delete')}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

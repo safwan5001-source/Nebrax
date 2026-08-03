@@ -68,68 +68,127 @@ class InvoiceService
                 'created_by'   => $data['created_by'] ?? null,
             ]);
 
-            $subtotal = $taxTotal = 0;
-
-            foreach ($items as $item) {
-                $qty       = (int) ($item['quantity'] ?? 1);
-                $unitPrice = (int) ($item['unit_price'] ?? 0);
-                $rate      = (int) ($item['tax_rate'] ?? 15);
-                $lineDisc  = (int) ($item['discount'] ?? 0);
-
-                if ($qty <= 0 || $unitPrice < 0) {
-                    throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
-                }
-
-                $lineSubtotal = $qty * $unitPrice;                 // إجمالي السطر قبل خصم السطر
-                if ($lineDisc < 0 || $lineDisc > $lineSubtotal) {
-                    throw new RuntimeException('خصم السطر لا يمكن أن يتجاوز إجمالي السطر.');
-                }
-                $lineNet = $lineSubtotal - $lineDisc;               // الأساس الخاضع بعد خصم السطر
-                $lineTax = $this->calcTax($lineNet, $rate);
-
-                InvoiceLine::create([
-                    'invoice_id'    => $invoice->id,
-                    'product_id'    => $item['product_id'] ?? null,
-                    'description'   => $item['description'] ?? null,
-                    'quantity'      => $qty,
-                    'unit_price'    => $unitPrice,
-                    'tax_rate'      => $rate,
-                    'line_subtotal' => $lineSubtotal,
-                    'line_discount' => $lineDisc,
-                    'line_tax'      => $lineTax,
-                    'line_total'    => $lineNet + $lineTax,
-                ]);
-
-                $subtotal += $lineNet;                             // إجمالي الفاتورة = مجموع صافي السطور
-                $taxTotal += $lineTax;
-            }
-
-            // خصم على مستوى الفاتورة (net method): يخفّض الإيراد والضريبة تناسبياً.
-            [$discount, $goodsVat] = $this->applyDiscount($subtotal, $taxTotal, (int) ($data['discount'] ?? 0));
-
-            // الشحن: إيراد خاضع للضريبة يُضاف فوق السلع.
-            $shipping    = max(0, (int) ($data['shipping'] ?? 0));
-            $shippingVat = $shipping > 0 ? $this->calcTax($shipping, self::VAT_RATE) : 0;
-            $taxAmount   = $goodsVat + $shippingVat;
-
-            // التسوية/التقريب (+/−، غير خاضعة للضريبة) تُعدّل الإجمالي النهائي.
-            $adjustment  = (int) ($data['adjustment'] ?? 0);
-            $total       = ($subtotal - $discount) + $shipping + $taxAmount + $adjustment;
-            if ($total < 0) {
-                throw new RuntimeException('التسوية تجعل إجمالي الفاتورة سالباً.');
-            }
-
-            $invoice->update([
-                'subtotal'   => $subtotal,
-                'discount'   => $discount,
-                'shipping'   => $shipping,
-                'adjustment' => $adjustment,
-                'tax_amount' => $taxAmount,
-                'total'      => $total,
-            ]);
+            $this->applyItemsAndTotals($invoice, $items, $data);
 
             return $invoice->load('lines');
         });
+    }
+
+    /**
+     * تعديل فاتورة مسوّدة (draft فقط) — تُبنى سطورها وإجمالياتها من جديد.
+     * المرحّلة immutable (تُصحَّح بإشعار دائن/عكس)، فتُرفَض هنا.
+     */
+    public function update(Invoice $invoice, array $data, array $items): Invoice
+    {
+        if (empty($items)) {
+            throw new RuntimeException('الفاتورة يجب أن تحتوي على سطر واحد على الأقل.');
+        }
+
+        return DB::transaction(function () use ($invoice, $data, $items) {
+            $invoice = Invoice::lockForUpdate()->findOrFail($invoice->id);
+            if (! $invoice->isDraft()) {
+                throw new RuntimeException('لا يمكن تعديل فاتورة مرحّلة.');
+            }
+
+            // مسوّدة: لا قيد ولا حركة مخزون، فحذف السطور وإعادة بنائها آمن.
+            $invoice->lines()->delete();
+
+            $invoice->update([
+                'partner_id'     => $data['partner_id'],
+                'payment_type'   => $data['payment_type'] ?? 'cash',
+                'invoice_date'   => $data['invoice_date'] ?? $invoice->invoice_date,
+                'due_date'       => $data['due_date'] ?? null,
+                'cost_center_id' => $data['cost_center_id'] ?? null,
+                'salesperson_id' => $data['salesperson_id'] ?? null,
+                'notes'          => $data['notes'] ?? null,
+            ]);
+
+            $this->applyItemsAndTotals($invoice, $items, $data);
+
+            return $invoice->fresh('lines');
+        });
+    }
+
+    /**
+     * حذف فاتورة مسوّدة (draft فقط). المرحّلة لا تُحذف إطلاقاً (سلامة الأثر المحاسبي).
+     */
+    public function deleteDraft(Invoice $invoice): void
+    {
+        DB::transaction(function () use ($invoice) {
+            $invoice = Invoice::lockForUpdate()->findOrFail($invoice->id);
+            if (! $invoice->isDraft()) {
+                throw new RuntimeException('لا يمكن حذف فاتورة مرحّلة.');
+            }
+            $invoice->lines()->delete();
+            $invoice->delete();
+        });
+    }
+
+    /**
+     * بناء سطور الفاتورة وحساب إجمالياتها من السطور (مصدر الحقيقة) — للإنشاء والتعديل.
+     * يفترض أن السطور القديمة (إن وُجدت) حُذفت مسبقاً. لا يمسّ رأس المستند غير الإجماليات.
+     */
+    private function applyItemsAndTotals(Invoice $invoice, array $items, array $data): void
+    {
+        $subtotal = $taxTotal = 0;
+
+        foreach ($items as $item) {
+            $qty       = (int) ($item['quantity'] ?? 1);
+            $unitPrice = (int) ($item['unit_price'] ?? 0);
+            $rate      = (int) ($item['tax_rate'] ?? 15);
+            $lineDisc  = (int) ($item['discount'] ?? 0);
+
+            if ($qty <= 0 || $unitPrice < 0) {
+                throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
+            }
+
+            $lineSubtotal = $qty * $unitPrice;                 // إجمالي السطر قبل خصم السطر
+            if ($lineDisc < 0 || $lineDisc > $lineSubtotal) {
+                throw new RuntimeException('خصم السطر لا يمكن أن يتجاوز إجمالي السطر.');
+            }
+            $lineNet = $lineSubtotal - $lineDisc;               // الأساس الخاضع بعد خصم السطر
+            $lineTax = $this->calcTax($lineNet, $rate);
+
+            InvoiceLine::create([
+                'invoice_id'    => $invoice->id,
+                'product_id'    => $item['product_id'] ?? null,
+                'description'   => $item['description'] ?? null,
+                'quantity'      => $qty,
+                'unit_price'    => $unitPrice,
+                'tax_rate'      => $rate,
+                'line_subtotal' => $lineSubtotal,
+                'line_discount' => $lineDisc,
+                'line_tax'      => $lineTax,
+                'line_total'    => $lineNet + $lineTax,
+            ]);
+
+            $subtotal += $lineNet;                             // إجمالي الفاتورة = مجموع صافي السطور
+            $taxTotal += $lineTax;
+        }
+
+        // خصم على مستوى الفاتورة (net method): يخفّض الإيراد والضريبة تناسبياً.
+        [$discount, $goodsVat] = $this->applyDiscount($subtotal, $taxTotal, (int) ($data['discount'] ?? 0));
+
+        // الشحن: إيراد خاضع للضريبة يُضاف فوق السلع.
+        $shipping    = max(0, (int) ($data['shipping'] ?? 0));
+        $shippingVat = $shipping > 0 ? $this->calcTax($shipping, self::VAT_RATE) : 0;
+        $taxAmount   = $goodsVat + $shippingVat;
+
+        // التسوية/التقريب (+/−، غير خاضعة للضريبة) تُعدّل الإجمالي النهائي.
+        $adjustment  = (int) ($data['adjustment'] ?? 0);
+        $total       = ($subtotal - $discount) + $shipping + $taxAmount + $adjustment;
+        if ($total < 0) {
+            throw new RuntimeException('التسوية تجعل إجمالي الفاتورة سالباً.');
+        }
+
+        $invoice->update([
+            'subtotal'   => $subtotal,
+            'discount'   => $discount,
+            'shipping'   => $shipping,
+            'adjustment' => $adjustment,
+            'tax_amount' => $taxAmount,
+            'total'      => $total,
+        ]);
     }
 
     /**
