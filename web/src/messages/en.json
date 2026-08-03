@@ -144,7 +144,8 @@
     "qa_invoice": "New invoice",
     "qa_partner": "New customer",
     "qa_payment": "Record payment",
-    "qa_reports": "Reports"
+    "qa_reports": "Reports",
+    "spark_label": "Last 7-day trend"
   },
   "invoices": {
     "title": "Invoices",

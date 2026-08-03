@@ -144,7 +144,8 @@
     "qa_invoice": "فاتورة جديدة",
     "qa_partner": "عميل جديد",
     "qa_payment": "تسجيل دفعة",
-    "qa_reports": "التقارير"
+    "qa_reports": "التقارير",
+    "spark_label": "اتجاه آخر ٧ أيام"
   },
   "invoices": {
     "title": "الفواتير",
