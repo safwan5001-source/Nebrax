@@ -254,7 +254,9 @@
     "shared_ok": "Shared",
     "downloaded_ok": "Downloaded",
     "export_failed": "Export failed",
-    "preview": "Invoice preview"
+    "preview": "Invoice preview",
+    "load_error": "Failed to load the invoice",
+    "retry": "Retry"
   },
   "invoiceDoc": {
     "title": "Tax Invoice",

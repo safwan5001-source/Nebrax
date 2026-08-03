@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
@@ -72,12 +72,14 @@ export default function InvoiceDetailPage() {
   const [company, setCompany] = useState<Company | null>(null);
   const [zatca, setZatca] = useState<Zatca | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share' | 'excel'>(null);
 
   const partnerName = customer?.name ?? '—';
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true);
+    setLoadError(false);
     api<{ data: Invoice }>(`/invoices/${id}`)
       .then(async (r) => {
         setInvoice(r.data);
@@ -90,14 +92,26 @@ export default function InvoiceDetailPage() {
         if (z.status === 'fulfilled') setZatca(z.value);
         if (m.status === 'fulfilled') setCompany(m.value.company);
       })
+      .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => load(), [load]);
 
   if (loading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="rounded border border-border bg-surface p-8 text-center">
+        <p className="text-sm text-negative">{t('load_error')}</p>
+        <Button variant="outline" className="mt-3" onClick={load}>{t('retry')}</Button>
       </div>
     );
   }
