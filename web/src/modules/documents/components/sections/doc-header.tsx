@@ -35,7 +35,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
             ))}
           <div>
             <div className="text-lg font-bold text-black">{seller.name || '—'}</div>
-            <div className="text-[11px] text-gray-500">{seller.tagline ?? t('brand_tagline')}</div>
+            {seller.tagline && <div className="text-[11px] text-gray-500">{seller.tagline}</div>}
           </div>
         </div>
         <div className="text-end">
