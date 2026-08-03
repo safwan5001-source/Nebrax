@@ -4,16 +4,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
-import { ArrowRight, Printer, Download, Share2, FileSpreadsheet } from 'lucide-react';
+import { ArrowRight, Printer, Download, Share2, FileSpreadsheet, LayoutTemplate, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
+import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { exportXlsx } from '@/lib/xlsx';
 
 interface Line {
@@ -74,6 +76,8 @@ export default function InvoiceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share' | 'excel'>(null);
+  const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
+  const tt = useTranslations('invoiceTemplates');
 
   const partnerName = customer?.name ?? '—';
 
@@ -83,14 +87,17 @@ export default function InvoiceDetailPage() {
     api<{ data: Invoice }>(`/invoices/${id}`)
       .then(async (r) => {
         setInvoice(r.data);
-        const [p, z, m] = await Promise.allSettled([
+        const [p, z, m, d] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
+          api<{ data: { template?: string } }>(`/sales-config/designs`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
         if (m.status === 'fulfilled') setCompany(m.value.company);
+        // القالب الافتراضي من إعدادات التصاميم (يتراجع للافتراضي إن غاب/غير معروف).
+        if (d.status === 'fulfilled') setTemplateId(getTemplate(`tax-invoice-${d.value.data?.template ?? ''}`).id);
       })
       .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
       .finally(() => setLoading(false));
@@ -264,12 +271,30 @@ export default function InvoiceDetailPage() {
 
       {/* معاينة قالب الفاتورة الضريبية A4 (مرئية على الشاشة + مصدر الطباعة/الـ PDF) */}
       <Card>
-        <CardHeader className="no-print">
+        <CardHeader className="no-print flex flex-row items-center justify-between gap-3">
           <CardTitle>{t('preview')}</CardTitle>
+          <Dropdown
+            align="end"
+            menuLabel={t('template')}
+            triggerClassName="h-8 gap-2 border border-border px-3 text-sm text-text hover:bg-primary-soft"
+            trigger={
+              <>
+                <LayoutTemplate className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
+                <span>{tt(getTemplate(templateId).nameKey)}</span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.8} />
+              </>
+            }
+          >
+            {listTemplates().map((d) => (
+              <DropdownItem key={d.id} onClick={() => setTemplateId(d.id)}>
+                {tt(d.nameKey)}
+              </DropdownItem>
+            ))}
+          </Dropdown>
         </CardHeader>
         <CardContent className="print:p-0">
           <div className="overflow-x-auto rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
-            <InvoiceDocument invoice={invoice} company={company} customer={customer} qr={zatca?.qr ?? null} />
+            <InvoiceDocument invoice={invoice} company={company} customer={customer} qr={zatca?.qr ?? null} templateId={templateId} />
           </div>
         </CardContent>
       </Card>

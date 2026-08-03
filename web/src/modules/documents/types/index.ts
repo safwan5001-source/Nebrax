@@ -145,6 +145,21 @@ export interface TemplateConfig {
   sections: Partial<TemplateSectionsConfig>;
 }
 
+/**
+ * توكنز أسلوب القالب — تُمرَّر للأقسام (عبر Context) فتتغيّر هوية القالب البصرية
+ * دون تكرار منطق الأقسام. قالب واحد من الأقسام، مُعامَل بهذه التوكنز.
+ */
+export interface TemplateStyle {
+  /** حشو غلاف الصفحة (Tailwind). */
+  pagePadding: string;
+  /** زوايا البطاقات/الحاويات. */
+  cardRadius: string;
+  /** الفاصل الرأسي بين الأقسام. */
+  sectionGap: string;
+  /** نمط رأس جدول البنود. */
+  tableHead: 'brand' | 'soft' | 'plain';
+}
+
 /** خصائص كل قالب — يستقبل النموذج ومنسّق العملة والثيم والإعداد. */
 export interface DocumentTemplateProps {
   model: DocumentModel;

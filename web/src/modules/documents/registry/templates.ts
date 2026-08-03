@@ -1,5 +1,7 @@
 import type { TemplateDescriptor } from '../types';
 import { TaxInvoiceClassic } from '../templates/tax-invoice-classic';
+import { TaxInvoiceModern } from '../templates/tax-invoice-modern';
+import { TaxInvoiceErp } from '../templates/tax-invoice-erp';
 
 /**
  * سجلّ القوالب — id ← مكوّن + بيانات وصفية. إضافة قالب جديد = إدخال واحد هنا،
@@ -11,6 +13,20 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     nameKey: 'classic',
     component: TaxInvoiceClassic,
     defaultTheme: 'blue',
+    supportedPaper: ['a4', 'letter', 'legal'],
+  },
+  'tax-invoice-modern': {
+    id: 'tax-invoice-modern',
+    nameKey: 'modern',
+    component: TaxInvoiceModern,
+    defaultTheme: 'blue',
+    supportedPaper: ['a4', 'letter', 'legal'],
+  },
+  'tax-invoice-erp': {
+    id: 'tax-invoice-erp',
+    nameKey: 'erp',
+    component: TaxInvoiceErp,
+    defaultTheme: 'gray',
     supportedPaper: ['a4', 'letter', 'legal'],
   },
 };

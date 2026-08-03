@@ -281,7 +281,13 @@
     "export_failed": "تعذّر التصدير",
     "preview": "معاينة الفاتورة",
     "load_error": "تعذّر تحميل الفاتورة",
-    "retry": "إعادة المحاولة"
+    "retry": "إعادة المحاولة",
+    "template": "القالب"
+  },
+  "invoiceTemplates": {
+    "classic": "كلاسيكي",
+    "modern": "عصري",
+    "erp": "ERP"
   },
   "invoiceDoc": {
     "title": "فاتورة ضريبية",

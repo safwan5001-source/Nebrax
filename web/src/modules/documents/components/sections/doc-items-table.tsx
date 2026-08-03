@@ -1,9 +1,25 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { DocumentModel } from '../../types';
+import type { CSSProperties } from 'react';
+import { cn } from '@/lib/utils';
+import type { DocumentModel, TemplateStyle } from '../../types';
+import { useDocStyle } from '../doc-style-context';
 
-/** جدول البنود — رأس بلون الهوية، ترقيم وصفوف متناوبة، أرقام بمحاذاة النهاية. */
+/** خصائص صفّ رأس الجدول حسب نمط القالب. */
+function headRow(style: TemplateStyle): { className: string; style?: CSSProperties } {
+  switch (style.tableHead) {
+    case 'soft':
+      return { className: 'text-black', style: { background: 'var(--doc-brand-soft)' } };
+    case 'plain':
+      return { className: 'border-b-2 border-gray-300 text-gray-600' };
+    case 'brand':
+    default:
+      return { className: '', style: { background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' } };
+  }
+}
+
+/** جدول البنود — رأس حسب النمط، ترقيم وصفوف متناوبة، أرقام بمحاذاة النهاية. */
 export function DocItemsTable({
   model,
   formatMoney,
@@ -12,11 +28,13 @@ export function DocItemsTable({
   formatMoney: (minor: number) => string;
 }) {
   const t = useTranslations('invoiceDoc');
+  const style = useDocStyle();
+  const head = headRow(style);
 
   return (
-    <table className="mt-5 w-full border-collapse text-[11px]">
+    <table className={cn('w-full border-collapse text-[11px]', style.sectionGap)}>
       <thead>
-        <tr style={{ background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' }}>
+        <tr className={head.className} style={head.style}>
           <th className="p-2 text-start font-semibold">#</th>
           <th className="p-2 text-start font-semibold">{t('description')}</th>
           <th className="p-2 text-end font-semibold">{t('qty')}</th>
