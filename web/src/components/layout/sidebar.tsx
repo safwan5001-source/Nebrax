@@ -163,9 +163,6 @@ const GROUPS: NavGroup[] = [
   },
 ];
 
-/** مفتاح حفظ حالة طيّ/فتح المجموعات عبر الجلسات. */
-const SIDEBAR_GROUPS_KEY = 'nibras.sidebar.groups';
-
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const t = useTranslations('nav');
@@ -177,31 +174,18 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   // المجموعة التي تضمّ المسار الحالي — تبقى مفتوحة تلقائياً.
   const activeGroup = GROUPS.find((g) => g.items.some((it) => isActive(it.href)))?.title;
 
-  // تفضيلات المستخدم لطيّ/فتح المجموعات — تُحفظ عبر الجلسات في localStorage.
-  // الافتراضي: الكل مفتوح (سلوك أول زيارة). القراءة بعد التركيب تفادياً لعدم تطابق SSR.
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(GROUPS.map((g) => [g.title, true]))
-  );
+  // نمط Accordion حصري: مجموعة واحدة مفتوحة دائماً، تُشتق من المسار النشط.
+  // الافتراضي = مجموعة الصفحة الحالية (أو الأولى إن كان المسار خارج المجموعات كاللوحة).
+  const [openGroup, setOpenGroup] = useState<string>(activeGroup ?? GROUPS[0].title);
 
+  // التنقّل لصفحة في مجموعة أخرى (رابط مباشر/بحث) يفتحها تلقائياً ويُغلق سواها.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(SIDEBAR_GROUPS_KEY);
-      if (saved) setOpenGroups((prev) => ({ ...prev, ...(JSON.parse(saved) as Record<string, boolean>) }));
-    } catch {
-      /* تخزين تالف أو غير متاح — نُبقي الافتراضي */
-    }
-  }, []);
+    if (activeGroup) setOpenGroup(activeGroup);
+  }, [activeGroup]);
 
-  const toggleGroup = (title: string) =>
-    setOpenGroups((prev) => {
-      const next = { ...prev, [title]: !prev[title] };
-      try {
-        localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(next));
-      } catch {
-        /* تجاهل فشل الكتابة */
-      }
-      return next;
-    });
+  // فتح حصري: النقر يفتح المجموعة المختارة (فتُغلق الأخرى)؛ ولا يُغلق الكل —
+  // النقر على المفتوحة يُبقيها مفتوحة (تبقى مجموعة واحدة نشطة دائماً).
+  const openExclusive = (title: string) => setOpenGroup(title);
 
   return (
     <>
@@ -247,13 +231,13 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           </Link>
 
           {GROUPS.map((group) => {
-            // المجموعة الحاوية للصفحة الحالية تظهر مفتوحة دائماً (دون تعديل التفضيل المحفوظ).
-            const expanded = openGroups[group.title] || group.title === activeGroup;
+            // Accordion حصري: المجموعة مفتوحة فقط إن كانت هي المجموعة النشطة الوحيدة.
+            const expanded = openGroup === group.title;
             return (
               <div key={group.title} className="mb-2">
                 <button
                   type="button"
-                  onClick={() => toggleGroup(group.title)}
+                  onClick={() => openExclusive(group.title)}
                   aria-expanded={expanded}
                   className="flex w-full items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-muted hover:text-text"
                 >
@@ -265,8 +249,15 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                   )}
                 </button>
 
-                {expanded && (
-                  <div className="mt-0.5 flex flex-col gap-0.5">
+                {/* انتقال ارتفاع سلس (grid-rows 0fr↔1fr) — المحتوى يبقى في DOM ويُطوى بنعومة. */}
+                <div
+                  className={cn(
+                    'grid transition-[grid-template-rows] duration-200 ease-out',
+                    expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                  )}
+                >
+                  <div className={cn('overflow-hidden', !expanded && 'pointer-events-none')} aria-hidden={!expanded}>
+                  <div className="flex flex-col gap-0.5 pt-0.5">
                     {group.items.map((item) => {
                       const Icon = item.icon;
                       const active = isActive(item.href);
@@ -294,7 +285,8 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                       );
                     })}
                   </div>
-                )}
+                  </div>
+                </div>
               </div>
             );
           })}
