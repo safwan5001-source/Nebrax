@@ -41,6 +41,36 @@ class InvoiceController extends ApiController
         return (new InvoiceResource(Invoice::with('lines')->findOrFail($id)))->response();
     }
 
+    /**
+     * تعديل فاتورة مسوّدة (draft فقط) — نفس تحقّق المراجع في store.
+     * المرحّلة immutable؛ الخدمة ترفضها (422).
+     */
+    public function update(StoreInvoiceRequest $request, string $id): JsonResponse
+    {
+        $invoice = Invoice::findOrFail($id); // عزل تلقائي بالمستأجر
+        $data = $request->validated();
+
+        Partner::findOrFail($data['partner_id']);
+        $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
+        $this->assertTenantOwned(Employee::class, $data['salesperson_id'] ?? null, 'مسؤول المبيعات');
+        $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
+
+        $updated = $this->domain(fn () => $this->invoices->update($invoice, $data, $data['items']));
+
+        return (new InvoiceResource($updated->load('lines')))->response();
+    }
+
+    /**
+     * حذف فاتورة مسوّدة (draft فقط). المرحّلة لا تُحذف (سلامة الأثر المحاسبي).
+     */
+    public function destroy(string $id): JsonResponse
+    {
+        $invoice = Invoice::findOrFail($id);
+        $this->domain(fn () => $this->invoices->deleteDraft($invoice));
+
+        return response()->json(['message' => 'تم الحذف.']);
+    }
+
     public function post(string $id): JsonResponse
     {
         $invoice = Invoice::findOrFail($id);

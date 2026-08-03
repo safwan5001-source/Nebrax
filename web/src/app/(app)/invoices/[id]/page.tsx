@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { api } from '@/lib/api';
@@ -249,38 +248,17 @@ export default function InvoiceDetailPage() {
         </Card>
       </div>
 
+      {/* معاينة قالب الفاتورة الضريبية A4 (مرئية على الشاشة + مصدر الطباعة/الـ PDF) */}
       <Card>
-        <CardHeader>
-          <CardTitle>{t('lines')}</CardTitle>
+        <CardHeader className="no-print">
+          <CardTitle>{t('preview')}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <THead>
-              <TR>
-                <TH>{t('description')}</TH>
-                <TH className="text-end">{t('qty')}</TH>
-                <TH className="text-end">{t('unit_price')}</TH>
-                <TH className="text-end">{t('tax')}</TH>
-                <TH className="text-end">{ti('total')}</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {invoice.lines.map((l) => (
-                <TR key={l.id}>
-                  <TD>{l.description ?? '—'}</TD>
-                  <TD className="num text-end">{l.quantity}</TD>
-                  <TD className="num text-end">{formatRiyal(l.unit_price)}</TD>
-                  <TD className="num text-end">{formatRiyal(l.line_tax)}</TD>
-                  <TD className="num text-end">{formatRiyal(l.line_total)}</TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
+        <CardContent className="print:p-0">
+          <div className="overflow-x-auto rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
+            <InvoiceDocument invoice={invoice} company={company} customer={customer} qr={zatca?.qr ?? null} />
+          </div>
         </CardContent>
       </Card>
-
-      {/* مستند الفاتورة الضريبية A4 — يظهر عند الطباعة / حفظ PDF فقط */}
-      <InvoiceDocument invoice={invoice} company={company} customer={customer} qr={zatca?.qr ?? null} />
     </div>
   );
 }

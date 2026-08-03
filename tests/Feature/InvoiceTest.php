@@ -491,4 +491,70 @@ class InvoiceTest extends TestCase
         $posted = $this->invoices->post($invoice); // نقدي لا يُنشئ ذمّة ⇒ لا يتأثر بالحد
         $this->assertTrue($posted->isPosted());
     }
+
+    /** @test */
+    public function a_draft_invoice_can_be_edited_and_totals_recomputed(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]] // 1000 + 150 = 1150
+        );
+        $this->assertEquals(115000, $invoice->total);
+
+        $updated = $this->invoices->update(
+            $invoice,
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 2, 'unit_price' => 100000, 'tax_rate' => 15]] // 2000 + 300 = 2300
+        );
+
+        $this->assertEquals(230000, $updated->total);
+        $this->assertEquals('credit', $updated->payment_type);
+        $this->assertCount(1, $updated->lines);            // السطر القديم استُبدل (لا تراكم)
+        $this->assertTrue($updated->isDraft());
+    }
+
+    /** @test */
+    public function a_posted_invoice_cannot_be_edited(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $this->invoices->post($invoice);
+
+        $this->expectException(\RuntimeException::class);
+        $this->invoices->update(
+            $invoice,
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 5, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+    }
+
+    /** @test */
+    public function a_draft_invoice_can_be_deleted_with_its_lines(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $id = $invoice->id;
+
+        $this->invoices->deleteDraft($invoice);
+
+        $this->assertNull(Invoice::find($id));
+        $this->assertEquals(0, \App\Models\InvoiceLine::where('invoice_id', $id)->count());
+    }
+
+    /** @test */
+    public function a_posted_invoice_cannot_be_deleted(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $this->invoices->post($invoice);
+
+        $this->expectException(\RuntimeException::class);
+        $this->invoices->deleteDraft($invoice);
+    }
 }

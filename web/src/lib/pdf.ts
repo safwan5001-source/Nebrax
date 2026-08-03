@@ -1,6 +1,6 @@
 // توليد PDF من عنصر مستند HTML (html2canvas + jsPDF)، مع تنزيل ومشاركة كملف.
 // المكتبتان تُستورَدان ديناميكياً فلا تُثقلان الحزمة الأساسية.
-// العنصر print-only (display:none)؛ نُظهره بتخطيط كامل خارج الشاشة أثناء الالتقاط.
+// العنصر مرئيّ على الشاشة (#print-root)؛ يُلتقَط في مكانه بعرض A4 كامل.
 
 async function elementToPdfBlob(el: HTMLElement): Promise<Blob> {
   const [{ default: html2canvas }, jspdf] = await Promise.all([
@@ -9,38 +9,29 @@ async function elementToPdfBlob(el: HTMLElement): Promise<Blob> {
   ]);
   const JsPDF = jspdf.jsPDF;
 
-  const prev = el.getAttribute('style') ?? '';
-  el.setAttribute(
-    'style',
-    'display:block;position:fixed;top:0;left:-10000px;width:210mm;background:#ffffff;z-index:-1;'
-  );
-  try {
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      windowWidth: el.scrollWidth,
-    });
-    const img = canvas.toDataURL('image/png');
-    const pdf = new JsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    const pw = pdf.internal.pageSize.getWidth(); // 210
-    const ph = pdf.internal.pageSize.getHeight(); // 297
-    const imgH = (canvas.height * pw) / canvas.width;
+  const canvas = await html2canvas(el, {
+    scale: 2,
+    backgroundColor: '#ffffff',
+    useCORS: true,
+    windowWidth: el.scrollWidth,
+  });
+  const img = canvas.toDataURL('image/png');
+  const pdf = new JsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  const pw = pdf.internal.pageSize.getWidth(); // 210
+  const ph = pdf.internal.pageSize.getHeight(); // 297
+  const imgH = (canvas.height * pw) / canvas.width;
 
-    let heightLeft = imgH;
-    let position = 0;
+  let heightLeft = imgH;
+  let position = 0;
+  pdf.addImage(img, 'PNG', 0, position, pw, imgH);
+  heightLeft -= ph;
+  while (heightLeft > 0) {
+    position -= ph;
+    pdf.addPage();
     pdf.addImage(img, 'PNG', 0, position, pw, imgH);
     heightLeft -= ph;
-    while (heightLeft > 0) {
-      position -= ph;
-      pdf.addPage();
-      pdf.addImage(img, 'PNG', 0, position, pw, imgH);
-      heightLeft -= ph;
-    }
-    return pdf.output('blob');
-  } finally {
-    el.setAttribute('style', prev);
   }
+  return pdf.output('blob');
 }
 
 function triggerDownload(blob: Blob, filename: string): void {

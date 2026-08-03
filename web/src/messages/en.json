@@ -158,7 +158,17 @@
     "create": "New invoice",
     "empty": "No invoices",
     "load_error": "Could not load invoices.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "view": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "posted_locked": "Posted — locked (correct via credit note)",
+    "delete_title": "Delete invoice",
+    "delete_confirm": "Delete invoice",
+    "retry_cancel": "Cancel",
+    "generating_delete": "Deleting…",
+    "deleted": "Invoice deleted",
+    "delete_failed": "Delete failed"
   },
   "invoiceForm": {
     "title": "New sales invoice",
@@ -214,7 +224,8 @@
     "salesperson": "Salesperson",
     "no_salesperson": "None",
     "summary_title": "Invoice summary",
-    "summary_hint": "Totals are derived from the lines — never entered manually. Discount reduces revenue and VAT."
+    "summary_hint": "Totals are derived from the lines — never entered manually. Discount reduces revenue and VAT.",
+    "edit_title": "Edit invoice"
   },
   "invoiceDetail": {
     "back": "Back",
@@ -241,7 +252,8 @@
     "generating": "Generating…",
     "shared_ok": "Shared",
     "downloaded_ok": "Downloaded",
-    "export_failed": "Export failed"
+    "export_failed": "Export failed",
+    "preview": "Invoice preview"
   },
   "invoiceDoc": {
     "title": "Tax Invoice",

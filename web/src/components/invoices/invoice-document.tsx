@@ -35,8 +35,8 @@ export interface Customer {
 
 /**
  * مستند فاتورة ضريبية A4 (RTL) — تصميم احترافي.
- * يُعرَض داخل #print-root.print-only: مخفيّ على الشاشة، يظهر عند الطباعة،
- * ويُلتقَط أيضاً لتوليد PDF (lib/pdf.ts). العربية يرسمها المتصفح.
+ * مرئيّ على الشاشة كمعاينة (#print-root)، ويُعزَل وحده عند الطباعة عبر @media print،
+ * ويُلتقَط لتوليد PDF (lib/pdf.ts). العربية يرسمها المتصفح (نصّ حقيقي).
  */
 export function InvoiceDocument({
   invoice,
@@ -61,8 +61,8 @@ export function InvoiceDocument({
     ) : null;
 
   return (
-    <div id="print-root" className="print-only">
-      <div className="mx-auto flex min-h-[277mm] max-w-[210mm] flex-col bg-white p-8 text-[12px] leading-relaxed text-black">
+    <div id="print-root">
+      <div className="mx-auto flex min-h-[277mm] w-[210mm] max-w-[210mm] flex-col bg-white p-8 text-[12px] leading-relaxed text-black shadow-lg print:min-h-0 print:w-full print:shadow-none">
         {/* ═══ الترويسة ═══ */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
