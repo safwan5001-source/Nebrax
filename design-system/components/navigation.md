@@ -2,14 +2,16 @@
 
 ## Sidebar (`layout/sidebar.tsx`)
 
-Anatomy: `fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-border bg-surface`.
+Anatomy: `fixed inset-y-0 start-0 z-50 flex w-64 flex-col border-e border-border bg-surface`.
 
-- **العرض `w-72` (288px).** ثابت على `lg+`؛ درج منزلق أصغر منها (`transition-transform duration-200`).
+- **العرض:** درج جوال `w-64` (256px)؛ ثابت على `lg+` بعرض أضيق `lg:w-56` (224px) — يوسّع مساحة
+  المحتوى مع بقاء تسميات الأقسام العربية على سطر واحد (`transition-transform duration-200`).
 - **مجمّع حسب خريطة الوحدات الثماني** (المبيعات، العملاء، المخزون، الحسابات، الموارد البشرية،
   التشغيل، اللوجستيات، النظام). كل مجموعة: عنوان خافت صغير + روابطها.
-- **مجموعات قابلة للطيّ** (`ChevronDown`).
-- **الرابط:** `flex h-9 items-center gap-2.5 rounded px-2.5 text-sm text-muted hover:bg-primary-soft hover:text-primary`
-  + أيقونة Lucide `h-[18px]`.
+- **مجموعات قابلة للطيّ** (`ChevronDown`) مع **تذكّر الحالة عبر الجلسات** (`localStorage`:
+  `nibras.sidebar.groups`)؛ المجموعة الحاوية للصفحة الحالية تُفتح تلقائياً دون تعديل التفضيل المحفوظ.
+- **الرابط:** `flex h-9 items-center gap-2 rounded px-2 text-sm text-muted hover:bg-primary-soft hover:text-primary`
+  + أيقونة Lucide `h-4`.
 - **النشط:** `bg-primary-soft font-medium text-primary` + مؤشّر خطّ جانبي
   `absolute inset-y-1.5 start-0 w-0.5 bg-primary`.
 - الوحدات غير المبنية: شارة **«قريباً»**.

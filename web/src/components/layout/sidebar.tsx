@@ -163,6 +163,9 @@ const GROUPS: NavGroup[] = [
   },
 ];
 
+/** مفتاح حفظ حالة طيّ/فتح المجموعات عبر الجلسات. */
+const SIDEBAR_GROUPS_KEY = 'nibras.sidebar.groups';
+
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const t = useTranslations('nav');
@@ -174,16 +177,31 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   // المجموعة التي تضمّ المسار الحالي — تبقى مفتوحة تلقائياً.
   const activeGroup = GROUPS.find((g) => g.items.some((it) => isActive(it.href)))?.title;
 
+  // تفضيلات المستخدم لطيّ/فتح المجموعات — تُحفظ عبر الجلسات في localStorage.
+  // الافتراضي: الكل مفتوح (سلوك أول زيارة). القراءة بعد التركيب تفادياً لعدم تطابق SSR.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(GROUPS.map((g) => [g.title, true]))
   );
 
   useEffect(() => {
-    if (activeGroup) setOpenGroups((prev) => ({ ...prev, [activeGroup]: true }));
-  }, [activeGroup]);
+    try {
+      const saved = localStorage.getItem(SIDEBAR_GROUPS_KEY);
+      if (saved) setOpenGroups((prev) => ({ ...prev, ...(JSON.parse(saved) as Record<string, boolean>) }));
+    } catch {
+      /* تخزين تالف أو غير متاح — نُبقي الافتراضي */
+    }
+  }, []);
 
   const toggleGroup = (title: string) =>
-    setOpenGroups((prev) => ({ ...prev, [title]: !prev[title] }));
+    setOpenGroups((prev) => {
+      const next = { ...prev, [title]: !prev[title] };
+      try {
+        localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(next));
+      } catch {
+        /* تجاهل فشل الكتابة */
+      }
+      return next;
+    });
 
   return (
     <>
@@ -192,8 +210,8 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
 
       <aside
         className={cn(
-          'no-print fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-border bg-surface transition-transform duration-200',
-          'lg:static lg:z-auto lg:w-60 lg:shrink-0 lg:translate-x-0',
+          'no-print fixed inset-y-0 start-0 z-50 flex w-64 flex-col border-e border-border bg-surface transition-transform duration-200',
+          'lg:static lg:z-auto lg:w-56 lg:shrink-0 lg:translate-x-0',
           open ? 'translate-x-0' : 'max-lg:rtl:translate-x-full max-lg:ltr:-translate-x-full'
         )}
       >
@@ -217,28 +235,29 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             href="/dashboard"
             onClick={onClose}
             className={cn(
-              'relative mb-3 flex h-9 items-center gap-2.5 rounded px-2.5 text-sm text-muted hover:bg-primary-soft hover:text-primary',
+              'relative mb-3 flex h-9 items-center gap-2 rounded px-2 text-sm text-muted hover:bg-primary-soft hover:text-primary',
               isActive('/dashboard') && 'bg-primary-soft font-medium text-primary'
             )}
           >
             {isActive('/dashboard') && (
               <span className="absolute inset-y-1.5 start-0 w-0.5 rounded bg-primary" />
             )}
-            <LayoutDashboard className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
+            <LayoutDashboard className="h-4 w-4 shrink-0" strokeWidth={1.7} />
             {t('dashboard')}
           </Link>
 
           {GROUPS.map((group) => {
-            const expanded = openGroups[group.title];
+            // المجموعة الحاوية للصفحة الحالية تظهر مفتوحة دائماً (دون تعديل التفضيل المحفوظ).
+            const expanded = openGroups[group.title] || group.title === activeGroup;
             return (
               <div key={group.title} className="mb-2">
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.title)}
                   aria-expanded={expanded}
-                  className="flex w-full items-center gap-1 rounded px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-muted/70 hover:text-muted"
+                  className="flex w-full items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-muted hover:text-text"
                 >
-                  <span>{t(`groups.${group.title}`)}</span>
+                  <span className="min-w-0 truncate">{t(`groups.${group.title}`)}</span>
                   {expanded ? (
                     <ChevronDown className="ms-auto h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
                   ) : (
@@ -257,14 +276,14 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                           href={item.href}
                           onClick={onClose}
                           className={cn(
-                            'relative flex h-9 items-center gap-2.5 rounded px-2.5 text-sm text-muted hover:bg-primary-soft hover:text-primary',
+                            'relative flex h-9 items-center gap-2 rounded px-2 text-sm text-muted hover:bg-primary-soft hover:text-primary',
                             active && 'bg-primary-soft font-medium text-primary'
                           )}
                         >
                           {active && (
                             <span className="absolute inset-y-1.5 start-0 w-0.5 rounded bg-primary" />
                           )}
-                          <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
+                          <Icon className="h-4 w-4 shrink-0" strokeWidth={1.7} />
                           <span className="truncate">{t(item.key)}</span>
                           {!item.built && (
                             <span className="ms-auto shrink-0 rounded bg-border px-1.5 py-0.5 text-[10px] font-normal text-muted">
