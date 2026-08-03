@@ -157,7 +157,17 @@
     "saving": "Saving…",
     "saved": "Design settings saved",
     "save_failed": "Could not save settings",
-    "preview": "Live preview"
+    "preview": "Live preview",
+    "layout_title": "Section layout (drag to reorder)",
+    "layout_reset": "Reset to default"
+  },
+  "documentSections": {
+    "header": "Header",
+    "barcode": "Barcode",
+    "parties": "Parties",
+    "items": "Items",
+    "summary": "Totals",
+    "footer": "Footer"
   },
   "themeColors": {
     "blue": "Blue",

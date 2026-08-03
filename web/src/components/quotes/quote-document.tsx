@@ -1,6 +1,6 @@
 'use client';
 
-import type { ThemeId } from '@/modules/documents/types';
+import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import { buildQuoteDocumentModel, type SourceQuote } from '@/modules/documents/builder/from-quote';
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
@@ -20,6 +20,7 @@ export function QuoteDocument({
   showLogo = true,
   logoUrl,
   logoHeight,
+  layout,
   rootId,
 }: {
   quote: QuoteDoc;
@@ -31,10 +32,11 @@ export function QuoteDocument({
   showLogo?: boolean;
   logoUrl?: string | null;
   logoHeight?: number | null;
+  layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
 }) {
   const model = buildQuoteDocumentModel({ quote, company, customer, footerText, logoUrl, logoHeight });
   return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} rootId={rootId} />
+    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />
   );
 }

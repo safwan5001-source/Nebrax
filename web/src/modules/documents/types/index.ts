@@ -164,6 +164,18 @@ export interface TemplateStyle {
   brandBar: boolean;
 }
 
+/** مفاتيح الأقسام القابلة للترتيب/الإظهار في مصمّم المستند. */
+export type DocSectionKey = 'header' | 'barcode' | 'parties' | 'items' | 'summary' | 'footer';
+
+/** عنصر تخطيط: قسم + ظهوره. ترتيب المصفوفة = ترتيب العرض. */
+export interface DocSectionLayoutItem {
+  key: DocSectionKey;
+  visible: boolean;
+}
+
+/** الترتيب الافتراضي للأقسام (يطابق التركيب الأصلي). */
+export const DEFAULT_SECTION_ORDER: DocSectionKey[] = ['header', 'barcode', 'parties', 'items', 'summary', 'footer'];
+
 /** خصائص كل قالب — يستقبل النموذج ومنسّق العملة والثيم والإعداد. */
 export interface DocumentTemplateProps {
   model: DocumentModel;
@@ -171,6 +183,8 @@ export interface DocumentTemplateProps {
   /** منسّق مبلغ (وحدات صغرى) → نصّ العملة. */
   formatMoney: (minor: number) => string;
   sections?: Partial<TemplateSectionsConfig>;
+  /** تخطيط مخصّص (ترتيب/إظهار الأقسام) من مصمّم المستند؛ يتجاوز الترتيب الافتراضي. */
+  layout?: DocSectionLayoutItem[] | null;
   /**
    * معرّف عنصر الجذر: 'print-root' (افتراضي) لمصدر الطباعة/التصدير،
    * أو `null` لمعاينة لا تخطف الطباعة (كمعاينة الإعدادات).

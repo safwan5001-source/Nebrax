@@ -157,7 +157,17 @@
     "saving": "جارٍ الحفظ…",
     "saved": "حُفظت إعدادات التصاميم",
     "save_failed": "تعذّر حفظ الإعدادات",
-    "preview": "معاينة حيّة"
+    "preview": "معاينة حيّة",
+    "layout_title": "ترتيب الأقسام (اسحب لإعادة الترتيب)",
+    "layout_reset": "استعادة الافتراضي"
+  },
+  "documentSections": {
+    "header": "الترويسة",
+    "barcode": "الباركود",
+    "parties": "الأطراف",
+    "items": "البنود",
+    "summary": "الإجماليات",
+    "footer": "التذييل"
   },
   "themeColors": {
     "blue": "أزرق",
