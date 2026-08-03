@@ -45,8 +45,11 @@ export function buildInvoiceDocumentModel(input: {
   qr: string | null;
   /** نصّ تذييل مخصّص (من إعدادات التصاميم)؛ يتراجع لنصّ الترجمة حين فارغ. */
   footerText?: string | null;
+  /** شعار مرفوع (data URL) وارتفاعه بالبكسل — من إعدادات التصاميم. */
+  logoUrl?: string | null;
+  logoHeight?: number | null;
 }): DocumentModel {
-  const { invoice, company, customer, qr, footerText } = input;
+  const { invoice, company, customer, qr, footerText, logoUrl, logoHeight } = input;
 
   return {
     type: 'tax_invoice',
@@ -58,6 +61,8 @@ export function buildInvoiceDocumentModel(input: {
       crNumber: company?.cr_number ?? null,
       tagline: null,
       logoText: null,
+      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : null,
+      logoHeight: logoHeight ?? null,
     },
     buyer: {
       name: customer?.name ?? '—',

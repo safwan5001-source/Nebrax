@@ -32,7 +32,7 @@ class SalesConfigController extends ApiController
             ['name' => 'Tax Free', 'rate' => 0, 'inclusive' => false],
         ],
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
-        'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'accent_color' => '#2563EB', 'footer_text' => ''],
+        'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'accent_color' => '#2563EB', 'footer_text' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
         'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'allow_discount' => true, 'receipt_footer' => ''],
     ];

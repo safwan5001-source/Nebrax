@@ -30,8 +30,10 @@ export function buildQuoteDocumentModel(input: {
   company: SourceCompany | null;
   customer: SourceCustomer | null;
   footerText?: string | null;
+  logoUrl?: string | null;
+  logoHeight?: number | null;
 }): DocumentModel {
-  const { quote, company, customer, footerText } = input;
+  const { quote, company, customer, footerText, logoUrl, logoHeight } = input;
 
   return {
     type: 'quotation',
@@ -43,6 +45,8 @@ export function buildQuoteDocumentModel(input: {
       crNumber: company?.cr_number ?? null,
       tagline: null,
       logoText: null,
+      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : null,
+      logoHeight: logoHeight ?? null,
     },
     buyer: {
       name: customer?.name ?? '—',

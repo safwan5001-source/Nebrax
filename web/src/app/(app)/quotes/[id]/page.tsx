@@ -47,6 +47,8 @@ export default function QuoteDetailPage() {
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
   const [showLogo, setShowLogo] = useState(true);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoHeight, setLogoHeight] = useState<number | null>(null);
 
   function load() {
     setLoading(true);
@@ -56,7 +58,7 @@ export default function QuoteDetailPage() {
         const [p, m, d] = await Promise.allSettled([
           api<{ data: QuoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: QuoteCompany }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean } }>(`/sales-config/designs`),
+          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number } }>(`/sales-config/designs`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
@@ -66,6 +68,8 @@ export default function QuoteDetailPage() {
           if (dg.theme) setThemeId(dg.theme as ThemeId);
           setFooterText(dg.footer_text ?? null);
           setShowLogo(dg.show_logo !== false);
+          setLogoUrl(dg.logo ?? null);
+          setLogoHeight(dg.logo_height ?? null);
         }
       })
       .finally(() => setLoading(false));
@@ -170,6 +174,8 @@ export default function QuoteDetailPage() {
               themeId={themeId}
               footerText={footerText}
               showLogo={showLogo}
+              logoUrl={logoUrl}
+              logoHeight={logoHeight}
             />
           </div>
         </CardContent>
