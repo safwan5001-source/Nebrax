@@ -21,6 +21,7 @@ class StoreInvoiceRequest extends FormRequest
             'discount'            => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — خصم على مستوى الفاتورة
             'shipping'            => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — رسوم الشحن (قبل الضريبة)
             'adjustment'          => ['nullable', 'integer', 'min:-100000000000', 'max:100000000000'],          // هللات — تسوية/تقريب (+/−)
+            'tax_inclusive'       => ['nullable', 'boolean'], // هل أسعار السطور متضمّنة الضريبة (تُستخرَج) أم لا (تُضاف)
             'cost_center_id'      => ['nullable', 'uuid'],
             'salesperson_id'      => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],

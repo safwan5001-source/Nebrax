@@ -557,4 +557,80 @@ class InvoiceTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->invoices->deleteDraft($invoice);
     }
+
+    /** @test */
+    public function tax_inclusive_invoice_extracts_tax_from_the_price(): void
+    {
+        // سعر متضمِّن 1150.00 عند 15% ⇒ صافي 1000.00، ضريبة 150.00، إجمالي 1150.00 (لا يُضاف فوقه).
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'tax_inclusive' => true],
+            [['quantity' => 1, 'unit_price' => 115000, 'tax_rate' => 15]]
+        );
+
+        $this->assertTrue($invoice->tax_inclusive);
+        $this->assertSame(100000, $invoice->subtotal);   // الصافي مُستخرَج
+        $this->assertSame(15000,  $invoice->tax_amount);
+        $this->assertSame(115000, $invoice->total);       // = السعر المتضمِّن (لا تُضاف الضريبة فوقه)
+
+        $posted = $this->invoices->post($invoice);
+
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)
+            ->where('source_id', $posted->id)
+            ->firstOrFail();
+
+        // القيد متوازن ويستخرج الضريبة: مدين 1110 = 115000، دائن 4110 = 100000، دائن 2120 = 15000
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(115000, $this->line($entry, '1110')->debit);
+        $this->assertEquals(100000, $this->line($entry, '4110')->credit);
+        $this->assertEquals(15000,  $this->line($entry, '2120')->credit);
+        $this->assertSame($posted->total, $posted->subtotal + $posted->tax_amount);
+    }
+
+    /** @test */
+    public function tax_inclusive_invoice_with_line_discount_stays_consistent(): void
+    {
+        // سعر متضمِّن 1150.00 وخصم سطر متضمِّن 115.00 ⇒ بعد الخصم 1035.00 متضمِّن
+        // ⇒ ضريبة مُستخرَجة 135.00، صافي 900.00، إجمالي 1035.00.
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit', 'tax_inclusive' => true],
+            [['quantity' => 1, 'unit_price' => 115000, 'tax_rate' => 15, 'discount' => 11500]]
+        );
+
+        $this->assertSame(90000, $invoice->subtotal);
+        $this->assertSame(13500, $invoice->tax_amount);
+        $this->assertSame(103500, $invoice->total);
+
+        // السطر: (line_subtotal − line_discount) = الصافي، و line_total = المبلغ المتضمِّن بعد الخصم
+        $line = $invoice->lines->first();
+        $this->assertSame(90000, (int) $line->line_subtotal - (int) $line->line_discount);
+        $this->assertSame(13500, (int) $line->line_tax);
+        $this->assertSame(103500, (int) $line->line_total);
+
+        // الترحيل يوازن ويطابق الإجماليات المشتقّة من السطور
+        $posted = $this->invoices->post($invoice);
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)
+            ->where('source_id', $posted->id)
+            ->firstOrFail();
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(103500, $this->line($entry, '1130')->debit);
+        $this->assertEquals(90000,  $this->line($entry, '4110')->credit);
+        $this->assertEquals(13500,  $this->line($entry, '2120')->credit);
+    }
+
+    /** @test */
+    public function default_invoice_remains_tax_exclusive(): void
+    {
+        // بلا الراية: السلوك الافتراضي (الضريبة تُضاف فوق السعر) — توافق رجعي.
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $this->assertFalse($invoice->tax_inclusive);
+        $this->assertSame(100000, $invoice->subtotal);
+        $this->assertSame(15000,  $invoice->tax_amount);
+        $this->assertSame(115000, $invoice->total); // الضريبة أُضيفت فوق السعر
+    }
 }

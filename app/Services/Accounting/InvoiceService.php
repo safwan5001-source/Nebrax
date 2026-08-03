@@ -63,6 +63,7 @@ class InvoiceService
                 'salesperson_id' => $data['salesperson_id'] ?? null,
                 'shipping'     => max(0, (int) ($data['shipping'] ?? 0)),
                 'adjustment'   => (int) ($data['adjustment'] ?? 0),
+                'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
                 'status'       => 'draft',
                 'notes'        => $data['notes'] ?? null,
                 'created_by'   => $data['created_by'] ?? null,
@@ -100,6 +101,7 @@ class InvoiceService
                 'due_date'       => $data['due_date'] ?? null,
                 'cost_center_id' => $data['cost_center_id'] ?? null,
                 'salesperson_id' => $data['salesperson_id'] ?? null,
+                'tax_inclusive'  => (bool) ($data['tax_inclusive'] ?? false),
                 'notes'          => $data['notes'] ?? null,
             ]);
 
@@ -130,6 +132,8 @@ class InvoiceService
      */
     private function applyItemsAndTotals(Invoice $invoice, array $items, array $data): void
     {
+        // وضع الاحتساب: هل أسعار السطور متضمّنة الضريبة (تُستخرَج) أم لا (تُضاف فوقها).
+        $inclusive = (bool) ($data['tax_inclusive'] ?? $invoice->tax_inclusive ?? false);
         $subtotal = $taxTotal = 0;
 
         foreach ($items as $item) {
@@ -142,12 +146,30 @@ class InvoiceService
                 throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
             }
 
-            $lineSubtotal = $qty * $unitPrice;                 // إجمالي السطر قبل خصم السطر
-            if ($lineDisc < 0 || $lineDisc > $lineSubtotal) {
+            $lineGross = $qty * $unitPrice;                    // إجمالي السطر قبل خصمه (متضمِّن أو غير متضمِّن حسب الوضع)
+            if ($lineDisc < 0 || $lineDisc > $lineGross) {
                 throw new RuntimeException('خصم السطر لا يمكن أن يتجاوز إجمالي السطر.');
             }
-            $lineNet = $lineSubtotal - $lineDisc;               // الأساس الخاضع بعد خصم السطر
-            $lineTax = $this->calcTax($lineNet, $rate);
+            $discounted = $lineGross - $lineDisc;
+
+            if ($inclusive) {
+                // السعر متضمِّن الضريبة: نستخرج الضريبة من المبلغ بعد الخصم.
+                // نخزّن الصافي (قبل الضريبة) في line_subtotal/line_discount حتى يبقى
+                // (line_subtotal − line_discount) = الأساس الخاضع الصافي، فيعمل post() دون تغيير.
+                $lineTax  = $this->extractTax($discounted, $rate);
+                $lineNet  = $discounted - $lineTax;            // الأساس الخاضع بعد الخصم
+                $discNet  = $lineDisc - $this->extractTax($lineDisc, $rate); // الجزء الصافي من الخصم
+                $storedSubtotal = $lineNet + $discNet;         // صافي الإجمالي قبل الخصم
+                $storedDiscount = $discNet;
+                $lineTotal = $lineNet + $lineTax;              // = المبلغ المتضمِّن بعد الخصم
+            } else {
+                // السعر غير متضمِّن: الضريبة تُضاف فوق الصافي (السلوك الافتراضي).
+                $lineNet  = $discounted;                       // الأساس الخاضع بعد الخصم
+                $lineTax  = $this->calcTax($lineNet, $rate);
+                $storedSubtotal = $lineGross;
+                $storedDiscount = $lineDisc;
+                $lineTotal = $lineNet + $lineTax;
+            }
 
             InvoiceLine::create([
                 'invoice_id'    => $invoice->id,
@@ -156,10 +178,10 @@ class InvoiceService
                 'quantity'      => $qty,
                 'unit_price'    => $unitPrice,
                 'tax_rate'      => $rate,
-                'line_subtotal' => $lineSubtotal,
-                'line_discount' => $lineDisc,
+                'line_subtotal' => $storedSubtotal,
+                'line_discount' => $storedDiscount,
                 'line_tax'      => $lineTax,
-                'line_total'    => $lineNet + $lineTax,
+                'line_total'    => $lineTotal,
             ]);
 
             $subtotal += $lineNet;                             // إجمالي الفاتورة = مجموع صافي السطور
@@ -385,6 +407,20 @@ class InvoiceService
     protected function calcTax(int $base, int $rate): int
     {
         return intdiv($base * $rate + 50, 100);
+    }
+
+    /**
+     * استخراج الضريبة من مبلغ متضمِّن لها = المبلغ × (النسبة ÷ (100 + النسبة))،
+     * بتقريب نصفي لأعلى وبلا float. (متضمِّن 115 عند 15% ⇒ ضريبة 15، صافي 100.)
+     */
+    protected function extractTax(int $inclusive, int $rate): int
+    {
+        if ($rate <= 0 || $inclusive <= 0) {
+            return 0;
+        }
+        $denom = 100 + $rate;
+
+        return intdiv(2 * $inclusive * $rate + $denom, 2 * $denom); // round(inclusive×rate ÷ denom)
     }
 
     /**

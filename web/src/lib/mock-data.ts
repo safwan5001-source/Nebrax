@@ -985,15 +985,27 @@ function mockMovements(productId: string) {
 
 // إجمالي فاتورة من جسم الطلب (السطور بالهللات) → ريال نصّي.
 function invoiceTotalFromBody(body: unknown): string {
-  const b = body as { items?: { quantity?: number; unit_price?: number; tax_rate?: number; discount?: number }[]; discount?: number; shipping?: number; adjustment?: number } | undefined;
+  const b = body as { items?: { quantity?: number; unit_price?: number; tax_rate?: number; discount?: number }[]; discount?: number; shipping?: number; adjustment?: number; tax_inclusive?: boolean } | undefined;
   const items = b?.items ?? [];
-  // صافي كل سطر بعد خصم السطر.
-  const lineNet = (it: { quantity?: number; unit_price?: number; discount?: number }) => {
+  const inclusive = !!b?.tax_inclusive;
+  // المبلغ الخاضع لكل سطر بعد خصمه.
+  const lineDiscounted = (it: { quantity?: number; unit_price?: number; discount?: number }) => {
     const gross = (it.quantity ?? 0) * (it.unit_price ?? 0);
     return gross - Math.max(0, Math.min(Number(it.discount ?? 0), gross));
   };
+  // في وضع «متضمَّن» تُستخرَج الضريبة من المبلغ؛ وإلا تُضاف فوقه.
+  const lineNet = (it: { quantity?: number; unit_price?: number; tax_rate?: number; discount?: number }) => {
+    const d = lineDiscounted(it);
+    const r = it.tax_rate ?? 0;
+    return inclusive ? d - (r > 0 ? Math.round((d * r) / (100 + r)) : 0) : d;
+  };
+  const lineTax = (it: { quantity?: number; unit_price?: number; tax_rate?: number; discount?: number }) => {
+    const d = lineDiscounted(it);
+    const r = it.tax_rate ?? 0;
+    return inclusive ? (r > 0 ? Math.round((d * r) / (100 + r)) : 0) : Math.round((d * r) / 100);
+  };
   const subtotal = items.reduce((s, it) => s + lineNet(it), 0);
-  const taxGross = items.reduce((s, it) => s + Math.round((lineNet(it) * (it.tax_rate ?? 0)) / 100), 0);
+  const taxGross = items.reduce((s, it) => s + lineTax(it), 0);
   // الخصم على مستوى الفاتورة (net method) + الشحن الخاضع للضريبة — مطابق للـ backend.
   const discount = Math.max(0, Math.min(Number(b?.discount ?? 0), subtotal));
   const net = subtotal - discount;
