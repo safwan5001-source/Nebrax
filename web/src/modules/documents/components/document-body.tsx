@@ -1,6 +1,15 @@
 'use client';
 
-import type { DocumentTemplateProps, TemplateSectionsConfig, TemplateStyle } from '../types';
+import { Fragment, type ReactNode } from 'react';
+import type {
+  DocumentModel,
+  DocumentTemplateProps,
+  DocSectionKey,
+  DocSectionLayoutItem,
+  TemplateSectionsConfig,
+  TemplateStyle,
+} from '../types';
+import { DEFAULT_SECTION_ORDER } from '../types';
 import { DocLayout } from './sections/doc-layout';
 import { DocHeader } from './sections/doc-header';
 import { DocBarcode } from './sections/doc-barcode';
@@ -17,19 +26,54 @@ const DEFAULT_SECTIONS: TemplateSectionsConfig = {
   footer: true,
 };
 
+/** هل القسم ظاهر وفق أعلام الإعداد (للترتيب الافتراضي). */
+function isVisible(key: DocSectionKey, s: TemplateSectionsConfig): boolean {
+  switch (key) {
+    case 'header': return s.header;
+    case 'barcode': return s.barcode;
+    case 'parties': return s.seller || s.buyer || s.meta;
+    case 'items': return s.items;
+    case 'summary': return s.summary;
+    case 'footer': return s.footer;
+  }
+}
+
+/** رسم قسم واحد حسب مفتاحه. */
+function renderSection(
+  key: DocSectionKey,
+  model: DocumentModel,
+  formatMoney: (minor: number) => string,
+  s: TemplateSectionsConfig
+): ReactNode {
+  switch (key) {
+    case 'header': return <DocHeader model={model} showLogo={s.logo} />;
+    case 'barcode': return <div className="mt-3 flex justify-center"><DocBarcode value={model.meta.number} /></div>;
+    case 'parties': return <DocParties model={model} />;
+    case 'items': return <DocItemsTable model={model} formatMoney={formatMoney} />;
+    case 'summary': return <DocSummary model={model} formatMoney={formatMoney} showQr={s.qr} />;
+    case 'footer': return <DocFooter model={model} />;
+  }
+}
+
 /**
- * تركيب المستند المشترك — مصدر تركيب واحد لكل القوالب. كل قالب يمرّر أسلوبه
- * (`TemplateStyle`) فقط؛ لا تكرار في ترتيب الأقسام أو منطق الإظهار.
+ * تركيب المستند المشترك — مصدر تركيب واحد لكل القوالب. الأقسام تُرسَم وفق تخطيط
+ * مرتّب: إمّا `layout` المخصّص (من المصمّم) أو الترتيب الافتراضي مصفّى بأعلام الإظهار.
+ * الافتراضي (بلا layout) = نفس التركيب السابق تماماً.
  */
 export function DocumentBody({
   model,
   theme,
   formatMoney,
   sections,
+  layout,
   style,
   rootId,
 }: DocumentTemplateProps & { style: TemplateStyle }) {
   const s = { ...DEFAULT_SECTIONS, ...sections };
+  const items: DocSectionLayoutItem[] =
+    layout && layout.length > 0
+      ? layout
+      : DEFAULT_SECTION_ORDER.map((key) => ({ key, visible: isVisible(key, s) }));
 
   return (
     <DocLayout
@@ -39,16 +83,7 @@ export function DocumentBody({
       style={style}
       rootId={rootId}
     >
-      {s.header && <DocHeader model={model} showLogo={s.logo} />}
-      {s.barcode && (
-        <div className="mt-3 flex justify-center">
-          <DocBarcode value={model.meta.number} />
-        </div>
-      )}
-      {(s.seller || s.buyer || s.meta) && <DocParties model={model} />}
-      {s.items && <DocItemsTable model={model} formatMoney={formatMoney} />}
-      {s.summary && <DocSummary model={model} formatMoney={formatMoney} showQr={s.qr} />}
-      {s.footer && <DocFooter model={model} />}
+      {items.map((it) => (it.visible ? <Fragment key={it.key}>{renderSection(it.key, model, formatMoney, s)}</Fragment> : null))}
     </DocLayout>
   );
 }

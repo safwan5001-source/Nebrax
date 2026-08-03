@@ -17,7 +17,7 @@ import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
-import type { ThemeId } from '@/modules/documents/types';
+import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { exportXlsx } from '@/lib/xlsx';
 
@@ -85,6 +85,7 @@ export default function InvoiceDetailPage() {
   const [showLogo, setShowLogo] = useState(true);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoHeight, setLogoHeight] = useState<number | null>(null);
+  const [layout, setLayout] = useState<DocSectionLayoutItem[] | null>(null);
   const tt = useTranslations('invoiceTemplates');
 
   const partnerName = customer?.name ?? '—';
@@ -99,7 +100,7 @@ export default function InvoiceDetailPage() {
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number } }>(`/sales-config/designs`),
+          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[] } }>(`/sales-config/designs`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
@@ -113,6 +114,7 @@ export default function InvoiceDetailPage() {
           setShowLogo(dg.show_logo !== false);
           setLogoUrl(dg.logo ?? null);
           setLogoHeight(dg.logo_height ?? null);
+          setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
         }
       })
       .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
@@ -325,6 +327,7 @@ export default function InvoiceDetailPage() {
                 showLogo={showLogo}
                 logoUrl={logoUrl}
                 logoHeight={logoHeight}
+                layout={layout}
               />
             </DocumentScaler>
           </div>

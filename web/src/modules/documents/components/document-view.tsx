@@ -1,6 +1,6 @@
 'use client';
 
-import type { DocumentModel, ThemeId } from '../types';
+import type { DocumentModel, ThemeId, DocSectionLayoutItem } from '../types';
 import { getTemplate } from '../registry/templates';
 import { getTheme } from '../themes';
 import { makeMoneyFormatter } from '../utils/currency';
@@ -14,12 +14,14 @@ export function DocumentView({
   templateId,
   themeId,
   showLogo = true,
+  layout,
   rootId,
 }: {
   model: DocumentModel;
   templateId?: string | null;
   themeId?: ThemeId | null;
   showLogo?: boolean;
+  layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
 }) {
   const descriptor = getTemplate(templateId);
@@ -28,6 +30,13 @@ export function DocumentView({
   const formatMoney = makeMoneyFormatter(model.currency);
 
   return (
-    <Template model={model} theme={theme} formatMoney={formatMoney} sections={{ logo: showLogo }} rootId={rootId} />
+    <Template
+      model={model}
+      theme={theme}
+      formatMoney={formatMoney}
+      sections={{ logo: showLogo }}
+      layout={layout}
+      rootId={rootId}
+    />
   );
 }

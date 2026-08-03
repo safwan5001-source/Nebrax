@@ -1,6 +1,6 @@
 'use client';
 
-import type { ThemeId } from '@/modules/documents/types';
+import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import { buildCreditNoteDocumentModel, type SourceCreditNote } from '@/modules/documents/builder/from-credit-note';
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
@@ -20,6 +20,7 @@ export function CreditNoteDocument({
   showLogo = true,
   logoUrl,
   logoHeight,
+  layout,
   rootId,
 }: {
   note: CreditNoteDoc;
@@ -31,10 +32,11 @@ export function CreditNoteDocument({
   showLogo?: boolean;
   logoUrl?: string | null;
   logoHeight?: number | null;
+  layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
 }) {
   const model = buildCreditNoteDocumentModel({ note, company, customer, footerText, logoUrl, logoHeight });
   return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} rootId={rootId} />
+    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />
   );
 }

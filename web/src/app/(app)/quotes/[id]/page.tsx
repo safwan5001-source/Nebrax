@@ -16,7 +16,7 @@ import { documentExporter, printDocument } from '@/modules/documents/services/ex
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
-import type { ThemeId } from '@/modules/documents/types';
+import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
 interface Quote {
@@ -50,6 +50,7 @@ export default function QuoteDetailPage() {
   const [showLogo, setShowLogo] = useState(true);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoHeight, setLogoHeight] = useState<number | null>(null);
+  const [layout, setLayout] = useState<DocSectionLayoutItem[] | null>(null);
 
   function load() {
     setLoading(true);
@@ -59,7 +60,7 @@ export default function QuoteDetailPage() {
         const [p, m, d] = await Promise.allSettled([
           api<{ data: QuoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: QuoteCompany }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number } }>(`/sales-config/designs`),
+          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[] } }>(`/sales-config/designs`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
@@ -71,6 +72,7 @@ export default function QuoteDetailPage() {
           setShowLogo(dg.show_logo !== false);
           setLogoUrl(dg.logo ?? null);
           setLogoHeight(dg.logo_height ?? null);
+          setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
         }
       })
       .finally(() => setLoading(false));
@@ -178,6 +180,7 @@ export default function QuoteDetailPage() {
                 showLogo={showLogo}
                 logoUrl={logoUrl}
                 logoHeight={logoHeight}
+                layout={layout}
               />
             </DocumentScaler>
           </div>

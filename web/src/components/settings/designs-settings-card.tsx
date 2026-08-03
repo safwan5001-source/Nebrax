@@ -11,12 +11,16 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument } from '@/components/invoices/invoice-document';
+import { SectionDesigner } from '@/components/settings/section-designer';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { api } from '@/lib/api';
 import { fileToResizedDataUrl } from '@/lib/image';
 import { listTemplates } from '@/modules/documents/registry/templates';
 import { THEME_IDS, themeSwatch } from '@/modules/documents/themes';
-import type { ThemeId } from '@/modules/documents/types';
+import { DEFAULT_SECTION_ORDER, type ThemeId, type DocSectionLayoutItem } from '@/modules/documents/types';
+
+/** التخطيط الافتراضي للأقسام (الباركود مخفيّ افتراضياً). */
+const DEFAULT_LAYOUT: DocSectionLayoutItem[] = DEFAULT_SECTION_ORDER.map((key) => ({ key, visible: key !== 'barcode' }));
 
 /** شكل إعداد التصاميم المخزَّن (sales-config/designs). */
 interface DesignsConfig {
@@ -26,6 +30,7 @@ interface DesignsConfig {
   logo: string;        // data URL أو فارغ
   logo_height: number; // بكسل
   footer_text: string;
+  sections?: DocSectionLayoutItem[]; // تخطيط الأقسام (مصمّم المستند)
   accent_color?: string;
 }
 
@@ -213,6 +218,17 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
               </div>
             </div>
 
+            {/* مصمّم الأقسام: سحب لإعادة الترتيب + إظهار/إخفاء (dnd-kit). */}
+            <div className="rounded-lg border border-border p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-xs font-medium text-muted">{t('layout_title')}</div>
+                {canManage && cfg.sections && (
+                  <Button variant="ghost" size="sm" onClick={() => patch({ sections: undefined })}>{t('layout_reset')}</Button>
+                )}
+              </div>
+              <SectionDesigner value={cfg.sections ?? DEFAULT_LAYOUT} onChange={(v) => patch({ sections: v })} disabled={!canManage} />
+            </div>
+
             {/* معاينة حيّة — rootId=null فلا تخطف الطباعة. */}
             <div>
               <div className="mb-2 text-xs font-medium text-muted">{t('preview')}</div>
@@ -229,6 +245,7 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
                     showLogo={cfg.show_logo}
                     logoUrl={cfg.logo}
                     logoHeight={cfg.logo_height}
+                    layout={cfg.sections ?? DEFAULT_LAYOUT}
                     rootId={null}
                   />
                 </DocumentScaler>

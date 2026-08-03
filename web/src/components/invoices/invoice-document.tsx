@@ -1,6 +1,6 @@
 'use client';
 
-import type { ThemeId } from '@/modules/documents/types';
+import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import {
   buildInvoiceDocumentModel,
@@ -29,6 +29,7 @@ export function InvoiceDocument({
   showLogo = true,
   logoUrl,
   logoHeight,
+  layout,
   rootId,
 }: {
   invoice: InvoiceDoc;
@@ -41,10 +42,11 @@ export function InvoiceDocument({
   showLogo?: boolean;
   logoUrl?: string | null;
   logoHeight?: number | null;
+  layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
 }) {
   const model = buildInvoiceDocumentModel({ invoice, company, customer, qr, footerText, logoUrl, logoHeight });
   return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} rootId={rootId} />
+    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />
   );
 }
