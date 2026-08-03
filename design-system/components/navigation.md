@@ -8,8 +8,10 @@ Anatomy: `fixed inset-y-0 start-0 z-50 flex w-64 flex-col border-e border-border
   المحتوى مع بقاء تسميات الأقسام العربية على سطر واحد (`transition-transform duration-200`).
 - **مجمّع حسب خريطة الوحدات الثماني** (المبيعات، العملاء، المخزون، الحسابات، الموارد البشرية،
   التشغيل، اللوجستيات، النظام). كل مجموعة: عنوان خافت صغير + روابطها.
-- **مجموعات قابلة للطيّ** (`ChevronDown`) مع **تذكّر الحالة عبر الجلسات** (`localStorage`:
-  `nibras.sidebar.groups`)؛ المجموعة الحاوية للصفحة الحالية تُفتح تلقائياً دون تعديل التفضيل المحفوظ.
+- **مجموعات قابلة للطيّ بنمط Accordion حصري:** مجموعة واحدة مفتوحة دائماً، تُشتق من المسار
+  النشط (`openGroup = activeGroup`). النقر على مجموعة يفتحها ويُغلق سواها؛ ولا يمكن إغلاق الكل.
+  التنقّل لصفحة في مجموعة أخرى يفتحها تلقائياً. الطيّ/الفتح بانتقال ارتفاع سلس
+  (`grid-rows-[0fr↔1fr]` + `transition-[grid-template-rows] duration-200`). لا تخزين — الحالة مشتقّة.
 - **الرابط:** `flex h-9 items-center gap-2 rounded px-2 text-sm text-muted hover:bg-primary-soft hover:text-primary`
   + أيقونة Lucide `h-4`.
 - **النشط:** `bg-primary-soft font-medium text-primary` + مؤشّر خطّ جانبي
