@@ -83,6 +83,16 @@
     display: block;
   }
 
+  /* إلغاء تصغير المعاينة عند الطباعة (المستند يُطبع بحجمه الكامل) */
+  .doc-scaler-outer {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .doc-scaler-inner {
+    transform: none !important;
+    width: auto !important;
+  }
+
   @page {
     size: A4;
     margin: 14mm;

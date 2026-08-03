@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument } from '@/components/invoices/invoice-document';
+import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { api } from '@/lib/api';
 import { fileToResizedDataUrl } from '@/lib/image';
 import { listTemplates } from '@/modules/documents/registry/templates';
@@ -215,20 +216,22 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
             {/* معاينة حيّة — rootId=null فلا تخطف الطباعة. */}
             <div>
               <div className="mb-2 text-xs font-medium text-muted">{t('preview')}</div>
-              <div className="max-h-[560px] overflow-auto rounded-lg border border-border bg-gray-100 p-3 dark:bg-black/30">
-                <InvoiceDocument
-                  invoice={SAMPLE.invoice}
-                  company={SAMPLE.company}
-                  customer={SAMPLE.customer}
-                  qr={null}
-                  templateId={templateId}
-                  themeId={cfg.theme}
-                  footerText={cfg.footer_text}
-                  showLogo={cfg.show_logo}
-                  logoUrl={cfg.logo}
-                  logoHeight={cfg.logo_height}
-                  rootId={null}
-                />
+              <div className="max-h-[600px] overflow-auto rounded-lg border border-border bg-gray-100 p-3 dark:bg-black/30">
+                <DocumentScaler>
+                  <InvoiceDocument
+                    invoice={SAMPLE.invoice}
+                    company={SAMPLE.company}
+                    customer={SAMPLE.customer}
+                    qr={null}
+                    templateId={templateId}
+                    themeId={cfg.theme}
+                    footerText={cfg.footer_text}
+                    showLogo={cfg.show_logo}
+                    logoUrl={cfg.logo}
+                    logoHeight={cfg.logo_height}
+                    rootId={null}
+                  />
+                </DocumentScaler>
               </div>
             </div>
           </>

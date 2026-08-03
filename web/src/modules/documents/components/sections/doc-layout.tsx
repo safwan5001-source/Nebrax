@@ -8,8 +8,9 @@ import { CLASSIC_STYLE } from '../../templates/template-styles';
 import { DocStyleProvider } from '../doc-style-context';
 
 /**
- * غلاف المستند A4 — جذر الالتقاط (#print-root) الذي يُطبَع ويُصدَّر PDF.
- * يُسقط متغيّرات الثيم ويوفّر أسلوب القالب للأقسام، ويضبط الاتجاه.
+ * غلاف المستند A4 — جذر الالتقاط (#print-root) الذي يُطبَع ويُصدَّر PDF *هو نفسه*
+ * ورقة الـ 210mm (لا غلاف خارجي بعرض الحاوية)، فيُلتقَط بالعرض الصحيح دون قصّ
+ * أو صفحات زائدة أياً كان عرض الشاشة. يُسقط متغيّرات الثيم ويوفّر أسلوب القالب.
  */
 export function DocLayout({
   theme,
@@ -23,23 +24,23 @@ export function DocLayout({
   direction: Direction;
   directionSample?: string | null;
   style?: TemplateStyle;
-  /** 'print-root' لمصدر الطباعة/PDF، أو null لمعاينة لا تخطف الطباعة. */
   rootId?: string | null;
   children: React.ReactNode;
 }) {
   const dir = resolveDirection(direction, directionSample);
   return (
-    <div id={rootId ?? undefined} dir={dir} style={themeCssVars(theme)}>
-      <DocStyleProvider value={style}>
-        <div
-          className={cn(
-            'mx-auto flex min-h-[277mm] w-[210mm] max-w-[210mm] flex-col bg-white text-[12px] leading-relaxed text-black shadow-lg print:min-h-0 print:w-full print:shadow-none',
-            style.pagePadding
-          )}
-        >
-          {children}
-        </div>
-      </DocStyleProvider>
-    </div>
+    <DocStyleProvider value={style}>
+      <div
+        id={rootId ?? undefined}
+        dir={dir}
+        style={themeCssVars(theme)}
+        className={cn(
+          'mx-auto flex min-h-[277mm] w-[210mm] max-w-[210mm] flex-col bg-white text-[12px] leading-relaxed text-black shadow-lg print:min-h-0 print:w-full print:shadow-none',
+          style.pagePadding
+        )}
+      >
+        {children}
+      </div>
+    </DocStyleProvider>
   );
 }
