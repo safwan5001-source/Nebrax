@@ -22,8 +22,9 @@ interface ApiLine { product_id: string | null; description: string | null; quant
 interface ApiInvoice {
   status: string; partner_id: string; payment_type: string; invoice_date: string; due_date: string | null;
   cost_center_id: string | null; salesperson_id: string | null; discount: string; shipping: string;
-  adjustment: string; notes: string | null; lines: ApiLine[];
+  adjustment: string; tax_inclusive: boolean; notes: string | null; lines: ApiLine[];
 }
+interface TaxDef { name: string; rate: number; inclusive: boolean }
 
 let lineSeq = 0;
 const newLine = (): Line => ({ key: `l${++lineSeq}`, productId: null, description: '', qty: '1', price: '', tax: '15', disc: '' });
@@ -63,6 +64,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [discountInput, setDiscountInput] = useState('');
   const [shippingInput, setShippingInput] = useState('');
   const [adjustmentInput, setAdjustmentInput] = useState('');
+  const [taxInclusive, setTaxInclusive] = useState(false);
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -77,6 +79,15 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
     api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
     api<{ data: Employee[] }>('/employees').then((r) => setEmployees(r.data)).catch(() => {});
+    // الافتراضي للإنشاء: من إعدادات الضرائب (هل الضريبة الرئيسية «متضمَّنة»؟).
+    if (!editId) {
+      api<{ data: TaxDef[] }>('/sales-config/taxes')
+        .then((r) => {
+          const primary = r.data.find((x) => Number(x.rate) > 0) ?? r.data[0];
+          if (primary?.inclusive) setTaxInclusive(true);
+        })
+        .catch(() => {});
+    }
   }, [editId]);
 
   // تحميل المستند للتعديل وملء الحقول.
@@ -96,6 +107,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         setNotes(inv.notes ?? '');
         setShippingInput(Number(inv.shipping) > 0 ? inv.shipping : '');
         setAdjustmentInput(Number(inv.adjustment) !== 0 ? inv.adjustment : '');
+        setTaxInclusive(!!inv.tax_inclusive);
         setDiscountMode('amount'); // يُخزَّن الخصم كمبلغ مطلق
         setDiscountInput(Number(inv.discount) > 0 ? inv.discount : '');
         setLines(
@@ -138,12 +150,20 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   }
 
   // معاينة الإجماليات (هللات) — بلا float. مطابق للـ backend.
-  const lineNetMinor = (l: Line) => {
+  // في وضع «متضمَّن» تُستخرَج الضريبة من السعر؛ وإلا تُضاف فوقه.
+  const extractTax = (incl: number, rate: number) =>
+    rate <= 0 || incl <= 0 ? 0 : Math.round((incl * rate) / (100 + rate));
+  // [الصافي، الضريبة] لكل سطر بعد خصمه.
+  const lineNetTax = (l: Line): [number, number] => {
     const gross = (Number(l.qty) || 0) * riyalToMinor(l.price);
-    return gross - Math.min(riyalToMinor(l.disc), gross);
+    const discounted = gross - Math.min(riyalToMinor(l.disc), gross);
+    const rate = Number(l.tax) || 0;
+    return taxInclusive
+      ? [discounted - extractTax(discounted, rate), extractTax(discounted, rate)]
+      : [discounted, Math.round((discounted * rate) / 100)];
   };
-  const subMinor = lines.reduce((s, l) => s + lineNetMinor(l), 0);
-  const taxGrossMinor = lines.reduce((s, l) => s + Math.round((lineNetMinor(l) * (Number(l.tax) || 0)) / 100), 0);
+  const subMinor = lines.reduce((s, l) => s + lineNetTax(l)[0], 0);
+  const taxGrossMinor = lines.reduce((s, l) => s + lineNetTax(l)[1], 0);
   const rawDiscount = discountMode === 'percent'
     ? Math.floor((subMinor * (Number(discountInput) || 0)) / 100)
     : riyalToMinor(discountInput);
@@ -183,7 +203,8 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     const body = {
       partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null,
       cost_center_id: centerId || null, salesperson_id: salespersonId || null,
-      discount: discountMinor, shipping: shippingMinor, adjustment: adjustmentMinor, notes: notes || null, items,
+      discount: discountMinor, shipping: shippingMinor, adjustment: adjustmentMinor,
+      tax_inclusive: taxInclusive, notes: notes || null, items,
     };
     try {
       const id = editId
@@ -306,8 +327,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
               </div>
 
               {lines.map((l) => {
-                const net = lineNetMinor(l);
-                const lineTax = Math.round((net * (Number(l.tax) || 0)) / 100);
+                const [net, lineTax] = lineNetTax(l);
                 return (
                   <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded-lg border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
                     <Select className="col-span-2 md:col-span-3" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
@@ -334,6 +354,13 @@ export function InvoiceForm({ editId }: { editId?: string }) {
             <CardHeader><CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('discount_shipping')}</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="taxmode">{t('tax_mode')}</Label>
+                  <Select id="taxmode" value={taxInclusive ? '1' : '0'} onChange={(e) => setTaxInclusive(e.target.value === '1')}>
+                    <option value="0">{t('tax_exclusive')}</option>
+                    <option value="1">{t('tax_inclusive')}</option>
+                  </Select>
+                </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="dmode">{t('discount_mode')}</Label>
                   <Select id="dmode" value={discountMode} onChange={(e) => setDiscountMode(e.target.value as 'amount' | 'percent')}>

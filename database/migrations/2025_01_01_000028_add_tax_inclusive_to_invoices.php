@@ -1,0 +1,24 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // وضع احتساب الضريبة: false = الأسعار غير متضمّنة الضريبة (تُضاف فوقها — السلوك الافتراضي)،
+        // true = الأسعار متضمّنة الضريبة (تُستخرَج منها). لا يغيّر أي فاتورة قائمة (افتراضي false).
+        Schema::table('invoices', function (Blueprint $table) {
+            $table->boolean('tax_inclusive')->default(false)->after('adjustment');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('invoices', function (Blueprint $table) {
+            $table->dropColumn('tax_inclusive');
+        });
+    }
+};

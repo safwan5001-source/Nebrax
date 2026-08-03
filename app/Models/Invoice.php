@@ -16,7 +16,7 @@ class Invoice extends BaseModel
         'tenant_id', 'number', 'partner_id', 'type', 'payment_type',
         'invoice_date', 'due_date', 'cost_center_id', 'salesperson_id', 'status',
         'subtotal', 'discount', 'shipping', 'adjustment', 'tax_amount', 'total',
-        'paid_amount', 'payment_status',
+        'tax_inclusive', 'paid_amount', 'payment_status',
         'notes', 'journal_entry_id', 'cogs_entry_id', 'created_by',
         'zatca_qr', 'zatca_hash',
         'zatca_uuid', 'zatca_icv', 'zatca_previous_hash', 'zatca_xml',
@@ -31,6 +31,7 @@ class Invoice extends BaseModel
         'adjustment'   => 'integer',
         'tax_amount'   => 'integer',
         'total'        => 'integer',
+        'tax_inclusive' => 'boolean',
         'paid_amount'  => 'integer',
     ];
 
@@ -44,6 +45,7 @@ class Invoice extends BaseModel
         'adjustment'     => 0,
         'tax_amount'     => 0,
         'total'          => 0,
+        'tax_inclusive'  => false,
         'paid_amount'    => 0,
         'payment_status' => 'unpaid',
     ];
