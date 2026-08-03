@@ -76,6 +76,7 @@
     "fleet": "Fleet Management",
     "shipping": "Shipping Orders",
     "reports": "Reports",
+    "documentDesign": "Document design",
     "settings": "Settings",
     "payments": "Payments",
     "returns": "Returns",
@@ -137,6 +138,9 @@
     "inclusive": "Included",
     "exclusive": "Not included",
     "remove": "Remove"
+  },
+  "documentDesign": {
+    "title": "Document design"
   },
   "designSettings": {
     "title": "Designs & branding",

@@ -76,6 +76,7 @@
     "fleet": "إدارة الأسطول",
     "shipping": "أوامر الشحن",
     "reports": "التقارير",
+    "documentDesign": "تصميم المستندات",
     "settings": "الإعدادات",
     "payments": "المدفوعات",
     "returns": "المرتجعات",
@@ -137,6 +138,9 @@
     "inclusive": "متضمَّنة",
     "exclusive": "غير متضمَّنة",
     "remove": "حذف"
+  },
+  "documentDesign": {
+    "title": "تصميم المستندات"
   },
   "designSettings": {
     "title": "التصاميم والهوية",

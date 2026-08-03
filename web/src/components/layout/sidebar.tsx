@@ -46,6 +46,7 @@ import {
   Truck,
   Send,
   BarChart3,
+  LayoutTemplate,
   Settings,
   ChevronDown,
   ChevronLeft,
@@ -158,6 +159,7 @@ const GROUPS: NavGroup[] = [
     title: 'system',
     items: [
       { href: '/reports', icon: BarChart3, key: 'reports', built: true },
+      { href: '/document-design', icon: LayoutTemplate, key: 'documentDesign', built: true },
       { href: '/settings', icon: Settings, key: 'settings', built: true },
     ],
   },
