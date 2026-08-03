@@ -310,7 +310,9 @@
   "invoiceTemplates": {
     "classic": "Classic",
     "modern": "Modern",
-    "erp": "ERP"
+    "erp": "ERP",
+    "minimal": "Minimal",
+    "retail": "Retail"
   },
   "invoiceDoc": {
     "title": "Tax Invoice",

@@ -2,6 +2,8 @@ import type { TemplateDescriptor } from '../types';
 import { TaxInvoiceClassic } from '../templates/tax-invoice-classic';
 import { TaxInvoiceModern } from '../templates/tax-invoice-modern';
 import { TaxInvoiceErp } from '../templates/tax-invoice-erp';
+import { TaxInvoiceMinimal } from '../templates/tax-invoice-minimal';
+import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
 
 /**
  * سجلّ القوالب — id ← مكوّن + بيانات وصفية. إضافة قالب جديد = إدخال واحد هنا،
@@ -28,6 +30,20 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     component: TaxInvoiceErp,
     defaultTheme: 'gray',
     supportedPaper: ['a4', 'letter', 'legal'],
+  },
+  'tax-invoice-minimal': {
+    id: 'tax-invoice-minimal',
+    nameKey: 'minimal',
+    component: TaxInvoiceMinimal,
+    defaultTheme: 'black',
+    supportedPaper: ['a4', 'letter', 'legal'],
+  },
+  'tax-invoice-retail': {
+    id: 'tax-invoice-retail',
+    nameKey: 'retail',
+    component: TaxInvoiceRetail,
+    defaultTheme: 'blue',
+    supportedPaper: ['a4', 'letter'],
   },
 };
 

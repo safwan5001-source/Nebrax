@@ -12,9 +12,11 @@
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
     "@tanstack/react-table": "^8.20.5",
+    "@types/jsbarcode": "^3.11.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "html2canvas": "^1.4.1",
+    "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.460.0",
     "next": "^15.5.19",
