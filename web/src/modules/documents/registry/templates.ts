@@ -4,6 +4,7 @@ import { TaxInvoiceModern } from '../templates/tax-invoice-modern';
 import { TaxInvoiceErp } from '../templates/tax-invoice-erp';
 import { TaxInvoiceMinimal } from '../templates/tax-invoice-minimal';
 import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
+import { TaxReceiptThermal58, TaxReceiptThermal80 } from '../templates/thermal-receipt';
 
 /**
  * سجلّ القوالب — id ← مكوّن + بيانات وصفية. إضافة قالب جديد = إدخال واحد هنا،
@@ -44,6 +45,20 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     component: TaxInvoiceRetail,
     defaultTheme: 'blue',
     supportedPaper: ['a4', 'letter'],
+  },
+  'tax-invoice-thermal58': {
+    id: 'tax-invoice-thermal58',
+    nameKey: 'thermal58',
+    component: TaxReceiptThermal58,
+    defaultTheme: 'black',
+    supportedPaper: ['thermal_58'],
+  },
+  'tax-invoice-thermal80': {
+    id: 'tax-invoice-thermal80',
+    nameKey: 'thermal80',
+    component: TaxReceiptThermal80,
+    defaultTheme: 'black',
+    supportedPaper: ['thermal_80'],
   },
 };
 

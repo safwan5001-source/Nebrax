@@ -312,7 +312,9 @@
     "modern": "عصري",
     "erp": "ERP",
     "minimal": "مبسّط",
-    "retail": "تجزئة"
+    "retail": "تجزئة",
+    "thermal58": "حراري 58مم",
+    "thermal80": "حراري 80مم"
   },
   "invoiceDoc": {
     "title": "فاتورة ضريبية",

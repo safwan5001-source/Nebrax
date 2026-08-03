@@ -312,7 +312,9 @@
     "modern": "Modern",
     "erp": "ERP",
     "minimal": "Minimal",
-    "retail": "Retail"
+    "retail": "Retail",
+    "thermal58": "Thermal 58mm",
+    "thermal80": "Thermal 80mm"
   },
   "invoiceDoc": {
     "title": "Tax Invoice",
