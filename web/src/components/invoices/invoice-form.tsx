@@ -246,7 +246,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>{t('invoice_number')}</Label>
-                  <div className="flex h-10 items-center rounded-md border border-border bg-background px-3 text-sm text-muted">{t('auto_number')}</div>
+                  <div className="flex h-9 items-center rounded border border-border bg-background px-3 text-sm text-muted">{t('auto_number')}</div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="date">{t('invoice_date')}</Label>
@@ -375,7 +375,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
-                className="min-h-20 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-muted focus:border-primary"
+                className="min-h-20 w-full resize-y rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 placeholder={t('notes')}
               />
             </CardContent>
