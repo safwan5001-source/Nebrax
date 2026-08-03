@@ -310,7 +310,9 @@
   "invoiceTemplates": {
     "classic": "كلاسيكي",
     "modern": "عصري",
-    "erp": "ERP"
+    "erp": "ERP",
+    "minimal": "مبسّط",
+    "retail": "تجزئة"
   },
   "invoiceDoc": {
     "title": "فاتورة ضريبية",

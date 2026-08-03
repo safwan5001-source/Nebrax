@@ -3,6 +3,7 @@
 import type { DocumentTemplateProps, TemplateSectionsConfig, TemplateStyle } from '../types';
 import { DocLayout } from './sections/doc-layout';
 import { DocHeader } from './sections/doc-header';
+import { DocBarcode } from './sections/doc-barcode';
 import { DocParties } from './sections/doc-parties';
 import { DocItemsTable } from './sections/doc-items-table';
 import { DocSummary } from './sections/doc-summary';
@@ -11,7 +12,7 @@ import { DocFooter } from './sections/doc-footer';
 /** الأقسام الظاهرة افتراضياً (فاتورة ضريبية كاملة). */
 const DEFAULT_SECTIONS: TemplateSectionsConfig = {
   logo: true, header: true, seller: true, buyer: true, meta: true,
-  items: true, summary: true, qr: true,
+  items: true, summary: true, qr: true, barcode: false,
   terms: false, notes: false, bank: false, stamp: false, signature: false,
   footer: true,
 };
@@ -39,6 +40,11 @@ export function DocumentBody({
       rootId={rootId}
     >
       {s.header && <DocHeader model={model} showLogo={s.logo} />}
+      {s.barcode && (
+        <div className="mt-3 flex justify-center">
+          <DocBarcode value={model.meta.number} />
+        </div>
+      )}
       {(s.seller || s.buyer || s.meta) && <DocParties model={model} />}
       {s.items && <DocItemsTable model={model} formatMoney={formatMoney} />}
       {s.summary && <DocSummary model={model} formatMoney={formatMoney} showQr={s.qr} />}

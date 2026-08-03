@@ -129,6 +129,7 @@ export interface TemplateSectionsConfig {
   items: boolean;
   summary: boolean;
   qr: boolean;
+  barcode: boolean;
   terms: boolean;
   notes: boolean;
   bank: boolean;
@@ -158,6 +159,8 @@ export interface TemplateStyle {
   sectionGap: string;
   /** نمط رأس جدول البنود. */
   tableHead: 'brand' | 'soft' | 'plain';
+  /** إظهار شريط الهوية أسفل الترويسة. */
+  brandBar: boolean;
 }
 
 /** خصائص كل قالب — يستقبل النموذج ومنسّق العملة والثيم والإعداد. */

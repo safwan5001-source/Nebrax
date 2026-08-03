@@ -2,10 +2,12 @@
 
 import { useTranslations } from 'next-intl';
 import type { DocumentModel } from '../../types';
+import { useDocStyle } from '../doc-style-context';
 
 /** ترويسة المستند: الشعار + اسم البائع + عنوان المستند ورقمه + شريط الهوية. */
 export function DocHeader({ model, showLogo = true }: { model: DocumentModel; showLogo?: boolean }) {
   const t = useTranslations('invoiceDoc');
+  const style = useDocStyle();
   const { seller, meta } = model;
 
   return (
@@ -37,7 +39,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
         </div>
       </div>
 
-      <div className="mt-4 h-1 rounded" style={{ background: 'var(--doc-brand)' }} />
+      {style.brandBar && <div className="mt-4 h-1 rounded" style={{ background: 'var(--doc-brand)' }} />}
     </>
   );
 }
