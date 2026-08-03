@@ -1,6 +1,6 @@
 'use client';
 
-import { getTemplate, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
+import { getTemplate } from '@/modules/documents/registry/templates';
 import { getTheme } from '@/modules/documents/themes';
 import { makeMoneyFormatter } from '@/modules/documents/utils/currency';
 import {
@@ -25,13 +25,16 @@ export function InvoiceDocument({
   company,
   customer,
   qr,
+  templateId,
 }: {
   invoice: InvoiceDoc;
   company: Company | null;
   customer: Customer | null;
   qr: string | null;
+  /** معرّف القالب من السجلّ؛ يتراجع للافتراضي إن غاب أو كان غير معروف. */
+  templateId?: string | null;
 }) {
-  const descriptor = getTemplate(DEFAULT_TEMPLATE_ID);
+  const descriptor = getTemplate(templateId);
   const Template = descriptor.component;
   const model = buildInvoiceDocumentModel({ invoice, company, customer, qr });
   const theme = getTheme(descriptor.defaultTheme);
