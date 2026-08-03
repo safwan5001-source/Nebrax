@@ -87,26 +87,38 @@
   total, status, payment_status, search, create`.
 - الحالات تُترجَم عبر مجموعة `status`.
 
-## 8. رصد المطابقة (Compliance Findings) — توثيق فقط، بلا تعديل كود
+## 8. رصد المطابقة (Compliance Findings) — **عولِجت جميعها ✅**
 
-الشاشة **تجتاز** معظم قواعد DS. رُصدت ثلاثة انحرافات (هذا بالضبط دور DS كأداة مراجعة):
+رُصدت ثلاثة انحرافات في التوثيق الأول (دور DS كأداة مراجعة)، ثم **عُولجت في الكود**
+وفق قواعد DS. الجدول يوثّق التاريخ الكامل:
 
-| # | الانحراف | القاعدة | الشدّة | التوصية (لا تُطبَّق هنا) |
+| # | الانحراف | القاعدة | الحالة | الإصلاح المطبَّق |
 |---|---|---|---|---|
-| A | `emptyLabel="لا توجد فواتير"` **نصّ عربي مكتوب مباشرة** لا مفتاح i18n | `guidelines/engineering.md` §7 «لا نصّ مكتوب؛ مفاتيح next-intl» | متوسّطة | استبدله بـ `t('empty')` وأضف المفتاح لـ ar/en |
-| B | **لا حالة خطأ صريحة** — `Promise.all` بلا `.catch`؛ فشل الجلب يظهر كحالة «فارغة» | `patterns/states.md` §3 | متوسّطة | أضف `.catch` + رسالة خطأ/إعادة محاولة (تمييزها عن الفارغ) |
-| C | الرأس `flex items-center justify-between` بدل `flex flex-wrap items-center gap-3` + `ms-auto` | `layout/grid-system.md` §Layout Rules 2 | منخفضة | استخدم `flex-wrap` لعنوان طويل على شاشة ضيقة |
+| A | `emptyLabel="لا توجد فواتير"` نصّ عربي مباشر | `guidelines/engineering.md` §7 | ✅ عولِج | `emptyLabel={t('empty')}` + مفتاح `empty` في ar/en |
+| B | لا حالة خطأ صريحة (`Promise.all` بلا `.catch`) | `patterns/states.md` §3 | ✅ عولِج | `.catch` → حالة خطأ ببطاقة + رسالة `text-negative` + زر «إعادة المحاولة» (`t('retry')`) + `load_error` |
+| C | الرأس بلا `flex-wrap`/`ms-auto` | `layout/grid-system.md` §Layout Rules 2 | ✅ عولِج | `flex flex-wrap items-center gap-3` + `ms-auto` على زر الإنشاء |
 
-> ملاحظة: `space-y-4` (بدل `space-y-5` في الوصفة القياسية) **ضمن المقياس ومقبول** — ليس انحرافاً.
+> ملاحظة: `space-y-4` (بدل `space-y-5`) **ضمن المقياس ومقبول** — أُبقي كما هو.
+
+### حالة الخطأ بعد الإصلاح (مطابقة `patterns/states.md` §3)
+```tsx
+{error ? (
+  <div className="rounded border border-border bg-surface p-8 text-center">
+    <p className="text-sm text-negative">{error}</p>
+    <Button variant="outline" className="mt-3" onClick={load}>{t('retry')}</Button>
+  </div>
+) : (
+  <DataTable … emptyLabel={t('empty')} exportName="invoices" />
+)}
+```
 
 ## 9. الخلاصة (اختبار DS)
 
-- **وثّقتُ الشاشة بالكامل من قواعد DS دون الحاجة لأي سؤال** → النظام مكتمل عند هذه الشاشة.
-- DS أثبت قيمته المزدوجة: **مرجع بناء** (كل عنصر له قاعدة واضحة) و**أداة مراجعة**
-  (كشف ٣ انحرافات محدّدة بدقّة).
-- هذه الشاشة صالحة كـ **قالب «شاشة قائمة»** بعد معالجة الانحرافات الثلاثة (خارج نطاق هذا التوثيق).
+- **وثّقتُ الشاشة بالكامل من قواعد DS دون أي سؤال** → النظام مكتمل عند هذه الشاشة.
+- DS أثبت قيمته المزدوجة: **مرجع بناء** (كل عنصر له قاعدة) و**أداة مراجعة** (كشف ٣ انحرافات).
+- **الدورة اكتملت:** كشف → إصلاح وفق القاعدة → توثيق. الشاشة الآن **قالب «شاشة قائمة» مطابق 100%**.
 
 ## مرجع سريع للنسخ (Canonical List Screen)
 
-انظر `examples/recipes.md` §«وصفة 1 — شاشة قائمة» — النسخة المثالية المطابقة 100% (تعالج
-A/B/C مسبقاً: `emptyLabel={t('empty')}`، `flex-wrap … ms-auto`، ومعالجة الخطأ).
+`examples/recipes.md` §«وصفة 1 — شاشة قائمة» — النسخة المثالية المطابقة (نفس الحلول: `t('empty')`،
+`flex-wrap … ms-auto`، معالجة الخطأ).

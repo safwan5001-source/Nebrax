@@ -155,7 +155,10 @@
     "status": "Status",
     "payment_status": "Payment",
     "search": "Search invoices…",
-    "create": "New invoice"
+    "create": "New invoice",
+    "empty": "No invoices",
+    "load_error": "Could not load invoices.",
+    "retry": "Retry"
   },
   "invoiceForm": {
     "title": "New sales invoice",

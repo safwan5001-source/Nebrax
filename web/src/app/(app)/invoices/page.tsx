@@ -37,18 +37,21 @@ export default function InvoicesPage() {
   const t = useTranslations('invoices');
   const ts = useTranslations('status');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [partners, setPartners] = useState<Record<string, string>>({});
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     Promise.all([api<{ data: Invoice[] }>('/invoices'), api<{ data: Partner[] }>('/partners')])
       .then(([inv, prt]) => {
         setInvoices(inv.data);
         setPartners(Object.fromEntries(prt.data.map((p) => [p.id, p.name])));
       })
+      .catch(() => setError(t('load_error')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   useEffect(() => load(), [load]);
 
@@ -97,9 +100,9 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <Link href="/invoices/new">
+        <Link href="/invoices/new" className="ms-auto">
           <Button>
             <Plus className="h-4 w-4" strokeWidth={1.8} />
             {t('create')}
@@ -107,14 +110,23 @@ export default function InvoicesPage() {
         </Link>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={invoices}
-        loading={loading}
-        searchPlaceholder={t('search')}
-        emptyLabel="لا توجد فواتير"
-        exportName="invoices"
-      />
+      {error ? (
+        <div className="rounded border border-border bg-surface p-8 text-center">
+          <p className="text-sm text-negative">{error}</p>
+          <Button variant="outline" className="mt-3" onClick={load}>
+            {t('retry')}
+          </Button>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={invoices}
+          loading={loading}
+          searchPlaceholder={t('search')}
+          emptyLabel={t('empty')}
+          exportName="invoices"
+        />
+      )}
     </div>
   );
 }
