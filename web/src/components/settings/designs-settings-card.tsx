@@ -19,8 +19,11 @@ import { listTemplates } from '@/modules/documents/registry/templates';
 import { THEME_IDS, themeSwatch } from '@/modules/documents/themes';
 import { DEFAULT_SECTION_ORDER, type ThemeId, type DocSectionLayoutItem } from '@/modules/documents/types';
 
-/** التخطيط الافتراضي للأقسام (الباركود مخفيّ افتراضياً). */
-const DEFAULT_LAYOUT: DocSectionLayoutItem[] = DEFAULT_SECTION_ORDER.map((key) => ({ key, visible: key !== 'barcode' }));
+/** الأقسام المخفيّة افتراضياً (اختيارية — يفعّلها المستخدم من المصمّم). */
+const HIDDEN_BY_DEFAULT: ReadonlySet<string> = new Set(['barcode', 'amountWords']);
+
+/** التخطيط الافتراضي للأقسام. */
+const DEFAULT_LAYOUT: DocSectionLayoutItem[] = DEFAULT_SECTION_ORDER.map((key) => ({ key, visible: !HIDDEN_BY_DEFAULT.has(key) }));
 
 /** شكل إعداد التصاميم المخزَّن (sales-config/designs). */
 interface DesignsConfig {

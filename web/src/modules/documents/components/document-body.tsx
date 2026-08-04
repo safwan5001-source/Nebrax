@@ -17,6 +17,7 @@ import { DocParties } from './sections/doc-parties';
 import { DocItemsTable } from './sections/doc-items-table';
 import { DocSummary } from './sections/doc-summary';
 import { DocVoucher } from './sections/doc-voucher';
+import { DocAmountWords } from './sections/doc-amount-words';
 import { DocNotes } from './sections/doc-notes';
 import { DocTerms } from './sections/doc-terms';
 import { DocBank } from './sections/doc-bank';
@@ -27,7 +28,7 @@ import { DocFooter } from './sections/doc-footer';
 /** الأقسام الظاهرة افتراضياً (فاتورة ضريبية كاملة). */
 const DEFAULT_SECTIONS: TemplateSectionsConfig = {
   logo: true, header: true, seller: true, buyer: true, meta: true,
-  items: true, summary: true, voucher: false, qr: true, barcode: false,
+  items: true, summary: true, voucher: false, amountWords: false, qr: true, barcode: false,
   terms: false, notes: false, bank: false, stamp: false, signature: false,
   footer: true,
 };
@@ -41,6 +42,7 @@ function isVisible(key: DocSectionKey, s: TemplateSectionsConfig): boolean {
     case 'items': return s.items;
     case 'summary': return s.summary;
     case 'voucher': return s.voucher;
+    case 'amountWords': return s.amountWords;
     case 'notes': return s.notes;
     case 'terms': return s.terms;
     case 'bank': return s.bank;
@@ -64,6 +66,7 @@ function renderSection(
     case 'items': return <DocItemsTable model={model} formatMoney={formatMoney} />;
     case 'summary': return <DocSummary model={model} formatMoney={formatMoney} showQr={s.qr} />;
     case 'voucher': return <DocVoucher model={model} formatMoney={formatMoney} />;
+    case 'amountWords': return <DocAmountWords model={model} />;
     case 'notes': return <DocNotes model={model} />;
     case 'terms': return <DocTerms model={model} />;
     case 'bank': return <DocBank model={model} />;
