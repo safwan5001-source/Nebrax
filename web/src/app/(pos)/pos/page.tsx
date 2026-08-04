@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
+import { getSystemTaxInclusive } from '@/lib/tax';
 import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
@@ -68,6 +69,8 @@ export default function PosPage() {
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [posCfg, setPosCfg] = useState<PosConfig>(POS_DEFAULTS);
+  // وضع الضريبة من إعدادات النظام (متضمَّن/غير متضمَّن) — يوحّد سلوك كل المعاملات.
+  const [taxInclusive, setTaxInclusive] = useState(false);
 
   // اسم العميل المعروض في السلة/الدفع/الإيصال — من الإعداد، مع تراجع للنقدي.
   const customerName = posCfg.default_customer?.trim() || WALKIN;
@@ -80,6 +83,7 @@ export default function PosPage() {
     api<{ data: Partial<PosConfig> }>('/sales-config/pos')
       .then((r) => setPosCfg({ ...POS_DEFAULTS, ...r.data }))
       .catch(() => {});
+    getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
     try {
       const raw = localStorage.getItem(FAV_KEY);
       if (raw) setFavs(new Set(JSON.parse(raw)));
@@ -115,9 +119,25 @@ export default function PosPage() {
   const setQty = (k: string, d: number) => setCart((c) => c.map((l) => (l.key === k ? { ...l, qty: Math.max(1, l.qty + d) } : l)));
   const remove = (k: string) => setCart((c) => c.filter((l) => l.key !== k));
 
-  const subMinor = cart.reduce((s, l) => s + l.qty * riyalToMinor(l.price), 0);
-  const taxMinor = cart.reduce((s, l) => s + Math.round((l.qty * riyalToMinor(l.price) * l.tax) / 100), 0);
-  const totalMinor = subMinor + taxMinor;
+  // الإجماليات حسب وضع الضريبة: متضمَّن = السعر شامل (تُستخرَج منه)؛ غير متضمَّن = تُضاف فوقه.
+  const { subMinor, taxMinor, totalMinor } = cart.reduce(
+    (acc, l) => {
+      const gross = l.qty * riyalToMinor(l.price);
+      if (taxInclusive) {
+        const tax = extractInclusiveTax(gross, l.tax);
+        acc.subMinor += gross - tax;
+        acc.taxMinor += tax;
+        acc.totalMinor += gross;
+      } else {
+        const tax = Math.round((gross * l.tax) / 100);
+        acc.subMinor += gross;
+        acc.taxMinor += tax;
+        acc.totalMinor += gross + tax;
+      }
+      return acc;
+    },
+    { subMinor: 0, taxMinor: 0, totalMinor: 0 },
+  );
   const count = cart.reduce((s, l) => s + l.qty, 0);
 
   async function ensureWalkin(): Promise<string> {
@@ -147,7 +167,7 @@ export default function PosPage() {
         }));
         const created = await api<{ data: { id: string; number: string; total: string } }>('/invoices', {
           method: 'POST',
-          body: { partner_id: partnerId, payment_type: paymentType, items },
+          body: { partner_id: partnerId, payment_type: paymentType, tax_inclusive: taxInclusive, items },
         });
         await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
         const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
@@ -162,7 +182,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc, customerName, posCfg.receipt_footer],
+    [cart, success, t, tc, customerName, posCfg.receipt_footer, taxInclusive],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({

@@ -55,3 +55,12 @@ export function riyalToMinor(input: string | number): number {
 export function isValidRiyal(input: string | number): boolean {
   return Number.isFinite(riyalToMinor(input));
 }
+
+// استخراج ضريبة متضمَّنة من مبلغ إجمالي (شامل الضريبة) — بالهللات.
+// يطابق صيغة الـ backend حرفياً: round(gross × rate ÷ (100+rate))
+// عبر intdiv(2·g·r + denom, 2·denom) — فتتّسق أرقام الواجهة مع الترحيل.
+export function extractInclusiveTax(grossMinor: number, rate: number): number {
+  if (rate <= 0 || grossMinor <= 0) return 0;
+  const denom = 100 + rate;
+  return Math.floor((2 * grossMinor * rate + denom) / (2 * denom));
+}
