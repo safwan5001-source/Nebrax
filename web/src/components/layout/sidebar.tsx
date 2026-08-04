@@ -251,15 +251,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                   )}
                 </button>
 
-                {/* انتقال ارتفاع سلس (grid-rows 0fr↔1fr) — المحتوى يبقى في DOM ويُطوى بنعومة. */}
-                <div
-                  className={cn(
-                    'grid transition-[grid-template-rows] duration-200 ease-out',
-                    expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-                  )}
-                >
-                  <div className={cn('overflow-hidden', !expanded && 'pointer-events-none')} aria-hidden={!expanded}>
-                  <div className="flex flex-col gap-0.5 pt-0.5">
+                {/* عرض شرطي: عناصر المجموعة المفتوحة فقط (Accordion حصري) — يُخفّف الـ DOM
+                    ويلغي تحريك grid-template-rows الثقيل؛ ظهور سلس على الـ compositor. */}
+                {expanded && (
+                  <div className="sidebar-group-in flex flex-col gap-0.5 pt-0.5">
                     {group.items.map((item) => {
                       const Icon = item.icon;
                       const active = isActive(item.href);
@@ -287,8 +282,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                       );
                     })}
                   </div>
-                  </div>
-                </div>
+                )}
               </div>
             );
           })}
