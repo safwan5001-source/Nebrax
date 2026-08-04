@@ -5,11 +5,10 @@ import type {
   DocumentModel,
   DocumentTemplateProps,
   DocSectionKey,
-  DocSectionLayoutItem,
   TemplateSectionsConfig,
   TemplateStyle,
 } from '../types';
-import { DEFAULT_SECTION_ORDER } from '../types';
+import { resolveLayout } from './section-order';
 import { DocLayout } from './sections/doc-layout';
 import { DocHeader } from './sections/doc-header';
 import { DocBarcode } from './sections/doc-barcode';
@@ -24,33 +23,6 @@ import { DocBank } from './sections/doc-bank';
 import { DocStamp } from './sections/doc-stamp';
 import { DocSignature } from './sections/doc-signature';
 import { DocFooter } from './sections/doc-footer';
-
-/** الأقسام الظاهرة افتراضياً (فاتورة ضريبية كاملة). */
-const DEFAULT_SECTIONS: TemplateSectionsConfig = {
-  logo: true, header: true, seller: true, buyer: true, meta: true,
-  items: true, summary: true, voucher: false, amountWords: false, qr: true, barcode: false,
-  terms: false, notes: false, bank: false, stamp: false, signature: false,
-  footer: true,
-};
-
-/** هل القسم ظاهر وفق أعلام الإعداد (للترتيب الافتراضي). */
-function isVisible(key: DocSectionKey, s: TemplateSectionsConfig): boolean {
-  switch (key) {
-    case 'header': return s.header;
-    case 'barcode': return s.barcode;
-    case 'parties': return s.seller || s.buyer || s.meta;
-    case 'items': return s.items;
-    case 'summary': return s.summary;
-    case 'voucher': return s.voucher;
-    case 'amountWords': return s.amountWords;
-    case 'notes': return s.notes;
-    case 'terms': return s.terms;
-    case 'bank': return s.bank;
-    case 'stamp': return s.stamp;
-    case 'signature': return s.signature;
-    case 'footer': return s.footer;
-  }
-}
 
 /** رسم قسم واحد حسب مفتاحه. */
 function renderSection(
@@ -90,11 +62,7 @@ export function DocumentBody({
   style,
   rootId,
 }: DocumentTemplateProps & { style: TemplateStyle }) {
-  const s = { ...DEFAULT_SECTIONS, ...sections };
-  const items: DocSectionLayoutItem[] =
-    layout && layout.length > 0
-      ? layout
-      : DEFAULT_SECTION_ORDER.map((key) => ({ key, visible: isVisible(key, s) }));
+  const { items, sections: s } = resolveLayout(layout, sections);
 
   return (
     <DocLayout
