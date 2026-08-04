@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatRiyal, riyalToMinor, isNegative } from '../money';
+import { formatRiyal, riyalToMinor, isNegative, extractInclusiveTax } from '../money';
 
 describe('formatRiyal — العرض من الريال إلى نص بفواصل + ﷼', () => {
   it('ينسّق نصاً وعدداً بفاصلتين', () => {
@@ -36,6 +36,25 @@ describe('riyalToMinor — تحويل الريال إلى هللات بلا floa
   it('يتجنّب انحراف الفاصلة العائمة (0.1+0.2 الكلاسيكي)', () => {
     // 0.1 ريال = 10 هللات، 0.2 ريال = 20 هللة، المجموع 30 بالضبط
     expect(riyalToMinor('0.10') + riyalToMinor('0.20')).toBe(30);
+  });
+});
+
+describe('extractInclusiveTax — استخراج ضريبة متضمَّنة (يطابق الـ backend)', () => {
+  it('يستخرج 15% من مبلغ شامل', () => {
+    // 115.00 شامل 15% → ضريبة 15.00 (1500 هللة)
+    expect(extractInclusiveTax(11500, 15)).toBe(1500);
+    // 1150.00 شامل → 150.00
+    expect(extractInclusiveTax(115000, 15)).toBe(15000);
+  });
+
+  it('يقرّب لأقرب هللة كالـ backend', () => {
+    // 100.00 شامل 15% → 100×15/115 = 13.043… → 1304 هللة (round)
+    expect(extractInclusiveTax(10000, 15)).toBe(1304);
+  });
+
+  it('صفر عند نسبة أو مبلغ غير موجب', () => {
+    expect(extractInclusiveTax(11500, 0)).toBe(0);
+    expect(extractInclusiveTax(0, 15)).toBe(0);
   });
 });
 
