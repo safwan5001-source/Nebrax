@@ -15,7 +15,7 @@ class Purchase extends BaseModel
     protected $fillable = [
         'tenant_id', 'number', 'partner_id', 'payment_type',
         'purchase_date', 'due_date', 'supplier_invoice_no', 'status',
-        'subtotal', 'tax_amount', 'total',
+        'subtotal', 'tax_amount', 'total', 'tax_inclusive',
         'paid_amount', 'payment_status',
         'notes', 'journal_entry_id', 'created_by',
     ];
@@ -26,6 +26,7 @@ class Purchase extends BaseModel
         'subtotal'      => 'integer',
         'tax_amount'    => 'integer',
         'total'         => 'integer',
+        'tax_inclusive' => 'boolean',
         'paid_amount'   => 'integer',
     ];
 

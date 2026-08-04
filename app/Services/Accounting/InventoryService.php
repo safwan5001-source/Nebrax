@@ -70,8 +70,13 @@ class InventoryService
      * إدخال بضاعة للمخزون (كمية + متوسط متحرك) **دون** توليد قيد محاسبي.
      * يُستخدم عندما يكون القيد جزءاً من عملية أكبر (مثل فاتورة المشتريات)
      * حتى لا يتكرّر الترحيل. يجب استدعاؤه ضمن معاملة الطرف المستدعي.
+     *
+     * `$totalCost` (اختياري): القيمة الصافية الدقيقة للوارد. حين تُمرَّر تُستخدم
+     * كما هي (فيتطابق المخزون مع حساب الأستاذ 1140 بلا انحراف تقريب) — لازمٌ
+     * للمشتريات المتضمَّنة الضريبة حيث الصافي = الإجمالي − الضريبة المستخرَجة.
+     * حين تُحذَف يبقى السلوك السابق تماماً: القيمة = الكمية × تكلفة الوحدة.
      */
-    public function applyReceipt(Product $product, int $quantity, int $unitCost, array $meta = []): StockMovement
+    public function applyReceipt(Product $product, int $quantity, int $unitCost, array $meta = [], ?int $totalCost = null): StockMovement
     {
         if ($quantity <= 0 || $unitCost < 0) {
             throw new RuntimeException('كمية الاستلام يجب أن تكون موجبة والتكلفة غير سالبة.');
@@ -79,19 +84,26 @@ class InventoryService
 
         $date = $meta['date'] ?? now()->toDateString();
 
+        // قيمة الوارد: الصافي الدقيق إن مُرِّر، وإلا الكمية × تكلفة الوحدة (كالسابق).
+        $lineValue = $totalCost ?? ($quantity * $unitCost);
+        if ($lineValue < 0) {
+            throw new RuntimeException('قيمة الوارد لا تكون سالبة.');
+        }
+        $recordedUnit = $totalCost !== null ? intdiv($totalCost, $quantity) : $unitCost;
+
         // متوسط متحرك: المتوسط الجديد = (قيمة المخزون القديمة + قيمة الوارد) ÷ الكمية الكلية
         $oldQty   = $product->quantity_on_hand;
         $oldValue = $oldQty * $product->avg_cost;
         $newQty   = $oldQty + $quantity;
-        $newValue = $oldValue + ($quantity * $unitCost);
+        $newValue = $oldValue + $lineValue;
         $newAvg   = $newQty > 0 ? intdiv($newValue, $newQty) : 0;
 
         $movement = StockMovement::create([
             'product_id'       => $product->id,
             'type'             => 'in',
             'quantity'         => $quantity,
-            'unit_cost'        => $unitCost,
-            'total_cost'       => $quantity * $unitCost,
+            'unit_cost'        => $recordedUnit,
+            'total_cost'       => $lineValue,
             'balance_quantity' => $newQty,
             'source_type'      => $meta['source_type'] ?? null,
             'source_id'        => $meta['source_id'] ?? null,

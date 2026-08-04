@@ -107,6 +107,39 @@ class PurchaseTest extends TestCase
     }
 
     /** @test */
+    public function inclusive_purchase_extracts_tax_values_inventory_at_net_and_stays_balanced(): void
+    {
+        $product = $this->trackedProduct();
+
+        // 10 وحدات بسعر 46.00 «شامل الضريبة» → صافي 40.00 + ضريبة مستخرَجة 6.00
+        $purchase = $this->purchases->create(
+            ['partner_id' => $this->supplier->id, 'payment_type' => 'credit', 'tax_inclusive' => true],
+            [['product_id' => $product->id, 'quantity' => 10, 'unit_price' => 4600, 'tax_rate' => 15]]
+        );
+
+        $this->assertTrue($purchase->tax_inclusive);
+        $this->assertSame(40000, $purchase->subtotal);   // الصافي (يُقيَّم به المخزون)
+        $this->assertSame(6000,  $purchase->tax_amount);  // ضريبة مستخرَجة لا مضافة
+        $this->assertSame(46000, $purchase->total);       // الإجمالي = ما يُدفع للمورد
+
+        $posted = $this->purchases->post($purchase);
+        $entry  = $posted->journalEntry()->with('lines.account')->first();
+
+        // القيد: مدين 1140 بالصافي، مدين 1150 بالضريبة المستخرَجة، دائن 2110 بالإجمالي — متوازن
+        $this->assertEquals(40000, $this->line($entry, '1140')->debit);
+        $this->assertEquals(6000,  $this->line($entry, '1150')->debit);
+        $this->assertEquals(46000, $this->line($entry, '2110')->credit);
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+
+        // المخزون مُقيَّم بالصافي (40.00/وحدة) لا الإجمالي (46.00)، ويتطابق مع مدين 1140
+        $product->refresh();
+        $this->assertSame(10, $product->quantity_on_hand);
+        $this->assertSame(4000, $product->avg_cost); // صافي لا 4600
+        $this->assertEquals(40000, Account::where('code', '1140')->first()->balance->balance);
+        $this->assertSame(40000, (int) $product->movements()->sum('total_cost')); // = مدين 1140
+    }
+
+    /** @test */
     public function cash_purchase_credits_the_cash_account_not_payables(): void
     {
         $product = $this->trackedProduct();

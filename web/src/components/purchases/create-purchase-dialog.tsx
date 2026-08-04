@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { getSystemTaxInclusive } from '@/lib/tax';
 
 interface Partner { id: string; name: string; type: string }
 interface Line { description: string; quantity: string; unit_price: string; tax_rate: string }
@@ -27,11 +28,13 @@ export function CreatePurchaseDialog({
   onCreated: () => void;
 }) {
   const t = useTranslations('purchaseForm');
+  const tf = useTranslations('invoiceForm');
   const tc = useTranslations('common');
   const { success } = useToast();
   const [suppliers, setSuppliers] = useState<Partner[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [paymentType, setPaymentType] = useState('credit');
+  const [taxInclusive, setTaxInclusive] = useState(false);
   const [postNow, setPostNow] = useState(true);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +45,8 @@ export function CreatePurchaseDialog({
     api<{ data: Partner[] }>('/partners').then((r) =>
       setSuppliers(r.data.filter((p) => ['supplier', 'both'].includes(p.type)))
     );
+    // الوضع الافتراضي من إعدادات النظام (كالفاتورة وعرض السعر).
+    getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
   }, [open]);
 
   const setLine = (i: number, k: keyof Line, v: string) =>
@@ -49,9 +54,11 @@ export function CreatePurchaseDialog({
   const addLine = () => setLines((ls) => [...ls, emptyLine()]);
   const removeLine = (i: number) => setLines((ls) => (ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls));
 
+  // الإجمالي حسب الوضع: متضمَّن = مجموع الأسعار (شاملة)؛ غير متضمَّن = السعر + الضريبة.
   const totalMinor = lines.reduce((sum, l) => {
-    const sub = (Number(l.quantity) || 0) * riyalToMinor(l.unit_price);
-    return sum + sub + Math.round((sub * (Number(l.tax_rate) || 0)) / 100);
+    const gross = (Number(l.quantity) || 0) * riyalToMinor(l.unit_price);
+    const rate = Number(l.tax_rate) || 0;
+    return sum + (taxInclusive ? gross : gross + Math.round((gross * rate) / 100));
   }, 0);
 
   async function submit(e: React.FormEvent) {
@@ -67,7 +74,7 @@ export function CreatePurchaseDialog({
     try {
       const created = await api<{ data: { id: string } }>('/purchases', {
         method: 'POST',
-        body: { partner_id: partnerId, payment_type: paymentType, items },
+        body: { partner_id: partnerId, payment_type: paymentType, tax_inclusive: taxInclusive, items },
       });
       if (postNow) await api(`/purchases/${created.data.id}/post`, { method: 'POST' });
       success(tc('created'));
@@ -84,7 +91,7 @@ export function CreatePurchaseDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t('title')} className="max-w-2xl">
       <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="supplier">{t('supplier')}</Label>
             <Select id="supplier" value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required>
@@ -103,6 +110,13 @@ export function CreatePurchaseDialog({
             <Select id="pt" value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
               <option value="credit">{t('credit')}</option>
               <option value="cash">{t('cash')}</option>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="taxmode">{tf('tax_mode')}</Label>
+            <Select id="taxmode" value={taxInclusive ? '1' : '0'} onChange={(e) => setTaxInclusive(e.target.value === '1')}>
+              <option value="0">{tf('tax_exclusive')}</option>
+              <option value="1">{tf('tax_inclusive')}</option>
             </Select>
           </div>
         </div>
