@@ -72,7 +72,7 @@ export function ThermalReceipt({
           <div className="space-y-1">
             {model.lines.map((line) => (
               <div key={line.id}>
-                <div className="truncate">{line.description || '—'}</div>
+                <div className="break-words leading-relaxed">{line.description || '—'}</div>
                 <div className="flex justify-between text-gray-600">
                   <span className="num">{line.quantity} × {formatMoney(line.unitPrice)}</span>
                   <span className="num text-black">{formatMoney(line.total)}</span>
