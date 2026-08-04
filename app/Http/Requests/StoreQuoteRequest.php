@@ -18,6 +18,7 @@ class StoreQuoteRequest extends FormRequest
             'quote_date'          => ['nullable', 'date'],
             'valid_until'         => ['nullable', 'date'],
             'status'              => ['nullable', 'in:draft,sent,accepted,rejected'],
+            'tax_inclusive'       => ['nullable', 'boolean'], // هل أسعار السطور متضمّنة الضريبة (تُستخرَج) أم لا (تُضاف)
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],

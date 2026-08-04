@@ -14,16 +14,17 @@ class Quote extends BaseModel
 {
     protected $fillable = [
         'tenant_id', 'number', 'partner_id', 'quote_date', 'valid_until',
-        'status', 'subtotal', 'tax_amount', 'total', 'notes',
+        'status', 'subtotal', 'tax_amount', 'total', 'tax_inclusive', 'notes',
         'converted_invoice_id', 'created_by',
     ];
 
     protected $casts = [
-        'quote_date'  => 'date',
-        'valid_until' => 'date',
-        'subtotal'    => 'integer',
-        'tax_amount'  => 'integer',
-        'total'       => 'integer',
+        'quote_date'    => 'date',
+        'valid_until'   => 'date',
+        'subtotal'      => 'integer',
+        'tax_amount'    => 'integer',
+        'total'         => 'integer',
+        'tax_inclusive' => 'boolean',
     ];
 
     protected $attributes = [

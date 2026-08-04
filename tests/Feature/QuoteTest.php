@@ -47,6 +47,31 @@ class QuoteTest extends TestCase
     }
 
     /** @test */
+    public function inclusive_quote_extracts_tax_from_price_and_preserves_mode_on_convert(): void
+    {
+        $auth = $this->registerTenant();
+        $partnerId = $this->partner($auth['token']);
+
+        // 115.00 شامل 15% → صافي 100.00 + ضريبة 15.00 (تُستخرَج لا تُضاف)
+        $res = $this->withToken($auth['token'])->postJson('/api/quotes', [
+            'partner_id'    => $partnerId,
+            'tax_inclusive' => true,
+            'items'         => [['quantity' => 1, 'unit_price' => 11500, 'tax_rate' => 15]],
+        ])->assertCreated();
+
+        $this->assertTrue($res['data']['tax_inclusive']);
+        $this->assertSame('100.00', $res['data']['subtotal']);
+        $this->assertSame('15.00', $res['data']['tax_amount']);
+        $this->assertSame('115.00', $res['data']['total']);
+
+        // التحويل يحافظ على الوضع والإجمالي (لا يتضاعف)
+        $invoice = $this->withToken($auth['token'])
+            ->postJson("/api/quotes/{$res['data']['id']}/convert", ['payment_type' => 'credit'])
+            ->assertCreated();
+        $this->assertSame('115.00', $invoice['data']['total']);
+    }
+
+    /** @test */
     public function quote_requires_at_least_one_line(): void
     {
         $auth = $this->registerTenant();

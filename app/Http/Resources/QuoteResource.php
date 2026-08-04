@@ -20,6 +20,7 @@ class QuoteResource extends JsonResource
             'subtotal'             => Money::toRiyal($this->subtotal),
             'tax_amount'           => Money::toRiyal($this->tax_amount),
             'total'                => Money::toRiyal($this->total),
+            'tax_inclusive'        => (bool) $this->tax_inclusive,
             'notes'                => $this->notes,
             'converted_invoice_id' => $this->converted_invoice_id,
             'lines'                => QuoteLineResource::collection($this->whenLoaded('lines')),

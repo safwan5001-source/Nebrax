@@ -20,6 +20,8 @@ use RuntimeException;
  */
 class QuoteService
 {
+    use ComputesLineTax;
+
     public function __construct(protected InvoiceService $invoices) {}
 
     /**
@@ -37,45 +39,20 @@ class QuoteService
         return DB::transaction(function () use ($data, $items) {
             $date = $data['quote_date'] ?? now()->toDateString();
 
+            $inclusive = (bool) ($data['tax_inclusive'] ?? false);
+
             $quote = Quote::create([
-                'number'      => $data['number'] ?? $this->nextNumber($date),
-                'partner_id'  => $data['partner_id'],
-                'quote_date'  => $date,
-                'valid_until' => $data['valid_until'] ?? null,
-                'status'      => $data['status'] ?? 'draft',
-                'notes'       => $data['notes'] ?? null,
-                'created_by'  => $data['created_by'] ?? null,
+                'number'        => $data['number'] ?? $this->nextNumber($date),
+                'partner_id'    => $data['partner_id'],
+                'quote_date'    => $date,
+                'valid_until'   => $data['valid_until'] ?? null,
+                'status'        => $data['status'] ?? 'draft',
+                'tax_inclusive' => $inclusive,
+                'notes'         => $data['notes'] ?? null,
+                'created_by'    => $data['created_by'] ?? null,
             ]);
 
-            $subtotal = $taxTotal = 0;
-
-            foreach ($items as $item) {
-                $qty       = (int) ($item['quantity'] ?? 1);
-                $unitPrice = (int) ($item['unit_price'] ?? 0);
-                $rate      = (int) ($item['tax_rate'] ?? 15);
-
-                if ($qty <= 0 || $unitPrice < 0) {
-                    throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
-                }
-
-                $lineSubtotal = $qty * $unitPrice;
-                $lineTax      = $this->calcTax($lineSubtotal, $rate);
-
-                QuoteLine::create([
-                    'quote_id'      => $quote->id,
-                    'product_id'    => $item['product_id'] ?? null,
-                    'description'   => $item['description'] ?? null,
-                    'quantity'      => $qty,
-                    'unit_price'    => $unitPrice,
-                    'tax_rate'      => $rate,
-                    'line_subtotal' => $lineSubtotal,
-                    'line_tax'      => $lineTax,
-                    'line_total'    => $lineSubtotal + $lineTax,
-                ]);
-
-                $subtotal += $lineSubtotal;
-                $taxTotal += $lineTax;
-            }
+            [$subtotal, $taxTotal] = $this->writeLines($quote, $items, $inclusive);
 
             $quote->update([
                 'subtotal'   => $subtotal,
@@ -109,10 +86,11 @@ class QuoteService
             ])->all();
 
             $invoice = $this->invoices->create([
-                'partner_id'   => $quote->partner_id,
-                'payment_type' => $paymentType,
-                'notes'        => "محوّل من عرض السعر {$quote->number}",
-                'created_by'   => $quote->created_by,
+                'partner_id'    => $quote->partner_id,
+                'payment_type'  => $paymentType,
+                'tax_inclusive' => $quote->tax_inclusive, // يحافظ على وضع الضريبة عند التحويل
+                'notes'         => "محوّل من عرض السعر {$quote->number}",
+                'created_by'    => $quote->created_by,
             ], $items);
 
             $quote->update([
@@ -136,11 +114,12 @@ class QuoteService
 
         return DB::transaction(function () use ($quote, $data, $items) {
             $quote->update(array_filter([
-                'partner_id'  => $data['partner_id'] ?? null,
-                'quote_date'  => $data['quote_date'] ?? null,
-                'valid_until' => $data['valid_until'] ?? null,
-                'status'      => $data['status'] ?? null,
-                'notes'       => $data['notes'] ?? null,
+                'partner_id'    => $data['partner_id'] ?? null,
+                'quote_date'    => $data['quote_date'] ?? null,
+                'valid_until'   => $data['valid_until'] ?? null,
+                'status'        => $data['status'] ?? null,
+                'tax_inclusive' => $data['tax_inclusive'] ?? null,
+                'notes'         => $data['notes'] ?? null,
             ], fn ($v) => $v !== null));
 
             if ($items !== null) {
@@ -149,34 +128,8 @@ class QuoteService
                 }
                 $quote->lines()->delete();
 
-                $subtotal = $taxTotal = 0;
-                foreach ($items as $item) {
-                    $qty       = (int) ($item['quantity'] ?? 1);
-                    $unitPrice = (int) ($item['unit_price'] ?? 0);
-                    $rate      = (int) ($item['tax_rate'] ?? 15);
-
-                    if ($qty <= 0 || $unitPrice < 0) {
-                        throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
-                    }
-
-                    $lineSubtotal = $qty * $unitPrice;
-                    $lineTax      = $this->calcTax($lineSubtotal, $rate);
-
-                    QuoteLine::create([
-                        'quote_id'      => $quote->id,
-                        'product_id'    => $item['product_id'] ?? null,
-                        'description'   => $item['description'] ?? null,
-                        'quantity'      => $qty,
-                        'unit_price'    => $unitPrice,
-                        'tax_rate'      => $rate,
-                        'line_subtotal' => $lineSubtotal,
-                        'line_tax'      => $lineTax,
-                        'line_total'    => $lineSubtotal + $lineTax,
-                    ]);
-
-                    $subtotal += $lineSubtotal;
-                    $taxTotal += $lineTax;
-                }
+                // الوضع بعد التحديث (المُمرَّر إن وُجد، وإلا المخزَّن).
+                [$subtotal, $taxTotal] = $this->writeLines($quote, $items, (bool) $quote->tax_inclusive);
 
                 $quote->update([
                     'subtotal'   => $subtotal,
@@ -189,10 +142,45 @@ class QuoteService
         });
     }
 
-    /** حساب الضريبة كعدد صحيح (تقريب نصفي لأعلى) — بلا float. */
-    protected function calcTax(int $base, int $rate): int
+    /**
+     * يكتب سطور العرض ويعيد [الإجمالي قبل الضريبة، إجمالي الضريبة] حسب الوضع:
+     * متضمّن → تُستخرَج الضريبة من السعر؛ غير متضمّن → تُضاف فوقه.
+     *
+     * @return array{0:int,1:int}
+     */
+    protected function writeLines(Quote $quote, array $items, bool $inclusive): array
     {
-        return intdiv($base * $rate + 50, 100);
+        $subtotal = $taxTotal = 0;
+
+        foreach ($items as $item) {
+            $qty       = (int) ($item['quantity'] ?? 1);
+            $unitPrice = (int) ($item['unit_price'] ?? 0);
+            $rate      = (int) ($item['tax_rate'] ?? 15);
+
+            if ($qty <= 0 || $unitPrice < 0) {
+                throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
+            }
+
+            $lineGross = $qty * $unitPrice;
+            [$lineNet, $lineTax] = $this->splitLineTax($lineGross, $rate, $inclusive);
+
+            QuoteLine::create([
+                'quote_id'      => $quote->id,
+                'product_id'    => $item['product_id'] ?? null,
+                'description'   => $item['description'] ?? null,
+                'quantity'      => $qty,
+                'unit_price'    => $unitPrice,
+                'tax_rate'      => $rate,
+                'line_subtotal' => $lineNet,
+                'line_tax'      => $lineTax,
+                'line_total'    => $lineNet + $lineTax,
+            ]);
+
+            $subtotal += $lineNet;
+            $taxTotal += $lineTax;
+        }
+
+        return [$subtotal, $taxTotal];
     }
 
     /** توليد رقم عرض تسلسلي: QUO-2025-00001 */
