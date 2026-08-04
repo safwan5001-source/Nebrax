@@ -14,6 +14,7 @@ const VOUCHER_LAYOUT: DocSectionLayoutItem[] = [
   { key: 'header', visible: true },
   { key: 'parties', visible: true },
   { key: 'voucher', visible: true },
+  { key: 'amountWords', visible: true },
   { key: 'notes', visible: true },
   { key: 'signature', visible: true },
   { key: 'stamp', visible: true },

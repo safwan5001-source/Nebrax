@@ -160,6 +160,7 @@ export interface TemplateSectionsConfig {
   items: boolean;
   summary: boolean;
   voucher: boolean;
+  amountWords: boolean;
   qr: boolean;
   barcode: boolean;
   terms: boolean;
@@ -202,7 +203,7 @@ export interface TemplateStyle {
  */
 export type DocSectionKey =
   | 'header' | 'barcode' | 'parties' | 'items' | 'summary' | 'voucher'
-  | 'notes' | 'terms' | 'bank' | 'stamp' | 'signature' | 'footer';
+  | 'amountWords' | 'notes' | 'terms' | 'bank' | 'stamp' | 'signature' | 'footer';
 
 /** عنصر تخطيط: قسم + ظهوره. ترتيب المصفوفة = ترتيب العرض. */
 export interface DocSectionLayoutItem {
@@ -212,7 +213,7 @@ export interface DocSectionLayoutItem {
 
 /** الترتيب الافتراضي للأقسام (يطابق التركيب الأصلي). */
 export const DEFAULT_SECTION_ORDER: DocSectionKey[] = [
-  'header', 'barcode', 'parties', 'items', 'summary',
+  'header', 'barcode', 'parties', 'items', 'summary', 'amountWords',
   'notes', 'terms', 'bank', 'stamp', 'signature', 'footer',
 ];
 
