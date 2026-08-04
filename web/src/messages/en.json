@@ -342,12 +342,40 @@
   "documentTypes": {
     "tax_invoice": "Tax Invoice",
     "quotation": "Quotation",
-    "credit_note": "Credit Note"
+    "credit_note": "Credit Note",
+    "receipt_voucher": "Receipt Voucher",
+    "payment_voucher": "Payment Voucher"
   },
   "documentTypesAlt": {
     "tax_invoice": "فاتورة ضريبية",
     "quotation": "عرض سعر",
-    "credit_note": "إشعار دائن"
+    "credit_note": "إشعار دائن",
+    "receipt_voucher": "سند قبض",
+    "payment_voucher": "سند صرف"
+  },
+  "voucherDoc": {
+    "received_from": "Received from",
+    "paid_to": "Paid to",
+    "amount": "Amount",
+    "method": "Payment method",
+    "reference": "Reference",
+    "applied_to": "Applied to documents"
+  },
+  "paymentDetail": {
+    "back": "Back",
+    "details": "Voucher details",
+    "print": "Print",
+    "download_pdf": "Download PDF",
+    "share": "Share",
+    "generating": "Generating…",
+    "shared_ok": "Shared",
+    "downloaded_ok": "Downloaded",
+    "export_failed": "Export failed",
+    "preview": "Voucher preview",
+    "load_error": "Could not load voucher",
+    "retry": "Retry",
+    "not_found": "Voucher not found",
+    "template": "Template"
   },
   "invoiceTemplates": {
     "classic": "Classic",

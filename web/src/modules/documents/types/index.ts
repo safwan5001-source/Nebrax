@@ -86,6 +86,24 @@ export interface DocumentQr {
   note?: string | null;
 }
 
+/** تخصيص سند (فاتورة/مشترى غطّاه السند) — المبلغ بالوحدات الصغرى. */
+export interface DocumentVoucherAllocation {
+  label: string;
+  amount: number; // minor units
+}
+
+/**
+ * بيانات السند (قبض/صرف) — المحتوى الجوهري لمستند لا يحمل بنوداً/ضريبة:
+ * اتجاه الحركة، الطريقة، المبلغ، وما غطّاه من مستندات.
+ */
+export interface DocumentVoucher {
+  direction: 'received' | 'paid';
+  method: string;         // نقدي/تحويل/شيك… (نصّ مترجَم مسبقاً)
+  amount: number;         // minor units
+  reference?: string | null;
+  allocations?: DocumentVoucherAllocation[];
+}
+
 /**
  * نموذج المستند الموحّد — ما تستهلكه كل القوالب.
  */
@@ -110,6 +128,8 @@ export interface DocumentModel {
   stampUrl?: string | null;
   /** التوقيع (data URL، من إعدادات التصاميم). */
   signatureUrl?: string | null;
+  /** بيانات السند (قبض/صرف) — للمستندات من نوع voucher فقط. */
+  voucher?: DocumentVoucher | null;
 }
 
 /** توكنز الثيم (تُسقَط إلى متغيّرات CSS). */
@@ -139,6 +159,7 @@ export interface TemplateSectionsConfig {
   meta: boolean;
   items: boolean;
   summary: boolean;
+  voucher: boolean;
   qr: boolean;
   barcode: boolean;
   terms: boolean;
@@ -174,9 +195,13 @@ export interface TemplateStyle {
   brandBar: boolean;
 }
 
-/** مفاتيح الأقسام القابلة للترتيب/الإظهار في مصمّم المستند. */
+/**
+ * مفاتيح الأقسام القابلة للترتيب/الإظهار في مصمّم المستند.
+ * `voucher` مستثنى من `DEFAULT_SECTION_ORDER` (فلا يظهر في مصمّم الفواتير) — تستدعيه
+ * مستندات السند عبر تخطيط صريح.
+ */
 export type DocSectionKey =
-  | 'header' | 'barcode' | 'parties' | 'items' | 'summary'
+  | 'header' | 'barcode' | 'parties' | 'items' | 'summary' | 'voucher'
   | 'notes' | 'terms' | 'bank' | 'stamp' | 'signature' | 'footer';
 
 /** عنصر تخطيط: قسم + ظهوره. ترتيب المصفوفة = ترتيب العرض. */

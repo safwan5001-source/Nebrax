@@ -1,0 +1,80 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+import { cn } from '@/lib/utils';
+import type { DocumentModel } from '../../types';
+import { useDocStyle } from '../doc-style-context';
+
+/**
+ * جسم السند (قبض/صرف) — بديل جدول البنود لمستند لا يحمل ضريبة:
+ * عبارة الاتجاه + مبلغ بارز + الطريقة/المرجع + قائمة ما غطّاه من مستندات.
+ */
+export function DocVoucher({
+  model,
+  formatMoney,
+}: {
+  model: DocumentModel;
+  formatMoney: (minor: number) => string;
+}) {
+  const t = useTranslations('voucherDoc');
+  const style = useDocStyle();
+  const v = model.voucher;
+  if (!v) return null;
+
+  const party = model.buyer.name || '—';
+  const phrase = v.direction === 'received' ? t('received_from') : t('paid_to');
+
+  return (
+    <div className={cn('space-y-3', style.sectionGap)}>
+      {/* المبلغ البارز — البطل البصري للسند. */}
+      <div
+        className={cn('flex items-center justify-between border p-4', style.cardRadius)}
+        style={{ borderColor: 'var(--doc-brand)', background: 'var(--doc-brand-soft)' }}
+      >
+        <div>
+          <div className="text-[11px] text-gray-500">{phrase}</div>
+          <div className="text-base font-bold text-black">{party}</div>
+        </div>
+        <div className="text-end">
+          <div className="text-[11px] text-gray-500">{t('amount')}</div>
+          <div className="num text-2xl font-bold" style={{ color: 'var(--doc-brand)' }}>
+            {formatMoney(v.amount)}
+          </div>
+        </div>
+      </div>
+
+      {/* الطريقة والمرجع. */}
+      <div className="grid grid-cols-2 gap-3 text-[12px]">
+        <div className="flex justify-between border-b border-gray-100 pb-1">
+          <span className="text-gray-500">{t('method')}</span>
+          <span className="font-medium text-black">{v.method}</span>
+        </div>
+        {v.reference && (
+          <div className="flex justify-between border-b border-gray-100 pb-1">
+            <span className="text-gray-500">{t('reference')}</span>
+            <span className="num font-medium text-black">{v.reference}</span>
+          </div>
+        )}
+      </div>
+
+      {/* التخصيصات — ما غطّاه السند من فواتير/مشتريات. */}
+      {v.allocations && v.allocations.length > 0 && (
+        <div className={cn('overflow-hidden border border-gray-200', style.cardRadius)}>
+          <div className="bg-gray-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+            {t('applied_to')}
+          </div>
+          <table className="w-full text-[12px]">
+            <tbody>
+              {v.allocations.map((a, i) => (
+                <tr key={i} className="border-t border-gray-100">
+                  <td className="px-3 py-1.5 text-gray-700">{a.label}</td>
+                  <td className="num px-3 py-1.5 text-end font-medium text-black">{formatMoney(a.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
