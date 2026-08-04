@@ -1,11 +1,14 @@
 <?php
 
-namespace App\Services\Accounting\Concerns;
+namespace App\Services\Accounting;
 
 /**
  * احتساب ضريبة السطر — أعداد صحيحة بالهللات، بلا float. مصدر واحد يعيد استخدامه
  * كل مستند يحسب الضريبة (عرض سعر/مشتريات…). الصيغ تطابق `InvoiceService` حرفياً
  * فتتّسق الإجماليات عبر المنظومة.
+ *
+ * (يبقى في مجلّد Services/Accounting مباشرةً — لا مجلّد فرعي — لأن تجميع الـ CI
+ *  ينسخ ملفات هذا المسار المباشرة فقط.)
  */
 trait ComputesLineTax
 {
