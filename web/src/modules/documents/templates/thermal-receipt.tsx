@@ -28,7 +28,9 @@ export function ThermalReceipt({
 }: DocumentTemplateProps & { widthMm: number }) {
   const t = useTranslations('invoiceDoc');
   const dt = useTranslations('documentTypes');
+  const tv = useTranslations('voucherDoc');
   const rule = 'my-2 border-t border-dashed border-gray-400';
+  const v = model.voucher;
 
   return (
     <ThermalLayout theme={theme} direction={model.direction} directionSample={model.seller.name} widthMm={widthMm} rootId={rootId}>
@@ -44,31 +46,66 @@ export function ThermalReceipt({
       <div className="space-y-0.5">
         <Row label={t('number')} value={<span className="num">{model.meta.number}</span>} />
         <Row label={t('date')} value={<span className="num">{model.meta.date}</span>} />
-        <Row label={t('bill_to')} value={model.buyer.name || null} />
+        <Row
+          label={v ? (v.direction === 'received' ? tv('received_from') : tv('paid_to')) : t('bill_to')}
+          value={model.buyer.name || null}
+        />
       </div>
 
-      <div className={rule} />
-      <div className="space-y-1">
-        {model.lines.map((line) => (
-          <div key={line.id}>
-            <div className="truncate">{line.description || '—'}</div>
-            <div className="flex justify-between text-gray-600">
-              <span className="num">{line.quantity} × {formatMoney(line.unitPrice)}</span>
-              <span className="num text-black">{formatMoney(line.total)}</span>
+      {v ? (
+        /* سند قبض/صرف — لا بنود/ضريبة: المبلغ + الطريقة + التخصيصات. */
+        <>
+          <div className={rule} />
+          <div className="flex justify-between pt-1 text-[13px] font-bold">
+            <span>{tv('amount')}</span>
+            <span className="num">{formatMoney(v.amount)}</span>
+          </div>
+          <div className="mt-1 space-y-0.5">
+            <Row label={tv('method')} value={v.method} />
+            {v.reference && <Row label={tv('reference')} value={<span className="num">{v.reference}</span>} />}
+          </div>
+          {v.allocations && v.allocations.length > 0 && (
+            <>
+              <div className={rule} />
+              <div className="text-[10px] text-gray-500">{tv('applied_to')}</div>
+              <div className="mt-1 space-y-0.5">
+                {v.allocations.map((a, i) => (
+                  <div key={i} className="flex justify-between text-gray-600">
+                    <span className="num">{a.label}</span>
+                    <span className="num text-black">{formatMoney(a.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        /* فاتورة — بنود + إجماليات. */
+        <>
+          <div className={rule} />
+          <div className="space-y-1">
+            {model.lines.map((line) => (
+              <div key={line.id}>
+                <div className="truncate">{line.description || '—'}</div>
+                <div className="flex justify-between text-gray-600">
+                  <span className="num">{line.quantity} × {formatMoney(line.unitPrice)}</span>
+                  <span className="num text-black">{formatMoney(line.total)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={rule} />
+          <div className="space-y-0.5">
+            <Row label={t('subtotal')} value={<span className="num">{formatMoney(model.totals.subtotal)}</span>} />
+            <Row label={t('vat')} value={<span className="num">{formatMoney(model.totals.tax)}</span>} />
+            <div className="flex justify-between pt-1 text-[13px] font-bold">
+              <span>{t('grand_total')}</span>
+              <span className="num">{formatMoney(model.totals.total)}</span>
             </div>
           </div>
-        ))}
-      </div>
-
-      <div className={rule} />
-      <div className="space-y-0.5">
-        <Row label={t('subtotal')} value={<span className="num">{formatMoney(model.totals.subtotal)}</span>} />
-        <Row label={t('vat')} value={<span className="num">{formatMoney(model.totals.tax)}</span>} />
-        <div className="flex justify-between pt-1 text-[13px] font-bold">
-          <span>{t('grand_total')}</span>
-          <span className="num">{formatMoney(model.totals.total)}</span>
-        </div>
-      </div>
+        </>
+      )}
 
       {model.qr?.value && (
         <div className="mt-3 flex justify-center">
