@@ -14,8 +14,8 @@
   --positive: #16a34a;
   --negative: #dc2626;
   --warning: #d97706;
-  --font-sans: 'IBM Plex Sans Arabic', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-sans: var(--font-ibm-sans), 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --font-mono: var(--font-ibm-mono), 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 .dark {
@@ -42,6 +42,27 @@
   .num {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+  }
+}
+
+/* فتح مجموعة الشريط الجانبي — حركة على الـ compositor فقط (opacity/transform)
+   بلا إعادة تخطيط، فتبقى سلسة بعكس تحريك grid-template-rows. */
+@keyframes sidebar-group-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.sidebar-group-in {
+  animation: sidebar-group-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-group-in {
+    animation: none;
   }
 }
 

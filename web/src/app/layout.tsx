@@ -1,7 +1,23 @@
 import type { Metadata } from 'next';
+import { IBM_Plex_Sans_Arabic, IBM_Plex_Mono } from 'next/font/google';
 import { getLocale, getMessages } from 'next-intl/server';
 import { Providers } from '@/components/providers';
 import './globals.css';
+
+// خطوط ذاتية الاستضافة (next/font) — تُبنى محلياً فلا طلب CDN حاجب للعرض
+// (يمنع اختفاء النص عند بطء/حجب fonts.googleapis.com) مع display: swap.
+const sans = IBM_Plex_Sans_Arabic({
+  subsets: ['arabic', 'latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-ibm-sans',
+});
+const mono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+  variable: '--font-ibm-mono',
+});
 
 export const metadata: Metadata = {
   title: 'نبراس ERP',
@@ -14,15 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
 
   return (
-    <html lang={locale} dir={dir} suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang={locale} dir={dir} className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body suppressHydrationWarning>
         <Providers locale={locale} messages={messages}>
           {children}
