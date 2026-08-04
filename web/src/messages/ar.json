@@ -342,12 +342,40 @@
   "documentTypes": {
     "tax_invoice": "فاتورة ضريبية",
     "quotation": "عرض سعر",
-    "credit_note": "إشعار دائن"
+    "credit_note": "إشعار دائن",
+    "receipt_voucher": "سند قبض",
+    "payment_voucher": "سند صرف"
   },
   "documentTypesAlt": {
     "tax_invoice": "Tax Invoice",
     "quotation": "Quotation",
-    "credit_note": "Credit Note"
+    "credit_note": "Credit Note",
+    "receipt_voucher": "Receipt Voucher",
+    "payment_voucher": "Payment Voucher"
+  },
+  "voucherDoc": {
+    "received_from": "استلمنا من",
+    "paid_to": "صرفنا إلى",
+    "amount": "المبلغ",
+    "method": "طريقة الدفع",
+    "reference": "المرجع",
+    "applied_to": "مخصوم من المستندات"
+  },
+  "paymentDetail": {
+    "back": "رجوع",
+    "details": "تفاصيل السند",
+    "print": "طباعة",
+    "download_pdf": "تنزيل PDF",
+    "share": "مشاركة",
+    "generating": "جارٍ التوليد…",
+    "shared_ok": "تمت المشاركة",
+    "downloaded_ok": "تم التنزيل",
+    "export_failed": "تعذّر التصدير",
+    "preview": "معاينة السند",
+    "load_error": "تعذّر تحميل السند",
+    "retry": "إعادة المحاولة",
+    "not_found": "السند غير موجود",
+    "template": "القالب"
   },
   "invoiceTemplates": {
     "classic": "كلاسيكي",

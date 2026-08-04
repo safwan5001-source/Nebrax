@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
@@ -43,7 +44,15 @@ export default function PaymentsPage() {
 
   const columns = useMemo<ColumnDef<Payment, unknown>[]>(
     () => [
-      { accessorKey: 'number', header: t('number'), cell: ({ row }) => <span className="num">{row.original.number}</span> },
+      {
+        accessorKey: 'number',
+        header: t('number'),
+        cell: ({ row }) => (
+          <Link href={`/payments/${row.original.id}`} className="num font-medium text-primary hover:underline">
+            {row.original.number}
+          </Link>
+        ),
+      },
       {
         id: 'partner',
         header: t('partner'),
