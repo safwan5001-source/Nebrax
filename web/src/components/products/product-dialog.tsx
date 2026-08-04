@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { riyalToMinor } from '@/lib/money';
+import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
+import { getSystemTaxInclusive } from '@/lib/tax';
 
 export interface Product {
   id: string;
@@ -105,10 +106,12 @@ export function ProductDialog({
   const [form, setForm] = useState<FormState>(product ? fromProduct(product) : emptyForm());
   const [revenueAccounts, setRevenueAccounts] = useState<Acct[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<Acct[]>([]);
+  const [taxInclusive, setTaxInclusive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
     api<{ data: Acct[] }>('/accounts')
       .then((r) => {
         const leaf = r.data.filter((a) => !a.is_group);
@@ -215,6 +218,18 @@ export function ProductDialog({
           <div className="space-y-1.5">
             <Label htmlFor="sale_price">{t('sale_price')}</Label>
             <Input id="sale_price" className="num text-end" inputMode="decimal" value={form.sale_price} onChange={(e) => set('sale_price', e.target.value)} required />
+            {(() => {
+              // تلميح وضع الضريبة (من إعدادات النظام): يوضّح دلالة السعر ويعرض المكمّل.
+              const pm = riyalToMinor(form.sale_price);
+              const rate = Number(form.tax_rate) || 0;
+              if (!Number.isFinite(pm) || pm <= 0 || rate <= 0) return null;
+              const other = taxInclusive ? pm - extractInclusiveTax(pm, rate) : pm + Math.round((pm * rate) / 100);
+              return (
+                <p className="text-[11px] text-muted">
+                  {t(taxInclusive ? 'price_hint_incl' : 'price_hint_excl', { amount: formatRiyal(other / 100) })}
+                </p>
+              );
+            })()}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="purchase_price">{t('purchase_price')}</Label>

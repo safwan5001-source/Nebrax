@@ -52,6 +52,7 @@ function stockTone(qty: number) {
 export default function PosPage() {
   const t = useTranslations('pos');
   const tc = useTranslations('common');
+  const tprod = useTranslations('products');
   const router = useRouter();
   const { success } = useToast();
 
@@ -263,6 +264,7 @@ export default function PosPage() {
               <span className="line-clamp-2 min-h-[36px] text-[13px] font-semibold leading-snug text-text">{p.name}</span>
               {p.sku && <span className="num mb-1.5 mt-0.5 text-[10.5px] text-muted">{p.sku}</span>}
               <span className="num text-[15px] font-bold text-primary-hover">{formatRiyal(p.sale_price)}</span>
+              <span className="text-[9px] text-muted">{taxInclusive ? tprod('tax_incl_tag') : tprod('tax_excl_tag')}</span>
               {tracked && (
                 <div className="mt-2">
                   <div className="mb-1 h-1 overflow-hidden rounded bg-border">
