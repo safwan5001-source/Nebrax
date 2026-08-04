@@ -18,6 +18,15 @@ import { PosPayment, type PaymentSummaryItem } from '@/components/pos/pos-paymen
 
 const WALKIN = 'عميل نقدي (POS)';
 
+/** إعدادات نقطة البيع (sales-config/pos) — تُطبَّق فعلياً على تدفّق البيع. */
+interface PosConfig {
+  default_customer: string;
+  receipt_footer: string;
+  print_receipt: boolean;
+  allow_discount: boolean;
+}
+const POS_DEFAULTS: PosConfig = { default_customer: WALKIN, receipt_footer: '', print_receipt: true, allow_discount: true };
+
 interface Product {
   id: string;
   sku: string | null;
@@ -58,11 +67,18 @@ export default function PosPage() {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [posCfg, setPosCfg] = useState<PosConfig>(POS_DEFAULTS);
+
+  // اسم العميل المعروض في السلة/الدفع/الإيصال — من الإعداد، مع تراجع للنقدي.
+  const customerName = posCfg.default_customer?.trim() || WALKIN;
 
   useEffect(() => {
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
     api<{ user?: { name?: string }; company?: { name?: string } }>('/me')
       .then((r) => { setCashier(r.user?.name ?? t('cashier')); setBranch(r.company?.name ?? t('main_branch')); })
+      .catch(() => {});
+    api<{ data: Partial<PosConfig> }>('/sales-config/pos')
+      .then((r) => setPosCfg({ ...POS_DEFAULTS, ...r.data }))
       .catch(() => {});
     try {
       const raw = localStorage.getItem(FAV_KEY);
@@ -106,9 +122,9 @@ export default function PosPage() {
 
   async function ensureWalkin(): Promise<string> {
     const r = await api<{ data: { id: string; name: string }[] }>('/partners');
-    const found = r.data.find((p) => p.name === WALKIN);
+    const found = r.data.find((p) => p.name === customerName);
     if (found) return found.id;
-    const created = await api<{ data: { id: string } }>('/partners', { method: 'POST', body: { name: WALKIN, type: 'customer' } });
+    const created = await api<{ data: { id: string } }>('/partners', { method: 'POST', body: { name: customerName, type: 'customer' } });
     return created.data.id;
   }
 
@@ -136,7 +152,7 @@ export default function PosPage() {
         await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
         const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
         success(t('sale_done'));
-        setReceipt({ number: created.data.number, total: created.data.total, qr: z.qr });
+        setReceipt({ number: created.data.number, total: created.data.total, qr: z.qr, footer: posCfg.receipt_footer });
         setCart([]);
         setStep('sale');
         setMobileTab('products');
@@ -146,7 +162,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc],
+    [cart, success, t, tc, customerName, posCfg.receipt_footer],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -248,8 +264,8 @@ export default function PosPage() {
       <div className="border-b border-border p-3.5">
         <div className="mb-2.5 flex items-center gap-2">
           <button className="flex flex-1 items-center justify-between rounded-[10px] border border-border bg-background px-3 py-2.5 text-[12.5px] font-semibold">
-            <span>{t('walkin_customer')}</span>
-            <User className="h-[15px] w-[15px] text-muted" strokeWidth={1.7} />
+            <span className="truncate">{customerName}</span>
+            <User className="h-[15px] w-[15px] shrink-0 text-muted" strokeWidth={1.7} />
           </button>
           <button className="grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-surface" aria-label={t('add_customer')}>
             <UserPlus className="h-4 w-4" strokeWidth={1.8} />
@@ -340,7 +356,7 @@ export default function PosPage() {
         <PosPayment
           totalMinor={totalMinor}
           items={summaryItems}
-          customerName={t('walkin_customer')}
+          customerName={customerName}
           paying={paying}
           error={error}
           onBack={() => setStep('sale')}
@@ -385,7 +401,7 @@ export default function PosPage() {
         </>
       )}
 
-      <ReceiptDialog receipt={receipt} onClose={() => setReceipt(null)} />
+      <ReceiptDialog receipt={receipt} autoPrint={posCfg.print_receipt} onClose={() => setReceipt(null)} />
     </div>
   );
 }
