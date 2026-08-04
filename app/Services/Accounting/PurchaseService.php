@@ -28,6 +28,8 @@ use RuntimeException;
  */
 class PurchaseService
 {
+    use ComputesLineTax;
+
     private const ACC_INVENTORY  = '1140'; // المخزون
     private const ACC_INPUT_VAT  = '1150'; // ضريبة المدخلات
     private const ACC_EXPENSE    = '5150'; // مصروفات عامة (بنود غير مخزنية)
@@ -55,6 +57,8 @@ class PurchaseService
         return DB::transaction(function () use ($data, $items) {
             $date = $data['purchase_date'] ?? now()->toDateString();
 
+            $inclusive = (bool) ($data['tax_inclusive'] ?? false);
+
             $purchase = Purchase::create([
                 'number'              => $data['number'] ?? $this->nextNumber($date),
                 'partner_id'          => $data['partner_id'],
@@ -63,6 +67,7 @@ class PurchaseService
                 'due_date'            => $data['due_date'] ?? null,
                 'supplier_invoice_no' => $data['supplier_invoice_no'] ?? null,
                 'status'              => 'draft',
+                'tax_inclusive'       => $inclusive,
                 'notes'               => $data['notes'] ?? null,
                 'created_by'          => $data['created_by'] ?? null,
             ]);
@@ -78,8 +83,9 @@ class PurchaseService
                     throw new RuntimeException('الكمية يجب أن تكون موجبة والتكلفة غير سالبة.');
                 }
 
-                $lineSubtotal = $qty * $unitPrice;
-                $lineTax      = $this->calcTax($lineSubtotal, $rate);
+                // متضمَّن → تُستخرَج الضريبة فيُخزَّن الصافي (يُقيَّم المخزون به)؛ غير متضمَّن → تُضاف.
+                $lineGross = $qty * $unitPrice;
+                [$lineNet, $lineTax] = $this->splitLineTax($lineGross, $rate, $inclusive);
 
                 PurchaseLine::create([
                     'purchase_id'   => $purchase->id,
@@ -88,12 +94,12 @@ class PurchaseService
                     'quantity'      => $qty,
                     'unit_price'    => $unitPrice,
                     'tax_rate'      => $rate,
-                    'line_subtotal' => $lineSubtotal,
+                    'line_subtotal' => $lineNet,
                     'line_tax'      => $lineTax,
-                    'line_total'    => $lineSubtotal + $lineTax,
+                    'line_total'    => $lineNet + $lineTax,
                 ]);
 
-                $subtotal += $lineSubtotal;
+                $subtotal += $lineNet;
                 $taxTotal += $lineTax;
             }
 
@@ -181,12 +187,14 @@ class PurchaseService
             foreach ($purchase->lines as $line) {
                 $product = $line->product;
                 if ($product && $product->track_inventory && $line->quantity > 0) {
+                    // يُقيَّم المخزون بالصافي الدقيق (line_subtotal) فيتطابق مع مدين 1140
+                    // في كلا الوضعين — وفي «المتضمَّن» الصافي = التكلفة بلا الضريبة المستخرَجة.
                     $this->inventory->applyReceipt($product, $line->quantity, $line->unit_price, [
                         'source_type' => Purchase::class,
                         'source_id'   => $purchase->id,
                         'date'        => $purchase->purchase_date->toDateString(),
                         'notes'       => "شراء عبر الفاتورة {$purchase->number}",
-                    ]);
+                    ], $line->line_subtotal);
                 }
             }
 
@@ -200,14 +208,6 @@ class PurchaseService
 
             return $purchase->fresh('lines');
         });
-    }
-
-    /**
-     * حساب الضريبة كعدد صحيح (تقريب نصفي لأعلى) — بلا float.
-     */
-    protected function calcTax(int $base, int $rate): int
-    {
-        return intdiv($base * $rate + 50, 100);
     }
 
     protected function accountId(string $code): string

@@ -22,6 +22,7 @@ class PurchaseResource extends JsonResource
             'subtotal'            => Money::toRiyal($this->subtotal),
             'tax_amount'          => Money::toRiyal($this->tax_amount),
             'total'               => Money::toRiyal($this->total),
+            'tax_inclusive'       => (bool) $this->tax_inclusive,
             'paid_amount'         => Money::toRiyal($this->paid_amount),
             'remaining'           => Money::toRiyal($this->remaining()),
             'lines'               => InvoiceLineResource::collection($this->whenLoaded('lines')),
