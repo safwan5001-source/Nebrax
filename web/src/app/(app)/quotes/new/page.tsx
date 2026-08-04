@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
+import { getSystemTaxInclusive } from '@/lib/tax';
 
 interface Partner { id: string; name: string }
 interface Product { id: string; name: string; sale_price: string; tax_rate: number; is_active: boolean }
@@ -33,6 +34,7 @@ export default function NewQuotePage() {
   const [date, setDate] = useState('');
   const [validUntil, setValidUntil] = useState('');
   const [notes, setNotes] = useState('');
+  const [taxInclusive, setTaxInclusive] = useState(false);
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -44,7 +46,13 @@ export default function NewQuotePage() {
       if (r.data[0]) setPartnerId((p) => p || r.data[0].id);
     });
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
+    // الوضع الافتراضي من إعدادات النظام (كالفاتورة).
+    getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
   }, []);
+
+  // ضريبة السطر حسب الوضع: متضمَّن = تُستخرَج من السعر؛ غير متضمَّن = تُضاف فوقه.
+  const lineTax = (grossMinor: number, rate: number) =>
+    taxInclusive ? extractInclusiveTax(grossMinor, rate) : Math.round((grossMinor * rate) / 100);
 
   const setLine = (key: string, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -57,11 +65,17 @@ export default function NewQuotePage() {
     setLine(key, { productId: p.id, description: p.name, price: p.sale_price, tax: String(p.tax_rate) });
   }
 
-  const subMinor = lines.reduce((s, l) => s + (Number(l.qty) || 0) * riyalToMinor(l.price), 0);
-  const taxMinor = lines.reduce((s, l) => {
-    const sub = (Number(l.qty) || 0) * riyalToMinor(l.price);
-    return s + Math.round((sub * (Number(l.tax) || 0)) / 100);
-  }, 0);
+  // الإجماليات حسب الوضع: متضمَّن = المجموع قبل الضريبة = الإجمالي − الضريبة المستخرَجة.
+  const { subMinor, taxMinor } = lines.reduce(
+    (acc, l) => {
+      const gross = (Number(l.qty) || 0) * riyalToMinor(l.price);
+      const tax = lineTax(gross, Number(l.tax) || 0);
+      acc.subMinor += taxInclusive ? gross - tax : gross;
+      acc.taxMinor += tax;
+      return acc;
+    },
+    { subMinor: 0, taxMinor: 0 },
+  );
 
   async function submit() {
     const items = lines
@@ -82,7 +96,7 @@ export default function NewQuotePage() {
     try {
       const created = await api<{ data: { id: string } }>('/quotes', {
         method: 'POST',
-        body: { partner_id: partnerId, quote_date: date || null, valid_until: validUntil || null, notes: notes || null, items },
+        body: { partner_id: partnerId, quote_date: date || null, valid_until: validUntil || null, tax_inclusive: taxInclusive, notes: notes || null, items },
       });
       success(tc('created'));
       router.push(`/quotes/${created.data.id}`);
@@ -123,6 +137,13 @@ export default function NewQuotePage() {
               <Input id="valid" type="date" dir="ltr" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="taxmode">{tf('tax_mode')}</Label>
+              <Select id="taxmode" value={taxInclusive ? '1' : '0'} onChange={(e) => setTaxInclusive(e.target.value === '1')}>
+                <option value="0">{tf('tax_exclusive')}</option>
+                <option value="1">{tf('tax_inclusive')}</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="notes">{t('notes')}</Label>
               <Input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
@@ -151,7 +172,8 @@ export default function NewQuotePage() {
 
           {lines.map((l) => {
             const lt = (Number(l.qty) || 0) * riyalToMinor(l.price);
-            const lx = Math.round((lt * (Number(l.tax) || 0)) / 100);
+            // إجمالي السطر: متضمَّن = السعر نفسه (شامل)؛ غير متضمَّن = السعر + الضريبة.
+            const lineDisplayTotal = taxInclusive ? lt : lt + lineTax(lt, Number(l.tax) || 0);
             return (
               <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
                 <Select className="col-span-2 md:col-span-3" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
@@ -162,7 +184,7 @@ export default function NewQuotePage() {
                 <Input className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
                 <Input className="num text-end md:col-span-2" inputMode="decimal" placeholder={tf('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
                 <Input className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
-                <div className="num col-span-1 text-end text-sm md:col-span-1">{formatRiyal((lt + lx) / 100)}</div>
+                <div className="num col-span-1 text-end text-sm md:col-span-1">{formatRiyal(lineDisplayTotal / 100)}</div>
                 <Button type="button" variant="ghost" size="icon" className="col-span-1 ms-auto md:col-span-1" aria-label={tf('remove_line')} onClick={() => removeLine(l.key)}>
                   <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
                 </Button>
