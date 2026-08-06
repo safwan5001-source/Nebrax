@@ -20,6 +20,7 @@ import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
 import { PosPayment, type PaymentSummaryItem } from '@/components/pos/pos-payment';
+import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 
 const WALKIN = 'عميل نقدي (POS)';
 
@@ -86,8 +87,13 @@ export default function PosPage() {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const ts = useTranslations('posSessions');
 
-  // اسم العميل المعروض في السلة/الدفع/الإيصال — من الإعداد، مع تراجع للنقدي.
-  const customerName = posCfg.default_customer?.trim() || WALKIN;
+  // العميل المختار (null = العميل النقدي الافتراضي). منتقي عملاء حقيقي.
+  const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // اسم العميل الافتراضي (النقدي) من الإعداد؛ والمعروض = المختار أو الافتراضي.
+  const walkinName = posCfg.default_customer?.trim() || WALKIN;
+  const customerName = selectedCustomer?.name ?? walkinName;
 
   useEffect(() => {
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
@@ -196,9 +202,9 @@ export default function PosPage() {
 
   async function ensureWalkin(): Promise<string> {
     const r = await api<{ data: { id: string; name: string }[] }>('/partners');
-    const found = r.data.find((p) => p.name === customerName);
+    const found = r.data.find((p) => p.name === walkinName);
     if (found) return found.id;
-    const created = await api<{ data: { id: string } }>('/partners', { method: 'POST', body: { name: customerName, type: 'customer' } });
+    const created = await api<{ data: { id: string } }>('/partners', { method: 'POST', body: { name: walkinName, type: 'customer' } });
     return created.data.id;
   }
 
@@ -211,7 +217,8 @@ export default function PosPage() {
       const nonCredit = tenders.cash + tenders.card + tenders.transfer;
       const paymentType = nonCredit === 0 && tenders.credit > 0 ? 'credit' : 'cash';
       try {
-        const partnerId = await ensureWalkin();
+        // العميل المختار إن وُجد، وإلا العميل النقدي الافتراضي.
+        const partnerId = selectedCustomer?.id ?? (await ensureWalkin());
         const items = cart.map((l) => ({
           product_id: l.productId,
           description: l.description,
@@ -236,7 +243,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc, customerName, posCfg.receipt_footer, taxInclusive],
+    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -338,11 +345,20 @@ export default function PosPage() {
     <aside className="flex min-h-0 flex-col overflow-hidden border-border bg-surface lg:border-e">
       <div className="border-b border-border p-3.5">
         <div className="mb-2.5 flex items-center gap-2">
-          <button className="flex flex-1 items-center justify-between rounded-[10px] border border-border bg-background px-3 py-2.5 text-[12.5px] font-semibold">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className={'flex flex-1 items-center justify-between rounded-[10px] border bg-background px-3 py-2.5 text-[12.5px] font-semibold ' + (selectedCustomer ? 'border-primary text-primary-hover' : 'border-border')}
+          >
             <span className="truncate">{customerName}</span>
             <User className="h-[15px] w-[15px] shrink-0 text-muted" strokeWidth={1.7} />
           </button>
-          <button className="grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-surface" aria-label={t('add_customer')}>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-surface hover:border-primary"
+            aria-label={t('add_customer')}
+          >
             <UserPlus className="h-4 w-4" strokeWidth={1.8} />
           </button>
         </div>
@@ -482,6 +498,13 @@ export default function PosPage() {
       )}
 
       <ReceiptDialog receipt={receipt} autoPrint={posCfg.print_receipt} onClose={() => setReceipt(null)} />
+
+      <CustomerPickerDialog
+        open={pickerOpen}
+        walkinLabel={walkinName}
+        onClose={() => setPickerOpen(false)}
+        onSelect={setSelectedCustomer}
+      />
 
       {/* بوابة الوردية: لا بيع قبل فتح وردية — الإغلاق = مغادرة نقطة البيع. */}
       <Dialog open={sessionReady && !session} onClose={() => router.push('/dashboard')} title={ts('open_title')}>
