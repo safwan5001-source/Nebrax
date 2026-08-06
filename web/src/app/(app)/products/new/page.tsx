@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { riyalToMinor } from '@/lib/money';
+import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
+import { getSystemTaxInclusive } from '@/lib/tax';
 
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
@@ -50,10 +51,12 @@ export default function NewProductPage() {
   const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
   const [salesAccountId, setSalesAccountId] = useState('');
   const [cogsAccountId, setCogsAccountId] = useState('');
+  const [taxInclusive, setTaxInclusive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
     api<{ data: Partner[] }>('/partners')
       .then((r) => setSuppliers(r.data.filter((p) => p.type === 'supplier' || p.type === 'both')))
       .catch(() => {});
@@ -198,6 +201,18 @@ export default function NewProductPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="sale_price">{t('sale_price')}</Label>
                 <Input id="sale_price" inputMode="decimal" className="num text-end" placeholder="0.00" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+                {(() => {
+                  // تلميح وضع الضريبة (من إعدادات النظام): يوضّح دلالة السعر ويعرض المكمّل.
+                  const pm = riyalToMinor(salePrice);
+                  const rate = Number(taxRate) || 0;
+                  if (!Number.isFinite(pm) || pm <= 0 || rate <= 0) return null;
+                  const other = taxInclusive ? pm - extractInclusiveTax(pm, rate) : pm + Math.round((pm * rate) / 100);
+                  return (
+                    <p className="text-[11px] text-muted">
+                      {t(taxInclusive ? 'price_hint_incl' : 'price_hint_excl', { amount: formatRiyal(other / 100) })}
+                    </p>
+                  );
+                })()}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="tax_rate">{t('tax_rate')}</Label>

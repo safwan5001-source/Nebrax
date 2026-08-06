@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ProductDialog, type Product } from '@/components/products/product-dialog';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { getSystemTaxInclusive } from '@/lib/tax';
 
 export default function ProductsPage() {
   const t = useTranslations('products');
@@ -18,6 +19,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [taxInclusive, setTaxInclusive] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -27,6 +29,7 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => load(), [load]);
+  useEffect(() => { getSystemTaxInclusive().then(setTaxInclusive).catch(() => {}); }, []);
 
   const columns = useMemo<ColumnDef<Product, unknown>[]>(
     () => [
@@ -37,7 +40,11 @@ export default function ProductsPage() {
         header: t('type'),
         cell: ({ row }) => <Badge tone="muted">{t(row.original.type === 'service' ? 'service' : 'good')}</Badge>,
       },
-      { accessorKey: 'sale_price', header: t('sale_price'), cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.sale_price)}</div> },
+      {
+        accessorKey: 'sale_price',
+        header: `${t('sale_price')} · ${taxInclusive ? t('tax_incl_tag') : t('tax_excl_tag')}`,
+        cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.sale_price)}</div>,
+      },
       { accessorKey: 'tax_rate', header: t('tax_rate'), cell: ({ row }) => <div className="num text-end">{row.original.tax_rate}%</div> },
       {
         id: 'stock',
@@ -64,7 +71,7 @@ export default function ProductsPage() {
         ),
       },
     ],
-    [t]
+    [t, taxInclusive]
   );
 
   return (
