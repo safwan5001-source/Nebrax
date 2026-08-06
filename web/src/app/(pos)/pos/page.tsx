@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
@@ -36,6 +36,7 @@ const POS_DEFAULTS: PosConfig = { default_customer: WALKIN, receipt_footer: '', 
 interface Product {
   id: string;
   sku: string | null;
+  barcode: string | null;
   name: string;
   sale_price: string;
   tax_rate: number;
@@ -59,7 +60,8 @@ export default function PosPage() {
   const tc = useTranslations('common');
   const tprod = useTranslations('products');
   const router = useRouter();
-  const { success } = useToast();
+  const { success, error: errorToast } = useToast();
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cashier, setCashier] = useState('—');
@@ -144,6 +146,44 @@ export default function PosPage() {
   const setQty = (k: string, d: number) => setCart((c) => c.map((l) => (l.key === k ? { ...l, qty: Math.max(1, l.qty + d) } : l)));
   const setDiscount = (k: string, v: string) => setCart((c) => c.map((l) => (l.key === k ? { ...l, discount: v } : l)));
   const remove = (k: string) => setCart((c) => c.filter((l) => l.key !== k));
+
+  // مسح باركود: مطابقة الكود بالـ SKU أو الباركود ثم الإضافة للسلة.
+  function scanCode(code: string): boolean {
+    const c = code.trim();
+    if (!c) return false;
+    const p = products.find((x) => (x.sku ?? '').trim() === c || (x.barcode ?? '').trim() === c);
+    if (p) { addProduct(p); success(t('scan_added', { name: p.name })); return true; }
+    errorToast(t('scan_not_found', { code: c }));
+    return false;
+  }
+  // مرجع حيّ لأحدث scanCode (يقرأ أحدث products) — يُستدعى من مستمع لوحة المفاتيح.
+  const scanRef = useRef(scanCode);
+  scanRef.current = scanCode;
+
+  // ماسح الباركود (keyboard-wedge): يكتب الكود سريعاً ثم Enter. نلتقط التسلسل
+  // السريع خارج حقول الإدخال، فالمسح يعمل دون تركيز حقل معيّن.
+  useEffect(() => {
+    let buf = '';
+    let last = 0;
+    function onKey(e: KeyboardEvent) {
+      const el = document.activeElement as HTMLElement | null;
+      const editable = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      const now = Date.now();
+      if (e.key === 'Enter') {
+        if (!editable && buf.length >= 3) { e.preventDefault(); scanRef.current(buf); }
+        buf = '';
+        return;
+      }
+      if (editable) return; // لا نلتقط أثناء الكتابة اليدوية في الحقول
+      if (e.key.length === 1) {
+        if (now - last > 80) buf = ''; // فجوة طويلة = تسلسل بشري لا ماسح
+        buf += e.key;
+        last = now;
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // حساب السطر حسب وضع الضريبة والخصم: الخصم يقلّل الأساس قبل الضريبة (مطابق للـ backend).
   const lineCalc = (l: CartLine) => {
@@ -276,13 +316,31 @@ export default function PosPage() {
   const productsPanel = (
     <section className="flex min-h-0 flex-col gap-4 overflow-y-auto p-4 lg:p-5">
       <div className="flex gap-2.5">
-        <button className="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 text-[13px] font-semibold shadow-sm">
+        <button
+          type="button"
+          onClick={() => searchRef.current?.focus()}
+          className="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 text-[13px] font-semibold shadow-sm hover:border-primary"
+        >
           <Barcode className="h-4 w-4" strokeWidth={1.8} />
           <span className="hidden sm:inline">{t('barcode_search')}</span>
         </button>
         <div className="flex flex-1 items-center gap-2.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 shadow-sm">
           <Search className="h-4 w-4 text-muted" strokeWidth={1.8} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('search_products')} className="w-full bg-transparent text-[13px] text-text outline-none placeholder:text-muted" />
+          <input
+            ref={searchRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter في البحث: إن طابق النصّ كوداً بالضبط أُضيف المنتج ونُظّف الحقل.
+              if (e.key === 'Enter' && search.trim()) {
+                const c = search.trim();
+                const p = products.find((x) => (x.sku ?? '').trim() === c || (x.barcode ?? '').trim() === c);
+                if (p) { e.preventDefault(); addProduct(p); success(t('scan_added', { name: p.name })); setSearch(''); }
+              }
+            }}
+            placeholder={t('search_products')}
+            className="w-full bg-transparent text-[13px] text-text outline-none placeholder:text-muted"
+          />
           <kbd className="num hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted sm:block">F4</kbd>
         </div>
         <button className="hidden items-center gap-2 rounded-xl border border-border bg-surface px-4 text-[13px] font-semibold shadow-sm sm:flex">
