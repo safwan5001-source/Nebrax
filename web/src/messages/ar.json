@@ -879,6 +879,8 @@
     "sc_discount": "خصم",
     "sc_qty": "الكمية",
     "sc_delete": "حذف صنف",
+    "sc_pay": "الدفع",
+    "sc_back": "رجوع",
     "sc_drawer": "فتح درج النقود",
     "receipt": "الإيصال",
     "receipt_done": "تمّ البيع بنجاح",

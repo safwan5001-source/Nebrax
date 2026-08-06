@@ -220,6 +220,25 @@ export default function PosPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // اختصارات لوحة المفاتيح الفعلية (مفاتيح وظيفية لا تتعارض مع ماسح الباركود).
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const el = document.activeElement as HTMLElement | null;
+      const editable = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      if (e.key === 'F2') { e.preventDefault(); setPickerOpen(true); }
+      else if (e.key === 'F4') { e.preventDefault(); searchRef.current?.focus(); }
+      else if (e.key === 'F8' && !editable) { e.preventDefault(); setCart((c) => c.slice(0, -1)); }
+      else if (e.key === 'F9') { e.preventDefault(); if (cartRef.current.length > 0 && stepRef.current === 'sale') setStep('payment'); }
+      else if (e.key === 'Escape' && stepRef.current === 'payment') { e.preventDefault(); setStep('sale'); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // حساب السطر حسب وضع الضريبة والخصم: الخصم يقلّل الأساس قبل الضريبة (مطابق للـ backend).
   const lineCalc = (l: CartLine) => {
     const gross = l.qty * riyalToMinor(l.price);
