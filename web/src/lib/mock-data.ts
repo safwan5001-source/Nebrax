@@ -828,6 +828,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     if (clean === '/logout') return resolve(null);
     // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
     if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
+    if (clean === '/pos/checkout') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body), payment_status: 'paid' } });
     // إنشاء مصروف: نُعيد إجمالاً محسوباً من المبلغ والضريبة (مسودة).
     if (clean === '/expenses') {
       const b = (body ?? {}) as { amount?: number; tax_rate?: number };

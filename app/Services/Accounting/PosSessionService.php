@@ -2,7 +2,8 @@
 
 namespace App\Services\Accounting;
 
-use App\Models\Invoice;
+use App\Models\Account;
+use App\Models\JournalLine;
 use App\Models\PosSession;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -46,13 +47,10 @@ class PosSessionService
         }
 
         return DB::transaction(function () use ($session, $countedBalance) {
-            // المبيعات النقدية المرحّلة خلال الجلسة (من فتحها حتى الآن).
-            $cashSales = (int) Invoice::where('status', 'posted')
-                ->where('payment_type', 'cash')
-                ->where('created_at', '>=', $session->opened_at)
-                ->sum('total');
-
-            $expected = $session->opening_balance + $cashSales;
+            // المتوقّع = الافتتاحي + صافي حركة الصندوق (1110) خلال الجلسة —
+            // يشمل النقد الوارد من السندات والصادر (مصروفات/مرتجعات) فيصمد لكل الوسائل.
+            $cash = $this->cashMovement($session->opened_at, now());
+            $expected = $session->opening_balance + $cash['net'];
 
             $session->update([
                 'status'           => 'closed',
@@ -67,29 +65,51 @@ class PosSessionService
     }
 
     /**
-     * تقرير الوردية (X/Z): المبيعات النقدية المرحّلة خلال الجلسة + المتوقّع.
+     * تقرير الوردية (X/Z): النقد المُستلَم (وارد 1110) + المتوقّع + عدد المبيعات.
      * للجلسة المفتوحة يُحسب حتى الآن؛ للمغلقة حتى وقت الإغلاق. لا يمسّ القيود.
      *
      * @return array{cash_sales:int, sales_count:int, average:int, expected:int}
      */
     public function report(PosSession $session): array
     {
-        $end = $session->closed_at ?? now();
+        $end  = $session->closed_at ?? now();
+        $cash = $this->cashMovement($session->opened_at, $end);
 
-        $query = Invoice::where('status', 'posted')
-            ->where('payment_type', 'cash')
+        // عدد المبيعات ومتوسّط قيمتها (فواتير مرحّلة خلال النافذة).
+        $invoices   = \App\Models\Invoice::where('status', 'posted')
             ->where('created_at', '>=', $session->opened_at)
             ->where('created_at', '<=', $end);
-
-        $cashSales = (int) $query->sum('total');
-        $count     = (int) $query->count();
+        $salesTotal = (int) $invoices->sum('total');
+        $count      = (int) $invoices->count();
 
         return [
-            'cash_sales'  => $cashSales,
+            'cash_sales'  => $cash['inflow'], // النقد الوارد للدرج
             'sales_count' => $count,
-            'average'     => $count > 0 ? intdiv($cashSales, $count) : 0,
-            'expected'    => $session->opening_balance + $cashSales,
+            'average'     => $count > 0 ? intdiv($salesTotal, $count) : 0,
+            'expected'    => $session->opening_balance + $cash['net'],
         ];
+    }
+
+    /**
+     * صافي/وارد حركة حساب الصندوق (1110) خلال نافذة زمنية (قيود مرحّلة).
+     *
+     * @return array{inflow:int, net:int}
+     */
+    protected function cashMovement($openedAt, $end): array
+    {
+        $accountId = Account::where('code', '1110')->value('id');
+        if (! $accountId) {
+            return ['inflow' => 0, 'net' => 0];
+        }
+
+        $row = JournalLine::where('account_id', $accountId)
+            ->whereHas('entry', fn ($q) => $q->where('status', 'posted')
+                ->where('created_at', '>=', $openedAt)
+                ->where('created_at', '<=', $end))
+            ->selectRaw('COALESCE(SUM(debit), 0) as inflow, COALESCE(SUM(debit) - SUM(credit), 0) as net')
+            ->first();
+
+        return ['inflow' => (int) $row->inflow, 'net' => (int) $row->net];
     }
 
     protected function nextNumber(): string
