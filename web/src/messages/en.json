@@ -843,6 +843,8 @@
     "add_and_select": "Add & select",
     "no_customers": "No matching customers",
     "back": "Back",
+    "scan_added": "Added: {name}",
+    "scan_not_found": "Unknown barcode: {code}",
     "printer": "Printer",
     "barcode": "Barcode",
     "internet": "Internet",

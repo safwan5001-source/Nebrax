@@ -843,6 +843,8 @@
     "add_and_select": "إضافة واختيار",
     "no_customers": "لا عملاء مطابقون",
     "back": "رجوع",
+    "scan_added": "أُضيف: {name}",
+    "scan_not_found": "باركود غير معروف: {code}",
     "printer": "الطابعة",
     "barcode": "الباركود",
     "internet": "الإنترنت",
