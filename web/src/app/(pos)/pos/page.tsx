@@ -44,7 +44,7 @@ interface Product {
   quantity_on_hand: number;
   is_active: boolean;
 }
-interface CartLine { key: string; productId: string | null; description: string; sku: string | null; price: string; qty: number; tax: number }
+interface CartLine { key: string; productId: string | null; description: string; sku: string | null; price: string; qty: number; tax: number; discount: string }
 
 const FAV_KEY = 'nibras_pos_favs';
 
@@ -138,30 +138,38 @@ export default function PosPage() {
     setCart((c) => {
       const ex = c.find((l) => l.productId === p.id);
       if (ex) return c.map((l) => (l.productId === p.id ? { ...l, qty: l.qty + 1 } : l));
-      return [...c, { key: p.id, productId: p.id, description: p.name, sku: p.sku, price: p.sale_price, qty: 1, tax: p.tax_rate }];
+      return [...c, { key: p.id, productId: p.id, description: p.name, sku: p.sku, price: p.sale_price, qty: 1, tax: p.tax_rate, discount: '' }];
     });
   }
   const setQty = (k: string, d: number) => setCart((c) => c.map((l) => (l.key === k ? { ...l, qty: Math.max(1, l.qty + d) } : l)));
+  const setDiscount = (k: string, v: string) => setCart((c) => c.map((l) => (l.key === k ? { ...l, discount: v } : l)));
   const remove = (k: string) => setCart((c) => c.filter((l) => l.key !== k));
 
-  // الإجماليات حسب وضع الضريبة: متضمَّن = السعر شامل (تُستخرَج منه)؛ غير متضمَّن = تُضاف فوقه.
-  const { subMinor, taxMinor, totalMinor } = cart.reduce(
+  // حساب السطر حسب وضع الضريبة والخصم: الخصم يقلّل الأساس قبل الضريبة (مطابق للـ backend).
+  const lineCalc = (l: CartLine) => {
+    const gross = l.qty * riyalToMinor(l.price);
+    const raw = riyalToMinor(l.discount);
+    const disc = Number.isFinite(raw) ? Math.min(Math.max(0, raw), gross) : 0;
+    const discounted = gross - disc;
+    if (taxInclusive) {
+      const tax = extractInclusiveTax(discounted, l.tax);
+      return { gross, disc, net: discounted - tax, tax, total: discounted };
+    }
+    const tax = Math.round((discounted * l.tax) / 100);
+    return { gross, disc, net: discounted, tax, total: discounted + tax };
+  };
+
+  // الإجماليات مشتقّة من حساب السطور (مصدر الحقيقة) — تطابق ما يرحّله الخادم.
+  const { subMinor, taxMinor, totalMinor, discMinor } = cart.reduce(
     (acc, l) => {
-      const gross = l.qty * riyalToMinor(l.price);
-      if (taxInclusive) {
-        const tax = extractInclusiveTax(gross, l.tax);
-        acc.subMinor += gross - tax;
-        acc.taxMinor += tax;
-        acc.totalMinor += gross;
-      } else {
-        const tax = Math.round((gross * l.tax) / 100);
-        acc.subMinor += gross;
-        acc.taxMinor += tax;
-        acc.totalMinor += gross + tax;
-      }
+      const c = lineCalc(l);
+      acc.subMinor += c.net;
+      acc.taxMinor += c.tax;
+      acc.totalMinor += c.total;
+      acc.discMinor += c.disc;
       return acc;
     },
-    { subMinor: 0, taxMinor: 0, totalMinor: 0 },
+    { subMinor: 0, taxMinor: 0, totalMinor: 0, discMinor: 0 },
   );
   const count = cart.reduce((s, l) => s + l.qty, 0);
 
@@ -225,6 +233,7 @@ export default function PosPage() {
           quantity: l.qty,
           unit_price: riyalToMinor(l.price),
           tax_rate: l.tax,
+          discount: lineCalc(l).disc, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
         }));
         const created = await api<{ data: { id: string; number: string; total: string } }>('/invoices', {
           method: 'POST',
@@ -247,7 +256,7 @@ export default function PosPage() {
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
-    name: l.description, qty: l.qty, unitPrice: formatRiyal(l.price), lineTotal: l.qty * riyalToMinor(l.price),
+    name: l.description, qty: l.qty, unitPrice: formatRiyal(l.price), lineTotal: lineCalc(l).total,
   }));
 
   const CATS = [
@@ -383,9 +392,22 @@ export default function PosPage() {
             <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-lg bg-background"><Package className="h-4 w-4 text-border" strokeWidth={1.6} /></div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-semibold">{l.description}</div>
-              {l.sku && <div className="num text-[10px] text-muted">{l.sku}</div>}
+              {posCfg.allow_discount ? (
+                <div className="mt-0.5 flex items-center gap-1">
+                  <span className="text-[10px] text-muted">{t('discount')}</span>
+                  <input
+                    value={l.discount}
+                    onChange={(e) => setDiscount(l.key, e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0"
+                    className="num w-14 rounded border border-border bg-background px-1 py-0.5 text-end text-[10px] text-text outline-none focus:border-primary"
+                  />
+                </div>
+              ) : (
+                l.sku && <div className="num text-[10px] text-muted">{l.sku}</div>
+              )}
             </div>
-            <div className="num shrink-0 text-[12.5px] font-bold">{formatRiyal((l.qty * riyalToMinor(l.price)) / 100)}</div>
+            <div className="num shrink-0 text-[12.5px] font-bold">{formatRiyal(lineCalc(l).total / 100)}</div>
           </div>
         ))}
       </div>
@@ -399,7 +421,9 @@ export default function PosPage() {
 
       <div className="flex flex-col gap-1.5 border-t border-border bg-background p-3.5">
         <div className="flex justify-between text-[12.5px]"><span className="text-muted">{t('subtotal')}</span><span className="num font-semibold">{formatRiyal(subMinor / 100)}</span></div>
-        <div className="flex justify-between text-[12.5px]"><span className="text-muted">{t('discount')}</span><span className="num font-semibold text-positive">{formatRiyal(0)}</span></div>
+        {discMinor > 0 && (
+          <div className="flex justify-between text-[12.5px]"><span className="text-muted">{t('discount')}</span><span className="num font-semibold text-positive">−{formatRiyal(discMinor / 100)}</span></div>
+        )}
         <div className="flex justify-between text-[12.5px]"><span className="text-muted">{t('tax')}</span><span className="num font-semibold">{formatRiyal(taxMinor / 100)}</span></div>
         <div className="flex items-baseline justify-between border-t border-border pt-2">
           <span className="text-sm font-bold">{t('total')}</span>
