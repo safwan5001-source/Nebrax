@@ -152,6 +152,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // جلسات نقطة البيع (تشغيلي — لا قيود)
         Route::get('pos-sessions', [PosSessionController::class, 'index'])->middleware($perm('invoices.view'));
+        Route::get('pos-sessions/{id}/report', [PosSessionController::class, 'report'])->middleware($perm('invoices.view'));
         Route::post('pos-sessions/open', [PosSessionController::class, 'open'])->middleware($perm('invoices.manage'));
         Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware($perm('invoices.manage'));
 

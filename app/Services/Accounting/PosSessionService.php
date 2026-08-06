@@ -66,6 +66,32 @@ class PosSessionService
         });
     }
 
+    /**
+     * تقرير الوردية (X/Z): المبيعات النقدية المرحّلة خلال الجلسة + المتوقّع.
+     * للجلسة المفتوحة يُحسب حتى الآن؛ للمغلقة حتى وقت الإغلاق. لا يمسّ القيود.
+     *
+     * @return array{cash_sales:int, sales_count:int, average:int, expected:int}
+     */
+    public function report(PosSession $session): array
+    {
+        $end = $session->closed_at ?? now();
+
+        $query = Invoice::where('status', 'posted')
+            ->where('payment_type', 'cash')
+            ->where('created_at', '>=', $session->opened_at)
+            ->where('created_at', '<=', $end);
+
+        $cashSales = (int) $query->sum('total');
+        $count     = (int) $query->count();
+
+        return [
+            'cash_sales'  => $cashSales,
+            'sales_count' => $count,
+            'average'     => $count > 0 ? intdiv($cashSales, $count) : 0,
+            'expected'    => $session->opening_balance + $cashSales,
+        ];
+    }
+
     protected function nextNumber(): string
     {
         $year  = Carbon::now()->year;

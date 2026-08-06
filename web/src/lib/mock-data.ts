@@ -860,6 +860,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/users') return resolve({ data: mockUsers });
   if (clean === '/products') return resolve({ data: mockProducts });
   if (clean === '/pos-sessions') return resolve({ data: mockPosSessions });
+  const posReportMatch = clean.match(/^\/pos-sessions\/([^/]+)\/report$/);
+  if (posReportMatch) {
+    const s = mockPosSessions.find((x) => x.id === posReportMatch[1]) ?? mockPosSessions[0];
+    return resolve({ session: s, report: { cash_sales: '3880.00', sales_count: 12, average: '323.33', expected: '4380.00' } });
+  }
   if (clean === '/appointments') return resolve({ data: mockAppointments });
   if (clean === '/contacts') return resolve({ data: mockContacts });
   if (clean === '/crm-activities') return resolve({ data: mockCrmActivities });

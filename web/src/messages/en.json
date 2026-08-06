@@ -1167,6 +1167,7 @@
     "title": "POS report",
     "subtitle": "Summary of posted cash sales.",
     "total_sales": "Total cash sales",
+    "cash_sales": "Cash sales (shift)",
     "count": "Invoice count",
     "avg": "Average invoice",
     "recent": "Recent POS invoices",
