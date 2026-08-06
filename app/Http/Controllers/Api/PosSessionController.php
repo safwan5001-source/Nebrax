@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Resources\PosSessionResource;
 use App\Models\PosSession;
 use App\Services\Accounting\PosSessionService;
+use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -41,5 +42,22 @@ class PosSessionController extends ApiController
         $closed = $this->domain(fn () => $this->sessions->close($session, (int) $data['closing_balance']));
 
         return (new PosSessionResource($closed))->response();
+    }
+
+    /** تقرير الوردية (X/Z): مبيعات نقدية + متوقّع + مطابقة. */
+    public function report(string $id): JsonResponse
+    {
+        $session = PosSession::findOrFail($id);
+        $r = $this->sessions->report($session);
+
+        return response()->json([
+            'session' => new PosSessionResource($session),
+            'report'  => [
+                'cash_sales'  => Money::toRiyal($r['cash_sales']),
+                'sales_count' => $r['sales_count'],
+                'average'     => Money::toRiyal($r['average']),
+                'expected'    => Money::toRiyal($r['expected']),
+            ],
+        ]);
     }
 }

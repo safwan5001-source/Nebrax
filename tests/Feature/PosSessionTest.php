@@ -59,6 +59,34 @@ class PosSessionTest extends TestCase
     }
 
     /** @test */
+    public function report_returns_live_cash_sales_and_expected_for_an_open_session(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $id = $this->withToken($auth['token'])->postJson('/api/pos-sessions/open', ['opening_balance' => 50000])
+            ->assertCreated()['data']['id'];
+
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل نقدي', 'type' => 'customer'])['data']['id'];
+        foreach ([100000, 100000] as $price) {
+            $invId = $this->withToken($auth['token'])->postJson('/api/invoices', [
+                'partner_id' => $partnerId, 'payment_type' => 'cash',
+                'items' => [['quantity' => 1, 'unit_price' => $price, 'tax_rate' => 15]],
+            ])['data']['id'];
+            $this->withToken($auth['token'])->postJson("/api/invoices/{$invId}/post")->assertOk();
+        }
+
+        // مبيعتان نقديتان بإجمالي 115,000 لكلٍّ = 230,000؛ المتوقّع = 50,000 + 230,000
+        $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$id}/report")
+            ->assertOk()
+            ->assertJsonPath('report.cash_sales', '2300.00')
+            ->assertJsonPath('report.sales_count', 2)
+            ->assertJsonPath('report.average', '1150.00')
+            ->assertJsonPath('report.expected', '2800.00')
+            ->assertJsonPath('session.status', 'open');
+    }
+
+    /** @test */
     public function sessions_are_tenant_isolated(): void
     {
         $a = $this->registerTenant('acme', 'owner@acme.test');
