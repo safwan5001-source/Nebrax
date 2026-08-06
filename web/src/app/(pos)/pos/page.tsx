@@ -21,6 +21,7 @@ import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
 import { PosPayment, type PaymentSummaryItem } from '@/components/pos/pos-payment';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
+import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
 
 const WALKIN = 'عميل نقدي (POS)';
 
@@ -70,6 +71,7 @@ export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cashier, setCashier] = useState('—');
   const [branch, setBranch] = useState('—');
+  const [company, setCompany] = useState<SourceCompany | null>(null);
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState<'all' | 'good' | 'service'>('all');
   const [tab, setTab] = useState('all');
@@ -105,8 +107,12 @@ export default function PosPage() {
 
   useEffect(() => {
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
-    api<{ user?: { name?: string }; company?: { name?: string } }>('/me')
-      .then((r) => { setCashier(r.user?.name ?? t('cashier')); setBranch(r.company?.name ?? t('main_branch')); })
+    api<{ user?: { name?: string }; company?: { name?: string; vat_number?: string | null; cr_number?: string | null } }>('/me')
+      .then((r) => {
+        setCashier(r.user?.name ?? t('cashier'));
+        setBranch(r.company?.name ?? t('main_branch'));
+        if (r.company) setCompany({ name: r.company.name ?? '—', vat_number: r.company.vat_number ?? null, cr_number: r.company.cr_number ?? null });
+      })
       .catch(() => {});
     api<{ data: Partial<PosConfig> }>('/sales-config/pos')
       .then((r) => setPosCfg({ ...POS_DEFAULTS, ...r.data }))
@@ -336,7 +342,34 @@ export default function PosPage() {
         await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
         const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
         success(t('sale_done'));
-        setReceipt({ number: created.data.number, total: created.data.total, qr: z.qr, footer: posCfg.receipt_footer });
+
+        // بناء نموذج الإيصال الحراري من السلة (بلا نداء إضافي) عبر محرّك المستندات.
+        const toRiyal = (m: number) => (m / 100).toFixed(2);
+        const totals = cart.reduce(
+          (a, l) => { const c = lineCalc(l); return { sub: a.sub + c.net, tax: a.tax + c.tax, tot: a.tot + c.total }; },
+          { sub: 0, tax: 0, tot: 0 },
+        );
+        const receiptInvoice: SourceInvoice = {
+          number: created.data.number,
+          invoice_date: new Date().toISOString().slice(0, 10),
+          payment_type: paymentType,
+          subtotal: toRiyal(totals.sub),
+          tax_amount: toRiyal(totals.tax),
+          total: toRiyal(totals.tot),
+          notes: null,
+          lines: cart.map((l) => { const c = lineCalc(l); return {
+            id: l.key, description: l.description, quantity: l.qty,
+            unit_price: l.price, tax_rate: l.tax, line_tax: toRiyal(c.tax), line_total: toRiyal(c.total),
+          }; }),
+        };
+        const model = buildInvoiceDocumentModel({
+          invoice: receiptInvoice,
+          company,
+          customer: { name: selectedCustomer?.name ?? walkinName, vat_number: null, city: null },
+          qr: z.qr,
+          footerText: posCfg.receipt_footer,
+        });
+        setReceipt({ model, number: created.data.number });
         setCart([]);
         setStep('sale');
         setMobileTab('products');
@@ -346,7 +379,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive],
+    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive, company],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
