@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import {
   Search, Barcode, SlidersHorizontal, Star, Package, ImageIcon, Plus, Minus, Trash2,
   User, UserPlus, StickyNote, Clock, TrendingUp, Tag, LayoutGrid, Wrench, ShoppingCart,
-  Users, MoreHorizontal,
+  Users, MoreHorizontal, PauseCircle, Archive, Trash,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { Dialog } from '@/components/ui/dialog';
@@ -48,6 +48,10 @@ interface Product {
 interface CartLine { key: string; productId: string | null; description: string; sku: string | null; price: string; qty: number; tax: number; discount: string }
 
 const FAV_KEY = 'nibras_pos_favs';
+const HELD_KEY = 'nibras_pos_held';
+
+/** بيع معلّق (محلّي): سلة + عميل، لاستئنافه لاحقاً. */
+interface HeldSale { id: string; at: string; cart: CartLine[]; customer: PosCustomer | null }
 
 function stockTone(qty: number) {
   if (qty <= 20) return { w: Math.max(8, (qty / 20) * 40), c: 'var(--negative)' };
@@ -92,6 +96,8 @@ export default function PosPage() {
   // العميل المختار (null = العميل النقدي الافتراضي). منتقي عملاء حقيقي.
   const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [heldSales, setHeldSales] = useState<HeldSale[]>([]);
+  const [retrieveOpen, setRetrieveOpen] = useState(false);
 
   // اسم العميل الافتراضي (النقدي) من الإعداد؛ والمعروض = المختار أو الافتراضي.
   const walkinName = posCfg.default_customer?.trim() || WALKIN;
@@ -114,6 +120,10 @@ export default function PosPage() {
     try {
       const raw = localStorage.getItem(FAV_KEY);
       if (raw) setFavs(new Set(JSON.parse(raw)));
+    } catch { /* ignore */ }
+    try {
+      const raw = localStorage.getItem(HELD_KEY);
+      if (raw) setHeldSales(JSON.parse(raw));
     } catch { /* ignore */ }
   }, [t]);
 
@@ -146,6 +156,31 @@ export default function PosPage() {
   const setQty = (k: string, d: number) => setCart((c) => c.map((l) => (l.key === k ? { ...l, qty: Math.max(1, l.qty + d) } : l)));
   const setDiscount = (k: string, v: string) => setCart((c) => c.map((l) => (l.key === k ? { ...l, discount: v } : l)));
   const remove = (k: string) => setCart((c) => c.filter((l) => l.key !== k));
+
+  const persistHeld = (list: HeldSale[]) => {
+    setHeldSales(list);
+    try { localStorage.setItem(HELD_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+  };
+  // تعليق البيع الحالي (سلة + عميل) وتفريغ الشاشة لبيع جديد.
+  function holdSale() {
+    if (cart.length === 0) return;
+    const entry: HeldSale = { id: `h${Date.now()}`, at: new Date().toISOString(), cart, customer: selectedCustomer };
+    persistHeld([entry, ...heldSales]);
+    setCart([]);
+    setSelectedCustomer(null);
+    success(t('held_done'));
+  }
+  // استرجاع بيع معلّق إلى السلة (وحذفه من المعلّقة).
+  function retrieveSale(id: string) {
+    const entry = heldSales.find((h) => h.id === id);
+    if (!entry) return;
+    setCart(entry.cart);
+    setSelectedCustomer(entry.customer);
+    persistHeld(heldSales.filter((h) => h.id !== id));
+    setRetrieveOpen(false);
+    setMobileTab('cart');
+  }
+  const removeHeld = (id: string) => persistHeld(heldSales.filter((h) => h.id !== id));
 
   // مسح باركود: مطابقة الكود بالـ SKU أو الباركود ثم الإضافة للسلة.
   function scanCode(code: string): boolean {
@@ -470,7 +505,28 @@ export default function PosPage() {
         ))}
       </div>
 
-      <div className="p-3">
+      <div className="space-y-2 p-3">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={holdSale}
+            disabled={cart.length === 0}
+            className="flex items-center justify-center gap-1.5 rounded-[9px] border border-border bg-surface px-3 py-2 text-[11.5px] font-semibold text-text hover:border-primary disabled:opacity-50"
+          >
+            <PauseCircle className="h-3.5 w-3.5" strokeWidth={1.8} />
+            {t('hold')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRetrieveOpen(true)}
+            disabled={heldSales.length === 0}
+            className="flex items-center justify-center gap-1.5 rounded-[9px] border border-border bg-surface px-3 py-2 text-[11.5px] font-semibold text-text hover:border-primary disabled:opacity-50"
+          >
+            <Archive className="h-3.5 w-3.5" strokeWidth={1.8} />
+            {t('held')}
+            {heldSales.length > 0 && <span className="num rounded bg-primary px-1.5 text-[10px] font-bold text-white">{heldSales.length}</span>}
+          </button>
+        </div>
         <button className="flex w-full items-center gap-2 rounded-[9px] border border-dashed border-border bg-background px-3 py-2 text-[11.5px] text-muted">
           <StickyNote className="h-3.5 w-3.5" strokeWidth={1.7} />
           {t('invoice_note')}
@@ -587,6 +643,34 @@ export default function PosPage() {
         onClose={() => setPickerOpen(false)}
         onSelect={setSelectedCustomer}
       />
+
+      {/* استرجاع بيع معلّق. */}
+      <Dialog open={retrieveOpen} onClose={() => setRetrieveOpen(false)} title={t('held_title')} className="max-w-md">
+        {heldSales.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted">{t('no_held')}</p>
+        ) : (
+          <div className="max-h-80 space-y-2 overflow-y-auto">
+            {heldSales.map((h) => {
+              const items = h.cart.reduce((s, l) => s + l.qty, 0);
+              const gross = h.cart.reduce((s, l) => s + l.qty * riyalToMinor(l.price), 0);
+              return (
+                <div key={h.id} className="flex items-center gap-2 rounded-lg border border-border p-2">
+                  <button type="button" onClick={() => retrieveSale(h.id)} className="min-w-0 flex-1 text-start">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="num text-[11px] text-muted">{h.at.slice(11, 16)} · {h.customer?.name ?? walkinName}</span>
+                      <span className="num text-[12.5px] font-bold text-text">{formatRiyal(gross / 100)}</span>
+                    </div>
+                    <div className="text-[11px] text-muted">{t('held_items', { n: items })}</div>
+                  </button>
+                  <button type="button" onClick={() => removeHeld(h.id)} className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-negative/10 text-negative" aria-label={t('remove')}>
+                    <Trash className="h-3.5 w-3.5" strokeWidth={1.8} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Dialog>
 
       {/* بوابة الوردية: لا بيع قبل فتح وردية — الإغلاق = مغادرة نقطة البيع. */}
       <Dialog open={sessionReady && !session} onClose={() => router.push('/dashboard')} title={ts('open_title')}>
