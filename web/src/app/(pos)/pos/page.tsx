@@ -9,6 +9,10 @@ import {
   Users, MoreHorizontal,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { Dialog } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
@@ -72,6 +76,15 @@ export default function PosPage() {
   const [posCfg, setPosCfg] = useState<PosConfig>(POS_DEFAULTS);
   // وضع الضريبة من إعدادات النظام (متضمَّن/غير متضمَّن) — يوحّد سلوك كل المعاملات.
   const [taxInclusive, setTaxInclusive] = useState(false);
+  // الوردية (الجلسة النقدية) — تُربط بالبيع: تُفتح قبل البيع وتُغلق بعدّ النقد.
+  const [session, setSession] = useState<{ id: string; number: string } | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [openBal, setOpenBal] = useState('');
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [countedBal, setCountedBal] = useState('');
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const ts = useTranslations('posSessions');
 
   // اسم العميل المعروض في السلة/الدفع/الإيصال — من الإعداد، مع تراجع للنقدي.
   const customerName = posCfg.default_customer?.trim() || WALKIN;
@@ -85,6 +98,11 @@ export default function PosPage() {
       .then((r) => setPosCfg({ ...POS_DEFAULTS, ...r.data }))
       .catch(() => {});
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
+    // الوردية المفتوحة الحالية (إن وُجدت) — وإلا تُعرض بوابة فتح وردية.
+    api<{ data: { id: string; number: string; status: string }[] }>('/pos-sessions')
+      .then((r) => setSession(r.data.find((s) => s.status === 'open') ?? null))
+      .catch(() => {})
+      .finally(() => setSessionReady(true));
     try {
       const raw = localStorage.getItem(FAV_KEY);
       if (raw) setFavs(new Set(JSON.parse(raw)));
@@ -140,6 +158,41 @@ export default function PosPage() {
     { subMinor: 0, taxMinor: 0, totalMinor: 0 },
   );
   const count = cart.reduce((s, l) => s + l.qty, 0);
+
+  async function openSession(e: React.FormEvent) {
+    e.preventDefault();
+    setSessionBusy(true);
+    setSessionError(null);
+    try {
+      const r = await api<{ data: { id: string; number: string } }>('/pos-sessions/open', {
+        method: 'POST',
+        body: { opening_balance: riyalToMinor(openBal) },
+      });
+      setSession(r.data);
+      setOpenBal('');
+    } catch (err) {
+      setSessionError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
+  async function closeSession(e: React.FormEvent) {
+    e.preventDefault();
+    if (!session) return;
+    setSessionBusy(true);
+    setSessionError(null);
+    try {
+      await api(`/pos-sessions/${session.id}/close`, {
+        method: 'POST',
+        body: { closing_balance: riyalToMinor(countedBal) },
+      });
+      router.push('/dashboard'); // الوردية أُغلقت — نغادر نقطة البيع
+    } catch (err) {
+      setSessionError(err instanceof ApiError ? err.message : tc('saveFailed'));
+      setSessionBusy(false);
+    }
+  }
 
   async function ensureWalkin(): Promise<string> {
     const r = await api<{ data: { id: string; name: string }[] }>('/partners');
@@ -372,7 +425,12 @@ export default function PosPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
-      <PosTopbar cashier={cashier} branch={branch} onEndSession={() => router.push('/dashboard')} />
+      <PosTopbar
+        cashier={cashier}
+        branch={branch}
+        session={session}
+        onEndSession={() => (session ? (setCountedBal(''), setSessionError(null), setCloseOpen(true)) : router.push('/dashboard'))}
+      />
 
       {step === 'payment' ? (
         <PosPayment
@@ -424,6 +482,37 @@ export default function PosPage() {
       )}
 
       <ReceiptDialog receipt={receipt} autoPrint={posCfg.print_receipt} onClose={() => setReceipt(null)} />
+
+      {/* بوابة الوردية: لا بيع قبل فتح وردية — الإغلاق = مغادرة نقطة البيع. */}
+      <Dialog open={sessionReady && !session} onClose={() => router.push('/dashboard')} title={ts('open_title')}>
+        <form onSubmit={openSession} className="space-y-3">
+          <p className="text-xs text-muted">{t('open_to_start')}</p>
+          <div className="space-y-1.5">
+            <Label htmlFor="ob">{ts('opening_balance')}</Label>
+            <Input id="ob" className="num text-end" inputMode="decimal" value={openBal} onChange={(e) => setOpenBal(e.target.value)} required autoFocus />
+          </div>
+          {sessionError && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{sessionError}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => router.push('/dashboard')}>{t('leave')}</Button>
+            <Button type="submit" disabled={sessionBusy}>{ts('open')}</Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* إغلاق الوردية: عدّ النقد → المتوقّع/الفرق يُحسبان في الخادم ثم نغادر. */}
+      <Dialog open={closeOpen} onClose={() => setCloseOpen(false)} title={ts('close_title')}>
+        <form onSubmit={closeSession} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="cb">{ts('counted')}</Label>
+            <Input id="cb" className="num text-end" inputMode="decimal" value={countedBal} onChange={(e) => setCountedBal(e.target.value)} required autoFocus />
+          </div>
+          {sessionError && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{sessionError}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setCloseOpen(false)}>{ts('cancel')}</Button>
+            <Button type="submit" disabled={sessionBusy}>{ts('close')}</Button>
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Printer, Barcode, Wifi, Building2, Power } from 'lucide-react';
+import { Printer, Barcode, Wifi, Building2, Power, Clock } from 'lucide-react';
 
 /** نقطة حالة ملوّنة (متصل/غير متصل) على زر أداة. */
 function StatusDot({ ok }: { ok: boolean }) {
@@ -18,10 +18,12 @@ function StatusDot({ ok }: { ok: boolean }) {
 export function PosTopbar({
   cashier,
   branch,
+  session,
   onEndSession,
 }: {
   cashier: string;
   branch: string;
+  session?: { number: string } | null;
   onEndSession?: () => void;
 }) {
   const t = useTranslations('pos');
@@ -74,6 +76,12 @@ export function PosTopbar({
 
       <div className="flex-1" />
 
+      {session?.number && (
+        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs" title={t('session')}>
+          <Clock className="h-3.5 w-3.5 text-positive" strokeWidth={1.7} />
+          <span className="num">{session.number}</span>
+        </div>
+      )}
       <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs">
         <Building2 className="h-3.5 w-3.5 text-muted" strokeWidth={1.7} />
         <span>{branch}</span>
