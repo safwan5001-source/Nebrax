@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\PosSessionController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\QuoteController;
@@ -151,6 +152,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('recurring-invoices/{id}/generate', [RecurringInvoiceController::class, 'generate'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
 
         // جلسات نقطة البيع (تشغيلي — لا قيود)
+        Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware($perm('invoices.manage'));
         Route::get('pos-sessions', [PosSessionController::class, 'index'])->middleware($perm('invoices.view'));
         Route::get('pos-sessions/{id}/report', [PosSessionController::class, 'report'])->middleware($perm('invoices.view'));
         Route::post('pos-sessions/open', [PosSessionController::class, 'open'])->middleware($perm('invoices.manage'));

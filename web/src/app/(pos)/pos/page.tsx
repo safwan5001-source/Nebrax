@@ -321,9 +321,6 @@ export default function PosPage() {
       if (cart.length === 0) return;
       setPaying(true);
       setError(null);
-      // نوع الدفع للفاتورة: آجل فقط إن كان كامل المبلغ على الذمة، وإلا نقدي (POS).
-      const nonCredit = tenders.cash + tenders.card + tenders.transfer;
-      const paymentType = nonCredit === 0 && tenders.credit > 0 ? 'credit' : 'cash';
       try {
         // العميل المختار إن وُجد، وإلا العميل النقدي الافتراضي.
         const partnerId = selectedCustomer?.id ?? (await ensureWalkin());
@@ -335,11 +332,11 @@ export default function PosPage() {
           tax_rate: l.tax,
           discount: lineCalc(l).disc, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
         }));
-        const created = await api<{ data: { id: string; number: string; total: string } }>('/invoices', {
+        // إتمام ذرّي: فاتورة آجلة مرحّلة + سندات قبض حسب الوسائل (نقد→1110، بطاقة/تحويل→1120).
+        const created = await api<{ data: { id: string; number: string; total: string } }>('/pos/checkout', {
           method: 'POST',
-          body: { partner_id: partnerId, payment_type: paymentType, tax_inclusive: taxInclusive, items },
+          body: { partner_id: partnerId, tax_inclusive: taxInclusive, items, tenders },
         });
-        await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
         const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
         success(t('sale_done'));
 
@@ -349,10 +346,12 @@ export default function PosPage() {
           (a, l) => { const c = lineCalc(l); return { sub: a.sub + c.net, tax: a.tax + c.tax, tot: a.tot + c.total }; },
           { sub: 0, tax: 0, tot: 0 },
         );
+        // نوع الدفع للعرض: نقدي إن سُدِّد فوراً بأي وسيلة، وإلا آجل.
+        const paidNow = tenders.cash + tenders.card + tenders.transfer;
         const receiptInvoice: SourceInvoice = {
           number: created.data.number,
           invoice_date: new Date().toISOString().slice(0, 10),
-          payment_type: paymentType,
+          payment_type: paidNow > 0 ? 'cash' : 'credit',
           subtotal: toRiyal(totals.sub),
           tax_amount: toRiyal(totals.tax),
           total: toRiyal(totals.tot),
