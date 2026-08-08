@@ -585,7 +585,12 @@
     "b90_plus": "90+",
     "empty": "No balances",
     "csv": "CSV",
-    "pdf": "Print PDF"
+    "pdf": "Print PDF",
+    "from": "From",
+    "to": "To",
+    "all_branches": "All branches",
+    "branches_selected": "{n} branches selected",
+    "clear_filters": "Clear filters"
   },
   "reportDoc": {
     "vat_number": "VAT number",

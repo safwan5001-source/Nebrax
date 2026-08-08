@@ -13,6 +13,7 @@ import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { useCompany } from '@/lib/company';
 import { toCsv, downloadCsv } from '@/lib/export';
+import { ReportFilters, filtersToQuery, EMPTY_FILTERS, type ReportFilterState } from '@/components/reports/report-filters';
 
 type Tab = 'trial' | 'costcenter' | 'aging';
 
@@ -41,17 +42,22 @@ export default function ReportsPage() {
   const [trial, setTrial] = useState<TrialBalance | null>(null);
   const [aging, setAging] = useState<Aging | null>(null);
   const [cc, setCc] = useState<Profitability | null>(null);
+  // مرشّحات مشتركة: مدى تاريخي + فروع (فارغة = كل الفروع مجمّعة).
+  const [filters, setFilters] = useState<ReportFilterState>(EMPTY_FILTERS);
 
   const load = useCallback(() => {
     setLoading(true);
+    const q = filtersToQuery(filters);
     if (tab === 'trial') {
-      api<TrialBalance>('/reports/trial-balance').then(setTrial).finally(() => setLoading(false));
+      api<TrialBalance>(`/reports/trial-balance${q}`).then(setTrial).finally(() => setLoading(false));
     } else if (tab === 'costcenter') {
-      api<Profitability>('/reports/cost-center-profitability').then(setCc).finally(() => setLoading(false));
+      api<Profitability>(`/reports/cost-center-profitability${q}`).then(setCc).finally(() => setLoading(false));
     } else {
-      api<Aging>(`/reports/aging/${agingType}`).then(setAging).finally(() => setLoading(false));
+      // الأعمار تعتمد «حتى تاريخ» لا مدى — يُمرَّر الفرع فقط.
+      api<Aging>(`/reports/aging/${agingType}${filtersToQuery({ ...filters, from: '', to: '' })}`)
+        .then(setAging).finally(() => setLoading(false));
     }
-  }, [tab, agingType]);
+  }, [tab, agingType, filters]);
 
   useEffect(() => load(), [load]);
 
@@ -154,6 +160,8 @@ export default function ReportsPage() {
           {t('aging')}
         </Button>
       </div>
+
+      <ReportFilters value={filters} onChange={setFilters} />
 
       {tab === 'trial' ? (
         <Card>

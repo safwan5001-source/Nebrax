@@ -585,7 +585,12 @@
     "b90_plus": "+90",
     "empty": "لا توجد أرصدة",
     "csv": "CSV",
-    "pdf": "طباعة PDF"
+    "pdf": "طباعة PDF",
+    "from": "من تاريخ",
+    "to": "إلى تاريخ",
+    "all_branches": "كل الفروع",
+    "branches_selected": "{n} فروع مختارة",
+    "clear_filters": "مسح المرشّحات"
   },
   "reportDoc": {
     "vat_number": "الرقم الضريبي",

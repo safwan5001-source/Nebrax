@@ -120,7 +120,10 @@ class ReportController extends ApiController
     {
         abort_unless(in_array($type, ['receivable', 'payable'], true), 404);
 
-        $aging = $this->reports->aging($type, array_filter(['as_of' => $request->query('as_of')]));
+        $aging = $this->reports->aging($type, array_filter([
+            'as_of'     => $request->query('as_of'),
+            'branch_id' => $request->query('branch_id'),
+        ]));
 
         $bucketize = fn (array $r) => [
             'partner_id' => $r['partner_id'],
