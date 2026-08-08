@@ -6,7 +6,9 @@ use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Product;
+use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
+use App\Models\Warehouse;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -82,7 +84,8 @@ class InventoryService
             throw new RuntimeException('كمية الاستلام يجب أن تكون موجبة والتكلفة غير سالبة.');
         }
 
-        $date = $meta['date'] ?? now()->toDateString();
+        $date        = $meta['date'] ?? now()->toDateString();
+        $warehouseId = $this->resolveWarehouseId($meta);
 
         // قيمة الوارد: الصافي الدقيق إن مُرِّر، وإلا الكمية × تكلفة الوحدة (كالسابق).
         $lineValue = $totalCost ?? ($quantity * $unitCost);
@@ -100,6 +103,7 @@ class InventoryService
 
         $movement = StockMovement::create([
             'product_id'       => $product->id,
+            'warehouse_id'     => $warehouseId,
             'type'             => 'in',
             'quantity'         => $quantity,
             'unit_cost'        => $recordedUnit,
@@ -112,6 +116,7 @@ class InventoryService
         ]);
 
         $product->update(['quantity_on_hand' => $newQty, 'avg_cost' => $newAvg]);
+        $this->adjustWarehouseStock($warehouseId, $product->id, $quantity);
 
         return $movement;
     }
@@ -127,10 +132,12 @@ class InventoryService
             throw new RuntimeException('كمية الإخراج يجب أن تكون موجبة والتكلفة غير سالبة.');
         }
 
-        $newQty = $product->quantity_on_hand - $quantity;
+        $newQty      = $product->quantity_on_hand - $quantity;
+        $warehouseId = $this->resolveWarehouseId($meta);
 
         $movement = StockMovement::create([
             'product_id'       => $product->id,
+            'warehouse_id'     => $warehouseId,
             'type'             => 'out',
             'quantity'         => $quantity,
             'unit_cost'        => $unitCost,
@@ -143,6 +150,7 @@ class InventoryService
         ]);
 
         $product->update(['quantity_on_hand' => $newQty]);
+        $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity);
 
         return $movement;
     }
@@ -177,6 +185,9 @@ class InventoryService
         $cogsByAccount = []; // account_id => amount (تجاوز حساب التكلفة لكل منتج)
         $defaultCogs = $this->accountId(self::ACC_COGS);
 
+        // مخزن الإخراج: مخزن فرع الفاتورة إن وُجد، وإلا المخزن الافتراضي.
+        $warehouseId = $this->warehouseForBranch($invoice->branch_id);
+
         foreach ($invoice->lines as $line) {
             $product = $line->product;
 
@@ -190,6 +201,7 @@ class InventoryService
 
             StockMovement::create([
                 'product_id'       => $product->id,
+                'warehouse_id'     => $warehouseId,
                 'type'             => 'out',
                 'quantity'         => $line->quantity,
                 'unit_cost'        => $unitCost,
@@ -202,6 +214,7 @@ class InventoryService
             ]);
 
             $product->update(['quantity_on_hand' => $newQty]);
+            $this->adjustWarehouseStock($warehouseId, $product->id, -$line->quantity);
             $totalCogs += $cost;
             $cogsAcct = $product->cogs_account_id ?: $defaultCogs;
             $cogsByAccount[$cogsAcct] = ($cogsByAccount[$cogsAcct] ?? 0) + $cost;
@@ -224,6 +237,52 @@ class InventoryService
             'source_type' => Invoice::class,
             'source_id'   => $invoice->id,
         ]);
+    }
+
+    /**
+     * يحلّ المخزن المستهدَف للحركة: الصريح في meta، وإلا المخزن الافتراضي.
+     * `null` = لا مخازن معرّفة بعد ⇒ تُسجَّل الحركة بلا مخزن (سلوك ما قبل B4).
+     */
+    protected function resolveWarehouseId(array $meta): ?string
+    {
+        if (! empty($meta['warehouse_id'])) {
+            return Warehouse::whereKey($meta['warehouse_id'])->exists() ? $meta['warehouse_id'] : null;
+        }
+
+        return Warehouse::default()?->id;
+    }
+
+    /**
+     * مخزن الفرع: أول مخزن نشط تابع للفرع، وإلا المخزن الافتراضي للمنشأة.
+     */
+    protected function warehouseForBranch(?string $branchId): ?string
+    {
+        if ($branchId !== null) {
+            $byBranch = Warehouse::where('branch_id', $branchId)->where('is_active', true)
+                ->orderByDesc('is_default')->orderBy('code')->first();
+            if ($byBranch) {
+                return $byBranch->id;
+            }
+        }
+
+        return Warehouse::default()?->id;
+    }
+
+    /**
+     * يعدّل رصيد المنتج في مخزن بمقدار موجب/سالب. لا يمسّ القيمة —
+     * التقييم عالمي على المنتج (products.avg_cost).
+     */
+    protected function adjustWarehouseStock(?string $warehouseId, string $productId, int $delta): void
+    {
+        if ($warehouseId === null || $delta === 0) {
+            return;
+        }
+
+        $row = ProductWarehouseStock::firstOrCreate(
+            ['product_id' => $productId, 'warehouse_id' => $warehouseId],
+            ['quantity' => 0]
+        );
+        $row->increment('quantity', $delta);
     }
 
     protected function accountId(string $code): string

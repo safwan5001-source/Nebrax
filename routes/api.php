@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsurePermission;
@@ -119,6 +120,14 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('assets/{id}/depreciate', [AssetController::class, 'depreciate'])->middleware($perm('assets.manage'));
 
         // مراكز التكلفة (بيانات رئيسية — بُعد تحليلي للقيود)
+        // المخازن — تحمل الكميات لكل موقع (التقييم يبقى عالمياً على المنتج).
+        Route::get('warehouses', [WarehouseController::class, 'index'])->middleware($perm('products.view'));
+        Route::get('warehouses/{id}', [WarehouseController::class, 'show'])->middleware($perm('products.view'));
+        Route::get('warehouses/{id}/stock', [WarehouseController::class, 'stock'])->middleware($perm('products.view'));
+        Route::post('warehouses', [WarehouseController::class, 'store'])->middleware($perm('products.manage'));
+        Route::put('warehouses/{id}', [WarehouseController::class, 'update'])->middleware($perm('products.manage'));
+        Route::delete('warehouses/{id}', [WarehouseController::class, 'destroy'])->middleware($perm('products.manage'));
+
         // الفروع — بنية تنظيمية داخل المؤسسة (بيانات رئيسية، لا أثر محاسبي).
         Route::get('branches', [BranchController::class, 'index'])->middleware($perm('branches.view'));
         Route::get('branch-settings', [BranchSettingsController::class, 'show'])->middleware($perm('branches.view'));

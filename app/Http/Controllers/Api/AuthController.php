@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Models\Branch;
+use App\Models\Warehouse;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Accounting\ChartOfAccountsSeeder;
@@ -50,6 +51,13 @@ class AuthController extends ApiController
             $tenant->update(['settings' => array_merge($tenant->settings ?? [], [
                 'branches' => ['main_branch_id' => $branch->id],
             ])]);
+
+            // مخزن رئيسي افتراضي تابع للفرع الرئيسي — يستقبل كل الحركات
+            // حتى يعرّف المستخدم مخازن إضافية.
+            Warehouse::create([
+                'code' => '00001', 'name' => 'المخزن الرئيسي',
+                'branch_id' => $branch->id, 'is_default' => true,
+            ]);
 
             $user = User::create([
                 'tenant_id' => $tenant->id,
