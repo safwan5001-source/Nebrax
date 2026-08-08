@@ -47,6 +47,7 @@ import {
   Send,
   MapPin,
   MapPinPlus,
+  Boxes,
   BarChart3,
   LayoutTemplate,
   Settings,
@@ -111,6 +112,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/products', icon: Package, key: 'products', built: true },
       { href: '/inventory', icon: Warehouse, key: 'stockBalances', built: true },
+      { href: '/warehouses', icon: Boxes, key: 'warehouses', built: true },
       { href: '/purchases', icon: ShoppingCart, key: 'purchases', built: true },
       { href: '/suppliers', icon: Handshake, key: 'suppliers' },
       { href: '/purchase-cycle', icon: Repeat, key: 'purchaseCycle' },

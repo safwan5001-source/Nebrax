@@ -723,6 +723,12 @@ export const mockBranches = [
   { id: 'br-3', code: '00003', name: 'فرع الجبيل', phone: '0133000000', mobile: '', address_line1: '', address_line2: '', city: 'الجبيل', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: null, longitude: null, is_active: false },
 ];
 
+export const mockWarehouses = [
+  { id: 'wh-1', code: '00001', name: 'المخزن الرئيسي', branch_id: 'br-1', city: 'الدمام', address: '', notes: '', is_default: true, is_active: true },
+  { id: 'wh-2', code: '00002', name: 'مخزن الخبر', branch_id: 'br-2', city: 'الخبر', address: '', notes: '', is_default: false, is_active: true },
+  { id: 'wh-3', code: '00003', name: 'مخزن مركزي', branch_id: null, city: 'الدمام', address: '', notes: '', is_default: false, is_active: false },
+];
+
 export const mockBranchSettings = {
   main_branch_id: 'br-1',
   share_customers: true,
@@ -876,6 +882,17 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/users') return resolve({ data: mockUsers });
   if (clean === '/products') return resolve({ data: mockProducts });
   if (clean === '/branches') return resolve({ data: mockBranches, main_branch_id: mockBranchSettings.main_branch_id });
+  if (clean === '/warehouses') return resolve({ data: mockWarehouses });
+  const whStockMatch = clean.match(/^\/warehouses\/([^/]+)\/stock$/);
+  if (whStockMatch) {
+    return resolve({ data: mockProducts.slice(0, 5).map((p, i) => ({
+      product_id: p.id, name: p.name, sku: p.sku, quantity: [42, 18, 7, 130, 55][i] ?? 0,
+    })) });
+  }
+  const whMatch = clean.match(/^\/warehouses\/([^/]+)$/);
+  if (whMatch) {
+    return resolve({ data: mockWarehouses.find((w) => w.id === whMatch[1]) ?? mockWarehouses[0] });
+  }
   if (clean === '/branch-settings') return resolve({ data: mockBranchSettings });
   const branchMatch = clean.match(/^\/branches\/([^/]+)$/);
   if (branchMatch) {
