@@ -103,7 +103,8 @@
     "posSettings": "POS settings",
     "branchesManage": "Manage branches",
     "branchAdd": "Add branch",
-    "branchSettings": "Branch settings"
+    "branchSettings": "Branch settings",
+    "warehouses": "Warehouses"
   },
   "login": {
     "title": "Sign in",
@@ -1389,5 +1390,39 @@
     "account_branch_scoping_title": "Account allocation per branch",
     "account_branch_scoping_desc": "Allocate each account at branch level to record financial transactions and follow accounting results separately. An account can be assigned to one branch, several, or all.",
     "footer_note": "Choose how data and financial records are shared between branches to unify or separate your operations. Existing records are shared once enabled."
+  },
+  "warehouses": {
+    "title": "Warehouses",
+    "subtitle": "Warehouses hold product quantities per location; cost valuation stays unified company-wide.",
+    "add": "Add warehouse",
+    "new_title": "New warehouse",
+    "edit_title": "Edit warehouse",
+    "details": "Warehouse details",
+    "name": "Name",
+    "code": "Code",
+    "code_auto": "Auto-generated",
+    "branch": "Branch",
+    "no_branch": "— Central (no branch) —",
+    "central": "Central",
+    "branch_hint": "Link to a branch to make it that branch default sales warehouse; leave empty for a central warehouse.",
+    "city": "City",
+    "address": "Address",
+    "notes": "Notes",
+    "is_default": "Default warehouse",
+    "is_default_hint": "Receives movements with no explicit warehouse. Only one per company.",
+    "is_active": "Active",
+    "is_active_hint": "Inactive warehouses are not selectable for new movements.",
+    "default": "Default",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "stock": "Warehouse stock",
+    "product": "Product",
+    "sku": "SKU",
+    "qty": "Quantity",
+    "search": "Search warehouses…",
+    "empty": "No warehouses",
+    "search_products": "Search products…",
+    "no_stock": "No stock in this warehouse"
   }
 }
