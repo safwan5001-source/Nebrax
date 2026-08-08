@@ -22,12 +22,15 @@ class Rbac
             'expenses.view', 'expenses.manage',
             'assets.view', 'assets.manage',
             'cost_centers.view', 'cost_centers.manage',
+            // الفروع بنية تنظيمية: العرض متاح للعمل اليومي، والإدارة للمالك/المدير فقط.
+            'branches.view',
             'accounts.view', 'reports.view', 'zatca.view',
         ],
         'staff' => [
             'partners.view', 'products.view', 'invoices.view',
             'payments.view', 'purchases.view', 'returns.view',
             'hr.view', 'expenses.view', 'assets.view', 'cost_centers.view',
+            'branches.view',
             'accounts.view', 'reports.view', 'zatca.view',
         ],
     ];

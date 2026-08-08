@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Models\Branch;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Accounting\ChartOfAccountsSeeder;
@@ -42,6 +43,13 @@ class AuthController extends ApiController
 
             app(TenantContext::class)->set($tenant->id);
             app(ChartOfAccountsSeeder::class)->seed($tenant->id);
+
+            // فرع رئيسي افتراضي لكل مؤسسة (كدليل الحسابات) — يبقى النظام أحادي
+            // الفرع سلوكياً حتى يضيف المستخدم فروعاً ويعطّل المشاركة.
+            $branch = Branch::create(['code' => '00001', 'name' => 'الفرع الرئيسي']);
+            $tenant->update(['settings' => array_merge($tenant->settings ?? [], [
+                'branches' => ['main_branch_id' => $branch->id],
+            ])]);
 
             $user = User::create([
                 'tenant_id' => $tenant->id,
