@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\BelongsToBranch;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -12,7 +13,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Quote extends BaseModel
 {
+    use BelongsToBranch;
+
     protected $fillable = [
+        'branch_id',
         'tenant_id', 'number', 'partner_id', 'quote_date', 'valid_until',
         'status', 'subtotal', 'tax_amount', 'total', 'tax_inclusive', 'notes',
         'converted_invoice_id', 'created_by',

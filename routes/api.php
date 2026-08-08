@@ -36,6 +36,7 @@ use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\ForceJsonResponse;
+use App\Http\Middleware\SetBranch;
 use App\Http\Middleware\SetTenant;
 use Illuminate\Support\Facades\Route;
 
@@ -50,7 +51,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
     // محمي: مصادقة Sanctum + ضبط المستأجر (العزل التلقائي)
-    Route::middleware(['auth:sanctum', SetTenant::class])->group(function () {
+    Route::middleware(['auth:sanctum', SetTenant::class, SetBranch::class])->group(function () {
         // متاح دائماً (حتى مع اشتراك منتهٍ) لرؤية الحالة والخروج
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);

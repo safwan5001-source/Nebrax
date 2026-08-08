@@ -9,6 +9,7 @@ class JournalLine extends BaseModel
     protected $fillable = [
         'tenant_id', 'journal_entry_id', 'account_id',
         'debit', 'credit', 'description', 'partner_type', 'partner_id', 'cost_center_id',
+        'branch_id',
     ];
 
     protected $casts = [

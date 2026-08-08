@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\AccountBalance;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
+use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -35,7 +36,10 @@ class LedgerService
     {
         $this->validateBalanced($lines);
 
-        return DB::transaction(function () use ($lines, $meta) {
+        // الفرع النشط للطلب (إن وُجد) يوسم به كل سطور هذا القيد.
+        $branchId = $meta['branch_id'] ?? app(BranchContext::class)->id();
+
+        return DB::transaction(function () use ($lines, $meta, $branchId) {
             $entry = JournalEntry::create([
                 'number'      => $this->nextNumber($meta['entry_date'] ?? now()->toDateString()),
                 'entry_date'  => $meta['entry_date'] ?? now()->toDateString(),
@@ -59,6 +63,9 @@ class LedgerService
                     'partner_type'     => $line['partner_type'] ?? null,
                     'partner_id'       => $line['partner_id'] ?? null,
                     'cost_center_id'   => $line['cost_center_id'] ?? null,
+                    // بُعد الفرع: صريحاً من السطر، وإلا الفرع النشط للطلب.
+                    // وسم فقط — لا يمسّ التوازن ولا الأرصدة.
+                    'branch_id'        => $line['branch_id'] ?? $branchId,
                 ]);
 
                 $this->applyToBalance(
@@ -109,6 +116,8 @@ class LedgerService
                     'partner_type'     => $line->partner_type,
                     'partner_id'       => $line->partner_id,
                     'cost_center_id'   => $line->cost_center_id,
+                    // العاكس يرث فرع الأصل — وإلا لم يتصفّر رصيد الفرع بعد العكس.
+                    'branch_id'        => $line->branch_id,
                 ]);
 
                 $this->applyToBalance($line->account_id, $line->credit, $line->debit);

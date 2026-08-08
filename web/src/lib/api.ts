@@ -37,10 +37,13 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
   }
 
   const token = getToken();
+  // الفرع النشط — يوسم به الخادمُ المستنداتِ وسطورَ قيدها (بلا ترويسة: الفرع الرئيسي).
+  const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(branchId ? { 'X-Branch-Id': branchId } : {}),
     ...(options.headers as Record<string, string> | undefined),
   };
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\BelongsToBranch;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -12,7 +13,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class CreditNote extends BaseModel
 {
+    use BelongsToBranch;
+
     protected $fillable = [
+        'branch_id',
         'tenant_id', 'number', 'partner_id', 'refund_type', 'note_date',
         'status', 'subtotal', 'tax_amount', 'total', 'reason',
         'original_invoice_id', 'journal_entry_id', 'created_by',
