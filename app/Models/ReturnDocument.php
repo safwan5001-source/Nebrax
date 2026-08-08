@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\BelongsToBranch;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -13,9 +14,12 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 class ReturnDocument extends BaseModel
 {
+    use BelongsToBranch;
+
     protected $table = 'return_documents';
 
     protected $fillable = [
+        'branch_id',
         'tenant_id', 'number', 'type', 'partner_id', 'payment_type',
         'return_date', 'status', 'subtotal', 'tax_amount', 'total',
         'notes', 'original_type', 'original_id',

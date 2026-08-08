@@ -216,11 +216,14 @@ class ReportService
      */
     protected function movementsByAccount(array $filters): Collection
     {
-        $from = $filters['from'] ?? null;
-        $to   = $filters['to'] ?? null;
+        $from   = $filters['from'] ?? null;
+        $to     = $filters['to'] ?? null;
+        $branch = $filters['branch_id'] ?? null;
 
         $sums = JournalLine::query()
             ->selectRaw('account_id, SUM(debit) as total_debit, SUM(credit) as total_credit')
+            // بُعد الفرع: تصفية صريحة واختيارية — بلا مرشّح تبقى الأرقام مجمّعة لكل الفروع.
+            ->when($branch, fn ($q) => $q->where('journal_lines.branch_id', $branch))
             ->whereHas('entry', function ($q) use ($from, $to) {
                 $q->whereIn('status', ['posted', 'reversed']); // المعكوس يبقى في الدفاتر (الأصل + العاكس = صفر)
                 if ($from) {
@@ -285,7 +288,7 @@ class ReportService
         $from = $filters['from'] ?? null;
         $to   = $filters['to'] ?? null;
 
-        $lines = $this->postedLines(fn ($q) => $q->where('journal_lines.account_id', $accountId));
+        $lines = $this->postedLines(fn ($q) => $q->where('journal_lines.account_id', $accountId), $filters['branch_id'] ?? null);
 
         $signed = fn (int $d, int $c) => $account->normal_balance === 'debit' ? $d - $c : $c - $d;
 
@@ -338,7 +341,7 @@ class ReportService
 
         $lines = $this->postedLines(fn ($q) => $q
             ->where('journal_lines.partner_type', Partner::class)
-            ->where('journal_lines.partner_id', $partnerId));
+            ->where('journal_lines.partner_id', $partnerId), $filters['branch_id'] ?? null);
 
         $opening = 0;
         $rows = [];
@@ -437,11 +440,12 @@ class ReportService
      *
      * @return Collection<int, JournalLine>
      */
-    protected function postedLines(callable $where): Collection
+    protected function postedLines(callable $where, ?string $branchId = null): Collection
     {
         $query = JournalLine::query()
             ->select('journal_lines.*')
             ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
+            ->when($branchId, fn ($q) => $q->where('journal_lines.branch_id', $branchId))
             ->whereIn('e.status', ['posted', 'reversed']) // المعكوس يبقى في الدفاتر (الأصل + العاكس = صفر)
             ->orderBy('e.entry_date')
             ->orderBy('e.created_at')

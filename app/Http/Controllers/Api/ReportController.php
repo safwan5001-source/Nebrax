@@ -149,8 +149,10 @@ class ReportController extends ApiController
     private function filters(Request $request): array
     {
         return array_filter([
-            'from' => $request->query('from'),
-            'to'   => $request->query('to'),
+            'from'      => $request->query('from'),
+            'to'        => $request->query('to'),
+            // بُعد الفرع: اختياري — بلا تمريره تبقى التقارير مجمّعة لكل الفروع.
+            'branch_id' => $request->query('branch_id'),
         ]);
     }
 

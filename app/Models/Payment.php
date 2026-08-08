@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\BelongsToBranch;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -14,7 +15,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Payment extends BaseModel
 {
+    use BelongsToBranch;
+
     protected $fillable = [
+        'branch_id',
         'tenant_id', 'number', 'partner_id', 'invoice_id',
         'direction', 'method', 'payment_date', 'amount',
         'status', 'notes', 'journal_entry_id', 'created_by',

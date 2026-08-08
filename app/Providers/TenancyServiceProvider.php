@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -19,6 +20,8 @@ class TenancyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(TenantContext::class, fn () => new TenantContext());
+        // سياق الفرع النشط — بُعد كتابة (وسم المستندات)، لا حاجز عزل.
+        $this->app->singleton(BranchContext::class, fn () => new BranchContext());
     }
 
     public function boot(): void

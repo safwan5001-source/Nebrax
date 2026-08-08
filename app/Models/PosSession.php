@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Tenancy\BelongsToBranch;
 /**
  * جلسة نقطة بيع (وردية) — سجلّ تشغيلي لمطابقة النقدية. غير محاسبي.
  * المبالغ بالهللات كـ bigint.
  */
 class PosSession extends BaseModel
 {
+    use BelongsToBranch;
+
     protected $fillable = [
+        'branch_id',
         'tenant_id', 'number', 'status', 'opening_balance', 'closing_balance',
         'expected_balance', 'difference', 'opened_at', 'closed_at', 'notes', 'opened_by',
     ];
