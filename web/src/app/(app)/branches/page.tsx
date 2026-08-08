@@ -14,13 +14,12 @@ import type { Branch } from '@/lib/branch';
 export default function BranchesPage() {
   const t = useTranslations('branches');
   const [data, setData] = useState<Branch[]>([]);
-  const [mainId, setMainId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     setLoading(true);
-    api<{ data: Branch[]; main_branch_id: string | null }>('/branches')
-      .then((r) => { setData(r.data); setMainId(r.main_branch_id ?? null); })
+    api<{ data: Branch[] }>('/branches')
+      .then((r) => setData(r.data))
       .finally(() => setLoading(false));
   }, []);
 
@@ -36,7 +35,7 @@ export default function BranchesPage() {
             <Link href={`/branches/${row.original.id}`} className="font-medium text-primary hover:underline">
               {row.original.name}
             </Link>
-            {row.original.id === mainId && <Badge tone="positive">{t('main')}</Badge>}
+            {row.original.is_main && <Badge tone="positive">{t('main')}</Badge>}
           </div>
         ),
       },
@@ -64,7 +63,7 @@ export default function BranchesPage() {
         ),
       },
     ],
-    [t, mainId],
+    [t],
   );
 
   return (

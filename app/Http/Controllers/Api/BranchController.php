@@ -27,12 +27,13 @@ class BranchController extends ApiController
         $data = $request->validated();
         $code = $this->uniqueCode($data['code'] ?? null);
 
+        // `is_main` لا يُقبل من المدخل — يتغيّر حصراً من «إعدادات الفروع».
+        unset($data['is_main']);
         $branch = Branch::create([...$data, 'code' => $code]);
 
-        // أول فرع للمؤسسة يصير الفرع الرئيسي تلقائياً.
-        if (BranchSettings::current()['main_branch_id'] === null) {
-            BranchSettings::merge(['main_branch_id' => $branch->id]);
-        }
+        // يصير رئيسياً **فقط** إن لم يكن للمؤسسة فرع رئيسي بعد (أول فرع).
+        // إضافة فرع لاحق لا تمسّ الرئيسي إطلاقاً.
+        $branch->claimMainIfNone();
 
         return (new BranchResource($branch))->response()->setStatusCode(201);
     }
@@ -41,6 +42,7 @@ class BranchController extends ApiController
     {
         $branch = Branch::findOrFail($id);
         $data   = $request->validated();
+        unset($data['is_main']); // لا يتغيّر من نموذج الفرع — بل من الإعدادات
 
         if (! empty($data['code']) && $data['code'] !== $branch->code) {
             $data['code'] = $this->uniqueCode($data['code'], $branch->id);
@@ -57,7 +59,7 @@ class BranchController extends ApiController
     {
         $branch = Branch::findOrFail($id);
 
-        if (BranchSettings::current()['main_branch_id'] === $branch->id) {
+        if ($branch->is_main) {
             abort(422, 'لا يمكن حذف الفرع الرئيسي — عيّن فرعاً رئيسياً آخر أولاً.');
         }
 

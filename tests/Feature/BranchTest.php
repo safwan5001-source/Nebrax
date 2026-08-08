@@ -144,4 +144,63 @@ class BranchTest extends TestCase
         $this->withToken($staff)->postJson('/api/branches', ['name' => 'فرع'])->assertForbidden();
         $this->withToken($staff)->putJson('/api/branch-settings', ['share_customers' => false])->assertForbidden();
     }
+
+    /**
+     * انحدار P1: إضافة فرع لاحق **لا تسرق** صفة الفرع الرئيسي — العَرَض المُبلَّغ.
+     * @test
+     */
+    public function adding_more_branches_never_changes_the_main_branch(): void
+    {
+        $auth = $this->registerTenant();
+        $main = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+
+        foreach (['فرع الخبر', 'فرع الجبيل', 'فرع الأحساء'] as $name) {
+            $created = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => $name])
+                ->assertCreated();
+            $this->assertFalse($created['data']['is_main'], "الفرع الجديد {$name} يجب ألّا يكون رئيسياً");
+
+            // والرئيسي يبقى الأصلي بعد كل إضافة
+            $this->assertSame($main, $this->withToken($auth['token'])->getJson('/api/branches')['main_branch_id']);
+        }
+
+        // فرع رئيسي واحد فقط في نهاية المطاف
+        $mains = collect($this->withToken($auth['token'])->getJson('/api/branches')['data'])
+            ->where('is_main', true);
+        $this->assertCount(1, $mains);
+        $this->assertSame($main, $mains->first()['id']);
+    }
+
+    /** @test */
+    public function is_main_cannot_be_forced_through_the_branch_form(): void
+    {
+        $auth = $this->registerTenant();
+        $main = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+
+        // محاولة فرض is_main عند الإنشاء تُتجاهَل
+        $new = $this->withToken($auth['token'])
+            ->postJson('/api/branches', ['name' => 'فرع متطفّل', 'is_main' => true])->assertCreated();
+        $this->assertFalse($new['data']['is_main']);
+
+        // وكذلك عند التعديل
+        $this->withToken($auth['token'])
+            ->putJson("/api/branches/{$new['data']['id']}", ['name' => 'فرع متطفّل', 'is_main' => true])->assertOk();
+        $this->assertSame($main, $this->withToken($auth['token'])->getJson('/api/branches')['main_branch_id']);
+    }
+
+    /** @test */
+    public function the_main_branch_changes_only_through_branch_settings(): void
+    {
+        $auth = $this->registerTenant();
+        $old  = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $new  = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])['data']['id'];
+
+        // الإجراء الصريح الوحيد المسموح
+        $this->withToken($auth['token'])->putJson('/api/branch-settings', ['main_branch_id' => $new])->assertOk();
+
+        $list = $this->withToken($auth['token'])->getJson('/api/branches');
+        $this->assertSame($new, $list['main_branch_id']);
+        // والقديم فقد الصفة — واحد فقط دائماً
+        $this->assertCount(1, collect($list['data'])->where('is_main', true));
+        $this->assertFalse(collect($list['data'])->firstWhere('id', $old)['is_main']);
+    }
 }

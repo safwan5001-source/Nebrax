@@ -718,9 +718,9 @@ export const mockSalesConfig: Record<string, unknown> = {
 };
 
 export const mockBranches = [
-  { id: 'br-1', code: '00001', name: 'الفرع الرئيسي', phone: '0138100000', mobile: '0550000000', address_line1: 'طريق الملك فهد', address_line2: '', city: 'الدمام', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: 'الأحد–الخميس ٩ص–٥م', latitude: 26.4207, longitude: 50.0888, is_active: true },
-  { id: 'br-2', code: '00002', name: 'فرع الخبر', phone: '0138200000', mobile: '0551111111', address_line1: 'شارع الأمير فيصل', address_line2: '', city: 'الخبر', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: 26.2794, longitude: 50.2083, is_active: true },
-  { id: 'br-3', code: '00003', name: 'فرع الجبيل', phone: '0133000000', mobile: '', address_line1: '', address_line2: '', city: 'الجبيل', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: null, longitude: null, is_active: false },
+  { id: 'br-1', code: '00001', name: 'الفرع الرئيسي', is_main: true, phone: '0138100000', mobile: '0550000000', address_line1: 'طريق الملك فهد', address_line2: '', city: 'الدمام', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: 'الأحد–الخميس ٩ص–٥م', latitude: 26.4207, longitude: 50.0888, is_active: true },
+  { id: 'br-2', code: '00002', name: 'فرع الخبر', is_main: false, phone: '0138200000', mobile: '0551111111', address_line1: 'شارع الأمير فيصل', address_line2: '', city: 'الخبر', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: 26.2794, longitude: 50.2083, is_active: true },
+  { id: 'br-3', code: '00003', name: 'فرع الجبيل', is_main: false, phone: '0133000000', mobile: '', address_line1: '', address_line2: '', city: 'الجبيل', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: null, longitude: null, is_active: false },
 ];
 
 export const mockWarehouses = [

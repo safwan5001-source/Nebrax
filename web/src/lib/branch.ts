@@ -8,6 +8,8 @@ export interface Branch {
   id: string;
   code: string;
   name: string;
+  /** الفرع الرئيسي — عمود حقيقي، يتغيّر حصراً من «إعدادات الفروع». */
+  is_main: boolean;
   phone?: string | null;
   mobile?: string | null;
   address_line1?: string | null;

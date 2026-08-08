@@ -47,10 +47,9 @@ class AuthController extends ApiController
 
             // فرع رئيسي افتراضي لكل مؤسسة (كدليل الحسابات) — يبقى النظام أحادي
             // الفرع سلوكياً حتى يضيف المستخدم فروعاً ويعطّل المشاركة.
-            $branch = Branch::create(['code' => '00001', 'name' => 'الفرع الرئيسي']);
-            $tenant->update(['settings' => array_merge($tenant->settings ?? [], [
-                'branches' => ['main_branch_id' => $branch->id],
-            ])]);
+            $branch = Branch::create([
+                'code' => '00001', 'name' => 'الفرع الرئيسي', 'is_main' => true,
+            ]);
 
             // مخزن رئيسي افتراضي تابع للفرع الرئيسي — يستقبل كل الحركات
             // حتى يعرّف المستخدم مخازن إضافية.
