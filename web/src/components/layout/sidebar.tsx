@@ -45,6 +45,8 @@ import {
   Factory,
   Truck,
   Send,
+  MapPin,
+  MapPinPlus,
   BarChart3,
   LayoutTemplate,
   Settings,
@@ -153,6 +155,16 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/fleet', icon: Truck, key: 'fleet' },
       { href: '/shipping', icon: Send, key: 'shipping' },
+    ],
+  },
+  {
+    // الفروع — عنصر مستقلّ (إدارة/إضافة/إعدادات)، منفصل عن مبدّل الفرع النشط
+    // في قائمة المستخدم بالشريط العلوي.
+    title: 'branches',
+    items: [
+      { href: '/branches', icon: MapPin, key: 'branchesManage', built: true },
+      { href: '/branches/new', icon: MapPinPlus, key: 'branchAdd', built: true },
+      { href: '/branches/settings', icon: SlidersHorizontal, key: 'branchSettings', built: true },
     ],
   },
   {

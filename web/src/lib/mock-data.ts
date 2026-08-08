@@ -717,6 +717,21 @@ export const mockSalesConfig: Record<string, unknown> = {
   pos: { default_customer: 'عميل نقدي (POS)', print_receipt: true, allow_discount: true, receipt_footer: 'شكراً لزيارتكم' },
 };
 
+export const mockBranches = [
+  { id: 'br-1', code: '00001', name: 'الفرع الرئيسي', phone: '0138100000', mobile: '0550000000', address_line1: 'طريق الملك فهد', address_line2: '', city: 'الدمام', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: 'الأحد–الخميس ٩ص–٥م', latitude: 26.4207, longitude: 50.0888, is_active: true },
+  { id: 'br-2', code: '00002', name: 'فرع الخبر', phone: '0138200000', mobile: '0551111111', address_line1: 'شارع الأمير فيصل', address_line2: '', city: 'الخبر', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: 26.2794, longitude: 50.2083, is_active: true },
+  { id: 'br-3', code: '00003', name: 'فرع الجبيل', phone: '0133000000', mobile: '', address_line1: '', address_line2: '', city: 'الجبيل', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: null, longitude: null, is_active: false },
+];
+
+export const mockBranchSettings = {
+  main_branch_id: 'br-1',
+  share_customers: true,
+  share_products: true,
+  share_suppliers: true,
+  share_cost_centers: true,
+  account_branch_scoping: false,
+};
+
 export const mockPosSessions = [
   { id: 'ps-2', number: 'POS-2026-0002', status: 'open', opening_balance: '500.00', closing_balance: null, expected_balance: null, difference: null, opened_at: '2026-06-28T08:00:00', closed_at: null },
   { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00' },
@@ -860,6 +875,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (salesConfigMatch) return resolve({ data: mockSalesConfig[salesConfigMatch[1]] ?? [] });
   if (clean === '/users') return resolve({ data: mockUsers });
   if (clean === '/products') return resolve({ data: mockProducts });
+  if (clean === '/branches') return resolve({ data: mockBranches, main_branch_id: mockBranchSettings.main_branch_id });
+  if (clean === '/branch-settings') return resolve({ data: mockBranchSettings });
+  const branchMatch = clean.match(/^\/branches\/([^/]+)$/);
+  if (branchMatch) {
+    const b = mockBranches.find((x) => x.id === branchMatch[1]) ?? mockBranches[0];
+    return resolve({ data: b });
+  }
   if (clean === '/pos-sessions') return resolve({ data: mockPosSessions });
   const posReportMatch = clean.match(/^\/pos-sessions\/([^/]+)\/report$/);
   if (posReportMatch) {

@@ -37,7 +37,8 @@
       "operations": "Operations",
       "logistics": "Logistics",
       "system": "System",
-      "pos": "Point of Sale"
+      "pos": "Point of Sale",
+      "branches": "Branches"
     },
     "invoices": "Invoices & Quotes",
     "pos": "POS",
@@ -99,7 +100,10 @@
     "posStart": "Start selling",
     "posSessions": "Sessions",
     "posReport": "POS report",
-    "posSettings": "POS settings"
+    "posSettings": "POS settings",
+    "branchesManage": "Manage branches",
+    "branchAdd": "Add branch",
+    "branchSettings": "Branch settings"
   },
   "login": {
     "title": "Sign in",
@@ -707,7 +711,10 @@
     "created": "Created successfully",
     "updated": "Updated successfully",
     "deleted": "Deleted successfully",
-    "saveFailed": "Could not save"
+    "saveFailed": "Could not save",
+    "back": "Back",
+    "save": "Save",
+    "loadFailed": "Could not load"
   },
   "settings": {
     "title": "Settings",
@@ -1325,5 +1332,57 @@
     "terms": "By creating an account you agree to the Terms and Privacy Policy.",
     "phone": "Mobile number",
     "phone_invalid": "Enter a valid mobile number."
+  },
+  "branches": {
+    "title": "Manage branches",
+    "add": "Add branch",
+    "new_title": "New branch",
+    "edit_title": "Edit branch",
+    "details": "Branch details",
+    "settings_title": "Branch settings",
+    "switch": "Switch branch",
+    "main": "Main branch",
+    "name": "Name",
+    "code": "Code",
+    "code_auto": "Auto-generated",
+    "phone": "Phone",
+    "mobile": "Mobile",
+    "address1": "Address 1",
+    "address2": "Address 2",
+    "city": "City",
+    "region": "Region",
+    "country": "Country",
+    "description": "Description",
+    "working_hours": "Working hours",
+    "working_hours_ph": "e.g. Sun–Thu 9am–5pm",
+    "location": "Location",
+    "location_hint": "Click the map to set the branch location, or drag the pin.",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "is_active": "Active",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "search": "Search branches…",
+    "empty": "No branches"
+  },
+  "branchSettings": {
+    "title": "Branch settings",
+    "subtitle": "Choose the main branch and control how data and financial records are shared between branches.",
+    "main_branch": "Main branch",
+    "main_branch_hint": "The main branch is the primary reference for managing data and financial records across all branches.",
+    "no_main": "— No main branch —",
+    "sharing": "Data sharing between branches",
+    "share_customers_title": "Customers",
+    "share_customers_desc": "Let all branches access customer data to avoid duplication and serve the same customer from any branch. When disabled, each branch keeps its own customers.",
+    "share_products_title": "Products",
+    "share_products_desc": "Share products and services across all branches to unify prices and descriptions and avoid duplication. When disabled, each branch adds its own products. Stock availability per branch depends on warehouses, regardless of sharing.",
+    "share_suppliers_title": "Suppliers",
+    "share_suppliers_desc": "Share the supplier list across branches to unify dealings and create purchase orders from one base. When disabled, each branch keeps its own suppliers.",
+    "share_cost_centers_title": "Cost centers",
+    "share_cost_centers_desc": "Link cost centers across branches to track expenses and revenue per center, enabling company-wide financial analysis. When disabled, each branch has its own cost centers.",
+    "account_branch_scoping_title": "Account allocation per branch",
+    "account_branch_scoping_desc": "Allocate each account at branch level to record financial transactions and follow accounting results separately. An account can be assigned to one branch, several, or all.",
+    "footer_note": "Choose how data and financial records are shared between branches to unify or separate your operations. Existing records are shared once enabled."
   }
 }

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
+import { useBranches } from '@/lib/branch';
 import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
@@ -70,7 +71,10 @@ export default function PosPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cashier, setCashier] = useState('—');
-  const [branch, setBranch] = useState('—');
+  const [companyName, setCompanyName] = useState('—');
+  // الفرع المعروض: الفرع النشط (افتراضه الرئيسي)، وإلا اسم الشركة.
+  const { active: activeBranch } = useBranches();
+  const branch = activeBranch?.name ?? companyName;
   const [company, setCompany] = useState<SourceCompany | null>(null);
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState<'all' | 'good' | 'service'>('all');
@@ -110,7 +114,7 @@ export default function PosPage() {
     api<{ user?: { name?: string }; company?: { name?: string; vat_number?: string | null; cr_number?: string | null } }>('/me')
       .then((r) => {
         setCashier(r.user?.name ?? t('cashier'));
-        setBranch(r.company?.name ?? t('main_branch'));
+        setCompanyName(r.company?.name ?? t('main_branch'));
         if (r.company) setCompany({ name: r.company.name ?? '—', vat_number: r.company.vat_number ?? null, cr_number: r.company.cr_number ?? null });
       })
       .catch(() => {});
