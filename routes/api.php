@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BranchController;
+use App\Http\Controllers\Api\BranchSettingsController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CostCenterController;
@@ -116,6 +118,15 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('assets/{id}/depreciate', [AssetController::class, 'depreciate'])->middleware($perm('assets.manage'));
 
         // مراكز التكلفة (بيانات رئيسية — بُعد تحليلي للقيود)
+        // الفروع — بنية تنظيمية داخل المؤسسة (بيانات رئيسية، لا أثر محاسبي).
+        Route::get('branches', [BranchController::class, 'index'])->middleware($perm('branches.view'));
+        Route::get('branch-settings', [BranchSettingsController::class, 'show'])->middleware($perm('branches.view'));
+        Route::put('branch-settings', [BranchSettingsController::class, 'update'])->middleware($perm('branches.manage'));
+        Route::get('branches/{id}', [BranchController::class, 'show'])->middleware($perm('branches.view'));
+        Route::post('branches', [BranchController::class, 'store'])->middleware($perm('branches.manage'));
+        Route::put('branches/{id}', [BranchController::class, 'update'])->middleware($perm('branches.manage'));
+        Route::delete('branches/{id}', [BranchController::class, 'destroy'])->middleware($perm('branches.manage'));
+
         Route::get('cost-centers', [CostCenterController::class, 'index'])->middleware($perm('cost_centers.view'));
         Route::post('cost-centers', [CostCenterController::class, 'store'])->middleware($perm('cost_centers.manage'));
         Route::put('cost-centers/{id}', [CostCenterController::class, 'update'])->middleware($perm('cost_centers.manage'));
