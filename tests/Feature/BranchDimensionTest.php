@@ -138,4 +138,46 @@ class BranchDimensionTest extends TestCase
         $this->assertSame($lines->sum('debit'), $lines->sum('credit'));
         $this->assertGreaterThan(0, $lines->count());
     }
+
+    /** @test */
+    public function reports_accept_multiple_branches_and_sum_them(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $main   = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $khobar = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])['data']['id'];
+        $jubail = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الجبيل'])['data']['id'];
+
+        $this->postInvoice($auth['token'], 10000, $main);   // 100
+        $this->postInvoice($auth['token'], 20000, $khobar); // 200
+        $this->postInvoice($auth['token'], 40000, $jubail); // 400
+
+        // فرعان مختاران معاً = مجموعهما فقط (لا الثالث)
+        $two = $this->withToken($auth['token'])
+            ->getJson("/api/reports/income-statement?branch_id[]={$main}&branch_id[]={$khobar}");
+        $this->assertSame('300.00', $two['total_revenue']);
+
+        // الثلاثة = المجمّع نفسه
+        $all = $this->withToken($auth['token'])
+            ->getJson("/api/reports/income-statement?branch_id[]={$main}&branch_id[]={$khobar}&branch_id[]={$jubail}");
+        $this->assertSame('700.00', $all['total_revenue']);
+        $this->assertSame('700.00', $this->withToken($auth['token'])->getJson('/api/reports/income-statement')['total_revenue']);
+    }
+
+    /** @test */
+    public function the_trial_balance_of_a_single_branch_is_balanced_on_its_own(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $khobar = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])['data']['id'];
+        $this->postInvoice($auth['token'], 10000, $khobar);
+        $this->postInvoice($auth['token'], 20000); // الفرع الرئيسي
+
+        // كل فرع متوازن بذاته (البيع النقدي يقيّد طرفيه داخل الفرع نفسه)
+        $tb = $this->withToken($auth['token'])->getJson("/api/reports/trial-balance?branch_id={$khobar}")->assertOk();
+        $this->assertTrue($tb['balanced']);
+        $this->assertSame($tb['total_debit'], $tb['total_credit']);
+    }
 }
