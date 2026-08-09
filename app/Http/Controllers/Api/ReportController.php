@@ -33,13 +33,19 @@ class ReportController extends ApiController
     {
         $is = $this->reports->incomeStatement($this->filters($request));
 
-        return response()->json([
+        return response()->json(array_filter([
             'revenues'      => $this->mapAmounts($is['revenues']),
             'expenses'      => $this->mapAmounts($is['expenses']),
             'total_revenue' => Money::toRiyal($is['total_revenue']),
             'total_expense' => Money::toRiyal($is['total_expense']),
             'net_income'    => Money::toRiyal($is['net_income']),
-        ]);
+            // يظهر عند التصفية بفرع فقط — انظر ReportService::incomeStatement.
+            'unallocated'   => isset($is['unallocated']) ? [
+                'total_revenue' => Money::toRiyal($is['unallocated']['total_revenue']),
+                'total_expense' => Money::toRiyal($is['unallocated']['total_expense']),
+                'net_income'    => Money::toRiyal($is['unallocated']['net_income']),
+            ] : null,
+        ], fn ($v) => $v !== null));
     }
 
     public function balanceSheet(Request $request): JsonResponse

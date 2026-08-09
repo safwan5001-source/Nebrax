@@ -86,13 +86,31 @@ class ReportService
         $totalRevenue = array_sum(array_column($revenues, 'amount'));
         $totalExpense = array_sum(array_column($expenses, 'amount'));
 
-        return [
+        $result = [
             'revenues'      => $revenues,
             'expenses'      => $expenses,
             'total_revenue' => $totalRevenue,
             'total_expense' => $totalExpense,
             'net_income'    => $totalRevenue - $totalExpense,
         ];
+
+        // عند التصفية بفرع: كشف صريح لما هو **غير موزَّع** على أي فرع (الرواتب
+        // المركزية والقيود السابقة للفروع). بدونه تبدو قائمة دخل الفرع ناقصةً
+        // بلا تفسير — والمستخدم لا يعرف أين ذهبت المصروفات.
+        // في العرض المجمّع لا يُحسب: غير الموزَّع داخل الإجماليات أصلاً.
+        if ($this->branchIds($filters) !== null) {
+            $un        = $this->movementsByAccount($filters, true);
+            $unRevenue = array_sum(array_column($this->rowsForType($un, 'revenue', fn ($net) => -$net), 'amount'));
+            $unExpense = array_sum(array_column($this->rowsForType($un, 'expense', fn ($net) => $net), 'amount'));
+
+            $result['unallocated'] = [
+                'total_revenue' => $unRevenue,
+                'total_expense' => $unExpense,
+                'net_income'    => $unRevenue - $unExpense,
+            ];
+        }
+
+        return $result;
     }
 
     /**
@@ -218,7 +236,11 @@ class ReportService
      *
      * @return Collection<int, array{account: Account, debit: int, credit: int, net: int}>
      */
-    protected function movementsByAccount(array $filters): Collection
+    /**
+     * @param  bool  $unallocatedOnly  يقصر النتيجة على السطور **بلا فرع** — المصروفات
+     *                                 المركزية (كالرواتب) والقيود السابقة للفروع.
+     */
+    protected function movementsByAccount(array $filters, bool $unallocatedOnly = false): Collection
     {
         $from   = $filters['from'] ?? null;
         $to     = $filters['to'] ?? null;
@@ -227,7 +249,11 @@ class ReportService
         $sums = JournalLine::query()
             ->selectRaw('account_id, SUM(debit) as total_debit, SUM(credit) as total_credit')
             // بُعد الفرع: تصفية صريحة واختيارية — بلا مرشّح تبقى الأرقام مجمّعة لكل الفروع.
-            ->when($branch, fn ($q) => $q->whereIn('journal_lines.branch_id', $branch))
+            ->when(
+                $unallocatedOnly,
+                fn ($q) => $q->whereNull('journal_lines.branch_id'),
+                fn ($q) => $q->when($branch, fn ($inner) => $inner->whereIn('journal_lines.branch_id', $branch)),
+            )
             ->whereHas('entry', function ($q) use ($from, $to) {
                 $q->whereIn('status', ['posted', 'reversed']); // المعكوس يبقى في الدفاتر (الأصل + العاكس = صفر)
                 if ($from) {
