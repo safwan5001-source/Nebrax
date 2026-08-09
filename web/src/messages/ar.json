@@ -636,7 +636,8 @@
       "logistics": "اللوجستيات",
       "system": "النظام",
       "pos": "نقطة البيع",
-      "branches": "الفروع"
+      "branches": "الفروع",
+      "purchases": "المشتريات"
     },
     "invoices": "الفواتير وعروض الأسعار",
     "pos": "نقطة البيع",
@@ -704,7 +705,16 @@
     "branchSettings": "إعدادات الفروع",
     "warehouses": "المخازن",
     "collapse": "طيّ الشريط",
-    "expand": "توسيع الشريط"
+    "expand": "توسيع الشريط",
+    "purchaseRequests": "طلبات الشراء",
+    "rfq": "طلبات عروض الأسعار",
+    "purchaseQuotes": "عروض أسعار المشتريات",
+    "purchaseOrders": "أوامر الشراء",
+    "purchaseInvoices": "فواتير الشراء",
+    "purchaseReturns": "مرتجعات المشتريات",
+    "debitNotes": "إشعارات مدينة",
+    "supplierPayments": "مدفوعات الموردين",
+    "purchaseSettings": "إعدادات المشتريات"
   },
   "partnerProfile": {
     "back": "رجوع",
