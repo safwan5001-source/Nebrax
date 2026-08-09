@@ -15,7 +15,7 @@ import { useCompany } from '@/lib/company';
 import { toCsv, downloadCsv } from '@/lib/export';
 import { ReportFilters, filtersToQuery, EMPTY_FILTERS, type ReportFilterState } from '@/components/reports/report-filters';
 
-type Tab = 'trial' | 'income' | 'costcenter' | 'aging';
+type Tab = 'trial' | 'income' | 'balance' | 'costcenter' | 'aging';
 
 interface TrialRow { code: string; name: string; debit: string; credit: string }
 interface TrialBalance { rows: TrialRow[]; total_debit: string; total_credit: string; balanced: boolean }
@@ -31,6 +31,17 @@ interface IncomeStatement {
   net_income: string;
   /** يعود من الـ API **عند التصفية بفرع فقط** — ما لا يخصّ أي فرع. */
   unallocated?: Unallocated;
+}
+interface BalanceSheet {
+  assets: AmountRow[];
+  liabilities: AmountRow[];
+  equity: AmountRow[];
+  total_assets: string;
+  total_liabilities: string;
+  total_equity: string;
+  net_income: string;
+  total_equity_and_income: string;
+  balanced: boolean;
 }
 interface CcRow { cost_center_id: string; code: string; name: string; revenue: string; expense: string; profit: string }
 interface Profitability { rows: CcRow[]; total_revenue: string; total_expense: string; total_profit: string }
@@ -54,6 +65,7 @@ export default function ReportsPage() {
   const [aging, setAging] = useState<Aging | null>(null);
   const [cc, setCc] = useState<Profitability | null>(null);
   const [income, setIncome] = useState<IncomeStatement | null>(null);
+  const [balance, setBalance] = useState<BalanceSheet | null>(null);
   // مرشّحات مشتركة: مدى تاريخي + فروع (فارغة = كل الفروع مجمّعة).
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_FILTERS);
 
@@ -64,6 +76,11 @@ export default function ReportsPage() {
       api<TrialBalance>(`/reports/trial-balance${q}`).then(setTrial).finally(() => setLoading(false));
     } else if (tab === 'income') {
       api<IncomeStatement>(`/reports/income-statement${q}`).then(setIncome).finally(() => setLoading(false));
+    } else if (tab === 'balance') {
+      // الميزانية «حتى تاريخ»: الخادم يتجاهل `from` أصلاً، ولا نرسله كي لا
+      // يوحي المرشّح بأثرٍ لا يقع.
+      api<BalanceSheet>(`/reports/balance-sheet${filtersToQuery({ ...filters, from: '' })}`)
+        .then(setBalance).finally(() => setLoading(false));
     } else if (tab === 'costcenter') {
       api<Profitability>(`/reports/cost-center-profitability${q}`).then(setCc).finally(() => setLoading(false));
     } else {
@@ -116,6 +133,28 @@ export default function ReportsPage() {
         exportName: 'income-statement',
       };
     }
+    if (tab === 'balance') {
+      if (!balance) return null;
+      const section = (label: string, rows: AmountRow[]) =>
+        rows.map((r) => [label, r.code, r.name, formatRiyal(r.amount)]);
+      return {
+        title: t('balance_sheet'),
+        columns: [
+          { label: t('item') },
+          { label: t('code') },
+          { label: t('account') },
+          { label: t('amount'), align: 'end' },
+        ],
+        rows: [
+          ...section(t('assets'), balance.assets),
+          ...section(t('liabilities'), balance.liabilities),
+          ...section(t('equity'), balance.equity),
+          [t('equity'), '', t('net_income'), formatRiyal(balance.net_income)],
+        ],
+        totalRow: ['', '', t('total_assets'), formatRiyal(balance.total_assets)],
+        exportName: 'balance-sheet',
+      };
+    }
     if (tab === 'costcenter') {
       if (!cc) return null;
       return {
@@ -162,7 +201,7 @@ export default function ReportsPage() {
       ],
       exportName: `aging-${agingType}`,
     };
-  }, [tab, agingType, trial, aging, cc, income, t]);
+  }, [tab, agingType, trial, aging, cc, income, balance, t]);
 
   function exportCsv() {
     if (!doc) return;
@@ -193,6 +232,9 @@ export default function ReportsPage() {
         </Button>
         <Button variant={tab === 'income' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('income')}>
           {t('income_statement')}
+        </Button>
+        <Button variant={tab === 'balance' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('balance')}>
+          {t('balance_sheet')}
         </Button>
         <Button variant={tab === 'costcenter' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('costcenter')}>
           {t('cost_profit')}
@@ -350,6 +392,73 @@ export default function ReportsPage() {
             )}
           </CardContent>
         </Card>
+      ) : tab === 'balance' ? (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{t('balance_sheet')}</CardTitle>
+            {balance && (
+              <Badge tone={balance.balanced ? 'positive' : 'negative'}>
+                {balance.balanced ? t('balanced') : t('unbalanced')}
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            {loading || !balance ? (
+              <Skeleton className="h-40 w-full" />
+            ) : (
+              <>
+                <Table>
+                  <THead>
+                    <TR>
+                      <TH>{t('code')}</TH>
+                      <TH>{t('account')}</TH>
+                      <TH className="text-end">{t('amount')}</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    <SheetSection label={t('assets')} rows={balance.assets} emptyLabel={t('empty')} />
+                    <TR className="font-semibold">
+                      <TD />
+                      <TD>{t('total_assets')}</TD>
+                      <TD className="num text-end">{formatRiyal(balance.total_assets)}</TD>
+                    </TR>
+
+                    <SheetSection label={t('liabilities')} rows={balance.liabilities} emptyLabel={t('empty')} />
+                    <TR className="font-semibold">
+                      <TD />
+                      <TD>{t('total_liabilities')}</TD>
+                      <TD className="num text-end">{formatRiyal(balance.total_liabilities)}</TD>
+                    </TR>
+
+                    <SheetSection label={t('equity')} rows={balance.equity} emptyLabel={t('empty')} />
+                    <TR>
+                      <TD />
+                      <TD className="text-muted">{t('net_income')}</TD>
+                      <TD className={'num text-end ' + (Number(balance.net_income) < 0 ? 'text-negative' : '')}>
+                        {formatRiyal(balance.net_income)}
+                      </TD>
+                    </TR>
+                    <TR className="font-semibold">
+                      <TD />
+                      <TD>{t('equity_and_income')}</TD>
+                      <TD className="num text-end">{formatRiyal(balance.total_equity_and_income)}</TD>
+                    </TR>
+
+                    {/* المعادلة المحاسبية صريحة في السطر الأخير: أصول = خصوم + حقوق ملكية. */}
+                    <TR className="border-t-2 border-border font-semibold">
+                      <TD />
+                      <TD>{`${t('total_assets')} = ${t('total_liabilities')} + ${t('equity_and_income')}`}</TD>
+                      <TD className="num text-end">
+                        {formatRiyal(balance.total_assets)}
+                      </TD>
+                    </TR>
+                  </TBody>
+                </Table>
+                <p className="mt-3 text-[11px] leading-relaxed text-muted">{t('as_of_hint')}</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
       ) : tab === 'costcenter' ? (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -484,5 +593,27 @@ export default function ReportsPage() {
         />
       )}
     </div>
+  );
+}
+
+/** قسم في الميزانية: ترويسة ملوّنة بخلفية خفيفة ثم صفوف حساباته. */
+function SheetSection({ label, rows, emptyLabel }: { label: string; rows: AmountRow[]; emptyLabel: string }) {
+  return (
+    <>
+      <TR className="bg-background">
+        <TD colSpan={3} className="text-xs font-semibold text-muted">{label}</TD>
+      </TR>
+      {rows.length === 0 ? (
+        <TR><TD colSpan={3} className="py-4 text-center text-muted">{emptyLabel}</TD></TR>
+      ) : (
+        rows.map((r) => (
+          <TR key={`${label}-${r.code}`}>
+            <TD className="num">{r.code}</TD>
+            <TD>{r.name}</TD>
+            <TD className="num text-end">{formatRiyal(r.amount)}</TD>
+          </TR>
+        ))
+      )}
+    </>
   );
 }

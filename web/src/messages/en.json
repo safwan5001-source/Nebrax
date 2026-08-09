@@ -1231,7 +1231,16 @@
     "unallocated": "Unallocated to a branch",
     "unallocated_hint": "Central revenues and expenses that belong to no single branch (payroll, for example) — they appear in the consolidated view and are never charged to a branch.",
     "item": "Item",
-    "amount": "Amount"
+    "amount": "Amount",
+    "balance_sheet": "Balance sheet",
+    "assets": "Assets",
+    "liabilities": "Liabilities",
+    "equity": "Equity",
+    "total_assets": "Total assets",
+    "total_liabilities": "Total liabilities",
+    "total_equity": "Total equity",
+    "equity_and_income": "Equity + net income",
+    "as_of_hint": "Cumulative balances as of the “to” date — the “from” date does not apply here (it would cut off capital and opening balances and break the equation)."
   },
   "returnForm": {
     "title": "New return",
