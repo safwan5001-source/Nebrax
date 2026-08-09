@@ -1406,6 +1406,13 @@
     "rejected": "Rejected",
     "converted": "Converted"
   },
+  "suppliers": {
+    "title": "Suppliers",
+    "add": "New supplier",
+    "search": "Search suppliers…",
+    "empty": "No suppliers",
+    "edit": "Edit supplier"
+  },
   "taxDoc": {
     "vat_number": "VAT number",
     "cr_number": "CR number",

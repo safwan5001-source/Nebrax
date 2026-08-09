@@ -33,6 +33,11 @@ export const mockPartners: MockPartner[] = [
   { id: 'p4', name: 'مؤسسة نجد للتوريدات', type: 'customer', email: 'po@najd-supply.sa', phone: '0138045678', city: 'الظهران', vat_number: '314444444400003' },
   { id: 'p5', name: 'شركة البحر الأحمر اللوجستية', type: 'customer', email: 'ops@redsea-log.sa', phone: '0138056789', city: 'الدمام', vat_number: '315555555500003' },
   { id: 'p6', name: 'مؤسسة الفيصل للأجهزة', type: 'customer', email: 'buy@faisal-dev.sa', phone: '0138067890', city: 'الأحساء', vat_number: '316666666600003' },
+  // موردون — لتظهر شاشة «إدارة الموردين» ببيانات في المعاينة.
+  { id: 'p7', name: 'شركة الجزيرة للتوريدات الصناعية', type: 'supplier', entity_type: 'commercial', email: 'sales@jazira-ind.sa', phone: '0138078901', city: 'الجبيل', vat_number: '317777777700003', code: 'S-001' },
+  { id: 'p8', name: 'مصنع الرياض للتغليف', type: 'supplier', entity_type: 'commercial', email: 'orders@riyadh-pack.sa', phone: '0112233445', city: 'الرياض', vat_number: '318888888800003', code: 'S-002' },
+  // طرف مزدوج (عميل ومورّد معاً) — يظهر في الشاشتين.
+  { id: 'p9', name: 'مجموعة الخليج التجارية الشاملة', type: 'both', entity_type: 'commercial', email: 'hub@gulf-group.sa', phone: '0138090123', city: 'الدمام', vat_number: '319999999900003', code: 'CS-001' },
 ];
 
 // ── الفواتير ──────────────────────────────────────────────────────────────
