@@ -139,6 +139,44 @@ class BranchAssetHrIsolationTest extends TestCase
         $this->assertSame($lines->sum('debit'), $lines->sum('credit'));
     }
 
+    /**
+     * أصل بلا فرع ⇒ قيوده **غير موزَّعة**، لا محمَّلة على فرع من ضغط الزرّ.
+     * نتيجة مقصودة لتمييز `LedgerService` بين «الفرع غائب» و«null صريحة».
+     *
+     * @test
+     */
+    public function a_branchless_asset_posts_unallocated_entries(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $main    = $this->mainBranch($auth['token']);
+        $account = $this->assetAccount($auth['token']);
+
+        app(BranchContext::class)->forget(); // أصل منشأ قبل الفروع
+        $asset = Asset::create([
+            'tenant_id' => $auth['tenant_id'],
+            'number' => 'FA-2026-09001', 'name' => 'أصل بلا فرع',
+            'account_id' => $account, 'acquisition_date' => '2026-01-15',
+            'cost' => 600000, 'useful_life_months' => 10,
+        ]);
+        $this->assertNull($asset->branch_id);
+
+        // الترحيل يجري والفرع النشط هو الرئيسي — ومع ذلك لا يُحمَّل عليه
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $main])
+            ->postJson("/api/assets/{$asset->id}/post")->assertOk();
+
+        $lines = JournalLine::whereIn(
+            'journal_entry_id',
+            JournalEntry::where('source_type', Asset::class)->where('source_id', $asset->id)->pluck('id')
+        )->get();
+
+        $this->assertNotEmpty($lines);
+        foreach ($lines as $line) {
+            $this->assertNull($line->branch_id);
+        }
+    }
+
     /** @test */
     public function legacy_assets_without_a_branch_stay_visible_to_everyone(): void
     {

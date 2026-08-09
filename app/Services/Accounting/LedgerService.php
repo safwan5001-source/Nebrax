@@ -36,8 +36,13 @@ class LedgerService
     {
         $this->validateBalanced($lines);
 
-        // الفرع النشط للطلب (إن وُجد) يوسم به كل سطور هذا القيد.
-        $branchId = $meta['branch_id'] ?? app(BranchContext::class)->id();
+        // بُعد الفرع لهذا القيد. التمييز حاسم بين حالتين لا يفرّق بينهما `??`:
+        //  • المفتاح **غائب**            ⇒ يُوسَم بالفرع النشط (السلوك الافتراضي).
+        //  • المفتاح **موجود بـ null**   ⇒ «غير موزَّع على فرع» عن قصد — كالمصروفات
+        //    المركزية (الرواتب). لا يُستبدل بالفرع النشط.
+        $branchId = array_key_exists('branch_id', $meta)
+            ? $meta['branch_id']
+            : app(BranchContext::class)->id();
 
         return DB::transaction(function () use ($lines, $meta, $branchId) {
             $entry = JournalEntry::create([

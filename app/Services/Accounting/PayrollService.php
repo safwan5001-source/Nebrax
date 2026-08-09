@@ -156,6 +156,9 @@ class PayrollService
                 'description' => "استحقاق رواتب {$run->number} ({$run->period})",
                 'source_type' => PayrollRun::class,
                 'source_id'   => $run->id,
+                // مصروف مركزي **غير موزَّع على فرع**: المسيّر يشمل كل الموظفين،
+                // فتحميله على الفرع المفتوح وقت الترحيل يشوّه قائمة دخل ذلك الفرع.
+                'branch_id'   => null,
                 'created_by'  => $run->created_by,
             ]);
 
@@ -199,6 +202,8 @@ class PayrollService
                 'description' => "صرف رواتب {$run->number} ({$run->period})",
                 'source_type' => PayrollRun::class,
                 'source_id'   => $run->id,
+                'branch_id'   => null, // الصرف يتبع الاستحقاق: غير موزَّع
+
                 'created_by'  => $run->created_by,
             ]);
 
