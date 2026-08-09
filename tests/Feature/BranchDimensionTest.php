@@ -180,4 +180,34 @@ class BranchDimensionTest extends TestCase
         $this->assertTrue($tb['balanced']);
         $this->assertSame($tb['total_debit'], $tb['total_credit']);
     }
+
+    /**
+     * والميزانية العمومية كذلك: كل سطور القيد الواحد تحمل الفرع نفسه، فدفتر
+     * كل فرع مقفل على ذاته. هذا ما تُعلنه شارة «متوازن» في شاشة التقارير
+     * حين تُصفّى بفرع — فالاختبار يحرس صدقها لا شكلها.
+     *
+     * @test
+     */
+    public function the_balance_sheet_of_a_single_branch_is_balanced_on_its_own(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $main   = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $khobar = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])['data']['id'];
+
+        $this->postInvoice($auth['token'], 10000, $khobar);
+        $this->postInvoice($auth['token'], 20000, $main);
+
+        foreach ([$khobar, $main, null] as $branch) {
+            $q  = $branch ? "?branch_id={$branch}" : '';
+            $bs = $this->withToken($auth['token'])->getJson("/api/reports/balance-sheet{$q}")->assertOk();
+
+            $this->assertTrue($bs['balanced'], 'الميزانية يجب أن تتوازن للفرع وللمجمّع.');
+            $this->assertSame(
+                (float) $bs['total_assets'],
+                (float) $bs['total_liabilities'] + (float) $bs['total_equity_and_income'],
+            );
+        }
+    }
 }

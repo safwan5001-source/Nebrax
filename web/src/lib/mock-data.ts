@@ -161,6 +161,30 @@ export const mockIncomeStatement = {
 };
 
 /**
+ * ميزانية عمومية متوازنة: أصول = خصوم + حقوق ملكية + صافي الدخل.
+ * الأرقام مشتقّة من قائمة الدخل الوهمية فتبقى الشاشتان متّسقتين.
+ */
+export const mockBalanceSheet = {
+  assets: [
+    { code: '1110', name: 'الصندوق', amount: '86000.00' },
+    { code: '1120', name: 'البنك', amount: '214000.00' },
+    { code: '1130', name: 'العملاء', amount: '132840.00' },
+    { code: '1140', name: 'المخزون', amount: '95000.00' },
+  ],
+  liabilities: [
+    { code: '2110', name: 'الموردون', amount: '210000.00' },
+    { code: '2120', name: 'ضريبة المخرجات', amount: '40000.00' },
+  ],
+  equity: [{ code: '3110', name: 'رأس المال', amount: '60000.00' }],
+  total_assets: '527840.00',
+  total_liabilities: '250000.00',
+  total_equity: '60000.00',
+  net_income: '217840.00',
+  total_equity_and_income: '277840.00',
+  balanced: true,
+};
+
+/**
  * قائمة الدخل مصفّاة بفرع: الرواتب مصروف مركزي **غير موزَّع**، فتخرج من
  * إجمالي الفرع وتظهر في بندها الخاص — كما يفعل الخادم تماماً.
  */
@@ -964,6 +988,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (movementsMatch) return resolve(mockMovements(movementsMatch[1]));
 
   if (clean === '/reports/income-statement') return resolve(incomeStatementFor(path));
+  if (clean === '/reports/balance-sheet') return resolve(mockBalanceSheet);
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);
   if (clean === '/reports/cost-center-profitability') return resolve(mockCostCenterProfit);
   const agingMatch = clean.match(/^\/reports\/aging\/([^/]+)$/);
