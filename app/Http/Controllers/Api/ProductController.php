@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StoreProductRequest;
+use App\Http\Requests\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use App\Models\Account;
@@ -62,7 +63,7 @@ class ProductController extends ApiController
         return (new ProductResource(Product::findOrFail($id)))->response();
     }
 
-    public function update(StoreProductRequest $request, string $id): JsonResponse
+    public function update(UpdateProductRequest $request, string $id): JsonResponse
     {
         $product = Product::findOrFail($id);
         $data = $request->validated();
