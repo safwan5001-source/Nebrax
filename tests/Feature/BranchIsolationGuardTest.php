@@ -34,7 +34,7 @@ class BranchIsolationGuardTest extends TestCase
      * ممنوعة — النماذج الجديدة تُصنَّف من أول يوم. اختبارٌ أدناه يحرس ذلك.
      */
     private const PENDING_ISOLATION = [
-        'CostCenter', 'Partner', 'Product', 'StockMovement',
+        'CostCenter', 'Partner',
     ];
 
     /** كل نماذج الأعمال (ترث BaseModel) بأسمائها القصيرة. */
@@ -106,9 +106,9 @@ class BranchIsolationGuardTest extends TestCase
             $this->assertContains($short, $existing, "نموذج «{$short}» في قائمة الانتظار لم يعد موجوداً — احذفه منها.");
         }
 
-        // سقف صارم يُخفَّض مع كل موجة: ١١ في P2 ← ٧ بعد P3-أ ← ٤ بعد P3-ب. الهدف صفر.
+        // سقف صارم يُخفَّض مع كل موجة: ١١ ← ٧ (P3-أ) ← ٤ (P3-ب) ← ٢ (P3-ج-٢). الهدف صفر.
         $this->assertLessThanOrEqual(
-            4,
+            2,
             count(self::PENDING_ISOLATION),
             'قائمة انتظار العزل تنقص ولا تزيد — أي نموذج جديد يُصنَّف فوراً، لا يُضاف هنا.'
         );
