@@ -35,7 +35,13 @@ export interface BranchSettings {
 }
 
 const ACTIVE_KEY = 'nibras_active_branch';
-const EVENT = 'nibras:branch-changed';
+
+/**
+ * حدث تغيّر الفرع النشط داخل التبويب الواحد. (بين التبويبات يكفي حدث `storage`.)
+ * يستمع له مبدّل الفرع في الشريط العلوي **و**`BranchScope` الذي يُعيد جلب بيانات الصفحة.
+ */
+export const BRANCH_CHANGED_EVENT = 'nibras:branch-changed';
+const EVENT = BRANCH_CHANGED_EVENT;
 
 export function getActiveBranchId(): string | null {
   if (typeof window === 'undefined') return null;
@@ -51,8 +57,24 @@ export function setActiveBranchId(id: string | null): void {
 }
 
 /**
- * الفروع + الفرع النشط. النشط = المخزَّن محلياً إن كان صالحاً، وإلا **الفرع
- * الرئيسي** من الإعدادات (الافتراضي المتّفق عليه)، وإلا أول فرع.
+ * قاعدة حلّ الفرع النشط — دالة نقية لتكون قابلة للاختبار:
+ * المخزَّن محلياً إن كان **فرعاً قائماً**، وإلا الفرع الرئيسي، وإلا أول فرع.
+ *
+ * حاسمة للتطابق بين ما تعرضه الواجهة وما تُرسله ترويسة `X-Branch-Id`:
+ * معرّف مخزَّن لفرع محذوف يجب أن يسقط للرئيسي بدل أن يُرسَل كما هو.
+ */
+export function resolveActiveBranchId(
+  branches: Pick<Branch, 'id'>[],
+  storedId: string | null,
+  mainBranchId: string | null,
+): string | null {
+  const valid = storedId && branches.some((b) => b.id === storedId) ? storedId : null;
+
+  return valid ?? mainBranchId ?? branches[0]?.id ?? null;
+}
+
+/**
+ * الفروع + الفرع النشط (انظر `resolveActiveBranchId`).
  * يتزامن عبر التبويب الواحد (حدث مخصّص) وبين التبويبات (storage).
  */
 export function useBranches() {
@@ -85,9 +107,16 @@ export function useBranches() {
     };
   }, []);
 
-  const stored = activeId && branches.some((b) => b.id === activeId) ? activeId : null;
-  const resolvedId = stored ?? mainBranchId ?? branches[0]?.id ?? null;
+  const resolvedId = resolveActiveBranchId(branches, activeId, mainBranchId);
   const active = branches.find((b) => b.id === resolvedId) ?? null;
+
+  // يثبّت الفرع المحلول في التخزين حين يكون المخزَّن غائباً أو لفرع محذوف —
+  // فتتطابق ترويسة `X-Branch-Id` مع ما تعرضه الواجهة من أول لحظة. كتابة صامتة
+  // بلا حدث عمداً: لولا ذلك لأعاد `BranchScope` جلب الصفحة عند كل تحميل.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !resolvedId || activeId === resolvedId) return;
+    localStorage.setItem(ACTIVE_KEY, resolvedId);
+  }, [resolvedId, activeId]);
 
   return { branches, active, activeId: resolvedId, mainBranchId, loading, setActiveBranchId };
 }
