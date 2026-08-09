@@ -1092,6 +1092,13 @@
     "cancel": "Cancel",
     "create": "Create"
   },
+  "purchaseReturns": {
+    "title": "Purchase returns",
+    "create": "New purchase return",
+    "search": "Search returns…",
+    "empty": "No purchase returns",
+    "supplier": "Supplier"
+  },
   "purchases": {
     "title": "Purchases",
     "create": "New purchase",

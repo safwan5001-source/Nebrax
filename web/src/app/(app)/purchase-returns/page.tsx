@@ -15,7 +15,6 @@ import { formatRiyal } from '@/lib/money';
 interface ReturnDoc {
   id: string;
   number: string;
-  type: string;
   partner_id: string;
   return_date: string;
   total: string;
@@ -23,8 +22,13 @@ interface ReturnDoc {
 }
 interface Partner { id: string; name: string }
 
-export default function ReturnsPage() {
+/**
+ * مرتجعات المشتريات — تصفيةٌ على المرتجعات بالنوع (`type=purchase`).
+ * التفاصيل تُفتح على شاشة المرتجع المشتركة `/returns/[id]`.
+ */
+export default function PurchaseReturnsPage() {
   const t = useTranslations('returns');
+  const tp = useTranslations('purchaseReturns');
   const ts = useTranslations('status');
   const [data, setData] = useState<ReturnDoc[]>([]);
   const [partners, setPartners] = useState<Record<string, string>>({});
@@ -33,8 +37,10 @@ export default function ReturnsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    // مقصورة على مرتجعات المبيعات — مرتجعات المشتريات لها شاشتها المستقلّة.
-    Promise.all([api<{ data: ReturnDoc[] }>('/returns?type=sales'), api<{ data: Partner[] }>('/partners')])
+    Promise.all([
+      api<{ data: ReturnDoc[] }>('/returns?type=purchase'),
+      api<{ data: Partner[] }>('/partners?type=supplier'),
+    ])
       .then(([ret, prt]) => {
         setData(ret.data);
         setPartners(Object.fromEntries(prt.data.map((p) => [p.id, p.name])));
@@ -57,7 +63,7 @@ export default function ReturnsPage() {
       },
       {
         id: 'partner',
-        header: t('partner'),
+        header: tp('supplier'),
         accessorFn: (r) => partners[r.partner_id] ?? '—',
         cell: ({ row }) => partners[row.original.partner_id] ?? '—',
       },
@@ -65,20 +71,20 @@ export default function ReturnsPage() {
       { accessorKey: 'total', header: t('total'), cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.total)}</div> },
       { accessorKey: 'status', header: t('status'), cell: ({ row }) => <Badge tone={row.original.status === 'posted' ? 'positive' : 'muted'}>{ts(row.original.status)}</Badge> },
     ],
-    [partners, t, ts]
+    [partners, t, tp, ts]
   );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+        <h1 className="text-xl font-semibold text-text">{tp('title')}</h1>
         <Button onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" strokeWidth={1.8} />
-          {t('create')}
+          {tp('create')}
         </Button>
       </div>
-      <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="returns" />
-      <CreateReturnDialog open={open} onClose={() => setOpen(false)} onCreated={load} fixedType="sales" />
+      <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={tp('search')} emptyLabel={tp('empty')} exportName="purchase-returns" />
+      <CreateReturnDialog open={open} onClose={() => setOpen(false)} onCreated={load} fixedType="purchase" />
     </div>
   );
 }
