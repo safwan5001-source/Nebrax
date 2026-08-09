@@ -9,14 +9,26 @@ use App\Models\Product;
 use App\Models\ReturnDocument;
 use App\Services\Accounting\ReturnService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ReturnController extends ApiController
 {
     public function __construct(protected ReturnService $returns) {}
 
-    public function index(): JsonResponse
+    /**
+     * قائمة المرتجعات، مع تصفية اختيارية بالنوع (`?type=sales|purchase`).
+     * بلا نوع تُعاد كلها — توافق رجعي كامل.
+     */
+    public function index(Request $request): JsonResponse
     {
-        return ReturnResource::collection(ReturnDocument::with('lines')->latest()->get())->response();
+        $type = $request->query('type');
+
+        $query = ReturnDocument::with('lines')->latest();
+        if (in_array($type, ['sales', 'purchase'], true)) {
+            $query->where('type', $type);
+        }
+
+        return ReturnResource::collection($query->get())->response();
     }
 
     public function store(StoreReturnRequest $request): JsonResponse

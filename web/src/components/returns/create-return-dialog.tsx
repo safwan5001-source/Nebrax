@@ -21,15 +21,18 @@ export function CreateReturnDialog({
   open,
   onClose,
   onCreated,
+  fixedType,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  /** يثبّت نوع المرتجع ويُخفي منتقيه — لشاشتَي مرتجعات المبيعات/المشتريات. */
+  fixedType?: 'sales' | 'purchase';
 }) {
   const t = useTranslations('returnForm');
   const tc = useTranslations('common');
   const { success } = useToast();
-  const [type, setType] = useState<'sales' | 'purchase'>('sales');
+  const [type, setType] = useState<'sales' | 'purchase'>(fixedType ?? 'sales');
   const [partners, setPartners] = useState<Partner[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [paymentType, setPaymentType] = useState('credit');
@@ -91,21 +94,24 @@ export function CreateReturnDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t('title')} className="max-w-2xl">
       <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="type">{t('type')}</Label>
-            <Select
-              id="type"
-              value={type}
-              onChange={(e) => {
-                setType(e.target.value as 'sales' | 'purchase');
-                setPartnerId('');
-              }}
-            >
-              <option value="sales">{t('sales')}</option>
-              <option value="purchase">{t('purchase')}</option>
-            </Select>
-          </div>
+        <div className={fixedType ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-3 gap-3'}>
+          {/* منتقي النوع يظهر فقط في الشاشة العامة؛ الشاشتان المتخصّصتان تثبّتانه. */}
+          {!fixedType && (
+            <div className="space-y-1.5">
+              <Label htmlFor="type">{t('type')}</Label>
+              <Select
+                id="type"
+                value={type}
+                onChange={(e) => {
+                  setType(e.target.value as 'sales' | 'purchase');
+                  setPartnerId('');
+                }}
+              >
+                <option value="sales">{t('sales')}</option>
+                <option value="purchase">{t('purchase')}</option>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="partner">{t('partner')}</Label>
             <Select id="partner" value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required>

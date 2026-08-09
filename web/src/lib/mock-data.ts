@@ -417,9 +417,10 @@ function returnDoc(
 
 export const mockReturns: MockReturn[] = [
   returnDoc('re-7', 'RET-2026-0007', 'sales', 'p1', '2026-06-21', 'posted', [line('l1', 'مرتجع بضاعة تالفة', 2, 500)]),
-  returnDoc('re-6', 'RET-2026-0006', 'purchase', 'p3', '2026-06-17', 'posted', [line('l1', 'مواد معيبة مرتجعة للمورد', 5, 600)]),
+  returnDoc('re-6', 'RET-2026-0006', 'purchase', 'p7', '2026-06-17', 'posted', [line('l1', 'مواد معيبة مرتجعة للمورد', 5, 600)]),
   returnDoc('re-5', 'RET-2026-0005', 'sales', 'p5', '2026-06-10', 'posted', [line('l1', 'خدمة ملغاة', 1, 3700)]),
   returnDoc('re-4', 'RET-2026-0004', 'sales', 'p2', '2026-05-25', 'draft', [line('l1', 'مرتجع جزئي', 1, 800)]),
+  returnDoc('re-3', 'RET-2026-0003', 'purchase', 'p8', '2026-05-18', 'draft', [line('l1', 'شحنة ناقصة مرتجعة', 3, 450)]),
 ];
 
 // ── عروض الأسعار ───────────────────────────────────────────────────────────
@@ -983,7 +984,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/credit-notes') return resolve({ data: mockCreditNotes });
   if (clean === '/recurring-invoices') return resolve({ data: mockRecurring });
   if (clean === '/purchases') return resolve({ data: mockPurchases });
-  if (clean === '/returns') return resolve({ data: mockReturns });
+  if (clean === '/returns') {
+    const rtype = new URLSearchParams(path.split('?')[1] ?? '').get('type');
+    const list = rtype === 'sales' || rtype === 'purchase' ? mockReturns.filter((r) => r.type === rtype) : mockReturns;
+    return resolve({ data: list });
+  }
   if (clean === '/payments') return resolve({ data: mockPayments });
   if (clean === '/employees') return resolve({ data: mockEmployees });
   if (clean === '/payroll-runs') return resolve({ data: mockPayrollRuns });
