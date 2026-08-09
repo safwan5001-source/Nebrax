@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Tenancy\BranchScoped;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * موعد مع عميل — مستند تنظيمي غير محاسبي (لا يولّد قيوداً).
  */
+/** @see design-system/foundations/multi-branch-architecture.md — تشغيلي: معزول بالفرع */
 class Appointment extends BaseModel
 {
+    use BranchScoped;
+
     protected $fillable = [
-        'tenant_id', 'partner_id', 'title', 'appointment_at',
+        'tenant_id', 'branch_id', 'partner_id', 'title', 'appointment_at',
         'duration_minutes', 'status', 'location', 'notes', 'created_by',
     ];
 

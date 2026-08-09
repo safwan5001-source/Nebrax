@@ -112,6 +112,8 @@ class RecurringInvoiceService
 
             $invoice = $this->invoices->create([
                 'partner_id'   => $rec->partner_id,
+                'branch_id'    => $rec->branch_id, // الفاتورة المولَّدة تتبع فرع القالب
+
                 'payment_type' => $rec->payment_type,
                 'invoice_date' => now()->toDateString(),
                 'notes'        => $rec->title ? "فاتورة دورية: {$rec->title}" : 'فاتورة دورية',

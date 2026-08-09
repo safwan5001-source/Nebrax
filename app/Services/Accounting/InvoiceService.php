@@ -55,6 +55,8 @@ class InvoiceService
             $invoice = Invoice::create([
                 'number'       => $data['number'] ?? $this->nextNumber($date),
                 'partner_id'   => $data['partner_id'],
+                // فرع صريح (كالتوليد من فاتورة دورية)؛ وإن غاب يوسمه BelongsToBranch بالفرع النشط.
+                'branch_id'    => $data['branch_id'] ?? null,
                 'type'         => 'sale',
                 'payment_type' => $data['payment_type'] ?? 'cash',
                 'invoice_date' => $date,

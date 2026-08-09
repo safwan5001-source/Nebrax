@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\BranchScoped;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -9,10 +10,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * فاتورة دورية (قالب + جدولة) — غير محاسبية. توليد فاتورة منها ينتج فاتورة
  * draft عبر InvoiceService. كل المبالغ بالهللات كـ bigint.
  */
+/** @see design-system/foundations/multi-branch-architecture.md — تشغيلي: معزول بالفرع */
 class RecurringInvoice extends BaseModel
 {
+    use BranchScoped;
+
     protected $fillable = [
-        'tenant_id', 'title', 'partner_id', 'payment_type', 'frequency',
+        'tenant_id', 'branch_id', 'title', 'partner_id', 'payment_type', 'frequency',
         'start_date', 'next_run_date', 'end_date', 'active', 'generated_count',
         'subtotal', 'tax_amount', 'total', 'notes', 'created_by',
     ];
