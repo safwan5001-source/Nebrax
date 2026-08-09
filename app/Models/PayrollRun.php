@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -11,7 +12,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * (مدين 2130 / دائن 1110|1120). كل القيود تمر عبر LedgerService حصراً.
  * المبالغ بالـ minor units (هللات) كـ bigint.
  */
-class PayrollRun extends BaseModel
+/**
+ * @see design-system/foundations/multi-branch-architecture.md
+ * مركزي على مستوى المؤسسة: المسيّر يشمل كل الموظفين النشطين بلا تمييز فرع،
+ * فعزله بالفرع كان سيُنتج مسيّرات ناقصة صامتة.
+ */
+class PayrollRun extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'number', 'period', 'period_start', 'period_end',

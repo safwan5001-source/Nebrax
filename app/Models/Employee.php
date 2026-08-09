@@ -2,16 +2,24 @@
 
 namespace App\Models;
 
+use App\Tenancy\BelongsToBranch;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * موظف. الرواتب بالـ minor units (هللات) كـ bigint — لا float إطلاقاً.
  * الإجمالي (gross) = الراتب الأساسي + البدلات.
  */
+/**
+ * @see design-system/foundations/multi-branch-architecture.md
+ * موسوم بالفرع **وصفياً فقط** (مكان العمل) — شؤون الموظفين مركزية على مستوى
+ * المؤسسة، فلا Global Scope هنا: كل الفروع ترى كل الموظفين.
+ */
 class Employee extends BaseModel
 {
+    use BelongsToBranch;
+
     protected $fillable = [
-        'tenant_id', 'employee_no', 'name', 'national_id', 'job_title',
+        'tenant_id', 'branch_id', 'employee_no', 'name', 'national_id', 'job_title',
         'basic_salary', 'allowances', 'gosi', 'other_deductions',
         'hire_date', 'is_active', 'notes',
     ];

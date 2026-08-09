@@ -12,6 +12,7 @@ class EmployeeResource extends JsonResource
     {
         return [
             'id'           => $this->id,
+            'branch_id'    => $this->branch_id,   // مكان العمل (وصفي)
             'employee_no'  => $this->employee_no,
             'name'         => $this->name,
             'national_id'  => $this->national_id,

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Http\Resources\EmployeeResource;
+use App\Models\Branch;
 use App\Models\Employee;
 use Illuminate\Http\JsonResponse;
 
@@ -18,6 +19,7 @@ class EmployeeController extends ApiController
     public function store(StoreEmployeeRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $this->assertTenantOwned(Branch::class, $data['branch_id'] ?? null, 'الفرع');
         $data['employee_no'] ??= $this->nextEmployeeNo();
 
         $employee = Employee::create($data);
@@ -33,7 +35,9 @@ class EmployeeController extends ApiController
     public function update(UpdateEmployeeRequest $request, string $id): JsonResponse
     {
         $employee = Employee::findOrFail($id);
-        $employee->update($request->validated());
+        $data = $request->validated();
+        $this->assertTenantOwned(Branch::class, $data['branch_id'] ?? null, 'الفرع');
+        $employee->update($data);
 
         return (new EmployeeResource($employee))->response();
     }

@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Tenancy\BranchScoped;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/** @see design-system/foundations/multi-branch-architecture.md — تشغيلي: معزول بالفرع (الأصل يخصّ موقعاً) */
 class Asset extends BaseModel
 {
+    use BranchScoped;
+
     protected $fillable = [
-        'tenant_id', 'number', 'name', 'account_id', 'partner_id', 'acquisition_date',
+        'tenant_id', 'branch_id', 'number', 'name', 'account_id', 'partner_id', 'acquisition_date',
         'payment_method', 'cost', 'tax_rate', 'tax_amount', 'total', 'salvage_value',
         'useful_life_months', 'accumulated_depreciation', 'status',
         'acquisition_entry_id', 'created_by',
