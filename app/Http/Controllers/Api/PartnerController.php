@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StorePartnerRequest;
+use App\Http\Requests\UpdatePartnerRequest;
 use App\Http\Resources\PartnerResource;
 use App\Models\Partner;
 use App\Services\Accounting\PartnerService;
@@ -59,7 +60,7 @@ class PartnerController extends ApiController
         return (new PartnerResource(Partner::findOrFail($id)))->response();
     }
 
-    public function update(StorePartnerRequest $request, string $id): JsonResponse
+    public function update(UpdatePartnerRequest $request, string $id): JsonResponse
     {
         $partner = Partner::findOrFail($id);
         $partner->update($request->validated());
