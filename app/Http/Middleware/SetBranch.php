@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Branch;
 use App\Support\BranchSettings;
 use App\Tenancy\BranchContext;
+use App\Tenancy\BranchSharing;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,10 +19,13 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class SetBranch
 {
-    public function __construct(protected BranchContext $branch) {}
+    public function __construct(protected BranchContext $branch, protected BranchSharing $sharing) {}
 
     public function handle(Request $request, Closure $next): Response
     {
+        // مفاتيح المشاركة محفوظة في singleton — تُبطَل مع كل طلب فتُقرأ طازجة مرة واحدة.
+        $this->sharing->forget();
+
         $requested = $request->header('X-Branch-Id');
 
         // التحقّق يمرّ عبر TenantScope، فلا يمكن تمرير فرع مستأجر آخر.

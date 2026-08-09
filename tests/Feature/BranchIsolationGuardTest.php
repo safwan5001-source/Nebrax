@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\BaseModel;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\BranchScoped;
+use App\Tenancy\BranchShareable;
 use App\Tenancy\CompanyWide;
 use ReflectionClass;
 use Tests\TestCase;
@@ -111,6 +112,27 @@ class BranchIsolationGuardTest extends TestCase
             count(self::PENDING_ISOLATION),
             'قائمة انتظار العزل تنقص ولا تزيد — أي نموذج جديد يُصنَّف فوراً، لا يُضاف هنا.'
         );
+    }
+
+    /**
+     * العزل المشروط لا معنى له بلا عزل: نموذج يعلن مفتاح مشاركة **يجب** أن يكون
+     * `BranchScoped`، وإلا كان الإعفاء إعفاءً من لا شيء — واجهة ميتة تُوهم بالحماية.
+     *
+     * @test
+     */
+    public function a_shareable_model_is_always_branch_scoped(): void
+    {
+        $violations = [];
+
+        foreach ($this->businessModels() as $short => $class) {
+            if (is_subclass_of($class, BranchShareable::class) && ! $this->usesTrait($class, BranchScoped::class)) {
+                $violations[] = $short;
+            }
+        }
+
+        // تأكيد واحد دائم — يمرّ بقائمة فارغة قبل تصنيف أي نموذج (P3-ج-١)،
+        // ويبدأ بالحراسة فعلياً مع أول نموذج مشمول (P3-ج-٢).
+        $this->assertSame([], $violations, implode('، ', $violations) . ' — تعلن مفتاح مشاركة بلا عزل، فالإعفاء بلا معنى.');
     }
 
     /** @test */

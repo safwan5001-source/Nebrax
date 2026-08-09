@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Branch;
 use App\Models\Tenant;
+use App\Tenancy\BranchSharing;
 use App\Tenancy\TenantContext;
 
 /**
@@ -23,6 +24,9 @@ class BranchSettings
         'account_branch_scoping' => false, // تخصيص الحسابات على مستوى الفروع
     ];
 
+    /** الافتراضات وحدها — يستخدمها `BranchSharing` بلا سياق مستأجر. */
+    public const SHARING_DEFAULTS = self::DEFAULTS;
+
     /**
      * الإعدادات الحالية. **`main_branch_id` مشتقّ من العمود `branches.is_main`**
      * (مصدر الحقيقة الوحيد) لا من الـ JSON — فلا يضيع صامتاً ولا يتصادم.
@@ -35,6 +39,22 @@ class BranchSettings
         return array_merge(self::DEFAULTS, $stored, [
             'main_branch_id' => Branch::main()?->id,
         ]);
+    }
+
+    /**
+     * مفاتيح المشاركة وحدها — **بلا** `Branch::main()`، فاستعلام واحد لا اثنان.
+     * يقرأها `BranchSharing` مرة لكل طلب، ويستدعيها الـ Scope عند كل استعلام.
+     *
+     * @return array<string, bool>
+     */
+    public static function sharing(): array
+    {
+        $stored = self::tenant()->settings['branches'] ?? [];
+
+        return array_intersect_key(
+            array_merge(self::SHARING_DEFAULTS, $stored),
+            self::SHARING_DEFAULTS,
+        );
     }
 
     /**
@@ -68,6 +88,9 @@ class BranchSettings
         $settings = $tenant->settings ?? [];
         $settings['branches'] = $branches;
         $tenant->update(['settings' => $settings]);
+
+        // المفاتيح محفوظة في singleton للطلب — تُبطَل فوراً وإلا خدم بقيةُ الطلب قيماً قديمة.
+        app(BranchSharing::class)->forget();
 
         return self::current();
     }
