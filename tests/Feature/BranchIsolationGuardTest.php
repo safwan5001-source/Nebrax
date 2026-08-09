@@ -28,14 +28,15 @@ use Tests\TestCase;
 class BranchIsolationGuardTest extends TestCase
 {
     /**
-     * دَين معروف: نماذج تشغيلية تنتظر العزل في P3 (تحتاج عمود branch_id).
+     * دَين العزل — **فارغة منذ P3-ج-٣: كل نموذج أعمال مصنَّف صراحةً.**
      *
-     * **هذه القائمة سقّاطة (ratchet): تنقص ولا تزيد.** إضافة نموذج جديد إليها
-     * ممنوعة — النماذج الجديدة تُصنَّف من أول يوم. اختبارٌ أدناه يحرس ذلك.
+     * كانت سقّاطة (ratchet) تنقص ولا تزيد: ١١ ← ٧ ← ٤ ← ٢ ← ٠. تبقى هنا فارغةً
+     * لا محذوفة، لأن السقف صفر هو ما يمنع عودة الدَّين: أي نموذج جديد لا خيار
+     * أمامه إلا التصنيف.
+     *
+     * @var array<int, string>
      */
-    private const PENDING_ISOLATION = [
-        'CostCenter', 'Partner',
-    ];
+    private const PENDING_ISOLATION = [];
 
     /** كل نماذج الأعمال (ترث BaseModel) بأسمائها القصيرة. */
     private function businessModels(): array
@@ -106,11 +107,11 @@ class BranchIsolationGuardTest extends TestCase
             $this->assertContains($short, $existing, "نموذج «{$short}» في قائمة الانتظار لم يعد موجوداً — احذفه منها.");
         }
 
-        // سقف صارم يُخفَّض مع كل موجة: ١١ ← ٧ (P3-أ) ← ٤ (P3-ب) ← ٢ (P3-ج-٢). الهدف صفر.
-        $this->assertLessThanOrEqual(
-            2,
-            count(self::PENDING_ISOLATION),
-            'قائمة انتظار العزل تنقص ولا تزيد — أي نموذج جديد يُصنَّف فوراً، لا يُضاف هنا.'
+        // ١١ ← ٧ (P3-أ) ← ٤ (P3-ب) ← ٢ (P3-ج-٢) ← **٠** (P3-ج-٣). السقف لا يرتفع بعدها أبداً.
+        $this->assertSame(
+            [],
+            self::PENDING_ISOLATION,
+            'الدَّين أُغلق — لا يُضاف نموذج إلى قائمة الانتظار بعد اليوم؛ كل جديد يُصنَّف فوراً.'
         );
     }
 

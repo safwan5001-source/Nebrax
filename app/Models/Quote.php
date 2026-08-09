@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Tenancy\BelongsToBranch;
+use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Quote extends BaseModel
 {
+    use ResolvesBranchReferences;
     use BelongsToBranch;
 
     protected $fillable = [
@@ -43,9 +45,10 @@ class Quote extends BaseModel
         return $this->hasMany(QuoteLine::class);
     }
 
+    /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {
-        return $this->belongsTo(Partner::class);
+        return $this->referenceBelongsTo(Partner::class);
     }
 
     public function isConverted(): bool

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Tenancy\BranchScoped;
+use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** @see design-system/foundations/multi-branch-architecture.md — تشغيلي: معزول بالفرع */
 class CrmActivity extends BaseModel
 {
+    use ResolvesBranchReferences;
     use BranchScoped;
 
     protected $table = 'crm_activities';
@@ -28,8 +30,9 @@ class CrmActivity extends BaseModel
         'status' => 'open',
     ];
 
+    /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {
-        return $this->belongsTo(Partner::class);
+        return $this->referenceBelongsTo(Partner::class);
     }
 }
