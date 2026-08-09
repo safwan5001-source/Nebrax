@@ -32,7 +32,7 @@ export interface PartnerAction {
 export function primaryActions(t: (k: string) => string, partnerId: string): PartnerAction[] {
   return [
     { key: 'new_invoice',   label: t('new_invoice'),   icon: FilePlus,      href: '/invoices/new' },
-    { key: 'edit',          label: t('edit'),          icon: Pencil },
+    { key: 'edit',          label: t('edit'),          icon: Pencil,        href: `/partners/${partnerId}/edit` },
     { key: 'note',          label: t('note'),          icon: FileText },
     { key: 'appointment',   label: t('appointment'),   icon: Calendar },
     { key: 'new_quote',     label: t('new_quote'),     icon: Receipt,       href: '/quotes/new' },

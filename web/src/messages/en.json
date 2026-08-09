@@ -798,9 +798,9 @@
     "empty": "No partners",
     "save": "Save",
     "cancel": "Cancel",
-    "new_title": "New customer",
+    "new_title": "New partner",
     "back": "Back",
-    "customer_details": "Customer details",
+    "customer_details": "Partner details",
     "account_details": "Account details",
     "name_en": "Name (English)",
     "code": "Code",
@@ -827,7 +827,10 @@
     "street": "Street",
     "district": "District",
     "postal_code": "Postal code",
-    "country": "Country"
+    "country": "Country",
+    "edit_title": "Edit partner",
+    "not_found": "Partner not found",
+    "opening_balance_locked": "The opening balance is recorded at creation and posts a journal entry — posted entries are never edited. Correct it with a reversing entry from account activity."
   },
   "paymentDetail": {
     "back": "Back",
