@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreCostCenterRequest;
 use App\Http\Resources\CostCenterResource;
 use App\Models\CostCenter;
+use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
 
 class CostCenterController extends ApiController
@@ -17,7 +18,9 @@ class CostCenterController extends ApiController
     public function store(StoreCostCenterRequest $request): JsonResponse
     {
         $data = $request->validated();
-        if (CostCenter::where('code', $data['code'])->exists()) {
+        // التفرّد `(tenant_id, code)` على مستوى المؤسسة — فالفحص يتجاوز عزل الفرع
+        // عمداً، وإلا مرّ كودٌ مكرَّر من فرع آخر ثم انفجر القيد الفريد بخطأ 500.
+        if (BranchScope::reference(CostCenter::class)->where('code', $data['code'])->exists()) {
             abort(422, 'كود مركز التكلفة مستخدم مسبقاً.');
         }
 
@@ -34,7 +37,7 @@ class CostCenterController extends ApiController
     {
         $center = CostCenter::findOrFail($id);
         $data = $request->validated();
-        if (CostCenter::where('code', $data['code'])->where('id', '!=', $id)->exists()) {
+        if (BranchScope::reference(CostCenter::class)->where('code', $data['code'])->where('id', '!=', $id)->exists()) {
             abort(422, 'كود مركز التكلفة مستخدم مسبقاً.');
         }
 

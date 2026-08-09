@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Tenancy\BranchScoped;
+use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** @see design-system/foundations/multi-branch-architecture.md — تشغيلي: معزول بالفرع (الأصل يخصّ موقعاً) */
 class Asset extends BaseModel
 {
+    use ResolvesBranchReferences;
     use BranchScoped;
 
     protected $fillable = [
@@ -33,9 +35,10 @@ class Asset extends BaseModel
         return $this->belongsTo(Account::class);
     }
 
+    /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {
-        return $this->belongsTo(Partner::class);
+        return $this->referenceBelongsTo(Partner::class);
     }
 
     public function isDraft(): bool

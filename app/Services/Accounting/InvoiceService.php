@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\JournalLine;
 use App\Models\Partner;
+use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -377,7 +378,8 @@ class InvoiceService
         }
 
         // قفل صف العميل يسلسل فواتيره الآجلة المتزامنة، فلا تعبر فاتورتان الحد معاً.
-        $partner = Partner::lockForUpdate()->find($invoice->partner_id);
+        // خارج عزل الفرع: عميلٌ لا يراه الفرع النشط كان سيُقرأ null فيسقط الحدّ الائتماني صامتاً.
+        $partner = BranchScope::reference(Partner::class)->lockForUpdate()->find($invoice->partner_id);
         $limit   = (int) ($partner?->credit_limit ?? 0);
         if ($limit <= 0) {
             return; // بلا حد محدَّد

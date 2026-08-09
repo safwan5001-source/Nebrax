@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Purchase;
+use App\Tenancy\BranchScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -146,7 +147,9 @@ class ReportService
         $rows = [];
         $totalRevenue = $totalExpense = 0;
 
-        foreach (CostCenter::orderBy('code')->get() as $cc) {
+        // خارج عزل الفرع: التقرير يجمّع قيوداً مرحَّلة، فمركزٌ له قيود لا يجوز
+        // أن يختفي صفّه لأن مفتاح المشاركة مطفأ — لغابت أرقامه بلا أثر.
+        foreach (BranchScope::reference(CostCenter::class)->orderBy('code')->get() as $cc) {
             $revenue = $agg[$cc->id]['revenue'] ?? 0;
             $expense = $agg[$cc->id]['expense'] ?? 0;
 
@@ -336,7 +339,8 @@ class ReportService
      */
     public function partnerStatement(string $partnerId, array $filters = []): array
     {
-        $partner = Partner::findOrFail($partnerId);
+        // كشف حساب طرفٍ له قيود يجب أن يُفتح من أي فرع — القيود نفسها تُصفّى بالمرشّح.
+        $partner = BranchScope::reference(Partner::class)->findOrFail($partnerId);
         $from = $filters['from'] ?? null;
         $to   = $filters['to'] ?? null;
 
@@ -399,7 +403,9 @@ class ReportService
 
         $dateField = $type === 'payable' ? 'purchase_date' : 'invoice_date';
 
-        $partners = Partner::whereIn('id', $documents->pluck('partner_id')->unique())->get()->keyBy('id');
+        // أسماء أطراف مستندات قائمة — مرجع لا تصفّح، وإلا ظهرت أعمار ديون بلا أسماء.
+        $partners = BranchScope::reference(Partner::class)
+            ->whereIn('id', $documents->pluck('partner_id')->unique())->get()->keyBy('id');
 
         $byPartner = [];
         $totals = ['b0_30' => 0, 'b31_60' => 0, 'b61_90' => 0, 'b90_plus' => 0, 'total' => 0];

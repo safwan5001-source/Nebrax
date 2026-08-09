@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Tenancy\BelongsToBranch;
+use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Invoice extends BaseModel
 {
+    use ResolvesBranchReferences;
     use BelongsToBranch;
 
     protected $fillable = [
@@ -59,9 +61,10 @@ class Invoice extends BaseModel
         return $this->hasMany(InvoiceLine::class);
     }
 
+    /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {
-        return $this->belongsTo(Partner::class);
+        return $this->referenceBelongsTo(Partner::class);
     }
 
     public function journalEntry(): BelongsTo
