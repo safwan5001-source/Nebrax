@@ -702,7 +702,9 @@
     "branchesManage": "Manage branches",
     "branchAdd": "Add branch",
     "branchSettings": "Branch settings",
-    "warehouses": "Warehouses"
+    "warehouses": "Warehouses",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
   },
   "partnerProfile": {
     "back": "Back",

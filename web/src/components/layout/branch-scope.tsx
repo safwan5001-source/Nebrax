@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, Fragment, useContext, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { BRANCH_CHANGED_EVENT, getActiveBranchId } from '@/lib/branch';
 
 /**
@@ -19,14 +19,14 @@ import { BRANCH_CHANGED_EVENT, getActiveBranchId } from '@/lib/branch';
  *  الشريط العلوي والجانبي خارج النطاق عمداً: القائمة المنسدلة تبقى مفتوحة
  *  والعلامة ✓ تنتقل بسلاسة أثناء تحديث المحتوى.
  */
-const BranchVersionContext = createContext(0);
-
-/** رقم إصدار يتقدّم عند كل تبديل فرع — لمن يحتاج تفاعلاً أدقّ من إعادة التركيب. */
+/**
+ * رقم إصدار يتقدّم عند كل تبديل فرع، **بالاشتراك المباشر في الحدث**.
+ *
+ * يصلح لمن هو **خارج** `BranchScope` — كالشريط الجانبي والتخطيط العام، اللذين
+ * لا يُعاد تركيبهما مع المحتوى. عدّة مشتركين يتقدّمون معاً: كلٌّ يقارن المعرّف
+ * الحالي بآخر ما رآه، والحدث واحد.
+ */
 export function useBranchVersion(): number {
-  return useContext(BranchVersionContext);
-}
-
-export function BranchScope({ children }: { children: React.ReactNode }) {
   const [version, setVersion] = useState(0);
   const lastId = useRef<string | null>(null);
 
@@ -50,10 +50,12 @@ export function BranchScope({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return (
-    <BranchVersionContext.Provider value={version}>
-      {/* Fragment مُفتاح: يُعيد تركيب الشجرة بلا إضافة أي عنصر DOM يكسر التخطيط. */}
-      <Fragment key={version}>{children}</Fragment>
-    </BranchVersionContext.Provider>
-  );
+  return version;
+}
+
+export function BranchScope({ children }: { children: React.ReactNode }) {
+  const version = useBranchVersion();
+
+  // Fragment مُفتاح: يُعيد تركيب الشجرة بلا إضافة أي عنصر DOM يكسر التخطيط.
+  return <Fragment key={version}>{children}</Fragment>;
 }

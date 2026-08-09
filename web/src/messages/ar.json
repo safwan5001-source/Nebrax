@@ -702,7 +702,9 @@
     "branchesManage": "إدارة الفروع",
     "branchAdd": "أضف فرع",
     "branchSettings": "إعدادات الفروع",
-    "warehouses": "المخازن"
+    "warehouses": "المخازن",
+    "collapse": "طيّ الشريط",
+    "expand": "توسيع الشريط"
   },
   "partnerProfile": {
     "back": "رجوع",
