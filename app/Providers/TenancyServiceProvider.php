@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Tenancy\BranchContext;
+use App\Tenancy\BranchSharing;
 use App\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -22,6 +23,8 @@ class TenancyServiceProvider extends ServiceProvider
         $this->app->singleton(TenantContext::class, fn () => new TenantContext());
         // سياق الفرع النشط — بُعد كتابة (وسم المستندات)، لا حاجز عزل.
         $this->app->singleton(BranchContext::class, fn () => new BranchContext());
+        // مفاتيح مشاركة البيانات بين الفروع — تُقرأ مرة واحدة للطلب (حاسم للأداء).
+        $this->app->singleton(BranchSharing::class, fn () => new BranchSharing());
     }
 
     public function boot(): void

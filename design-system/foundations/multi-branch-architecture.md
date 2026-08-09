@@ -63,11 +63,56 @@ class Account extends BaseModel implements CompanyWide
 الحسابات وأرصدته · الفروع والمخازن · المستخدمون والصلاحيات · **سطور المستندات**
 (تتبع فرع رأسها فلا تُعزل مستقلّةً).
 
-## مفاتيح المشاركة الخمسة — استثناءات اختيارية
+## تصفّح · إنشاء · مرجع — تفرقة مُلزِمة
 
-العزل هو الأصل. المستخدم قد يختار **مشاركة** أنواع محدّدة عبر «إعدادات الفروع»:
+الخطأ الجذري في «عزل كل شيء» هو الخلط بين ثلاثة أسئلة مختلفة:
+
+| السؤال | المثال | القاعدة |
+|---|---|---|
+| **تصفّح** — ما المتاح لي؟ | قائمة، بحث، قائمة اختيار | **يُصفّى بالفرع** |
+| **إنشاء** — هل يحقّ لي اختيار هذا؟ | `assertTenantOwned…` عند إنشاء مستند | **يُصفّى بالفرع** |
+| **مرجع** — ما هذا المذكور في هذا السطر؟ | `$line->product` عند الترحيل · التقارير · ZATCA | **لا يُصفّى أبداً** |
+
+> المستند القائم **حجّة محاسبية**. إخفاء مرجعه لا يحمي بيانات أحد — يُفسد قيداً فقط.
+
+علاقات Eloquent تمرّ عبر الـ Global Scopes، فمرجعٌ لا يراه الفرع النشط يُرجع
+`null` بلا استثناء، والمسار المحاسبي يتخطّاه بـ `continue` **صامتاً** (الإيراد
+يُرحَّل وقيد التكلفة لا). لذلك:
+
+```php
+use App\Tenancy\ResolvesBranchReferences;
+
+public function product(): BelongsTo { return $this->referenceBelongsTo(Product::class); }
+BranchScope::reference(Partner::class)->findOrFail($id);   // حلّ معرّف مخزَّن
+```
+
+## مفاتيح المشاركة — عزل **مشروط**
+
+العزل هو الأصل، لكن المستخدم قد يختار **مشاركة** أنواع محدّدة من «إعدادات الفروع»:
 العملاء · المنتجات · الموردون · مراكز التكلفة · تخصيص الحسابات.
-تُقرأ من `BranchSettings` ولا تُلغي القاعدة — بل تُرخّص استثناءً واعياً.
+
+**كل المفاتيح مفعّلة افتراضياً**، فالنموذج المشمول يسلك كما لو لا عزل عليه حتى
+يُطفئ المستخدم المفتاح بيده — العزل ميزة اختيارية لا ترقية قسرية.
+
+```php
+class Product extends BaseModel implements BranchShareable
+{
+    use BranchScoped;
+
+    public function branchSharingExemption(BranchSharing $sharing): bool|Closure
+    {
+        return $sharing->shared('share_products');   // true = بلا تصفية إطلاقاً
+    }
+}
+```
+
+ثلاثة أوضاع للإعفاء: `true` مشترك بالكامل · `false` معزول بالكامل · `Closure`
+مشترك **جزئياً** (شرط يُضاف بـ `orWhere`) — وهو ما يحتاجه الطرف: العملاء
+بمفتاحهم والموردون بمفتاحهم، و`both` مشترك ما دام أحدهما مفعّلاً.
+
+المفاتيح تُقرأ عبر `BranchSharing` **مرة واحدة لكل طلب** (singleton) — قراءتها
+مع كل استعلام كانت ستضاعف عدد الاستعلامات. تُبطَل في `SetBranch` مع كل طلب
+وفي `BranchSettings::merge` عند التعديل.
 
 ## سلوك `BranchScope` بدقّة
 
@@ -88,6 +133,8 @@ class Account extends BaseModel implements CompanyWide
 - [ ] هل الشاشة توضّح للمستخدم أي فرع يعرض؟
 - [ ] هل يوجد اختبار يثبت أن فرعاً لا يرى بيانات فرع آخر؟
 - [ ] هل مرّ `BranchIsolationGuardTest`؟ (يعمل تلقائياً في CI)
+- [ ] هل كل **مرجع مخزَّن** يُحلّ خارج العزل (`referenceBelongsTo` / `BranchScope::reference`)؟
+- [ ] إن كان النموذج يولّد **ترقيماً تسلسلياً** بقيد فريد للمستأجر: هل يُحسب خارج العزل؟
 
 ## الحارس الآلي
 
@@ -114,5 +161,6 @@ class Account extends BaseModel implements CompanyWide
 ## مراجع
 
 - التنفيذ: `app/Tenancy/{BranchScope,BranchScoped,BelongsToBranch,CompanyWide,BranchContext}.php`
+- العزل المشروط: `app/Tenancy/{BranchShareable,BranchSharing,ResolvesBranchReferences}.php`
 - الوسيط: `app/Http/Middleware/SetBranch.php` (يحلّ الفرع من `X-Branch-Id` أو الفرع الرئيسي)
 - الفرع الرئيسي: عمود `branches.is_main` بفهرس فريد جزئي — يتغيّر من «إعدادات الفروع» حصراً
