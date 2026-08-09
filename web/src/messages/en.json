@@ -636,7 +636,8 @@
       "logistics": "Logistics",
       "system": "System",
       "pos": "Point of Sale",
-      "branches": "Branches"
+      "branches": "Branches",
+      "purchases": "Purchases"
     },
     "invoices": "Invoices & Quotes",
     "pos": "POS",
@@ -704,7 +705,16 @@
     "branchSettings": "Branch settings",
     "warehouses": "Warehouses",
     "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "expand": "Expand sidebar",
+    "purchaseRequests": "Purchase requests",
+    "rfq": "Requests for quotation",
+    "purchaseQuotes": "Purchase quotations",
+    "purchaseOrders": "Purchase orders",
+    "purchaseInvoices": "Purchase invoices",
+    "purchaseReturns": "Purchase returns",
+    "debitNotes": "Debit notes",
+    "supplierPayments": "Supplier payments",
+    "purchaseSettings": "Purchase settings"
   },
   "partnerProfile": {
     "back": "Back",

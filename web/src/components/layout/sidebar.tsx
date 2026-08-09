@@ -23,7 +23,7 @@ import {
   Package,
   ShoppingCart,
   Handshake,
-  Repeat,
+  FileQuestion,
   ClipboardCheck,
   Warehouse,
   BookOpen,
@@ -121,11 +121,26 @@ const GROUPS: NavGroup[] = [
       { href: '/products', icon: Package, key: 'products', built: true },
       { href: '/inventory', icon: Warehouse, key: 'stockBalances', built: true },
       { href: '/warehouses', icon: Boxes, key: 'warehouses', built: true },
-      { href: '/purchases', icon: ShoppingCart, key: 'purchases', built: true },
-      { href: '/suppliers', icon: Handshake, key: 'suppliers' },
-      { href: '/purchase-cycle', icon: Repeat, key: 'purchaseCycle' },
       { href: '/stock-permits', icon: ClipboardCheck, key: 'stockPermits' },
       { href: '/stocktaking', icon: Warehouse, key: 'stocktaking' },
+    ],
+  },
+  {
+    // المشتريات — مجموعة مستقلّة (كانت أقسامها مبعثرة تحت المخزون).
+    // فاتورة الشراء وحدها مبنيّة (/purchases)؛ البقية روابط بشارة «قريباً».
+    title: 'purchases',
+    icon: ShoppingCart,
+    items: [
+      { href: '/purchase-requests', icon: ClipboardList, key: 'purchaseRequests' },
+      { href: '/rfq', icon: FileQuestion, key: 'rfq' },
+      { href: '/purchase-quotes', icon: FileText, key: 'purchaseQuotes' },
+      { href: '/purchase-orders', icon: ClipboardCheck, key: 'purchaseOrders' },
+      { href: '/purchases', icon: Receipt, key: 'purchaseInvoices', built: true },
+      { href: '/purchase-returns', icon: Undo2, key: 'purchaseReturns' },
+      { href: '/debit-notes', icon: FileMinus, key: 'debitNotes' },
+      { href: '/suppliers', icon: Handshake, key: 'suppliers' },
+      { href: '/supplier-payments', icon: CreditCard, key: 'supplierPayments' },
+      { href: '/purchase-settings', icon: SlidersHorizontal, key: 'purchaseSettings' },
     ],
   },
   {
