@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -9,7 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * gross = basic_salary + allowances ، net = gross (في MVP، بلا استقطاعات).
  * المبالغ بالـ minor units (هللات) كـ bigint.
  */
-class PayrollItem extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: سطر تابع لمسيّر رواتب — يتبع فرع رأسه */
+class PayrollItem extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'payroll_run_id', 'employee_id',

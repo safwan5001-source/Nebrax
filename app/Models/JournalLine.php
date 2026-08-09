@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class JournalLine extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: سطر قيد — موسوم بالفرع، وتصفيته صريحة في التقارير حصراً */
+class JournalLine extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'journal_entry_id', 'account_id',

@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class Account extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: دليل الحسابات — بنية واحدة للمنشأة (التخصيص للفروع عبر account_branch) */
+class Account extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'parent_id', 'code', 'name', 'name_en',

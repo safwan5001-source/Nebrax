@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * سطر مرتجع. المبالغ بالـ minor units (هللات) كـ bigint.
  */
-class ReturnLine extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: سطر تابع لمرتجع — يتبع فرع رأسه */
+class ReturnLine extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'return_id', 'product_id', 'description',
