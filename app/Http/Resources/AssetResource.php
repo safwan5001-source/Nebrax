@@ -12,6 +12,7 @@ class AssetResource extends JsonResource
     {
         return [
             'id'                       => $this->id,
+            'branch_id'                => $this->branch_id,
             'number'                   => $this->number,
             'name'                     => $this->name,
             'account_id'               => $this->account_id,

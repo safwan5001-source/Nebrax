@@ -14,6 +14,7 @@ class StoreEmployeeRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'branch_id'    => ['nullable', 'uuid'], // مكان العمل (وصفي — لا يعزل)
             'employee_no'  => ['nullable', 'string', 'max:255'],
             'name'         => ['required', 'string', 'max:255'],
             'national_id'  => ['nullable', 'string', 'max:255'],

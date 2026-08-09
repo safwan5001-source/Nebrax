@@ -14,6 +14,7 @@ class UpdateEmployeeRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'branch_id'    => ['nullable', 'uuid'], // مكان العمل (وصفي — لا يعزل)
             'employee_no'  => ['sometimes', 'string', 'max:255'],
             'name'         => ['sometimes', 'string', 'max:255'],
             'national_id'  => ['nullable', 'string', 'max:255'],

@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\Asset;
 use App\Models\Partner;
+use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -115,6 +116,7 @@ class AssetService
                 'description' => "اقتناء أصل {$asset->number} — {$asset->name}",
                 'source_type' => Asset::class,
                 'source_id'   => $asset->id,
+                'branch_id'   => $asset->branch_id, // القيد يتبع فرع الأصل لا الفرع النشط
                 'created_by'  => $asset->created_by,
             ]);
 
@@ -157,6 +159,7 @@ class AssetService
                 'description' => "إهلاك أصل {$asset->number} — {$asset->name}",
                 'source_type' => Asset::class,
                 'source_id'   => $asset->id,
+                'branch_id'   => $asset->branch_id, // الإهلاك يُحمَّل على فرع الأصل
                 'created_by'  => $asset->created_by,
             ]);
 
@@ -209,11 +212,17 @@ class AssetService
         return $account->id;
     }
 
-    /** توليد رقم تسلسلي: FA-2025-00001 */
+    /**
+     * توليد رقم تسلسلي: FA-2025-00001
+     *
+     * التسلسل **على مستوى المؤسسة** لا الفرع — لأن القيد الفريد `(tenant_id, number)`.
+     * لذا يتجاوز عزل الفرع عمداً؛ لولا ذلك لبدأ كل فرع من ١ فاصطدمت الأرقام.
+     */
     protected function nextNumber(string $date): string
     {
         $year  = substr($date, 0, 4);
-        $count = Asset::whereYear('acquisition_date', $year)->count() + 1;
+        $count = Asset::withoutGlobalScope(BranchScope::class)
+            ->whereYear('acquisition_date', $year)->count() + 1;
 
         return sprintf('FA-%s-%05d', $year, $count);
     }
