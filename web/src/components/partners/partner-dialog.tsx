@@ -25,17 +25,25 @@ export function PartnerDialog({
   onClose,
   onSaved,
   partner,
+  defaultType = 'customer',
+  addTitle,
+  editTitle,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
   partner?: Partner | null;
+  /** نوع الطرف عند الإنشاء — 'customer' لشاشة العملاء، 'supplier' لشاشة الموردين. */
+  defaultType?: string;
+  /** عناوين تخصّ سياق الشاشة (مورّد/عميل)؛ بلا تمرير تُستخدم صيغة «الطرف» العامة. */
+  addTitle?: string;
+  editTitle?: string;
 }) {
   const tp = useTranslations('partners');
   const tc = useTranslations('common');
   const { success } = useToast();
   const [form, setForm] = useState<Partner>(
-    partner ?? { id: '', name: '', type: 'customer', entity_type: 'commercial', email: '', phone: '', city: '' }
+    partner ?? { id: '', name: '', type: defaultType, entity_type: 'commercial', email: '', phone: '', city: '' }
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -48,7 +56,8 @@ export function PartnerDialog({
     setError(null);
     const body = {
       name: form.name,
-      type: form.type || 'customer', // شاشة العملاء تُنشئ عملاء؛ المورّد يُدار في المشتريات
+      // عند التعديل يُحفظ نوع الطرف كما هو؛ وعند الإنشاء يُحسم بنوع الشاشة (عميل/مورّد).
+      type: form.type || defaultType,
       entity_type: form.entity_type || 'commercial',
       email: form.email || null,
       phone: form.phone || null,
@@ -72,7 +81,7 @@ export function PartnerDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title={partner?.id ? tp('edit') : tp('add')}>
+    <Dialog open={open} onClose={onClose} title={partner?.id ? (editTitle ?? tp('edit')) : (addTitle ?? tp('add'))}>
       <form onSubmit={submit} className="space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor="name">{tp('name')}</Label>
