@@ -1221,7 +1221,17 @@
     "to": "To",
     "all_branches": "All branches",
     "branches_selected": "{n} branches selected",
-    "clear_filters": "Clear filters"
+    "clear_filters": "Clear filters",
+    "income_statement": "Income statement",
+    "revenues": "Revenues",
+    "expenses": "Expenses",
+    "total_revenue": "Total revenue",
+    "total_expense": "Total expense",
+    "net_income": "Net income",
+    "unallocated": "Unallocated to a branch",
+    "unallocated_hint": "Central revenues and expenses that belong to no single branch (payroll, for example) — they appear in the consolidated view and are never charged to a branch.",
+    "item": "Item",
+    "amount": "Amount"
   },
   "returnForm": {
     "title": "New return",

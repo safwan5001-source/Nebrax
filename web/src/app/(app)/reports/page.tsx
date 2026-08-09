@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Printer, Download } from 'lucide-react';
+import { Printer, Download, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,12 +15,23 @@ import { useCompany } from '@/lib/company';
 import { toCsv, downloadCsv } from '@/lib/export';
 import { ReportFilters, filtersToQuery, EMPTY_FILTERS, type ReportFilterState } from '@/components/reports/report-filters';
 
-type Tab = 'trial' | 'costcenter' | 'aging';
+type Tab = 'trial' | 'income' | 'costcenter' | 'aging';
 
 interface TrialRow { code: string; name: string; debit: string; credit: string }
 interface TrialBalance { rows: TrialRow[]; total_debit: string; total_credit: string; balanced: boolean }
 interface AgingRow { partner_id: string; name: string; b0_30: string; b31_60: string; b61_90: string; b90_plus: string; total: string }
 interface Aging { type: string; as_of: string; rows: AgingRow[]; totals: Omit<AgingRow, 'partner_id' | 'name'> }
+interface AmountRow { code: string; name: string; amount: string }
+interface Unallocated { total_revenue: string; total_expense: string; net_income: string }
+interface IncomeStatement {
+  revenues: AmountRow[];
+  expenses: AmountRow[];
+  total_revenue: string;
+  total_expense: string;
+  net_income: string;
+  /** يعود من الـ API **عند التصفية بفرع فقط** — ما لا يخصّ أي فرع. */
+  unallocated?: Unallocated;
+}
 interface CcRow { cost_center_id: string; code: string; name: string; revenue: string; expense: string; profit: string }
 interface Profitability { rows: CcRow[]; total_revenue: string; total_expense: string; total_profit: string }
 
@@ -42,6 +53,7 @@ export default function ReportsPage() {
   const [trial, setTrial] = useState<TrialBalance | null>(null);
   const [aging, setAging] = useState<Aging | null>(null);
   const [cc, setCc] = useState<Profitability | null>(null);
+  const [income, setIncome] = useState<IncomeStatement | null>(null);
   // مرشّحات مشتركة: مدى تاريخي + فروع (فارغة = كل الفروع مجمّعة).
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_FILTERS);
 
@@ -50,6 +62,8 @@ export default function ReportsPage() {
     const q = filtersToQuery(filters);
     if (tab === 'trial') {
       api<TrialBalance>(`/reports/trial-balance${q}`).then(setTrial).finally(() => setLoading(false));
+    } else if (tab === 'income') {
+      api<IncomeStatement>(`/reports/income-statement${q}`).then(setIncome).finally(() => setLoading(false));
     } else if (tab === 'costcenter') {
       api<Profitability>(`/reports/cost-center-profitability${q}`).then(setCc).finally(() => setLoading(false));
     } else {
@@ -76,6 +90,30 @@ export default function ReportsPage() {
         rows: trial.rows.map((r) => [r.code, r.name, formatRiyal(r.debit), formatRiyal(r.credit)]),
         totalRow: ['', t('total'), formatRiyal(trial.total_debit), formatRiyal(trial.total_credit)],
         exportName: 'trial-balance',
+      };
+    }
+    if (tab === 'income') {
+      if (!income) return null;
+      // بند «غير موزَّع» جزء من المستند المصدَّر أيضاً — وإلا خرج ملفٌ لا يفسّر نفسه.
+      const rows: string[][] = [
+        ...income.revenues.map((r) => [t('revenues'), r.code, r.name, formatRiyal(r.amount)]),
+        ...income.expenses.map((r) => [t('expenses'), r.code, r.name, formatRiyal(r.amount)]),
+      ];
+      if (income.unallocated) {
+        rows.push([t('unallocated'), '', t('total_revenue'), formatRiyal(income.unallocated.total_revenue)]);
+        rows.push([t('unallocated'), '', t('total_expense'), formatRiyal(income.unallocated.total_expense)]);
+      }
+      return {
+        title: t('income_statement'),
+        columns: [
+          { label: t('item') },
+          { label: t('code') },
+          { label: t('account') },
+          { label: t('amount'), align: 'end' },
+        ],
+        rows,
+        totalRow: ['', '', t('net_income'), formatRiyal(income.net_income)],
+        exportName: 'income-statement',
       };
     }
     if (tab === 'costcenter') {
@@ -124,7 +162,7 @@ export default function ReportsPage() {
       ],
       exportName: `aging-${agingType}`,
     };
-  }, [tab, agingType, trial, aging, cc, t]);
+  }, [tab, agingType, trial, aging, cc, income, t]);
 
   function exportCsv() {
     if (!doc) return;
@@ -152,6 +190,9 @@ export default function ReportsPage() {
       <div className="flex gap-1">
         <Button variant={tab === 'trial' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('trial')}>
           {t('trial_balance')}
+        </Button>
+        <Button variant={tab === 'income' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('income')}>
+          {t('income_statement')}
         </Button>
         <Button variant={tab === 'costcenter' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('costcenter')}>
           {t('cost_profit')}
@@ -203,6 +244,109 @@ export default function ReportsPage() {
                   </TR>
                 </TBody>
               </Table>
+            )}
+          </CardContent>
+        </Card>
+      ) : tab === 'income' ? (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{t('income_statement')}</CardTitle>
+            {income && (
+              <Badge tone={Number(income.net_income) >= 0 ? 'positive' : 'negative'}>
+                {formatRiyal(income.net_income)}
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            {loading || !income ? (
+              <Skeleton className="h-40 w-full" />
+            ) : (
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>{t('code')}</TH>
+                    <TH>{t('account')}</TH>
+                    <TH className="text-end">{t('amount')}</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  <TR className="bg-background">
+                    <TD colSpan={3} className="text-xs font-semibold text-muted">{t('revenues')}</TD>
+                  </TR>
+                  {income.revenues.length === 0 ? (
+                    <TR><TD colSpan={3} className="py-4 text-center text-muted">{t('empty')}</TD></TR>
+                  ) : (
+                    income.revenues.map((r) => (
+                      <TR key={`rev-${r.code}`}>
+                        <TD className="num">{r.code}</TD>
+                        <TD>{r.name}</TD>
+                        <TD className="num text-end">{formatRiyal(r.amount)}</TD>
+                      </TR>
+                    ))
+                  )}
+                  <TR className="font-semibold">
+                    <TD />
+                    <TD>{t('total_revenue')}</TD>
+                    <TD className="num text-end text-positive">{formatRiyal(income.total_revenue)}</TD>
+                  </TR>
+
+                  <TR className="bg-background">
+                    <TD colSpan={3} className="text-xs font-semibold text-muted">{t('expenses')}</TD>
+                  </TR>
+                  {income.expenses.length === 0 ? (
+                    <TR><TD colSpan={3} className="py-4 text-center text-muted">{t('empty')}</TD></TR>
+                  ) : (
+                    income.expenses.map((r) => (
+                      <TR key={`exp-${r.code}`}>
+                        <TD className="num">{r.code}</TD>
+                        <TD>{r.name}</TD>
+                        <TD className="num text-end">{formatRiyal(r.amount)}</TD>
+                      </TR>
+                    ))
+                  )}
+                  <TR className="font-semibold">
+                    <TD />
+                    <TD>{t('total_expense')}</TD>
+                    <TD className="num text-end text-negative">{formatRiyal(income.total_expense)}</TD>
+                  </TR>
+
+                  <TR className="border-t-2 border-border font-semibold">
+                    <TD />
+                    <TD>{t('net_income')}</TD>
+                    <TD className={'num text-end ' + (Number(income.net_income) < 0 ? 'text-negative' : 'text-positive')}>
+                      {formatRiyal(income.net_income)}
+                    </TD>
+                  </TR>
+                </TBody>
+              </Table>
+            )}
+
+            {/* عند التصفية بفرع: ما لا يخصّ أي فرع يُكشَف صراحةً، فلا تبدو
+                قائمة الفرع ناقصةً بلا تفسير. لا يظهر في العرض المجمّع. */}
+            {income?.unallocated && (
+              <div className="mt-4 rounded border border-border bg-background p-3">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-text">
+                  <Info className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.8} />
+                  {t('unallocated')}
+                </div>
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted">{t('total_revenue')}</dt>
+                    <dd className="num font-medium">{formatRiyal(income.unallocated.total_revenue)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted">{t('total_expense')}</dt>
+                    <dd className="num font-medium">{formatRiyal(income.unallocated.total_expense)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted">{t('net_income')}</dt>
+                    <dd className={'num font-medium ' + (Number(income.unallocated.net_income) < 0 ? 'text-negative' : '')}>
+                      {formatRiyal(income.unallocated.net_income)}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted">{t('unallocated_hint')}</p>
+              </div>
             )}
           </CardContent>
         </Card>
