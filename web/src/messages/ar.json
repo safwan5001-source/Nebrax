@@ -1221,7 +1221,17 @@
     "to": "إلى تاريخ",
     "all_branches": "كل الفروع",
     "branches_selected": "{n} فروع مختارة",
-    "clear_filters": "مسح المرشّحات"
+    "clear_filters": "مسح المرشّحات",
+    "income_statement": "قائمة الدخل",
+    "revenues": "الإيرادات",
+    "expenses": "المصروفات",
+    "total_revenue": "إجمالي الإيرادات",
+    "total_expense": "إجمالي المصروفات",
+    "net_income": "صافي الدخل",
+    "unallocated": "غير موزَّع على فرع",
+    "unallocated_hint": "مصروفات وإيرادات مركزية لا تخصّ فرعاً بعينه (كالرواتب) — تظهر في العرض المجمّع، ولا تُحمَّل على أي فرع.",
+    "item": "البند",
+    "amount": "المبلغ"
   },
   "returnForm": {
     "title": "مرتجع جديد",

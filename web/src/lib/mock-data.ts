@@ -145,10 +145,40 @@ export const mockDashboard = {
 };
 
 export const mockIncomeStatement = {
+  revenues: [
+    { code: '4110', name: 'إيرادات المبيعات', amount: '470000.00' },
+    { code: '4130', name: 'إيرادات الشحن', amount: '12500.00' },
+  ],
+  expenses: [
+    { code: '5110', name: 'تكلفة البضاعة المباعة', amount: '198000.00' },
+    { code: '5120', name: 'الرواتب والأجور', amount: '52000.00' },
+    { code: '5140', name: 'الوقود', amount: '8660.00' },
+    { code: '5160', name: 'مصروف الإهلاك', amount: '6000.00' },
+  ],
   total_revenue: '482500.00',
   total_expense: '264660.00',
   net_income: '217840.00',
 };
+
+/**
+ * قائمة الدخل مصفّاة بفرع: الرواتب مصروف مركزي **غير موزَّع**، فتخرج من
+ * إجمالي الفرع وتظهر في بندها الخاص — كما يفعل الخادم تماماً.
+ */
+function incomeStatementFor(path: string) {
+  const params = new URLSearchParams(path.split('?')[1] ?? '');
+  const filtered = params.has('branch_id') || params.has('branch_id[]');
+  if (!filtered) return mockIncomeStatement;
+
+  const expenses = mockIncomeStatement.expenses.filter((e) => e.code !== '5120');
+
+  return {
+    ...mockIncomeStatement,
+    expenses,
+    total_expense: '212660.00',
+    net_income: '269840.00',
+    unallocated: { total_revenue: '0.00', total_expense: '52000.00', net_income: '-52000.00' },
+  };
+}
 
 // دليل الحسابات السعودي القياسي (يطابق ChartOfAccountsSeeder) — شجرة 3 مستويات.
 // المجموعات (is_group) لا تقبل قيوداً ولا رصيد مباشر؛ الأوراق تحمل الأرصدة.
@@ -933,7 +963,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const movementsMatch = clean.match(/^\/inventory\/([^/]+)\/movements$/);
   if (movementsMatch) return resolve(mockMovements(movementsMatch[1]));
 
-  if (clean === '/reports/income-statement') return resolve(mockIncomeStatement);
+  if (clean === '/reports/income-statement') return resolve(incomeStatementFor(path));
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);
   if (clean === '/reports/cost-center-profitability') return resolve(mockCostCenterProfit);
   const agingMatch = clean.match(/^\/reports\/aging\/([^/]+)$/);
