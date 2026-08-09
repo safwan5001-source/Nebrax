@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\DB;
 
@@ -9,7 +10,8 @@ use Illuminate\Support\Facades\DB;
  * فرع تابع للمؤسسة (المستأجر). بنية تنظيمية وبُعد تصفية — لا يولّد قيوداً
  * ولا يشكّل حاجز عزل (العزل بالمستأجر عبر TenantScope).
  */
-class Branch extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: الفرع نفسه لا يُعزل بفرع */
+class Branch extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'code', 'name', 'is_main', 'phone', 'mobile',

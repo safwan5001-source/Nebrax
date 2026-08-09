@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * سطر فاتورة مشتريات. المبالغ بالـ minor units (هللات) كـ bigint.
  */
-class PurchaseLine extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: سطر تابع لمشترى — يتبع فرع رأسه */
+class PurchaseLine extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'purchase_id', 'product_id', 'description',

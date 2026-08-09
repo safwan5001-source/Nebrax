@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class JournalEntry extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: قيد محاسبي — التصفية بالفرع صريحة في التقارير (لا Scope عالمي) حمايةً لميزان المراجعة المجمّع */
+class JournalEntry extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'number', 'entry_date', 'description',

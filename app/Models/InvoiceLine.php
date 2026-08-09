@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * سطر فاتورة. المبالغ بالـ minor units (هللات) كـ bigint.
  * line_subtotal = quantity × unit_price، و line_tax محسوبة بنسبة tax_rate.
  */
-class InvoiceLine extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: سطر تابع لفاتورة — يتبع فرع رأسه */
+class InvoiceLine extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'invoice_id', 'product_id', 'description',

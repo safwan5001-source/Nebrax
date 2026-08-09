@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -9,7 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * مخزن — يحمل كميات المنتجات لموقع معيّن، ويتبع فرعاً (أو لا فرع = مركزي).
  * التقييم (متوسط التكلفة) يبقى عالمياً على مستوى المنتج؛ المخزن يفصّل الكميات فقط.
  */
-class Warehouse extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: المخازن تُدار مركزياً وتُنسب لفرع عبر branch_id (لا تُعزل عن إدارتها) */
+class Warehouse extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'branch_id', 'code', 'name', 'city', 'address', 'notes',

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** رصيد كمية منتج في مخزن — تفصيل لـ products.quantity_on_hand (بلا قيمة). */
-class ProductWarehouseStock extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: رصيد كمّي تابع لمخزن — العزل عبر المخزن/الفرع */
+class ProductWarehouseStock extends BaseModel implements CompanyWide
 {
     protected $table = 'product_warehouse_stock';
 

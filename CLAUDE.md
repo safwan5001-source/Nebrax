@@ -35,6 +35,7 @@
 1. **النقود بالـ minor units (هللات) كـ `bigint`.** ممنوع `float`/`double` في أي حساب مالي. 100.50 ريال = 10050.
 1. **القيود immutable بعد الترحيل.** التصحيح بقيد عكسي عبر `LedgerService::reverse()` فقط.
 1. **العزل تلقائي:** كل نموذج أعمال يرث `BaseModel` (فيه `TenantScope` + `BelongsToTenant`). ممنوع استعلام يدوي يتجاوز الـ scope.
+1. **عزل الفروع إلزامي:** كل نموذج جديد يُصنَّف صراحةً — `BranchScoped` (تشغيلي معزول، الافتراضي) أو `BelongsToBranch` (محاسبي بتصفية صريحة) أو `CompanyWide` (مشترك). نموذج غير مصنَّف **يُفشل الـ CI** (`BranchIsolationGuardTest`). المرجع الكامل: `design-system/foundations/multi-branch-architecture.md`.
 1. **الحسابات التجميعية (`is_group`) لا تقبل قيوداً مباشرة.**
 1. **`TenantContext` مسجّل singleton** في `TenancyServiceProvider` — حاسم للعزل.
 1. **PSR-4:** كلاس واحد لكل ملف.

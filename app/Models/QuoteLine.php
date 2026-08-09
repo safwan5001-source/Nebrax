@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * سطر عرض سعر. الإجماليات مشتقّة من الكمية × السعر + الضريبة (هللات).
  */
-class QuoteLine extends BaseModel
+/** @see design-system/foundations/multi-branch-architecture.md — مشترك: سطر تابع لعرض سعر — يتبع فرع رأسه */
+class QuoteLine extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'quote_id', 'product_id', 'description',
