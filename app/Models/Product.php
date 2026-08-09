@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use App\Tenancy\BranchScoped;
+use App\Tenancy\BranchShareable;
+use App\Tenancy\BranchSharing;
+use Closure;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -9,12 +13,18 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * منتج أو خدمة. الأسعار بالـ minor units (هللات) كـ bigint — لا float إطلاقاً.
  * tax_rate نسبة مئوية صحيحة (15 = 15%).
  */
-class Product extends BaseModel
+/**
+ * @see design-system/foundations/multi-branch-architecture.md
+ * تشغيلي بعزل **مشروط**: مشترك ما دام مفتاح «مشاركة المنتجات» مفعّلاً (الافتراضي).
+ * المراجع المخزَّنة في سطور المستندات تُحلّ خارج العزل عبر `referenceBelongsTo`.
+ */
+class Product extends BaseModel implements BranchShareable
 {
+    use BranchScoped;
     use SoftDeletes;
 
     protected $fillable = [
-        'tenant_id', 'sku', 'barcode', 'name', 'name_en', 'type', 'unit',
+        'tenant_id', 'branch_id', 'sku', 'barcode', 'name', 'name_en', 'type', 'unit',
         'description', 'category', 'brand', 'reorder_level',
         'supplier_id', 'sales_account_id', 'cogs_account_id',
         'min_sale_price', 'discount', 'discount_type', 'profit_margin', 'tags', 'internal_notes',
@@ -56,5 +66,14 @@ class Product extends BaseModel
     public function movements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    /**
+     * العزل مشروط بمفتاح «مشاركة المنتجات» — مفعّل افتراضياً، فالسلوك القائم
+     * لكل مستأجر لا يتغيّر حتى يُطفئه بيده من «إعدادات الفروع».
+     */
+    public function branchSharingExemption(BranchSharing $sharing): bool|Closure
+    {
+        return $sharing->shared('share_products');
     }
 }

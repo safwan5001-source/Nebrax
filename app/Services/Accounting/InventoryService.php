@@ -104,6 +104,7 @@ class InventoryService
         $movement = StockMovement::create([
             'product_id'       => $product->id,
             'warehouse_id'     => $warehouseId,
+            'branch_id'        => $this->branchOfWarehouse($warehouseId), // الحركة تتبع فرع المخزن
             'type'             => 'in',
             'quantity'         => $quantity,
             'unit_cost'        => $recordedUnit,
@@ -138,6 +139,7 @@ class InventoryService
         $movement = StockMovement::create([
             'product_id'       => $product->id,
             'warehouse_id'     => $warehouseId,
+            'branch_id'        => $this->branchOfWarehouse($warehouseId), // الحركة تتبع فرع المخزن
             'type'             => 'out',
             'quantity'         => $quantity,
             'unit_cost'        => $unitCost,
@@ -202,6 +204,7 @@ class InventoryService
             StockMovement::create([
                 'product_id'       => $product->id,
                 'warehouse_id'     => $warehouseId,
+                'branch_id'        => $this->branchOfWarehouse($warehouseId), // الحركة تتبع فرع المخزن
                 'type'             => 'out',
                 'quantity'         => $line->quantity,
                 'unit_cost'        => $unitCost,
@@ -250,6 +253,16 @@ class InventoryService
         }
 
         return Warehouse::default()?->id;
+    }
+
+    /**
+     * فرع المخزن — مصدر وسم حركة المخزون. الحركة تخصّ المكان الذي دخلت منه
+     * البضاعة أو خرجت، لا الفرع الذي كان مفتوحاً أمام من ضغط الزرّ.
+     * `null` (بلا مخزن أو مخزن بلا فرع) يترك الوسم لـ `BelongsToBranch`.
+     */
+    protected function branchOfWarehouse(?string $warehouseId): ?string
+    {
+        return $warehouseId === null ? null : Warehouse::whereKey($warehouseId)->value('branch_id');
     }
 
     /**

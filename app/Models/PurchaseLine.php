@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Tenancy\CompanyWide;
+use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** @see design-system/foundations/multi-branch-architecture.md — مشترك: سطر تابع لمشترى — يتبع فرع رأسه */
 class PurchaseLine extends BaseModel implements CompanyWide
 {
+    use ResolvesBranchReferences;
+
     protected $fillable = [
         'tenant_id', 'purchase_id', 'product_id', 'description',
         'quantity', 'unit_price', 'tax_rate',
@@ -31,8 +34,9 @@ class PurchaseLine extends BaseModel implements CompanyWide
         return $this->belongsTo(Purchase::class);
     }
 
+    /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (وإلا تخطّى المسار المحاسبي السطرَ صامتاً). */
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->referenceBelongsTo(Product::class);
     }
 }
