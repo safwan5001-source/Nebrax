@@ -127,20 +127,20 @@ const GROUPS: NavGroup[] = [
   },
   {
     // المشتريات — مجموعة مستقلّة (كانت أقسامها مبعثرة تحت المخزون).
-    // فاتورة الشراء وحدها مبنيّة (/purchases)؛ البقية روابط بشارة «قريباً».
+    // المجموعة مكتملة: عشرة أقسام مبنيّة.
     title: 'purchases',
     icon: ShoppingCart,
     items: [
-      { href: '/purchase-requests', icon: ClipboardList, key: 'purchaseRequests' },
-      { href: '/rfq', icon: FileQuestion, key: 'rfq' },
-      { href: '/purchase-quotes', icon: FileText, key: 'purchaseQuotes' },
-      { href: '/purchase-orders', icon: ClipboardCheck, key: 'purchaseOrders' },
+      { href: '/purchase-requests', icon: ClipboardList, key: 'purchaseRequests', built: true },
+      { href: '/rfq', icon: FileQuestion, key: 'rfq', built: true },
+      { href: '/purchase-quotes', icon: FileText, key: 'purchaseQuotes', built: true },
+      { href: '/purchase-orders', icon: ClipboardCheck, key: 'purchaseOrders', built: true },
       { href: '/purchases', icon: Receipt, key: 'purchaseInvoices', built: true },
       { href: '/purchase-returns', icon: Undo2, key: 'purchaseReturns', built: true },
       { href: '/debit-notes', icon: FileMinus, key: 'debitNotes', built: true },
       { href: '/suppliers', icon: Handshake, key: 'suppliers', built: true },
       { href: '/supplier-payments', icon: CreditCard, key: 'supplierPayments', built: true },
-      { href: '/purchase-settings', icon: SlidersHorizontal, key: 'purchaseSettings' },
+      { href: '/purchase-settings', icon: SlidersHorizontal, key: 'purchaseSettings', built: true },
     ],
   },
   {

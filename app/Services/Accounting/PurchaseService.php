@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Partner;
 use App\Models\Purchase;
 use App\Models\PurchaseLine;
+use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -57,12 +58,13 @@ class PurchaseService
         return DB::transaction(function () use ($data, $items) {
             $date = $data['purchase_date'] ?? now()->toDateString();
 
-            $inclusive = (bool) ($data['tax_inclusive'] ?? false);
+            // الغياب يعني «استخدم تفضيل المستأجر»؛ القيمة المرسلة تسبقه دائماً.
+            $inclusive = (bool) ($data['tax_inclusive'] ?? Settings::get('purchases', 'default_tax_inclusive'));
 
             $purchase = Purchase::create([
                 'number'              => $data['number'] ?? $this->nextNumber($date),
                 'partner_id'          => $data['partner_id'],
-                'payment_type'        => $data['payment_type'] ?? 'credit',
+                'payment_type'        => $data['payment_type'] ?? Settings::get('purchases', 'default_payment_type'),
                 'purchase_date'       => $date,
                 'due_date'            => $data['due_date'] ?? null,
                 'supplier_invoice_no' => $data['supplier_invoice_no'] ?? null,
@@ -73,11 +75,12 @@ class PurchaseService
             ]);
 
             $subtotal = $taxTotal = 0;
+            $defaultRate = (int) Settings::get('purchases', 'default_tax_rate');
 
             foreach ($items as $item) {
                 $qty       = (int) ($item['quantity'] ?? 1);
                 $unitPrice = (int) ($item['unit_price'] ?? 0);
-                $rate      = (int) ($item['tax_rate'] ?? 15);
+                $rate      = (int) ($item['tax_rate'] ?? $defaultRate);
 
                 if ($qty <= 0 || $unitPrice < 0) {
                     throw new RuntimeException('الكمية يجب أن تكون موجبة والتكلفة غير سالبة.');
@@ -224,11 +227,17 @@ class PurchaseService
     /**
      * توليد رقم فاتورة مشتريات تسلسلي: BILL-2025-00001
      */
+    /**
+     * البادئة من إعدادات المشتريات (`BILL` افتراضاً — سلوك ما قبل الإعداد).
+     * تغييرها لا يصطدم بالأرقام القائمة: العدّاد يواصل التصاعد فيبقى
+     * `unique(tenant_id, number)` مصوناً.
+     */
     protected function nextNumber(string $date): string
     {
-        $year  = substr($date, 0, 4);
-        $count = Purchase::whereYear('purchase_date', $year)->count() + 1;
+        $year   = substr($date, 0, 4);
+        $prefix = (string) Settings::get('purchases', 'purchase_prefix');
+        $count  = Purchase::whereYear('purchase_date', $year)->count() + 1;
 
-        return sprintf('BILL-%s-%05d', $year, $count);
+        return sprintf('%s-%s-%05d', $prefix ?: 'BILL', $year, $count);
     }
 }

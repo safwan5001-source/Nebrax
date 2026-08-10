@@ -489,6 +489,77 @@ export const mockCreditNotes: MockCreditNote[] = [
   creditNote('dn-1', 'DN-2026-0001', 'p8', '2026-06-05', 'credit', 'draft', 'تعويض عن تلف جزئي', [line('l1', 'تعويض', 1, 450)], 'purchase'),
 ];
 
+// ── إعدادات المشتريات ───────────────────────────────────────────────────────
+export const mockPurchaseSettings = {
+  default_tax_rate: 15,
+  default_payment_type: 'credit',
+  default_tax_inclusive: false,
+  purchase_prefix: 'BILL',
+};
+
+// ── دورة الشراء (طلب · طلب عروض · عرض مورّد · أمر شراء) ──────────────────────
+export interface MockProcurement {
+  id: string;
+  type: string;
+  number: string;
+  partner_id: string | null;
+  partner_name: string | null;
+  status: string;
+  doc_date: string;
+  due_date: string | null;
+  requested_by: string | null;
+  subtotal: string;
+  tax_amount: string;
+  total: string;
+  notes: string | null;
+  source_document_id: string | null;
+  source_number: string | null;
+  source_type: string | null;
+  converted_purchase_id: string | null;
+  supplier_ids: string[];
+  lines: MockLine[];
+}
+
+function procurement(
+  id: string, type: string, number: string, partnerId: string | null, date: string,
+  status: string, requestedBy: string | null, lines: MockLine[],
+  extra: Partial<MockProcurement> = {}
+): MockProcurement {
+  const { subtotal, tax_amount, total } = docTotals(lines);
+  return {
+    id, type, number, partner_id: partnerId,
+    partner_name: partnerId ? (mockPartners.find((p) => p.id === partnerId)?.name ?? null) : null,
+    status, doc_date: date, due_date: null, requested_by: requestedBy,
+    subtotal, tax_amount, total, notes: null,
+    source_document_id: null, source_number: null, source_type: null,
+    converted_purchase_id: null, supplier_ids: [], lines,
+    ...extra,
+  };
+}
+
+// سلسلة واقعية: طلب ← طلب عروض ← عرض مورّد ← أمر شراء.
+export const mockProcurement: MockProcurement[] = [
+  procurement('pr-2', 'request', 'PR-2026-00002', null, '2026-06-24', 'submitted', 'إدارة الصيانة',
+    [line('l1', 'قطع غيار مضخات', 4, 950)]),
+  procurement('pr-1', 'request', 'PR-2026-00001', null, '2026-06-11', 'converted', 'إدارة المشاريع',
+    [line('l1', 'إسمنت مقاوم', 200, 24), line('l2', 'حديد تسليح 12مم', 40, 310)]),
+
+  procurement('rfq-1', 'rfq', 'RFQ-2026-00001', null, '2026-06-13', 'converted', 'إدارة المشاريع',
+    [line('l1', 'إسمنت مقاوم', 200, 24), line('l2', 'حديد تسليح 12مم', 40, 310)],
+    { source_document_id: 'pr-1', source_number: 'PR-2026-00001', source_type: 'request', supplier_ids: ['p7', 'p8'], due_date: '2026-06-18' }),
+
+  procurement('pq-1', 'quotation', 'PQ-2026-00001', 'p7', '2026-06-17', 'converted', 'إدارة المشاريع',
+    [line('l1', 'إسمنت مقاوم', 200, 23.5), line('l2', 'حديد تسليح 12مم', 40, 305)],
+    { source_document_id: 'rfq-1', source_number: 'RFQ-2026-00001', source_type: 'rfq', due_date: '2026-07-17' }),
+
+  procurement('po-2', 'order', 'PO-2026-00002', 'p8', '2026-06-25', 'approved', 'إدارة التشغيل',
+    [line('l1', 'مواد تغليف', 500, 6.5)], { due_date: '2026-07-05' }),
+  procurement('po-1', 'order', 'PO-2026-00001', 'p7', '2026-06-20', 'converted', 'إدارة المشاريع',
+    [line('l1', 'إسمنت مقاوم', 200, 23.5), line('l2', 'حديد تسليح 12مم', 40, 305)],
+    { source_document_id: 'pq-1', source_number: 'PQ-2026-00001', source_type: 'quotation',
+      converted_purchase_id: mockPurchases[0].id, due_date: '2026-06-30' }),
+];
+
 // ── المصروفات (الحسابات) ────────────────────────────────────────────────────
 export interface MockExpense {
   id: string;
@@ -990,6 +1061,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const list = nt === 'sales' || nt === 'purchase' ? mockCreditNotes.filter((c) => c.type === nt) : mockCreditNotes;
     return resolve({ data: list });
   }
+  if (clean === '/purchase-settings') return resolve({ data: mockPurchaseSettings });
+  if (clean === '/procurement') {
+    const pt = new URLSearchParams(path.split('?')[1] ?? '').get('type');
+    return resolve({ data: pt ? mockProcurement.filter((d) => d.type === pt) : mockProcurement });
+  }
   if (clean === '/recurring-invoices') return resolve({ data: mockRecurring });
   if (clean === '/purchases') return resolve({ data: mockPurchases });
   if (clean === '/returns') {
@@ -1041,6 +1117,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const creditNoteMatch = clean.match(/^\/credit-notes\/([^/]+)$/);
   if (creditNoteMatch) {
     const found = mockCreditNotes.find((c) => c.id === creditNoteMatch[1]) ?? mockCreditNotes[0];
+    return resolve({ data: found });
+  }
+
+  const procurementMatch = clean.match(/^\/procurement\/([^/]+)$/);
+  if (procurementMatch) {
+    const found = mockProcurement.find((d) => d.id === procurementMatch[1]) ?? mockProcurement[0];
     return resolve({ data: found });
   }
 
