@@ -504,6 +504,31 @@ export const mockRevisions = [
   },
 ];
 
+// ── الأذون المخزنية ─────────────────────────────────────────────────────────
+export const mockStockPermits = [
+  {
+    id: 'sp-3', type: 'transfer', number: 'ST-2026-00001',
+    warehouse_name: 'المخزن الرئيسي', target_warehouse_name: 'مخزن الجبيل',
+    permit_date: '2026-06-26', status: 'posted', reason: 'إعادة توزيع', notes: null,
+    total_cost: '4,500.00', journal_entry_id: null,   // تحويل داخلي — بلا قيد
+    lines: [{ id: 'l1', product_name: 'إسمنت مقاوم', quantity: 200, unit_cost: '22.50', line_cost: '4500.00' }],
+  },
+  {
+    id: 'sp-2', type: 'issue', number: 'SI-2026-00002',
+    warehouse_name: 'المخزن الرئيسي', target_warehouse_name: null,
+    permit_date: '2026-06-23', status: 'posted', reason: 'تلف أثناء المناولة', notes: null,
+    total_cost: '675.00', journal_entry_id: 'je-9',
+    lines: [{ id: 'l1', product_name: 'إسمنت مقاوم', quantity: 30, unit_cost: '22.50', line_cost: '675.00' }],
+  },
+  {
+    id: 'sp-1', type: 'receipt', number: 'SR-2026-00001',
+    warehouse_name: 'المخزن الرئيسي', target_warehouse_name: null,
+    permit_date: '2026-06-18', status: 'draft', reason: 'بضاعة وُجدت في الجرد', notes: null,
+    total_cost: '225.00', journal_entry_id: null,
+    lines: [{ id: 'l1', product_name: 'إسمنت مقاوم', quantity: 10, unit_cost: '22.50', line_cost: '225.00' }],
+  },
+];
+
 // ── إعدادات المشتريات ───────────────────────────────────────────────────────
 export const mockPurchaseSettings = {
   default_tax_rate: 15,
@@ -1077,6 +1102,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: list });
   }
   if (clean === '/purchase-settings') return resolve({ data: mockPurchaseSettings });
+  if (clean === '/stock-permits') return resolve({ data: mockStockPermits });
   if (clean.startsWith('/revisions/')) return resolve({ data: mockRevisions });
   if (clean === '/procurement') {
     const pt = new URLSearchParams(path.split('?')[1] ?? '').get('type');
@@ -1133,6 +1159,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const creditNoteMatch = clean.match(/^\/credit-notes\/([^/]+)$/);
   if (creditNoteMatch) {
     const found = mockCreditNotes.find((c) => c.id === creditNoteMatch[1]) ?? mockCreditNotes[0];
+    return resolve({ data: found });
+  }
+
+  const permitMatch = clean.match(/^\/stock-permits\/([^/]+)$/);
+  if (permitMatch) {
+    const found = mockStockPermits.find((p) => p.id === permitMatch[1]) ?? mockStockPermits[0];
     return resolve({ data: found });
   }
 

@@ -59,6 +59,7 @@ class ChartOfAccountsSeeder
             ['5150', 'مصروفات عامة', 'General Expenses', 'expense', false, []],
             ['5160', 'الإهلاك', 'Depreciation', 'expense', false, []],
             ['5170', 'فروق التقريب والتسويات', 'Rounding & Adjustments', 'expense', false, []],
+            ['5180', 'فروق الجرد والتلف', 'Inventory Adjustments', 'expense', false, []],
         ]],
     ];
 
