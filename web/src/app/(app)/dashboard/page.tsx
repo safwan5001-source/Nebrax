@@ -22,6 +22,7 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { Donut } from '@/components/charts/donut';
 import { Sparkline } from '@/components/charts/sparkline';
 import { api } from '@/lib/api';
+import { getActiveBranchId } from '@/lib/branch';
 import { isDemo } from '@/lib/demo';
 import { mockDashboard } from '@/lib/mock-data';
 import { formatRiyal, formatRiyalShort } from '@/lib/money';
@@ -46,9 +47,15 @@ export default function DashboardPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
+  // اللوحة تحترم الفرع النشط: قائمة الدخل تُصفّى به، فتعرض أرقام الفرع لا
+  // المؤسسة. بلا فرع نشط (مؤسسة بفرع واحد) تبقى مجمّعة كما كانت.
+  const branchId = getActiveBranchId();
+
   useEffect(() => {
+    const branchQuery = branchId ? `?branch_id=${encodeURIComponent(branchId)}` : '';
+
     Promise.all([
-      api<IncomeStatement>('/reports/income-statement'),
+      api<IncomeStatement>(`/reports/income-statement${branchQuery}`),
       api<{ data: Account[] }>('/accounts'),
       api<{ data: Invoice[] }>('/invoices'),
     ])
@@ -58,7 +65,7 @@ export default function DashboardPage() {
         setInvoices(inv.data);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [branchId]);
 
   const balanceOf = (code: string) => accounts.find((a) => a.code === code)?.balance ?? '0';
   const receivables = balanceOf('1130');
