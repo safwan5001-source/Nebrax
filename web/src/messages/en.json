@@ -1418,6 +1418,13 @@
     "rejected": "Rejected",
     "converted": "Converted"
   },
+  "supplierPayments": {
+    "title": "Supplier payments",
+    "create": "New payment voucher",
+    "search": "Search vouchers…",
+    "empty": "No supplier payments",
+    "supplier": "Supplier"
+  },
   "suppliers": {
     "title": "Suppliers",
     "add": "New supplier",
