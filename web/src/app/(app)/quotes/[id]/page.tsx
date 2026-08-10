@@ -16,6 +16,7 @@ import { documentExporter, printDocument } from '@/modules/documents/services/ex
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
+import { RevisionLog } from '@/components/documents/revision-log';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
@@ -198,6 +199,9 @@ export default function QuoteDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* سجلّ التغييرات — لا يُطبع مع المستند. */}
+      <RevisionLog type="quote" id={id} />
     </div>
   );
 }

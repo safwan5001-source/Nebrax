@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RevisionLog } from '@/components/documents/revision-log';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
@@ -219,6 +220,9 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
           </table>
         </CardContent>
       </Card>
+
+      {/* سجلّ التغييرات — نفس المكوّن، بنوع المستند فقط. */}
+      <RevisionLog type="procurement" id={id} />
     </div>
   );
 }
