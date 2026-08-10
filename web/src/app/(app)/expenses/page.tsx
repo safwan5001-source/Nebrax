@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
+import { branchViewQuery, type BranchView } from '@/lib/branch-view';
 import { formatRiyal } from '@/lib/money';
 
 interface Expense {
@@ -36,12 +38,15 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState<string | null>(null);
 
+  // نطاق العرض: الفرع النشط افتراضياً؛ لا يُحفظ فيبدأ كل فتح من الافتراضي.
+  const [view, setView] = useState<BranchView>('current');
+
   const load = useCallback(() => {
     setLoading(true);
-    api<{ data: Expense[] }>('/expenses')
+    api<{ data: Expense[] }>(`/expenses${branchViewQuery(view)}`)
       .then((r) => setData(r.data))
       .finally(() => setLoading(false));
-  }, []);
+  }, [view]);
 
   useEffect(() => load(), [load]);
 
@@ -89,6 +94,8 @@ export default function ExpensesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+        {/* نطاق العرض ظاهر في الشاشة نفسها — لا مخفيّاً في الإعدادات. */}
+        <BranchViewToggle value={view} onChange={setView} />
         <Link href="/expenses/new">
           <Button>
             <Plus className="h-4 w-4" strokeWidth={1.8} />

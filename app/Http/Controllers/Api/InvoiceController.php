@@ -11,14 +11,15 @@ use App\Models\Partner;
 use App\Models\Product;
 use App\Services\Accounting\InvoiceService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class InvoiceController extends ApiController
 {
     public function __construct(protected InvoiceService $invoices) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return InvoiceResource::collection(Invoice::with('lines')->latest()->get())->response();
+        return InvoiceResource::collection($this->scopeToActiveBranch(Invoice::with('lines')->latest(), $request)->get())->response();
     }
 
     public function store(StoreInvoiceRequest $request): JsonResponse

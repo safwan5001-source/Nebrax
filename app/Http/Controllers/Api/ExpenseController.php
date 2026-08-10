@@ -9,14 +9,15 @@ use App\Models\Partner;
 use App\Models\CostCenter;
 use App\Services\Accounting\ExpenseService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ExpenseController extends ApiController
 {
     public function __construct(protected ExpenseService $expenses) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return ExpenseResource::collection(Expense::with('account')->latest()->get())->response();
+        return ExpenseResource::collection($this->scopeToActiveBranch(Expense::with('account')->latest(), $request)->get())->response();
     }
 
     public function store(StoreExpenseRequest $request): JsonResponse

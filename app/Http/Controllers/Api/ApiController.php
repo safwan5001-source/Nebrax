@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Tenancy\BranchContext;
 use Closure;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use PDOException;
 use RuntimeException;
 
@@ -23,6 +26,39 @@ abstract class ApiController extends Controller
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  تصفية قائمة مستندات بالفرع النشط — **صريحة، لا Global Scope**
+     * ═══════════════════════════════════════════════════════════════
+     *  المستندات المحاسبية مصنَّفة `BelongsToBranch`: موسومة بالفرع بلا Scope
+     *  عالمي، حفاظاً على شمول ميزان المراجعة المجمّع (لو صُفّيت تلقائياً
+     *  لاختفت قيود صامتةً). فتصفية **العرض** تتمّ هنا في المتحكّم وحده،
+     *  ولا تمسّ `ReportService` ولا أي حساب محاسبي.
+     *
+     *  ثلاث قواعد:
+     *   1. الافتراضي = الفرع النشط. `?branch=all` يُظهر كل الفروع صراحةً.
+     *   2. تشمل `branch_id IS NULL` — بيانات ما قبل الفروع تبقى مرئية للجميع.
+     *   3. بلا سياق فرع (مؤسسة بفرع واحد، أوامر artisan) لا تصفية إطلاقاً.
+     */
+    protected function scopeToActiveBranch(Builder $query, Request $request): Builder
+    {
+        if ($request->query('branch') === 'all') {
+            return $query;
+        }
+
+        $branchId = app(BranchContext::class)->id();
+        if ($branchId === null) {
+            return $query;
+        }
+
+        $table = $query->getModel()->getTable();
+
+        return $query->where(function (Builder $q) use ($table, $branchId) {
+            $q->where($table . '.branch_id', $branchId)
+              ->orWhereNull($table . '.branch_id');
+        });
     }
 
     /**

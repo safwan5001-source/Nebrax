@@ -9,6 +9,8 @@ import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
+import { branchViewQuery, type BranchView } from '@/lib/branch-view';
 import { formatRiyal } from '@/lib/money';
 
 interface CreditNote {
@@ -29,15 +31,18 @@ export default function CreditNotesPage() {
   const [partners, setPartners] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
+  // نطاق العرض: الفرع النشط افتراضياً؛ لا يُحفظ فيبدأ كل فتح من الافتراضي.
+  const [view, setView] = useState<BranchView>('current');
+
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([api<{ data: CreditNote[] }>('/credit-notes'), api<{ data: Partner[] }>('/partners')])
+    Promise.all([api<{ data: CreditNote[] }>(`/credit-notes${branchViewQuery(view)}`), api<{ data: Partner[] }>('/partners')])
       .then(([cn, prt]) => {
         setData(cn.data);
         setPartners(Object.fromEntries(prt.data.map((p) => [p.id, p.name])));
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [view]);
 
   useEffect(() => load(), [load]);
 
@@ -69,6 +74,8 @@ export default function CreditNotesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+        {/* نطاق العرض ظاهر في الشاشة نفسها — لا مخفيّاً في الإعدادات. */}
+        <BranchViewToggle value={view} onChange={setView} />
         <Link href="/credit-notes/new">
           <Button>
             <Plus className="h-4 w-4" strokeWidth={1.8} />
