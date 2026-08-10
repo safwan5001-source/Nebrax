@@ -1567,5 +1567,73 @@
     "empty": "لا توجد مخازن",
     "search_products": "ابحث في المنتجات…",
     "no_stock": "لا أرصدة في هذا المخزن"
+  },
+  "procurement": {
+    "number": "الرقم",
+    "supplier": "المورّد",
+    "requested_by": "الجهة الطالبة",
+    "date": "التاريخ",
+    "status": "الحالة",
+    "total": "الإجمالي",
+    "subtotal": "الإجمالي قبل الضريبة",
+    "tax_total": "إجمالي الضريبة",
+    "unit_cost": "التكلفة",
+    "optional_price": "اختياري",
+    "qty": "الكمية",
+    "description": "الوصف",
+    "notes": "ملاحظات",
+    "details": "التفاصيل",
+    "lines": "السطور",
+    "invited": "الموردون المدعوّون",
+    "no_suppliers": "لا يوجد موردون مسجّلون بعد.",
+    "search": "بحث في المستندات…",
+    "back": "رجوع",
+    "save": "حفظ المستند",
+    "not_found": "المستند غير موجود",
+    "source": "محوّل من",
+    "converted_purchase": "فاتورة المشتريات الناتجة",
+    "status_draft": "مسودة",
+    "status_submitted": "مُرسَل",
+    "status_approved": "معتمد",
+    "status_rejected": "مرفوض",
+    "status_converted": "مُحوَّل",
+    "status_cancelled": "ملغى",
+    "action_draft": "إعادة فتح",
+    "action_submitted": "إرسال",
+    "action_approved": "اعتماد",
+    "action_rejected": "رفض",
+    "action_cancelled": "إلغاء",
+    "convert_to_rfq": "تحويل إلى طلب عروض",
+    "convert_to_quotation": "تسجيل عرض مورّد",
+    "convert_to_order": "تحويل إلى أمر شراء",
+    "convert_to_purchase": "توليد فاتورة مشتريات",
+    "request": {
+      "title": "طلبات الشراء",
+      "create": "طلب شراء جديد",
+      "new_title": "طلب شراء جديد",
+      "empty": "لا توجد طلبات شراء",
+      "due_label": "تاريخ الحاجة"
+    },
+    "rfq": {
+      "title": "طلبات عروض الأسعار",
+      "create": "طلب عروض جديد",
+      "new_title": "طلب عروض أسعار جديد",
+      "empty": "لا توجد طلبات عروض",
+      "due_label": "آخر موعد للردّ"
+    },
+    "quotation": {
+      "title": "عروض أسعار الموردين",
+      "create": "تسجيل عرض مورّد",
+      "new_title": "عرض سعر مورّد جديد",
+      "empty": "لا توجد عروض من الموردين",
+      "due_label": "صالح حتى"
+    },
+    "order": {
+      "title": "أوامر الشراء",
+      "create": "أمر شراء جديد",
+      "new_title": "أمر شراء جديد",
+      "empty": "لا توجد أوامر شراء",
+      "due_label": "تاريخ التسليم"
+    }
   }
 }

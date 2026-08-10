@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\PosSessionController;
+use App\Http\Controllers\Api\ProcurementController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RecurringInvoiceController;
@@ -190,6 +191,15 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('purchases/{id}', [PurchaseController::class, 'show'])->middleware($perm('purchases.view'));
         Route::post('purchases', [PurchaseController::class, 'store'])->middleware($perm('purchases.manage'));
         Route::post('purchases/{id}/post', [PurchaseController::class, 'post'])->middleware($perm('purchases.manage'));
+
+        // دورة الشراء: طلب → طلب عروض → عرض مورّد → أمر شراء (مستندات غير محاسبية)
+        Route::get('procurement', [ProcurementController::class, 'index'])->middleware($perm('purchases.view'));
+        Route::get('procurement/{id}', [ProcurementController::class, 'show'])->middleware($perm('purchases.view'));
+        Route::post('procurement', [ProcurementController::class, 'store'])->middleware($perm('purchases.manage'));
+        Route::put('procurement/{id}', [ProcurementController::class, 'update'])->middleware($perm('purchases.manage'));
+        Route::delete('procurement/{id}', [ProcurementController::class, 'destroy'])->middleware($perm('purchases.manage'));
+        Route::post('procurement/{id}/transition', [ProcurementController::class, 'transition'])->middleware($perm('purchases.manage'));
+        Route::post('procurement/{id}/convert', [ProcurementController::class, 'convert'])->middleware($perm('purchases.manage'));
 
         // المرتجعات
         Route::get('returns', [ReturnController::class, 'index'])->middleware($perm('returns.view'));
