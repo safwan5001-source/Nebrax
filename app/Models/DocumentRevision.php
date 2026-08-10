@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -16,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 /** @see design-system/foundations/multi-branch-architecture.md — مشترك: سجلّ تابع لمستند — يتبع فرع رأسه */
 class DocumentRevision extends BaseModel implements CompanyWide
 {
+    use Prunable;
     use ResolvesBranchReferences;
 
     /** سجلّ لا يُعدَّل: لا `updated_at` له معنى، لكن نُبقيه لبساطة الجدول. */
@@ -27,6 +30,22 @@ class DocumentRevision extends BaseModel implements CompanyWide
 
     /** ميكروثانية — يرتّب الخطّ الزمني قيوداً تقع في الثانية نفسها. */
     protected $dateFormat = 'Y-m-d H:i:s.u';
+
+    /** مدّة الاحتفاظ بالأيام — سنتان تغطّيان دورة مراجعة ضريبية كاملة. */
+    public const RETENTION_DAYS = 730;
+
+    /**
+     * سجلٌّ ينمو مع كل تعديل، فيحتاج حدّاً وإلا صار عبئاً على مستأجر كثيف
+     * الحركة. `Prunable` من Laravel: يكفيه `php artisan model:prune` مجدولاً
+     * — لا أمر مخصَّص ولا جدول انتظار.
+     *
+     * القديم يُحذف لا يُؤرشَف: قيمة هذا السجلّ في كشف الخطأ **قريباً** من
+     * وقوعه؛ وبعد سنتين تكون الفترة مقفلةً ضريبياً والمستند مرحَّلاً immutable.
+     */
+    public function prunable(): Builder
+    {
+        return static::where('created_at', '<=', now()->subDays(self::RETENTION_DAYS));
+    }
 
     public function document(): MorphTo
     {

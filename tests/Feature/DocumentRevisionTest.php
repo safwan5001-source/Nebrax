@@ -200,6 +200,34 @@ class DocumentRevisionTest extends TestCase
             ->assertNotFound();
     }
 
+    /**
+     * سجلٌّ ينمو بلا حدّ يصير عبئاً. القديم يُشذَّب والحديث يبقى.
+     * (`Prunable` من Laravel — `php artisan model:prune` مجدولاً.)
+     *
+     * @test
+     */
+    public function old_entries_are_pruned_and_recent_ones_kept(): void
+    {
+        $invoice = $this->invoice();
+        $fresh   = DocumentRevision::firstOrFail();
+
+        $stale = DocumentRevision::create([
+            'document_type' => Invoice::class,
+            'document_id'   => $invoice['id'],
+            'action'        => 'updated',
+            'diff'          => ['total' => [1, 2]],
+        ]);
+        // أقدم من مدّة الاحتفاظ بيوم واحد
+        $stale->forceFill([
+            'created_at' => now()->subDays(DocumentRevision::RETENTION_DAYS + 1),
+        ])->saveQuietly();
+
+        $this->artisan('model:prune', ['--model' => [DocumentRevision::class]])->assertSuccessful();
+
+        $this->assertNull(DocumentRevision::find($stale->id), 'القديم شُذِّب.');
+        $this->assertNotNull(DocumentRevision::find($fresh->id), 'والحديث بقي.');
+    }
+
     /** العزل: سجلّ مستند مستأجرٍ آخر غير مرئي. */
     /** @test */
     public function a_tenant_cannot_read_another_tenants_log(): void
