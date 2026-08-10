@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\JournalLine;
 use App\Models\Partner;
+use App\Support\Settings;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -59,7 +60,7 @@ class InvoiceService
                 // فرع صريح (كالتوليد من فاتورة دورية)؛ وإن غاب يوسمه BelongsToBranch بالفرع النشط.
                 'branch_id'    => $data['branch_id'] ?? null,
                 'type'         => 'sale',
-                'payment_type' => $data['payment_type'] ?? 'cash',
+                'payment_type' => $data['payment_type'] ?? Settings::get('sales', 'default_payment_type'),
                 'invoice_date' => $date,
                 'due_date'     => $data['due_date'] ?? null,
                 'cost_center_id' => $data['cost_center_id'] ?? null,
@@ -97,14 +98,21 @@ class InvoiceService
             // مسوّدة: لا قيد ولا حركة مخزون، فحذف السطور وإعادة بنائها آمن.
             $invoice->lines()->delete();
 
+            // ═══════════════════════════════════════════════════════════
+            //  في التعديل: الحقل الغائب **يبقى كما هو** — لا يعود لافتراض
+            // ═══════════════════════════════════════════════════════════
+            //  كان `tax_inclusive` يعود إلى `false` عند غيابه (وهو اختياري في
+            //  الطلب)، فتعديلُ ملاحظةٍ وحدها يقلب وضع الضريبة **ويغيّر إجمالي
+            //  الفاتورة**: ١١٥٠ ← ١٣٢٢٫٥٠ في فاتورة لم يُمسّ مبلغُها.
+            //  الافتراض معناه «قيمة عند الإنشاء» لا «قيمة عند كل حفظ».
             $invoice->update([
                 'partner_id'     => $data['partner_id'],
-                'payment_type'   => $data['payment_type'] ?? 'cash',
+                'payment_type'   => $data['payment_type'] ?? $invoice->payment_type,
                 'invoice_date'   => $data['invoice_date'] ?? $invoice->invoice_date,
                 'due_date'       => $data['due_date'] ?? null,
                 'cost_center_id' => $data['cost_center_id'] ?? null,
                 'salesperson_id' => $data['salesperson_id'] ?? null,
-                'tax_inclusive'  => (bool) ($data['tax_inclusive'] ?? false),
+                'tax_inclusive'  => (bool) ($data['tax_inclusive'] ?? $invoice->tax_inclusive),
                 'notes'          => $data['notes'] ?? null,
             ]);
 
@@ -142,7 +150,7 @@ class InvoiceService
         foreach ($items as $item) {
             $qty       = (int) ($item['quantity'] ?? 1);
             $unitPrice = (int) ($item['unit_price'] ?? 0);
-            $rate      = (int) ($item['tax_rate'] ?? 15);
+            $rate      = (int) ($item['tax_rate'] ?? (int) Settings::get('sales', 'default_tax_rate'));
             $lineDisc  = (int) ($item['discount'] ?? 0);
 
             if ($qty <= 0 || $unitPrice < 0) {
@@ -466,9 +474,10 @@ class InvoiceService
      */
     protected function nextNumber(string $date): string
     {
-        $year  = substr($date, 0, 4);
-        $count = Invoice::whereYear('invoice_date', $year)->count() + 1;
+        $year   = substr($date, 0, 4);
+        $prefix = (string) Settings::get('sales', 'invoice_prefix');
+        $count  = Invoice::whereYear('invoice_date', $year)->count() + 1;
 
-        return sprintf('INV-%s-%05d', $year, $count);
+        return sprintf('%s-%s-%05d', $prefix ?: 'INV', $year, $count);
     }
 }

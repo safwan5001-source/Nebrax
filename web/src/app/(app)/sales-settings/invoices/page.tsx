@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -90,11 +91,18 @@ export default function InvoiceSettingsPage() {
                 <div className="space-y-1.5">
                   <Label htmlFor="prefix">{t('invoice_prefix')}</Label>
                   <Input id="prefix" dir="ltr" maxLength={10} value={form.invoice_prefix} onChange={(e) => set('invoice_prefix', e.target.value)} />
+                  <p className="num text-xs text-muted">{t('invoice_prefix_hint')} {(form.invoice_prefix || 'INV')}-2026-00001</p>
                 </div>
               </div>
+              {/* الشروط المطبوعة على المستند تأتي من «تصميم المستندات» لا من هنا —
+                  فالتلميح يوجّه إليها بدل أن يترك الحقل يَعِد بما لا يفعل. */}
               <div className="space-y-1.5">
                 <Label htmlFor="terms">{t('default_terms')}</Label>
                 <Input id="terms" value={form.default_terms} onChange={(e) => set('default_terms', e.target.value)} />
+                <p className="text-xs text-muted">
+                  {t('default_terms_hint')}{' '}
+                  <Link href="/sales-settings/designs" className="text-primary hover:underline">{t('designs_link')}</Link>
+                </p>
               </div>
 
               {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}

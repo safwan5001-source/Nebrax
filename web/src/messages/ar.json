@@ -1396,7 +1396,10 @@
     "dsn_footer": "نص التذييل",
     "ord_auto": "تحويل تلقائي إلى فاتورة",
     "ord_approval": "يتطلب موافقة",
-    "ord_prefix": "بادئة أوامر البيع"
+    "ord_prefix": "بادئة أوامر البيع",
+    "invoice_prefix_hint": "مثال:",
+    "default_terms_hint": "الشروط المطبوعة على الفاتورة تُضبط من",
+    "designs_link": "تصميم المستندات"
   },
   "settings": {
     "title": "الإعدادات",

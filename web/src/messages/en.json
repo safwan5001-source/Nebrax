@@ -1396,7 +1396,10 @@
     "dsn_footer": "Footer text",
     "ord_auto": "Auto-convert to invoice",
     "ord_approval": "Requires approval",
-    "ord_prefix": "Sales order prefix"
+    "ord_prefix": "Sales order prefix",
+    "invoice_prefix_hint": "Example:",
+    "default_terms_hint": "Terms printed on the invoice are set in",
+    "designs_link": "document design"
   },
   "settings": {
     "title": "Settings",

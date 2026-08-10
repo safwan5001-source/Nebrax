@@ -15,7 +15,10 @@ class StoreInvoiceRequest extends FormRequest
     {
         return [
             'partner_id'          => ['required', 'uuid'],
-            'payment_type'        => ['required', 'in:cash,credit'],
+            // اختياري لا مطلوب: عند الإنشاء يعني الغياب «استخدم تفضيل المستأجر»
+            // (`sales.default_payment_type`)، وعند التعديل «أبقِ القيمة كما هي».
+            // كونه مطلوباً كان يجعل التفضيل حبراً على ورق.
+            'payment_type'        => ['nullable', 'in:cash,credit'],
             'invoice_date'        => ['nullable', 'date'],
             'due_date'            => ['nullable', 'date'],
             'discount'            => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — خصم على مستوى الفاتورة
