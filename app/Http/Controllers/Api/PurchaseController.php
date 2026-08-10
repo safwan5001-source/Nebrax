@@ -9,14 +9,15 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Services\Accounting\PurchaseService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PurchaseController extends ApiController
 {
     public function __construct(protected PurchaseService $purchases) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return PurchaseResource::collection(Purchase::with('lines')->latest()->get())->response();
+        return PurchaseResource::collection($this->scopeToActiveBranch(Purchase::with('lines')->latest(), $request)->get())->response();
     }
 
     public function store(StorePurchaseRequest $request): JsonResponse

@@ -9,14 +9,15 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Services\Accounting\PaymentService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PaymentController extends ApiController
 {
     public function __construct(protected PaymentService $payments) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return PaymentResource::collection(Payment::latest()->get())->response();
+        return PaymentResource::collection($this->scopeToActiveBranch(Payment::latest(), $request)->get())->response();
     }
 
     public function store(StorePaymentRequest $request): JsonResponse

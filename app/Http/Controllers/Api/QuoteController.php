@@ -16,9 +16,9 @@ class QuoteController extends ApiController
 {
     public function __construct(protected QuoteService $quotes) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return QuoteResource::collection(Quote::with('lines')->latest()->get())->response();
+        return QuoteResource::collection($this->scopeToActiveBranch(Quote::with('lines')->latest(), $request)->get())->response();
     }
 
     public function store(StoreQuoteRequest $request): JsonResponse

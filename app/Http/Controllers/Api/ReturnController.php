@@ -28,7 +28,9 @@ class ReturnController extends ApiController
             $query->where('type', $type);
         }
 
-        return ReturnResource::collection($query->get())->response();
+        return ReturnResource::collection(
+            $this->scopeToActiveBranch($query, $request)->get()
+        )->response();
     }
 
     public function store(StoreReturnRequest $request): JsonResponse

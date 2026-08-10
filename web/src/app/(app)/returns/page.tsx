@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
 import { api } from '@/lib/api';
+import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
+import { branchViewQuery, type BranchView } from '@/lib/branch-view';
 import { formatRiyal } from '@/lib/money';
 
 interface ReturnDoc {
@@ -31,16 +33,19 @@ export default function ReturnsPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
+  // نطاق العرض: الفرع النشط افتراضياً؛ لا يُحفظ فيبدأ كل فتح من الافتراضي.
+  const [view, setView] = useState<BranchView>('current');
+
   const load = useCallback(() => {
     setLoading(true);
     // مقصورة على مرتجعات المبيعات — مرتجعات المشتريات لها شاشتها المستقلّة.
-    Promise.all([api<{ data: ReturnDoc[] }>('/returns?type=sales'), api<{ data: Partner[] }>('/partners')])
+    Promise.all([api<{ data: ReturnDoc[] }>(`/returns?type=sales${branchViewQuery(view, true)}`), api<{ data: Partner[] }>('/partners')])
       .then(([ret, prt]) => {
         setData(ret.data);
         setPartners(Object.fromEntries(prt.data.map((p) => [p.id, p.name])));
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [view]);
 
   useEffect(() => load(), [load]);
 
@@ -72,6 +77,8 @@ export default function ReturnsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+        {/* نطاق العرض ظاهر في الشاشة نفسها — لا مخفيّاً في الإعدادات. */}
+        <BranchViewToggle value={view} onChange={setView} />
         <Button onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" strokeWidth={1.8} />
           {t('create')}

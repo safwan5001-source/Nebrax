@@ -9,14 +9,15 @@ use App\Models\Partner;
 use App\Models\Product;
 use App\Services\Accounting\CreditNoteService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class CreditNoteController extends ApiController
 {
     public function __construct(protected CreditNoteService $creditNotes) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return CreditNoteResource::collection(CreditNote::with('lines')->latest()->get())->response();
+        return CreditNoteResource::collection($this->scopeToActiveBranch(CreditNote::with('lines')->latest(), $request)->get())->response();
     }
 
     public function store(StoreCreditNoteRequest $request): JsonResponse

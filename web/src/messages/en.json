@@ -102,6 +102,11 @@
     "account_branch_scoping_desc": "Allocate each account at branch level to record financial transactions and follow accounting results separately. An account can be assigned to one branch, several, or all.",
     "footer_note": "Choose how data and financial records are shared between branches to unify or separate your operations. Existing records are shared once enabled."
   },
+  "branchView": {
+    "label": "View scope",
+    "current": "Current branch",
+    "all": "All branches"
+  },
   "branches": {
     "title": "Manage branches",
     "add": "Add branch",

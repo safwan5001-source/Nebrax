@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
+import { branchViewQuery, type BranchView } from '@/lib/branch-view';
 import { formatRiyal } from '@/lib/money';
 
 interface Invoice {
@@ -48,10 +50,13 @@ export default function InvoicesPage() {
   const [toDelete, setToDelete] = useState<Invoice | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // نطاق العرض: الفرع النشط افتراضياً؛ لا يُحفظ فيبدأ كل فتح من الافتراضي.
+  const [view, setView] = useState<BranchView>('current');
+
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    Promise.all([api<{ data: Invoice[] }>('/invoices'), api<{ data: Partner[] }>('/partners')])
+    Promise.all([api<{ data: Invoice[] }>(`/invoices${branchViewQuery(view)}`), api<{ data: Partner[] }>('/partners')])
       .then(([inv, prt]) => {
         setInvoices(inv.data);
         setPartners(Object.fromEntries(prt.data.map((p) => [p.id, p.name])));
@@ -160,6 +165,8 @@ export default function InvoicesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+        {/* نطاق العرض ظاهر في الشاشة نفسها — لا مخفيّاً في الإعدادات. */}
+        <BranchViewToggle value={view} onChange={setView} />
         <Link href="/invoices/new" className="ms-auto">
           <Button>
             <Plus className="h-4 w-4" strokeWidth={1.8} />
