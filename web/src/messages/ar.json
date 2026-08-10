@@ -1656,5 +1656,30 @@
     "purchase_prefix": "بادئة ترقيم فاتورة الشراء",
     "purchase_prefix_hint": "مثال:",
     "save": "حفظ الإعدادات"
+  },
+  "revisions": {
+    "title": "سجلّ التغييرات",
+    "empty": "لا تغييرات مسجَّلة.",
+    "system": "النظام",
+    "action_created": "إنشاء",
+    "action_updated": "تعديل",
+    "action_status": "تغيّر الحالة",
+    "f_status": "الحالة",
+    "f_total": "الإجمالي",
+    "f_subtotal": "الإجمالي قبل الضريبة",
+    "f_tax_amount": "الضريبة",
+    "f_discount": "الخصم",
+    "f_shipping": "الشحن",
+    "f_adjustment": "التسوية",
+    "f_notes": "ملاحظات",
+    "f_due_date": "تاريخ الاستحقاق",
+    "f_payment_type": "نوع السداد",
+    "f_tax_inclusive": "شامل الضريبة",
+    "f_partner_id": "الطرف",
+    "f_cost_center_id": "مركز التكلفة",
+    "f_salesperson_id": "المندوب",
+    "f_paid_amount": "المسدَّد",
+    "f_payment_status": "حالة السداد",
+    "f_valid_until": "صالح حتى"
   }
 }

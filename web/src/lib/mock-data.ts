@@ -489,6 +489,21 @@ export const mockCreditNotes: MockCreditNote[] = [
   creditNote('dn-1', 'DN-2026-0001', 'p8', '2026-06-05', 'credit', 'draft', 'تعويض عن تلف جزئي', [line('l1', 'تعويض', 1, 450)], 'purchase'),
 ];
 
+// ── سجلّ تغييرات المستندات ──────────────────────────────────────────────────
+// القيم بالهللات كما يعيدها الـ API (التحويل إلى ريال في طبقة العرض).
+export const mockRevisions = [
+  {
+    id: 'rev-2', action: 'updated', user_name: 'مستخدم المعاينة',
+    created_at: '2026-06-22T10:42:00+03:00',
+    changes: { shipping: [50000, 20000], total: [172500, 138000], notes: [null, 'تخفيض الشحن'] },
+  },
+  {
+    id: 'rev-1', action: 'created', user_name: 'مستخدم المعاينة',
+    created_at: '2026-06-20T09:15:00+03:00',
+    changes: {},
+  },
+];
+
 // ── إعدادات المشتريات ───────────────────────────────────────────────────────
 export const mockPurchaseSettings = {
   default_tax_rate: 15,
@@ -1062,6 +1077,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: list });
   }
   if (clean === '/purchase-settings') return resolve({ data: mockPurchaseSettings });
+  if (clean.startsWith('/revisions/')) return resolve({ data: mockRevisions });
   if (clean === '/procurement') {
     const pt = new URLSearchParams(path.split('?')[1] ?? '').get('type');
     return resolve({ data: pt ? mockProcurement.filter((d) => d.type === pt) : mockProcurement });

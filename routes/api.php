@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\CostCenterController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\CrmActivityController;
 use App\Http\Controllers\Api\CustomerSettingsController;
+use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\HealthController;
@@ -201,6 +202,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('procurement/{id}', [ProcurementController::class, 'destroy'])->middleware($perm('purchases.manage'));
         Route::post('procurement/{id}/transition', [ProcurementController::class, 'transition'])->middleware($perm('purchases.manage'));
         Route::post('procurement/{id}/convert', [ProcurementController::class, 'convert'])->middleware($perm('purchases.manage'));
+
+        // سجلّ تغييرات المستندات (قراءة فقط — لا أثر محاسبي)
+        Route::get('revisions/{type}/{id}', [DocumentRevisionController::class, 'index'])->middleware($perm('invoices.view'));
 
         // المرتجعات
         Route::get('returns', [ReturnController::class, 'index'])->middleware($perm('returns.view'));

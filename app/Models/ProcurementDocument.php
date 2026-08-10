@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\RecordsRevisions;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ProcurementDocument extends BaseModel
 {
     use ResolvesBranchReferences;
+    use RecordsRevisions;
     use BelongsToBranch;
 
     /** أنواع المستندات بترتيب السلسلة. */

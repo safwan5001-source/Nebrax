@@ -1656,5 +1656,30 @@
     "purchase_prefix": "Purchase bill number prefix",
     "purchase_prefix_hint": "Example:",
     "save": "Save settings"
+  },
+  "revisions": {
+    "title": "Change log",
+    "empty": "No changes recorded.",
+    "system": "System",
+    "action_created": "Created",
+    "action_updated": "Edited",
+    "action_status": "Status change",
+    "f_status": "Status",
+    "f_total": "Total",
+    "f_subtotal": "Subtotal",
+    "f_tax_amount": "Tax",
+    "f_discount": "Discount",
+    "f_shipping": "Shipping",
+    "f_adjustment": "Adjustment",
+    "f_notes": "Notes",
+    "f_due_date": "Due date",
+    "f_payment_type": "Payment type",
+    "f_tax_inclusive": "Tax inclusive",
+    "f_partner_id": "Partner",
+    "f_cost_center_id": "Cost center",
+    "f_salesperson_id": "Salesperson",
+    "f_paid_amount": "Paid",
+    "f_payment_status": "Payment status",
+    "f_valid_until": "Valid until"
   }
 }
