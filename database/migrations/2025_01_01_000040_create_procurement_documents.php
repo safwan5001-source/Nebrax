@@ -49,9 +49,9 @@ return new class extends Migration
             $table->boolean('tax_inclusive')->default(false);
             $table->string('notes')->nullable();
 
-            // سلسلة المستندات: طلب → طلب عروض → عرض مورّد → أمر شراء → فاتورة
-            $table->foreignUuid('source_document_id')->nullable()
-                ->constrained('procurement_documents')->nullOnDelete();
+            // سلسلة المستندات: طلب → طلب عروض → عرض مورّد → أمر شراء → فاتورة.
+            // المرجع الذاتي يُقيَّد بعد `create` لا داخلها — انظر التعليق أسفل.
+            $table->uuid('source_document_id')->nullable();
             $table->foreignUuid('converted_purchase_id')->nullable()
                 ->constrained('purchases')->nullOnDelete();
 
@@ -62,6 +62,18 @@ return new class extends Migration
             $table->index(['tenant_id', 'type', 'status']);
             $table->index(['tenant_id', 'partner_id']);
             $table->index(['tenant_id', 'branch_id']);
+        });
+
+        /**
+         * المرجع الذاتي في جملة مستقلّة **بالضرورة لا بالذوق**: `constrained()`
+         * يدفع أمر المفتاح الأجنبي فور استدعائه، بينما `->primary()` يُلحَق في
+         * آخر قائمة الأوامر — فيُنفَّذ الـ FK قبل وجود المفتاح الأساسي على
+         * الجدول نفسه. PostgreSQL يرفض («no unique constraint matching given
+         * keys») بينما SQLite يمرّ صامتاً، فالخلل لا يظهر إلا في CI.
+         */
+        Schema::table('procurement_documents', function (Blueprint $table) {
+            $table->foreign('source_document_id')
+                ->references('id')->on('procurement_documents')->nullOnDelete();
         });
 
         Schema::create('procurement_lines', function (Blueprint $table) {

@@ -49,8 +49,8 @@ class ProcurementTest extends TestCase
 
         $this->supplier = Partner::create(['name' => 'مورد', 'type' => 'supplier']);
         $this->product  = Product::create([
-            'name' => 'إسمنت', 'sku' => 'CEM-1', 'type' => 'product',
-            'sale_price' => 20000, 'cost_price' => 15000, 'track_inventory' => true,
+            'name' => 'إسمنت', 'sku' => 'CEM-1', 'type' => 'good',
+            'sale_price' => 20000, 'purchase_price' => 15000, 'track_inventory' => true,
         ]);
 
         $this->procurement = app(ProcurementService::class);
