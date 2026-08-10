@@ -1418,6 +1418,13 @@
     "rejected": "مرفوض",
     "converted": "محوَّل"
   },
+  "supplierPayments": {
+    "title": "مدفوعات الموردين",
+    "create": "سند صرف",
+    "search": "بحث في السندات…",
+    "empty": "لا توجد مدفوعات موردين",
+    "supplier": "المورّد"
+  },
   "suppliers": {
     "title": "إدارة الموردين",
     "add": "إضافة مورد",

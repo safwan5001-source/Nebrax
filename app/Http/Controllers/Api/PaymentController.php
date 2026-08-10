@@ -15,9 +15,23 @@ class PaymentController extends ApiController
 {
     public function __construct(protected PaymentService $payments) {}
 
+    /**
+     * قائمة المدفوعات، مع تصفية اختيارية بالاتجاه (`?direction=received|paid`)
+     * تفصل شاشتَي مدفوعات العملاء (قبض) والموردين (صرف).
+     * بلا اتجاه تُعاد كلها — توافق رجعي كامل.
+     */
     public function index(Request $request): JsonResponse
     {
-        return PaymentResource::collection($this->scopeToActiveBranch(Payment::latest(), $request)->get())->response();
+        $direction = $request->query('direction');
+
+        $query = Payment::latest();
+        if (in_array($direction, ['received', 'paid'], true)) {
+            $query->where('direction', $direction);
+        }
+
+        return PaymentResource::collection(
+            $this->scopeToActiveBranch($query, $request)->get()
+        )->response();
     }
 
     public function store(StorePaymentRequest $request): JsonResponse

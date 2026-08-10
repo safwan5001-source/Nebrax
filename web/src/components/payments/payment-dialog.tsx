@@ -18,10 +18,13 @@ export function PaymentDialog({
   open,
   onClose,
   onSaved,
+  fixedDirection,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /** يثبّت اتجاه الدفعة ويُخفي منتقيه — لشاشتَي مدفوعات العملاء/الموردين. */
+  fixedDirection?: 'received' | 'paid';
 }) {
   const t = useTranslations('paymentForm');
   const tc = useTranslations('common');
@@ -29,7 +32,7 @@ export function PaymentDialog({
   const [partners, setPartners] = useState<Partner[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
 
-  const [direction, setDirection] = useState<'received' | 'paid'>('received');
+  const [direction, setDirection] = useState<'received' | 'paid'>(fixedDirection ?? 'received');
   const [partnerId, setPartnerId] = useState('');
   const [method, setMethod] = useState('cash');
   const [docId, setDocId] = useState(''); // المستند المخصَّص (اختياري)
@@ -104,21 +107,24 @@ export function PaymentDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t('title')}>
       <form onSubmit={submit} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="dir">{t('direction')}</Label>
-            <Select
-              id="dir"
-              value={direction}
-              onChange={(e) => {
-                setDirection(e.target.value as 'received' | 'paid');
-                setPartnerId('');
-              }}
-            >
-              <option value="received">{t('received')}</option>
-              <option value="paid">{t('paid')}</option>
-            </Select>
-          </div>
+        <div className={fixedDirection ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-2 gap-3'}>
+          {/* الاتجاه يظهر في الشاشة العامة وحدها؛ الشاشتان المتخصّصتان تثبّتانه. */}
+          {!fixedDirection && (
+            <div className="space-y-1.5">
+              <Label htmlFor="dir">{t('direction')}</Label>
+              <Select
+                id="dir"
+                value={direction}
+                onChange={(e) => {
+                  setDirection(e.target.value as 'received' | 'paid');
+                  setPartnerId('');
+                }}
+              >
+                <option value="received">{t('received')}</option>
+                <option value="paid">{t('paid')}</option>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="method">{t('method')}</Label>
             <Select id="method" value={method} onChange={(e) => setMethod(e.target.value)}>

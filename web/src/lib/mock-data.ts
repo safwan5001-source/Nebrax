@@ -643,9 +643,9 @@ export const mockAppointments = [
 export const mockPayments = [
   { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
   { id: 'pm-50', number: 'PMT-2026-0050', partner_id: 'p2', direction: 'received', method: 'cash', payment_date: '2026-06-22', amount: '6325.00' },
-  { id: 'pm-49', number: 'PMT-2026-0049', partner_id: 'p3', direction: 'paid', method: 'bank', payment_date: '2026-06-20', amount: '6900.00' },
+  { id: 'pm-49', number: 'PMT-2026-0049', partner_id: 'p7', direction: 'paid', method: 'bank', payment_date: '2026-06-20', amount: '6900.00' },
   { id: 'pm-48', number: 'PMT-2026-0048', partner_id: 'p5', direction: 'received', method: 'bank', payment_date: '2026-06-18', amount: '21275.00' },
-  { id: 'pm-47', number: 'PMT-2026-0047', partner_id: 'p4', direction: 'paid', method: 'cash', payment_date: '2026-06-12', amount: '3450.00' },
+  { id: 'pm-47', number: 'PMT-2026-0047', partner_id: 'p8', direction: 'paid', method: 'cash', payment_date: '2026-06-12', amount: '3450.00' },
   { id: 'pm-46', number: 'PMT-2026-0046', partner_id: 'p6', direction: 'received', method: 'bank', payment_date: '2026-06-08', amount: '4600.00' },
 ];
 
@@ -989,7 +989,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const list = rtype === 'sales' || rtype === 'purchase' ? mockReturns.filter((r) => r.type === rtype) : mockReturns;
     return resolve({ data: list });
   }
-  if (clean === '/payments') return resolve({ data: mockPayments });
+  if (clean === '/payments') {
+    const dir = new URLSearchParams(path.split('?')[1] ?? '').get('direction');
+    const list = dir === 'received' || dir === 'paid' ? mockPayments.filter((p) => p.direction === dir) : mockPayments;
+    return resolve({ data: list });
+  }
   if (clean === '/employees') return resolve({ data: mockEmployees });
   if (clean === '/payroll-runs') return resolve({ data: mockPayrollRuns });
 
