@@ -14,7 +14,9 @@ class StoreCreditNoteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'partner_id'          => ['required', 'uuid'],
+            'partner_id'           => ['required', 'uuid'],
+            'type'                 => ['nullable', 'in:sales,purchase'],
+            'original_purchase_id' => ['nullable', 'uuid'],
             'refund_type'         => ['nullable', 'in:credit,cash'],
             'note_date'           => ['nullable', 'date'],
             'reason'              => ['nullable', 'string', 'max:500'],

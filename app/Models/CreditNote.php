@@ -19,9 +19,9 @@ class CreditNote extends BaseModel
 
     protected $fillable = [
         'branch_id',
-        'tenant_id', 'number', 'partner_id', 'refund_type', 'note_date',
+        'tenant_id', 'number', 'type', 'partner_id', 'refund_type', 'note_date',
         'status', 'subtotal', 'tax_amount', 'total', 'reason',
-        'original_invoice_id', 'journal_entry_id', 'created_by',
+        'original_invoice_id', 'original_purchase_id', 'journal_entry_id', 'created_by',
     ];
 
     protected $casts = [
@@ -53,5 +53,11 @@ class CreditNote extends BaseModel
     public function isDraft(): bool
     {
         return $this->status === 'draft';
+    }
+
+    /** إشعار مدين (للمورّد) بخلاف الإشعار الدائن الافتراضي (للعميل). */
+    public function isPurchase(): bool
+    {
+        return $this->type === 'purchase';
     }
 }

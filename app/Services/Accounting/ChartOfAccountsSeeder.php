@@ -50,6 +50,9 @@ class ChartOfAccountsSeeder
         ]],
         ['5', 'المصروفات', 'Expenses', 'expense', true, [
             ['5110', 'تكلفة البضاعة المباعة', 'COGS', 'expense', false, []],
+            // مصروف مقابل (contra): حركته دائنة فيخفّض إجمالي المصروفات.
+            // يستقبل الإشعارات المدينة — خصومات المورّد بلا حركة مخزون.
+            ['5115', 'مردودات ومسموحات المشتريات', 'Purchase Returns & Allowances', 'expense', false, []],
             ['5120', 'الرواتب والأجور', 'Salaries', 'expense', false, []],
             ['5130', 'الإيجار', 'Rent', 'expense', false, []],
             ['5140', 'الوقود والمحروقات', 'Fuel', 'expense', false, []],

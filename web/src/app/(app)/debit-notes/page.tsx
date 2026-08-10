@@ -25,8 +25,8 @@ interface Partner { id: string; name: string }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
 
-export default function CreditNotesPage() {
-  const t = useTranslations('creditNotes');
+export default function DebitNotesPage() {
+  const t = useTranslations('debitNotes');
   const [data, setData] = useState<CreditNote[]>([]);
   const [partners, setPartners] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -36,7 +36,7 @@ export default function CreditNotesPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([api<{ data: CreditNote[] }>(`/credit-notes?type=sales${branchViewQuery(view, true)}`), api<{ data: Partner[] }>('/partners?type=customer')])
+    Promise.all([api<{ data: CreditNote[] }>(`/credit-notes?type=purchase${branchViewQuery(view, true)}`), api<{ data: Partner[] }>('/partners?type=supplier')])
       .then(([cn, prt]) => {
         setData(cn.data);
         setPartners(Object.fromEntries(prt.data.map((p) => [p.id, p.name])));
@@ -76,7 +76,7 @@ export default function CreditNotesPage() {
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
         {/* نطاق العرض ظاهر في الشاشة نفسها — لا مخفيّاً في الإعدادات. */}
         <BranchViewToggle value={view} onChange={setView} />
-        <Link href="/credit-notes/new">
+        <Link href="/debit-notes/new">
           <Button>
             <Plus className="h-4 w-4" strokeWidth={1.8} />
             {t('create')}
@@ -84,7 +84,7 @@ export default function CreditNotesPage() {
         </Link>
       </div>
 
-      <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="credit-notes" />
+      <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="debit-notes" />
     </div>
   );
 }

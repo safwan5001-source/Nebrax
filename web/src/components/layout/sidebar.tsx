@@ -137,7 +137,7 @@ const GROUPS: NavGroup[] = [
       { href: '/purchase-orders', icon: ClipboardCheck, key: 'purchaseOrders' },
       { href: '/purchases', icon: Receipt, key: 'purchaseInvoices', built: true },
       { href: '/purchase-returns', icon: Undo2, key: 'purchaseReturns', built: true },
-      { href: '/debit-notes', icon: FileMinus, key: 'debitNotes' },
+      { href: '/debit-notes', icon: FileMinus, key: 'debitNotes', built: true },
       { href: '/suppliers', icon: Handshake, key: 'suppliers', built: true },
       { href: '/supplier-payments', icon: CreditCard, key: 'supplierPayments', built: true },
       { href: '/purchase-settings', icon: SlidersHorizontal, key: 'purchaseSettings' },
