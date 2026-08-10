@@ -17,7 +17,16 @@ class CreditNoteController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        return CreditNoteResource::collection($this->scopeToActiveBranch(CreditNote::with('lines')->latest(), $request)->get())->response();
+        $type = $request->query('type');
+
+        $query = CreditNote::with('lines')->latest();
+        if (in_array($type, ['sales', 'purchase'], true)) {
+            $query->where('type', $type);
+        }
+
+        return CreditNoteResource::collection(
+            $this->scopeToActiveBranch($query, $request)->get()
+        )->response();
     }
 
     public function store(StoreCreditNoteRequest $request): JsonResponse

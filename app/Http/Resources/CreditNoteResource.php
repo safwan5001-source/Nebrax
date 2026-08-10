@@ -13,6 +13,7 @@ class CreditNoteResource extends JsonResource
         return [
             'id'                  => $this->id,
             'number'              => $this->number,
+            'type'                => $this->type,
             'partner_id'          => $this->partner_id,
             'refund_type'         => $this->refund_type,
             'status'              => $this->status,

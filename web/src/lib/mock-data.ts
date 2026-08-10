@@ -460,6 +460,7 @@ export const mockQuotes: MockQuote[] = [
 export interface MockCreditNote {
   id: string;
   number: string;
+  type: string;
   partner_id: string;
   refund_type: string;
   status: string;
@@ -473,16 +474,19 @@ export interface MockCreditNote {
 
 function creditNote(
   id: string, number: string, partner_id: string, date: string,
-  refundType: string, status: string, reason: string, lines: MockLine[]
+  refundType: string, status: string, reason: string, lines: MockLine[], type = 'sales'
 ): MockCreditNote {
   const { subtotal, tax_amount, total } = docTotals(lines);
-  return { id, number, partner_id, refund_type: refundType, status, note_date: date, subtotal, tax_amount, total, reason, lines };
+  return { id, number, type, partner_id, refund_type: refundType, status, note_date: date, subtotal, tax_amount, total, reason, lines };
 }
 
 export const mockCreditNotes: MockCreditNote[] = [
   creditNote('cn-3', 'CN-2026-0003', 'p1', '2026-06-22', 'credit', 'posted', 'خصم تسوية على فاتورة', [line('l1', 'تسوية سعر', 1, 800)]),
   creditNote('cn-2', 'CN-2026-0002', 'p5', '2026-06-15', 'cash', 'posted', 'استرداد جزئي', [line('l1', 'استرداد خدمة', 1, 1500)]),
   creditNote('cn-1', 'CN-2026-0001', 'p2', '2026-06-10', 'credit', 'draft', 'بضاعة ناقصة', [line('l1', 'نقص في التوريد', 2, 300)]),
+  // إشعارات مدينة (للموردين) — خصم بلا حركة مخزون.
+  creditNote('dn-2', 'DN-2026-0002', 'p7', '2026-06-19', 'credit', 'posted', 'خصم تجاري لاحق', [line('l1', 'خصم على توريد', 1, 1200)], 'purchase'),
+  creditNote('dn-1', 'DN-2026-0001', 'p8', '2026-06-05', 'credit', 'draft', 'تعويض عن تلف جزئي', [line('l1', 'تعويض', 1, 450)], 'purchase'),
 ];
 
 // ── المصروفات (الحسابات) ────────────────────────────────────────────────────
@@ -981,7 +985,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   }
   if (clean === '/invoices') return resolve({ data: mockInvoices });
   if (clean === '/quotes') return resolve({ data: mockQuotes });
-  if (clean === '/credit-notes') return resolve({ data: mockCreditNotes });
+  if (clean === '/credit-notes') {
+    const nt = new URLSearchParams(path.split('?')[1] ?? '').get('type');
+    const list = nt === 'sales' || nt === 'purchase' ? mockCreditNotes.filter((c) => c.type === nt) : mockCreditNotes;
+    return resolve({ data: list });
+  }
   if (clean === '/recurring-invoices') return resolve({ data: mockRecurring });
   if (clean === '/purchases') return resolve({ data: mockPurchases });
   if (clean === '/returns') {
