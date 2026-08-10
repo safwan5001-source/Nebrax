@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Invoice;
 use App\Models\Quote;
 use App\Models\QuoteLine;
+use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -45,7 +46,9 @@ class QuoteService
                 'number'        => $data['number'] ?? $this->nextNumber($date),
                 'partner_id'    => $data['partner_id'],
                 'quote_date'    => $date,
-                'valid_until'   => $data['valid_until'] ?? null,
+                // صلاحية افتراضية من إعدادات المبيعات حين لا يحدّدها المستخدم —
+                // فيخرج العرض بتاريخ انتهاء بدل أن يبقى مفتوحاً إلى الأبد.
+                'valid_until'   => $data['valid_until'] ?? $this->defaultValidUntil($date),
                 'status'        => $data['status'] ?? 'draft',
                 'tax_inclusive' => $inclusive,
                 'notes'         => $data['notes'] ?? null,
@@ -155,7 +158,7 @@ class QuoteService
         foreach ($items as $item) {
             $qty       = (int) ($item['quantity'] ?? 1);
             $unitPrice = (int) ($item['unit_price'] ?? 0);
-            $rate      = (int) ($item['tax_rate'] ?? 15);
+            $rate      = (int) ($item['tax_rate'] ?? (int) Settings::get('sales', 'default_tax_rate'));
 
             if ($qty <= 0 || $unitPrice < 0) {
                 throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
@@ -181,6 +184,17 @@ class QuoteService
         }
 
         return [$subtotal, $taxTotal];
+    }
+
+    /**
+     * تاريخ انتهاء الصلاحية من `sales.quote_validity_days`.
+     * صفرٌ يعني «بلا انتهاء» — فيبقى الحقل فارغاً كما كان قبل الإعداد.
+     */
+    protected function defaultValidUntil(string $date): ?string
+    {
+        $days = (int) Settings::get('sales', 'quote_validity_days');
+
+        return $days > 0 ? \Illuminate\Support\Carbon::parse($date)->addDays($days)->toDateString() : null;
     }
 
     /** توليد رقم عرض تسلسلي: QUO-2025-00001 */
