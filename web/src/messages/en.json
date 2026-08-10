@@ -1635,5 +1635,23 @@
       "empty": "No purchase orders",
       "due_label": "Delivery date"
     }
+  },
+  "purchaseSettings": {
+    "title": "Purchase settings",
+    "subtitle": "Defaults applied to purchase documents and bills. No accounting effect on their own.",
+    "defaults": "Defaults",
+    "default_tax_rate": "Default tax rate (%)",
+    "default_tax_rate_hint": "Applied to any line without an explicit rate.",
+    "default_payment_type": "Default payment type",
+    "default_payment_type_hint": "Used when generating a bill from a purchase order without one.",
+    "payment_credit": "Credit",
+    "payment_cash": "Cash",
+    "default_tax_inclusive": "Default tax mode",
+    "default_tax_inclusive_hint": "Inclusive: the price already contains tax, which is extracted from it.",
+    "tax_inclusive": "Tax inclusive",
+    "tax_exclusive": "Tax exclusive",
+    "purchase_prefix": "Purchase bill number prefix",
+    "purchase_prefix_hint": "Example:",
+    "save": "Save settings"
   }
 }

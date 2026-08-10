@@ -15,7 +15,10 @@ class StorePurchaseRequest extends FormRequest
     {
         return [
             'partner_id'          => ['required', 'uuid'],
-            'payment_type'        => ['required', 'in:cash,credit'],
+            // اختياري لا مطلوب: الغياب يعني «استخدم تفضيل المستأجر»
+            // (`purchases.default_payment_type`). كونه مطلوباً كان يجعل
+            // التفضيل حبراً على ورق — لا طلبَ يصل بلا قيمة فيُقرأ.
+            'payment_type'        => ['nullable', 'in:cash,credit'],
             'purchase_date'       => ['nullable', 'date'],
             'due_date'            => ['nullable', 'date'],
             'supplier_invoice_no' => ['nullable', 'string', 'max:255'],

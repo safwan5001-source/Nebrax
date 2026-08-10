@@ -1635,5 +1635,23 @@
       "empty": "لا توجد أوامر شراء",
       "due_label": "تاريخ التسليم"
     }
+  },
+  "purchaseSettings": {
+    "title": "إعدادات المشتريات",
+    "subtitle": "قيم افتراضية تسري على مستندات الشراء وفواتيره. لا أثر محاسبي لها بذاتها.",
+    "defaults": "الافتراضات",
+    "default_tax_rate": "نسبة الضريبة الافتراضية (%)",
+    "default_tax_rate_hint": "تُطبَّق على السطر الذي لا تُحدَّد له نسبة.",
+    "default_payment_type": "نوع السداد الافتراضي",
+    "default_payment_type_hint": "يُستخدم عند توليد فاتورة من أمر شراء بلا تحديد.",
+    "payment_credit": "آجل",
+    "payment_cash": "نقدي",
+    "default_tax_inclusive": "وضع الضريبة الافتراضي",
+    "default_tax_inclusive_hint": "متضمّن: السعر شامل الضريبة فتُستخرَج منه.",
+    "tax_inclusive": "شامل الضريبة",
+    "tax_exclusive": "غير شامل الضريبة",
+    "purchase_prefix": "بادئة ترقيم فاتورة الشراء",
+    "purchase_prefix_hint": "مثال:",
+    "save": "حفظ الإعدادات"
   }
 }

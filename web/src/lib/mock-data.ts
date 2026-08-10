@@ -489,6 +489,14 @@ export const mockCreditNotes: MockCreditNote[] = [
   creditNote('dn-1', 'DN-2026-0001', 'p8', '2026-06-05', 'credit', 'draft', 'تعويض عن تلف جزئي', [line('l1', 'تعويض', 1, 450)], 'purchase'),
 ];
 
+// ── إعدادات المشتريات ───────────────────────────────────────────────────────
+export const mockPurchaseSettings = {
+  default_tax_rate: 15,
+  default_payment_type: 'credit',
+  default_tax_inclusive: false,
+  purchase_prefix: 'BILL',
+};
+
 // ── دورة الشراء (طلب · طلب عروض · عرض مورّد · أمر شراء) ──────────────────────
 export interface MockProcurement {
   id: string;
@@ -1053,6 +1061,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const list = nt === 'sales' || nt === 'purchase' ? mockCreditNotes.filter((c) => c.type === nt) : mockCreditNotes;
     return resolve({ data: list });
   }
+  if (clean === '/purchase-settings') return resolve({ data: mockPurchaseSettings });
   if (clean === '/procurement') {
     const pt = new URLSearchParams(path.split('?')[1] ?? '').get('type');
     return resolve({ data: pt ? mockProcurement.filter((d) => d.type === pt) : mockProcurement });

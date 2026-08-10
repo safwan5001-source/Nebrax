@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\PosSessionController;
 use App\Http\Controllers\Api\ProcurementController;
+use App\Http\Controllers\Api\PurchaseSettingsController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RecurringInvoiceController;
@@ -227,6 +228,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // إعدادات المبيعات (تفضيلات غير محاسبية)
         Route::get('sales-settings', [SalesSettingsController::class, 'show'])->middleware($perm('invoices.view'));
         Route::put('sales-settings', [SalesSettingsController::class, 'update'])->middleware($perm('company.manage'));
+
+        // إعدادات المشتريات (تفضيلات؛ تُقرأ فعلاً في خدمتَي الشراء والمشتريات)
+        Route::get('purchase-settings', [PurchaseSettingsController::class, 'show'])->middleware($perm('purchases.view'));
+        Route::put('purchase-settings', [PurchaseSettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // أقسام إعدادات المبيعات المتعددة (حالات/تصميمات/قوائم أسعار/شحن…)
         Route::get('sales-config/{section}', [SalesConfigController::class, 'show'])->middleware($perm('invoices.view'));

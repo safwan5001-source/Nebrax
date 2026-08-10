@@ -7,6 +7,7 @@ use App\Models\ProcurementDocument;
 use App\Models\ProcurementLine;
 use App\Models\Purchase;
 use App\Models\RfqInvitation;
+use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -81,7 +82,7 @@ class ProcurementService
 
         return DB::transaction(function () use ($data, $items, $type) {
             $date      = $data['doc_date'] ?? now()->toDateString();
-            $inclusive = (bool) ($data['tax_inclusive'] ?? false);
+            $inclusive = (bool) ($data['tax_inclusive'] ?? Settings::get('purchases', 'default_tax_inclusive'));
 
             $doc = ProcurementDocument::create([
                 'type'               => $type,
@@ -190,7 +191,7 @@ class ProcurementService
      * تحويل أمر الشراء إلى فاتورة مشتريات (draft). لا ترحيل تلقائي — يراجع
      * المستخدم الفاتورة ثم يرحّلها، فيبدأ الأثر المحاسبي عبر المحرك وحده.
      */
-    public function convertToPurchase(ProcurementDocument $doc, string $paymentType = 'credit'): Purchase
+    public function convertToPurchase(ProcurementDocument $doc, ?string $paymentType = null): Purchase
     {
         if ($doc->type !== 'order') {
             throw new RuntimeException('فاتورة المشتريات تُولَّد من أمر شراء فقط.');
@@ -204,7 +205,7 @@ class ProcurementService
         return DB::transaction(function () use ($doc, $paymentType) {
             $purchase = $this->purchases->create([
                 'partner_id'    => $doc->partner_id,
-                'payment_type'  => $paymentType,
+                'payment_type'  => $paymentType ?? Settings::get('purchases', 'default_payment_type'),
                 'tax_inclusive' => $doc->tax_inclusive,
                 'notes'         => "محوّل من أمر الشراء {$doc->number}",
                 'created_by'    => $doc->created_by,
@@ -234,11 +235,12 @@ class ProcurementService
     protected function writeLines(ProcurementDocument $doc, array $items, bool $inclusive): void
     {
         $subtotal = $taxTotal = 0;
+        $defaultRate = (int) Settings::get('purchases', 'default_tax_rate');
 
         foreach ($items as $item) {
             $qty       = (int) ($item['quantity'] ?? 1);
             $unitPrice = (int) ($item['unit_price'] ?? 0);
-            $rate      = (int) ($item['tax_rate'] ?? 15);
+            $rate      = (int) ($item['tax_rate'] ?? $defaultRate);
 
             if ($qty <= 0 || $unitPrice < 0) {
                 throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');

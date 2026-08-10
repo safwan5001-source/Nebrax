@@ -127,7 +127,7 @@ const GROUPS: NavGroup[] = [
   },
   {
     // المشتريات — مجموعة مستقلّة (كانت أقسامها مبعثرة تحت المخزون).
-    // دورة الشراء الأربع مبنيّة؛ يبقى «إعدادات المشتريات» رابطاً بشارة «قريباً».
+    // المجموعة مكتملة: عشرة أقسام مبنيّة.
     title: 'purchases',
     icon: ShoppingCart,
     items: [
@@ -140,7 +140,7 @@ const GROUPS: NavGroup[] = [
       { href: '/debit-notes', icon: FileMinus, key: 'debitNotes', built: true },
       { href: '/suppliers', icon: Handshake, key: 'suppliers', built: true },
       { href: '/supplier-payments', icon: CreditCard, key: 'supplierPayments', built: true },
-      { href: '/purchase-settings', icon: SlidersHorizontal, key: 'purchaseSettings' },
+      { href: '/purchase-settings', icon: SlidersHorizontal, key: 'purchaseSettings', built: true },
     ],
   },
   {
