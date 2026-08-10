@@ -99,21 +99,28 @@ class InvoiceService
             $invoice->lines()->delete();
 
             // ═══════════════════════════════════════════════════════════
-            //  في التعديل: الحقل الغائب **يبقى كما هو** — لا يعود لافتراض
+            //  في التعديل: **الغائب يبقى، والمُرسَل فارغاً يُمحى**
             // ═══════════════════════════════════════════════════════════
-            //  كان `tax_inclusive` يعود إلى `false` عند غيابه (وهو اختياري في
-            //  الطلب)، فتعديلُ ملاحظةٍ وحدها يقلب وضع الضريبة **ويغيّر إجمالي
-            //  الفاتورة**: ١١٥٠ ← ١٣٢٢٫٥٠ في فاتورة لم يُمسّ مبلغُها.
-            //  الافتراض معناه «قيمة عند الإنشاء» لا «قيمة عند كل حفظ».
+            //  `??` لا يفرّق بين الاثنين، فكان الغياب محواً:
+            //   • `tax_inclusive` يعود `false` ⇒ تعديل ملاحظةٍ يقلب وضع الضريبة
+            //     **ويغيّر الإجمالي** ١١٥٠ ← ١٣٢٢٫٥٠ في فاتورة لم يُمسّ مبلغُها.
+            //   • `cost_center_id` يُمحى ⇒ سطر الإيراد يفقد وسمه فيسقط من
+            //     تقرير ربحية مراكز التكلفة صامتاً.
+            //   • `due_date` يُمحى ⇒ الفاتورة تتغيّر خانتها في أعمار الديون.
+            //
+            //  `array_key_exists` يفصل «لم يُرسَل» عن «أُرسل فارغاً» — نفس
+            //  علاج `branch_id` في `LedgerService` (#152).
+            $keep = fn (string $key, $current) => array_key_exists($key, $data) ? $data[$key] : $current;
+
             $invoice->update([
                 'partner_id'     => $data['partner_id'],
-                'payment_type'   => $data['payment_type'] ?? $invoice->payment_type,
-                'invoice_date'   => $data['invoice_date'] ?? $invoice->invoice_date,
-                'due_date'       => $data['due_date'] ?? null,
-                'cost_center_id' => $data['cost_center_id'] ?? null,
-                'salesperson_id' => $data['salesperson_id'] ?? null,
-                'tax_inclusive'  => (bool) ($data['tax_inclusive'] ?? $invoice->tax_inclusive),
-                'notes'          => $data['notes'] ?? null,
+                'payment_type'   => $keep('payment_type', $invoice->payment_type) ?? $invoice->payment_type,
+                'invoice_date'   => $keep('invoice_date', $invoice->invoice_date) ?? $invoice->invoice_date,
+                'due_date'       => $keep('due_date', $invoice->due_date),
+                'cost_center_id' => $keep('cost_center_id', $invoice->cost_center_id),
+                'salesperson_id' => $keep('salesperson_id', $invoice->salesperson_id),
+                'tax_inclusive'  => (bool) ($keep('tax_inclusive', $invoice->tax_inclusive) ?? $invoice->tax_inclusive),
+                'notes'          => $keep('notes', $invoice->notes),
             ]);
 
             $this->applyItemsAndTotals($invoice, $items, $data);
@@ -199,16 +206,24 @@ class InvoiceService
             $taxTotal += $lineTax;
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        //  حقول المال الثلاثة: الغائب **يبقى**، والمُرسَل يحلّ محلّه
+        // ═══════════════════════════════════════════════════════════════
+        //  كانت `?? 0` تصفّرها عند الغياب، وهذه الدالة تخدم الإنشاء والتعديل
+        //  معاً — فتعديلُ ملاحظةٍ يمحو الشحن والخصم والتسوية ويهبط بالإجمالي
+        //  ١٦٠٥ ← ١١٥٠. عند الإنشاء لا فرق: الرأس يحمل القيم المُرسَلة ذاتها.
+        $money = fn (string $key, $current) => (int) (array_key_exists($key, $data) ? $data[$key] : $current);
+
         // خصم على مستوى الفاتورة (net method): يخفّض الإيراد والضريبة تناسبياً.
-        [$discount, $goodsVat] = $this->applyDiscount($subtotal, $taxTotal, (int) ($data['discount'] ?? 0));
+        [$discount, $goodsVat] = $this->applyDiscount($subtotal, $taxTotal, $money('discount', $invoice->discount));
 
         // الشحن: إيراد خاضع للضريبة يُضاف فوق السلع.
-        $shipping    = max(0, (int) ($data['shipping'] ?? 0));
+        $shipping    = max(0, $money('shipping', $invoice->shipping));
         $shippingVat = $shipping > 0 ? $this->calcTax($shipping, self::VAT_RATE) : 0;
         $taxAmount   = $goodsVat + $shippingVat;
 
         // التسوية/التقريب (+/−، غير خاضعة للضريبة) تُعدّل الإجمالي النهائي.
-        $adjustment  = (int) ($data['adjustment'] ?? 0);
+        $adjustment  = $money('adjustment', $invoice->adjustment);
         $total       = ($subtotal - $discount) + $shipping + $taxAmount + $adjustment;
         if ($total < 0) {
             throw new RuntimeException('التسوية تجعل إجمالي الفاتورة سالباً.');
