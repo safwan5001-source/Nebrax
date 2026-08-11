@@ -31,6 +31,26 @@ class DocumentRevision extends BaseModel implements CompanyWide
     /** ميكروثانية — يرتّب الخطّ الزمني قيوداً تقع في الثانية نفسها. */
     protected $dateFormat = 'Y-m-d H:i:s.u';
 
+    /**
+     * الأنواع المعروفة: مفتاحٌ قصير ↔ كلاس. مصدر واحد يتشاركه المتحكّم (قائمة
+     * بيضاء للاستعلام) والمورد (اسمٌ مقروء في التغذية) — فلا ينحرف أحدهما.
+     */
+    public const TYPES = [
+        'invoice'      => \App\Models\Invoice::class,
+        'quote'        => \App\Models\Quote::class,
+        'procurement'  => \App\Models\ProcurementDocument::class,
+        'stocktake'    => \App\Models\Stocktake::class,
+        'stock_permit' => \App\Models\StockPermit::class,
+    ];
+
+    /** المفتاح القصير لكلاس مستند — أو null لنوع خارج القائمة. */
+    public static function typeKey(?string $class): ?string
+    {
+        $key = array_search($class, self::TYPES, true);
+
+        return $key === false ? null : $key;
+    }
+
     /** مدّة الاحتفاظ بالأيام — سنتان تغطّيان دورة مراجعة ضريبية كاملة. */
     public const RETENTION_DAYS = 730;
 

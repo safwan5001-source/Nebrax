@@ -23,6 +23,15 @@ export function formatRiyalShort(value: string | number | null | undefined): str
   return `${shortFormatter.format(n)} ﷼`;
 }
 
+/**
+ * رقمٌ مختصر **بلا رمز العملة** — للبطاقات التي تعرض الوحدة بحجم أصغر
+ * بجانب الرقم (كما في مرجع لوحة التحكم). استعمال `formatRiyalShort` هناك
+ * كان يُنتج «﷼ ريال» مكرّرة.
+ */
+export function formatNumberShort(value: string | number | null | undefined): string {
+  return shortFormatter.format(Number(value ?? 0));
+}
+
 export function isNegative(value: string | number | null | undefined): boolean {
   return Number(value ?? 0) < 0;
 }

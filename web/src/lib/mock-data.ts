@@ -504,6 +504,49 @@ export const mockRevisions = [
   },
 ];
 
+// ── لوحة التحكم: تفصيل المبيعات · تغذية النشاطات · ورديات ─────────────────
+export const mockBreakdown: Record<string, { key: string | null; label: string; amount: string }[]> = {
+  day: [
+    { key: '2026-08-04', label: '2026-08-04', amount: '12400.00' },
+    { key: '2026-08-05', label: '2026-08-05', amount: '15800.00' },
+    { key: '2026-08-06', label: '2026-08-06', amount: '9600.00' },
+    { key: '2026-08-07', label: '2026-08-07', amount: '21300.00' },
+    { key: '2026-08-08', label: '2026-08-08', amount: '18450.00' },
+    { key: '2026-08-09', label: '2026-08-09', amount: '27900.00' },
+    { key: '2026-08-10', label: '2026-08-10', amount: '31200.00' },
+  ],
+  product: [
+    { key: 'pr2', label: 'حديد تسليح 12مم', amount: '48900.00' },
+    { key: 'pr1', label: 'إسمنت مقاوم', amount: '32400.00' },
+    { key: 'pr3', label: 'مواد تغليف', amount: '11250.00' },
+  ],
+  category: [
+    { key: 'مواد بناء', label: 'مواد بناء', amount: '81300.00' },
+    { key: null, label: 'غير محدّد', amount: '11250.00' },
+  ],
+  branch: [
+    { key: 'b1', label: 'فرع الدمام', amount: '54600.00' },
+    { key: 'b2', label: 'فرع الجبيل', amount: '37950.00' },
+  ],
+  salesperson: [
+    { key: 'e1', label: 'سارة إبراهيم', amount: '61200.00' },
+    { key: 'e2', label: 'خالد المطيري', amount: '31350.00' },
+  ],
+};
+
+export const mockFeed = [
+  { id: 'rv1', action: 'status', document_type: 'invoice', document_number: 'INV-2026-00023', user_name: 'مستخدم المعاينة', created_at: '2026-08-10T09:02:00+03:00', changes: {} },
+  { id: 'rv2', action: 'created', document_type: 'invoice', document_number: 'INV-2026-00023', user_name: 'مستخدم المعاينة', created_at: '2026-08-09T16:41:00+03:00', changes: {} },
+  { id: 'rv3', action: 'created', document_type: 'quote', document_number: 'QUO-2026-00007', user_name: 'مستخدم المعاينة', created_at: '2026-08-09T14:15:00+03:00', changes: {} },
+  { id: 'rv4', action: 'status', document_type: 'stock_permit', document_number: 'SI-2026-00002', user_name: 'مستخدم المعاينة', created_at: '2026-08-08T11:20:00+03:00', changes: {} },
+];
+
+export const mockSessions = [
+  { id: 'ps1', number: 'POS-2026-00012', status: 'open', opening_balance: '3000.00', closing_balance: null, opened_at: '2026-08-10T09:02:00+03:00' },
+  { id: 'ps2', number: 'POS-2026-00011', status: 'closed', opening_balance: '2500.00', closing_balance: '4120.00', opened_at: '2026-08-09T08:30:00+03:00' },
+  { id: 'ps3', number: 'POS-2026-00010', status: 'closed', opening_balance: '2000.00', closing_balance: '2860.50', opened_at: '2026-08-08T08:15:00+03:00' },
+];
+
 // ── الجرد ───────────────────────────────────────────────────────────────────
 export const mockStocktakes = [
   {
@@ -1126,6 +1169,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/purchase-settings') return resolve({ data: mockPurchaseSettings });
   if (clean === '/stock-permits') return resolve({ data: mockStockPermits });
   if (clean === '/stocktakes') return resolve({ data: mockStocktakes });
+  if (clean.startsWith('/dashboard/sales-breakdown')) {
+    const by = new URLSearchParams(path.split('?')[1] ?? '').get('by') ?? 'day';
+    return resolve({ dimension: by, data: mockBreakdown[by] ?? [] });
+  }
+  if (clean === '/revisions') return resolve({ data: mockFeed });
+  if (clean === '/pos-sessions') return resolve({ data: mockSessions });
   if (clean.startsWith('/revisions/')) return resolve({ data: mockRevisions });
   if (clean === '/procurement') {
     const pt = new URLSearchParams(path.split('?')[1] ?? '').get('type');
