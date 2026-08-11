@@ -42,7 +42,7 @@ export function Registers() {
     <section>
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <ShoppingCart className="h-[18px] w-[18px] text-text" strokeWidth={2} />
+          <ShoppingCart className="h-[18px] w-[18px] text-muted" strokeWidth={1.7} />
           <h2 className="text-[14.5px] font-semibold text-text">{t('registers')}</h2>
         </div>
         <Link href="/pos/sessions" className="text-[13px] font-semibold text-primary hover:underline">
@@ -70,17 +70,11 @@ export function Registers() {
                     <Badge tone={open ? 'positive' : 'muted'}>{t(open ? 'reg_open' : 'reg_closed')}</Badge>
                   </div>
                   <div className="flex items-center gap-2.5">
-                    <span
-                      className={cn(
-                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]',
-                        open ? 'bg-positive/10' : 'bg-background'
-                      )}
-                    >
-                      <Icon
-                        className={cn('h-[17px] w-[17px]', open ? 'text-positive' : 'text-muted')}
-                        strokeWidth={2}
-                      />
-                    </span>
+                    {/* أيقونة عارية — لا صندوق ملوّن (DESIGN_SYSTEM.md). */}
+                    <Icon
+                      className={cn('h-[17px] w-[17px] shrink-0', open ? 'text-positive' : 'text-muted')}
+                      strokeWidth={1.7}
+                    />
                     <div className="min-w-0">
                       <p className="text-[11.5px] text-muted">
                         {t(open ? 'reg_opening_balance' : 'reg_closing_balance')}

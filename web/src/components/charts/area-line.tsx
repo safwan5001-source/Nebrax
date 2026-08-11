@@ -39,9 +39,6 @@ export function AreaLine({
   const line = points.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
   const area = `${line} L ${W} ${H} L 0 ${H} Z`;
 
-  // معرّف فريد لكل نسخة: تدرّجان بالمعرّف نفسه في صفحة واحدة يتنازعان.
-  const gradientId = `area-${color.replace(/[^a-z0-9]/gi, '')}-${points.length}`;
-
   const lastX = x(points.length - 1);
   const lastY = y(points[points.length - 1]);
 
@@ -54,13 +51,8 @@ export function AreaLine({
       role="img"
       aria-label={label}
     >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.16" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gradientId})`} />
+      {/* تعبئة مسطّحة خفيفة لا تدرّج — `DESIGN_SYSTEM.md`: «بلا زخرفة: لا تدرّجات». */}
+      <path d={area} fill={color} fillOpacity="0.1" />
       <path
         d={line}
         fill="none"

@@ -199,7 +199,7 @@ export default function DashboardPage() {
                 className="flex items-center justify-between rounded-[10px] border border-border bg-surface px-4 py-4 text-sm font-semibold text-text transition-colors hover:border-primary hover:bg-primary-soft"
               >
                 <span className="truncate">{t(a.key)}</span>
-                <Icon className="h-[18px] w-[18px] shrink-0 text-primary" strokeWidth={2} />
+                <Icon className="h-[18px] w-[18px] shrink-0 text-primary" strokeWidth={1.7} />
               </Link>
             );
           })}
@@ -210,9 +210,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-[300px_1fr]">
         <Card className="hidden rounded-2xl lg:block">
           <CardContent className="flex flex-col gap-3.5 p-5">
-            <span className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-primary-soft">
-              <Package className="h-[19px] w-[19px] text-primary" strokeWidth={2} />
-            </span>
+            {/* أيقونة عارية — لا صندوق ملوّن (DESIGN_SYSTEM.md). */}
+            <Package className="h-[19px] w-[19px] text-muted" strokeWidth={1.7} />
             <div>
               <p className="text-[13px] font-medium text-muted">{t('inventory_value')}</p>
               {loading ? (
@@ -370,7 +369,7 @@ function Bar({
 }) {
   const fill =
     tone === 'positive'
-      ? 'bg-gradient-to-l from-positive to-positive/70'
+      ? 'bg-positive'
       : tone === 'negative'
         ? 'bg-negative'
         : 'bg-border';

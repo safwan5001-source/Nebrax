@@ -37,8 +37,10 @@ export function KpiCard({
   sub?: { label: string; value: string; tone?: 'positive' | 'negative' | 'muted' };
   loading?: boolean;
 }) {
-  const iconColor = tone === 'positive' ? 'text-positive' : 'text-primary';
-  const iconBg = tone === 'positive' ? 'bg-positive/10' : 'bg-primary-soft';
+  // أيقونة عارية بلا صندوق ملوّن — `DESIGN_SYSTEM.md`: «لا أيقونات في صناديق
+  // ملوّنة» (وردت في مبادئ التخطيط وفي «ما يجب تجنّبه» معاً). النموذج المرجعي
+  // يضعها في صناديق، والنظام أَولى عند التعارض.
+  const iconColor = tone === 'positive' ? 'text-positive' : 'text-muted';
   const subColor =
     sub?.tone === 'negative' ? 'text-negative' : sub?.tone === 'muted' ? 'text-muted' : 'text-positive';
 
@@ -47,9 +49,7 @@ export function KpiCard({
       <CardContent className="p-[18px]">
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-medium text-muted">{label}</span>
-          <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px]', iconBg)}>
-            <Icon className={cn('h-4 w-4', iconColor)} strokeWidth={2} />
-          </span>
+          <Icon className={cn('h-4 w-4 shrink-0', iconColor)} strokeWidth={1.7} />
         </div>
 
         {loading ? (

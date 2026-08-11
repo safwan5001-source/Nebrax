@@ -54,9 +54,8 @@ export function ActivityFeed({ limit = 6 }: { limit?: number }) {
 
         return (
           <li key={r.id} className="flex items-start gap-3 border-b border-border py-3 last:border-0 last:pb-1">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-background">
-              <Icon className="h-[15px] w-[15px] text-muted" strokeWidth={2} />
-            </span>
+            {/* أيقونة عارية — لا صندوق ملوّن (DESIGN_SYSTEM.md). */}
+            <Icon className="mt-0.5 h-[15px] w-[15px] shrink-0 text-muted" strokeWidth={1.7} />
             <div className="min-w-0">
               <p className="text-[13.5px] font-medium leading-snug text-text">
                 {t(`act_${r.action}`, { doc: docLabel })}{' '}
