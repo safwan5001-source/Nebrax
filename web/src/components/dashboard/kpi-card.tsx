@@ -44,6 +44,11 @@ export function KpiCard({
   const subColor =
     sub?.tone === 'negative' ? 'text-negative' : sub?.tone === 'muted' ? 'text-muted' : 'text-positive';
 
+  // `DESIGN_SYSTEM.md` — «الأرقام المالية: السالب أحمر مع إشارة لا لوناً وحده».
+  // الإشارة يضعها المنسّق (`-3,321`)، واللون هنا. رقمٌ سالب بلون النصّ العادي
+  // يمرّ دون أن يُلاحَظ — وقد ظهر ذلك فعلاً في «قيمة المخزون» بالإنتاج.
+  const isNegativeValue = value.trim().startsWith('-');
+
   return (
     <Card className="rounded-2xl">
       <CardContent className="p-[18px]">
@@ -56,7 +61,14 @@ export function KpiCard({
           <Skeleton className="mt-3 h-7 w-32" />
         ) : (
           <div className="mt-2.5 flex items-baseline gap-1.5">
-            <span className="num text-[26px] font-bold leading-tight text-text">{value}</span>
+            <span
+              className={cn(
+                'num text-[26px] font-bold leading-tight',
+                isNegativeValue ? 'text-negative' : 'text-text'
+              )}
+            >
+              {value}
+            </span>
             {unit && <span className="text-[13px] font-medium text-muted">{unit}</span>}
           </div>
         )}
