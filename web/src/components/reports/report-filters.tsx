@@ -84,12 +84,12 @@ export function ReportFilters({
     <div className="no-print flex flex-wrap items-end gap-3 rounded border border-border bg-surface p-3">
       <div className="space-y-1.5">
         <Label htmlFor="rf-from">{t('from')}</Label>
-        <Input id="rf-from" type="date" dir="ltr" className="w-40" value={value.from}
+        <Input id="rf-from" type="date" dir="ltr" className="w-40 text-start [unicode-bidi:isolate]" value={value.from}
           onChange={(e) => onChange({ ...value, from: e.target.value })} />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="rf-to">{t('to')}</Label>
-        <Input id="rf-to" type="date" dir="ltr" className="w-40" value={value.to}
+        <Input id="rf-to" type="date" dir="ltr" className="w-40 text-start [unicode-bidi:isolate]" value={value.to}
           onChange={(e) => onChange({ ...value, to: e.target.value })} />
       </div>
 

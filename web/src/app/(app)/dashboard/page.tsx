@@ -325,33 +325,59 @@ function RecentInvoices({
 }) {
   if (loading) return <Skeleton className="h-32 w-full" />;
 
+  const rows = invoices.slice(0, 5);
+
   return (
-    <Table>
-      <THead>
-        <TR>
-          <TH>{ti('number')}</TH>
-          <TH>{ti('date')}</TH>
-          <TH className="text-end">{ti('total')}</TH>
-          <TH>{ti('status')}</TH>
-        </TR>
-      </THead>
-      <TBody>
-        {invoices.slice(0, 5).map((inv) => (
-          <TR key={inv.id}>
-            <TD>
+    <>
+      {/* بطاقات على الضيّق وجدول على الواسع — `DESIGN_SYSTEM.md`: «الجداول →
+          بطاقات على الجوال». جدولٌ بأربعة أعمدة في عرض ٤١٢px يلفّ كل خلية
+          سطرين فيصير أقلّ قابلية للقراءة من قائمة. */}
+      <ul className="space-y-2 sm:hidden">
+        {rows.map((inv) => (
+          <li key={inv.id} className="rounded border border-border p-3">
+            <div className="flex items-center justify-between gap-2">
               <Link href={`/invoices/${inv.id}`} className="num font-semibold text-primary hover:underline">
                 {inv.number}
               </Link>
-            </TD>
-            <TD className="num text-muted">{inv.invoice_date}</TD>
-            <TD className="num text-end">{formatRiyal(inv.total)}</TD>
-            <TD>
               <Badge tone={inv.status === 'posted' ? 'positive' : 'muted'}>{ts(inv.status)}</Badge>
-            </TD>
-          </TR>
+            </div>
+            <div className="mt-1.5 flex items-baseline justify-between gap-2 text-xs">
+              <span className="num text-muted">{inv.invoice_date}</span>
+              <span className="num font-semibold text-text">{formatRiyal(inv.total)}</span>
+            </div>
+          </li>
         ))}
-      </TBody>
-    </Table>
+      </ul>
+
+      <div className="hidden sm:block">
+        <Table>
+          <THead>
+            <TR>
+              <TH>{ti('number')}</TH>
+              <TH>{ti('date')}</TH>
+              <TH className="text-end">{ti('total')}</TH>
+              <TH>{ti('status')}</TH>
+            </TR>
+          </THead>
+          <TBody>
+            {rows.map((inv) => (
+              <TR key={inv.id}>
+                <TD>
+                  <Link href={`/invoices/${inv.id}`} className="num font-semibold text-primary hover:underline">
+                    {inv.number}
+                  </Link>
+                </TD>
+                <TD className="num text-muted">{inv.invoice_date}</TD>
+                <TD className="num text-end">{formatRiyal(inv.total)}</TD>
+                <TD>
+                  <Badge tone={inv.status === 'posted' ? 'positive' : 'muted'}>{ts(inv.status)}</Badge>
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </div>
+    </>
   );
 }
 
