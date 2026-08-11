@@ -504,6 +504,28 @@ export const mockRevisions = [
   },
 ];
 
+// ── الجرد ───────────────────────────────────────────────────────────────────
+export const mockStocktakes = [
+  {
+    id: 'stk-2', number: 'STK-2026-00002', warehouse_name: 'المخزن الرئيسي',
+    stocktake_date: '2026-06-28', status: 'draft', notes: null,
+    difference_value: '0.00', journal_entry_id: null,
+    lines: [
+      { id: 'sl1', product_id: 'pr1', product_name: 'إسمنت مقاوم', system_quantity: 420, counted_quantity: null, difference: null, difference_value: '0.00' },
+      { id: 'sl2', product_id: 'pr2', product_name: 'حديد تسليح 12مم', system_quantity: 85, counted_quantity: null, difference: null, difference_value: '0.00' },
+    ],
+  },
+  {
+    id: 'stk-1', number: 'STK-2026-00001', warehouse_name: 'المخزن الرئيسي',
+    stocktake_date: '2026-03-31', status: 'posted', notes: 'جرد الربع الأول',
+    difference_value: '-1,125.00', journal_entry_id: 'je-7',
+    lines: [
+      { id: 'sl3', product_id: 'pr1', product_name: 'إسمنت مقاوم', system_quantity: 300, counted_quantity: 250, difference: -50, difference_value: '-1125.00' },
+      { id: 'sl4', product_id: 'pr2', product_name: 'حديد تسليح 12مم', system_quantity: 60, counted_quantity: 60, difference: 0, difference_value: '0.00' },
+    ],
+  },
+];
+
 // ── الأذون المخزنية ─────────────────────────────────────────────────────────
 export const mockStockPermits = [
   {
@@ -1103,6 +1125,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   }
   if (clean === '/purchase-settings') return resolve({ data: mockPurchaseSettings });
   if (clean === '/stock-permits') return resolve({ data: mockStockPermits });
+  if (clean === '/stocktakes') return resolve({ data: mockStocktakes });
   if (clean.startsWith('/revisions/')) return resolve({ data: mockRevisions });
   if (clean === '/procurement') {
     const pt = new URLSearchParams(path.split('?')[1] ?? '').get('type');
@@ -1159,6 +1182,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const creditNoteMatch = clean.match(/^\/credit-notes\/([^/]+)$/);
   if (creditNoteMatch) {
     const found = mockCreditNotes.find((c) => c.id === creditNoteMatch[1]) ?? mockCreditNotes[0];
+    return resolve({ data: found });
+  }
+
+  const stocktakeMatch = clean.match(/^\/stocktakes\/([^/]+)$/);
+  if (stocktakeMatch) {
+    const found = mockStocktakes.find((s) => s.id === stocktakeMatch[1]) ?? mockStocktakes[0];
     return resolve({ data: found });
   }
 

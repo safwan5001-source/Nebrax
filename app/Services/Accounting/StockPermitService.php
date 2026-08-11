@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\Account;
 use App\Models\Product;
+use App\Models\ProductWarehouseStock;
 use App\Models\StockPermit;
 use App\Models\StockPermitLine;
 use App\Models\Warehouse;
@@ -171,7 +172,7 @@ class StockPermitService
             $product  = $line->product;
             $unitCost = (int) $product->avg_cost;
 
-            $this->assertAvailable($product, $line->quantity);
+            $this->assertAvailable($product, $line->quantity, $permit->warehouse_id);
 
             $this->inventory->applyIssue($product, $line->quantity, $unitCost, [
                 'warehouse_id' => $permit->warehouse_id,
@@ -270,12 +271,42 @@ class StockPermitService
         ];
     }
 
-    /** لا يُصرَف ما ليس موجوداً — الكمية السالبة تفسد التقييم بلا رجعة. */
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  لا يُصرَف ما ليس موجوداً — **في المخزن المقصود**، لا في الشركة
+     * ═══════════════════════════════════════════════════════════════
+     *  فحصُ الإجمالي وحده يمرّر صرفَ ٢٠ من مخزنٍ فيه ٥ لأن الشركة تملك ١٠٠،
+     *  فيهبط رصيد المخزن إلى سالب: الثابت المحاسبي يبقى صحيحاً (القيمة
+     *  الكلّية سليمة) لكن تقرير أرصدة المخازن يكذب. والأذون هي الموضع الذي
+     *  **يختار فيه المستخدم المخزن صراحةً**، فالفحص هنا ملزِم.
+     *
+     *  تسامحٌ مقصود مع ما قبل المخازن: منتجٌ لا صفّ له في `ProductWarehouseStock`
+     *  إطلاقاً كان مخزونُه قائماً قبل إضافة المخازن، فيُفحَص بالإجمالي — وإلا
+     *  رُفض كل صرفٍ لبضاعةٍ موجودة فعلاً. نفس مبدأ `branch_id IS NULL`.
+     */
     protected function assertAvailable(Product $product, int $quantity, ?string $warehouseId = null): void
     {
         if ($product->quantity_on_hand < $quantity) {
             throw new RuntimeException(
                 "الكمية المتاحة من «{$product->name}» ({$product->quantity_on_hand}) أقل من المطلوب ({$quantity})."
+            );
+        }
+
+        if ($warehouseId === null) {
+            return;
+        }
+
+        $row = ProductWarehouseStock::where('product_id', $product->id)
+            ->where('warehouse_id', $warehouseId)->first();
+
+        if ($row === null) {
+            return; // بضاعة ما قبل المخازن — الإجمالي هو المرجع
+        }
+
+        if ($row->quantity < $quantity) {
+            $warehouse = BranchScope::reference(Warehouse::class)->whereKey($warehouseId)->value('name');
+            throw new RuntimeException(
+                "الكمية المتاحة من «{$product->name}» في «{$warehouse}» ({$row->quantity}) أقل من المطلوب ({$quantity})."
             );
         }
     }

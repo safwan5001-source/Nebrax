@@ -272,6 +272,77 @@ class StockPermitTest extends TestCase
         ]));
     }
 
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  المتاح يُقاس **في المخزن المقصود** لا في الشركة
+     * ═══════════════════════════════════════════════════════════════
+     *  قبل الإصلاح كان صرفُ ٢٠ من مخزنٍ فيه ٥ يمرّ لأن الشركة تملك ١٠٠،
+     *  فيهبط رصيد المخزن إلى **−١٥** بينما الإجمالي يبقى سليماً: الثابت
+     *  المحاسبي صحيح وتقرير أرصدة المخازن يكذب. مؤكَّد تجريبياً قبل الإصلاح.
+     *
+     * @test
+     */
+    public function issuing_more_than_the_warehouse_holds_is_rejected(): void
+    {
+        $second = Warehouse::create(['name' => 'مخزن ٢', 'code' => 'WH-2']);
+
+        // ٥ وحدات فقط في المخزن الثاني، بينما الشركة تملك ١٠٥
+        $this->permits->post($this->permit('transfer', [
+            ['product_id' => $this->product->id, 'quantity' => 5],
+        ], ['target_warehouse_id' => $second->id]));
+
+        try {
+            $this->permits->post($this->permit('issue', [
+                ['product_id' => $this->product->id, 'quantity' => 20],
+            ], ['warehouse_id' => $second->id]));
+            $this->fail('كان يجب رفض صرف ٢٠ من مخزن فيه ٥.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('مخزن ٢', $e->getMessage());
+        }
+
+        // ولم يهبط رصيد المخزن إلى سالب
+        $this->assertSame(5, $this->stockIn($second->id));
+        $this->assertSame(100, $this->product->fresh()->quantity_on_hand);
+        $this->assertLedgerMatchesStock('بعد الرفض');
+    }
+
+    /** والتحويل يُفحَص بمخزن المصدر كذلك — لا يُحوَّل ما ليس فيه. */
+    /** @test */
+    public function transferring_more_than_the_source_warehouse_holds_is_rejected(): void
+    {
+        $second = Warehouse::create(['name' => 'مخزن ٢', 'code' => 'WH-2']);
+
+        // ٥ وحدات في المخزن الثاني — فيصير له صفّ، ويسري الفحص بالمخزن
+        $this->permits->post($this->permit('transfer', [
+            ['product_id' => $this->product->id, 'quantity' => 5],
+        ], ['target_warehouse_id' => $second->id]));
+
+        $this->expectExceptionMessage('مخزن ٢');
+        $this->permits->post($this->permit('transfer', [
+            ['product_id' => $this->product->id, 'quantity' => 10],
+        ], ['warehouse_id' => $second->id, 'target_warehouse_id' => $this->main->id]));
+    }
+
+    /**
+     * تسامحٌ مقصود مع ما قبل المخازن: بضاعةٌ بلا صفّ في `ProductWarehouseStock`
+     * تُفحَص بالإجمالي — وإلا رُفض كل صرفٍ لبضاعةٍ موجودة فعلاً.
+     *
+     * @test
+     */
+    public function pre_warehouse_stock_falls_back_to_the_company_total(): void
+    {
+        $empty = Warehouse::create(['name' => 'مخزن بلا سجلّ', 'code' => 'WH-9']);
+
+        // لا صفّ لهذا المنتج في هذا المخزن إطلاقاً ⇒ يُفحَص بالإجمالي فيمرّ
+        $permit = $this->permits->post($this->permit('issue', [
+            ['product_id' => $this->product->id, 'quantity' => 10],
+        ], ['warehouse_id' => $empty->id]));
+
+        $this->assertSame('posted', $permit->status);
+        $this->assertSame(90, $this->product->fresh()->quantity_on_hand);
+        $this->assertLedgerMatchesStock('بعد صرف بضاعة ما قبل المخازن');
+    }
+
     /** الترحيل مرّة واحدة — لا مضاعفة للحركة ولا للقيد. */
     /** @test */
     public function a_posted_permit_cannot_be_posted_again(): void
