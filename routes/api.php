@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\CostCenterController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\CrmActivityController;
 use App\Http\Controllers\Api\CustomerSettingsController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
@@ -221,7 +222,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('stocktakes/{id}', [StocktakeController::class, 'destroy'])->middleware($perm('products.manage'));
 
         // سجلّ تغييرات المستندات (قراءة فقط — لا أثر محاسبي)
+        Route::get('revisions', [DocumentRevisionController::class, 'feed'])->middleware($perm('invoices.view'));
         Route::get('revisions/{type}/{id}', [DocumentRevisionController::class, 'index'])->middleware($perm('invoices.view'));
+
+        // لوحة التحكم: تفصيل المبيعات ببُعد (يوم/منتج/فئة/فرع/بائع) — قراءة فقط
+        Route::get('dashboard/sales-breakdown', [DashboardController::class, 'salesBreakdown'])->middleware($perm('reports.view'));
 
         // المرتجعات
         Route::get('returns', [ReturnController::class, 'index'])->middleware($perm('returns.view'));

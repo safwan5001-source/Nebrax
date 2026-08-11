@@ -4,10 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\DocumentRevisionResource;
 use App\Models\DocumentRevision;
-use App\Models\Invoice;
-use App\Models\ProcurementDocument;
-use App\Models\Quote;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * سجلّ تغييرات مستند — قراءة فقط. لا كتابة يدوية: القيود تُكتب تلقائياً في
@@ -15,16 +13,27 @@ use Illuminate\Http\JsonResponse;
  */
 class DocumentRevisionController extends ApiController
 {
-    /** الأنواع المسموح الاستعلام عنها — لا يُمرَّر اسم كلاس من العميل. */
-    private const TYPES = [
-        'invoice'     => Invoice::class,
-        'quote'       => Quote::class,
-        'procurement' => ProcurementDocument::class,
-    ];
+    /**
+     * تغذية النشاطات على مستوى المستأجر — أحدث ما جرى عبر كل المستندات.
+     * قراءة خالصة: لا تكتب شيئاً ولا تمسّ قيداً.
+     */
+    public function feed(Request $request): JsonResponse
+    {
+        $request->validate(['limit' => ['nullable', 'integer', 'min:1', 'max:50']]);
+
+        $revisions = DocumentRevision::with(['user', 'document'])
+            // الأنواع المعروفة وحدها: سجلٌّ لنموذج خارج القائمة لا واجهة له.
+            ->whereIn('document_type', array_values(DocumentRevision::TYPES))
+            ->latest()
+            ->limit((int) $request->query('limit', 10))
+            ->get();
+
+        return DocumentRevisionResource::collection($revisions)->response();
+    }
 
     public function index(string $type, string $id): JsonResponse
     {
-        $model = self::TYPES[$type] ?? abort(404, 'نوع مستند غير معروف.');
+        $model = DocumentRevision::TYPES[$type] ?? abort(404, 'نوع مستند غير معروف.');
 
         // العزل: المستند نفسه يجب أن يخصّ المستأجر — findOrFail يمرّ بـ TenantScope.
         $model::findOrFail($id);
