@@ -121,7 +121,7 @@ const GROUPS: NavGroup[] = [
       { href: '/products', icon: Package, key: 'products', built: true },
       { href: '/inventory', icon: Warehouse, key: 'stockBalances', built: true },
       { href: '/warehouses', icon: Boxes, key: 'warehouses', built: true },
-      { href: '/stock-permits', icon: ClipboardCheck, key: 'stockPermits' },
+      { href: '/stock-permits', icon: ClipboardCheck, key: 'stockPermits', built: true },
       { href: '/stocktaking', icon: Warehouse, key: 'stocktaking' },
     ],
   },

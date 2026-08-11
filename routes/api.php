@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesSettingsController;
+use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WarehouseController;
@@ -202,6 +203,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('procurement/{id}', [ProcurementController::class, 'destroy'])->middleware($perm('purchases.manage'));
         Route::post('procurement/{id}/transition', [ProcurementController::class, 'transition'])->middleware($perm('purchases.manage'));
         Route::post('procurement/{id}/convert', [ProcurementController::class, 'convert'])->middleware($perm('purchases.manage'));
+
+        // الأذون المخزنية (الترحيل يحرّك المخزون ويولّد القيد معاً)
+        Route::get('stock-permits', [StockPermitController::class, 'index'])->middleware($perm('products.view'));
+        Route::get('stock-permits/{id}', [StockPermitController::class, 'show'])->middleware($perm('products.view'));
+        Route::post('stock-permits', [StockPermitController::class, 'store'])->middleware($perm('products.manage'));
+        Route::post('stock-permits/{id}/post', [StockPermitController::class, 'post'])->middleware($perm('products.manage'));
+        Route::delete('stock-permits/{id}', [StockPermitController::class, 'destroy'])->middleware($perm('products.manage'));
 
         // سجلّ تغييرات المستندات (قراءة فقط — لا أثر محاسبي)
         Route::get('revisions/{type}/{id}', [DocumentRevisionController::class, 'index'])->middleware($perm('invoices.view'));
