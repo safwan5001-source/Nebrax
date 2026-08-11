@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\StockPermitController;
+use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WarehouseController;
@@ -210,6 +211,14 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('stock-permits', [StockPermitController::class, 'store'])->middleware($perm('products.manage'));
         Route::post('stock-permits/{id}/post', [StockPermitController::class, 'post'])->middleware($perm('products.manage'));
         Route::delete('stock-permits/{id}', [StockPermitController::class, 'destroy'])->middleware($perm('products.manage'));
+
+        // الجرد (الترحيل يصحّح الكمية ويولّد قيد الفرق معاً)
+        Route::get('stocktakes', [StocktakeController::class, 'index'])->middleware($perm('products.view'));
+        Route::get('stocktakes/{id}', [StocktakeController::class, 'show'])->middleware($perm('products.view'));
+        Route::post('stocktakes', [StocktakeController::class, 'store'])->middleware($perm('products.manage'));
+        Route::post('stocktakes/{id}/count', [StocktakeController::class, 'count'])->middleware($perm('products.manage'));
+        Route::post('stocktakes/{id}/post', [StocktakeController::class, 'post'])->middleware($perm('products.manage'));
+        Route::delete('stocktakes/{id}', [StocktakeController::class, 'destroy'])->middleware($perm('products.manage'));
 
         // سجلّ تغييرات المستندات (قراءة فقط — لا أثر محاسبي)
         Route::get('revisions/{type}/{id}', [DocumentRevisionController::class, 'index'])->middleware($perm('invoices.view'));
