@@ -26,7 +26,7 @@ class Product extends BaseModel implements BranchShareable
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'sku', 'barcode', 'name', 'name_en', 'type', 'unit',
-        'description', 'category', 'brand', 'category_id', 'brand_id', 'reorder_level',
+        'description', 'category', 'brand', 'category_id', 'brand_id', 'unit_template_id', 'reorder_level',
         'supplier_id', 'sales_account_id', 'cogs_account_id',
         'min_sale_price', 'discount', 'discount_type', 'profit_margin', 'tags', 'internal_notes',
         'sale_price', 'purchase_price', 'tax_rate', 'track_inventory',
@@ -83,6 +83,12 @@ class Product extends BaseModel implements BranchShareable
     public function productBrand(): BelongsTo
     {
         return $this->belongsTo(Brand::class, 'brand_id');
+    }
+
+    /** قالب الوحدات: وحدة أساس (هي `unit`) ووحدات بديلة بمعاملات صحيحة. */
+    public function unitTemplate(): BelongsTo
+    {
+        return $this->belongsTo(UnitTemplate::class, 'unit_template_id');
     }
 
     /**

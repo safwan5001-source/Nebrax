@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasUnitConversion;
 use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,16 +13,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** @see design-system/foundations/multi-branch-architecture.md — مشترك: سطر تابع لمشترى — يتبع فرع رأسه */
 class PurchaseLine extends BaseModel implements CompanyWide
 {
+    use HasUnitConversion;
     use ResolvesBranchReferences;
 
     protected $fillable = [
         'tenant_id', 'purchase_id', 'product_id', 'description',
-        'quantity', 'unit_price', 'tax_rate',
+        'quantity', 'unit_name', 'unit_factor', 'unit_price', 'tax_rate',
         'line_subtotal', 'line_tax', 'line_total',
     ];
 
     protected $casts = [
         'quantity'      => 'integer',
+        'unit_factor'   => 'integer',
         'unit_price'    => 'integer',
         'tax_rate'      => 'integer',
         'line_subtotal' => 'integer',

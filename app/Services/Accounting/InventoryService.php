@@ -198,20 +198,25 @@ class InventoryService
                 continue;
             }
 
+            // الكمية بوحدة المخزون: السطر قد يكون بوحدة أكبر (طبلية = ٥٠ كيساً).
+            // المعامل ١ لكل سطر لا يحدّد وحدة، فالسلوك القائم لا يتغيّر.
+            $quantity = $line->baseQuantity();
+
             // الحارس قبل أي حركة: الرفض هنا يُبطل المعاملة كلها، فلا فاتورة
-            // نصفها مرحَّل ونصفها لا.
-            $this->assertStockAvailable($product, $line->quantity);
+            // نصفها مرحَّل ونصفها لا. ويقارن بوحدة المخزون لا بوحدة السطر —
+            // «طبليتان» و«رصيد ٦٠ كيساً» لا يُقارَنان قبل التحويل.
+            $this->assertStockAvailable($product, $quantity);
 
             $unitCost = $product->avg_cost;
-            $cost     = $line->quantity * $unitCost;
-            $newQty   = $product->quantity_on_hand - $line->quantity;
+            $cost     = $quantity * $unitCost;
+            $newQty   = $product->quantity_on_hand - $quantity;
 
             StockMovement::create([
                 'product_id'       => $product->id,
                 'warehouse_id'     => $warehouseId,
                 'branch_id'        => $this->branchOfWarehouse($warehouseId), // الحركة تتبع فرع المخزن
                 'type'             => 'out',
-                'quantity'         => $line->quantity,
+                'quantity'         => $quantity,   // دفتر المخزون بوحدة الأساس دائماً
                 'unit_cost'        => $unitCost,
                 'total_cost'       => $cost,
                 'balance_quantity' => $newQty,
@@ -222,7 +227,7 @@ class InventoryService
             ]);
 
             $product->update(['quantity_on_hand' => $newQty]);
-            $this->adjustWarehouseStock($warehouseId, $product->id, -$line->quantity);
+            $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity);
             $totalCogs += $cost;
             $cogsAcct = $product->cogs_account_id ?: $defaultCogs;
             $cogsByAccount[$cogsAcct] = ($cogsByAccount[$cogsAcct] ?? 0) + $cost;

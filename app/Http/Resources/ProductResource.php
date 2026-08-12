@@ -23,6 +23,16 @@ class ProductResource extends JsonResource
             'brand'            => $this->productBrand?->name ?? $this->brand,
             'category_id'      => $this->category_id,
             'brand_id'         => $this->brand_id,
+            'unit_template_id' => $this->unit_template_id,
+            // الوحدات المتاحة للسطر: الأساس بمعامل ١ ثم البدائل — تقرؤها شاشات
+            // الفاتورة والمشتريات مباشرةً بلا استدعاء ثانٍ.
+            // فحصٌ صريح لا `whenNotNull`: تلك تُعيد `MissingValue` وهو **كائن**
+            // فيمرّ الشرط الثلاثي دائماً ثم ينفجر على قالب غير موجود.
+            'units'            => $this->unitTemplate
+                ? collect([['name' => $this->unitTemplate->base_unit, 'factor' => 1]])
+                    ->concat($this->unitTemplate->units->map(fn ($u) => ['name' => $u->name, 'factor' => (int) $u->factor]))
+                    ->values()
+                : [],
             'reorder_level'    => $this->reorder_level,
             'supplier_id'      => $this->supplier_id,
             'sales_account_id' => $this->sales_account_id,

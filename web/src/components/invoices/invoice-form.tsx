@@ -14,11 +14,12 @@ import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
 interface Partner { id: string; name: string }
-interface Product { id: string; name: string; sale_price: string; tax_rate: number; is_active: boolean }
+interface ProductUnit { name: string; factor: number }
+interface Product { id: string; name: string; sale_price: string; tax_rate: number; is_active: boolean; units?: ProductUnit[] }
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
 interface Employee { id: string; name: string }
-interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string; disc: string }
-interface ApiLine { product_id: string | null; description: string | null; quantity: number; unit_price: string; tax_rate: number; line_discount: string }
+interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string; disc: string; unit: string }
+interface ApiLine { product_id: string | null; description: string | null; quantity: number; unit_name: string | null; unit_price: string; tax_rate: number; line_discount: string }
 interface ApiInvoice {
   status: string; partner_id: string; payment_type: string; invoice_date: string; due_date: string | null;
   cost_center_id: string | null; salesperson_id: string | null; discount: string; shipping: string;
@@ -27,7 +28,7 @@ interface ApiInvoice {
 interface TaxDef { name: string; rate: number; inclusive: boolean }
 
 let lineSeq = 0;
-const newLine = (): Line => ({ key: `l${++lineSeq}`, productId: null, description: '', qty: '1', price: '', tax: '15', disc: '' });
+const newLine = (): Line => ({ key: `l${++lineSeq}`, productId: null, description: '', qty: '1', price: '', tax: '15', disc: '', unit: '' });
 
 /** يضيف عدداً من الأيام إلى تاريخ YYYY-MM-DD ويعيد YYYY-MM-DD (بلا مناطق زمنية). */
 function addDays(date: string, days: number): string {
@@ -117,6 +118,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                 productId: l.product_id,
                 description: l.description ?? '',
                 qty: String(l.quantity),
+                unit: l.unit_name ?? '',
                 price: l.unit_price,
                 tax: String(l.tax_rate),
                 disc: Number(l.line_discount) > 0 ? l.line_discount : '',
@@ -146,7 +148,9 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   function pickProduct(key: string, productId: string) {
     const p = products.find((x) => x.id === productId);
     if (!p) { setLine(key, { productId: null }); return; }
-    setLine(key, { productId: p.id, description: p.name, price: p.sale_price, tax: String(p.tax_rate) });
+    // تبديل المنتج يُصفّر الوحدة: وحدة المنتج السابق قد لا تكون معرَّفة في
+    // قالب الجديد، وإرسالها كان يُرفض بـ 422 بلا سبب ظاهر للمستخدم.
+    setLine(key, { productId: p.id, description: p.name, price: p.sale_price, tax: String(p.tax_rate), unit: '' });
   }
 
   // معاينة الإجماليات (هللات) — بلا float. مطابق للـ backend.
@@ -192,6 +196,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
           product_id: l.productId,
           description: l.description || null,
           quantity: qty,
+          unit: l.unit || null,
           unit_price: riyalToMinor(l.price),
           tax_rate: Number(l.tax) || 0,
           discount: Math.min(Number.isFinite(riyalToMinor(l.disc)) ? riyalToMinor(l.disc) : 0, gross),
@@ -316,10 +321,10 @@ export function InvoiceForm({ editId }: { editId?: string }) {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="hidden grid-cols-12 gap-2 px-1 text-[11px] font-medium text-muted md:grid">
-                <div className="col-span-3">{t('item')}</div>
+                <div className="col-span-2">{t('item')}</div>
                 <div className="col-span-2">{t('description')}</div>
                 <div className="col-span-2 text-end">{t('price')}</div>
-                <div className="col-span-1 text-end">{t('qty')}</div>
+                <div className="col-span-2 text-end">{t('qty')}</div>
                 <div className="col-span-1 text-end">{t('line_discount_short')}</div>
                 <div className="col-span-1 text-end">{t('tax')}</div>
                 <div className="col-span-1 text-end">{t('total_with_vat')}</div>
@@ -330,13 +335,26 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                 const [net, lineTax] = lineNetTax(l);
                 return (
                   <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded-lg border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
-                    <Select className="col-span-2 md:col-span-3" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
+                    <Select className="col-span-2 md:col-span-2" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
                       <option value="">{t('manual')}</option>
                       {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                     </Select>
                     <Input className="col-span-2 md:col-span-2" placeholder={t('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
                     <Input className="num text-end md:col-span-2" inputMode="decimal" placeholder={t('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
-                    <Input className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
+                    {/* الكمية ووحدتها خلية واحدة: الوحدة تُعرَض فقط حين يحمل
+                        المنتج قالباً بأكثر من وحدة، فلا تزدحم الشاشة بلا داعٍ. */}
+                    <div className="col-span-2 flex items-center gap-1 md:col-span-2">
+                      <Input className="num flex-1 text-end" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
+                      {(() => {
+                        const units = products.find((p) => p.id === l.productId)?.units ?? [];
+                        if (units.length < 2) return null;
+                        return (
+                          <Select className="w-24 shrink-0" value={l.unit} onChange={(e) => setLine(l.key, { unit: e.target.value })} aria-label={t('unit')}>
+                            {units.map((u) => (<option key={u.name} value={u.factor === 1 ? '' : u.name}>{u.name}</option>))}
+                          </Select>
+                        );
+                      })()}
+                    </div>
                     <Input className="num text-end md:col-span-1" inputMode="decimal" placeholder="0" value={l.disc} onChange={(e) => setLine(l.key, { disc: e.target.value })} />
                     <Input className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
                     <div className="num col-span-1 text-end text-sm text-text md:col-span-1">{formatRiyal((net + lineTax) / 100)}</div>

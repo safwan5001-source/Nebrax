@@ -15,6 +15,8 @@ class InvoiceLineResource extends JsonResource
             'product_id'    => $this->product_id,
             'description'   => $this->description,
             'quantity'      => $this->quantity,
+            'unit_name'     => $this->unit_name,
+            'unit_factor'   => (int) $this->unit_factor,
             'unit_price'    => Money::toRiyal($this->unit_price),
             'tax_rate'      => $this->tax_rate,
             'line_subtotal' => Money::toRiyal($this->line_subtotal),

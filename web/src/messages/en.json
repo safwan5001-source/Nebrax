@@ -610,7 +610,8 @@
     "no_salesperson": "None",
     "summary_title": "Invoice summary",
     "summary_hint": "Totals are derived from the lines — never entered manually. Discount reduces revenue and VAT.",
-    "edit_title": "Edit invoice"
+    "edit_title": "Edit invoice",
+    "unit": "Unit"
   },
   "invoiceTemplates": {
     "classic": "Classic",
@@ -1137,7 +1138,10 @@
     "pricing_details": "Pricing details",
     "inventory_mgmt": "Inventory management",
     "more_options": "More options",
-    "unclassified": "Unclassified"
+    "unclassified": "Unclassified",
+    "unit_template": "Unit template",
+    "no_unit_template": "No template",
+    "unit_template_hint": "Lets you buy and sell in a unit larger than the stock unit."
   },
   "purchaseForm": {
     "title": "New purchase invoice",
@@ -1724,7 +1728,23 @@
     "brand_list": "Brands",
     "brand_empty": "No brands yet.",
     "cancel": "Cancel",
-    "delete": "Delete"
+    "delete": "Delete",
+    "unit_new": "New unit template",
+    "unit_edit": "Edit template",
+    "unit_create": "Create",
+    "unit_save": "Save",
+    "unit_template_name": "Template name",
+    "unit_base": "Base unit",
+    "unit_base_hint": "The stock unit — every quantity in the ledger is counted in it.",
+    "unit_base_placeholder": "base unit",
+    "unit_alternatives": "Alternative units",
+    "unit_add_row": "Add unit",
+    "unit_row_name": "Unit name (e.g. pallet)",
+    "unit_row_factor": "Factor",
+    "unit_factor_hint": "The factor is how many “{base}” make one unit. It starts at 2 and takes no fractions: a unit smaller than the base is handled by making the smaller one the base. Changing a factor later never touches a posted document — the line copies its factor when it is created.",
+    "unit_list": "Templates",
+    "unit_empty": "No unit templates yet.",
+    "unit_none": "No alternative units — base only."
   },
   "purchaseSettings": {
     "title": "Purchase settings",

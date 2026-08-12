@@ -27,8 +27,10 @@ echo "▶ 3/4  دمج ملفات النواة وطبقة الـ API..."
 mkdir -p app/Services/Accounting app/Services/Reporting app/Support \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
          app/Http/Requests app/Http/Resources app/Console/Commands \
-         tests/Feature routes
+         app/Models/Concerns tests/Feature routes
 cp -r "$CORE_DIR/app/Models/"*.php               app/Models/
+# المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
+cp -r "$CORE_DIR/app/Models/Concerns/"*.php      app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
 cp -r "$CORE_DIR/app/Services/Reporting/"*.php   app/Services/Reporting/
 cp -r "$CORE_DIR/app/Support/"*.php              app/Support/

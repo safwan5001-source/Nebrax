@@ -21,7 +21,7 @@ const ITEMS: Item[] = [
   { key: 'c_products', href: '/inventory-settings/products', icon: Package },
   { key: 'c_categories', href: '/inventory-settings/categories', icon: Shapes },
   { key: 'c_brands', href: '/inventory-settings/brands', icon: Tag },
-  { key: 'c_units', href: null, icon: Scale },
+  { key: 'c_units', href: '/inventory-settings/units', icon: Scale },
   { key: 'c_employee_warehouses', href: null, icon: Warehouse },
   { key: 'c_barcode', href: null, icon: ScanLine },
   { key: 'c_fields', href: null, icon: ListPlus },

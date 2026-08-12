@@ -27,6 +27,7 @@ class StoreProductRequest extends FormRequest
             'brand'           => ['nullable', 'string', 'max:255'],
             'category_id'     => ['nullable', 'uuid'],
             'brand_id'        => ['nullable', 'uuid'],
+            'unit_template_id' => ['nullable', 'uuid'],
             'reorder_level'   => ['nullable', 'integer', 'min:0'],
             'supplier_id'     => ['nullable', 'uuid'],
             'sales_account_id' => ['nullable', 'uuid'],

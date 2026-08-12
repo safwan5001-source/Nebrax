@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\JournalLine;
 use App\Models\Partner;
+use App\Models\Product;
 use App\Support\Settings;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +37,8 @@ class InvoiceService
     public function __construct(
         protected LedgerService $ledger,
         protected InventoryService $inventory,
-        protected ZatcaService $zatca
+        protected ZatcaService $zatca,
+        protected UnitConversion $units
     ) {}
 
     /**
@@ -160,6 +162,12 @@ class InvoiceService
             $rate      = (int) ($item['tax_rate'] ?? (int) Settings::get('sales', 'default_tax_rate'));
             $lineDisc  = (int) ($item['discount'] ?? 0);
 
+            // الوحدة تُحلّ وتُنسَخ على السطر لقطةً — لا تُحوَّل النقود، الكمية وحدها.
+            [$unitName, $unitFactor] = $this->units->resolve(
+                ! empty($item['product_id']) ? Product::find($item['product_id']) : null,
+                $item['unit'] ?? null
+            );
+
             if ($qty <= 0 || $unitPrice < 0) {
                 throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
             }
@@ -194,6 +202,8 @@ class InvoiceService
                 'product_id'    => $item['product_id'] ?? null,
                 'description'   => $item['description'] ?? null,
                 'quantity'      => $qty,
+                'unit_name'     => $unitName,
+                'unit_factor'   => $unitFactor,
                 'unit_price'    => $unitPrice,
                 'tax_rate'      => $rate,
                 'line_subtotal' => $storedSubtotal,

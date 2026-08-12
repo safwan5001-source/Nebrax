@@ -27,6 +27,10 @@ class StorePurchaseRequest extends FormRequest
             'items.*.product_id'  => ['nullable', 'uuid'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
+            // اسم الوحدة كما في قالب المنتج. الغياب = وحدة الأساس بمعامل ١؛
+            // والاسم المجهول يُرفض في `UnitConversion` لا هنا، فالتحقق يحتاج
+            // المنتج نفسه لا شكل الحقل.
+            'items.*.unit'        => ['nullable', 'string', 'max:255'],
             'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'],
             'tax_inclusive'       => ['nullable', 'boolean'], // هل تكاليف السطور متضمّنة الضريبة (تُستخرَج) أم لا (تُضاف)
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],

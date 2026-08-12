@@ -25,6 +25,7 @@ export interface Product {
   brand: string | null;
   category_id: string | null;
   brand_id: string | null;
+  unit_template_id: string | null;
   reorder_level: number | null;
   min_sale_price: string | null;
   discount: number | null;
@@ -53,6 +54,7 @@ interface FormState {
   description: string;
   category_id: string;
   brand_id: string;
+  unit_template_id: string;
   reorder_level: string;
   min_sale_price: string;
   discount: string;
@@ -75,7 +77,7 @@ interface Listed { id: string; name: string }
 
 const emptyForm = (): FormState => ({
   name: '', sku: '', barcode: '', name_en: '', type: 'good', unit: 'piece',
-  description: '', category_id: '', brand_id: '', reorder_level: '',
+  description: '', category_id: '', brand_id: '', unit_template_id: '', reorder_level: '',
   min_sale_price: '', discount: '', discount_type: 'percent', profit_margin: '', tags: '', internal_notes: '',
   sales_account_id: '', cogs_account_id: '',
   sale_price: '', purchase_price: '', tax_rate: '15', track_inventory: false, is_active: true,
@@ -84,7 +86,7 @@ const emptyForm = (): FormState => ({
 function fromProduct(p: Product): FormState {
   return {
     name: p.name, sku: p.sku ?? '', barcode: p.barcode ?? '', name_en: p.name_en ?? '', type: p.type, unit: p.unit,
-    description: p.description ?? '', category_id: p.category_id ?? '', brand_id: p.brand_id ?? '', reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
+    description: p.description ?? '', category_id: p.category_id ?? '', brand_id: p.brand_id ?? '', unit_template_id: p.unit_template_id ?? '', reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
     min_sale_price: p.min_sale_price ?? '', discount: p.discount != null ? String(p.discount) : '', discount_type: p.discount_type ?? 'percent',
     profit_margin: p.profit_margin != null ? String(p.profit_margin) : '', tags: p.tags ?? '', internal_notes: p.internal_notes ?? '',
     sales_account_id: p.sales_account_id ?? '', cogs_account_id: p.cogs_account_id ?? '',
@@ -113,6 +115,7 @@ export function ProductDialog({
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [categories, setCategories] = useState<Listed[]>([]);
   const [brands, setBrands] = useState<Listed[]>([]);
+  const [templates, setTemplates] = useState<Listed[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -120,6 +123,7 @@ export function ProductDialog({
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
     api<{ data: Listed[] }>('/product-categories').then((r) => setCategories(r.data)).catch(() => {});
     api<{ data: Listed[] }>('/brands').then((r) => setBrands(r.data)).catch(() => {});
+    api<{ data: Listed[] }>('/unit-templates').then((r) => setTemplates(r.data)).catch(() => {});
     api<{ data: Acct[] }>('/accounts')
       .then((r) => {
         const leaf = r.data.filter((a) => !a.is_group);
@@ -146,6 +150,7 @@ export function ProductDialog({
       description: form.description || null,
       category_id: form.category_id || null,
       brand_id: form.brand_id || null,
+      unit_template_id: form.unit_template_id || null,
       reorder_level: form.track_inventory && form.reorder_level !== '' ? Number(form.reorder_level) || 0 : null,
       min_sale_price: form.min_sale_price !== '' ? riyalToMinor(form.min_sale_price) : null,
       discount: form.discount !== '' ? Number(form.discount) || 0 : null,
@@ -207,6 +212,14 @@ export function ProductDialog({
           <div className="space-y-1.5">
             <Label htmlFor="unit">{t('unit')}</Label>
             <Input id="unit" value={form.unit} onChange={(e) => set('unit', e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="unit-template">{t('unit_template')}</Label>
+            <Select id="unit-template" value={form.unit_template_id} onChange={(e) => set('unit_template_id', e.target.value)}>
+              <option value="">{t('no_unit_template')}</option>
+              {templates.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </Select>
+            <p className="text-xs text-muted">{t('unit_template_hint')}</p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="category">{t('category')}</Label>

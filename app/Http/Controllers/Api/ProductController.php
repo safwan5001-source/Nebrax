@@ -10,6 +10,7 @@ use App\Models\Account;
 use App\Models\Brand;
 use App\Models\Partner;
 use App\Models\ProductCategory;
+use App\Models\UnitTemplate;
 use App\Services\Accounting\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class ProductController extends ApiController
         $this->assertTenantOwned(Partner::class, $data['supplier_id'] ?? null, 'المورّد');
         $this->assertTenantOwned(ProductCategory::class, $data['category_id'] ?? null, 'التصنيف');
         $this->assertTenantOwned(Brand::class, $data['brand_id'] ?? null, 'العلامة التجارية');
+        $this->assertTenantOwned(UnitTemplate::class, $data['unit_template_id'] ?? null, 'قالب الوحدات');
 
         foreach ([['sales_account_id', 'revenue', 'حساب المبيعات'], ['cogs_account_id', 'expense', 'حساب التكلفة']] as [$key, $type, $label]) {
             if (! empty($data[$key])) {
@@ -43,7 +45,7 @@ class ProductController extends ApiController
         // التحميل المسبق للتصنيف والعلامة: المورد يقرأ اسميهما لكل صفّ، وبلا
         // هذا السطر يصير استعلامان لكل منتج (N+1) في أكثر قائمة تُفتح.
         return ProductResource::collection(
-            Product::with(['productCategory', 'productBrand'])->latest()->get()
+            Product::with(['productCategory', 'productBrand', 'unitTemplate.units'])->latest()->get()
         )->response();
     }
 

@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UnitTemplateController;
 use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
@@ -136,6 +137,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('brands', [BrandController::class, 'store'])->middleware($perm('products.manage'));
         Route::put('brands/{id}', [BrandController::class, 'update'])->middleware($perm('products.manage'));
         Route::delete('brands/{id}', [BrandController::class, 'destroy'])->middleware($perm('products.manage'));
+
+        // قوالب الوحدات (لا قيد؛ لكن المعامل يضرب الكمية الداخلة للمخزون)
+        Route::get('unit-templates', [UnitTemplateController::class, 'index'])->middleware($perm('products.view'));
+        Route::post('unit-templates', [UnitTemplateController::class, 'store'])->middleware($perm('products.manage'));
+        Route::put('unit-templates/{id}', [UnitTemplateController::class, 'update'])->middleware($perm('products.manage'));
+        Route::delete('unit-templates/{id}', [UnitTemplateController::class, 'destroy'])->middleware($perm('products.manage'));
 
         // تقرير المخزون (قراءة فقط — لا أثر محاسبي)
         Route::get('inventory', [InventoryController::class, 'index'])->middleware($perm('products.view'));
