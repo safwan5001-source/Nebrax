@@ -44,6 +44,35 @@ jobs:
       - name: Checkout core (النواة)
         uses: actions/checkout@v4
 
+      # ═══════════════════════════════════════════════════════════════
+      #  حارس قائمة النسخ — لا ملفَّ نواة يسقط صامتاً
+      # ═══════════════════════════════════════════════════════════════
+      #  المستودع نواةٌ فقط، ويُجمَّع مشروع Laravel كامل أدناه بنسخ **قوائم
+      #  صريحة** من المجلدات. والـ glob `*.php` لا يلتقط المجلدات الفرعية،
+      #  فمجلدٌ جديد يبقى في المستودع ولا يصل إلى الخادم — ويسقط الترحيل
+      #  بخطأ «صنف غير موجود» بعد أن مرّ محلياً.
+      #
+      #  حدث هذا مرّتين (`app/Console`، ثم `app/Models/Concerns`). فبدل
+      #  انتظار الثالثة: أي مجلد يحمل ملفات PHP وليس في القائمة **يُفشل
+      #  الـ CI هنا** برسالة تقول أين يُضاف.
+      - name: حارس قائمة النسخ
+        run: |
+          ALLOWED="app/Models app/Models/Concerns app/Services/Accounting \
+                   app/Services/Reporting app/Support app/Tenancy \
+                   app/Http/Middleware app/Http/Controllers/Api \
+                   app/Http/Requests app/Http/Resources app/Providers \
+                   app/Console/Commands"
+          MISSING=0
+          for f in $(find app -name '*.php' | sort); do
+            d=$(dirname "$f")
+            case " $(echo $ALLOWED) " in
+              *" $d "*) ;;
+              *) echo "::error file=$f::المجلد «$d» ليس في قائمة النسخ — أضفه إلى .github/workflows/ci.yml و deploy/assemble.sh"; MISSING=1 ;;
+            esac
+          done
+          [ "$MISSING" -eq 0 ] || exit 1
+          echo "✔ كل ملفات النواة مشمولة بقائمة النسخ."
+
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
@@ -73,8 +102,10 @@ jobs:
           mkdir -p app/Services/Accounting app/Services/Reporting app/Support \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
-                   tests/Feature routes
+                   app/Models/Concerns tests/Feature routes
           cp -r "$CORE/app/Models/"*.php                  app/Models/
+          # المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
+          cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
           cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
           cp -r "$CORE/app/Services/Reporting/"*.php      app/Services/Reporting/
           cp -r "$CORE/app/Support/"*.php                 app/Support/
