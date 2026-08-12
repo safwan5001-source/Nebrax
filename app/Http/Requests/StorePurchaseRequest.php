@@ -22,6 +22,7 @@ class StorePurchaseRequest extends FormRequest
             'purchase_date'       => ['nullable', 'date'],
             'due_date'            => ['nullable', 'date'],
             'supplier_invoice_no' => ['nullable', 'string', 'max:255'],
+            'cost_center_id'      => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],

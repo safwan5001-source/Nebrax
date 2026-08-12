@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StorePurchaseRequest;
 use App\Http\Resources\PurchaseResource;
+use App\Models\CostCenter;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\Purchase;
@@ -25,6 +26,7 @@ class PurchaseController extends ApiController
         $data = $request->validated();
 
         Partner::findOrFail($data['partner_id']); // عزل المورد
+        $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $purchase = $this->domain(fn () => $this->purchases->create($data, $data['items']));
