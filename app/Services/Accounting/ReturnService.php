@@ -272,6 +272,10 @@ class ReturnService
         foreach ($return->lines as $line) {
             $product = $line->product;
             if ($product && $product->track_inventory && $line->quantity > 0) {
+                // إرجاع للمورّد إخراجٌ من المخزون كالبيع — فيخضع لسياسة
+                // «البيع بلا رصيد» نفسها: لا يُرَدّ ما ليس موجوداً.
+                $this->inventory->assertStockAvailable($product, $line->quantity);
+
                 $this->inventory->applyIssue($product, $line->quantity, $line->unit_price, [
                     'source_type' => ReturnDocument::class,
                     'source_id'   => $return->id,

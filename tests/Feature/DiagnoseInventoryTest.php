@@ -11,6 +11,7 @@ use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\InvoiceService;
+use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -61,9 +62,17 @@ class DiagnoseInventoryTest extends TestCase
         return $product->fresh();
     }
 
-    /** بيع يتجاوز المتاح — يُنزل الكمية إلى سالب (العطل قيد التشخيص). */
+    /**
+     * بيع يتجاوز المتاح — يُنزل الكمية إلى سالب (العطل قيد التشخيص).
+     *
+     * السياسة الافتراضية تمنع هذا اليوم، لكن الأداة موجودة أصلاً من أجل
+     * **بياناتٍ نشأت قبلها** — فيُحاكى ذلك بتخفيف السياسة كما هي مثبَّتة
+     * للمستأجرين القائمين (هجرة 000044).
+     */
     private function oversell(Product $product, int $quantity): void
     {
+        Settings::put('inventory', ['allow_negative_stock' => true]);
+
         $invoice = app(InvoiceService::class)->create(
             ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
             [['product_id' => $product->id, 'quantity' => $quantity, 'unit_price' => 20000, 'tax_rate' => 0]]

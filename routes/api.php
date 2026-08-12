@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
@@ -126,6 +127,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // تقرير المخزون (قراءة فقط — لا أثر محاسبي)
         Route::get('inventory', [InventoryController::class, 'index'])->middleware($perm('products.view'));
         Route::get('inventory/{productId}/movements', [InventoryController::class, 'movements'])->middleware($perm('products.view'));
+
+        // إعدادات المخزون (سياسة؛ تُقرأ فعلاً في حارس البيع بلا رصيد)
+        Route::get('inventory-settings', [InventorySettingsController::class, 'show'])->middleware($perm('products.view'));
+        Route::put('inventory-settings', [InventorySettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // دليل الحسابات (قراءة)
         Route::get('accounts', [AccountController::class, 'index'])->middleware($perm('accounts.view'));

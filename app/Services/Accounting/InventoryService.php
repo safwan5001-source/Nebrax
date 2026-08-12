@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
+use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -197,6 +198,10 @@ class InventoryService
                 continue;
             }
 
+            // الحارس قبل أي حركة: الرفض هنا يُبطل المعاملة كلها، فلا فاتورة
+            // نصفها مرحَّل ونصفها لا.
+            $this->assertStockAvailable($product, $line->quantity);
+
             $unitCost = $product->avg_cost;
             $cost     = $line->quantity * $unitCost;
             $newQty   = $product->quantity_on_hand - $line->quantity;
@@ -240,6 +245,42 @@ class InventoryService
             'source_type' => Invoice::class,
             'source_id'   => $invoice->id,
         ]);
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  حارس البيع بلا رصيد — بسياسة المستأجر
+     * ═══════════════════════════════════════════════════════════════
+     *  `inventory.allow_negative_stock`: مفعّلاً يمرّ كما كان، ومطفأً يُرفض
+     *  الإخراج الذي يُنزل الكمية تحت الصفر.
+     *
+     *  **لماذا الرفض هو الافتراض:** الكمية السالبة أثرها مزدوج — حساب المراقبة
+     *  1140 يصير برصيد دائن (ميزانية بمخزون سالب)، **والمتوسط المتحرك يُفسَد
+     *  بعده**: أي شراء لاحق يقسم الوارد على قاعدة سالبة فيخرج متوسطٌ مضخّم،
+     *  وكل قيد تكلفة بضاعة مباعة بعده خاطئ. (قياس: −٧ ثم شراء ١٠ بـ٢٠٠ ريال
+     *  أعطى متوسطاً ٤٣٣٫٣٣.)
+     *
+     *  **ولماذا هنا لا في `applyIssue`:** الجرد يستدعي `applyIssue` لتسجيل
+     *  عجز، وحظرٌ أعمى في البدائية كان سيمنع **مسار التصحيح نفسه**. الحارس
+     *  يُستدعى صراحةً من مسارات البيع والمرتجع، ويبقى التصحيح حرّاً.
+     */
+    public function assertStockAvailable(Product $product, int $quantity): void
+    {
+        if (Settings::get('inventory', 'allow_negative_stock')) {
+            return;
+        }
+
+        if ($product->quantity_on_hand >= $quantity) {
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'الكمية المتاحة من «%s» (%d) أقل من المطلوب (%d). لا يمكن البيع بأكثر من الرصيد — '
+            . 'يمكن تغيير ذلك من إعدادات المخزون.',
+            $product->name,
+            $product->quantity_on_hand,
+            $quantity
+        ));
     }
 
     /**
