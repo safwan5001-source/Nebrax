@@ -66,6 +66,7 @@ class PurchaseService
             $purchase = Purchase::create([
                 'number'              => $data['number'] ?? $this->nextNumber($date),
                 'partner_id'          => $data['partner_id'],
+                'cost_center_id'      => $data['cost_center_id'] ?? null,
                 'payment_type'        => $data['payment_type'] ?? Settings::get('purchases', 'default_payment_type'),
                 'purchase_date'       => $date,
                 'due_date'            => $data['due_date'] ?? null,
@@ -166,11 +167,20 @@ class PurchaseService
 
             // بناء سطور القيد (الجانب المدين)
             $lines = [];
+
+            // **وسم التكلفة لا الأصل ولا الضريبة.** مركز التكلفة بُعدٌ في قائمة
+            // الدخل: المخزون (1140) أصلٌ يصير تكلفةً حين يُباع فيُوسَم قيد تكلفة
+            // البضاعة المباعة لا قيد الشراء؛ وضريبة المدخلات (1150) ذمّةٌ على
+            // الدولة لا مصروف مركز. فيُوسَم المصروف وحده.
             if ($inventoryTotal > 0) {
                 $lines[] = ['account_id' => $this->accountId(self::ACC_INVENTORY), 'debit' => $inventoryTotal];
             }
             if ($expenseTotal > 0) {
-                $lines[] = ['account_id' => $this->accountId(self::ACC_EXPENSE), 'debit' => $expenseTotal];
+                $lines[] = [
+                    'account_id'     => $this->accountId(self::ACC_EXPENSE),
+                    'debit'          => $expenseTotal,
+                    'cost_center_id' => $purchase->cost_center_id,
+                ];
             }
             if ($taxTotal > 0) {
                 $lines[] = ['account_id' => $this->accountId(self::ACC_INPUT_VAT), 'debit' => $taxTotal];

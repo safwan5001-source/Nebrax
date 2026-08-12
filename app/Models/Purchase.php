@@ -19,7 +19,7 @@ class Purchase extends BaseModel
 
     protected $fillable = [
         'branch_id',
-        'tenant_id', 'number', 'partner_id', 'payment_type',
+        'tenant_id', 'number', 'partner_id', 'cost_center_id', 'payment_type',
         'purchase_date', 'due_date', 'supplier_invoice_no', 'status',
         'subtotal', 'tax_amount', 'total', 'tax_inclusive',
         'paid_amount', 'payment_status',

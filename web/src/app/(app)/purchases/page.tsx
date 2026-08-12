@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CreatePurchaseDialog } from '@/components/purchases/create-purchase-dialog';
 import { api } from '@/lib/api';
 import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
 import { branchViewQuery, type BranchView } from '@/lib/branch-view';
@@ -34,10 +34,10 @@ export default function PurchasesPage() {
   const [data, setData] = useState<Purchase[]>([]);
   const [partners, setPartners] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
 
   // نطاق العرض: الفرع النشط افتراضياً؛ لا يُحفظ فيبدأ كل فتح من الافتراضي.
   const [view, setView] = useState<BranchView>('current');
+  const router = useRouter();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -82,13 +82,13 @@ export default function PurchasesPage() {
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
         {/* نطاق العرض ظاهر في الشاشة نفسها — لا مخفيّاً في الإعدادات. */}
         <BranchViewToggle value={view} onChange={setView} />
-        <Button onClick={() => setOpen(true)}>
+        {/* صفحة كاملة لا نافذة: النموذج صار يختار منتجاً ووحدةً ومركز تكلفة. */}
+        <Button onClick={() => router.push('/purchases/new')}>
           <Plus className="h-4 w-4" strokeWidth={1.8} />
           {t('create')}
         </Button>
       </div>
       <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="purchases" />
-      <CreatePurchaseDialog open={open} onClose={() => setOpen(false)} onCreated={load} />
     </div>
   );
 }
