@@ -7,7 +7,9 @@ use App\Http\Requests\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use App\Models\Account;
+use App\Models\Brand;
 use App\Models\Partner;
+use App\Models\ProductCategory;
 use App\Services\Accounting\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +25,8 @@ class ProductController extends ApiController
     private function assertProductRefs(array $data): void
     {
         $this->assertTenantOwned(Partner::class, $data['supplier_id'] ?? null, 'المورّد');
+        $this->assertTenantOwned(ProductCategory::class, $data['category_id'] ?? null, 'التصنيف');
+        $this->assertTenantOwned(Brand::class, $data['brand_id'] ?? null, 'العلامة التجارية');
 
         foreach ([['sales_account_id', 'revenue', 'حساب المبيعات'], ['cogs_account_id', 'expense', 'حساب التكلفة']] as [$key, $type, $label]) {
             if (! empty($data[$key])) {
@@ -36,7 +40,11 @@ class ProductController extends ApiController
 
     public function index(): JsonResponse
     {
-        return ProductResource::collection(Product::latest()->get())->response();
+        // التحميل المسبق للتصنيف والعلامة: المورد يقرأ اسميهما لكل صفّ، وبلا
+        // هذا السطر يصير استعلامان لكل منتج (N+1) في أكثر قائمة تُفتح.
+        return ProductResource::collection(
+            Product::with(['productCategory', 'productBrand'])->latest()->get()
+        )->response();
     }
 
     public function store(StoreProductRequest $request): JsonResponse

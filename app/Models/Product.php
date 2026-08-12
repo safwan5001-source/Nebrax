@@ -6,6 +6,7 @@ use App\Tenancy\BranchScoped;
 use App\Tenancy\BranchShareable;
 use App\Tenancy\BranchSharing;
 use Closure;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -25,7 +26,7 @@ class Product extends BaseModel implements BranchShareable
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'sku', 'barcode', 'name', 'name_en', 'type', 'unit',
-        'description', 'category', 'brand', 'reorder_level',
+        'description', 'category', 'brand', 'category_id', 'brand_id', 'reorder_level',
         'supplier_id', 'sales_account_id', 'cogs_account_id',
         'min_sale_price', 'discount', 'discount_type', 'profit_margin', 'tags', 'internal_notes',
         'sale_price', 'purchase_price', 'tax_rate', 'track_inventory',
@@ -66,6 +67,22 @@ class Product extends BaseModel implements BranchShareable
     public function movements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    /**
+     * التصنيف والعلامة المُدارَان. الاسمان `productCategory`/`productBrand`
+     * لا `category`/`brand`: العمودان النصّيان القديمان يحملان الاسمين، وعلاقةٌ
+     * بالاسم نفسه كانت تُحجَب بقيمة العمود صامتةً — يقرأ المستدعي نصّاً حيث
+     * يتوقّع نموذجاً.
+     */
+    public function productCategory(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategory::class, 'category_id');
+    }
+
+    public function productBrand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class, 'brand_id');
     }
 
     /**

@@ -23,6 +23,8 @@ export interface Product {
   description: string | null;
   category: string | null;
   brand: string | null;
+  category_id: string | null;
+  brand_id: string | null;
   reorder_level: number | null;
   min_sale_price: string | null;
   discount: number | null;
@@ -49,8 +51,8 @@ interface FormState {
   type: string;
   unit: string;
   description: string;
-  category: string;
-  brand: string;
+  category_id: string;
+  brand_id: string;
   reorder_level: string;
   min_sale_price: string;
   discount: string;
@@ -68,10 +70,12 @@ interface FormState {
 }
 
 interface Acct { id: string; code: string; name: string; type: string; is_group: boolean }
+/** عنصر قائمة مُدارة (تصنيف/علامة) — الاسم وحده يكفي للاختيار. */
+interface Listed { id: string; name: string }
 
 const emptyForm = (): FormState => ({
   name: '', sku: '', barcode: '', name_en: '', type: 'good', unit: 'piece',
-  description: '', category: '', brand: '', reorder_level: '',
+  description: '', category_id: '', brand_id: '', reorder_level: '',
   min_sale_price: '', discount: '', discount_type: 'percent', profit_margin: '', tags: '', internal_notes: '',
   sales_account_id: '', cogs_account_id: '',
   sale_price: '', purchase_price: '', tax_rate: '15', track_inventory: false, is_active: true,
@@ -80,7 +84,7 @@ const emptyForm = (): FormState => ({
 function fromProduct(p: Product): FormState {
   return {
     name: p.name, sku: p.sku ?? '', barcode: p.barcode ?? '', name_en: p.name_en ?? '', type: p.type, unit: p.unit,
-    description: p.description ?? '', category: p.category ?? '', brand: p.brand ?? '', reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
+    description: p.description ?? '', category_id: p.category_id ?? '', brand_id: p.brand_id ?? '', reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
     min_sale_price: p.min_sale_price ?? '', discount: p.discount != null ? String(p.discount) : '', discount_type: p.discount_type ?? 'percent',
     profit_margin: p.profit_margin != null ? String(p.profit_margin) : '', tags: p.tags ?? '', internal_notes: p.internal_notes ?? '',
     sales_account_id: p.sales_account_id ?? '', cogs_account_id: p.cogs_account_id ?? '',
@@ -107,11 +111,15 @@ export function ProductDialog({
   const [revenueAccounts, setRevenueAccounts] = useState<Acct[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<Acct[]>([]);
   const [taxInclusive, setTaxInclusive] = useState(false);
+  const [categories, setCategories] = useState<Listed[]>([]);
+  const [brands, setBrands] = useState<Listed[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
+    api<{ data: Listed[] }>('/product-categories').then((r) => setCategories(r.data)).catch(() => {});
+    api<{ data: Listed[] }>('/brands').then((r) => setBrands(r.data)).catch(() => {});
     api<{ data: Acct[] }>('/accounts')
       .then((r) => {
         const leaf = r.data.filter((a) => !a.is_group);
@@ -136,8 +144,8 @@ export function ProductDialog({
       type: form.type,
       unit: form.unit || null,
       description: form.description || null,
-      category: form.category || null,
-      brand: form.brand || null,
+      category_id: form.category_id || null,
+      brand_id: form.brand_id || null,
       reorder_level: form.track_inventory && form.reorder_level !== '' ? Number(form.reorder_level) || 0 : null,
       min_sale_price: form.min_sale_price !== '' ? riyalToMinor(form.min_sale_price) : null,
       discount: form.discount !== '' ? Number(form.discount) || 0 : null,
@@ -202,11 +210,17 @@ export function ProductDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="category">{t('category')}</Label>
-            <Input id="category" value={form.category} onChange={(e) => set('category', e.target.value)} />
+            <Select id="category" value={form.category_id} onChange={(e) => set('category_id', e.target.value)}>
+              <option value="">{t('unclassified')}</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="brand">{t('brand')}</Label>
-            <Input id="brand" value={form.brand} onChange={(e) => set('brand', e.target.value)} />
+            <Select id="brand" value={form.brand_id} onChange={(e) => set('brand_id', e.target.value)}>
+              <option value="">{t('unclassified')}</option>
+              {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
           </div>
           <div className="col-span-2 space-y-1.5">
             <Label htmlFor="description">{t('description')}</Label>
