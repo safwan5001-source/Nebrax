@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { cn } from '@/lib/utils';
 
 interface PosSession {
   id: string;
@@ -70,11 +69,10 @@ export function Registers() {
                     <Badge tone={open ? 'positive' : 'muted'}>{t(open ? 'reg_open' : 'reg_closed')}</Badge>
                   </div>
                   <div className="flex items-center gap-2.5">
-                    {/* أيقونة عارية — لا صندوق ملوّن (DESIGN_SYSTEM.md). */}
-                    <Icon
-                      className={cn('h-[17px] w-[17px] shrink-0', open ? 'text-positive' : 'text-muted')}
-                      strokeWidth={1.7}
-                    />
+                    {/* `muted` دائماً: «مفتوحة/مغلقة» حالة **تشغيلية** لا مالية،
+                        والقاعدة تحصر الأخضر في المالي. والشارة تحمل المعنى نصّاً
+                        أصلاً — فاللون هنا كان تكراراً خارج نطاق القاعدة. */}
+                    <Icon className="h-[17px] w-[17px] shrink-0 text-muted" strokeWidth={1.7} />
                     <div className="min-w-0">
                       <p className="text-[11.5px] text-muted">
                         {t(open ? 'reg_opening_balance' : 'reg_closing_balance')}

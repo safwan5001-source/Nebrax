@@ -37,10 +37,14 @@ export function KpiCard({
   sub?: { label: string; value: string; tone?: 'positive' | 'negative' | 'muted' };
   loading?: boolean;
 }) {
-  // أيقونة عارية بلا صندوق ملوّن — `DESIGN_SYSTEM.md`: «لا أيقونات في صناديق
-  // ملوّنة» (وردت في مبادئ التخطيط وفي «ما يجب تجنّبه» معاً). النموذج المرجعي
-  // يضعها في صناديق، والنظام أَولى عند التعارض.
-  const iconColor = tone === 'positive' ? 'text-positive' : 'text-muted';
+  // ═══════════════════════════════════════════════════════════════
+  //  الأيقونة `muted` دائماً — لا صندوق ولا لون دلالي
+  // ═══════════════════════════════════════════════════════════════
+  //  `DESIGN_SYSTEM.md` قاعدتان: «لا أيقونات في صناديق ملوّنة»، و«الأخضر
+  //  والأحمر دلاليان حصراً **للأرقام والحالات المالية**». أيقونة البطاقة ليست
+  //  رقماً ولا حالة — فتلوينها زخرفة. الدلالة تبقى حيث تنتمي: الرقم والشرارة.
+  //
+  //  و`tone` لم يُحذف: ما زال يحكم لون الشرارة (بيانات مالية).
   const subColor =
     sub?.tone === 'negative' ? 'text-negative' : sub?.tone === 'muted' ? 'text-muted' : 'text-positive';
 
@@ -54,7 +58,7 @@ export function KpiCard({
       <CardContent className="p-[18px]">
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-medium text-muted">{label}</span>
-          <Icon className={cn('h-4 w-4 shrink-0', iconColor)} strokeWidth={1.7} />
+          <Icon className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
         </div>
 
         {loading ? (
