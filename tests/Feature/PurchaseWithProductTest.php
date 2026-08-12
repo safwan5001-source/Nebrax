@@ -40,10 +40,10 @@ class PurchaseWithProductTest extends TestCase
             ->assertCreated()['data']['id'];
     }
 
-    private function product(bool $tracked = true): array
+    private function product(bool $tracked = true, string $name = 'إسمنت'): array
     {
         return $this->withToken($this->token)->postJson('/api/products', [
-            'name' => 'إسمنت', 'sku' => 'CEM-' . uniqid(), 'type' => 'good',
+            'name' => $name, 'sku' => 'CEM-' . uniqid(), 'type' => 'good',
             'purchase_price' => 1000, 'sale_price' => 2000, 'track_inventory' => $tracked,
         ])->assertCreated()['data'];
     }
@@ -85,34 +85,39 @@ class PurchaseWithProductTest extends TestCase
     }
 
     /**
-     * **الحالة التي كانت تُنتجها الشاشة.** سطرٌ وصفيّ بلا منتج ⇒ مدين
-     * **5150**، ولا كمية ولا متوسط.
+     * **المنتج إلزامي.** السطر بلا منتج كان يسقط في «5150 مصروفات عامة» بلا
+     * تمييزٍ بين بضاعةٍ تُرسمَل ومصروفِ فترة — فيُرفض الآن برسالة تدلّ على
+     * البديل.
      *
      * @test
      */
-    public function a_description_only_line_debits_general_expenses(): void
+    public function a_line_without_a_product_is_rejected(): void
     {
-        $this->buy(['description' => 'إسمنت', 'quantity' => 10, 'unit_price' => 1000, 'tax_rate' => 0]);
+        $this->withToken($this->token)->postJson('/api/purchases', [
+            'partner_id' => $this->supplierId, 'payment_type' => 'credit',
+            'items' => [['description' => 'إسمنت', 'quantity' => 10, 'unit_price' => 1000]],
+        ])->assertStatus(422)->assertJsonValidationErrors('items.0.product_id');
 
-        $this->assertSame(10000, $this->balance('5150'));
-        $this->assertSame(0, $this->balance('1140'));
+        $this->assertSame(0, JournalEntry::count(), 'لا قيد.');
     }
 
     /**
-     * **والسطر الوصفي يبقى متاحاً عمداً**: الشحن والتخليص على فاتورة المورّد
-     * مصروفٌ حقيقي لا يُرسمَل مخزوناً. فالفاتورة الواحدة توزّع على الحسابين.
+     * **مسار المصروف لم يُغلَق، بل صار مُدارَاً.** الشحن والتخليص يُدخَلان
+     * بمنتج **خدمي غير متابَع مخزونياً** فيبقى ترحيلهما إلى 5150 كما كان —
+     * لكنهما بندٌ يُبحث عنه ويُقاس لا نصٌّ حرّ يُكتب في كل مرة بإملاء مختلف.
      *
      * @test
      */
     public function a_mixed_invoice_splits_between_inventory_and_expenses(): void
     {
         $product = $this->product();
+        $service = $this->product(tracked: false, name: 'تخليص جمركي');
 
         $purchase = $this->withToken($this->token)->postJson('/api/purchases', [
             'partner_id' => $this->supplierId, 'payment_type' => 'credit',
             'items' => [
                 ['product_id' => $product['id'], 'quantity' => 10, 'unit_price' => 1000, 'tax_rate' => 0],
-                ['description' => 'تخليص جمركي', 'quantity' => 1, 'unit_price' => 3000, 'tax_rate' => 0],
+                ['product_id' => $service['id'], 'quantity' => 1, 'unit_price' => 3000, 'tax_rate' => 0],
             ],
         ])->assertCreated()['data'];
         $this->withToken($this->token)->postJson("/api/purchases/{$purchase['id']}/post")->assertOk();
@@ -160,13 +165,14 @@ class PurchaseWithProductTest extends TestCase
             ->postJson('/api/cost-centers', ['code' => 'CC-1', 'name' => 'مشروع الدمام'])
             ->assertCreated()['data'];
         $product = $this->product();
+        $service = $this->product(tracked: false, name: 'تخليص جمركي');
 
         $purchase = $this->withToken($this->token)->postJson('/api/purchases', [
             'partner_id' => $this->supplierId, 'payment_type' => 'credit',
             'cost_center_id' => $center['id'],
             'items' => [
                 ['product_id' => $product['id'], 'quantity' => 10, 'unit_price' => 1000, 'tax_rate' => 15],
-                ['description' => 'تخليص جمركي', 'quantity' => 1, 'unit_price' => 3000, 'tax_rate' => 15],
+                ['product_id' => $service['id'], 'quantity' => 1, 'unit_price' => 3000, 'tax_rate' => 15],
             ],
         ])->assertCreated()['data'];
         $this->withToken($this->token)->postJson("/api/purchases/{$purchase['id']}/post")->assertOk();
@@ -190,7 +196,7 @@ class PurchaseWithProductTest extends TestCase
 
         $this->withToken($this->token)->postJson('/api/purchases', [
             'partner_id' => $this->supplierId, 'cost_center_id' => $theirs['id'],
-            'items' => [['description' => 'بند', 'quantity' => 1, 'unit_price' => 1000]],
+            'items' => [['product_id' => $this->product()['id'], 'quantity' => 1, 'unit_price' => 1000]],
         ])->assertStatus(422);
     }
 
@@ -200,8 +206,9 @@ class PurchaseWithProductTest extends TestCase
     {
         $product = $this->product();
 
+        $service = $this->product(tracked: false, name: 'شحن');
         $this->buy(['product_id' => $product['id'], 'quantity' => 10, 'unit_price' => 1000, 'tax_rate' => 15]);
-        $this->buy(['description' => 'شحن', 'quantity' => 1, 'unit_price' => 2500, 'tax_rate' => 15]);
+        $this->buy(['product_id' => $service['id'], 'quantity' => 1, 'unit_price' => 2500, 'tax_rate' => 15]);
 
         foreach (JournalEntry::with('lines')->get() as $entry) {
             $this->assertSame($entry->lines->sum('debit'), $entry->lines->sum('credit'));

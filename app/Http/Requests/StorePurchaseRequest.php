@@ -25,7 +25,14 @@ class StorePurchaseRequest extends FormRequest
             'cost_center_id'      => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
-            'items.*.product_id'  => ['nullable', 'uuid'],
+            // **المنتج إلزامي.** فاتورة الشراء مستندُ تكلفةٍ حقيقية: بلا منتج لا
+            // يُعرَف أهي بضاعةٌ تُرسمَل مخزوناً أم مصروفُ فترة، فتسقط كلّها في
+            // «5150 مصروفات عامة» — وهو ما كان يحدث فعلاً ويُفسد قائمة الدخل.
+            //
+            // ومصروفات فاتورة المورّد (شحن، تخليص) لم تُغلَق: تُدخَل بمنتج
+            // **خدمي غير متابَع مخزونياً**، فيبقى ترحيلها إلى 5150 كما هو —
+            // لكنها تصير بنداً مُدارَاً يُبحث عنه ويُقاس، لا نصّاً حرّاً.
+            'items.*.product_id'  => ['required', 'uuid'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
             // اسم الوحدة كما في قالب المنتج. الغياب = وحدة الأساس بمعامل ١؛
@@ -35,6 +42,14 @@ class StorePurchaseRequest extends FormRequest
             'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'],
             'tax_inclusive'       => ['nullable', 'boolean'], // هل تكاليف السطور متضمّنة الضريبة (تُستخرَج) أم لا (تُضاف)
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'items.*.product_id.required' =>
+                'كل بند في فاتورة الشراء يحتاج منتجاً. للشحن أو التخليص أنشئ منتجاً خدمياً غير متابَع مخزونياً.',
         ];
     }
 }

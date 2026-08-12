@@ -20,7 +20,7 @@ import { getSystemTaxInclusive } from '@/lib/tax';
 interface Partner { id: string; name: string; type: string; phone?: string | null; vat_number?: string | null }
 interface ProductUnit { name: string; factor: number }
 interface Product {
-  id: string; name: string; sku: string | null; purchase_price: string;
+  id: string; name: string; sku: string | null; barcode: string | null; purchase_price: string;
   tax_rate: number; is_active: boolean; track_inventory: boolean;
   quantity_on_hand: number; units?: ProductUnit[];
 }
@@ -114,7 +114,9 @@ export function PurchaseForm() {
     () => products.map((p) => ({
       value: p.id,
       label: p.name,
-      sub: p.sku ?? undefined,
+      // الرمز والباركود معاً في السطر الثاني — كلاهما يُبحث فيه، فالمستخدم
+      // يمسح الباركود أو يكتب رقم الصنف حسب ما بين يديه.
+      sub: [p.sku, p.barcode].filter(Boolean).join('  ·  ') || undefined,
       // الرصيد للمتابَع مخزونياً وحده — «الرصيد ٠» على خدمةٍ رقمٌ بلا معنى.
       hint: p.track_inventory ? `${t('balance')} ${p.quantity_on_hand}` : undefined,
     })),
@@ -130,7 +132,7 @@ export function PurchaseForm() {
   /** اختيار المنتج يملأ التكلفة والضريبة، ويُصفّر الوحدة (قالب المنتج تغيّر). */
   function pickProduct(key: string, productId: string) {
     const p = products.find((x) => x.id === productId);
-    if (!p) { setLine(key, { productId: null, unit: '' }); return; }
+    if (!p) return; // المنتج إلزامي — لا يُمحى باختيارٍ فارغ
     setLine(key, {
       productId: p.id, description: p.name, price: p.purchase_price,
       tax: String(p.tax_rate), unit: '',
@@ -154,7 +156,13 @@ export function PurchaseForm() {
     return { net, tax, total: net + tax };
   }, [lines, taxInclusive]);
 
-  const canSave = !!partnerId && !saving && lines.some((l) => lineGross(l) > 0);
+  // **المنتج إلزامي على كل سطر.** بلا منتج لا يُعرَف أهي بضاعةٌ تُرسمَل مخزوناً
+  // أم مصروفُ فترة، فتسقط كلّها في «5150 مصروفات عامة». والحفظ يُمنع هنا قبل
+  // أن يرفضه الخادم — رسالةٌ عند الضغط أوضح من طلبٍ يعود بخطأ.
+  const canSave =
+    !!partnerId && !saving &&
+    lines.every((l) => !!l.productId) &&
+    lines.some((l) => lineGross(l) > 0);
 
   /** شروط الدفع بالأيام ⇒ تاريخ استحقاق. الفراغ يعني بلا استحقاق. */
   const dueDate = useMemo(() => {
@@ -169,7 +177,7 @@ export function PurchaseForm() {
     setSaving(true);
     setError(null);
     const items = lines
-      .filter((l) => (Number(l.qty) || 0) > 0 && riyalToMinor(l.price) >= 0 && (l.productId || l.description))
+      .filter((l) => l.productId && (Number(l.qty) || 0) > 0 && riyalToMinor(l.price) >= 0)
       .map((l) => ({
         product_id: l.productId,
         description: l.description || null,
@@ -326,10 +334,9 @@ export function PurchaseForm() {
                       value={l.productId ?? ''}
                       onChange={(v) => pickProduct(l.key, v)}
                       options={productOptions}
-                      placeholder={t('manual_line')}
+                      placeholder={t('pick_product')}
                       searchPlaceholder={t('search_product')}
                       emptyText={t('no_product_found')}
-                      clearLabel={t('manual_line')}
                       footerLabel={t('new_product')}
                       onFooterClick={() => setNewProductFor(l.key)}
                       aria-label={t('item')}
@@ -378,6 +385,11 @@ export function PurchaseForm() {
               })}
 
               <p className="pt-1 text-xs leading-relaxed text-muted">{t('items_hint')}</p>
+              {lines.some((l) => !l.productId) && (
+                <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  {t('product_required')}
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -432,11 +444,14 @@ export function PurchaseForm() {
         </div>
       </div>
 
+      {/* العنوان صريح: النافذة المشتركة تُسمّي نفسها «إضافة طرف»، وهي هنا
+          تُضيف مورّداً — والعنوان الغامض يجعل المستخدم يشكّ أنه في المكان الخطأ. */}
       <PartnerDialog
         open={newSupplier}
         onClose={() => setNewSupplier(false)}
         onSaved={() => { setNewSupplier(false); loadPartners(); }}
         defaultType="supplier"
+        addTitle={t('new_supplier_title')}
       />
 
       {/* المنتج المُنشأ يُختار في سطره فوراً — وإلا أعاد المستخدم البحث عمّا

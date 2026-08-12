@@ -32,11 +32,20 @@ class PurchaseSettingsTest extends TestCase
             ->assertCreated()['data'];
     }
 
+    /** منتج للسطر — المنتج إلزامي على فاتورة الشراء (انظر StorePurchaseRequest). */
+    private function productId(string $token): string
+    {
+        return $this->withToken($token)->postJson('/api/products', [
+            'name' => 'إسمنت', 'sku' => 'CEM-' . uniqid(), 'type' => 'good',
+            'sale_price' => 100000, 'purchase_price' => 100000,
+        ])->assertCreated()['data']['id'];
+    }
+
     private function bill(string $token, string $supplierId, array $extra = []): array
     {
         return $this->withToken($token)->postJson('/api/purchases', array_merge([
             'partner_id' => $supplierId,
-            'items'      => [['description' => 'إسمنت', 'quantity' => 1, 'unit_price' => 100000]],
+            'items'      => [['product_id' => $this->productId($token), 'quantity' => 1, 'unit_price' => 100000]],
         ], $extra))->assertCreated()['data'];
     }
 
