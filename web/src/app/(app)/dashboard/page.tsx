@@ -199,7 +199,8 @@ export default function DashboardPage() {
                 className="flex items-center justify-between rounded-[10px] border border-border bg-surface px-4 py-4 text-sm font-semibold text-text transition-colors hover:border-primary hover:bg-primary-soft"
               >
                 <span className="truncate">{t(a.key)}</span>
-                <Icon className="h-[18px] w-[18px] shrink-0 text-primary" strokeWidth={1.7} />
+                {/* `muted` كبقية شاشات التطبيق — الإطار والعنوان يكفيان لإبراز الإجراء. */}
+                <Icon className="h-[18px] w-[18px] shrink-0 text-muted" strokeWidth={1.7} />
               </Link>
             );
           })}
