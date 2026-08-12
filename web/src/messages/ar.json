@@ -610,7 +610,8 @@
     "no_salesperson": "بدون",
     "summary_title": "ملخّص الفاتورة",
     "summary_hint": "الإجماليات تُشتقّ تلقائياً من السطور — لا تُدخل يدوياً. الخصم يخفّض الإيراد والضريبة.",
-    "edit_title": "تعديل الفاتورة"
+    "edit_title": "تعديل الفاتورة",
+    "unit": "الوحدة"
   },
   "invoiceTemplates": {
     "classic": "كلاسيكي",
@@ -1137,7 +1138,10 @@
     "pricing_details": "تفاصيل التسعير",
     "inventory_mgmt": "إدارة المخزون",
     "more_options": "خيارات أكثر",
-    "unclassified": "بلا تصنيف"
+    "unclassified": "بلا تصنيف",
+    "unit_template": "قالب الوحدات",
+    "no_unit_template": "بلا قالب",
+    "unit_template_hint": "يتيح الشراء والبيع بوحدة أكبر من وحدة المخزون."
   },
   "purchaseForm": {
     "title": "فاتورة مشتريات جديدة",
@@ -1724,7 +1728,23 @@
     "brand_list": "العلامات التجارية",
     "brand_empty": "لا علامات تجارية بعد.",
     "cancel": "إلغاء",
-    "delete": "حذف"
+    "delete": "حذف",
+    "unit_new": "قالب وحدات جديد",
+    "unit_edit": "تعديل القالب",
+    "unit_create": "إنشاء",
+    "unit_save": "حفظ",
+    "unit_template_name": "اسم القالب",
+    "unit_base": "وحدة الأساس",
+    "unit_base_hint": "وحدة المخزون — كل كمية في الدفتر تُحسب بها.",
+    "unit_base_placeholder": "وحدة الأساس",
+    "unit_alternatives": "الوحدات البديلة",
+    "unit_add_row": "إضافة وحدة",
+    "unit_row_name": "اسم الوحدة (مثل: طبلية)",
+    "unit_row_factor": "المعامل",
+    "unit_factor_hint": "المعامل = كم «{base}» في الوحدة الواحدة. يبدأ من ٢، وبلا كسور: وحدةٌ أصغر من الأساس تُعالَج باختيار الأصغر أساساً. تعديل المعامل لاحقاً لا يمسّ مستنداً مرحَّلاً — السطر ينسخ معامله وقت إنشائه.",
+    "unit_list": "القوالب",
+    "unit_empty": "لا قوالب وحدات بعد.",
+    "unit_none": "بلا وحدات بديلة — الأساس فقط."
   },
   "purchaseSettings": {
     "title": "إعدادات المشتريات",

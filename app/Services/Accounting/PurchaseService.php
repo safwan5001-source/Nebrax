@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\Account;
 use App\Models\Partner;
+use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseLine;
 use App\Support\Settings;
@@ -39,7 +40,8 @@ class PurchaseService
 
     public function __construct(
         protected LedgerService $ledger,
-        protected InventoryService $inventory
+        protected InventoryService $inventory,
+        protected UnitConversion $units
     ) {}
 
     /**
@@ -82,6 +84,13 @@ class PurchaseService
                 $unitPrice = (int) ($item['unit_price'] ?? 0);
                 $rate      = (int) ($item['tax_rate'] ?? $defaultRate);
 
+                // الوحدة تُحلّ إلى (اسم، معامل) وتُنسَخ على السطر: لقطةٌ لا مرجع،
+                // فتعديل القالب لاحقاً لا يعيد تفسير مستندٍ مرحَّل.
+                [$unitName, $unitFactor] = $this->units->resolve(
+                    ! empty($item['product_id']) ? Product::find($item['product_id']) : null,
+                    $item['unit'] ?? null
+                );
+
                 if ($qty <= 0 || $unitPrice < 0) {
                     throw new RuntimeException('الكمية يجب أن تكون موجبة والتكلفة غير سالبة.');
                 }
@@ -95,6 +104,8 @@ class PurchaseService
                     'product_id'    => $item['product_id'] ?? null,
                     'description'   => $item['description'] ?? null,
                     'quantity'      => $qty,
+                    'unit_name'     => $unitName,
+                    'unit_factor'   => $unitFactor,
                     'unit_price'    => $unitPrice,
                     'tax_rate'      => $rate,
                     'line_subtotal' => $lineNet,
@@ -192,7 +203,11 @@ class PurchaseService
                 if ($product && $product->track_inventory && $line->quantity > 0) {
                     // يُقيَّم المخزون بالصافي الدقيق (line_subtotal) فيتطابق مع مدين 1140
                     // في كلا الوضعين — وفي «المتضمَّن» الصافي = التكلفة بلا الضريبة المستخرَجة.
-                    $this->inventory->applyReceipt($product, $line->quantity, $line->unit_price, [
+                    // الكمية بوحدة المخزون (طبلية = ٥٠ كيساً)، **والقيمة كما هي**:
+                    // `line_subtotal` صافي السطر بالضبط، فتكلفة الوحدة الأساس
+                    // تُشتقّ منه بالقسمة داخل `applyReceipt` بلا تحويل نقدي هنا.
+                    $baseQuantity = $line->baseQuantity();
+                    $this->inventory->applyReceipt($product, $baseQuantity, intdiv($line->unit_price, max(1, (int) $line->unit_factor)), [
                         'source_type' => Purchase::class,
                         'source_id'   => $purchase->id,
                         'date'        => $purchase->purchase_date->toDateString(),

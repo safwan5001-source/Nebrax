@@ -33,6 +33,10 @@ class StoreInvoiceRequest extends FormRequest
             'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — خصم على مستوى السطر
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
+            // اسم الوحدة كما في قالب المنتج. الغياب = وحدة الأساس بمعامل ١؛
+            // والاسم المجهول يُرفض في `UnitConversion` لا هنا، فالتحقق يحتاج
+            // المنتج نفسه لا شكل الحقل.
+            'items.*.unit'        => ['nullable', 'string', 'max:255'],
             'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'], // هللات
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
         ];
