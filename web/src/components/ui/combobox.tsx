@@ -1,10 +1,17 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ChevronDown, Search } from 'lucide-react';
+import { Check, ChevronDown, Plus, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export interface ComboOption { value: string; label: string; hint?: string }
+export interface ComboOption {
+  value: string;
+  label: string;
+  /** سطر ثانٍ تحت الاسم — الرمز أو الـ SKU. */
+  sub?: string;
+  /** قيمة على الطرف المقابل — الرصيد أو الهاتف. */
+  hint?: string;
+}
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -26,6 +33,9 @@ export function Combobox({
   id,
   disabled,
   className,
+  clearLabel,
+  footerLabel,
+  onFooterClick,
   'aria-label': ariaLabel,
 }: {
   value: string;
@@ -37,6 +47,11 @@ export function Combobox({
   id?: string;
   disabled?: boolean;
   className?: string;
+  /** خيارٌ في الأعلى يُعيد القيمة إلى الفراغ — «(اختر مورد)». */
+  clearLabel?: string;
+  /** إجراء ملتصق بالأسفل — «إضافة منتج جديد». */
+  footerLabel?: string;
+  onFooterClick?: () => void;
   'aria-label'?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -50,8 +65,9 @@ export function Combobox({
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return options;
-    return options.filter(
-      (o) => o.label.toLowerCase().includes(q) || (o.hint ?? '').toLowerCase().includes(q)
+    // البحث يشمل الاسم والرمز والقيمة الجانبية — يُدخل المستخدم ما يحفظه.
+    return options.filter((o) =>
+      [o.label, o.sub, o.hint].some((f) => (f ?? '').toLowerCase().includes(q))
     );
   }, [options, query]);
 
@@ -122,6 +138,24 @@ export function Combobox({
           </div>
 
           <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
+            {clearLabel && !query.trim() && (
+              <li>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={value === ''}
+                  onClick={() => pick({ value: '', label: clearLabel })}
+                  className={cn(
+                    'flex w-full items-center gap-2 border-b border-border px-3 py-2 text-start text-sm',
+                    value === '' ? 'bg-primary-soft text-primary' : 'text-muted'
+                  )}
+                >
+                  <Check className={cn('h-3.5 w-3.5 shrink-0', value === '' ? 'opacity-100' : 'opacity-0')} strokeWidth={2} />
+                  <span className="truncate">{clearLabel}</span>
+                </button>
+              </li>
+            )}
+
             {filtered.length === 0 ? (
               <li className="px-3 py-2 text-center text-xs text-muted">{emptyText}</li>
             ) : (
@@ -139,14 +173,28 @@ export function Combobox({
                       option.value === value ? 'text-primary' : 'text-text'
                     )}
                   >
-                    <Check className={cn('h-3.5 w-3.5 shrink-0', option.value === value ? 'opacity-100' : 'opacity-0')} strokeWidth={2} />
-                    <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                    {option.hint && <span className="num shrink-0 text-xs text-muted">{option.hint}</span>}
+                    <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0 self-start', option.value === value ? 'opacity-100' : 'opacity-0')} strokeWidth={2} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{option.label}</span>
+                      {option.sub && <span className="num block truncate text-xs text-muted">{option.sub}</span>}
+                    </span>
+                    {option.hint && <span className="num shrink-0 self-start text-xs text-muted">{option.hint}</span>}
                   </button>
                 </li>
               ))
             )}
           </ul>
+
+          {footerLabel && (
+            <button
+              type="button"
+              onClick={() => { setOpen(false); onFooterClick?.(); }}
+              className="flex w-full items-center gap-2 border-t border-border bg-primary-soft px-3 py-2.5 text-start text-sm font-medium text-primary transition-colors hover:brightness-95"
+            >
+              <Plus className="h-4 w-4 shrink-0" strokeWidth={2} />
+              {footerLabel}
+            </button>
+          )}
         </div>
       )}
     </div>

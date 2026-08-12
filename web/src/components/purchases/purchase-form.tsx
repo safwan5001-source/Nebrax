@@ -12,15 +12,17 @@ import { Select } from '@/components/ui/select';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { useToast } from '@/components/ui/toast';
 import { PartnerDialog } from '@/components/partners/partner-dialog';
+import { ProductDialog } from '@/components/products/product-dialog';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 
-interface Partner { id: string; name: string; type: string; phone?: string | null }
+interface Partner { id: string; name: string; type: string; phone?: string | null; vat_number?: string | null }
 interface ProductUnit { name: string; factor: number }
 interface Product {
   id: string; name: string; sku: string | null; purchase_price: string;
-  tax_rate: number; is_active: boolean; units?: ProductUnit[];
+  tax_rate: number; is_active: boolean; track_inventory: boolean;
+  quantity_on_hand: number; units?: ProductUnit[];
 }
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
 
@@ -72,6 +74,8 @@ export function PurchaseForm() {
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [newSupplier, setNewSupplier] = useState(false);
+  // السطر الذي فُتحت من منتقيه نافذة «منتج جديد» — ليُختار فيه تلقائياً بعد الحفظ.
+  const [newProductFor, setNewProductFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -82,21 +86,39 @@ export function PurchaseForm() {
     []
   );
 
+  const loadProducts = useCallback(
+    () => api<{ data: Product[] }>('/products')
+      .then((r) => setProducts(r.data.filter((p) => p.is_active)))
+      .catch(() => {}),
+    []
+  );
+
   useEffect(() => {
     setDate(new Date().toISOString().slice(0, 10));
     loadPartners();
-    api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
+    loadProducts();
     api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
-  }, [loadPartners]);
+  }, [loadPartners, loadProducts]);
 
+  // الرقم الضريبي في `sub` ليبحث فيه المنتقي فعلاً — نصّ البحث يَعِد به.
   const supplierOptions = useMemo<ComboOption[]>(
-    () => partners.map((p) => ({ value: p.id, label: p.name, hint: p.phone ?? undefined })),
+    () => partners.map((p) => ({
+      value: p.id, label: p.name,
+      sub: p.vat_number ?? undefined,
+      hint: p.phone ?? undefined,
+    })),
     [partners]
   );
   const productOptions = useMemo<ComboOption[]>(
-    () => products.map((p) => ({ value: p.id, label: p.name, hint: p.sku ?? undefined })),
-    [products]
+    () => products.map((p) => ({
+      value: p.id,
+      label: p.name,
+      sub: p.sku ?? undefined,
+      // الرصيد للمتابَع مخزونياً وحده — «الرصيد ٠» على خدمةٍ رقمٌ بلا معنى.
+      hint: p.track_inventory ? `${t('balance')} ${p.quantity_on_hand}` : undefined,
+    })),
+    [products, t]
   );
 
   const setLine = (key: string, patch: Partial<Line>) =>
@@ -221,6 +243,7 @@ export function PurchaseForm() {
                       placeholder={t('pick_supplier')}
                       searchPlaceholder={t('search_supplier')}
                       emptyText={t('no_supplier_found')}
+                      clearLabel={t('pick_supplier')}
                     />
                     <Button type="button" variant="outline" onClick={() => setNewSupplier(true)}>
                       <Plus className="h-4 w-4" strokeWidth={1.7} />
@@ -306,6 +329,9 @@ export function PurchaseForm() {
                       placeholder={t('manual_line')}
                       searchPlaceholder={t('search_product')}
                       emptyText={t('no_product_found')}
+                      clearLabel={t('manual_line')}
+                      footerLabel={t('new_product')}
+                      onFooterClick={() => setNewProductFor(l.key)}
                       aria-label={t('item')}
                     />
                     <Input
@@ -411,6 +437,29 @@ export function PurchaseForm() {
         onClose={() => setNewSupplier(false)}
         onSaved={() => { setNewSupplier(false); loadPartners(); }}
         defaultType="supplier"
+      />
+
+      {/* المنتج المُنشأ يُختار في سطره فوراً — وإلا أعاد المستخدم البحث عمّا
+          أنشأه للتوّ. الاختيار يتمّ بعد إعادة الجلب لا قبلها. */}
+      <ProductDialog
+        open={newProductFor !== null}
+        onClose={() => setNewProductFor(null)}
+        onSaved={async () => {
+          const key = newProductFor;
+          setNewProductFor(null);
+          const before = new Set(products.map((p) => p.id));
+          const fresh = await api<{ data: Product[] }>('/products').catch(() => null);
+          if (!fresh) { loadProducts(); return; }
+          const active = fresh.data.filter((p) => p.is_active);
+          setProducts(active);
+          const created = active.find((p) => !before.has(p.id));
+          if (key && created) {
+            setLine(key, {
+              productId: created.id, description: created.name,
+              price: created.purchase_price, tax: String(created.tax_rate), unit: '',
+            });
+          }
+        }}
       />
     </div>
   );

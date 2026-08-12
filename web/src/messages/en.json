@@ -1165,7 +1165,7 @@
     "save_post": "Save and post",
     "supplier_section": "Supplier and payment",
     "pick_supplier": "(select a supplier)",
-    "search_supplier": "Search by name or phone…",
+    "search_supplier": "Enter a name, phone or tax number",
     "no_supplier_found": "No supplier by that name.",
     "new_supplier": "New",
     "date": "Date",
@@ -1201,7 +1201,9 @@
     "s_deposit": "Deposit / already paid",
     "s_deposit_hint": "Automatically issue a payment voucher on posting. Today the payment is recorded from the payments screen and allocated to the invoice.",
     "s_attachments": "Attachments",
-    "s_attachments_hint": "Upload the supplier's invoice image and keep it with the document. Needs file storage, not built yet."
+    "s_attachments_hint": "Upload the supplier's invoice image and keep it with the document. Needs file storage, not built yet.",
+    "balance": "Stock",
+    "new_product": "Add a new product"
   },
   "purchaseReturns": {
     "title": "Purchase returns",
