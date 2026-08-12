@@ -777,7 +777,8 @@
     "purchaseReturns": "Purchase returns",
     "debitNotes": "Debit notes",
     "supplierPayments": "Supplier payments",
-    "purchaseSettings": "Purchase settings"
+    "purchaseSettings": "Purchase settings",
+    "inventorySettings": "Inventory settings"
   },
   "partnerProfile": {
     "back": "Back",
@@ -1668,6 +1669,17 @@
       "empty": "No purchase orders",
       "due_label": "Delivery date"
     }
+  },
+  "inventorySettings": {
+    "title": "Inventory settings",
+    "subtitle": "An operational policy with a direct accounting effect — read by the inventory service on every sale and return.",
+    "policy": "Stock policy",
+    "allow_negative_stock": "Selling beyond available stock",
+    "mode_reject": "Rejected — nothing leaves that is not in stock",
+    "mode_allow": "Allowed — quantity may go negative",
+    "allow_negative_stock_hint": "Applies to sales invoices, point of sale and purchase returns.",
+    "allow_warning": "Allowing negative stock does double damage: the inventory account (1140) ends up with a credit balance although it is an asset, and the moving average is corrupted by every later purchase, so the cost of goods sold comes out wrong. Use the inventory diagnostic report to see the affected items.",
+    "save": "Save settings"
   },
   "purchaseSettings": {
     "title": "Purchase settings",
