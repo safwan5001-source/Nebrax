@@ -1,7 +1,7 @@
 'use client';
 
 import { api, setToken, clearToken, getToken } from './api';
-import { isDemo, disableDemo } from './demo';
+import { isDemo } from './demo';
 
 export interface AuthUser {
   id: string;
@@ -11,12 +11,30 @@ export interface AuthUser {
   tenant_id: string;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════
+ *  مسح تفضيلات الجلسة السابقة — يُستدعى عند كل دخول وخروج
+ * ═══════════════════════════════════════════════════════════════
+ *  الفرع النشط ووضع المعاينة يعيشان في `localStorage`، فيبقيان بعد تبديل
+ *  الحساب. وقد تسبّب ذلك بعطل إنتاج حقيقي: متصفّح احتفظ بفرع المعاينة
+ *  (`br-1`) بعد إنشاء حساب حقيقي، فصار يُرسَل في `X-Branch-Id` مع كل طلب.
+ *
+ *  المسح هنا لا يُغني عن تحصين الخادم (`SetBranch` يتجاهل ما ليس UUID) —
+ *  الطبقتان معاً: الخادم لا ينهار، والعميل لا يرسل ما لا يخصّه أصلاً.
+ */
+function clearSessionPreferences(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('nibras_active_branch');
+  localStorage.removeItem('demo');
+}
+
 // الدخول بالبريد وكلمة المرور فقط — البريد فريد عالمياً فيُستنتَج منه المستأجر.
 export async function login(email: string, password: string): Promise<AuthUser> {
   const res = await api<{ token: string; user: AuthUser }>('/login', {
     method: 'POST',
     body: { email, password },
   });
+  clearSessionPreferences(); // لا يرث الحسابُ الجديد فرعَ الحساب السابق
   setToken(res.token);
   localStorage.setItem('user', JSON.stringify(res.user));
   return res.user;
@@ -34,7 +52,10 @@ export interface RegisterPayload {
 
 // تسجيل مؤسسة جديدة: ينشئ المستأجر + المالك + دليل الحسابات، ويعيد توكن الدخول.
 export async function register(payload: RegisterPayload): Promise<AuthUser> {
-  disableDemo(); // تسجيل حقيقي — نخرج من وضع المعاينة إن كان مفعّلاً
+  // كان هنا `disableDemo()` وحده: يمسح علم المعاينة **ويترك فرعها** في التخزين.
+  // فالحساب الحقيقي الجديد كان يرث `nibras_active_branch = "br-1"` ويرسله في
+  // كل طلب — وهو منشأ عطل الإنتاج. المسح الآن يشمل الاثنين معاً.
+  clearSessionPreferences();
   const res = await api<{ token: string; user: AuthUser }>('/register', {
     method: 'POST',
     body: payload,
@@ -51,6 +72,7 @@ export async function logout(): Promise<void> {
     // تجاهل أخطاء الشبكة عند الخروج
   }
   clearToken();
+  clearSessionPreferences();
 }
 
 export function currentUser(): AuthUser | null {

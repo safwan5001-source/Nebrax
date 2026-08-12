@@ -47,6 +47,25 @@ use App\Http\Middleware\SetBranch;
 use App\Http\Middleware\SetTenant;
 use Illuminate\Support\Facades\Route;
 
+/**
+ * ═══════════════════════════════════════════════════════════════
+ *  المعرّفات في المسارات **يجب أن تكون UUID** — وإلا لم يُطابَق المسار
+ * ═══════════════════════════════════════════════════════════════
+ *  كل مفاتيح النماذج من نوع `uuid` في PostgreSQL، وهو يرفض أي نصّ غير صالح
+ *  بـ `SQLSTATE[22P02]` — فيتحوّل معرّفٌ مشوّه إلى **500 خطأ خادم** بدل 404.
+ *  (SQLite لا يتحقّق من النوع فيمرّ صامتاً، ولذلك لم يظهر في الاختبارات.)
+ *
+ *  القيد هنا يجعل المسار **لا يُطابَق أصلاً** فتُعاد 404 — وهي الدلالة
+ *  الصحيحة لمعرّف غير موجود، وتُغلق باباً لتعطيل الخدمة بمعرّف عشوائي.
+ *
+ *  `{type}` و`{section}` مستثناة عمداً: نصّية لا معرّفات.
+ */
+$uuid = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+Route::pattern('id', $uuid);
+Route::pattern('productId', $uuid);
+Route::pattern('partnerId', $uuid);
+Route::pattern('accountId', $uuid);
+
 // كل مسارات الـ API ترجع JSON موحّداً (بما فيها الأخطاء).
 Route::middleware(ForceJsonResponse::class)->group(function () {
 
