@@ -227,6 +227,81 @@ class NegativeStockPolicyTest extends TestCase
         (require database_path('migrations/2025_01_01_000044_grandfather_negative_stock_policy.php'))->up();
     }
 
+    /**
+     * **الحقل المعروض ولا يُكتب.** التتبع التفصيلي (رقم مسلسل/شحنة/صلاحية)
+     * غير مبنيّ: لا جدول دفعات ولا طبقة تكلفة لكل دفعة. فتفعيله يُرفض برسالة
+     * مفهومة — تخزين `true` لقدرة غير موجودة كذبٌ يبني عليه قارئٌ لاحق.
+     *
+     * @test
+     */
+    public function detailed_tracking_is_readable_but_cannot_be_enabled(): void
+    {
+        $this->assertFalse(
+            $this->withToken($this->token)->getJson('/api/inventory-settings')
+                ->assertOk()['data']['detailed_tracking_enabled']
+        );
+
+        $this->withToken($this->token)
+            ->putJson('/api/inventory-settings', ['detailed_tracking_enabled' => true])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('detailed_tracking_enabled');
+
+        // إطفاؤه صراحةً مقبول — لا رفض لما لا يغيّر شيئاً.
+        $this->withToken($this->token)
+            ->putJson('/api/inventory-settings', ['detailed_tracking_enabled' => false])
+            ->assertOk();
+    }
+
+    /** الرفض لا يُسقط الحقول الأخرى في الطلب نفسه: لا حفظ جزئي. */
+    /** @test */
+    public function a_rejected_tracking_flag_saves_nothing_else(): void
+    {
+        $this->withToken($this->token)->putJson('/api/inventory-settings', [
+            'allow_negative_stock'      => true,
+            'detailed_tracking_enabled' => true,
+        ])->assertStatus(422);
+
+        $this->assertFalse(
+            $this->withToken($this->token)->getJson('/api/inventory-settings')['data']['allow_negative_stock'],
+            'التحقق يسبق الحفظ، فلا يمرّ نصف الطلب.'
+        );
+    }
+
+    /** عرض الكميات تفضيل عرض بحت — يُحفظ ولا يمسّ رصيداً ولا قيداً. */
+    /** @test */
+    public function showing_quantities_is_a_display_preference_only(): void
+    {
+        $product = $this->product(5);
+
+        $this->assertTrue(
+            $this->withToken($this->token)->getJson('/api/inventory-settings')['data']['show_stock_quantities'],
+            'الافتراض العرض — لا إخفاء بلا طلب.'
+        );
+
+        $this->withToken($this->token)
+            ->putJson('/api/inventory-settings', ['show_stock_quantities' => false])->assertOk();
+
+        // الرصيد كما هو، والبيع يعمل: الإخفاء عرضٌ لا سياسة.
+        $this->assertSame(5, Product::findOrFail($product['id'])->quantity_on_hand);
+        $this->sell($product['id'], 2)->assertOk();
+        $this->assertSame(3, Product::findOrFail($product['id'])->quantity_on_hand);
+    }
+
+    /** حفظ مفتاح لا يمسّ إخوته في المجموعة نفسها. */
+    /** @test */
+    public function saving_one_key_leaves_its_siblings_untouched(): void
+    {
+        $this->withToken($this->token)
+            ->putJson('/api/inventory-settings', ['allow_negative_stock' => true])->assertOk();
+
+        $this->withToken($this->token)
+            ->putJson('/api/inventory-settings', ['show_stock_quantities' => false])->assertOk();
+
+        $data = $this->withToken($this->token)->getJson('/api/inventory-settings')['data'];
+        $this->assertTrue($data['allow_negative_stock'], 'المفتاح غير المرسَل يبقى كما هو.');
+        $this->assertFalse($data['show_stock_quantities']);
+    }
+
     /** السياسة معزولة بالمستأجر. */
     /** @test */
     public function the_policy_is_isolated_per_tenant(): void

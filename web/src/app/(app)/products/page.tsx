@@ -12,6 +12,7 @@ import { ProductDialog, type Product } from '@/components/products/product-dialo
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
+import { getShowStockQuantities } from '@/lib/inventory';
 
 export default function ProductsPage() {
   const t = useTranslations('products');
@@ -20,6 +21,7 @@ export default function ProductsPage() {
   const [dialog, setDialog] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [taxInclusive, setTaxInclusive] = useState(false);
+  const [showStock, setShowStock] = useState(true);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -30,6 +32,7 @@ export default function ProductsPage() {
 
   useEffect(() => load(), [load]);
   useEffect(() => { getSystemTaxInclusive().then(setTaxInclusive).catch(() => {}); }, []);
+  useEffect(() => { getShowStockQuantities().then(setShowStock).catch(() => {}); }, []);
 
   const columns = useMemo<ColumnDef<Product, unknown>[]>(
     () => [
@@ -46,14 +49,17 @@ export default function ProductsPage() {
         cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.sale_price)}</div>,
       },
       { accessorKey: 'tax_rate', header: t('tax_rate'), cell: ({ row }) => <div className="num text-end">{row.original.tax_rate}%</div> },
-      {
-        id: 'stock',
-        header: t('stock'),
-        accessorFn: (r) => (r.track_inventory ? r.quantity_on_hand : ''),
-        cell: ({ row }) => (
-          <div className="num text-end">{row.original.track_inventory ? row.original.quantity_on_hand : '—'}</div>
-        ),
-      },
+      // عمود الكمية يخضع لتفضيل «عرض الكميات» في إعدادات المخزون — عرضٌ بحت.
+      ...(showStock
+        ? ([{
+            id: 'stock',
+            header: t('stock'),
+            accessorFn: (r: Product) => (r.track_inventory ? r.quantity_on_hand : ''),
+            cell: ({ row }) => (
+              <div className="num text-end">{row.original.track_inventory ? row.original.quantity_on_hand : '—'}</div>
+            ),
+          }] as ColumnDef<Product, unknown>[])
+        : []),
       {
         accessorKey: 'is_active',
         header: t('status_label'),
@@ -71,7 +77,7 @@ export default function ProductsPage() {
         ),
       },
     ],
-    [t, taxInclusive]
+    [t, taxInclusive, showStock]
   );
 
   return (
