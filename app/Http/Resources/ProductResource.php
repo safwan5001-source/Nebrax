@@ -17,8 +17,12 @@ class ProductResource extends JsonResource
             'name'             => $this->name,
             'name_en'          => $this->name_en,
             'description'      => $this->description,
-            'category'         => $this->category,
-            'brand'            => $this->brand,
+            // الاسم من العلاقة أولاً، والنصّ القديم احتياطياً لمنتجٍ لم يُربط
+            // بعد. فإعادة تسمية التصنيف تسري على كل منتجاته فوراً بلا مزامنة.
+            'category'         => $this->productCategory?->name ?? $this->category,
+            'brand'            => $this->productBrand?->name ?? $this->brand,
+            'category_id'      => $this->category_id,
+            'brand_id'         => $this->brand_id,
             'reorder_level'    => $this->reorder_level,
             'supplier_id'      => $this->supplier_id,
             'sales_account_id' => $this->sales_account_id,

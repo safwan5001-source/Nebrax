@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
+use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BranchSettingsController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PayrollController;
+use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\PosSessionController;
@@ -123,6 +125,17 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('products', [ProductController::class, 'store'])->middleware($perm('products.manage'));
         Route::put('products/{id}', [ProductController::class, 'update'])->middleware($perm('products.manage'));
         Route::delete('products/{id}', [ProductController::class, 'destroy'])->middleware($perm('products.manage'));
+
+        // تصنيفات المنتجات والعلامات التجارية (قوائم تصنيف — لا أثر محاسبي)
+        Route::get('product-categories', [ProductCategoryController::class, 'index'])->middleware($perm('products.view'));
+        Route::post('product-categories', [ProductCategoryController::class, 'store'])->middleware($perm('products.manage'));
+        Route::put('product-categories/{id}', [ProductCategoryController::class, 'update'])->middleware($perm('products.manage'));
+        Route::delete('product-categories/{id}', [ProductCategoryController::class, 'destroy'])->middleware($perm('products.manage'));
+
+        Route::get('brands', [BrandController::class, 'index'])->middleware($perm('products.view'));
+        Route::post('brands', [BrandController::class, 'store'])->middleware($perm('products.manage'));
+        Route::put('brands/{id}', [BrandController::class, 'update'])->middleware($perm('products.manage'));
+        Route::delete('brands/{id}', [BrandController::class, 'destroy'])->middleware($perm('products.manage'));
 
         // تقرير المخزون (قراءة فقط — لا أثر محاسبي)
         Route::get('inventory', [InventoryController::class, 'index'])->middleware($perm('products.view'));

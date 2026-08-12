@@ -778,7 +778,7 @@
     "debitNotes": "Debit notes",
     "supplierPayments": "Supplier payments",
     "purchaseSettings": "Purchase settings",
-    "inventorySettings": "Inventory settings"
+    "inventorySettings": "Inventory and product settings"
   },
   "partnerProfile": {
     "back": "Back",
@@ -1136,7 +1136,8 @@
     "item_details": "Item details",
     "pricing_details": "Pricing details",
     "inventory_mgmt": "Inventory management",
-    "more_options": "More options"
+    "more_options": "More options",
+    "unclassified": "Unclassified"
   },
   "purchaseForm": {
     "title": "New purchase invoice",
@@ -1689,7 +1690,41 @@
     "show_stock_quantities_hint": "When off, the quantity is hidden from the product list and the product card. This option affects no balance and no journal entry — display only.",
     "total_in_stock": "Total quantity (in stock)",
     "total_in_stock_hint": "Determines how quantity is checked on sale or issue: total stock, or what is available after deducting reserved quantities. Not built yet — there is no concept of a reserved quantity in the system today, so total and available are one number.",
-    "save": "Save settings"
+    "save": "Save settings",
+    "back": "Back",
+    "c_products_t": "Product settings",
+    "c_products_d": "Control product behaviour, tracking mechanisms, stocktaking and warehouse permits.",
+    "c_categories_t": "Categories",
+    "c_categories_d": "Create multi-level categories to group items and make filtering in lists and reports easier.",
+    "c_brands_t": "Brands",
+    "c_brands_d": "Create any number of brands to classify items, simplify managing them and link them to reports.",
+    "c_units_t": "Unit templates",
+    "c_units_d": "Define base units and conversion ratios so you can buy and sell products in different units.",
+    "c_employee_warehouses_t": "Default employee warehouses",
+    "c_employee_warehouses_d": "Assign default warehouses to employees to track their permissions, stock movements and permits.",
+    "c_barcode_t": "Barcode settings",
+    "c_barcode_d": "Set barcode preferences and formats for accurate scanning and weight-based pricing.",
+    "c_fields_t": "Custom fields",
+    "c_fields_d": "Add custom fields to capture extra data and show it on product pages, lists and reports.",
+    "cat_new": "New category",
+    "cat_edit": "Edit category",
+    "cat_name": "Category name",
+    "cat_parent": "Parent category",
+    "cat_no_parent": "No parent (top level)",
+    "cat_add": "Add",
+    "cat_save": "Save",
+    "cat_list": "Categories",
+    "cat_empty": "No categories yet.",
+    "cat_products": "{count} products",
+    "brand_new": "New brand",
+    "brand_edit": "Edit brand",
+    "brand_name": "Brand name",
+    "brand_add": "Add",
+    "brand_save": "Save",
+    "brand_list": "Brands",
+    "brand_empty": "No brands yet.",
+    "cancel": "Cancel",
+    "delete": "Delete"
   },
   "purchaseSettings": {
     "title": "Purchase settings",
