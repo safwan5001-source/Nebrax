@@ -72,7 +72,8 @@ jobs:
           cd "$APP_DIR"
           mkdir -p app/Services/Accounting app/Services/Reporting app/Support \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
-                   app/Http/Requests app/Http/Resources tests/Feature routes
+                   app/Http/Requests app/Http/Resources app/Console/Commands \
+                   tests/Feature routes
           cp -r "$CORE/app/Models/"*.php                  app/Models/
           cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
           cp -r "$CORE/app/Services/Reporting/"*.php      app/Services/Reporting/
@@ -83,6 +84,8 @@ jobs:
           cp -r "$CORE/app/Http/Requests/"*.php           app/Http/Requests/
           cp -r "$CORE/app/Http/Resources/"*.php          app/Http/Resources/
           cp -r "$CORE/app/Providers/"*.php               app/Providers/
+          # أوامر artisan (تشخيص/صيانة) — بلا هذا السطر توجد في المستودع ولا تصل الاختبار
+          cp -r "$CORE/app/Console/Commands/"*.php       app/Console/Commands/ 2>/dev/null || true
           cp -r "$CORE/database/migrations/"*.php         database/migrations/
           cp -r "$CORE/routes/api.php"                    routes/api.php
           cp -r "$CORE/tests/Feature/"*.php               tests/Feature/
