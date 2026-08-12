@@ -7,10 +7,14 @@ use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 
 /**
- * إعدادات المخزون — سياسة تشغيلية بأثر محاسبي غير مباشر.
+ * إعدادات المخزون والمنتجات — مورد مفرد (singleton) لكل مستأجر: لا فهرس ولا
+ * معرّف في المسار، فالسجلّ واحد بطبيعته.
  *
- * `allow_negative_stock` **يُقرأ فعلاً** في `InventoryService::assertStockAvailable`
- * على مسارَي البيع وإرجاع المشتريات. لا إعداد يُحفظ ولا يقرؤه أحد.
+ * كل مفتاح هنا **يقرؤه شيء فعلاً**: `allow_negative_stock` في
+ * `InventoryService::assertStockAvailable` على مسارَي البيع وإرجاع المشتريات،
+ * و`show_stock_quantities` في شاشات المنتجات. لا إعداد يُحفظ ولا يقرؤه أحد.
+ *
+ * `detailed_tracking_enabled` يُقرأ ولا يُكتب — انظر `Settings::DEFAULTS`.
  */
 class InventorySettingsController extends ApiController
 {
