@@ -22,6 +22,7 @@ class Purchase extends BaseModel
         'tenant_id', 'number', 'partner_id', 'cost_center_id', 'payment_type',
         'purchase_date', 'due_date', 'supplier_invoice_no', 'status',
         'subtotal', 'tax_amount', 'total', 'tax_inclusive',
+        'discount', 'shipping', 'adjustment',
         'paid_amount', 'payment_status',
         'notes', 'journal_entry_id', 'created_by',
     ];

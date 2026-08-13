@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Plus, Trash2, Truck, Users, Package, FileText, Paperclip, Percent, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Plus, Trash2, Users, Package, FileText, Paperclip, Percent, Wallet, type LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,12 +27,13 @@ interface Product {
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
 interface ApiLine {
   product_id: string | null; description: string | null; quantity: number;
-  unit_name: string | null; unit_price: string; tax_rate: number;
+  unit_name: string | null; unit_price: string; tax_rate: number; line_discount?: string;
 }
 interface ApiPurchase {
   partner_id: string; cost_center_id: string | null; payment_type: string;
   purchase_date: string | null; supplier_invoice_no: string | null;
   tax_inclusive: boolean; notes?: string | null; lines: ApiLine[];
+  discount?: string; shipping?: string; adjustment?: string;
 }
 
 interface Line {
@@ -42,12 +43,13 @@ interface Line {
   unit: string;
   qty: string;
   price: string;
+  disc: string;
   tax: string;
 }
 
 let lineSeq = 0;
 const newLine = (): Line => ({
-  key: `p${++lineSeq}`, productId: null, description: '', unit: '', qty: '1', price: '', tax: '15',
+  key: `p${++lineSeq}`, productId: null, description: '', unit: '', qty: '1', price: '', disc: '', tax: '15',
 });
 
 /**
@@ -83,6 +85,9 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('');
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [notes, setNotes] = useState('');
+  const [discountInput, setDiscountInput] = useState('');
+  const [shippingInput, setShippingInput] = useState('');
+  const [adjustmentInput, setAdjustmentInput] = useState('');
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [newSupplier, setNewSupplier] = useState(false);
   // السطر الذي فُتحت من منتقيه نافذة «منتج جديد» — ليُختار فيه تلقائياً بعد الحفظ.
@@ -128,6 +133,9 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
         setSupplierInvoiceNo(d.supplier_invoice_no ?? '');
         setTaxInclusive(!!d.tax_inclusive);
         setNotes(d.notes ?? '');
+        setDiscountInput(Number(d.discount) > 0 ? String(d.discount) : '');
+        setShippingInput(Number(d.shipping) > 0 ? String(d.shipping) : '');
+        setAdjustmentInput(Number(d.adjustment) !== 0 ? String(d.adjustment) : '');
         setLines(
           d.lines.length
             ? d.lines.map((l) => ({
@@ -137,6 +145,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                 unit: l.unit_name ?? '',
                 qty: String(l.quantity),
                 price: l.unit_price,
+                disc: l.line_discount && Number(l.line_discount) > 0 ? l.line_discount : '',
                 tax: String(l.tax_rate),
               }))
             : [newLine()]
@@ -189,7 +198,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const totals = useMemo(() => {
     let net = 0, tax = 0;
     for (const l of lines) {
-      const gross = lineGross(l);
+      const gross = Math.max(0, lineGross(l) - riyalToMinor(l.disc));
       const rate = Number(l.tax) || 0;
       if (taxInclusive) {
         const t = rate <= 0 || gross <= 0 ? 0 : Math.round((gross * rate) / (100 + rate));
@@ -198,8 +207,17 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
         net += gross; tax += Math.round((gross * rate) / 100);
       }
     }
-    return { net, tax, total: net + tax };
-  }, [lines, taxInclusive]);
+
+    // الخصم يخفّض الأساس والشحن يرفعه، والضريبة تُعاد نسبتُها عليهما — مطابقة
+    // لـ`applyHeadAdjustments` في الخادم حرفياً، فلا تخالف المعاينةُ المحفوظ.
+    const discount = Math.min(riyalToMinor(discountInput), net);
+    const shipping = riyalToMinor(shippingInput);
+    const adjustment = riyalToMinor(adjustmentInput);
+    const base = net - discount + shipping;
+    const taxNet = net > 0 ? Math.trunc((tax * base) / net) : 0;
+
+    return { net, tax: taxNet, discount, shipping, adjustment, base, total: base + taxNet + adjustment };
+  }, [lines, taxInclusive, discountInput, shippingInput, adjustmentInput]);
 
   // **المنتج إلزامي على كل سطر.** بلا منتج لا يُعرَف أهي بضاعةٌ تُرسمَل مخزوناً
   // أم مصروفُ فترة، فتسقط كلّها في «5150 مصروفات عامة». والحفظ يُمنع هنا قبل
@@ -229,6 +247,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
         quantity: Math.floor(Number(l.qty)) || 1,
         unit: l.unit || null,
         unit_price: riyalToMinor(l.price),
+        discount: riyalToMinor(l.disc),
         tax_rate: Number(l.tax) || 0,
       }));
 
@@ -243,6 +262,9 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
           due_date: dueDate,
           supplier_invoice_no: supplierInvoiceNo || null,
           tax_inclusive: taxInclusive,
+          discount: totals.discount,
+          shipping: totals.shipping,
+          adjustment: totals.adjustment,
           notes: notes || null,
           items,
       };
@@ -359,9 +381,10 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
             <CardContent className="space-y-2">
               <div className="hidden grid-cols-12 gap-2 px-1 text-[11px] font-medium text-muted md:grid">
                 <div className="col-span-3">{t('item')}</div>
-                <div className="col-span-2">{t('description')}</div>
+                <div className="col-span-1">{t('description')}</div>
                 <div className="col-span-2 text-end">{t('unit_price')}</div>
                 <div className="col-span-2 text-end">{t('qty')}</div>
+                <div className="col-span-1 text-end">{t('line_discount')}</div>
                 <div className="col-span-1 text-end">{t('tax')}</div>
                 <div className="col-span-1 text-end">{t('line_total')}</div>
                 <div className="col-span-1" />
@@ -387,7 +410,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                       aria-label={t('item')}
                     />
                     <Input
-                      className="col-span-2 md:col-span-2" placeholder={t('description')}
+                      className="col-span-2 md:col-span-1" placeholder={t('description')}
                       value={l.description}
                       onChange={(e) => setLine(l.key, { description: e.target.value })}
                     />
@@ -412,6 +435,10 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                         </Select>
                       )}
                     </div>
+                    <Input
+                      className="num text-end md:col-span-1" inputMode="decimal" placeholder="0"
+                      value={l.disc} onChange={(e) => setLine(l.key, { disc: e.target.value })}
+                    />
                     <Input
                       className="num text-end md:col-span-1" type="number" min={0} max={100}
                       value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })}
@@ -439,8 +466,41 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
           </Card>
 
           {/* ═══ أقسام مؤجَّلة — تظهر لتُعرَف لا لتُستعمَل ═══ */}
-          <SoonSection icon={Percent} title={t('s_discount')} hint={t('s_discount_hint')} soon={t('soon')} />
-          <SoonSection icon={Truck} title={t('s_shipping')} hint={t('s_shipping_hint')} soon={t('soon')} />
+          {/* الخصم والشحن والتسوية — يدخل الخصمُ والشحن **تكلفة البضاعة** لا
+              حساباً مستقلاً (IAS 2 للشحن، والخصم التجاري جزءٌ من ثمن الشراء). */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Percent className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('s_discount')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="pf-discount">{t('discount')}</Label>
+                  <Input
+                    id="pf-discount" className="num text-end" inputMode="decimal" placeholder="0"
+                    value={discountInput} onChange={(e) => setDiscountInput(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pf-shipping">{t('shipping')}</Label>
+                  <Input
+                    id="pf-shipping" className="num text-end" inputMode="decimal" placeholder="0"
+                    value={shippingInput} onChange={(e) => setShippingInput(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pf-adjustment">{t('adjustment')}</Label>
+                  <Input
+                    id="pf-adjustment" className="num text-end" inputMode="decimal" placeholder="0"
+                    value={adjustmentInput} onChange={(e) => setAdjustmentInput(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed text-muted">{t('head_amounts_hint')}</p>
+            </CardContent>
+          </Card>
           <SoonSection icon={Wallet} title={t('s_deposit')} hint={t('s_deposit_hint')} soon={t('soon')} />
           <SoonSection icon={Paperclip} title={t('s_attachments')} hint={t('s_attachments_hint')} soon={t('soon')} />
 
@@ -477,7 +537,14 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                 </Select>
               </div>
               <Row label={t('subtotal')} value={formatRiyal(totals.net / 100)} />
+              {totals.discount > 0 && (
+                <Row label={t('discount')} value={`− ${formatRiyal(totals.discount / 100)}`} />
+              )}
+              {totals.shipping > 0 && <Row label={t('shipping')} value={formatRiyal(totals.shipping / 100)} />}
               <Row label={t('tax_amount')} value={formatRiyal(totals.tax / 100)} />
+              {totals.adjustment !== 0 && (
+                <Row label={t('adjustment')} value={formatRiyal(totals.adjustment / 100)} />
+              )}
               <div className="flex items-center justify-between border-t border-border pt-2 font-semibold text-text">
                 <span>{t('total')}</span>
                 <span className="num">{formatRiyal(totals.total / 100)}</span>

@@ -1223,7 +1223,12 @@
     "pick_product": "(select a product)",
     "product_required": "Every line needs a product. For shipping or clearance create a non-inventory service product — it still posts to expenses.",
     "new_supplier_title": "Add a new supplier",
-    "edit_title": "Edit purchase invoice"
+    "edit_title": "Edit purchase invoice",
+    "line_discount": "Disc.",
+    "discount": "Invoice discount",
+    "shipping": "Shipping",
+    "adjustment": "Adjustment",
+    "head_amounts_hint": "Discount and shipping go into the cost of the goods themselves: the discount lowers the moving average, and inbound freight is capitalised onto it (IAS 2). The adjustment is a rounding difference on account 5170 that touches neither inventory nor tax."
   },
   "purchaseReturns": {
     "title": "Purchase returns",
