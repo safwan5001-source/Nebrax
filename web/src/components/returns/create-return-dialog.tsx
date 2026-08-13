@@ -8,14 +8,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
-interface Partner { id: string; name: string; type: string }
-interface Line { description: string; quantity: string; unit_price: string; tax_rate: string }
+interface Partner { id: string; name: string; type: string; phone?: string | null; vat_number?: string | null }
+interface Product {
+  id: string; name: string; sku?: string | null; barcode?: string | null;
+  sale_price: string; purchase_price: string; tax_rate: number; is_active: boolean;
+  track_inventory?: boolean; quantity_on_hand?: number;
+}
+interface Line { productId: string | null; description: string; quantity: string; unit_price: string; tax_rate: string }
 
-const emptyLine = (): Line => ({ description: '', quantity: '1', unit_price: '', tax_rate: '15' });
+const emptyLine = (): Line => ({ productId: null, description: '', quantity: '1', unit_price: '', tax_rate: '15' });
 
 export function CreateReturnDialog({
   open,
@@ -34,6 +40,7 @@ export function CreateReturnDialog({
   const { success } = useToast();
   const [type, setType] = useState<'sales' | 'purchase'>(fixedType ?? 'sales');
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [paymentType, setPaymentType] = useState('credit');
   const [postNow, setPostNow] = useState(true);
@@ -43,7 +50,10 @@ export function CreateReturnDialog({
 
   useEffect(() => {
     if (!open) return;
-    api<{ data: Partner[] }>('/partners').then((r) => setPartners(r.data));
+    api<{ data: Partner[] }>('/partners').then((r) => setPartners(r.data)).catch(() => {});
+    api<{ data: Product[] }>('/products')
+      .then((r) => setProducts(r.data.filter((p) => p.is_active)))
+      .catch(() => {});
   }, [open]);
 
   const eligible = useMemo(
@@ -54,10 +64,48 @@ export function CreateReturnDialog({
     [partners, type]
   );
 
-  const setLine = (i: number, k: keyof Line, v: string) =>
-    setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, [k]: v } : l)));
+  const partnerOptions = useMemo<ComboOption[]>(
+    () => eligible.map((p) => ({
+      value: p.id, label: p.name,
+      sub: p.vat_number ?? undefined,
+      hint: p.phone ?? undefined,
+    })),
+    [eligible]
+  );
+  const productOptions = useMemo<ComboOption[]>(
+    () => products.map((p) => ({
+      value: p.id, label: p.name,
+      sub: [p.sku, p.barcode].filter(Boolean).join('  \u00b7  ') || undefined,
+      hint: p.track_inventory ? `${t('balance')} ${p.quantity_on_hand ?? 0}` : undefined,
+    })),
+    [products, t]
+  );
+
+  const setLine = (i: number, patch: Partial<Line>) =>
+    setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+
+  /**
+   * اختيار المنتج يملأ الوصف والسعر والضريبة. والسعر يتبع اتجاه المرتجع:
+   * مرتجع المبيعات يُرَدّ بسعر البيع، ومرتجع المشتريات بسعر الشراء — فيساوي
+   * عكسُ القيد أصلَه بدل أن يترك فرقاً في الذمم.
+   */
+  function pickProduct(i: number, productId: string) {
+    const p = products.find((x) => x.id === productId);
+    if (!p) return setLine(i, { productId: null });
+    setLine(i, {
+      productId: p.id,
+      description: p.name,
+      unit_price: type === 'sales' ? p.sale_price : p.purchase_price,
+      tax_rate: String(p.tax_rate),
+    });
+  }
   const addLine = () => setLines((ls) => [...ls, emptyLine()]);
   const removeLine = (i: number) => setLines((ls) => (ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls));
+
+  // **المنتج إلزامي على كل سطر** (يفرضه `StoreReturnRequest` أيضاً، لا الشاشة
+  // وحدها): بلا منتج يمرّ المرتجع بأثرٍ مالي فقط — لا بضاعة تعود للمخزون ولا
+  // تكلفةَ بضاعةٍ مباعة تُعكَس. المنعُ هنا يسبق رفضَ الخادم برسالةٍ أوضح.
+  const canSave = !saving && !!partnerId && lines.every((l) => !!l.productId);
 
   const totalMinor = lines.reduce((sum, l) => {
     const sub = (Number(l.quantity) || 0) * riyalToMinor(l.unit_price);
@@ -68,7 +116,10 @@ export function CreateReturnDialog({
     e.preventDefault();
     setSaving(true);
     setError(null);
+    // شكل السطر هو نفسه الذي ستنتجه لاحقاً ميزة «مرتجع من مستند مصدر»
+    // (سحب السطور من الفاتورة)، فلا مسار ثانٍ يُبنى لها.
     const items = lines.map((l) => ({
+      product_id: l.productId,
       description: l.description || null,
       quantity: Number(l.quantity) || 1,
       unit_price: riyalToMinor(l.unit_price),
@@ -114,16 +165,15 @@ export function CreateReturnDialog({
           )}
           <div className="space-y-1.5">
             <Label htmlFor="partner">{t('partner')}</Label>
-            <Select id="partner" value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required>
-              <option value="" disabled>
-                {t('choose_partner')}
-              </option>
-              {eligible.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
+            <Combobox
+              id="partner"
+              value={partnerId}
+              onChange={setPartnerId}
+              options={partnerOptions}
+              placeholder={t('choose_partner')}
+              searchPlaceholder={t('search_partner')}
+              emptyText={t('no_partner_found')}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="pt">{t('payment_type')}</Label>
@@ -145,10 +195,19 @@ export function CreateReturnDialog({
           <div className="space-y-2">
             {lines.map((l, i) => (
               <div key={i} className="grid grid-cols-12 items-center gap-2">
-                <Input className="col-span-5" placeholder={t('description')} value={l.description} onChange={(e) => setLine(i, 'description', e.target.value)} />
-                <Input className="num col-span-2 text-end" type="number" min={1} placeholder={t('qty')} value={l.quantity} onChange={(e) => setLine(i, 'quantity', e.target.value)} />
-                <Input className="num col-span-2 text-end" inputMode="decimal" placeholder={t('price')} value={l.unit_price} onChange={(e) => setLine(i, 'unit_price', e.target.value)} />
-                <Input className="num col-span-2 text-end" type="number" min={0} max={100} value={l.tax_rate} onChange={(e) => setLine(i, 'tax_rate', e.target.value)} />
+                <Combobox
+                  className="col-span-5"
+                  value={l.productId ?? ''}
+                  onChange={(v) => pickProduct(i, v)}
+                  options={productOptions}
+                  placeholder={t('pick_product')}
+                  searchPlaceholder={t('search_product')}
+                  emptyText={t('no_product_found')}
+                  aria-label={t('product')}
+                />
+                <Input className="num col-span-2 text-end" type="number" min={1} placeholder={t('qty')} value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
+                <Input className="num col-span-2 text-end" inputMode="decimal" placeholder={t('price')} value={l.unit_price} onChange={(e) => setLine(i, { unit_price: e.target.value })} />
+                <Input className="num col-span-2 text-end" type="number" min={0} max={100} value={l.tax_rate} onChange={(e) => setLine(i, { tax_rate: e.target.value })} />
                 <Button type="button" variant="ghost" size="icon" className="col-span-1" aria-label={t('remove_line')} onClick={() => removeLine(i)}>
                   <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
                 </Button>
@@ -174,7 +233,7 @@ export function CreateReturnDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" disabled={saving || !partnerId}>
+          <Button type="submit" disabled={!canSave}>
             {t('create')}
           </Button>
         </div>
