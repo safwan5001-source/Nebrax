@@ -19,6 +19,7 @@ class ReturnResource extends JsonResource
             'status'       => $this->status,
             'return_date'  => optional($this->return_date)->toDateString(),
             'original_id'  => $this->original_id,
+            'restock'      => $this->restock,
             'subtotal'     => Money::toRiyal($this->subtotal),
             'tax_amount'   => Money::toRiyal($this->tax_amount),
             'total'        => Money::toRiyal($this->total),

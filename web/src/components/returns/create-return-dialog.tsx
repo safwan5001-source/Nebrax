@@ -62,6 +62,8 @@ export function CreateReturnDialog({
   const [sources, setSources] = useState<SourceDoc[]>([]);
   const [sourceId, setSourceId] = useState('');
   const [requireSource, setRequireSource] = useState(false);
+  /** '' = اتبع سياسة المستأجر · '1' يعود للمخزون · '0' يُتلَف. */
+  const [restock, setRestock] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -204,7 +206,14 @@ export function CreateReturnDialog({
     try {
       const created = await api<{ data: { id: string } }>('/returns', {
         method: 'POST',
-        body: { type, partner_id: partnerId, payment_type: paymentType, original_id: sourceId || null, items },
+        body: {
+          type, partner_id: partnerId, payment_type: paymentType,
+          original_id: sourceId || null,
+          // الفراغ يُرسَل `null` لا `false`: «اتبع السياسة» حالةٌ ثالثة لا
+          // مرادفَ لـ«لا يعود».
+          restock: restock === '' ? null : restock === '1',
+          items,
+        },
       });
       if (postNow) await api(`/returns/${created.data.id}/post`, { method: 'POST' });
       success(tc('created'));
@@ -269,6 +278,18 @@ export function CreateReturnDialog({
               clearLabel={requireSource ? undefined : t('no_source')}
             />
           </div>
+          {/* الردّ إلى المورّد إخراجٌ من المخزون في كل حال — فلا سؤال في
+              مرتجع المشتريات. */}
+          {type === 'sales' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="restock">{t('restock')}</Label>
+              <Select id="restock" value={restock} onChange={(e) => setRestock(e.target.value)}>
+                <option value="">{t('restock_default')}</option>
+                <option value="1">{t('restock_yes')}</option>
+                <option value="0">{t('restock_no')}</option>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="pt">{t('payment_type')}</Label>
             <Select id="pt" value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>

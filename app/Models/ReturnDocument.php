@@ -23,6 +23,7 @@ class ReturnDocument extends BaseModel
     protected $fillable = [
         'branch_id',
         'tenant_id', 'number', 'type', 'partner_id', 'payment_type',
+        'restock',
         'return_date', 'status', 'subtotal', 'tax_amount', 'total',
         'notes', 'original_type', 'original_id',
         'journal_entry_id', 'cogs_entry_id', 'created_by',
@@ -30,6 +31,7 @@ class ReturnDocument extends BaseModel
 
     protected $casts = [
         'return_date' => 'date',
+        'restock'     => 'boolean',
         'subtotal'    => 'integer',
         'tax_amount'  => 'integer',
         'total'       => 'integer',

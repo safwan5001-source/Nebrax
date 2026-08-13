@@ -16,6 +16,7 @@ class UpdateInventorySettingsRequest extends FormRequest
         return [
             'allow_negative_stock'  => ['nullable', 'boolean'],
             'show_stock_quantities' => ['nullable', 'boolean'],
+            'restock_sales_returns' => ['nullable', 'boolean'],
             // التتبع التفصيلي غير مبنيّ بعد: لا جدول دفعات ولا أرقام مسلسلة ولا
             // طبقة تكلفة لكل دفعة. فيُقبل إطفاؤه صراحةً ويُرفض تفعيله برسالة
             // مفهومة — أوضح من تجاهلٍ صامت يظنّه المستخدم حفظاً.

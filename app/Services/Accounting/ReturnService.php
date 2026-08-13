@@ -25,6 +25,8 @@ use RuntimeException;
  *  مرتجع مبيعات (sales) — عكس البيع:
  *    مدين 4110 المبيعات + مدين 2120 ضريبة المخرجات │ دائن 1130/1110 (الإجمالي)
  *    وللبضاعة المتابَعة: قيد عكس التكلفة (مدين 1140 / دائن 5110) + إرجاع للمخزون.
+ *    فإن كانت البضاعة **لا تعود للبيع** (سياسة المستأجر أو تصريح المستند):
+ *    مدين 5180 فروق الجرد والتلف / دائن 5110 — بلا حركة مخزون.
  *
  *  مرتجع مشتريات (purchase) — عكس الشراء:
  *    مدين 2110/1110 (الإجمالي) │ دائن 1140 المخزون + دائن 5150 + دائن 1150 ضريبة المدخلات
@@ -53,6 +55,7 @@ class ReturnService
     private const ACC_SALES       = '4110';
     private const ACC_COGS        = '5110';
     private const ACC_EXPENSE     = '5150';
+    private const ACC_DAMAGE      = '5180'; // فروق الجرد والتلف
 
     public function __construct(
         protected LedgerService $ledger,
@@ -92,6 +95,11 @@ class ReturnService
                 'type'          => $type,
                 'partner_id'    => $data['partner_id'],
                 'payment_type'  => $data['payment_type'] ?? 'credit',
+                // null = «اتبع سياسة المستأجر» — تُحسَم عند الترحيل لا الآن،
+                // فتبقى المسوّدة تابعةً للسياسة ولو تغيّرت قبل ترحيلها.
+                'restock'       => array_key_exists('restock', $data) && $data['restock'] !== null
+                    ? (bool) $data['restock']
+                    : null,
                 'return_date'   => $date,
                 'status'        => 'draft',
                 'notes'         => $data['notes'] ?? null,
@@ -338,30 +346,56 @@ class ReturnService
             'created_by'  => $return->created_by,
         ]);
 
-        // إرجاع البضاعة المتابَعة للمخزون + قيد عكس التكلفة (مدين 1140 / دائن 5110)
-        $cogsTotal = 0;
+        // ═══════════════════════════════════════════════════════════════
+        //  هل تعود البضاعة إلى المخزون القابل للبيع؟
+        // ═══════════════════════════════════════════════════════════════
+        //  المستند يعلو على السياسة: قيمةٌ صريحة عليه تُحترَم، و`null` تعني
+        //  «اتبع سياسة المستأجر». والقيمة تُخزَّن عند الترحيل فيصير المستند
+        //  المرحَّل شارحاً لنفسه لا مرهوناً بإعدادٍ قد يتغيّر بعده.
+        $restock = $return->restock ?? (bool) Settings::get('inventory', 'restock_sales_returns');
+
+        $costTotal = 0;
         foreach ($return->lines as $line) {
             $product = $line->product;
-            if ($product && $product->track_inventory && $line->quantity > 0) {
-                $unitCost = $product->avg_cost;
+            if (! $product || ! $product->track_inventory || $line->quantity <= 0) {
+                continue;
+            }
+
+            // التكلفة بمتوسط اليوم في الحالتين — هو الأساس الذي خرجت به.
+            $unitCost = $product->avg_cost;
+
+            if ($restock) {
                 $this->inventory->applyReceipt($product, $line->quantity, $unitCost, [
                     'source_type' => ReturnDocument::class,
                     'source_id'   => $return->id,
                     'date'        => $return->return_date->toDateString(),
                     'notes'       => "إرجاع عبر المرتجع {$return->number}",
                 ]);
-                $cogsTotal += $line->quantity * $unitCost;
             }
+            // بلا إرجاع: **لا حركة مخزون إطلاقاً**. إدخالُ بضاعةٍ تالفة بكميةٍ
+            // وتكلفةٍ لا وجود لهما على الرفّ يُفسد المتوسط المتحرك، فتخرج كل
+            // تكلفة بضاعة مباعة لاحقة خاطئة وينكسر الثابت 1140 = Σ(كمية × متوسط).
+
+            $costTotal += $line->quantity * $unitCost;
         }
 
         $cogsEntryId = null;
-        if ($cogsTotal > 0) {
+        if ($costTotal > 0) {
+            // الطرف المدين وحده هو ما يفترق: البضاعة العائدة أصلٌ يعود إلى
+            // 1140، والتالفة **مصروفٌ لا أصل** فمحلّه 5180 فروق الجرد والتلف.
+            //
+            // ولماذا 5180 لا 5110: البضاعة لم تُبَع. إبقاؤها في تكلفة البضاعة
+            // المباعة يُفسد هامش الربح الإجمالي ويجعل مطابقة 5110 بالمبيعات
+            // مستحيلة — نفس منطق الأذون المخزنية (هجرة 000042).
+            $debitAccount = $restock ? self::ACC_INVENTORY : self::ACC_DAMAGE;
+            $label        = $restock ? 'عكس تكلفة مرتجع' : 'إتلاف مردود';
+
             $cogsEntry = $this->ledger->post([
-                ['account_id' => $this->accountId(self::ACC_INVENTORY), 'debit' => $cogsTotal],
-                ['account_id' => $this->accountId(self::ACC_COGS), 'credit' => $cogsTotal],
+                ['account_id' => $this->accountId($debitAccount), 'debit' => $costTotal],
+                ['account_id' => $this->accountId(self::ACC_COGS), 'credit' => $costTotal],
             ], [
                 'entry_date'  => $return->return_date->toDateString(),
-                'description' => "عكس تكلفة مرتجع {$return->number}",
+                'description' => "{$label} {$return->number}",
                 'source_type' => ReturnDocument::class,
                 'source_id'   => $return->id,
             ]);
@@ -370,6 +404,7 @@ class ReturnService
 
         $return->update([
             'status'           => 'posted',
+            'restock'          => $restock,
             'subtotal'         => $subtotal,
             'tax_amount'       => $taxAmount,
             'total'            => $total,

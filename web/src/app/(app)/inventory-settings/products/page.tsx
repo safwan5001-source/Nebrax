@@ -16,6 +16,7 @@ interface InventorySettings {
   allow_negative_stock: boolean;
   detailed_tracking_enabled: boolean;
   show_stock_quantities: boolean;
+  restock_sales_returns: boolean;
 }
 
 /**
@@ -55,6 +56,7 @@ export default function InventorySettingsPage() {
         body: {
           allow_negative_stock: form.allow_negative_stock,
           show_stock_quantities: form.show_stock_quantities,
+          restock_sales_returns: form.restock_sales_returns,
         },
       });
       success(tc('updated'));
@@ -153,6 +155,33 @@ export default function InventorySettingsPage() {
             </div>
             <p className="mt-1.5 text-xs leading-relaxed text-muted">{t('total_in_stock_hint')}</p>
           </div>
+        </CardContent>
+      </Card>
+
+
+      {/* ═══ مردود المبيعات ═══ */}
+      {/* **سياسة عمل لا قاعدة محاسبية.** وإعادةُ التالف تُفسد المتوسط المتحرك
+          فتخرج كل تكلفة بضاعة مباعة لاحقة خاطئة — أثرٌ يتعدّى المستند. */}
+      <Card className="max-w-3xl">
+        <CardHeader><CardTitle>{t('returns')}</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-text">{t('restock_sales_returns')}</span>
+              <p className="text-xs leading-relaxed text-muted">{t('restock_sales_returns_hint')}</p>
+            </div>
+            <Switch
+              checked={form.restock_sales_returns}
+              onCheckedChange={(v) => set('restock_sales_returns', v)}
+              aria-label={t('restock_sales_returns')}
+            />
+          </div>
+
+          {!form.restock_sales_returns && (
+            <p className="rounded border border-border bg-background p-3 text-xs leading-relaxed text-muted">
+              {t('restock_off_note')}
+            </p>
+          )}
         </CardContent>
       </Card>
 

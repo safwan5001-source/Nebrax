@@ -21,6 +21,8 @@ class StoreReturnRequest extends FormRequest
             // المستند المصدر (اختياري ما لم يُلزِم به الإعداد). النوع يُستنتَج
             // من `type` في الخدمة، فلا يُرسله العميل ولا يُصدَّق إن أرسله.
             'original_id'         => ['nullable', 'uuid'],
+            // هل تعود البضاعة للمخزون؟ الغياب = اتبع سياسة المستأجر.
+            'restock'             => ['nullable', 'boolean'],
             'items.*.source_line_id' => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
