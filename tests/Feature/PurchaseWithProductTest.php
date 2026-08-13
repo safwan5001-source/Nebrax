@@ -214,4 +214,43 @@ class PurchaseWithProductTest extends TestCase
             $this->assertSame($entry->lines->sum('debit'), $entry->lines->sum('credit'));
         }
     }
+
+    /**
+     * سطرٌ بلا وصف يأخذ اسم المنتج — لقطةً كالوحدة تماماً.
+     *
+     * الشاشة تملأ الوصف عند اختيار المنتج، لكن الوصف `nullable` في العقد فلعميل
+     * الـ API أن يتركه. وبدون هذا الاحتياط يخرج المستند المطبوع بسطرٍ عنوانه
+     * «—»: بلا هوية للمورّد ولا للمراجع.
+     */
+    /** @test */
+    public function a_line_without_a_description_takes_the_product_name(): void
+    {
+        $product = $this->product(name: 'إسمنت مقاوم');
+
+        $purchase = $this->buy(['product_id' => $product['id'], 'quantity' => 5, 'unit_price' => 1000]);
+
+        $line = $this->withToken($this->token)
+            ->getJson("/api/purchases/{$purchase['id']}")
+            ->assertOk()['data']['lines'][0];
+
+        $this->assertSame('إسمنت مقاوم', $line['description']);
+    }
+
+    /** ووصفٌ مكتوبٌ صراحةً لا يُستبدَل باسم المنتج. */
+    /** @test */
+    public function an_explicit_description_wins_over_the_product_name(): void
+    {
+        $product = $this->product(name: 'إسمنت مقاوم');
+
+        $purchase = $this->buy([
+            'product_id' => $product['id'], 'quantity' => 5,
+            'unit_price' => 1000, 'description' => 'إسمنت — دفعة الجبيل',
+        ]);
+
+        $line = $this->withToken($this->token)
+            ->getJson("/api/purchases/{$purchase['id']}")
+            ->assertOk()['data']['lines'][0];
+
+        $this->assertSame('إسمنت — دفعة الجبيل', $line['description']);
+    }
 }
