@@ -127,6 +127,14 @@ export function PartnerForm({
 }) {
   const t = useTranslations('partners');
 
+  // النوع هنا يختاره المستخدم (عميل/مورد/كلاهما)، فالتسمية تتبعه لحظةً بلحظة.
+  // و«كلاهما» لا تصلح له «نوع العميل» ولا «نوع المورّد» — فيَرِد المحايد.
+  const entityLabel = t(
+    form.type === 'supplier' ? 'entity_type_supplier'
+      : form.type === 'customer' ? 'entity_type_customer'
+      : 'entity_type'
+  );
+
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       {/* بيانات الطرف */}
@@ -157,7 +165,7 @@ export function PartnerForm({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="entity_type">{t('entity_type')}</Label>
+              <Label htmlFor="entity_type">{entityLabel}</Label>
               <Select id="entity_type" value={form.entity_type} onChange={(e) => onChange('entity_type', e.target.value)}>
                 <option value="commercial">{t('commercial')}</option>
                 <option value="individual">{t('individual')}</option>

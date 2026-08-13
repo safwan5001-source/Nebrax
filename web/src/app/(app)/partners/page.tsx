@@ -40,7 +40,7 @@ export default function PartnersPage() {
       },
       {
         accessorKey: 'entity_type',
-        header: tp('entity_type'),
+        header: tp('entity_type_customer'),
         cell: ({ row }) => <Badge tone="muted">{tp(row.original.entity_type ?? 'commercial')}</Badge>,
       },
       { accessorKey: 'city', header: tp('city'), cell: ({ row }) => row.original.city ?? '—' },

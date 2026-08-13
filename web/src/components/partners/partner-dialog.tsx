@@ -50,6 +50,15 @@ export function PartnerDialog({
 
   const set = (k: keyof Partner, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  // الحقل واحد (تجاري/فردي) وسياقه ثلاثة: «نوع العميل» على مورّدٍ نصٌّ خاطئ
+  // يجعل المستخدم يشكّ أنه في النافذة الغلط. والقراءة من `form.type` لا من
+  // `defaultType` تُصيب حتى عند تعديل طرفٍ نوعُه يخالف نوع الشاشة.
+  const entityLabel = tp(
+    form.type === 'supplier' ? 'entity_type_supplier'
+      : form.type === 'customer' ? 'entity_type_customer'
+      : 'entity_type'
+  );
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -88,7 +97,7 @@ export function PartnerDialog({
           <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} required />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="entity_type">{tp('entity_type')}</Label>
+          <Label htmlFor="entity_type">{entityLabel}</Label>
           <Select id="entity_type" value={form.entity_type ?? 'commercial'} onChange={(e) => set('entity_type', e.target.value)}>
             <option value="commercial">{tp('commercial')}</option>
             <option value="individual">{tp('individual')}</option>
