@@ -19,12 +19,15 @@ use RuntimeException;
  *  - post():   يرحّل الفاتورة، يولّد قيداً متوازناً عبر LedgerService،
  *              ويُدخِل البضاعة للمخزون بالتكلفة (متوسط متحرك) دون ازدواج القيد.
  *
- *  فاتورة مشتريات آجلة:
+ *  فاتورة مشتريات:
  *    مدين  1140 المخزون        (تكلفة البضاعة المتابَعة)
  *    مدين  5150 مصروفات عامة    (تكلفة البنود غير المتابَعة، إن وُجدت)
  *    مدين  1150 ضريبة المدخلات
  *    دائن  2110 الموردون        (الإجمالي، مربوط بالمورد)
- *  (نقدي: يُستبدل 2110 بـ 1110 الصندوق)
+ *
+ *  والسداد الفوري — نقديةً كانت أو دفعةً جزئية عند الإصدار — **سندُ صرف
+ *  مستقلّ** يولّده `PaymentService` (مدين 2110 / دائن 1110 أو 1120)، لا
+ *  اختصارٌ داخل قيد الفاتورة. انظر هجرة 000050.
  *
  *  لا كتابة مباشرة في journal_lines — القيد عبر المحرك حصراً.
  */
@@ -36,13 +39,15 @@ class PurchaseService
     private const ACC_INPUT_VAT  = '1150'; // ضريبة المدخلات
     private const ACC_EXPENSE    = '5150'; // مصروفات عامة (بنود غير مخزنية)
     private const ACC_PAYABLE    = '2110'; // الموردون
-    private const ACC_CASH       = '1110'; // الصندوق
     private const ACC_ADJUSTMENT = '5170'; // فروق التقريب والتسويات
+    // حسابا النقد (1110/1120) لا يُذكران هنا: السداد سندُ صرف يبنيه
+    // `PaymentService`، فيبقى اختيار الصندوق أو البنك في موضع واحد.
 
     public function __construct(
         protected LedgerService $ledger,
         protected InventoryService $inventory,
-        protected UnitConversion $units
+        protected UnitConversion $units,
+        protected PaymentService $payments
     ) {}
 
     /**
@@ -77,6 +82,10 @@ class PurchaseService
                 'discount'            => max(0, (int) ($data['discount'] ?? 0)),
                 'shipping'            => max(0, (int) ($data['shipping'] ?? 0)),
                 'adjustment'          => (int) ($data['adjustment'] ?? 0),
+                'paid_on_post'        => max(0, (int) ($data['paid_on_post'] ?? 0)),
+                'payment_method'      => $data['payment_method'] ?? 'cash',
+                'received_status'     => $data['received_status'] ?? 'received',
+                'received_date'       => $data['received_date'] ?? null,
                 'notes'               => $data['notes'] ?? null,
                 'created_by'          => $data['created_by'] ?? null,
             ]);
@@ -218,6 +227,10 @@ class PurchaseService
                 'discount'            => max(0, (int) ($keep('discount', $purchase->discount) ?? 0)),
                 'shipping'            => max(0, (int) ($keep('shipping', $purchase->shipping) ?? 0)),
                 'adjustment'          => (int) ($keep('adjustment', $purchase->adjustment) ?? 0),
+                'paid_on_post'        => max(0, (int) ($keep('paid_on_post', $purchase->paid_on_post) ?? 0)),
+                'payment_method'      => $keep('payment_method', $purchase->payment_method) ?? $purchase->payment_method,
+                'received_status'     => $keep('received_status', $purchase->received_status) ?? $purchase->received_status,
+                'received_date'       => $keep('received_date', $purchase->received_date),
                 'notes'               => $keep('notes', $purchase->notes),
             ]);
 
@@ -360,18 +373,18 @@ class PurchaseService
                     : ['account_id' => $this->accountId(self::ACC_ADJUSTMENT), 'credit' => -$adjustment];
             }
 
-            // الجانب الدائن: الموردون (آجل) أو الصندوق (نقدي)
-            $creditLine = [
-                'account_id' => $this->accountId(
-                    $purchase->payment_type === 'cash' ? self::ACC_CASH : self::ACC_PAYABLE
-                ),
-                'credit' => $total,
+            // ═══════════════════════════════════════════════════════════════
+            //  الجانب الدائن: **2110 الموردون دائماً**
+            // ═══════════════════════════════════════════════════════════════
+            //  حتى النقدية. اختصارُ الصندوق كان يترك المستند `unpaid` بينما لا
+            //  دَين له في الدفتر، فيَعدّه تقرير أعمار الديون الدائنة التزاماً
+            //  قائماً. السداد يليه سنداً مستقلاً — انظر `settle` أدناه.
+            $lines[] = [
+                'account_id'   => $this->accountId(self::ACC_PAYABLE),
+                'credit'       => $total,
+                'partner_type' => Partner::class,
+                'partner_id'   => $purchase->partner_id,
             ];
-            if ($purchase->payment_type === 'credit') {
-                $creditLine['partner_type'] = Partner::class;
-                $creditLine['partner_id']   = $purchase->partner_id;
-            }
-            $lines[] = $creditLine;
 
             $entry = $this->ledger->post($lines, [
                 'entry_date'  => $purchase->purchase_date->toDateString(),
@@ -430,10 +443,50 @@ class PurchaseService
                 'tax_amount'       => $taxTotal,
                 'total'            => $total,
                 'journal_entry_id' => $entry->id,
+                // البضاعة دخلت المخزون للتوّ، فتاريخُ الاستلام تاريخُ الشراء
+                // ما لم يُصرّح المستخدم بغيره (وصولٌ متأخّر أو جزئي).
+                'received_date'    => $purchase->received_date
+                    ?? ($purchase->received_status === 'received' ? $purchase->purchase_date : null),
             ]);
+
+            $this->settle($purchase, $total);
 
             return $purchase->fresh('lines');
         });
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  السداد الفوري — سند صرف مرحَّل، لا اختصار داخل قيد الفاتورة
+     * ═══════════════════════════════════════════════════════════════
+     *  «نقدي» = مسدَّدة بالكامل؛ و«آجل» يقبل `paid_on_post` دفعةً مقدَّمة تترك
+     *  الفاتورة `partial` والباقي ديناً حقيقياً على 2110.
+     *
+     *  والمرور بـ`PaymentService` مقصود: هو من يحدّث `paid_amount` و
+     *  `payment_status` ويتحقق أن المبلغ لا يتجاوز المتبقي. تكرارُ ذلك هنا
+     *  كان سيُنشئ نسخةً ثانية من قاعدة السداد تنحرف عن الأولى.
+     */
+    protected function settle(Purchase $purchase, int $total): void
+    {
+        $paid = $purchase->payment_type === 'cash'
+            ? $total
+            : min(max(0, (int) $purchase->paid_on_post), $total);
+
+        if ($paid <= 0) {
+            return;
+        }
+
+        $payment = $this->payments->create([
+            'partner_id'   => $purchase->partner_id,
+            'amount'       => $paid,
+            'direction'    => 'paid',
+            'method'       => $purchase->payment_method === 'bank' ? 'bank' : 'cash',
+            'payment_date' => $purchase->purchase_date->toDateString(),
+            'notes'        => "سداد فاتورة المشتريات {$purchase->number}",
+            'created_by'   => $purchase->created_by,
+        ], [['purchase_id' => $purchase->id, 'amount' => $paid]]);
+
+        $this->payments->post($payment);
     }
 
     protected function accountId(string $code): string

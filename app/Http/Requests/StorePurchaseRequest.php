@@ -29,6 +29,13 @@ class StorePurchaseRequest extends FormRequest
             'shipping'            => ['nullable', 'integer', 'min:0', 'max:100000000000'],
             'adjustment'          => ['nullable', 'integer', 'min:-100000000000', 'max:100000000000'],
             'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'],
+            // «تم الدفع بالفعل»: مبلغٌ يُسدَّد لحظة الترحيل فيولّد سند صرف
+            // (هجرة 000050). النقدي يُسدَّد كاملاً ولو غاب الحقل.
+            'paid_on_post'        => ['nullable', 'integer', 'min:0', 'max:100000000000'],
+            'payment_method'      => ['nullable', 'in:cash,bank'],
+            // حالة الاستلام إعلامية: لا تؤخّر دخول المخزون ولا تغيّر القيد.
+            'received_status'     => ['nullable', 'in:pending,partial,received'],
+            'received_date'       => ['nullable', 'date'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
             // **المنتج إلزامي.** فاتورة الشراء مستندُ تكلفةٍ حقيقية: بلا منتج لا

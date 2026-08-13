@@ -23,18 +23,21 @@ class Purchase extends BaseModel
         'purchase_date', 'due_date', 'supplier_invoice_no', 'status',
         'subtotal', 'tax_amount', 'total', 'tax_inclusive',
         'discount', 'shipping', 'adjustment',
-        'paid_amount', 'payment_status',
+        'paid_amount', 'payment_status', 'paid_on_post', 'payment_method',
+        'received_status', 'received_date',
         'notes', 'journal_entry_id', 'created_by',
     ];
 
     protected $casts = [
         'purchase_date' => 'date',
         'due_date'      => 'date',
+        'received_date' => 'date',
         'subtotal'      => 'integer',
         'tax_amount'    => 'integer',
         'total'         => 'integer',
         'tax_inclusive' => 'boolean',
         'paid_amount'   => 'integer',
+        'paid_on_post'  => 'integer',
     ];
 
     protected $attributes = [
@@ -43,8 +46,11 @@ class Purchase extends BaseModel
         'subtotal'       => 0,
         'tax_amount'     => 0,
         'total'          => 0,
-        'paid_amount'    => 0,
-        'payment_status' => 'unpaid',
+        'paid_amount'     => 0,
+        'payment_status'  => 'unpaid',
+        'paid_on_post'    => 0,
+        'payment_method'  => 'cash',
+        'received_status' => 'received',
     ];
 
     public function lines(): HasMany

@@ -30,6 +30,8 @@ interface Purchase {
   total: string;
   paid_amount: string;
   remaining: string;
+  received_status: string;
+  received_date: string | null;
   lines: DocLine[];
 }
 
@@ -41,6 +43,7 @@ export default function PurchaseDetailPage() {
   const router = useRouter();
   const t = useTranslations('invoiceDetail');
   const tp = useTranslations('purchases');
+  const tpf = useTranslations('purchaseForm');
   const ts = useTranslations('status');
   const company = useCompany();
 
@@ -99,6 +102,9 @@ export default function PurchaseDetailPage() {
     [tp('total'), <span key="t" className="num font-semibold">{formatRiyal(purchase.total)}</span>],
     [t('paid'), <span key="p" className="num">{formatRiyal(purchase.paid_amount)}</span>],
     [t('remaining'), <span key="r" className="num">{formatRiyal(purchase.remaining)}</span>],
+    // الاستلام إعلامي: تاريخُ وصول البضاعة قد يخالف تاريخ الفاتورة.
+    [tpf('received_status'), tpf(`received_${purchase.received_status === 'received' ? 'full' : purchase.received_status}`)],
+    [tpf('received_date'), <span key="rd" className="num">{purchase.received_date ?? '—'}</span>],
   ];
 
   return (

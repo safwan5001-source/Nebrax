@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\Partner;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Tenant;
@@ -139,8 +140,14 @@ class PurchaseTest extends TestCase
         $this->assertSame(40000, (int) $product->movements()->sum('total_cost')); // = مدين 1140
     }
 
-    /** @test */
-    public function cash_purchase_credits_the_cash_account_not_payables(): void
+    /**
+     * @test
+     *
+     * الشراء النقدي **قيدان لا قيد**: الفاتورة على الموردين ثم سند صرف يقفلها.
+     * الأثر الصافي هو أثرُ الاختصار القديم نفسه (2110 يصفَّى)، لكنه يُبقي
+     * للمورّد كشفَ حسابٍ حقيقياً ويجعل `payment_status` صادقاً — انظر 000050.
+     */
+    public function cash_purchase_posts_to_payables_then_settles_it_with_a_voucher(): void
     {
         $product = $this->trackedProduct();
 
@@ -150,9 +157,24 @@ class PurchaseTest extends TestCase
         );
         $posted = $this->purchases->post($purchase);
 
+        // قيد الفاتورة: دائن الموردين بالكامل، ولا صندوق فيه.
         $entry = $posted->journalEntry()->with('lines.account')->first();
-        $this->assertEquals(23000, $this->line($entry, '1110')->credit); // الصندوق
-        $this->assertNull($this->line($entry, '2110'));                  // لا موردون
+        $this->assertEquals(23000, $this->line($entry, '2110')->credit);
+        $this->assertNull($this->line($entry, '1110'));
+
+        // سند الصرف: مدين الموردين / دائن الصندوق.
+        $payment = Payment::where('direction', 'paid')->firstOrFail();
+        $this->assertSame('posted', $payment->status);
+        $this->assertSame(23000, (int) $payment->amount);
+
+        $vEntry = $payment->journalEntry()->with('lines.account')->first();
+        $this->assertEquals(23000, $this->line($vEntry, '2110')->debit);
+        $this->assertEquals(23000, $this->line($vEntry, '1110')->credit);
+
+        // الصافي: لا رصيد على المورّد، والمستند مسدَّد.
+        $this->assertEquals(0, Account::where('code', '2110')->first()->balance->balance);
+        $this->assertSame('paid', $posted->fresh()->payment_status);
+        $this->assertSame(23000, (int) $posted->fresh()->paid_amount);
     }
 
     /** @test */

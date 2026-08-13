@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Plus, Trash2, Users, Package, FileText, Paperclip, Percent, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Plus, Trash2, Users, Package, FileText, Paperclip, Percent, Truck, Wallet, type LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,8 @@ interface ApiPurchase {
   purchase_date: string | null; supplier_invoice_no: string | null;
   tax_inclusive: boolean; notes?: string | null; lines: ApiLine[];
   discount?: string; shipping?: string; adjustment?: string;
+  paid_on_post?: string; payment_method?: string;
+  received_status?: string; received_date?: string | null;
 }
 
 interface Line {
@@ -88,6 +90,11 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const [discountInput, setDiscountInput] = useState('');
   const [shippingInput, setShippingInput] = useState('');
   const [adjustmentInput, setAdjustmentInput] = useState('');
+  const [paidNow, setPaidNow] = useState(false);
+  const [paidInput, setPaidInput] = useState('');
+  const [payMethod, setPayMethod] = useState('cash');
+  const [receivedStatus, setReceivedStatus] = useState('received');
+  const [receivedDate, setReceivedDate] = useState('');
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [newSupplier, setNewSupplier] = useState(false);
   // السطر الذي فُتحت من منتقيه نافذة «منتج جديد» — ليُختار فيه تلقائياً بعد الحفظ.
@@ -136,6 +143,11 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
         setDiscountInput(Number(d.discount) > 0 ? String(d.discount) : '');
         setShippingInput(Number(d.shipping) > 0 ? String(d.shipping) : '');
         setAdjustmentInput(Number(d.adjustment) !== 0 ? String(d.adjustment) : '');
+        setPaidNow(Number(d.paid_on_post) > 0);
+        setPaidInput(Number(d.paid_on_post) > 0 ? String(d.paid_on_post) : '');
+        setPayMethod(d.payment_method ?? 'cash');
+        setReceivedStatus(d.received_status ?? 'received');
+        setReceivedDate(d.received_date ?? '');
         setLines(
           d.lines.length
             ? d.lines.map((l) => ({
@@ -219,6 +231,17 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
     return { net, tax: taxNet, discount, shipping, adjustment, base, total: base + taxNet + adjustment };
   }, [lines, taxInclusive, discountInput, shippingInput, adjustmentInput]);
 
+  // ═══════════════════════════════════════════════════════════════
+  //  السداد الفوري — «نقدي» يعني مسدَّدة بالكامل
+  // ═══════════════════════════════════════════════════════════════
+  //  فلا خانةَ مبلغٍ معه: قيمتُها الإجمالي دائماً، وإظهارها قابلةً للتحرير
+  //  يَعِد بدفعةٍ جزئية لا يقبلها الخادم. الجزئي مسارُه «آجل».
+  const isCash = paymentType === 'cash';
+  const paidMinor = isCash
+    ? totals.total
+    : paidNow ? Math.min(riyalToMinor(paidInput), totals.total) : 0;
+  const remainingMinor = Math.max(0, totals.total - paidMinor);
+
   // **المنتج إلزامي على كل سطر.** بلا منتج لا يُعرَف أهي بضاعةٌ تُرسمَل مخزوناً
   // أم مصروفُ فترة، فتسقط كلّها في «5150 مصروفات عامة». والحفظ يُمنع هنا قبل
   // أن يرفضه الخادم — رسالةٌ عند الضغط أوضح من طلبٍ يعود بخطأ.
@@ -265,6 +288,12 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
           discount: totals.discount,
           shipping: totals.shipping,
           adjustment: totals.adjustment,
+          // النقدي يُسدَّد كاملاً بحساب الخادم لحظة الترحيل، فلا يُخزَّن له مبلغ
+          // هنا: مبلغٌ محفوظ على مسوّدةٍ تتغيّر سطورُها يصير قديماً بصمت.
+          paid_on_post: isCash ? 0 : paidMinor,
+          payment_method: payMethod,
+          received_status: receivedStatus,
+          received_date: receivedDate || null,
           notes: notes || null,
           items,
       };
@@ -435,12 +464,15 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                         </Select>
                       )}
                     </div>
+                    {/* خليّتان بعرض ١/١٢ (≈٤٧px): الحشو الافتراضي px-3 يأكل ٢٤
+                        منها فيُقصّ «١٥» إلى «٥» — رقمُ ضريبةٍ خاطئ في عين
+                        القارئ. الحشو المضغوط يُظهر الرقمين كاملَين. */}
                     <Input
-                      className="num text-end md:col-span-1" inputMode="decimal" placeholder="0"
+                      className="num px-1.5 text-end md:col-span-1" inputMode="decimal" placeholder="0"
                       value={l.disc} onChange={(e) => setLine(l.key, { disc: e.target.value })}
                     />
                     <Input
-                      className="num text-end md:col-span-1" type="number" min={0} max={100}
+                      className="num px-1.5 text-end md:col-span-1" type="number" min={0} max={100}
                       value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })}
                     />
                     <div className="num col-span-1 text-end text-sm text-text md:col-span-1">
@@ -501,7 +533,100 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
               <p className="text-xs leading-relaxed text-muted">{t('head_amounts_hint')}</p>
             </CardContent>
           </Card>
-          <SoonSection icon={Wallet} title={t('s_deposit')} hint={t('s_deposit_hint')} soon={t('soon')} />
+          {/* ═══ الدفع ═══ */}
+          {/* السداد الفوري **سندُ صرف مرحَّل** لا اختصارٌ داخل قيد الفاتورة:
+              الفاتورة تُقيَّد على ٢١١٠ ثم يقفلها السند، فيبقى للمورّد كشفُ
+              حساب حقيقي و`payment_status` صادق. */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('payment_section')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {!isCash && (
+                <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-text">
+                  <input
+                    type="checkbox" className="h-4 w-4 accent-primary"
+                    checked={paidNow}
+                    onChange={(e) => {
+                      setPaidNow(e.target.checked);
+                      // التأشير بلا مبلغ يعني «الكل» — وهو الحالة الغالبة.
+                      if (e.target.checked && !paidInput) setPaidInput(String(totals.total / 100));
+                    }}
+                  />
+                  {t('paid_now')}
+                </label>
+              )}
+
+              {(isCash || paidNow) && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pf-paid">{t('paid_amount')}</Label>
+                    {isCash ? (
+                      <Input id="pf-paid" className="num text-end" value={formatRiyal(totals.total / 100)} disabled />
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="pf-paid" className="num min-w-0 flex-1 text-end" inputMode="decimal" placeholder="0"
+                          value={paidInput} onChange={(e) => setPaidInput(e.target.value)}
+                        />
+                        <Button
+                          type="button" variant="outline" size="sm"
+                          onClick={() => setPaidInput(String(totals.total / 100))}
+                        >
+                          {t('pay_full')}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pf-method">{t('payment_method')}</Label>
+                    <Select id="pf-method" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
+                      <option value="cash">{t('method_cash')}</option>
+                      <option value="bank">{t('method_bank')}</option>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs leading-relaxed text-muted">
+                {isCash ? t('paid_cash_hint') : t('paid_hint')}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* ═══ الاستلام ═══ */}
+          {/* حقلان إعلاميان: المخزون يدخل عند الترحيل في كل الأحوال. فصلُه
+              يحتاج حساب «بضاعة بالطريق» ودورةَ استلام — وحدة مستقلة. */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('receipt_section')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="pf-recv">{t('received_status')}</Label>
+                  <Select id="pf-recv" value={receivedStatus} onChange={(e) => setReceivedStatus(e.target.value)}>
+                    <option value="received">{t('received_full')}</option>
+                    <option value="partial">{t('received_partial')}</option>
+                    <option value="pending">{t('received_pending')}</option>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pf-recv-date">{t('received_date')}</Label>
+                  <Input
+                    id="pf-recv-date" type="date"
+                    value={receivedDate} onChange={(e) => setReceivedDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed text-muted">{t('receipt_hint')}</p>
+            </CardContent>
+          </Card>
+
           <SoonSection icon={Paperclip} title={t('s_attachments')} hint={t('s_attachments_hint')} soon={t('soon')} />
 
           {/* ═══ الملاحظات ═══ */}
@@ -549,6 +674,18 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                 <span>{t('total')}</span>
                 <span className="num">{formatRiyal(totals.total / 100)}</span>
               </div>
+
+              {/* المدفوع والمتبقي — الرقمان اللذان يقرّر بهما المستخدم قبل
+                  الترحيل، فيُعرَضان معه لا في قسم الدفع وحده. */}
+              {paidMinor > 0 && (
+                <>
+                  <Row label={t('paid')} value={`− ${formatRiyal(paidMinor / 100)}`} />
+                  <div className="flex items-center justify-between border-t border-border pt-2 text-text">
+                    <span>{t('remaining')}</span>
+                    <span className="num font-semibold">{formatRiyal(remainingMinor / 100)}</span>
+                  </div>
+                </>
+              )}
 
               {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
             </CardContent>
