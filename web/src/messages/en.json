@@ -611,7 +611,15 @@
     "summary_title": "Invoice summary",
     "summary_hint": "Totals are derived from the lines — never entered manually. Discount reduces revenue and VAT.",
     "edit_title": "Edit invoice",
-    "unit": "Unit"
+    "unit": "Unit",
+    "search_partner": "Enter a name, phone or tax number",
+    "no_partner_found": "No customer by that name.",
+    "new_partner": "New",
+    "new_partner_title": "Add a new customer",
+    "search_product": "Search by name, SKU or barcode…",
+    "no_product_found": "No product by that name.",
+    "new_product": "Add a new product",
+    "balance": "Stock"
   },
   "invoiceTemplates": {
     "classic": "Classic",
