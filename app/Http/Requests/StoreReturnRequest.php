@@ -20,11 +20,27 @@ class StoreReturnRequest extends FormRequest
             'return_date'         => ['nullable', 'date'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
-            'items.*.product_id'  => ['nullable', 'uuid'],
+            // **المنتج إلزامي.** المرتجع أثرُه مخزونيٌّ لا مالي فقط: `ReturnService`
+            // يُعيد البضاعة المتابَعة للمخزون ويعكس تكلفتها (مدين 1140 / دائن 5110)،
+            // ومرتجع الشراء يُخرجها. وبلا منتج لا يُعرف أيُّ صنفٍ رُدَّ، فيمرّ
+            // المرتجع بأثرٍ مالي وحده: المخزون لا يتحرّك، و5110 يبقى مضخّماً،
+            // وهامش الربح الإجمالي يخرج خاطئاً — وهو ما كانت الشاشة تفعله فعلاً.
+            //
+            // والبنود الخدمية لم تُغلَق: تُدخَل بمنتج **غير متابَع مخزونياً**،
+            // فيبقى ترحيلها إلى 5150 كما هو.
+            'items.*.product_id'  => ['required', 'uuid'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
             'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'],
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'items.*.product_id.required' =>
+                'كل بند في المرتجع يحتاج منتجاً — به وحده تعود البضاعة إلى المخزون. للبنود الخدمية أنشئ منتجاً غير متابَع مخزونياً.',
         ];
     }
 }
