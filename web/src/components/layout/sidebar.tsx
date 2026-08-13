@@ -293,8 +293,9 @@ export function Sidebar({
   // المجموعة التي تضمّ المسار الحالي — تبقى مفتوحة تلقائياً.
   const activeGroup = GROUPS.find((g) => g.items.some((it) => isActive(it.href)))?.title;
 
-  // نمط Accordion حصري: مجموعة واحدة مفتوحة دائماً، تُشتق من المسار النشط.
-  // الافتراضي = مجموعة الصفحة الحالية (أو الأولى إن كان المسار خارج المجموعات كاللوحة).
+  // نمط Accordion حصري: مجموعة واحدة مفتوحة **كحدّ أقصى** — والطيّ اليدوي
+  // يجعلها صفراً. الافتراضي = مجموعة الصفحة الحالية (أو الأولى إن كان المسار
+  // خارج المجموعات كاللوحة). القيمة الفارغة تعني «الكلّ مطويّ».
   const [openGroup, setOpenGroup] = useState<string>(activeGroup ?? GROUPS[0].title);
 
   // التنقّل لصفحة في مجموعة أخرى (رابط مباشر/بحث) يفتحها تلقائياً ويُغلق سواها.
@@ -302,9 +303,17 @@ export function Sidebar({
     if (activeGroup) setOpenGroup(activeGroup);
   }, [activeGroup]);
 
-  // فتح حصري: النقر يفتح المجموعة المختارة (فتُغلق الأخرى)؛ ولا يُغلق الكل —
-  // النقر على المفتوحة يُبقيها مفتوحة (تبقى مجموعة واحدة نشطة دائماً).
-  const openExclusive = (title: string) => setOpenGroup(title);
+  /**
+   * فتح حصري + طيّ يدوي:
+   *  • النقر على مجموعة مغلقة يفتحها **ويغلق سواها** (مجموعة واحدة كحدّ أقصى).
+   *  • والنقر على المفتوحة **يطويها** فلا تبقى مجموعة مفتوحة إطلاقاً.
+   *
+   * الطيّ اليدوي لا يُنقَض بعده: `useEffect` أعلاه يعتمد على `activeGroup`
+   * وحده، فطيّ مجموعة الصفحة الحالية لا يُعيد فتحها ما دام المستخدم فيها —
+   * ولو اعتمد على `openGroup` لانقلب الطيّ فتحاً فورياً وبدا الزرّ معطّلاً.
+   */
+  const toggleGroup = (title: string) =>
+    setOpenGroup((current) => (current === title ? '' : title));
 
   return (
     <>
@@ -399,7 +408,7 @@ export function Sidebar({
               <div key={group.title} className="mb-1">
                 <button
                   type="button"
-                  onClick={(e) => (mini ? openFlyout(group.title, e.currentTarget) : openExclusive(group.title))}
+                  onClick={(e) => (mini ? openFlyout(group.title, e.currentTarget) : toggleGroup(group.title))}
                   onMouseEnter={(e) => mini && openFlyout(group.title, e.currentTarget)}
                   onMouseLeave={() => mini && scheduleClose()}
                   onFocus={(e) => mini && openFlyout(group.title, e.currentTarget)}
