@@ -18,6 +18,10 @@ class StoreReturnRequest extends FormRequest
             'partner_id'          => ['required', 'uuid'],
             'payment_type'        => ['required', 'in:cash,credit'],
             'return_date'         => ['nullable', 'date'],
+            // المستند المصدر (اختياري ما لم يُلزِم به الإعداد). النوع يُستنتَج
+            // من `type` في الخدمة، فلا يُرسله العميل ولا يُصدَّق إن أرسله.
+            'original_id'         => ['nullable', 'uuid'],
+            'items.*.source_line_id' => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
             // **المنتج إلزامي.** المرتجع أثرُه مخزونيٌّ لا مالي فقط: `ReturnService`

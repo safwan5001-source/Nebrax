@@ -18,6 +18,7 @@ interface SalesSettings {
   default_tax_rate: number;
   default_payment_type: string;
   invoice_prefix: string;
+  require_return_source: boolean;
   default_terms: string;
 }
 
@@ -49,6 +50,7 @@ export default function InvoiceSettingsPage() {
           default_tax_rate: Number(form.default_tax_rate) || 0,
           default_payment_type: form.default_payment_type,
           invoice_prefix: form.invoice_prefix || null,
+          require_return_source: form.require_return_source,
           default_terms: form.default_terms || null,
         },
       });
@@ -92,6 +94,18 @@ export default function InvoiceSettingsPage() {
                   <Label htmlFor="prefix">{t('invoice_prefix')}</Label>
                   <Input id="prefix" dir="ltr" maxLength={10} value={form.invoice_prefix} onChange={(e) => set('invoice_prefix', e.target.value)} />
                   <p className="num text-xs text-muted">{t('invoice_prefix_hint')} {(form.invoice_prefix || 'INV')}-2026-00001</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="require-source">{t('require_return_source')}</Label>
+                  <Select
+                    id="require-source" value={form.require_return_source ? '1' : '0'}
+                    onChange={(e) => set('require_return_source', e.target.value === '1')}
+                  >
+                    <option value="0">{t('require_return_source_off')}</option>
+                    <option value="1">{t('require_return_source_on')}</option>
+                  </Select>
+                  <p className="text-xs leading-relaxed text-muted">{t('require_return_source_hint')}</p>
                 </div>
               </div>
               {/* الشروط المطبوعة على المستند تأتي من «تصميم المستندات» لا من هنا —

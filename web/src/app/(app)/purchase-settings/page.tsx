@@ -16,6 +16,7 @@ interface PurchaseSettings {
   default_payment_type: string;
   default_tax_inclusive: boolean;
   purchase_prefix: string;
+  require_return_source: boolean;
 }
 
 /**
@@ -54,6 +55,7 @@ export default function PurchaseSettingsPage() {
           default_payment_type: form.default_payment_type,
           default_tax_inclusive: form.default_tax_inclusive,
           purchase_prefix: form.purchase_prefix || null,
+          require_return_source: form.require_return_source,
         },
       });
       success(tc('updated'));
@@ -123,6 +125,18 @@ export default function PurchaseSettingsPage() {
                   <p className="num text-xs text-muted">
                     {t('purchase_prefix_hint')} {(form.purchase_prefix || 'BILL')}-2026-00001
                   </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="require-source">{t('require_return_source')}</Label>
+                  <Select
+                    id="require-source" value={form.require_return_source ? '1' : '0'}
+                    onChange={(e) => set('require_return_source', e.target.value === '1')}
+                  >
+                    <option value="0">{t('require_return_source_off')}</option>
+                    <option value="1">{t('require_return_source_on')}</option>
+                  </Select>
+                  <p className="text-xs leading-relaxed text-muted">{t('require_return_source_hint')}</p>
                 </div>
               </div>
 

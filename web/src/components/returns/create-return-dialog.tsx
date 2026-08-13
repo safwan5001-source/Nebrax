@@ -19,9 +19,23 @@ interface Product {
   sale_price: string; purchase_price: string; tax_rate: number; is_active: boolean;
   track_inventory?: boolean; quantity_on_hand?: number;
 }
-interface Line { productId: string | null; description: string; quantity: string; unit_price: string; tax_rate: string }
+interface Line {
+  productId: string | null; description: string; quantity: string; unit_price: string; tax_rate: string;
+  /** سطر المستند المصدر — يملؤه السحب، ويبقى null في المرتجع الحرّ. */
+  sourceLineId: string | null;
+  /** المتبقي القابل للردّ من ذلك السطر — سقفٌ يُعرَض لا يُكتشَف عند الرفض. */
+  remaining: number | null;
+}
+interface SourceDoc { id: string; number: string; status: string; partner_id: string; total: string }
+interface ReturnableLine {
+  source_line_id: string; product_id: string | null; description: string | null;
+  quantity: number; returned: number; remaining: number; unit_price: string; tax_rate: number;
+}
 
-const emptyLine = (): Line => ({ productId: null, description: '', quantity: '1', unit_price: '', tax_rate: '15' });
+const emptyLine = (): Line => ({
+  productId: null, description: '', quantity: '1', unit_price: '', tax_rate: '15',
+  sourceLineId: null, remaining: null,
+});
 
 export function CreateReturnDialog({
   open,
@@ -45,6 +59,9 @@ export function CreateReturnDialog({
   const [paymentType, setPaymentType] = useState('credit');
   const [postNow, setPostNow] = useState(true);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
+  const [sources, setSources] = useState<SourceDoc[]>([]);
+  const [sourceId, setSourceId] = useState('');
+  const [requireSource, setRequireSource] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -55,6 +72,20 @@ export function CreateReturnDialog({
       .then((r) => setProducts(r.data.filter((p) => p.is_active)))
       .catch(() => {});
   }, [open]);
+
+  // المستندات المرحَّلة القابلة للردّ عليها + سياسة إلزام المصدر — كلاهما
+  // يتبع نوع المرتجع، فيُعاد جلبهما عند تبديله.
+  useEffect(() => {
+    if (!open) return;
+    const path = type === 'sales' ? '/invoices' : '/purchases';
+    api<{ data: SourceDoc[] }>(path)
+      .then((r) => setSources(r.data.filter((d) => d.status === 'posted')))
+      .catch(() => setSources([]));
+
+    api<{ data: Record<string, unknown> }>(type === 'sales' ? '/sales-settings' : '/purchase-settings')
+      .then((r) => setRequireSource(!!r.data.require_return_source))
+      .catch(() => setRequireSource(false));
+  }, [open, type]);
 
   const eligible = useMemo(
     () =>
@@ -81,8 +112,49 @@ export function CreateReturnDialog({
     [products, t]
   );
 
+  // مستندات هذا الطرف وحده — قائمةٌ تعرض فواتير عميلٍ آخر تدعو لخطأ يرفضه
+  // الخادم بعد ملء النموذج.
+  const sourceOptions = useMemo<ComboOption[]>(
+    () => sources
+      .filter((d) => d.partner_id === partnerId)
+      .map((d) => ({ value: d.id, label: d.number, hint: d.total })),
+    [sources, partnerId]
+  );
+
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+
+  /**
+   * سحب سطور المستند المصدر بكمياتها المتبقية وأسعارها.
+   *
+   * السطور المردودة بالكامل تُستبعَد — عرضُها بصفرٍ يدعو لكتابة كميةٍ تُرفض.
+   * والسعر يُملأ سقفاً لا قيداً: للمستخدم أن ينقصه (استرداد جزئي) لا أن يزيده.
+   */
+  async function pickSource(id: string) {
+    setSourceId(id);
+    if (!id) { setLines([emptyLine()]); return; }
+
+    setError(null);
+    try {
+      const r = await api<{ data: { lines: ReturnableLine[] } }>(`/returns/returnable/${type}/${id}`);
+      const pulled = r.data.lines
+        .filter((l) => l.remaining > 0)
+        .map((l) => ({
+          productId: l.product_id,
+          description: l.description ?? '',
+          quantity: String(l.remaining),
+          unit_price: l.unit_price,
+          tax_rate: String(l.tax_rate),
+          sourceLineId: l.source_line_id,
+          remaining: l.remaining,
+        }));
+      if (pulled.length === 0) { setError(t('fully_returned')); setSourceId(''); return; }
+      setLines(pulled);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : tc('loadFailed'));
+      setSourceId('');
+    }
+  }
 
   /**
    * اختيار المنتج يملأ الوصف والسعر والضريبة. والسعر يتبع اتجاه المرتجع:
@@ -105,7 +177,10 @@ export function CreateReturnDialog({
   // **المنتج إلزامي على كل سطر** (يفرضه `StoreReturnRequest` أيضاً، لا الشاشة
   // وحدها): بلا منتج يمرّ المرتجع بأثرٍ مالي فقط — لا بضاعة تعود للمخزون ولا
   // تكلفةَ بضاعةٍ مباعة تُعكَس. المنعُ هنا يسبق رفضَ الخادم برسالةٍ أوضح.
-  const canSave = !saving && !!partnerId && lines.every((l) => !!l.productId);
+  const canSave = !saving && !!partnerId && lines.every((l) => !!l.productId)
+    // السقف يُمنَع هنا قبل أن يرفضه الخادم — والرقم معروضٌ في تلميح الخانة.
+    && lines.every((l) => l.remaining === null || (Number(l.quantity) || 0) <= l.remaining)
+    && (!requireSource || !!sourceId);
 
   const totalMinor = lines.reduce((sum, l) => {
     const sub = (Number(l.quantity) || 0) * riyalToMinor(l.unit_price);
@@ -120,6 +195,7 @@ export function CreateReturnDialog({
     // (سحب السطور من الفاتورة)، فلا مسار ثانٍ يُبنى لها.
     const items = lines.map((l) => ({
       product_id: l.productId,
+      source_line_id: l.sourceLineId,
       description: l.description || null,
       quantity: Number(l.quantity) || 1,
       unit_price: riyalToMinor(l.unit_price),
@@ -128,7 +204,7 @@ export function CreateReturnDialog({
     try {
       const created = await api<{ data: { id: string } }>('/returns', {
         method: 'POST',
-        body: { type, partner_id: partnerId, payment_type: paymentType, items },
+        body: { type, partner_id: partnerId, payment_type: paymentType, original_id: sourceId || null, items },
       });
       if (postNow) await api(`/returns/${created.data.id}/post`, { method: 'POST' });
       success(tc('created'));
@@ -156,6 +232,8 @@ export function CreateReturnDialog({
                 onChange={(e) => {
                   setType(e.target.value as 'sales' | 'purchase');
                   setPartnerId('');
+                  setSourceId('');
+                  setLines([emptyLine()]);
                 }}
               >
                 <option value="sales">{t('sales')}</option>
@@ -168,11 +246,27 @@ export function CreateReturnDialog({
             <Combobox
               id="partner"
               value={partnerId}
-              onChange={setPartnerId}
+              onChange={(v) => { setPartnerId(v); setSourceId(''); setLines([emptyLine()]); }}
               options={partnerOptions}
               placeholder={t('choose_partner')}
               searchPlaceholder={t('search_partner')}
               emptyText={t('no_partner_found')}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="source">
+              {t('source_document')}{requireSource && <span className="text-negative"> *</span>}
+            </Label>
+            <Combobox
+              id="source"
+              value={sourceId}
+              onChange={pickSource}
+              options={sourceOptions}
+              disabled={!partnerId}
+              placeholder={requireSource ? t('choose_source') : t('no_source')}
+              searchPlaceholder={t('search_source')}
+              emptyText={t('no_source_found')}
+              clearLabel={requireSource ? undefined : t('no_source')}
             />
           </div>
           <div className="space-y-1.5">
@@ -187,25 +281,42 @@ export function CreateReturnDialog({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>{t('lines')}</Label>
-            <Button type="button" variant="outline" size="sm" onClick={addLine}>
-              <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />
-              {t('add_line')}
-            </Button>
+            {/* لا سطرَ يدويّ في مرتجعٍ مرتبط: كل سطر يحتاج سطرَ مصدره. */}
+            {!sourceId && (
+              <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />
+                {t('add_line')}
+              </Button>
+            )}
           </div>
           <div className="space-y-2">
             {lines.map((l, i) => (
               <div key={i} className="grid grid-cols-12 items-center gap-2">
-                <Combobox
-                  className="col-span-5"
-                  value={l.productId ?? ''}
-                  onChange={(v) => pickProduct(i, v)}
-                  options={productOptions}
-                  placeholder={t('pick_product')}
-                  searchPlaceholder={t('search_product')}
-                  emptyText={t('no_product_found')}
-                  aria-label={t('product')}
+                {/* السطر المسحوب من الفاتورة لا يُبدَّل منتجُه: تبديلُه يفصله
+                    عن سطر مصدره فيسقط السقفان — الكمية والسعر. */}
+                {l.sourceLineId ? (
+                  <div className="col-span-5 truncate rounded-md border border-border bg-background px-3 py-2 text-sm text-text">
+                    {l.description || '—'}
+                  </div>
+                ) : (
+                  <Combobox
+                    className="col-span-5"
+                    value={l.productId ?? ''}
+                    onChange={(v) => pickProduct(i, v)}
+                    options={productOptions}
+                    placeholder={t('pick_product')}
+                    searchPlaceholder={t('search_product')}
+                    emptyText={t('no_product_found')}
+                    aria-label={t('product')}
+                  />
+                )}
+                <Input
+                  className="num col-span-2 text-end" type="number" min={1}
+                  max={l.remaining ?? undefined}
+                  title={l.remaining !== null ? `${t('remaining_hint')} ${l.remaining}` : undefined}
+                  placeholder={t('qty')} value={l.quantity}
+                  onChange={(e) => setLine(i, { quantity: e.target.value })}
                 />
-                <Input className="num col-span-2 text-end" type="number" min={1} placeholder={t('qty')} value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
                 <Input className="num col-span-2 text-end" inputMode="decimal" placeholder={t('price')} value={l.unit_price} onChange={(e) => setLine(i, { unit_price: e.target.value })} />
                 <Input className="num col-span-2 text-end" type="number" min={0} max={100} value={l.tax_rate} onChange={(e) => setLine(i, { tax_rate: e.target.value })} />
                 <Button type="button" variant="ghost" size="icon" className="col-span-1" aria-label={t('remove_line')} onClick={() => removeLine(i)}>

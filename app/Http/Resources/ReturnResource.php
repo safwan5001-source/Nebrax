@@ -18,6 +18,7 @@ class ReturnResource extends JsonResource
             'payment_type' => $this->payment_type,
             'status'       => $this->status,
             'return_date'  => optional($this->return_date)->toDateString(),
+            'original_id'  => $this->original_id,
             'subtotal'     => Money::toRiyal($this->subtotal),
             'tax_amount'   => Money::toRiyal($this->tax_amount),
             'total'        => Money::toRiyal($this->total),
