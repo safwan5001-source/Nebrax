@@ -21,6 +21,7 @@ class UpdateSalesSettingsRequest extends FormRequest
             // البادئة تدخل رقم المستند مباشرةً: حروف وأرقام وشرطة فقط، بلا
             // مسافات ولا رموز — الرقم مُعرّف يُطبع ويُبحث به لا نصّ حرّ.
             'invoice_prefix'       => ['nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9-]+$/'],
+            'require_return_source' => ['nullable', 'boolean'],
         ];
     }
 

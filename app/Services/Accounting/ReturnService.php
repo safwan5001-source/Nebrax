@@ -3,9 +3,14 @@
 namespace App\Services\Accounting;
 
 use App\Models\Account;
+use App\Models\Invoice;
 use App\Models\Partner;
+use App\Models\Purchase;
 use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
+use App\Support\Money;
+use App\Support\Settings;
+use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -24,6 +29,16 @@ use RuntimeException;
  *  مرتجع مشتريات (purchase) — عكس الشراء:
  *    مدين 2110/1110 (الإجمالي) │ دائن 1140 المخزون + دائن 5150 + دائن 1150 ضريبة المدخلات
  *    وللبضاعة المتابَعة: إخراج من المخزون.
+ *
+ *  ── المستند المصدر
+ *
+ *  للمرتجع أن يُربط بفاتورةٍ مصدر (`original_*` على الرأس، و`source_line_id`
+ *  على كل سطر). والربط حين يوجد **يُلزِم**: لا يُرَدّ أكثر مما بيع، ولا بسعرٍ
+ *  أعلى مما قُبض. مستندٌ يعلن مرجعاً ثم يناقضه بياناتٌ خاطئة لا مختلفة.
+ *
+ *  أمّا **إلزام وجود مصدر أصلاً** فسياسةُ عملٍ لا صحّةٌ تقنية: التجزئة تريد
+ *  «لا ردّ بلا إيصال»، والخدمات تُصدر إشعارات دائنة مستقلّة. فهو مفتاحٌ في
+ *  إعدادات المبيعات/المشتريات، افتراضه معطّل.
  *
  *  لا كتابة مباشرة في journal_lines — القيد عبر المحرك حصراً.
  */
@@ -61,8 +76,16 @@ class ReturnService
             throw new RuntimeException('المرتجع يجب أن يحتوي على سطر واحد على الأقل.');
         }
 
-        return DB::transaction(function () use ($data, $items, $type) {
+        // المصدر يُحلّ ويُتحقَّق منه **قبل** أي كتابة: مستندٌ يعلن مرجعاً لا
+        // يخصّه أو غير مرحّل لا يُنشأ أصلاً.
+        $source = $this->resolveSource($data, $type);
+
+        return DB::transaction(function () use ($data, $items, $type, $source) {
             $date = $data['return_date'] ?? now()->toDateString();
+
+            if ($source) {
+                $this->assertWithinSource($source, $items);
+            }
 
             $return = ReturnDocument::create([
                 'number'        => $data['number'] ?? $this->nextNumber($type, $date),
@@ -72,8 +95,10 @@ class ReturnService
                 'return_date'   => $date,
                 'status'        => 'draft',
                 'notes'         => $data['notes'] ?? null,
-                'original_type' => $data['original_type'] ?? null,
-                'original_id'   => $data['original_id'] ?? null,
+                // النوع يُشتقّ من المصدر المحلول لا من المُرسَل: العميل يرسل
+                // المعرّف وحده، والنوع يقرّره نوعُ المرتجع فلا يتناقضان.
+                'original_type' => $source ? $source::class : null,
+                'original_id'   => $source?->id,
                 'created_by'    => $data['created_by'] ?? null,
             ]);
 
@@ -92,8 +117,9 @@ class ReturnService
                 $lineTax      = $this->calcTax($lineSubtotal, $rate);
 
                 ReturnLine::create([
-                    'return_id'     => $return->id,
-                    'product_id'    => $item['product_id'] ?? null,
+                    'return_id'      => $return->id,
+                    'product_id'     => $item['product_id'] ?? null,
+                    'source_line_id' => $item['source_line_id'] ?? null,
                     'description'   => $item['description'] ?? null,
                     'quantity'      => $qty,
                     'unit_price'    => $unitPrice,
@@ -118,6 +144,123 @@ class ReturnService
     }
 
     /**
+     * ═══════════════════════════════════════════════════════════════
+     *  المستند المصدر — حلٌّ وتحقّق
+     * ═══════════════════════════════════════════════════════════════
+     *  يُعيد الفاتورة/المشترى المصدر، أو `null` لمرتجعٍ حرّ. ويرفض:
+     *  مصدراً من نوعٍ يخالف نوع المرتجع، أو لا يخصّ طرفه، أو غير مرحّل،
+     *  أو غياب المصدر أصلاً حين يُلزِم به إعداد المستأجر.
+     */
+    protected function resolveSource(array $data, string $type): Invoice|Purchase|null
+    {
+        $class = $type === 'sales' ? Invoice::class : Purchase::class;
+        $id    = $data['original_id'] ?? null;
+
+        if (! $id) {
+            // **سياسة لا صحّة:** الإلزام اختيار المستأجر، ومفتاحه في قسم
+            // الوحدة (مبيعات/مشتريات) لا مفتاحٌ واحد يحكم الاتجاهين.
+            $group = $type === 'sales' ? 'sales' : 'purchases';
+            if (Settings::get($group, 'require_return_source')) {
+                throw new RuntimeException(
+                    $type === 'sales'
+                        ? 'إعدادات المبيعات تُلزِم ربط مرتجع المبيعات بفاتورته.'
+                        : 'إعدادات المشتريات تُلزِم ربط مرتجع المشتريات بفاتورته.'
+                );
+            }
+
+            return null;
+        }
+
+        // النوع المعلَن على الرأس — إن أُرسل — يجب أن يطابق نوع المرتجع.
+        if (! empty($data['original_type']) && $data['original_type'] !== $class) {
+            throw new RuntimeException('نوع المستند المصدر لا يطابق نوع المرتجع.');
+        }
+
+        // معرّف مخزَّن يُحلّ **خارج عزل الفرع**: المستند المصدر حجّة قائمة لا
+        // نتيجة تصفّح، وفرعُ المرتجع قد يخالف فرع الفاتورة.
+        $source = BranchScope::reference($class)->find($id);
+
+        if (! $source) {
+            throw new RuntimeException('المستند المصدر غير موجود.');
+        }
+        if (! $source->isPosted()) {
+            throw new RuntimeException('لا يُرَدّ على مستند غير مرحّل.');
+        }
+        if ($source->partner_id !== ($data['partner_id'] ?? null)) {
+            throw new RuntimeException('المستند المصدر لا يخصّ طرف المرتجع.');
+        }
+
+        return $source;
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  لا يُرَدّ أكثر مما بيع، ولا بسعرٍ أعلى مما قُبض
+     * ═══════════════════════════════════════════════════════════════
+     *  **صحّة تقنية لا سياسة:** مستندٌ يقول «هذا مقابل INV-001» ثم يردّ ١٠ من
+     *  صنفٍ باعت INV-001 منه ٥ مستندٌ يناقض مرجعه — بياناتٌ خاطئة لا مختلفة.
+     *
+     *  والقياس **تراكمي**: يُجمَع ما رُدَّ في كل المرتجعات المرحَّلة على السطر
+     *  نفسه، وإلا رُدَّ خمسةٌ ثلاث مرات. والمسوّدات لا تحجز — فلا تُقفل مسوّدةٌ
+     *  منسيّة ردّاً مشروعاً؛ الحارس يُعاد تنفيذه عند الترحيل داخل المعاملة.
+     */
+    protected function assertWithinSource(Invoice|Purchase $source, array $items, ?string $exceptReturnId = null): void
+    {
+        $sourceLines = $source->lines()->get()->keyBy('id');
+
+        // الكميات المردودة سابقاً لكل سطر مصدر — استعلامٌ واحد لا استعلام لكل سطر.
+        $alreadyReturned = ReturnLine::query()
+            ->whereIn('source_line_id', $sourceLines->keys())
+            ->whereHas('return', function ($q) use ($exceptReturnId) {
+                $q->where('status', 'posted');
+                if ($exceptReturnId) {
+                    $q->where('id', '!=', $exceptReturnId);
+                }
+            })
+            ->groupBy('source_line_id')
+            ->selectRaw('source_line_id, SUM(quantity) as qty')
+            ->pluck('qty', 'source_line_id');
+
+        // كميات هذا المستند مجموعةً بسطرها — سطران يشيران للسطر نفسه يُجمعان.
+        $requested = [];
+        foreach ($items as $item) {
+            $lineId = $item['source_line_id'] ?? null;
+            if (! $lineId) {
+                throw new RuntimeException('كل بند في مرتجعٍ مرتبط بفاتورة يحتاج سطره في الفاتورة.');
+            }
+
+            $sourceLine = $sourceLines->get($lineId);
+            if (! $sourceLine) {
+                throw new RuntimeException('البند المحدَّد لا يخصّ المستند المصدر.');
+            }
+
+            // السعر يُسقَّف ولا يُثبَّت: الردّ بأقلّ استردادٌ جزئي مشروع، والردّ
+            // بأكثر ممّا قُبض يخلق ربحاً وهمياً في القيد العكسي.
+            $price = (int) ($item['unit_price'] ?? 0);
+            if ($price > (int) $sourceLine->unit_price) {
+                throw new RuntimeException(
+                    'سعر الردّ لا يتجاوز سعر البيع في الفاتورة ('
+                    . Money::toRiyal($sourceLine->unit_price) . ').'
+                );
+            }
+
+            $requested[$lineId] = ($requested[$lineId] ?? 0) + (int) ($item['quantity'] ?? 0);
+        }
+
+        foreach ($requested as $lineId => $qty) {
+            $sold      = (int) $sourceLines[$lineId]->quantity;
+            $returned  = (int) ($alreadyReturned[$lineId] ?? 0);
+            $remaining = $sold - $returned;
+
+            if ($qty > $remaining) {
+                throw new RuntimeException(
+                    "الكمية المردودة ({$qty}) تتجاوز المتبقي من الفاتورة ({$remaining}) لهذا البند."
+                );
+            }
+        }
+    }
+
+    /**
      * ترحيل المرتجع: توليد القيد العكسي ومعالجة المخزون.
      */
     public function post(ReturnDocument $return): ReturnDocument
@@ -131,6 +274,28 @@ class ReturnService
             $return = ReturnDocument::lockForUpdate()->findOrFail($return->id);
             if (! $return->isDraft()) {
                 throw new RuntimeException('لا يمكن ترحيل مرتجع غير مسوّد (draft).');
+            }
+
+            // الحارس يُعاد **داخل المعاملة**: مسوّدتان أُنشئتا معاً لا تحجزان
+            // كميةً، فالفحص عند الإنشاء وحده يسمح لثانيتهما بتجاوز المتبقي.
+            if ($return->original_id) {
+                $source = $this->resolveSource([
+                    'original_id'   => $return->original_id,
+                    'original_type' => $return->original_type,
+                    'partner_id'    => $return->partner_id,
+                ], $return->type);
+
+                if ($source) {
+                    $this->assertWithinSource(
+                        $source,
+                        $return->lines()->get()->map(fn ($l) => [
+                            'source_line_id' => $l->source_line_id,
+                            'quantity'       => $l->quantity,
+                            'unit_price'     => $l->unit_price,
+                        ])->all(),
+                        $return->id
+                    );
+                }
             }
 
             return $return->isSales()

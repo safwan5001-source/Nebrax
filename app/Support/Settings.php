@@ -45,6 +45,18 @@ class Settings
             'quote_validity_days'  => 14,
             'invoice_prefix'       => 'INV',
             'default_terms'        => '',
+            /**
+             * هل يلزم مرتجعَ المبيعات فاتورةٌ مصدر؟
+             *
+             * **سياسة عمل لا صحّة تقنية** (انظر `design-system/foundations/
+             * configurable-policies.md`): التجزئة تريد «لا ردّ بلا إيصال»،
+             * والمقاولات والخدمات تُصدر إشعارات دائنة مستقلّة لتسويةٍ
+             * متفاوَض عليها. كلاهما يُنتج بياناتٍ صحيحة.
+             *
+             * **الافتراض `false`** — وهو سلوك اليوم حرفياً، فلا يتعطّل
+             * مستأجرٌ قائم يُنشئ مرتجعات حرّة بترقية.
+             */
+            'require_return_source' => false,
         ],
         /**
          * إعدادات المخزون والمنتجات.
@@ -85,6 +97,9 @@ class Settings
             'default_payment_type'  => 'credit',
             'default_tax_inclusive' => false,
             'purchase_prefix'       => 'BILL',
+            // مثيله في `sales` — مفتاحان لا مفتاح: قد تُلزِم المؤسسةُ إيصالاً
+            // لردّ عميلها ولا تُلزِم فاتورةً لردّها على مورّدها.
+            'require_return_source' => false,
         ],
     ];
 

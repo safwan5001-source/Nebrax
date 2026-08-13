@@ -15,7 +15,7 @@ class ReturnLine extends BaseModel implements CompanyWide
     use ResolvesBranchReferences;
 
     protected $fillable = [
-        'tenant_id', 'return_id', 'product_id', 'description',
+        'tenant_id', 'return_id', 'product_id', 'source_line_id', 'description',
         'quantity', 'unit_price', 'tax_rate',
         'line_subtotal', 'line_tax', 'line_total',
     ];
