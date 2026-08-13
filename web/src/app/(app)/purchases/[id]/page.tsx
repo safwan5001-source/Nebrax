@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
-import { TaxDocument, type Party, type DocLine } from '@/components/documents/tax-document';
+import { TaxDocument, type Party, type DocLine, type DocAdjustment } from '@/components/documents/tax-document';
 import { Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
@@ -28,8 +28,12 @@ interface Purchase {
   subtotal: string;
   tax_amount: string;
   total: string;
+  discount: string;
+  shipping: string;
+  adjustment: string;
   paid_amount: string;
   remaining: string;
+  due_date: string | null;
   received_status: string;
   received_date: string | null;
   lines: DocLine[];
@@ -94,6 +98,24 @@ export default function PurchaseDetailPage() {
   if (!purchase) return <div className="text-muted">{t('not_found')}</div>;
 
   const isDraft = purchase.status === 'draft';
+
+  /**
+   * الخصم والشحن والتسوية كانت تُحذَف من المستند المطبوع، فيقرأ المورّد
+   * «المجموع + الضريبة ≠ الإجمالي» ويبدو المستندُ خاطئ الحساب. والقيمة تُرسَل
+   * **موجبة دائماً** و`negative` للعرض وحده — وإلا ضُوعفت إشارةُ السالب.
+   */
+  const adjustments: DocAdjustment[] = [
+    ...(Number(purchase.discount) > 0
+      ? [{ label: tpf('discount'), amount: purchase.discount, negative: true }] : []),
+    ...(Number(purchase.shipping) > 0
+      ? [{ label: tpf('shipping'), amount: purchase.shipping }] : []),
+    ...(Number(purchase.adjustment) !== 0
+      ? [{
+          label: tpf('adjustment'),
+          amount: String(Math.abs(Number(purchase.adjustment))),
+          negative: Number(purchase.adjustment) < 0,
+        }] : []),
+  ];
 
   const info: [string, React.ReactNode][] = [
     [tp('supplier'), supplier?.name ?? '—'],
@@ -213,9 +235,13 @@ export default function PurchaseDetailPage() {
           [tp('number'), purchase.number],
           [t('date'), purchase.purchase_date],
           [t('payment_type'), purchase.payment_type === 'cash' ? t('cash') : t('credit')],
+          ...(purchase.due_date ? [[tpf('due_date'), purchase.due_date] as [string, string]] : []),
+          [tpf('received_status'), tpf(`received_${purchase.received_status === 'received' ? 'full' : purchase.received_status}`)],
+          ...(purchase.received_date ? [[tpf('received_date'), purchase.received_date] as [string, string]] : []),
         ]}
         lines={purchase.lines}
         subtotal={purchase.subtotal}
+        adjustments={adjustments}
         tax={purchase.tax_amount}
         total={purchase.total}
       />

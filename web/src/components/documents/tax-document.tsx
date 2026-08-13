@@ -18,8 +18,20 @@ export interface DocLine {
   description: string | null;
   quantity: number;
   unit_price: string;
+  line_discount?: string;
   line_tax: string;
   line_total: string;
+}
+
+/**
+ * سطرٌ بين الضريبة والإجمالي: خصم فاتورة، شحن، تسوية… يُمرَّر من المستدعي
+ * لا يُستنتَج هنا، فالمستند طابعٌ لا حاسِب. `negative` للعرض وحده — المبلغ
+ * يُرسَل موجباً دائماً.
+ */
+export interface DocAdjustment {
+  label: string;
+  amount: string;
+  negative?: boolean;
 }
 
 /**
@@ -36,6 +48,7 @@ export function TaxDocument({
   metaRows,
   lines,
   subtotal,
+  adjustments = [],
   tax,
   total,
 }: {
@@ -47,10 +60,15 @@ export function TaxDocument({
   metaRows: [string, string][];
   lines: DocLine[];
   subtotal: string;
+  adjustments?: DocAdjustment[];
   tax: string;
   total: string;
 }) {
   const t = useTranslations('taxDoc');
+
+  // عمود خصم السطر يظهر فقط حين يوجد خصمٌ فعلاً — وإلا بقي عمودٌ فارغ في كل
+  // مستند لا يستعمله (الإشعارات مثلاً).
+  const hasLineDiscount = lines.some((l) => Number(l.line_discount ?? 0) > 0);
 
   return (
     <div id="print-root" className="print-only">
@@ -104,6 +122,9 @@ export function TaxDocument({
               <th className="border border-gray-400 p-1.5 text-start">{t('description')}</th>
               <th className="border border-gray-400 p-1.5 text-end">{t('qty')}</th>
               <th className="border border-gray-400 p-1.5 text-end">{t('unit_price')}</th>
+              {hasLineDiscount && (
+                <th className="border border-gray-400 p-1.5 text-end">{t('discount')}</th>
+              )}
               <th className="border border-gray-400 p-1.5 text-end">{t('tax')}</th>
               <th className="border border-gray-400 p-1.5 text-end">{t('total')}</th>
             </tr>
@@ -114,6 +135,11 @@ export function TaxDocument({
                 <td className="border border-gray-400 p-1.5">{l.description ?? '—'}</td>
                 <td className="num border border-gray-400 p-1.5 text-end">{l.quantity}</td>
                 <td className="num border border-gray-400 p-1.5 text-end">{formatRiyal(l.unit_price)}</td>
+                {hasLineDiscount && (
+                  <td className="num border border-gray-400 p-1.5 text-end">
+                    {formatRiyal(l.line_discount ?? '0')}
+                  </td>
+                )}
                 <td className="num border border-gray-400 p-1.5 text-end">{formatRiyal(l.line_tax)}</td>
                 <td className="num border border-gray-400 p-1.5 text-end">{formatRiyal(l.line_total)}</td>
               </tr>
@@ -128,6 +154,12 @@ export function TaxDocument({
               <span>{t('subtotal')}</span>
               <span className="num">{formatRiyal(subtotal)}</span>
             </div>
+            {adjustments.map((a) => (
+              <div key={a.label} className="flex justify-between">
+                <span>{a.label}</span>
+                <span className="num">{a.negative ? '\u2212 ' : ''}{formatRiyal(a.amount)}</span>
+              </div>
+            ))}
             <div className="flex justify-between">
               <span>{t('vat')}</span>
               <span className="num">{formatRiyal(tax)}</span>

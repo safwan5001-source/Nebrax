@@ -112,12 +112,16 @@ class PurchaseService
             $unitPrice = (int) ($item['unit_price'] ?? 0);
             $rate      = (int) ($item['tax_rate'] ?? $defaultRate);
 
+            $product = ! empty($item['product_id']) ? Product::find($item['product_id']) : null;
+
             // الوحدة تُحلّ إلى (اسم، معامل) وتُنسَخ على السطر: لقطةٌ لا مرجع،
             // فتعديل القالب لاحقاً لا يعيد تفسير مستندٍ مرحَّل.
-            [$unitName, $unitFactor] = $this->units->resolve(
-                ! empty($item['product_id']) ? Product::find($item['product_id']) : null,
-                $item['unit'] ?? null
-            );
+            [$unitName, $unitFactor] = $this->units->resolve($product, $item['unit'] ?? null);
+
+            // الوصف يُنسَخ من اسم المنتج عند غيابه — لقطةً كالوحدة تماماً.
+            // بدونه يخرج المستند المطبوع بسطرٍ عنوانه «—»: بلا هوية للمورّد
+            // ولا للمراجع. والشاشة تملأه، لكن عميل الـ API له أن يتركه.
+            $description = $item['description'] ?? $product?->name;
 
             if ($qty <= 0 || $unitPrice < 0) {
                 throw new RuntimeException('الكمية يجب أن تكون موجبة والتكلفة غير سالبة.');
@@ -137,7 +141,7 @@ class PurchaseService
             PurchaseLine::create([
                 'purchase_id'   => $purchase->id,
                 'product_id'    => $item['product_id'] ?? null,
-                'description'   => $item['description'] ?? null,
+                'description'   => $description,
                 'quantity'      => $qty,
                 'unit_name'     => $unitName,
                 'unit_factor'   => $unitFactor,
