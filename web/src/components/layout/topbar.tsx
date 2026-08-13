@@ -7,6 +7,8 @@ import { Button } from '../ui/button';
 import { Dropdown, DropdownItem } from '../ui/dropdown';
 import { ThemeToggle } from './theme-toggle';
 import { LangToggle } from './lang-toggle';
+import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
+import { useCompany } from '@/lib/company';
 import { currentUser, logout } from '@/lib/auth';
 import { useBranches } from '@/lib/branch';
 
@@ -16,6 +18,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const router = useRouter();
   const user = currentUser();
   const initial = user?.name?.trim().charAt(0) || '؟';
+  const company = useCompany();
   // مبدّل الفرع النشط — تبديل سريع فقط (الإدارة في عنصر «الفروع» بالشريط الجانبي).
   const { branches, active, activeId, setActiveBranchId } = useBranches();
 
@@ -35,6 +38,10 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
       >
         <Menu className="h-5 w-5" strokeWidth={1.7} />
       </Button>
+
+      {/* علامة الشركة — على الجوال وحده: الشاشة الواسعة تعرضها في ترويسة
+          الشريط الجانبي، وتكرارها في الشريطين ضجيجٌ بلا فائدة. */}
+      <CompanyLogoMark logo={company?.logo} name={company?.name} size="sm" className="lg:hidden" />
 
       <div className="hidden h-9 items-center gap-2 rounded border border-border px-3 focus-within:ring-2 focus-within:ring-primary/40 sm:flex">
         <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.6} />

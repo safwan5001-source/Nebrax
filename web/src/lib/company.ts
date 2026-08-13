@@ -9,6 +9,8 @@ export interface Company {
   cr_number?: string | null;
   currency?: string | null;
   country?: string | null;
+  /** data URL أو فارغ — تعرضه قشرة التطبيق ورؤوس المستندات. */
+  logo?: string | null;
 }
 
 /** يجلب بيانات الشركة (البائع) من /me لاستخدامها في رؤوس المستندات. */

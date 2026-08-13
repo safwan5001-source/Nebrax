@@ -7,6 +7,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Models\Branch;
 use App\Models\Warehouse;
 use App\Models\Tenant;
+use App\Support\Settings;
 use App\Models\User;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Support\PlanGate;
@@ -151,6 +152,9 @@ class AuthController extends ApiController
             'cr_number'  => $tenant->cr_number,
             'currency'   => $tenant->currency,
             'country'    => $tenant->country,
+            // الشعار مع بقية بيانات الشركة: القشرة تقرؤه من هذا الاستدعاء
+            // القائم بلا طلبٍ إضافي وبلا قيد صلاحية.
+            'logo'       => Settings::group('company', $tenant)['logo'] ?? '',
         ];
     }
 }

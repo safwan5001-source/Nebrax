@@ -358,7 +358,9 @@
     "save_failed": "تعذّر حفظ الإعدادات",
     "preview": "معاينة حيّة",
     "layout_title": "ترتيب الأقسام (اسحب لإعادة الترتيب)",
-    "layout_reset": "استعادة الافتراضي"
+    "layout_reset": "استعادة الافتراضي",
+    "stamp_upload": "رفع ختم",
+    "signature_upload": "رفع توقيع"
   },
   "documentDesign": {
     "title": "تصميم المستندات"
