@@ -792,6 +792,10 @@
     "purchaseSettings": "Purchase settings",
     "inventorySettings": "Inventory and product settings",
     "superGroups": {
+    "return_window_days": "Return window (days)",
+    "return_window_days_hint": "Measured from the bill date. “0” means no limit — the default. Independent of the sales window: you may set a window for your customers yet be bound by none with your suppliers.",
+    "return_window_days": "Return window (days)",
+    "return_window_days_hint": "Measured from the invoice date. “0” means no limit — the default. A business policy, not an accounting rule: retail publishes a fixed window, while contracting and long-term agreements have none. It does not apply to a return without a source document, which has no reference date.",
     "returns": "Sales returns",
     "restock_sales_returns": "Return goods to stock",
     "restock_sales_returns_hint": "A business policy, not an accounting rule: retail puts sound goods back on the shelf, while restaurants and food shops never restock a return. Either way, the amount refunded to the customer is unchanged.",

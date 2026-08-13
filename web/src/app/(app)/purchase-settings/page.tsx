@@ -17,6 +17,7 @@ interface PurchaseSettings {
   default_tax_inclusive: boolean;
   purchase_prefix: string;
   require_return_source: boolean;
+  return_window_days: number;
 }
 
 /**
@@ -56,6 +57,7 @@ export default function PurchaseSettingsPage() {
           default_tax_inclusive: form.default_tax_inclusive,
           purchase_prefix: form.purchase_prefix || null,
           require_return_source: form.require_return_source,
+          return_window_days: form.return_window_days,
         },
       });
       success(tc('updated'));
@@ -137,6 +139,16 @@ export default function PurchaseSettingsPage() {
                     <option value="1">{t('require_return_source_on')}</option>
                   </Select>
                   <p className="text-xs leading-relaxed text-muted">{t('require_return_source_hint')}</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="return-window">{t('return_window_days')}</Label>
+                  <Input
+                    id="return-window" className="num text-end" type="number" min={0} max={3650}
+                    value={form.return_window_days}
+                    onChange={(e) => set('return_window_days', Number(e.target.value) || 0)}
+                  />
+                  <p className="text-xs leading-relaxed text-muted">{t('return_window_days_hint')}</p>
                 </div>
               </div>
 

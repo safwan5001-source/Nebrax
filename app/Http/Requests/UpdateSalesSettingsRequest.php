@@ -22,6 +22,7 @@ class UpdateSalesSettingsRequest extends FormRequest
             // مسافات ولا رموز — الرقم مُعرّف يُطبع ويُبحث به لا نصّ حرّ.
             'invoice_prefix'       => ['nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9-]+$/'],
             'require_return_source' => ['nullable', 'boolean'],
+            'return_window_days'    => ['nullable', 'integer', 'min:0', 'max:3650'],
         ];
     }
 
