@@ -611,7 +611,15 @@
     "summary_title": "Invoice summary",
     "summary_hint": "Totals are derived from the lines — never entered manually. Discount reduces revenue and VAT.",
     "edit_title": "Edit invoice",
-    "unit": "Unit"
+    "unit": "Unit",
+    "search_partner": "Enter a name, phone or tax number",
+    "no_partner_found": "No customer by that name.",
+    "new_partner": "New",
+    "new_partner_title": "Add a new customer",
+    "search_product": "Search by name, SKU or barcode…",
+    "no_product_found": "No product by that name.",
+    "new_product": "Add a new product",
+    "balance": "Stock"
   },
   "invoiceTemplates": {
     "classic": "Classic",
@@ -1205,7 +1213,8 @@
     "new_product": "Add a new product",
     "pick_product": "(select a product)",
     "product_required": "Every line needs a product. For shipping or clearance create a non-inventory service product — it still posts to expenses.",
-    "new_supplier_title": "Add a new supplier"
+    "new_supplier_title": "Add a new supplier",
+    "edit_title": "Edit purchase invoice"
   },
   "purchaseReturns": {
     "title": "Purchase returns",
@@ -1225,7 +1234,17 @@
     "payment_status": "Payment",
     "search": "Search…",
     "empty": "No purchases",
-    "doc_title": "Purchase invoice"
+    "doc_title": "Purchase invoice",
+    "view": "Preview",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "deleted": "Draft deleted.",
+    "posted_locked": "A posted invoice cannot be edited or deleted — it has a journal entry and a stock movement. Correct it with a purchase return.",
+    "delete_title": "Delete purchase invoice draft",
+    "delete_confirm": "This permanently deletes document",
+    "edit_title": "Edit purchase invoice",
+    "hide_preview": "Hide preview"
   },
   "quotes": {
     "title": "Quotes",

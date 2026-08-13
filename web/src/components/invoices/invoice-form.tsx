@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Plus, Trash2, FileText, Users, ShoppingCart, StickyNote, Tag } from 'lucide-react';
@@ -9,13 +9,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Combobox, type ComboOption } from '@/components/ui/combobox';
+import { PartnerDialog } from '@/components/partners/partner-dialog';
+import { ProductDialog } from '@/components/products/product-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
-interface Partner { id: string; name: string }
+interface Partner { id: string; name: string; type?: string; phone?: string | null; vat_number?: string | null }
 interface ProductUnit { name: string; factor: number }
-interface Product { id: string; name: string; sale_price: string; tax_rate: number; is_active: boolean; units?: ProductUnit[] }
+interface Product {
+  id: string; name: string; sku?: string | null; barcode?: string | null;
+  sale_price: string; tax_rate: number; is_active: boolean;
+  track_inventory?: boolean; quantity_on_hand?: number; units?: ProductUnit[];
+}
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
 interface Employee { id: string; name: string }
 interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string; disc: string; unit: string }
@@ -70,14 +77,32 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingDoc, setLoadingDoc] = useState(!!editId);
+  const [newPartner, setNewPartner] = useState(false);
+  // السطر الذي فُتحت من منتقيه نافذة «منتج جديد» — ليُختار فيه فور الحفظ.
+  const [newProductFor, setNewProductFor] = useState<string | null>(null);
+
+  const loadPartners = useCallback(
+    (selectFirst = false) =>
+      api<{ data: Partner[] }>('/partners')
+        .then((r) => {
+          setPartners(r.data);
+          if (selectFirst && r.data[0]) setPartnerId((p) => p || r.data[0].id);
+        })
+        .catch(() => {}),
+    []
+  );
+
+  const loadProducts = useCallback(
+    () => api<{ data: Product[] }>('/products')
+      .then((r) => setProducts(r.data.filter((p) => p.is_active)))
+      .catch(() => {}),
+    []
+  );
 
   useEffect(() => {
     setDate(new Date().toISOString().slice(0, 10));
-    api<{ data: Partner[] }>('/partners').then((r) => {
-      setPartners(r.data);
-      if (!editId && r.data[0]) setPartnerId((p) => p || r.data[0].id); // افتراضي للإنشاء فقط
-    });
-    api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
+    loadPartners(!editId); // الافتراضي للإنشاء فقط
+    loadProducts();
     api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
     api<{ data: Employee[] }>('/employees').then((r) => setEmployees(r.data)).catch(() => {});
     // الافتراضي للإنشاء: من إعدادات الضرائب (هل الضريبة الرئيسية «متضمَّنة»؟).
@@ -144,6 +169,28 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, newLine()]);
   const removeLine = (key: string) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
+
+  // البحث يشمل الاسم والهاتف والرقم الضريبي للطرف، والاسم والرمز والباركود
+  // للمنتج — يُدخل المستخدم ما بين يديه لا ما نفترض أنه يحفظه.
+  const partnerOptions = useMemo<ComboOption[]>(
+    () => partners.map((p) => ({
+      value: p.id, label: p.name,
+      sub: p.vat_number ?? undefined,
+      hint: p.phone ?? undefined,
+    })),
+    [partners]
+  );
+
+  const productOptions = useMemo<ComboOption[]>(
+    () => products.map((p) => ({
+      value: p.id,
+      label: p.name,
+      sub: [p.sku, p.barcode].filter(Boolean).join('  ·  ') || undefined,
+      // الرصيد للمتابَع مخزونياً وحده — وهو ما يهمّ البائع قبل أن يَعِد بالتسليم.
+      hint: p.track_inventory ? `${t('balance')} ${p.quantity_on_hand ?? 0}` : undefined,
+    })),
+    [products, t]
+  );
 
   function pickProduct(key: string, productId: string) {
     const p = products.find((x) => x.id === productId);
@@ -224,8 +271,44 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     }
   }
 
+  const dialogs = (
+    <>
+      <PartnerDialog
+        open={newPartner}
+        onClose={() => setNewPartner(false)}
+        onSaved={() => { setNewPartner(false); loadPartners(); }}
+        defaultType="customer"
+        addTitle={t('new_partner_title')}
+      />
+
+      {/* المنتج المُنشأ يُختار في سطره فوراً — وإلا أعاد المستخدم البحث عمّا
+          أنشأه للتوّ. الاختيار بعد إعادة الجلب لا قبلها. */}
+      <ProductDialog
+        open={newProductFor !== null}
+        onClose={() => setNewProductFor(null)}
+        onSaved={async () => {
+          const key = newProductFor;
+          setNewProductFor(null);
+          const before = new Set(products.map((p) => p.id));
+          const fresh = await api<{ data: Product[] }>('/products').catch(() => null);
+          if (!fresh) { loadProducts(); return; }
+          const active = fresh.data.filter((p) => p.is_active);
+          setProducts(active);
+          const created = active.find((p) => !before.has(p.id));
+          if (key && created) {
+            setLine(key, {
+              productId: created.id, description: created.name,
+              price: created.sale_price, tax: String(created.tax_rate), unit: '',
+            });
+          }
+        }}
+      />
+    </>
+  );
+
   return (
     <div className="space-y-5">
+      {dialogs}
       {/* شريط الإجراءات */}
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.push('/invoices')} aria-label={t('back')}>
@@ -249,10 +332,22 @@ export function InvoiceForm({ editId }: { editId?: string }) {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="partner">{t('partner')} <span className="text-negative">*</span></Label>
-                  <Select id="partner" value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required>
-                    <option value="" disabled>{t('choose_partner')}</option>
-                    {partners.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Combobox
+                      id="partner"
+                      className="min-w-0 flex-1"
+                      value={partnerId}
+                      onChange={setPartnerId}
+                      options={partnerOptions}
+                      placeholder={t('choose_partner')}
+                      searchPlaceholder={t('search_partner')}
+                      emptyText={t('no_partner_found')}
+                    />
+                    <Button type="button" variant="outline" onClick={() => setNewPartner(true)}>
+                      <Plus className="h-4 w-4" strokeWidth={1.7} />
+                      {t('new_partner')}
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="pt">{t('payment_type')}</Label>
@@ -335,10 +430,22 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                 const [net, lineTax] = lineNetTax(l);
                 return (
                   <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded-lg border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
-                    <Select className="col-span-2 md:col-span-2" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
-                      <option value="">{t('manual')}</option>
-                      {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                    </Select>
+                    {/* **السطر الوصفي يبقى متاحاً هنا عمداً** — خلافاً لفاتورة
+                        الشراء. بيعُ خدمةٍ خارج الكتالوج يُقيَّد إيراداً على 4110
+                        كأي بيع، فلا خطأ محاسبياً يُبرّر الإلزام. */}
+                    <Combobox
+                      className="col-span-2 md:col-span-2"
+                      value={l.productId ?? ''}
+                      onChange={(v) => pickProduct(l.key, v)}
+                      options={productOptions}
+                      placeholder={t('manual')}
+                      searchPlaceholder={t('search_product')}
+                      emptyText={t('no_product_found')}
+                      clearLabel={t('manual')}
+                      footerLabel={t('new_product')}
+                      onFooterClick={() => setNewProductFor(l.key)}
+                      aria-label={t('item')}
+                    />
                     <Input className="col-span-2 md:col-span-2" placeholder={t('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
                     <Input className="num text-end md:col-span-2" inputMode="decimal" placeholder={t('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
                     {/* الكمية ووحدتها خلية واحدة: الوحدة تُعرَض فقط حين يحمل

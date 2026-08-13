@@ -39,6 +39,33 @@ class PurchaseController extends ApiController
         return (new PurchaseResource(Purchase::with('lines')->findOrFail($id)))->response();
     }
 
+    /**
+     * تعديل مسوّدة. المرحّلة `immutable` ويرفضها `PurchaseService::update`
+     * — التحقق في الخدمة لا هنا، فلا يتسرّب مسارٌ يتجاوزه.
+     */
+    public function update(StorePurchaseRequest $request, string $id): JsonResponse
+    {
+        $purchase = Purchase::findOrFail($id); // عزل تلقائي بالمستأجر
+        $data = $request->validated();
+
+        Partner::findOrFail($data['partner_id']);
+        $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
+        $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
+
+        $updated = $this->domain(fn () => $this->purchases->update($purchase, $data, $data['items']));
+
+        return (new PurchaseResource($updated->load('lines')))->response();
+    }
+
+    /** حذف مسوّدة. المرحّلة لا تُحذف — سلامة الأثر المحاسبي. */
+    public function destroy(string $id): JsonResponse
+    {
+        $purchase = Purchase::findOrFail($id);
+        $this->domain(fn () => $this->purchases->deleteDraft($purchase));
+
+        return response()->json(['message' => 'تم الحذف.']);
+    }
+
     public function post(string $id): JsonResponse
     {
         $purchase = Purchase::findOrFail($id);

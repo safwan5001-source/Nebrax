@@ -5,11 +5,13 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api';
+import { Dialog } from '@/components/ui/dialog';
+import { useToast } from '@/components/ui/toast';
+import { api, ApiError } from '@/lib/api';
 import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
 import { branchViewQuery, type BranchView } from '@/lib/branch-view';
 import { formatRiyal } from '@/lib/money';
@@ -37,7 +39,11 @@ export default function PurchasesPage() {
 
   // نطاق العرض: الفرع النشط افتراضياً؛ لا يُحفظ فيبدأ كل فتح من الافتراضي.
   const [view, setView] = useState<BranchView>('current');
+  const [toDelete, setToDelete] = useState<Purchase | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
+  const tc = useTranslations('common');
+  const { success, error: errorToast } = useToast();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -72,9 +78,63 @@ export default function PurchasesPage() {
       { accessorKey: 'total', header: t('total'), cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.total)}</div> },
       { accessorKey: 'status', header: t('status'), cell: ({ row }) => <Badge tone={statusTone[row.original.status] ?? 'muted'}>{ts(row.original.status)}</Badge> },
       { accessorKey: 'payment_status', header: t('payment_status'), cell: ({ row }) => <Badge tone={payTone[row.original.payment_status] ?? 'muted'}>{ts(row.original.payment_status)}</Badge> },
+      {
+        id: 'actions',
+        header: '',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const p = row.original;
+          // **المرحّلة لا تُعدَّل ولا تُحذف**: لها قيدٌ في الدفتر وحركةُ مخزون
+          // غيّرت المتوسط المتحرك. الزرّان يظهران معطّلَين بسبب مكتوب — إخفاؤهما
+          // كان يترك المستخدم يبحث عنهما ظانّاً أن الشاشة ناقصة.
+          const isDraft = p.status === 'draft';
+          return (
+            <div className="flex items-center justify-end gap-0.5">
+              <Button variant="ghost" size="icon" aria-label={t('view')} onClick={() => router.push(`/purchases/${p.id}`)}>
+                <Eye className="h-4 w-4" strokeWidth={1.7} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t('edit')}
+                disabled={!isDraft}
+                title={isDraft ? t('edit') : t('posted_locked')}
+                onClick={() => router.push(`/purchases/${p.id}/edit`)}
+              >
+                <Pencil className="h-4 w-4" strokeWidth={1.7} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t('delete')}
+                disabled={!isDraft}
+                title={isDraft ? t('delete') : t('posted_locked')}
+                onClick={() => setToDelete(p)}
+              >
+                <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
+              </Button>
+            </div>
+          );
+        },
+      },
     ],
-    [partners, t, ts]
+    [partners, t, ts, router]
   );
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await api(`/purchases/${toDelete.id}`, { method: 'DELETE' });
+      success(t('deleted'));
+      setToDelete(null);
+      load();
+    } catch (e) {
+      errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -89,6 +149,16 @@ export default function PurchasesPage() {
         </Button>
       </div>
       <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="purchases" />
+
+      <Dialog open={!!toDelete} onClose={() => (deleting ? null : setToDelete(null))} title={t('delete_title')}>
+        <p className="text-sm text-text">
+          {t('delete_confirm')} <span className="num font-medium">{toDelete?.number}</span>؟
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setToDelete(null)} disabled={deleting}>{t('cancel')}</Button>
+          <Button variant="danger" onClick={confirmDelete} disabled={deleting}>{t('delete')}</Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -239,6 +239,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('purchases', [PurchaseController::class, 'index'])->middleware($perm('purchases.view'));
         Route::get('purchases/{id}', [PurchaseController::class, 'show'])->middleware($perm('purchases.view'));
         Route::post('purchases', [PurchaseController::class, 'store'])->middleware($perm('purchases.manage'));
+        Route::put('purchases/{id}', [PurchaseController::class, 'update'])->middleware($perm('purchases.manage'));    // مسوّدة فقط
+        Route::delete('purchases/{id}', [PurchaseController::class, 'destroy'])->middleware($perm('purchases.manage')); // مسوّدة فقط
         Route::post('purchases/{id}/post', [PurchaseController::class, 'post'])->middleware($perm('purchases.manage'));
 
         // دورة الشراء: طلب → طلب عروض → عرض مورّد → أمر شراء (مستندات غير محاسبية)
