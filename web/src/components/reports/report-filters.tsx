@@ -90,9 +90,16 @@ export function ReportFilters({
    * ولم أغيّر الافتراض نفسه إلى «هذا الشهر»: ذلك يبدّل **كل رقم** على اللوحة
    * وفي كل تقرير لمن يفتحها بعد الترقية، وهو قرار مالك منتج لا تحسين عرض.
    */
-  const dateLabel = !dateSet
-    ? t('all_periods')
-    : [value.from || '…', value.to || '…'].join(' ← ');
+  const dateLabel = useMemo(() => {
+    if (!dateSet) return t('all_periods');
+
+    // «اليوم» بدل «٢٠٢٦-٠٨-١٣ ← ٢٠٢٦-٠٨-١٣»: تكرار التاريخ نفسه مرّتين يشغل
+    // العرض ولا يضيف معنى، والاسم يُقرأ بلمحة.
+    const today = new Date().toISOString().slice(0, 10);
+    if (value.from === today && value.to === today) return t('today');
+
+    return [value.from || '…', value.to || '…'].join(' ← ');
+  }, [dateSet, value.from, value.to, t]);
 
   const chip = (active: boolean) =>
     cn(

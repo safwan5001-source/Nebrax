@@ -61,7 +61,21 @@ export default function DashboardPage() {
   const ts = useTranslations('status');
   const ti = useTranslations('invoices');
 
-  const [filters, setFilters] = useState<ReportFilterState>(EMPTY_FILTERS);
+  /**
+   * ═══════════════════════════════════════════════════════════════
+   *  الفترة الافتراضية على اللوحة: **اليوم**
+   * ═══════════════════════════════════════════════════════════════
+   *  اللوحة شاشة تشغيل يومية — «كم بعنا اليوم» لا «كم بعنا منذ التأسيس».
+   *
+   *  والافتراض هنا **محليّ للّوحة** لا في `EMPTY_FILTERS`: ذلك الثابت مشترك
+   *  مع شاشات التقارير، وميزانُ مراجعةٍ ليومٍ واحد بلا معنى. تغييره هناك كان
+   *  سيُفرغ كل تقرير من مضمونه بسطر واحد.
+   */
+  const [filters, setFilters] = useState<ReportFilterState>(() => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    return { ...EMPTY_FILTERS, from: today, to: today };
+  });
   const [loading, setLoading] = useState(true);
   const [income, setIncome] = useState<IncomeStatement | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -158,10 +172,12 @@ export default function DashboardPage() {
           loading={loading}
         />
         </div>
-        {/* البطاقة المدمجة: المبيعات رقماً رئيسياً والصافي سطراً فرعياً */}
+        {/* البطاقة المدمجة: المبيعات رقماً رئيسياً والصافي سطراً فرعياً.
+            اسمها «الأداء المالي» لا «إجمالي المبيعات»: صارت تحمل رقمين —
+            والاسم القديم يصف أحدهما فيُخفي الآخر. */}
         <div className="order-1 lg:order-3">
         <KpiCard
-          label={t('revenue')}
+          label={t('financial_performance')}
           value={formatNumberShort(revenue)}
           unit={t('currency')}
           icon={TrendingUp}
@@ -297,7 +313,7 @@ export default function DashboardPage() {
                 onClick={() => setMobileTab(k)}
                 className={cn(
                   'flex-1 rounded-[9px] py-2 text-center text-[12.5px] font-semibold transition-colors',
-                  mobileTab === k ? 'bg-surface text-text shadow-sm' : 'text-muted'
+                  mobileTab === k ? 'bg-primary text-white' : 'bg-background text-muted'
                 )}
               >
                 {t(k === 'activity' ? 'activity' : 'recent_invoices')}
