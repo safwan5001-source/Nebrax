@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Tenant;
+use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,7 +42,7 @@ class SalesConfigController extends ApiController
     {
         $this->assertSection($section);
 
-        return response()->json(['data' => $this->current($this->tenant(), $section)]);
+        return response()->json(['data' => $this->withCompanyLogo($section, $this->current($this->tenant(), $section))]);
     }
 
     public function update(Request $request, string $section): JsonResponse
@@ -54,13 +55,29 @@ class SalesConfigController extends ApiController
         ])['data'];
 
         $tenant = $this->tenant();
+
+        // ═══════════════════════════════════════════════════════════════
+        //  الشعار يُخزَّن على مستوى الشركة لا داخل تصميم المستندات
+        // ═══════════════════════════════════════════════════════════════
+        //  الشاشة لم تتغيّر — ما زالت ترفعه ضمن قسم «التصاميم والهوية» —
+        //  لكن مخزنه ارتفع إلى `settings['company']['logo']` ليقرأه `/me`
+        //  فتعرضه قشرة التطبيق لكل مستخدم بلا قيد صلاحية `invoices.view`.
+        //  (هجرة 000048 نقلت القيم القائمة.)
+        //
+        //  **مصدر واحد لا نسختان:** يُنزَع من حمولة التصميم قبل حفظها، فلا
+        //  تبقى نسخة قديمة تنحرف عن الجديدة ويحتار القارئ أيّهما الصحيح.
+        if ($section === 'designs' && array_key_exists('logo', $data)) {
+            Settings::put('company', ['logo' => (string) $data['logo']], $tenant);
+            unset($data['logo']);
+        }
+
         $settings = $tenant->settings ?? [];
         $config = $settings['sales_config'] ?? [];
         $config[$section] = $data;
         $settings['sales_config'] = $config;
         $tenant->update(['settings' => $settings]);
 
-        return response()->json(['data' => $data]);
+        return response()->json(['data' => $this->withCompanyLogo($section, $data)]);
     }
 
     private function assertSection(string $section): void
@@ -73,6 +90,19 @@ class SalesConfigController extends ApiController
     private function tenant(): Tenant
     {
         return Tenant::findOrFail(app(TenantContext::class)->id());
+    }
+
+    /** يحقن شعار الشركة في حمولة «التصاميم» فلا ترى الشاشة فرقاً بعد النقل. */
+    private function withCompanyLogo(string $section, mixed $data): mixed
+    {
+        if ($section !== 'designs' || ! is_array($data)) {
+            return $data;
+        }
+
+        // `array_merge` لا `+`: القيمة القديمة قد تبقى مخزَّنة في قسم التصاميم
+        // (الهجرة نسختها ولم تحذفها)، و`+` كان يُبقيها فتنتصر النسخة المهجورة
+        // على المصدر الجديد — وهو بالضبط الالتباس الذي نقلُ الحقل يمنعه.
+        return array_merge($data, ['logo' => Settings::group('company', $this->tenant())['logo'] ?? '']);
     }
 
     private function current(Tenant $tenant, string $section): mixed

@@ -58,6 +58,8 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
+import { useCompany } from '@/lib/company';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -228,6 +230,9 @@ export function Sidebar({
   // فحين يكون الدرج مفتوحاً يسقط الطيّ، ولا يبقى المستخدم أمام أيقونات صمّاء.
   const mini = collapsed && !open;
 
+  // بيانات الشركة للعلامة في الترويسة — من `/me` القائم بلا طلب إضافي.
+  const company = useCompany();
+
   // المجموعة التي انبثقت قائمتها في الحالة المطوية (flyout)، وموضعها الرأسي.
   const [flyout, setFlyout] = useState<{ title: string; top: number } | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -301,15 +306,11 @@ export function Sidebar({
       >
         {/* الترويسة: الشعار + زرّ الطيّ (شاشات واسعة) أو زرّ الإغلاق (الجوال) */}
         <div className={cn('flex h-14 shrink-0 items-center border-b border-border', mini ? 'justify-center gap-1 px-1' : 'gap-2 px-4')}>
-          <div
-            className={cn(
-              'flex shrink-0 items-center justify-center rounded bg-primary font-bold text-white',
-              mini ? 'h-7 w-7 text-xs' : 'h-8 w-8 text-sm'
-            )}
-          >
-            نـ
-          </div>
-          {!mini && <span className="truncate text-sm font-semibold text-text">نبراس</span>}
+          {/* شعار الشركة بدل الحرف الثابت — والحرف احتياطٌ حين لا شعار. */}
+          <CompanyLogoMark logo={company?.logo} name={company?.name} size={mini ? 'sm' : 'md'} />
+          {!mini && (
+            <span className="truncate text-sm font-semibold text-text">{company?.name ?? 'نبراس'}</span>
+          )}
 
           <button
             type="button"

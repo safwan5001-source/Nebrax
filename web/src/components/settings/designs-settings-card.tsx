@@ -260,8 +260,10 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
             {/* الختم والتوقيع — صور تظهر عند تفعيل قسميهما في المصمّم. */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {([
-                { key: 'stamp' as const, ref: stampRef, label: t('stamp'), hint: t('stamp_hint') },
-                { key: 'signature' as const, ref: signRef, label: t('signature'), hint: t('signature_hint') },
+                // نصّ الزرّ لكل كتلة على حدة — كان الثلاثة يقولون «رفع شعار»
+                // بخطأ نسخ، فيظنّ المستخدم أنه يستبدل الشعار وهو يرفع ختماً.
+                { key: 'stamp' as const, ref: stampRef, label: t('stamp'), hint: t('stamp_hint'), upload: t('stamp_upload') },
+                { key: 'signature' as const, ref: signRef, label: t('signature'), hint: t('signature_hint'), upload: t('signature_upload') },
               ]).map((img) => (
                 <div key={img.key} className="rounded-lg border border-border p-3">
                   <div className="mb-2 text-xs font-medium text-muted">{img.label}</div>
@@ -284,7 +286,7 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
                       />
                       <Button variant="outline" size="sm" disabled={!canManage} onClick={() => img.ref.current?.click()}>
                         <Upload className="h-4 w-4" strokeWidth={1.7} />
-                        {t('logo_upload')}
+                        {img.upload}
                       </Button>
                       {cfg[img.key] && (
                         <Button variant="ghost" size="sm" disabled={!canManage} onClick={() => patch({ [img.key]: '' })}>

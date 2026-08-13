@@ -358,7 +358,9 @@
     "save_failed": "Could not save settings",
     "preview": "Live preview",
     "layout_title": "Section layout (drag to reorder)",
-    "layout_reset": "Reset to default"
+    "layout_reset": "Reset to default",
+    "stamp_upload": "Upload stamp",
+    "signature_upload": "Upload signature"
   },
   "documentDesign": {
     "title": "Document design"
