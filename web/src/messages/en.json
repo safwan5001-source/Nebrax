@@ -1205,7 +1205,8 @@
     "new_product": "Add a new product",
     "pick_product": "(select a product)",
     "product_required": "Every line needs a product. For shipping or clearance create a non-inventory service product — it still posts to expenses.",
-    "new_supplier_title": "Add a new supplier"
+    "new_supplier_title": "Add a new supplier",
+    "edit_title": "Edit purchase invoice"
   },
   "purchaseReturns": {
     "title": "Purchase returns",
@@ -1225,7 +1226,17 @@
     "payment_status": "Payment",
     "search": "Search…",
     "empty": "No purchases",
-    "doc_title": "Purchase invoice"
+    "doc_title": "Purchase invoice",
+    "view": "Preview",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "deleted": "Draft deleted.",
+    "posted_locked": "A posted invoice cannot be edited or deleted — it has a journal entry and a stock movement. Correct it with a purchase return.",
+    "delete_title": "Delete purchase invoice draft",
+    "delete_confirm": "This permanently deletes document",
+    "edit_title": "Edit purchase invoice",
+    "hide_preview": "Hide preview"
   },
   "quotes": {
     "title": "Quotes",

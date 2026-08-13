@@ -77,54 +77,122 @@ class PurchaseService
                 'created_by'          => $data['created_by'] ?? null,
             ]);
 
-            $subtotal = $taxTotal = 0;
-            $defaultRate = (int) Settings::get('purchases', 'default_tax_rate');
-
-            foreach ($items as $item) {
-                $qty       = (int) ($item['quantity'] ?? 1);
-                $unitPrice = (int) ($item['unit_price'] ?? 0);
-                $rate      = (int) ($item['tax_rate'] ?? $defaultRate);
-
-                // الوحدة تُحلّ إلى (اسم، معامل) وتُنسَخ على السطر: لقطةٌ لا مرجع،
-                // فتعديل القالب لاحقاً لا يعيد تفسير مستندٍ مرحَّل.
-                [$unitName, $unitFactor] = $this->units->resolve(
-                    ! empty($item['product_id']) ? Product::find($item['product_id']) : null,
-                    $item['unit'] ?? null
-                );
-
-                if ($qty <= 0 || $unitPrice < 0) {
-                    throw new RuntimeException('الكمية يجب أن تكون موجبة والتكلفة غير سالبة.');
-                }
-
-                // متضمَّن → تُستخرَج الضريبة فيُخزَّن الصافي (يُقيَّم المخزون به)؛ غير متضمَّن → تُضاف.
-                $lineGross = $qty * $unitPrice;
-                [$lineNet, $lineTax] = $this->splitLineTax($lineGross, $rate, $inclusive);
-
-                PurchaseLine::create([
-                    'purchase_id'   => $purchase->id,
-                    'product_id'    => $item['product_id'] ?? null,
-                    'description'   => $item['description'] ?? null,
-                    'quantity'      => $qty,
-                    'unit_name'     => $unitName,
-                    'unit_factor'   => $unitFactor,
-                    'unit_price'    => $unitPrice,
-                    'tax_rate'      => $rate,
-                    'line_subtotal' => $lineNet,
-                    'line_tax'      => $lineTax,
-                    'line_total'    => $lineNet + $lineTax,
-                ]);
-
-                $subtotal += $lineNet;
-                $taxTotal += $lineTax;
-            }
-
-            $purchase->update([
-                'subtotal'   => $subtotal,
-                'tax_amount' => $taxTotal,
-                'total'      => $subtotal + $taxTotal,
-            ]);
+            $this->writeLines($purchase, $items, $inclusive);
 
             return $purchase->load('lines');
+        });
+    }
+
+    /**
+     * يكتب السطور ويشتقّ إجماليات الرأس منها — **مصدر الحقيقة هو السطور**.
+     *
+     * مشتركة بين الإنشاء والتعديل: نسختان كانتا ستنحرفان، فتُحسب الضريبة عند
+     * الإنشاء بقاعدة وعند التعديل بأخرى على المستند نفسه.
+     */
+    protected function writeLines(Purchase $purchase, array $items, bool $inclusive): void
+    {
+        $subtotal = $taxTotal = 0;
+        $defaultRate = (int) Settings::get('purchases', 'default_tax_rate');
+
+        foreach ($items as $item) {
+            $qty       = (int) ($item['quantity'] ?? 1);
+            $unitPrice = (int) ($item['unit_price'] ?? 0);
+            $rate      = (int) ($item['tax_rate'] ?? $defaultRate);
+
+            // الوحدة تُحلّ إلى (اسم، معامل) وتُنسَخ على السطر: لقطةٌ لا مرجع،
+            // فتعديل القالب لاحقاً لا يعيد تفسير مستندٍ مرحَّل.
+            [$unitName, $unitFactor] = $this->units->resolve(
+                ! empty($item['product_id']) ? Product::find($item['product_id']) : null,
+                $item['unit'] ?? null
+            );
+
+            if ($qty <= 0 || $unitPrice < 0) {
+                throw new RuntimeException('الكمية يجب أن تكون موجبة والتكلفة غير سالبة.');
+            }
+
+            // متضمَّن → تُستخرَج الضريبة فيُخزَّن الصافي (يُقيَّم المخزون به)؛ غير متضمَّن → تُضاف.
+            $lineGross = $qty * $unitPrice;
+            [$lineNet, $lineTax] = $this->splitLineTax($lineGross, $rate, $inclusive);
+
+            PurchaseLine::create([
+                'purchase_id'   => $purchase->id,
+                'product_id'    => $item['product_id'] ?? null,
+                'description'   => $item['description'] ?? null,
+                'quantity'      => $qty,
+                'unit_name'     => $unitName,
+                'unit_factor'   => $unitFactor,
+                'unit_price'    => $unitPrice,
+                'tax_rate'      => $rate,
+                'line_subtotal' => $lineNet,
+                'line_tax'      => $lineTax,
+                'line_total'    => $lineNet + $lineTax,
+            ]);
+
+            $subtotal += $lineNet;
+            $taxTotal += $lineTax;
+        }
+
+        $purchase->update([
+            'subtotal'   => $subtotal,
+            'tax_amount' => $taxTotal,
+            'total'      => $subtotal + $taxTotal,
+        ]);
+    }
+
+    /**
+     * تعديل فاتورة مشتريات **مسوّدة** — تُبنى سطورها وإجمالياتها من جديد.
+     *
+     * المرحّلة `immutable`: لها قيدٌ في الدفتر وحركةُ مخزون غيّرت المتوسط
+     * المتحرك، وتعديلها كان يترك القيد يشهد على مبلغٍ لم يعد موجوداً. تصحيحها
+     * بمرتجع مشتريات أو بقيد عكسي، لا بتحرير الحقول.
+     */
+    public function update(Purchase $purchase, array $data, array $items): Purchase
+    {
+        if (empty($items)) {
+            throw new RuntimeException('فاتورة المشتريات يجب أن تحتوي على سطر واحد على الأقل.');
+        }
+
+        return DB::transaction(function () use ($purchase, $data, $items) {
+            $purchase = Purchase::lockForUpdate()->findOrFail($purchase->id);
+            if (! $purchase->isDraft()) {
+                throw new RuntimeException('لا يمكن تعديل فاتورة مشتريات مرحّلة.');
+            }
+
+            // مسوّدة: لا قيد ولا حركة مخزون، فحذف السطور وإعادة بنائها آمن.
+            $purchase->lines()->delete();
+
+            // **الغائب يبقى، والمُرسَل فارغاً يُمحى.** `??` لا يفرّق بينهما،
+            // فكان تعديلُ ملاحظةٍ يقلب `tax_inclusive` إلى `false` **ويغيّر
+            // الإجمالي** في فاتورة لم يُمسّ مبلغُها — نفس علّة الفواتير (#166).
+            $keep = fn (string $key, $current) => array_key_exists($key, $data) ? $data[$key] : $current;
+
+            $purchase->update([
+                'partner_id'          => $data['partner_id'],
+                'cost_center_id'      => $keep('cost_center_id', $purchase->cost_center_id),
+                'payment_type'        => $keep('payment_type', $purchase->payment_type) ?? $purchase->payment_type,
+                'purchase_date'       => $keep('purchase_date', $purchase->purchase_date) ?? $purchase->purchase_date,
+                'due_date'            => $keep('due_date', $purchase->due_date),
+                'supplier_invoice_no' => $keep('supplier_invoice_no', $purchase->supplier_invoice_no),
+                'tax_inclusive'       => (bool) ($keep('tax_inclusive', $purchase->tax_inclusive) ?? $purchase->tax_inclusive),
+                'notes'               => $keep('notes', $purchase->notes),
+            ]);
+
+            $this->writeLines($purchase, $items, (bool) $purchase->fresh()->tax_inclusive);
+
+            return $purchase->fresh('lines');
+        });
+    }
+
+    /** حذف مسوّدة. المرحّلة لا تُحذف إطلاقاً — سلامة الأثر المحاسبي. */
+    public function deleteDraft(Purchase $purchase): void
+    {
+        DB::transaction(function () use ($purchase) {
+            $purchase = Purchase::lockForUpdate()->findOrFail($purchase->id);
+            if (! $purchase->isDraft()) {
+                throw new RuntimeException('لا يمكن حذف فاتورة مشتريات مرحّلة.');
+            }
+            $purchase->lines()->delete();
+            $purchase->delete();
         });
     }
 

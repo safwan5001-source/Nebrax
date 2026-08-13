@@ -25,6 +25,15 @@ interface Product {
   quantity_on_hand: number; units?: ProductUnit[];
 }
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
+interface ApiLine {
+  product_id: string | null; description: string | null; quantity: number;
+  unit_name: string | null; unit_price: string; tax_rate: number;
+}
+interface ApiPurchase {
+  partner_id: string; cost_center_id: string | null; payment_type: string;
+  purchase_date: string | null; supplier_invoice_no: string | null;
+  tax_inclusive: boolean; notes?: string | null; lines: ApiLine[];
+}
 
 interface Line {
   key: string;
@@ -55,7 +64,7 @@ const newLine = (): Line => ({
  *  بمنتج **خدمي غير متابَع مخزونياً** فيبقى ترحيلهما إلى 5150 كما كان —
  *  لكنهما بندٌ يُبحث عنه ويُقاس لا نصٌّ حرّ بإملاء مختلف كل مرة.
  */
-export function PurchaseForm() {
+export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const t = useTranslations('purchaseForm');
   const tf = useTranslations('invoiceForm');
   const tc = useTranslations('common');
@@ -80,6 +89,7 @@ export function PurchaseForm() {
   const [newProductFor, setNewProductFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loadingDoc, setLoadingDoc] = useState(!!editId);
 
   const loadPartners = useCallback(
     () => api<{ data: Partner[] }>('/partners')
@@ -102,6 +112,39 @@ export function PurchaseForm() {
     api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
   }, [loadPartners, loadProducts]);
+
+  // تحميل المسوّدة للتعديل وملء الحقول. المرحّلة يرفضها الخادم، وزرّ التعديل
+  // معطّل عليها في الشاشتين — فلا يصل المستخدم إلى هنا بمرحّلة إلا بالمسار.
+  useEffect(() => {
+    if (!editId) return;
+    setLoadingDoc(true);
+    api<{ data: ApiPurchase }>(`/purchases/${editId}`)
+      .then((r) => {
+        const d = r.data;
+        setPartnerId(d.partner_id);
+        setCenterId(d.cost_center_id ?? '');
+        setPaymentType(d.payment_type);
+        setDate(d.purchase_date ?? '');
+        setSupplierInvoiceNo(d.supplier_invoice_no ?? '');
+        setTaxInclusive(!!d.tax_inclusive);
+        setNotes(d.notes ?? '');
+        setLines(
+          d.lines.length
+            ? d.lines.map((l) => ({
+                key: `p${++lineSeq}`,
+                productId: l.product_id,
+                description: l.description ?? '',
+                unit: l.unit_name ?? '',
+                qty: String(l.quantity),
+                price: l.unit_price,
+                tax: String(l.tax_rate),
+              }))
+            : [newLine()]
+        );
+      })
+      .catch(() => setError(tc('loadFailed')))
+      .finally(() => setLoadingDoc(false));
+  }, [editId, tc]);
 
   // الرقم الضريبي في `sub` ليبحث فيه المنتقي فعلاً — نصّ البحث يَعِد به.
   const supplierOptions = useMemo<ComboOption[]>(
@@ -162,7 +205,7 @@ export function PurchaseForm() {
   // أم مصروفُ فترة، فتسقط كلّها في «5150 مصروفات عامة». والحفظ يُمنع هنا قبل
   // أن يرفضه الخادم — رسالةٌ عند الضغط أوضح من طلبٍ يعود بخطأ.
   const canSave =
-    !!partnerId && !saving &&
+    !!partnerId && !saving && !loadingDoc &&
     lines.every((l) => !!l.productId) &&
     lines.some((l) => lineGross(l) > 0);
 
@@ -192,9 +235,7 @@ export function PurchaseForm() {
     if (items.length === 0) { setError(t('need_line')); setSaving(false); return; }
 
     try {
-      const created = await api<{ data: { id: string } }>('/purchases', {
-        method: 'POST',
-        body: {
+      const body = {
           partner_id: partnerId,
           cost_center_id: centerId || null,
           payment_type: paymentType,
@@ -204,10 +245,12 @@ export function PurchaseForm() {
           tax_inclusive: taxInclusive,
           notes: notes || null,
           items,
-        },
-      });
-      if (post) await api(`/purchases/${created.data.id}/post`, { method: 'POST' });
-      success(tc('created'));
+      };
+      const id = editId
+        ? (await api<{ data: { id: string } }>(`/purchases/${editId}`, { method: 'PUT', body })).data.id
+        : (await api<{ data: { id: string } }>('/purchases', { method: 'POST', body })).data.id;
+      if (post) await api(`/purchases/${id}/post`, { method: 'POST' });
+      success(tc(editId ? 'updated' : 'created'));
       router.push('/purchases');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
@@ -222,7 +265,7 @@ export function PurchaseForm() {
         <Button variant="ghost" size="icon" onClick={() => router.push('/purchases')} aria-label={tf('back')}>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
         </Button>
-        <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
+        <h1 className="text-xl font-semibold text-text">{editId ? t('edit_title') : t('new_title')}</h1>
         <div className="ms-auto flex items-center gap-2">
           <Button variant="ghost" onClick={() => router.push('/purchases')}>{tf('cancel')}</Button>
           <Button variant="outline" disabled={!canSave} onClick={() => submit(false)}>{t('save_draft')}</Button>
