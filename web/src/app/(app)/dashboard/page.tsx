@@ -132,7 +132,7 @@ export default function DashboardPage() {
       {/* ٢ — صفّ المؤشّرات: ٣ بطاقات على الديسكتوب، شبكة ٢×٢ على الجوال */}
       {/* الترتيب يختلف بين المقاسين عمداً: الجوال يبدأ ببطاقة الأداء المالي
           (أهمّ ما يُقرأ أولاً على شاشة ضيّقة)، والديسكتوب يضعها ثالثةً كالمرجع. */}
-      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <div className="order-2 lg:order-1">
         <KpiCard
           label={t('cash')}
@@ -173,8 +173,10 @@ export default function DashboardPage() {
           loading={loading}
         />
         </div>
-        {/* قيمة المخزون — بطاقة رابعة على الجوال فقط لإكمال شبكة ٢×٢ */}
-        <div className="order-4 lg:hidden">
+        {/* قيمة المخزون — رابعةً في المقاسين: تُكمل شبكة ٢×٢ على الجوال وصفّ
+            الأربع على الديسكتوب. كانت مخفيّة على الواسع، فيرى صاحب الشاشة
+            الأكبر معلوماتٍ **أقلّ** — وهو عكس ما تعنيه المساحة. */}
+        <div className="order-4 lg:order-4">
           <KpiCard
             label={t('inventory_value')}
             value={formatNumberShort(inventoryValue)}

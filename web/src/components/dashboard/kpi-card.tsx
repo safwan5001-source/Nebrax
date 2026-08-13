@@ -1,6 +1,6 @@
 'use client';
 
-import type { LucideIcon } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/charts/sparkline';
@@ -90,7 +90,20 @@ export function KpiCard({
         {sub && !loading && (
           <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-dashed border-border pt-2.5">
             <span className="text-[11px] leading-snug text-muted">{sub.label}</span>
-            <span className={cn('num shrink-0 text-[13px] font-bold', subColor)}>{sub.value}</span>
+            {/* ═══════════════════════════════════════════════════════════
+                إشارة + لون، لا لون وحده
+                ═══════════════════════════════════════════════════════════
+                `DESIGN_SYSTEM.md` يفرض ألّا يحمل اللونُ الدلالةَ منفرداً — من لا
+                يميّز الأحمر من الأخضر لا يقرأ الإشارة، والطباعة بالأبيض والأسود
+                تُلغي اللون أصلاً. فالسهم يقول ما يقوله اللون. */}
+            <span className={cn('num flex shrink-0 items-center gap-0.5 text-[13px] font-bold', subColor)}>
+              {sub.tone === 'negative' ? (
+                <ArrowDownRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden />
+              ) : sub.tone === 'muted' ? null : (
+                <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden />
+              )}
+              {sub.value}
+            </span>
           </div>
         )}
       </CardContent>

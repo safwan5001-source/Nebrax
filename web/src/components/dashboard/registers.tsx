@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { Lock, LockOpen, ShoppingCart } from 'lucide-react';
+import { Info, Lock, LockOpen, ShoppingCart } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -89,8 +89,13 @@ export function Registers() {
         </div>
       )}
 
-      {/* لا يُخفى أن المعروض ورديات لا صناديق مسمّاة. */}
-      <p className="mt-2 text-[11.5px] text-muted">{t('registers_note')}</p>
+      {/* تنويهٌ لا يُخفى: المعروض ورديات لا صناديق مسمّاة برصيد حيّ. أيقونة
+          `warning` تجعله يُلاحَظ، وخلفية `background` تفصله عن البطاقات بلا
+          صخب — تصحيح توقّعٍ لا تحذير من خطأ. */}
+      <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-background px-3 py-2 text-[11.5px] leading-relaxed text-muted">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={1.9} aria-hidden />
+        <span>{t('registers_note')}</span>
+      </p>
     </section>
   );
 }

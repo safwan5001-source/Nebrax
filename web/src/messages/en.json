@@ -296,7 +296,7 @@
     "reg_open": "Open",
     "reg_closed": "Closed",
     "reg_opening_balance": "Opening balance",
-    "reg_closing_balance": "Closing balance"
+    "reg_closing_balance": "Session closing balance"
   },
   "debitNotes": {
     "title": "Debit notes",
@@ -1399,7 +1399,10 @@
     "total_liabilities": "Total liabilities",
     "total_equity": "Total equity",
     "equity_and_income": "Equity + net income",
-    "as_of_hint": "Cumulative balances as of the “to” date — the “from” date does not apply here (it would cut off capital and opening balances and break the equation)."
+    "as_of_hint": "Cumulative balances as of the “to” date — the “from” date does not apply here (it would cut off capital and opening balances and break the equation).",
+    "all_periods": "All periods",
+    "date_range": "Date range",
+    "apply": "Apply"
   },
   "returnForm": {
     "title": "New return",
