@@ -22,7 +22,7 @@ class Payment extends BaseModel
     protected $fillable = [
         'branch_id',
         'tenant_id', 'number', 'partner_id', 'invoice_id',
-        'direction', 'method', 'payment_date', 'amount',
+        'direction', 'method', 'reference', 'cash_account_id', 'payment_date', 'amount',
         'status', 'notes', 'journal_entry_id', 'created_by',
     ];
 
@@ -47,6 +47,12 @@ class Payment extends BaseModel
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    /** الخزينة/الحساب البنكي المستلِم — مرجع اختياري، غيابه يعني الافتراضي بحسب الطريقة. */
+    public function cashAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'cash_account_id');
     }
 
     public function journalEntry(): BelongsTo

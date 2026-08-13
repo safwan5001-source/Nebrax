@@ -16,6 +16,8 @@ class PaymentResource extends JsonResource
             'partner_id'   => $this->partner_id,
             'direction'    => $this->direction,
             'method'       => $this->method,
+            'reference'    => $this->reference,
+            'cash_account_id' => $this->cash_account_id,
             'status'       => $this->status,
             'payment_date' => optional($this->payment_date)->toDateString(),
             'amount'       => Money::toRiyal($this->amount),

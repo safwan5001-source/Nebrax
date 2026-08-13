@@ -19,6 +19,12 @@ class StoreInvoiceRequest extends FormRequest
             // (`sales.default_payment_type`)، وعند التعديل «أبقِ القيمة كما هي».
             // كونه مطلوباً كان يجعل التفضيل حبراً على ورق.
             'payment_type'        => ['nullable', 'in:cash,credit'],
+            // «مدفوع بالفعل» + تفاصيله. الثلاثة مشروطة بالخانة: بلا `is_paid`
+            // لا يُقرأ منها شيء، فلا سبيل لتسجيل تحصيل بلا إعلانه.
+            'is_paid'             => ['nullable', 'boolean'],
+            'payment_method'      => ['nullable', 'in:cash,transfer,card'],
+            'payment_reference'   => ['nullable', 'string', 'max:255'],
+            'cash_account_id'     => ['nullable', 'uuid'], // الخزينة — يتحقق نوعها PaymentService
             'invoice_date'        => ['nullable', 'date'],
             'due_date'            => ['nullable', 'date'],
             'discount'            => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — خصم على مستوى الفاتورة

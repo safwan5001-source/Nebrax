@@ -14,6 +14,7 @@ import { PartnerDialog } from '@/components/partners/partner-dialog';
 import { ProductDialog } from '@/components/products/product-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
 interface Partner { id: string; name: string; type?: string; phone?: string | null; vat_number?: string | null }
@@ -25,12 +26,14 @@ interface Product {
 }
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
 interface Employee { id: string; name: string }
+interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
 interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string; disc: string; unit: string }
 interface ApiLine { product_id: string | null; description: string | null; quantity: number; unit_name: string | null; unit_price: string; tax_rate: number; line_discount: string }
 interface ApiInvoice {
   status: string; partner_id: string; payment_type: string; invoice_date: string; due_date: string | null;
   cost_center_id: string | null; salesperson_id: string | null; discount: string; shipping: string;
   adjustment: string; tax_inclusive: boolean; notes: string | null; lines: ApiLine[];
+  is_paid?: boolean; payment_method?: string | null; payment_reference?: string | null; cash_account_id?: string | null;
 }
 interface TaxDef { name: string; rate: number; inclusive: boolean }
 
@@ -60,10 +63,10 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [centers, setCenters] = useState<CostCenter[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [cashAccounts, setCashAccounts] = useState<Account[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [centerId, setCenterId] = useState('');
   const [salespersonId, setSalespersonId] = useState('');
-  const [paymentType, setPaymentType] = useState('cash');
   const [date, setDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [terms, setTerms] = useState('');
@@ -73,6 +76,13 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [shippingInput, setShippingInput] = useState('');
   const [adjustmentInput, setAdjustmentInput] = useState('');
   const [taxInclusive, setTaxInclusive] = useState(false);
+  // ═══ السداد الفوري («مدفوع بالفعل») ═══
+  // الخانة وحدها تحكم **إرسال** التفاصيل؛ وقيم الحقول تعيش هنا مستقلّةً عنها،
+  // فإخفاؤها لا يمسّها ورفعُ الإخفاء يُظهرها كما تُركت (نقطة الاختبار D).
+  const [isPaid, setIsPaid] = useState(false);
+  const [payMethod, setPayMethod] = useState('cash');
+  const [payReference, setPayReference] = useState('');
+  const [cashAccountId, setCashAccountId] = useState('');
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -105,6 +115,11 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     loadProducts();
     api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
     api<{ data: Employee[] }>('/employees').then((r) => setEmployees(r.data)).catch(() => {});
+    // خزائن التحصيل: حسابات النقد والبنوك الفرعية وحدها (111x/112x) — وهو
+    // المدى نفسه الذي يقبله `PaymentService`، فلا تُعرَض خزينة يرفضها الخادم.
+    api<{ data: Account[] }>('/accounts')
+      .then((r) => setCashAccounts(r.data.filter((a) => !a.is_group && a.type === 'asset' && /^11[12]/.test(a.code))))
+      .catch(() => {});
     // الافتراضي للإنشاء: من إعدادات الضرائب (هل الضريبة الرئيسية «متضمَّنة»؟).
     if (!editId) {
       api<{ data: TaxDef[] }>('/sales-config/taxes')
@@ -125,7 +140,10 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         const inv = r.data;
         if (inv.status !== 'draft') { router.replace(`/invoices/${editId}`); return; } // المرحّلة لا تُعدَّل
         setPartnerId(inv.partner_id);
-        setPaymentType(inv.payment_type);
+        setIsPaid(!!inv.is_paid);
+        setPayMethod(inv.payment_method ?? 'cash');
+        setPayReference(inv.payment_reference ?? '');
+        setCashAccountId(inv.cash_account_id ?? '');
         setDate(inv.invoice_date ?? '');
         setDueDate(inv.due_date ?? '');
         setCenterId(inv.cost_center_id ?? '');
@@ -252,11 +270,20 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     if (items.length === 0) { setError(t('need_line')); return; }
     setSaving(true);
     setError(null);
+    // نوع الدفع (نقدي/آجل) لم يعد يُرسَل من هذه الشاشة: غيابه يعني «اتبع تفضيل
+    // المستأجر» عند الإنشاء و«أبقِ القيمة» عند التعديل. والسداد يُعبَّر عنه
+    // بخانة «مدفوع بالفعل» وحدها — يترجمها الخادم إلى سند قبض مرحَّل.
+    // وتفاصيل الدفع **مشروطة بالخانة**: بلا تأشير لا تُرسَل، فلا تُسجَّل
+    // خزينةٌ ولا مرجعٌ لفاتورة لم يُعلَن تحصيلها.
     const body = {
-      partner_id: partnerId, payment_type: paymentType, invoice_date: date || null, due_date: dueDate || null,
+      partner_id: partnerId, invoice_date: date || null, due_date: dueDate || null,
       cost_center_id: centerId || null, salesperson_id: salespersonId || null,
       discount: discountMinor, shipping: shippingMinor, adjustment: adjustmentMinor,
       tax_inclusive: taxInclusive, notes: notes || null, items,
+      is_paid: isPaid,
+      payment_method: isPaid ? payMethod : null,
+      payment_reference: isPaid ? payReference || null : null,
+      cash_account_id: isPaid ? cashAccountId || null : null,
     };
     try {
       const id = editId
@@ -325,7 +352,8 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_300px]">
         {/* العمود الرئيسي */}
         <div className="min-w-0 space-y-5">
-          {/* العميل والدفع */}
+          {/* العميل — بلا «نوع الدفع»: السداد صار خانةً واحدة في ملخّص الفاتورة
+              أسفل الإجمالي، حيث يُقرَّر فعلاً. */}
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('customer_section')}</CardTitle></CardHeader>
             <CardContent>
@@ -348,13 +376,6 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                       {t('new_partner')}
                     </Button>
                   </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="pt">{t('payment_type')}</Label>
-                  <Select id="pt" value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
-                    <option value="cash">{t('cash')}</option>
-                    <option value="credit">{t('credit')}</option>
-                  </Select>
                 </div>
               </div>
             </CardContent>
@@ -554,6 +575,73 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                 <span className="font-semibold text-text">{t('total')}</span>
                 <span className="num text-2xl font-bold text-primary-hover">{formatRiyal(totalMinor / 100)}</span>
               </div>
+
+              {/* ═══ مدفوع بالفعل ═══
+                  التأشير يعني تحصيل الإجمالي كاملاً لحظة الترحيل: الفاتورة على
+                  1130 ثم **سند قبض مرحَّل** يقفلها (مدين الخزينة · دائن 1130).
+                  التسمية تلفّ المربّع والنصّ معاً فتُنقر كلّها. */}
+              <div className="border-t border-border pt-3">
+                <label className="flex cursor-pointer items-center gap-2 py-0.5 text-sm font-medium text-text">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 shrink-0 accent-primary"
+                    checked={isPaid}
+                    onChange={(e) => setIsPaid(e.target.checked)}
+                  />
+                  {t('paid_already')}
+                </label>
+
+                {/* **إخفاء بصري لا إزالة**: الحقول تبقى في الـ DOM وقيمها في
+                    الحالة، فإلغاء الخانة لا يُفقد ما أُدخل، وإعادة التأشير
+                    تُظهره كما تُرك. والارتفاع ينتقل بلطف فلا تقفز الأزرار.
+                    و`invisible` ضرورية فوق قصّ الارتفاع: المقصوص وحده يبقى في
+                    شجرة الوصولية وقابلاً للتركيز، فيُملى على المستخدم حقلٌ لا
+                    يراه. */}
+                <div
+                  className={cn(
+                    'grid transition-[grid-template-rows] duration-150 ease-out',
+                    isPaid ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                  )}
+                >
+                  <div className={cn('overflow-hidden', !isPaid && 'invisible')}>
+                    <div className="space-y-2.5 pt-3" aria-hidden={!isPaid}>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="pay-method">{t('payment_method')}</Label>
+                        <Select
+                          id="pay-method" value={payMethod} tabIndex={isPaid ? undefined : -1}
+                          onChange={(e) => setPayMethod(e.target.value)}
+                        >
+                          <option value="cash">{t('method_cash')}</option>
+                          <option value="transfer">{t('method_transfer')}</option>
+                          <option value="card">{t('method_card')}</option>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="pay-ref">{t('payment_reference')}</Label>
+                        <Input
+                          id="pay-ref" dir="ltr" className="num" value={payReference}
+                          tabIndex={isPaid ? undefined : -1}
+                          onChange={(e) => setPayReference(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="pay-account">{t('cash_account')}</Label>
+                        <Select
+                          id="pay-account" value={cashAccountId} tabIndex={isPaid ? undefined : -1}
+                          onChange={(e) => setCashAccountId(e.target.value)}
+                        >
+                          {/* الافتراضية = خزينة الأداة (1110 للنقد، 1120 للتحويل/البطاقة). */}
+                          <option value="">{t('cash_account_main')}</option>
+                          {cashAccounts.map((a) => (
+                            <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                          ))}
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
               <Button className="mt-2 w-full" disabled={!canSave} onClick={() => submit(true)}>{t('save_post')}</Button>
               <Button variant="outline" className="w-full" disabled={!canSave} onClick={() => submit(false)}>{t('save_draft')}</Button>

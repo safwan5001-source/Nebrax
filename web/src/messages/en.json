@@ -586,7 +586,7 @@
     "save_post": "Save & post",
     "back": "Back",
     "need_line": "Add at least one line with a valid price",
-    "customer_section": "Customer & payment",
+    "customer_section": "Customer",
     "meta_section": "Invoice details",
     "invoice_number": "Invoice number",
     "auto_number": "Generated automatically on save",
@@ -622,7 +622,15 @@
     "search_product": "Search by name, SKU or barcode…",
     "no_product_found": "No product by that name.",
     "new_product": "Add a new product",
-    "balance": "Stock"
+    "balance": "Stock",
+    "paid_already": "Already paid",
+    "payment_method": "Payment method",
+    "method_cash": "Cash",
+    "method_transfer": "Bank transfer",
+    "method_card": "Card",
+    "payment_reference": "Reference number",
+    "cash_account": "Cash account",
+    "cash_account_main": "Main"
   },
   "invoiceTemplates": {
     "classic": "Classic",

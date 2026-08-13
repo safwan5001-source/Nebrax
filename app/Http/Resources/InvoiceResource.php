@@ -17,6 +17,13 @@ class InvoiceResource extends JsonResource
             'payment_type'   => $this->payment_type,
             'status'         => $this->status,
             'payment_status' => $this->payment_status,
+            // «مدفوع بالفعل» وتفاصيله — نيّة السداد كما حُفظت على المسوّدة.
+            // حالة السداد الفعلية بعد الترحيل تبقى `payment_status`/`paid_amount`
+            // وحدها (يشتقّها سندُ القبض)، فلا مصدرَ حقيقة ثانياً.
+            'is_paid'           => (bool) $this->is_paid,
+            'payment_method'    => $this->payment_method,
+            'payment_reference' => $this->payment_reference,
+            'cash_account_id'   => $this->cash_account_id,
             'invoice_date'   => optional($this->invoice_date)->toDateString(),
             'due_date'       => optional($this->due_date)->toDateString(),
             'notes'          => $this->notes,

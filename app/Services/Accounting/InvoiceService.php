@@ -34,17 +34,25 @@ class InvoiceService
     private const ACC_VAT_OUTPUT  = '2120'; // ضريبة المخرجات
     private const VAT_RATE        = 15;     // نسبة ضريبة القيمة المضافة للشحن
 
+    /**
+     * أدوات السداد الفوري كما يراها البائع ⇒ طريقة السند (ثنائية: نقد أو بنك).
+     * التحويل والبطاقة كلاهما يصبّ في البنك — نفس تعيين `PosService` حرفياً.
+     */
+    private const PAYMENT_METHODS = ['cash' => 'cash', 'transfer' => 'bank', 'card' => 'bank'];
+
     public function __construct(
         protected LedgerService $ledger,
         protected InventoryService $inventory,
         protected ZatcaService $zatca,
-        protected UnitConversion $units
+        protected UnitConversion $units,
+        protected PaymentService $payments
     ) {}
 
     /**
      * إنشاء فاتورة مبيعات بحالة draft مع حساب الإجماليات من السطور.
      *
-     * @param  array  $data   ['partner_id'=>uuid, 'payment_type'=>'cash|credit', 'invoice_date'=>?, 'due_date'=>?, 'notes'=>?, 'number'=>?]
+     * @param  array  $data   ['partner_id'=>uuid, 'payment_type'=>'cash|credit', 'invoice_date'=>?, 'due_date'=>?, 'notes'=>?, 'number'=>?,
+     *                         'is_paid'=>?bool, 'payment_method'=>'cash|transfer|card', 'payment_reference'=>?, 'cash_account_id'=>?]
      * @param  array  $items  [['product_id'=>?, 'description'=>?, 'quantity'=>int, 'unit_price'=>int, 'tax_rate'=>?int], ...]
      */
     public function create(array $data, array $items): Invoice
@@ -54,25 +62,30 @@ class InvoiceService
         }
 
         return DB::transaction(function () use ($data, $items) {
-            $date = $data['invoice_date'] ?? now()->toDateString();
+            $date   = $data['invoice_date'] ?? now()->toDateString();
+            $isPaid = (bool) ($data['is_paid'] ?? false);
 
             $invoice = Invoice::create([
-                'number'       => $data['number'] ?? $this->nextNumber($date),
-                'partner_id'   => $data['partner_id'],
+                'number'            => $data['number'] ?? $this->nextNumber($date),
+                'partner_id'        => $data['partner_id'],
                 // فرع صريح (كالتوليد من فاتورة دورية)؛ وإن غاب يوسمه BelongsToBranch بالفرع النشط.
-                'branch_id'    => $data['branch_id'] ?? null,
-                'type'         => 'sale',
-                'payment_type' => $data['payment_type'] ?? Settings::get('sales', 'default_payment_type'),
-                'invoice_date' => $date,
-                'due_date'     => $data['due_date'] ?? null,
-                'cost_center_id' => $data['cost_center_id'] ?? null,
-                'salesperson_id' => $data['salesperson_id'] ?? null,
-                'shipping'     => max(0, (int) ($data['shipping'] ?? 0)),
-                'adjustment'   => (int) ($data['adjustment'] ?? 0),
-                'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
-                'status'       => 'draft',
-                'notes'        => $data['notes'] ?? null,
-                'created_by'   => $data['created_by'] ?? null,
+                'branch_id'         => $data['branch_id'] ?? null,
+                'type'              => 'sale',
+                'payment_type'      => $this->paymentType($data['payment_type'] ?? Settings::get('sales', 'default_payment_type'), $isPaid),
+                'is_paid'           => $isPaid,
+                'payment_method'    => $this->paymentMethod($data['payment_method'] ?? null),
+                'payment_reference' => $data['payment_reference'] ?? null,
+                'cash_account_id'   => $data['cash_account_id'] ?? null,
+                'invoice_date'      => $date,
+                'due_date'          => $data['due_date'] ?? null,
+                'cost_center_id'    => $data['cost_center_id'] ?? null,
+                'salesperson_id'    => $data['salesperson_id'] ?? null,
+                'shipping'          => max(0, (int) ($data['shipping'] ?? 0)),
+                'adjustment'        => (int) ($data['adjustment'] ?? 0),
+                'tax_inclusive'     => (bool) ($data['tax_inclusive'] ?? false),
+                'status'            => 'draft',
+                'notes'             => $data['notes'] ?? null,
+                'created_by'        => $data['created_by'] ?? null,
             ]);
 
             $this->applyItemsAndTotals($invoice, $items, $data);
@@ -114,21 +127,48 @@ class InvoiceService
             //  علاج `branch_id` في `LedgerService` (#152).
             $keep = fn (string $key, $current) => array_key_exists($key, $data) ? $data[$key] : $current;
 
+            // «مدفوع بالفعل» نيّةٌ على المسوّدة: الغياب يُبقيها كما هي، فتعديلُ
+            // سطرٍ لا يُلغي سداداً أعلنه المستخدم في حفظٍ سابق.
+            $isPaid = (bool) ($keep('is_paid', $invoice->is_paid) ?? false);
+
             $invoice->update([
-                'partner_id'     => $data['partner_id'],
-                'payment_type'   => $keep('payment_type', $invoice->payment_type) ?? $invoice->payment_type,
-                'invoice_date'   => $keep('invoice_date', $invoice->invoice_date) ?? $invoice->invoice_date,
-                'due_date'       => $keep('due_date', $invoice->due_date),
-                'cost_center_id' => $keep('cost_center_id', $invoice->cost_center_id),
-                'salesperson_id' => $keep('salesperson_id', $invoice->salesperson_id),
-                'tax_inclusive'  => (bool) ($keep('tax_inclusive', $invoice->tax_inclusive) ?? $invoice->tax_inclusive),
-                'notes'          => $keep('notes', $invoice->notes),
+                'partner_id'        => $data['partner_id'],
+                'payment_type'      => $this->paymentType($keep('payment_type', $invoice->payment_type) ?? $invoice->payment_type, $isPaid),
+                'is_paid'           => $isPaid,
+                'payment_method'    => $this->paymentMethod($keep('payment_method', $invoice->payment_method)),
+                'payment_reference' => $keep('payment_reference', $invoice->payment_reference),
+                'cash_account_id'   => $keep('cash_account_id', $invoice->cash_account_id),
+                'invoice_date'      => $keep('invoice_date', $invoice->invoice_date) ?? $invoice->invoice_date,
+                'due_date'          => $keep('due_date', $invoice->due_date),
+                'cost_center_id'    => $keep('cost_center_id', $invoice->cost_center_id),
+                'salesperson_id'    => $keep('salesperson_id', $invoice->salesperson_id),
+                'tax_inclusive'     => (bool) ($keep('tax_inclusive', $invoice->tax_inclusive) ?? $invoice->tax_inclusive),
+                'notes'             => $keep('notes', $invoice->notes),
             ]);
 
             $this->applyItemsAndTotals($invoice, $items, $data);
 
             return $invoice->fresh('lines');
         });
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  «مدفوع بالفعل» يفرض الفاتورة **آجلة** — لا استثناء
+     * ═══════════════════════════════════════════════════════════════
+     *  فاتورةٌ نقدية تمدِّن 1110 داخل قيدها، فلو رافقها سندُ قبض لأُدخِل النقد
+     *  مرّتين وصار على العميل رصيدٌ دائن وهمي على 1130 لم يُقيَّد مدينُه قط.
+     *  المسار الصحيح واحد: الفاتورة على 1130، والسند يقفلها.
+     */
+    protected function paymentType(?string $requested, bool $isPaid): string
+    {
+        return $isPaid ? 'credit' : ($requested ?: 'credit');
+    }
+
+    /** أداة السداد المعروضة على البائع؛ المجهول يعود إلى النقد. */
+    protected function paymentMethod(?string $method): string
+    {
+        return isset(self::PAYMENT_METHODS[$method]) ? $method : 'cash';
     }
 
     /**
@@ -395,8 +435,46 @@ class InvoiceService
                 'zatca_xml'           => $zatca['xml'],
             ]);
 
+            $this->settle($invoice, $total);
+
             return $invoice->fresh('lines');
         });
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  السداد الفوري — سند قبض مرحَّل، لا اختصار داخل قيد الفاتورة
+     * ═══════════════════════════════════════════════════════════════
+     *  نظير `PurchaseService::settle` في جانب المبيعات: «مدفوع بالفعل» يعني
+     *  تحصيل الإجمالي كاملاً لحظة الترحيل (مدين الخزينة · دائن 1130).
+     *
+     *  والمرور بـ`PaymentService` مقصود: هو من يحدّث `paid_amount` و
+     *  `payment_status`، ويتحقق أن المبلغ لا يتجاوز المتبقي، ويولّد رقم السند.
+     *  تكرارُ ذلك هنا كان سيُنشئ نسخةً ثانية من قاعدة السداد تنحرف عن الأولى.
+     *
+     *  والمبلغ يُقرأ من الإجمالي المُعاد احتسابه من السطور لا من رأس الفاتورة،
+     *  فمسوّدةٌ تغيّرت سطورُها بعد التأشير تُسدَّد بقيمتها الحقيقية لا بقيمة
+     *  قديمة محفوظة.
+     */
+    protected function settle(Invoice $invoice, int $total): void
+    {
+        if (! $invoice->is_paid || $total <= 0) {
+            return;
+        }
+
+        $payment = $this->payments->create([
+            'partner_id'      => $invoice->partner_id,
+            'amount'          => $total,
+            'direction'       => 'received',
+            'method'          => self::PAYMENT_METHODS[$invoice->payment_method] ?? 'cash',
+            'reference'       => $invoice->payment_reference,
+            'cash_account_id' => $invoice->cash_account_id,
+            'payment_date'    => $invoice->invoice_date->toDateString(),
+            'notes'           => "تحصيل فاتورة المبيعات {$invoice->number}",
+            'created_by'      => $invoice->created_by,
+        ], [['invoice_id' => $invoice->id, 'amount' => $total]]);
+
+        $this->payments->post($payment);
     }
 
     /**
@@ -408,6 +486,13 @@ class InvoiceService
     {
         if ($invoice->payment_type !== 'credit') {
             return; // البيع النقدي لا يُنشئ ذمّة
+        }
+
+        // «مدفوع بالفعل» يقفلها سندُ قبض في المعاملة نفسها، فأثرها الصافي على
+        // 1130 صفر. حجبُها بالحدّ الائتماني كان سيمنع **بيعاً مسدَّداً نقداً**
+        // لعميلٍ بلغ حدّه — وهو بالضبط العميل الذي لا يُباع له إلا نقداً.
+        if ($invoice->is_paid) {
+            return;
         }
 
         // قفل صف العميل يسلسل فواتيره الآجلة المتزامنة، فلا تعبر فاتورتان الحد معاً.

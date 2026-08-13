@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StoreInvoiceRequest;
 use App\Http\Resources\InvoiceResource;
+use App\Models\Account;
 use App\Models\CostCenter;
 use App\Models\Employee;
 use App\Models\Invoice;
@@ -30,6 +31,7 @@ class InvoiceController extends ApiController
         Partner::findOrFail($data['partner_id']);
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertTenantOwned(Employee::class, $data['salesperson_id'] ?? null, 'مسؤول المبيعات');
+        $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $invoice = $this->domain(fn () => $this->invoices->create($data, $data['items']));
@@ -54,6 +56,7 @@ class InvoiceController extends ApiController
         Partner::findOrFail($data['partner_id']);
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertTenantOwned(Employee::class, $data['salesperson_id'] ?? null, 'مسؤول المبيعات');
+        $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $updated = $this->domain(fn () => $this->invoices->update($invoice, $data, $data['items']));

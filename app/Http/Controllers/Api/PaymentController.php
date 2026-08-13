@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StorePaymentRequest;
 use App\Http\Resources\PaymentResource;
+use App\Models\Account;
 use App\Models\Partner;
 use App\Models\Invoice;
 use App\Models\Payment;
@@ -40,6 +41,7 @@ class PaymentController extends ApiController
 
         Partner::findOrFail($data['partner_id']); // عزل الطرف
         $this->assertTenantOwned(Invoice::class, $data['invoice_id'] ?? null, 'الفاتورة');
+        $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
 
         $payment = $this->domain(
             fn () => $this->payments->create($data, $data['allocations'] ?? [])

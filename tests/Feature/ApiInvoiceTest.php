@@ -75,4 +75,52 @@ class ApiInvoiceTest extends TestCase
             'partner_id' => $partnerId, 'payment_type' => 'cash', 'items' => [],
         ])->assertStatus(422)->assertJsonValidationErrors('items');
     }
+
+    /**
+     * @test
+     * الحمولة كما ترسلها شاشة إنشاء الفاتورة بعد تأشير «مدفوع بالفعل»:
+     * بلا `payment_type` إطلاقاً، ومعها تفاصيل الدفع الثلاثة.
+     */
+    public function posting_a_paid_already_invoice_via_api_settles_it_with_a_receipt_voucher(): void
+    {
+        $auth  = $this->registerTenant();
+        $token = $auth['token'];
+
+        $partnerId = $this->withToken($token)->postJson('/api/partners', [
+            'name' => 'عميل', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+
+        $create = $this->withToken($token)->postJson('/api/invoices', [
+            'partner_id'        => $partnerId,
+            'is_paid'           => true,
+            'payment_method'    => 'transfer',
+            'payment_reference' => 'TRF-99120',
+            'items'             => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated();
+
+        $invoiceId = $create['data']['id'];
+        $this->assertTrue($create['data']['is_paid']);
+        $this->assertSame('credit', $create['data']['payment_type']); // التأشير يفرض الآجل
+
+        $posted = $this->withToken($token)->postJson("/api/invoices/{$invoiceId}/post")->assertOk();
+        $this->assertSame('paid', $posted['data']['payment_status']);
+        $this->assertSame('1150.00', $posted['data']['paid_amount']);
+        $this->assertSame('0.00', $posted['data']['remaining']);
+
+        // سند القبض يظهر في قائمة المدفوعات — لا أثرَ خفياً داخل قيد الفاتورة.
+        $payments = $this->withToken($token)->getJson('/api/payments?direction=received')->assertOk();
+        $this->assertCount(1, $payments['data']);
+        $this->assertSame('1150.00', $payments['data'][0]['amount']);
+        $this->assertSame('bank', $payments['data'][0]['method']);
+        $this->assertSame('TRF-99120', $payments['data'][0]['reference']);
+
+        // وذمّة العميل تنخفض فوراً: سطران في كشف حسابه (فاتورة ثم تحصيل)
+        // والرصيد الختامي صفر.
+        $statement = $this->withToken($token)
+            ->getJson("/api/reports/partner-statement/{$partnerId}")->assertOk();
+        $this->assertCount(2, $statement['rows']);
+        $this->assertSame('1150.00', $statement['rows'][0]['debit']);  // الفاتورة على 1130
+        $this->assertSame('1150.00', $statement['rows'][1]['credit']); // سند القبض يقفلها
+        $this->assertSame('0.00', $statement['closing_balance']);
+    }
 }
