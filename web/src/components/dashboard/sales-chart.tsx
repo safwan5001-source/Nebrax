@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,6 +40,35 @@ export function SalesChart({ query }: { query: string }) {
 
   useEffect(() => load(), [load]);
 
+  /**
+   * تدرّجٌ عند الحافة يشي بتبويبات لم تُعرَض بعد. يختفي عند بلوغ آخر تبويب —
+   * فتدرّجٌ باقٍ بلا شيء خلفه يَعِد بما ليس موجوداً.
+   *
+   * في RTL يكون `scrollLeft` **سالباً** في المتصفحات الحديثة، فالمقارنة على
+   * قيمته المطلقة: بدونها كان الشرط يصدق دائماً فيبقى التدرّج ظاهراً أبداً.
+   */
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [hasMore, setHasMore] = useState(false);
+
+  const syncFade = useCallback(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const scrolled = Math.abs(el.scrollLeft);
+    setHasMore(el.scrollWidth - el.clientWidth - scrolled > 4);
+  }, []);
+
+  useEffect(() => {
+    syncFade();
+    const el = tabsRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', syncFade, { passive: true });
+    window.addEventListener('resize', syncFade);
+    return () => {
+      el.removeEventListener('scroll', syncFade);
+      window.removeEventListener('resize', syncFade);
+    };
+  }, [syncFade]);
+
   const amounts = rows.map((r) => toNumber(r.amount));
 
   return (
@@ -47,10 +76,21 @@ export function SalesChart({ query }: { query: string }) {
       <CardContent className="p-5">
         <h3 className="mb-4 text-[14.5px] font-semibold text-text">{t('sales_chart')}</h3>
 
+        <div className="relative mb-4">
+          {/* التدرّج على الحافة المقابلة لاتجاه القراءة (نهاية السطر)، ويعبره
+              المؤشر بلا اعتراض — زينةٌ لا تحجب نقرة. */}
+          {hasMore && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 end-0 z-10 w-7 bg-gradient-to-l from-surface to-transparent rtl:bg-gradient-to-r"
+            />
+          )}
+
         <div
+          ref={tabsRef}
           role="tablist"
           aria-label={t('sales_chart')}
-          className="mb-4 flex gap-5 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex gap-5 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {TABS.map((d) => (
             <button
@@ -67,6 +107,7 @@ export function SalesChart({ query }: { query: string }) {
               {t(`chart_${d}`)}
             </button>
           ))}
+        </div>
         </div>
 
         {loading ? (

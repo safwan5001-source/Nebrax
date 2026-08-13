@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Check, ChevronDown, MapPin, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, MapPin, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import type { Branch } from '@/lib/branch';
@@ -44,6 +45,7 @@ export function ReportFilters({
   const tb = useTranslations('branches');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [open, setOpen] = useState(false);
+  const [dateSheet, setDateSheet] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,9 +81,91 @@ export function ReportFilters({
   }, [value.branchIds, branches, t]);
 
   const dirty = !!value.from || !!value.to || value.branchIds.length > 0;
+  const dateSet = !!value.from || !!value.to;
+
+  /**
+   * نصّ chip التاريخ. **لا يُترك فارغاً**: الحالة الافتراضية تُسمّى «كل الفترات»
+   * لا تُترك بياضاً — الفراغ يُقرأ عطلاً لا اختياراً.
+   *
+   * ولم أغيّر الافتراض نفسه إلى «هذا الشهر»: ذلك يبدّل **كل رقم** على اللوحة
+   * وفي كل تقرير لمن يفتحها بعد الترقية، وهو قرار مالك منتج لا تحسين عرض.
+   */
+  const dateLabel = useMemo(() => {
+    if (!dateSet) return t('all_periods');
+
+    // «اليوم» بدل «٢٠٢٦-٠٨-١٣ ← ٢٠٢٦-٠٨-١٣»: تكرار التاريخ نفسه مرّتين يشغل
+    // العرض ولا يضيف معنى، والاسم يُقرأ بلمحة.
+    const today = new Date().toISOString().slice(0, 10);
+    if (value.from === today && value.to === today) return t('today');
+
+    return [value.from || '…', value.to || '…'].join(' ← ');
+  }, [dateSet, value.from, value.to, t]);
+
+  const chip = (active: boolean) =>
+    cn(
+      'flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-[13px] transition-colors',
+      active
+        ? 'border-primary/40 bg-primary-soft font-medium text-primary'
+        : 'border-border bg-surface text-text'
+    );
 
   return (
-    <div className="no-print flex flex-wrap items-end gap-3 rounded border border-border bg-surface p-3">
+    <>
+      {/* ═══════════════════════════════════════════════════════════════
+          الجوال: صفّ chips واحد قابل للتمرير
+          ═══════════════════════════════════════════════════════════════
+          ثلاثة حقول كاملة العرض كانت تدفع أول بيانٍ حقيقي أسفل الطيّة —
+          فيُمرّر المستخدم ليرى ما جاء من أجله. الصفّ الواحد يردّه إلى مكانه. */}
+      <div className="no-print -mx-1 flex w-full gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden">
+        <button type="button" onClick={() => setDateSheet(true)} className={chip(dateSet)}>
+          <CalendarDays className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+          <span className={cn(dateSet && 'num')}>{dateLabel}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className={chip(value.branchIds.length > 0)}
+        >
+          <MapPin className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+          <span>{label}</span>
+        </button>
+
+        {dirty && (
+          <button type="button" onClick={() => onChange(EMPTY_FILTERS)} className={chip(false)}>
+            <X className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
+            {t('clear_filters')}
+          </button>
+        )}
+      </div>
+
+      {/* نافذة اختيار المدى — على الجوال وحده؛ الديسكتوب يعرض الحقلين مباشرةً. */}
+      <Dialog open={dateSheet} onClose={() => setDateSheet(false)} title={t('date_range')}>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="rf-from-m">{t('from')}</Label>
+            <Input id="rf-from-m" type="date" dir="ltr" className="w-full text-start [unicode-bidi:isolate]"
+              value={value.from} onChange={(e) => onChange({ ...value, from: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="rf-to-m">{t('to')}</Label>
+            <Input id="rf-to-m" type="date" dir="ltr" className="w-full text-start [unicode-bidi:isolate]"
+              value={value.to} onChange={(e) => onChange({ ...value, to: e.target.value })} />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            {dateSet && (
+              <Button variant="outline" onClick={() => onChange({ ...value, from: '', to: '' })}>
+                {t('clear_filters')}
+              </Button>
+            )}
+            <Button onClick={() => setDateSheet(false)}>{t('apply')}</Button>
+          </div>
+        </div>
+      </Dialog>
+
+    <div className="no-print hidden flex-wrap items-end gap-3 rounded border border-border bg-surface p-3 sm:flex">
       <div className="space-y-1.5">
         <Label htmlFor="rf-from">{t('from')}</Label>
         <Input id="rf-from" type="date" dir="ltr" className="w-40 text-start [unicode-bidi:isolate]" value={value.from}
@@ -150,5 +234,6 @@ export function ReportFilters({
         </Button>
       )}
     </div>
+    </>
   );
 }

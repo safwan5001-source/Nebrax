@@ -1,6 +1,6 @@
 'use client';
 
-import type { LucideIcon } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/charts/sparkline';
@@ -54,20 +54,32 @@ export function KpiCard({
   const isNegativeValue = value.trim().startsWith('-');
 
   return (
-    <Card className="rounded-2xl">
-      <CardContent className="p-[18px]">
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  ارتفاع موحّد في الصفّ
+     * ═══════════════════════════════════════════════════════════════
+     *  شبكة CSS تمطّ **عنصر الشبكة** لا البطاقة داخله؛ فبطاقةٌ بلا `h-full`
+     *  تنكمش إلى محتواها، وتبدو البطاقة ذات السطر الفرعي أطول من جاراتها
+     *  فينكسر الصفّ. `h-full` + عمود مرن يجعل الارتفاع واحداً، و`mt-auto`
+     *  يدفع السطر الفرعي إلى القاع بدل أن يطفو في المنتصف.
+     */
+    <Card className="h-full rounded-2xl">
+      {/* حشوٌ وخطٌّ أصغر على الجوال: أربع بطاقات في شبكة ٢×٢ تأكل الشاشة قبل
+          أن يصل المستخدم إلى الرسم البياني. الديسكتوب يبقى على مقاسه — عنده
+          المساحة، والرقم الأكبر أسهل قراءةً من بُعد. */}
+      <CardContent className="flex h-full flex-col p-3.5 sm:p-[18px]">
         <div className="flex items-center justify-between">
-          <span className="text-[13px] font-medium text-muted">{label}</span>
+          <span className="text-[12px] font-medium text-muted sm:text-[13px]">{label}</span>
           <Icon className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
         </div>
 
         {loading ? (
-          <Skeleton className="mt-3 h-7 w-32" />
+          <Skeleton className="mt-2 h-6 w-28 sm:mt-3 sm:h-7 sm:w-32" />
         ) : (
-          <div className="mt-2.5 flex items-baseline gap-1.5">
+          <div className="mt-1.5 flex items-baseline gap-1.5 sm:mt-2.5">
             <span
               className={cn(
-                'num text-[26px] font-bold leading-tight',
+                'num text-[21px] font-bold leading-tight sm:text-[26px]',
                 isNegativeValue ? 'text-negative' : 'text-text'
               )}
             >
@@ -78,7 +90,7 @@ export function KpiCard({
         )}
 
         {trend && !loading && (
-          <div className="mt-2 flex justify-end">
+          <div className="mt-1.5 flex justify-end pb-2 sm:mt-2 sm:pb-2.5">
             <Sparkline
               data={trend}
               color={tone === 'positive' ? 'var(--positive)' : 'var(--primary)'}
@@ -88,9 +100,22 @@ export function KpiCard({
         )}
 
         {sub && !loading && (
-          <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-dashed border-border pt-2.5">
+          <div className="mt-auto flex items-center justify-between gap-2 border-t border-dashed border-border pt-2 sm:pt-2.5">
             <span className="text-[11px] leading-snug text-muted">{sub.label}</span>
-            <span className={cn('num shrink-0 text-[13px] font-bold', subColor)}>{sub.value}</span>
+            {/* ═══════════════════════════════════════════════════════════
+                إشارة + لون، لا لون وحده
+                ═══════════════════════════════════════════════════════════
+                `DESIGN_SYSTEM.md` يفرض ألّا يحمل اللونُ الدلالةَ منفرداً — من لا
+                يميّز الأحمر من الأخضر لا يقرأ الإشارة، والطباعة بالأبيض والأسود
+                تُلغي اللون أصلاً. فالسهم يقول ما يقوله اللون. */}
+            <span className={cn('num flex shrink-0 items-center gap-0.5 text-[13px] font-bold', subColor)}>
+              {sub.tone === 'negative' ? (
+                <ArrowDownRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden />
+              ) : sub.tone === 'muted' ? null : (
+                <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden />
+              )}
+              {sub.value}
+            </span>
           </div>
         )}
       </CardContent>
