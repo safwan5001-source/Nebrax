@@ -31,7 +31,6 @@ export function CreateInvoiceDialog({
   const { success } = useToast();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [partnerId, setPartnerId] = useState('');
-  const [paymentType, setPaymentType] = useState('cash');
   const [postNow, setPostNow] = useState(true);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
@@ -68,9 +67,13 @@ export function CreateInvoiceDialog({
       tax_rate: Number(l.tax_rate) || 0,
     }));
     try {
+      // بلا `payment_type`: غيابه يعني «اتبع تفضيل المستأجر»
+      // (`sales.default_payment_type`) — كشاشة الفاتورة الكاملة تماماً.
+      // والسداد الفوري لا يُعلَن هنا: هذا حوارُ إنشاءٍ سريع، والتحصيل يُسجَّل
+      // من خانة «مدفوع بالفعل» في الشاشة الكاملة أو من «تسجيل دفعة».
       const created = await api<{ data: { id: string } }>('/invoices', {
         method: 'POST',
-        body: { partner_id: partnerId, payment_type: paymentType, items },
+        body: { partner_id: partnerId, items },
       });
       if (postNow) {
         await api(`/invoices/${created.data.id}/post`, { method: 'POST' });
@@ -90,27 +93,18 @@ export function CreateInvoiceDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t('title')} className="max-w-2xl">
       <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="partner">{t('partner')}</Label>
-            <Select id="partner" value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required>
-              <option value="" disabled>
-                {t('choose_partner')}
+        <div className="space-y-1.5">
+          <Label htmlFor="partner">{t('partner')}</Label>
+          <Select id="partner" value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required>
+            <option value="" disabled>
+              {t('choose_partner')}
+            </option>
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
               </option>
-              {partners.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="pt">{t('payment_type')}</Label>
-            <Select id="pt" value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
-              <option value="cash">{t('cash')}</option>
-              <option value="credit">{t('credit')}</option>
-            </Select>
-          </div>
+            ))}
+          </Select>
         </div>
 
         <div className="space-y-2">
