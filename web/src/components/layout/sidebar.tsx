@@ -211,6 +211,22 @@ const GROUPS: NavGroup[] = [
   },
 ];
 
+/**
+ * تجميع المجموعات الإحدى عشرة تحت عناوين خافتة.
+ *
+ * أحد عشر عنواناً متتابعاً بلا فاصل تقرؤها العين قائمةً واحدة طويلة؛ والعنوان
+ * الخافت يقسمها إلى أربع كتل تُمسَح بنظرة. **هو عنوان لا زرّ**: لا يُفتح ولا
+ * يُطوى ولا يُنقر — وإلا صار مستوى ثالثاً في شجرة عمقُها اثنان يكفيان.
+ *
+ * التغطية كاملة بلا بقايا: ٣ + ٣ + ٣ + ٢ = ١١.
+ */
+const SUPER_GROUPS: { label: string; titles: string[] }[] = [
+  { label: 'revenue', titles: ['sales', 'pos', 'customers'] },
+  { label: 'operations', titles: ['inventory', 'purchases', 'logistics'] },
+  { label: 'finance', titles: ['accounting', 'hr', 'operations'] },
+  { label: 'admin', titles: ['branches', 'system'] },
+];
+
 export function Sidebar({
   open,
   onClose,
@@ -360,7 +376,19 @@ export function Sidebar({
             {!mini && t('dashboard')}
           </Link>
 
-          {GROUPS.map((group) => {
+          {SUPER_GROUPS.map((sg) => (
+            <div key={sg.label}>
+              {/* عنوان المجموعة: خافت وصغير، بلا زخرفة ولا حدّ — يفصل بالفراغ
+                  والوزن لا بخطّ. ويختفي في الحالة المطوية: لا عرض لنصّ فيها. */}
+              {!mini && (
+                <div className="px-4 pb-1.5 pt-3.5 text-[11px] font-bold tracking-wide text-muted/70">
+                  {t(`superGroups.${sg.label}`)}
+                </div>
+              )}
+
+              {sg.titles.map((title) => {
+            const group = GROUPS.find((g) => g.title === title);
+            if (!group) return null;
             // Accordion حصري: المجموعة مفتوحة فقط إن كانت هي المجموعة النشطة الوحيدة.
             const expanded = openGroup === group.title;
             const GroupIcon = group.icon;
@@ -379,7 +407,7 @@ export function Sidebar({
                   aria-haspopup={mini ? 'menu' : undefined}
                   title={mini ? t(`groups.${group.title}`) : undefined}
                   className={cn(
-                    'flex h-9 w-full items-center rounded text-[13px] font-medium transition-colors',
+                    'relative flex h-9 w-full items-center rounded text-[14.5px] font-medium transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                     mini ? 'justify-center px-0' : 'gap-2 px-2',
                     groupActive || (mini && flyout?.title === group.title)
@@ -387,23 +415,34 @@ export function Sidebar({
                       : 'text-muted hover:bg-primary-soft hover:text-primary'
                   )}
                 >
+                  {/* الخطّ الجانبي ٣px يرافق الخلفية على **الرئيسي النشط وحده** —
+                      فيبقى للفرع النشط تمييزُ اللون والوزن بلا خلفية تنافسه. */}
+                  {groupActive && !mini && (
+                    <span aria-hidden className="absolute inset-y-1.5 start-0 w-[3px] rounded bg-primary" />
+                  )}
                   <GroupIcon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
                   {!mini && (
                     <>
                       <span className="min-w-0 flex-1 truncate text-start">{t(`groups.${group.title}`)}</span>
-                      {expanded ? (
-                        <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={1.8} />
-                      ) : (
-                        <ChevronLeft className="h-4 w-4 shrink-0 rtl:rotate-180" strokeWidth={1.8} />
-                      )}
+                      {/* سهم واحد يدور بدل عنصرين يتبادلان — الدوران وحده يقبل
+                          الانتقال، والاستبدال يقفز بلا حركة. */}
+                      <ChevronDown
+                        className={cn(
+                          'h-4 w-4 shrink-0 transition-transform duration-150',
+                          expanded ? 'rotate-0' : 'ltr:-rotate-90 rtl:rotate-90'
+                        )}
+                        strokeWidth={1.8}
+                      />
                     </>
                   )}
                 </button>
 
                 {/* عرض شرطي: عناصر المجموعة المفتوحة فقط (Accordion حصري) — يُخفّف الـ DOM
                     ويلغي تحريك grid-template-rows الثقيل؛ ظهور سلس على الـ compositor. */}
+                {/* الإزاحة والخطّ الفاصل على الحاوية لا على كل رابط: خطٌّ متصل
+                    واحد يربط الفروع بأبيها، بدل خطوط مقطّعة بينها فجوات. */}
                 {expanded && !mini && (
-                  <div className="sidebar-group-in flex flex-col gap-0.5 pt-0.5">
+                  <div className="sidebar-group-in ms-[29px] flex flex-col gap-0.5 border-s border-border ps-2 pt-0.5">
                     {group.items.map((item) => {
                       const Icon = item.icon;
                       const active = isActive(item.href);
@@ -413,14 +452,14 @@ export function Sidebar({
                           href={item.href}
                           onClick={onClose}
                           className={cn(
-                            'relative flex h-9 items-center gap-2 rounded ps-4 pe-2 text-sm text-muted hover:bg-primary-soft hover:text-primary',
-                            active && 'bg-primary-soft font-medium text-primary'
+                            // الفرع أصغر وأخفت من أبيه — والنشِط يتميّز باللون
+                            // والوزن **بلا خلفية**: `primary-soft` للرئيسي وحده،
+                            // ولو أخذها الفرع لتساويا في الوزن البصري.
+                            'flex h-8 items-center gap-2 rounded pe-2 ps-2 text-[13px] text-muted transition-colors hover:text-primary',
+                            active && 'font-semibold text-primary'
                           )}
                         >
-                          {active && (
-                            <span className="absolute inset-y-1.5 start-0 w-0.5 rounded bg-primary" />
-                          )}
-                          <Icon className="h-4 w-4 shrink-0" strokeWidth={1.7} />
+                          <Icon className="h-[15px] w-[15px] shrink-0" strokeWidth={1.7} />
                           <span className="truncate">{t(item.key)}</span>
                           {!item.built && (
                             <span className="ms-auto shrink-0 rounded bg-border px-1.5 py-0.5 text-[10px] font-normal text-muted">
@@ -434,7 +473,9 @@ export function Sidebar({
                 )}
               </div>
             );
-          })}
+              })}
+            </div>
+          ))}
         </nav>
       </aside>
 

@@ -789,7 +789,13 @@
     "debitNotes": "Debit notes",
     "supplierPayments": "Supplier payments",
     "purchaseSettings": "Purchase settings",
-    "inventorySettings": "Inventory and product settings"
+    "inventorySettings": "Inventory and product settings",
+    "superGroups": {
+      "revenue": "Revenue",
+      "operations": "Operations",
+      "finance": "Finance and resources",
+      "admin": "Administration"
+    }
   },
   "partnerProfile": {
     "back": "Back",

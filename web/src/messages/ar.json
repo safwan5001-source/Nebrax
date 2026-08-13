@@ -789,7 +789,13 @@
     "debitNotes": "إشعارات مدينة",
     "supplierPayments": "مدفوعات الموردين",
     "purchaseSettings": "إعدادات المشتريات",
-    "inventorySettings": "إعدادات المخزون والمنتجات"
+    "inventorySettings": "إعدادات المخزون والمنتجات",
+    "superGroups": {
+      "revenue": "إدارة الإيرادات",
+      "operations": "العمليات",
+      "finance": "المالية والموارد",
+      "admin": "الإدارة"
+    }
   },
   "partnerProfile": {
     "back": "رجوع",
