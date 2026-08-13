@@ -23,6 +23,12 @@ class StorePurchaseRequest extends FormRequest
             'due_date'            => ['nullable', 'date'],
             'supplier_invoice_no' => ['nullable', 'string', 'max:255'],
             'cost_center_id'      => ['nullable', 'uuid'],
+            // خصم وشحن وتسوية على مستوى الفاتورة (هللات). الخصم والشحن يدخلان
+            // تكلفة البضاعة؛ والتسوية فرقُ تقريب على 5170 — انظر هجرة 000049.
+            'discount'            => ['nullable', 'integer', 'min:0', 'max:100000000000'],
+            'shipping'            => ['nullable', 'integer', 'min:0', 'max:100000000000'],
+            'adjustment'          => ['nullable', 'integer', 'min:-100000000000', 'max:100000000000'],
+            'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
             // **المنتج إلزامي.** فاتورة الشراء مستندُ تكلفةٍ حقيقية: بلا منتج لا
