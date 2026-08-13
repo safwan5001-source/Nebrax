@@ -151,7 +151,14 @@ export default function PosPage() {
     return products.filter((p) => {
       if (cat !== 'all' && p.type !== cat) return false;
       if (tab === 'favorites' && !favs.has(p.id)) return false;
-      if (q && !p.name.toLowerCase().includes(q) && !(p.sku ?? '').toLowerCase().includes(q)) return false;
+      // الباركود يُبحث فيه كتابةً لا مسحاً فقط: `scanCode` أدناه يطابق الكود
+      // **كاملاً**، فمن يقرأ رقماً عن العبوة ويكتب آخره لا يجد شيئاً.
+      if (
+        q
+        && !p.name.toLowerCase().includes(q)
+        && !(p.sku ?? '').toLowerCase().includes(q)
+        && !(p.barcode ?? '').toLowerCase().includes(q)
+      ) return false;
       return true;
     });
   }, [products, search, cat, tab, favs]);
