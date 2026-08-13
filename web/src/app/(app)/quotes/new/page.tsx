@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Plus, Trash2 } from 'lucide-react';
@@ -9,13 +9,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Combobox, type ComboOption } from '@/components/ui/combobox';
+import { PartnerDialog } from '@/components/partners/partner-dialog';
+import { ProductDialog } from '@/components/products/product-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 
-interface Partner { id: string; name: string }
-interface Product { id: string; name: string; sale_price: string; tax_rate: number; is_active: boolean }
+interface Partner { id: string; name: string; type: string; phone?: string | null; vat_number?: string | null }
+interface Product {
+  id: string; name: string; sku?: string | null; barcode?: string | null;
+  sale_price: string; tax_rate: number; is_active: boolean;
+  track_inventory?: boolean; quantity_on_hand?: number;
+}
 interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string }
 
 let seq = 0;
@@ -38,17 +45,51 @@ export default function NewQuotePage() {
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [newPartner, setNewPartner] = useState(false);
+  const [newProductFor, setNewProductFor] = useState<string | null>(null);
+
+  // **الموردون لا يُعرَض عليهم سعر.** كانت القائمة تُحمَّل بلا تصفية، فيظهر
+  // المورّدون بين عملاء عرض السعر — والأسوأ أن أوّلهم كان يُختار تلقائياً.
+  const loadPartners = useCallback(
+    () => api<{ data: Partner[] }>('/partners')
+      .then((r) => setPartners(r.data.filter((p) => ['customer', 'both'].includes(p.type))))
+      .catch(() => {}),
+    []
+  );
+  const loadProducts = useCallback(
+    () => api<{ data: Product[] }>('/products')
+      .then((r) => setProducts(r.data.filter((p) => p.is_active)))
+      .catch(() => {}),
+    []
+  );
 
   useEffect(() => {
     setDate(new Date().toISOString().slice(0, 10));
-    api<{ data: Partner[] }>('/partners').then((r) => {
-      setPartners(r.data);
-      if (r.data[0]) setPartnerId((p) => p || r.data[0].id);
-    });
-    api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
+    loadPartners();
+    loadProducts();
     // الوضع الافتراضي من إعدادات النظام (كالفاتورة).
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
-  }, []);
+  }, [loadPartners, loadProducts]);
+
+  // الرقم الضريبي في `sub` والهاتف في `hint` — كلاهما يُبحث فيه.
+  const partnerOptions = useMemo<ComboOption[]>(
+    () => partners.map((p) => ({
+      value: p.id, label: p.name,
+      sub: p.vat_number ?? undefined,
+      hint: p.phone ?? undefined,
+    })),
+    [partners]
+  );
+  // الرمز والباركود معاً في السطر الثاني — يُبحث فيهما، فيَمسح المستخدم
+  // الباركود أو يكتب رقم الصنف حسب ما بين يديه.
+  const productOptions = useMemo<ComboOption[]>(
+    () => products.map((p) => ({
+      value: p.id, label: p.name,
+      sub: [p.sku, p.barcode].filter(Boolean).join('  ·  ') || undefined,
+      hint: p.track_inventory ? `${tf('balance')} ${p.quantity_on_hand ?? 0}` : undefined,
+    })),
+    [products, tf]
+  );
 
   // ضريبة السطر حسب الوضع: متضمَّن = تُستخرَج من السعر؛ غير متضمَّن = تُضاف فوقه.
   const lineTax = (grossMinor: number, rate: number) =>
@@ -123,10 +164,21 @@ export default function NewQuotePage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <Label htmlFor="partner">{t('partner')}</Label>
-              <Select id="partner" value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required>
-                <option value="" disabled>{tf('choose_partner')}</option>
-                {partners.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-              </Select>
+              <div className="flex items-center gap-2">
+                <Combobox
+                  id="partner"
+                  className="min-w-0 flex-1"
+                  value={partnerId}
+                  onChange={setPartnerId}
+                  options={partnerOptions}
+                  placeholder={tf('choose_partner')}
+                  searchPlaceholder={tf('search_partner')}
+                  emptyText={tf('no_partner_found')}
+                />
+                <Button type="button" variant="outline" onClick={() => setNewPartner(true)}>
+                  <Plus className="h-4 w-4" strokeWidth={1.7} />
+                </Button>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="date">{t('date')}</Label>
@@ -176,10 +228,19 @@ export default function NewQuotePage() {
             const lineDisplayTotal = taxInclusive ? lt : lt + lineTax(lt, Number(l.tax) || 0);
             return (
               <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
-                <Select className="col-span-2 md:col-span-3" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
-                  <option value="">{tf('manual')}</option>
-                  {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                </Select>
+                <Combobox
+                  className="col-span-2 md:col-span-3"
+                  value={l.productId ?? ''}
+                  onChange={(v) => pickProduct(l.key, v)}
+                  options={productOptions}
+                  placeholder={tf('manual')}
+                  searchPlaceholder={tf('search_product')}
+                  emptyText={tf('no_product_found')}
+                  clearLabel={tf('manual')}
+                  footerLabel={tf('new_product')}
+                  onFooterClick={() => setNewProductFor(l.key)}
+                  aria-label={tf('product')}
+                />
                 <Input className="col-span-2 md:col-span-3" placeholder={tf('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
                 <Input className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
                 <Input className="num text-end md:col-span-2" inputMode="decimal" placeholder={tf('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
@@ -208,6 +269,36 @@ export default function NewQuotePage() {
           <Button disabled={saving || !partnerId} onClick={submit}>{t('save')}</Button>
         </div>
       </div>
+
+      <PartnerDialog
+        open={newPartner}
+        onClose={() => setNewPartner(false)}
+        onSaved={() => { setNewPartner(false); loadPartners(); }}
+        defaultType="customer"
+      />
+
+      {/* المنتج المُنشأ يُختار في سطره فوراً — وإلا أعاد المستخدم البحث عمّا
+          أنشأه للتوّ. الاختيار بعد إعادة الجلب لا قبلها. */}
+      <ProductDialog
+        open={newProductFor !== null}
+        onClose={() => setNewProductFor(null)}
+        onSaved={async () => {
+          const key = newProductFor;
+          setNewProductFor(null);
+          const before = new Set(products.map((p) => p.id));
+          const fresh = await api<{ data: Product[] }>('/products').catch(() => null);
+          if (!fresh) { loadProducts(); return; }
+          const active = fresh.data.filter((p) => p.is_active);
+          setProducts(active);
+          const created = active.find((p) => !before.has(p.id));
+          if (key && created) {
+            setLine(key, {
+              productId: created.id, description: created.name,
+              price: created.sale_price, tax: String(created.tax_rate),
+            });
+          }
+        }}
+      />
     </div>
   );
 }
