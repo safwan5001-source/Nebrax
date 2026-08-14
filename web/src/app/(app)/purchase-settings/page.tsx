@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,7 +56,6 @@ export default function PurchaseSettingsPage() {
           default_tax_rate: Number(form.default_tax_rate) || 0,
           default_payment_type: form.default_payment_type,
           default_tax_inclusive: form.default_tax_inclusive,
-          purchase_prefix: form.purchase_prefix || null,
           require_return_source: form.require_return_source,
           return_window_days: form.return_window_days,
         },
@@ -117,18 +117,14 @@ export default function PurchaseSettingsPage() {
                   <p className="text-xs text-muted">{t('default_tax_inclusive_hint')}</p>
                 </div>
 
+                {/* البادئة انتقلت إلى «إعدادات الترقيم المتسلسل» — تُعرَض هنا للاطّلاع. */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="prefix">{t('purchase_prefix')}</Label>
-                  <Input
-                    id="prefix" dir="ltr" maxLength={10}
-                    value={form.purchase_prefix}
-                    onChange={(e) => set('purchase_prefix', e.target.value)}
-                  />
-                  <p className="num text-xs text-muted">
-                    {t('purchase_prefix_hint')} {(form.purchase_prefix || 'BILL')}-2026-00001
+                  <Label>{t('purchase_prefix')}</Label>
+                  <p className="num text-sm text-text" dir="ltr">{form.purchase_prefix || 'BILL'}</p>
+                  <p className="text-xs leading-relaxed text-muted">
+                    {t('prefix_moved')}{' '}
+                    <Link href="/numbering-settings" className="text-primary hover:underline">{t('prefix_moved_link')}</Link>
                   </p>
-                  {/* التباسٌ متوقَّع: «ترقيم المستند» ≠ «ترقيم ZATCA». */}
-                  <p className="text-xs leading-relaxed text-muted">{t('numbering_excludes_icv')}</p>
                 </div>
 
                 <div className="space-y-1.5">

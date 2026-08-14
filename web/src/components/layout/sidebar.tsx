@@ -49,6 +49,7 @@ import {
   MapPinPlus,
   Boxes,
   BarChart3,
+  Hash,
   LayoutTemplate,
   Settings,
   ChevronDown,
@@ -206,6 +207,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/reports', icon: BarChart3, key: 'reports', built: true },
       { href: '/document-design', icon: LayoutTemplate, key: 'documentDesign', built: true },
+      { href: '/numbering-settings', icon: Hash, key: 'numberingSettings', built: true },
       { href: '/settings', icon: Settings, key: 'settings', built: true },
     ],
   },

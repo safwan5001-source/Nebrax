@@ -43,6 +43,7 @@ use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UnitTemplateController;
+use App\Http\Controllers\Api\NumberingSettingsController;
 use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Controllers\Api\ZatcaSettingsController;
 use App\Http\Middleware\EnforcePlanLimit;
@@ -310,6 +311,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // إعدادات المشتريات (تفضيلات؛ تُقرأ فعلاً في خدمتَي الشراء والمشتريات)
         Route::get('purchase-settings', [PurchaseSettingsController::class, 'show'])->middleware($perm('purchases.view'));
         Route::put('purchase-settings', [PurchaseSettingsController::class, 'update'])->middleware($perm('company.manage'));
+
+        // إعدادات الترقيم المتسلسل — الموضع الواحد لسلاسل المستندات السبع عشرة
+        Route::get('numbering-settings', [NumberingSettingsController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::put('numbering-settings', [NumberingSettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // إعدادات الفوترة الإلكترونية (نطاق عدّاد ICV) — منفصلة عن بادئات ترقيم المستندات
         Route::get('zatca-settings', [ZatcaSettingsController::class, 'show'])->middleware($perm('invoices.view'));
