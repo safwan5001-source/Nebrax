@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\Partner;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
@@ -617,6 +618,198 @@ class InvoiceTest extends TestCase
         $this->assertEquals(103500, $this->line($entry, '1130')->debit);
         $this->assertEquals(90000,  $this->line($entry, '4110')->credit);
         $this->assertEquals(13500,  $this->line($entry, '2120')->credit);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  «مدفوع بالفعل» — سند قبض مرحَّل، لا اختصار داخل قيد الفاتورة
+    // ═══════════════════════════════════════════════════════════════
+
+    /** @test */
+    public function a_paid_already_invoice_posts_to_receivables_then_a_receipt_voucher_settles_it(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'is_paid' => true, 'payment_method' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]] // 1150
+        );
+
+        // التأشير يفرض الفاتورة آجلة مهما كان المطلوب — وإلا دخل النقد مرتين.
+        $this->assertSame('credit', $invoice->payment_type);
+
+        $posted = $this->invoices->post($invoice);
+
+        // (١) قيد الفاتورة: مدين 1130 العملاء (لا 1110).
+        $invoiceEntry = JournalEntry::with('lines.account')
+            ->where('source_type', Invoice::class)->where('source_id', $posted->id)->firstOrFail();
+        $this->assertEquals(115000, $this->line($invoiceEntry, '1130')->debit);
+        $this->assertNull($this->line($invoiceEntry, '1110'));
+
+        // (٢) سند قبض حقيقي مرحَّل، مخصَّص لهذه الفاتورة بكامل إجماليها.
+        $payment = Payment::where('direction', 'received')->firstOrFail();
+        $this->assertSame('posted', $payment->status);
+        $this->assertSame(115000, $payment->amount);
+        $this->assertSame('cash', $payment->method);
+        $this->assertStringStartsWith('REC-', $payment->number);
+        $this->assertSame(115000, (int) $payment->allocations()->sum('amount'));
+
+        // (٣) قيد السند: مدين 1110 الصندوق · دائن 1130 — والأثر الصافي كالبيع النقدي.
+        $paymentEntry = JournalEntry::with('lines.account')
+            ->where('source_type', Payment::class)->where('source_id', $payment->id)->firstOrFail();
+        $this->assertEquals($paymentEntry->lines->sum('debit'), $paymentEntry->lines->sum('credit'));
+        $this->assertEquals(115000, $this->line($paymentEntry, '1110')->debit);
+        $this->assertEquals(115000, $this->line($paymentEntry, '1130')->credit);
+
+        // (٤) حالة السداد صادقة — فلا تظهر الفاتورة في أعمار الديون.
+        $fresh = $posted->fresh();
+        $this->assertSame(115000, $fresh->paid_amount);
+        $this->assertSame('paid', $fresh->payment_status);
+    }
+
+    /** @test */
+    public function a_transfer_or_card_settlement_debits_the_bank_not_the_cash_box(): void
+    {
+        $posted = $this->invoices->post($this->invoices->create(
+            ['partner_id' => $this->customer->id, 'is_paid' => true, 'payment_method' => 'transfer'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        ));
+
+        $payment = Payment::where('direction', 'received')->firstOrFail();
+        $this->assertSame('bank', $payment->method); // تحويل/بطاقة ⇒ بنك (كنقطة البيع)
+
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', Payment::class)->where('source_id', $payment->id)->firstOrFail();
+        $this->assertEquals(115000, $this->line($entry, '1120')->debit);
+        $this->assertNull($this->line($entry, '1110'));
+        $this->assertSame('paid', $posted->fresh()->payment_status);
+    }
+
+    /** @test */
+    public function the_chosen_treasury_account_receives_the_collection(): void
+    {
+        // خزينة ثانية داخل عائلة النقد (111x) — كخزينة معرضٍ مستقلّة.
+        $showroom = Account::create([
+            'code' => '1111', 'name' => 'خزينة المعرض', 'type' => 'asset',
+            'normal_balance' => 'debit', 'is_group' => false,
+        ]);
+
+        $posted = $this->invoices->post($this->invoices->create([
+            'partner_id'      => $this->customer->id,
+            'is_paid'         => true,
+            'payment_method'  => 'cash',
+            'cash_account_id' => $showroom->id,
+        ], [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]));
+
+        $payment = Payment::where('direction', 'received')->firstOrFail();
+        $entry   = JournalEntry::with('lines.account')
+            ->where('source_type', Payment::class)->where('source_id', $payment->id)->firstOrFail();
+
+        $this->assertEquals(115000, $this->line($entry, '1111')->debit);
+        $this->assertNull($this->line($entry, '1110')); // لا الخزينة الافتراضية
+        $this->assertSame('paid', $posted->fresh()->payment_status);
+    }
+
+    /** @test */
+    public function a_treasury_outside_the_cash_family_is_rejected(): void
+    {
+        $receivable = Account::where('code', '1130')->firstOrFail();
+
+        $invoice = $this->invoices->create([
+            'partner_id'      => $this->customer->id,
+            'is_paid'         => true,
+            'cash_account_id' => $receivable->id, // العملاء ليس خزينة
+        ], [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->invoices->post($invoice);
+    }
+
+    /** @test */
+    public function the_payment_reference_reaches_the_receipt_voucher(): void
+    {
+        $this->invoices->post($this->invoices->create([
+            'partner_id'        => $this->customer->id,
+            'is_paid'           => true,
+            'payment_method'    => 'transfer',
+            'payment_reference' => 'TRF-99120',
+        ], [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]));
+
+        $this->assertSame('TRF-99120', Payment::where('direction', 'received')->firstOrFail()->reference);
+    }
+
+    /** @test */
+    public function an_unchecked_invoice_creates_no_voucher_and_stays_unpaid(): void
+    {
+        $posted = $this->invoices->post($this->invoices->create(
+            ['partner_id' => $this->customer->id], // بلا `is_paid` — الافتراضي
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        ));
+
+        $this->assertFalse($posted->is_paid);
+        $this->assertSame(0, Payment::count());
+        $this->assertSame(0, $posted->fresh()->paid_amount);
+        $this->assertSame('unpaid', $posted->fresh()->payment_status);
+    }
+
+    /** @test */
+    public function a_paid_already_invoice_ignores_the_credit_limit(): void
+    {
+        // الفاتورة آجلة شكلاً، لكن سند القبض يقفلها في المعاملة نفسها فأثرها
+        // الصافي على الذمم صفر — وحجبُها كان سيمنع بيعاً مسدَّداً نقداً.
+        $this->customer->update(['credit_limit' => 1]);
+
+        $posted = $this->invoices->post($this->invoices->create(
+            ['partner_id' => $this->customer->id, 'is_paid' => true],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        ));
+
+        $this->assertTrue($posted->isPosted());
+        $this->assertSame('paid', $posted->fresh()->payment_status);
+    }
+
+    /** @test */
+    public function editing_a_draft_keeps_the_settlement_intent_when_it_is_not_sent(): void
+    {
+        $invoice = $this->invoices->create([
+            'partner_id'        => $this->customer->id,
+            'is_paid'           => true,
+            'payment_method'    => 'card',
+            'payment_reference' => 'POS-771',
+        ], [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]);
+
+        // تعديل لا يمسّ الدفع (كتغيير ملاحظة) لا يُلغي سداداً أُعلن سابقاً.
+        $updated = $this->invoices->update(
+            $invoice,
+            ['partner_id' => $this->customer->id, 'notes' => 'ملاحظة'],
+            [['quantity' => 2, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $this->assertTrue($updated->is_paid);
+        $this->assertSame('card', $updated->payment_method);
+        $this->assertSame('POS-771', $updated->payment_reference);
+
+        // والسداد يتبع الإجمالي الجديد لا القديم (2300 لا 1150).
+        $posted = $this->invoices->post($updated);
+        $this->assertSame(230000, Payment::where('direction', 'received')->firstOrFail()->amount);
+        $this->assertSame('paid', $posted->fresh()->payment_status);
+    }
+
+    /** @test */
+    public function unchecking_paid_already_on_a_draft_drops_the_settlement(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'is_paid' => true],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $updated = $this->invoices->update(
+            $invoice,
+            ['partner_id' => $this->customer->id, 'is_paid' => false],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $posted = $this->invoices->post($updated);
+
+        $this->assertFalse($updated->is_paid);
+        $this->assertSame(0, Payment::count());
+        $this->assertSame('unpaid', $posted->fresh()->payment_status);
     }
 
     /** @test */

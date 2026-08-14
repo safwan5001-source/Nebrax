@@ -586,7 +586,7 @@
     "save_post": "حفظ وترحيل",
     "back": "رجوع",
     "need_line": "أضف سطراً واحداً على الأقل بسعر صحيح",
-    "customer_section": "العميل والدفع",
+    "customer_section": "العميل",
     "meta_section": "بيانات الفاتورة",
     "invoice_number": "رقم الفاتورة",
     "auto_number": "يُولّد تلقائياً عند الحفظ",
@@ -622,7 +622,15 @@
     "search_product": "ابحث بالاسم أو رقم الصنف أو الباركود…",
     "no_product_found": "لا منتج بهذا الاسم.",
     "new_product": "إضافة منتج جديد",
-    "balance": "الرصيد"
+    "balance": "الرصيد",
+    "paid_already": "مدفوع بالفعل",
+    "payment_method": "وسيلة الدفع",
+    "method_cash": "نقدي",
+    "method_transfer": "تحويل بنكي",
+    "method_card": "بطاقة",
+    "payment_reference": "رقم المعرف",
+    "cash_account": "الخزينة",
+    "cash_account_main": "الخزينة الرئيسية"
   },
   "invoiceTemplates": {
     "classic": "كلاسيكي",

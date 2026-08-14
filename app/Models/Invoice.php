@@ -27,6 +27,7 @@ class Invoice extends BaseModel
         'invoice_date', 'due_date', 'cost_center_id', 'salesperson_id', 'status',
         'subtotal', 'discount', 'shipping', 'adjustment', 'tax_amount', 'total',
         'tax_inclusive', 'paid_amount', 'payment_status',
+        'is_paid', 'payment_method', 'payment_reference', 'cash_account_id',
         'notes', 'journal_entry_id', 'cogs_entry_id', 'created_by',
         'zatca_qr', 'zatca_hash',
         'zatca_uuid', 'zatca_icv', 'zatca_previous_hash', 'zatca_xml',
@@ -43,6 +44,7 @@ class Invoice extends BaseModel
         'total'        => 'integer',
         'tax_inclusive' => 'boolean',
         'paid_amount'  => 'integer',
+        'is_paid'      => 'boolean',
     ];
 
     protected $attributes = [
@@ -58,6 +60,8 @@ class Invoice extends BaseModel
         'tax_inclusive'  => false,
         'paid_amount'    => 0,
         'payment_status' => 'unpaid',
+        'is_paid'        => false,
+        'payment_method' => 'cash',
     ];
 
     public function lines(): HasMany
