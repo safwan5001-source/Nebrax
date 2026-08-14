@@ -514,10 +514,8 @@ class PurchaseService
      */
     protected function nextNumber(string $date): string
     {
-        $year   = substr($date, 0, 4);
         $prefix = (string) Settings::get('purchases', 'purchase_prefix');
-        $count  = Purchase::whereYear('purchase_date', $year)->count() + 1;
 
-        return sprintf('%s-%s-%05d', $prefix ?: 'BILL', $year, $count);
+        return Purchase::nextDocumentNumber($prefix ?: 'BILL', $date);
     }
 }

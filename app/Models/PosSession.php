@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BelongsToBranch;
 /**
  * جلسة نقطة بيع (وردية) — سجلّ تشغيلي لمطابقة النقدية. غير محاسبي.
@@ -10,6 +11,7 @@ use App\Tenancy\BelongsToBranch;
 class PosSession extends BaseModel
 {
     use BelongsToBranch;
+    use GeneratesDocumentNumbers;
 
     protected $fillable = [
         'branch_id',

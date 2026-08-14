@@ -200,9 +200,6 @@ class QuoteService
     /** توليد رقم عرض تسلسلي: QUO-2025-00001 */
     protected function nextNumber(string $date): string
     {
-        $year  = substr($date, 0, 4);
-        $count = Quote::whereYear('quote_date', $year)->count() + 1;
-
-        return sprintf('QUO-%s-%05d', $year, $count);
+        return Quote::nextDocumentNumber('QUO', $date);
     }
 }

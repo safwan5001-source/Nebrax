@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** @see design-system/foundations/multi-branch-architecture.md — مشترك: المخازن تُدار مركزياً وتُنسب لفرع عبر branch_id (لا تُعزل عن إدارتها) */
 class Warehouse extends BaseModel implements CompanyWide
 {
+    use GeneratesDocumentNumbers;
+
     protected $fillable = [
         'tenant_id', 'branch_id', 'code', 'name', 'city', 'address', 'notes',
         'is_default', 'is_active',
@@ -38,14 +41,16 @@ class Warehouse extends BaseModel implements CompanyWide
         return $this->hasMany(ProductWarehouseStock::class);
     }
 
+    /** عمود الرقم هنا اسمه `code` لا `number`. */
+    public static function documentNumberColumn(): string
+    {
+        return 'code';
+    }
+
     /** الكود التسلسلي التالي (خمس خانات مصفَّرة) — كنمط الفروع. */
     public static function nextCode(): string
     {
-        $max = static::query()->pluck('code')
-            ->map(fn ($c) => (int) preg_replace('/\D/', '', (string) $c))
-            ->max() ?? 0;
-
-        return str_pad((string) ($max + 1), 5, '0', STR_PAD_LEFT);
+        return static::nextDocumentNumber();
     }
 
     /** المخزن الافتراضي للمستأجر: المُعلَّم افتراضياً، وإلا أول مخزن نشط. */

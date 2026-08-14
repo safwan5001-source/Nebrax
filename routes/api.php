@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\RecurringInvoiceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\ReturnableController;
+use App\Http\Controllers\Api\ReturnSourcesController;
 use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\StockPermitController;
@@ -43,7 +44,9 @@ use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UnitTemplateController;
+use App\Http\Controllers\Api\NumberingSettingsController;
 use App\Http\Controllers\Api\WarehouseController;
+use App\Http\Controllers\Api\ZatcaSettingsController;
 use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsurePermission;
@@ -280,6 +283,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // الترتيب فلا تبتلعها كمعرّف.
         Route::get('returns/returnable/{type}/{id}', ReturnableController::class)
             ->middleware($perm('returns.view'));
+        // مستندات طرفٍ القابلة للردّ عليها، بسبب المنع لغير الصالح منها.
+        Route::get('returns/sources/{type}', ReturnSourcesController::class)
+            ->middleware($perm('returns.view'));
         Route::get('returns', [ReturnController::class, 'index'])->middleware($perm('returns.view'));
         Route::get('returns/{id}', [ReturnController::class, 'show'])->middleware($perm('returns.view'));
         Route::post('returns', [ReturnController::class, 'store'])->middleware($perm('returns.manage'));
@@ -309,6 +315,14 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // إعدادات المشتريات (تفضيلات؛ تُقرأ فعلاً في خدمتَي الشراء والمشتريات)
         Route::get('purchase-settings', [PurchaseSettingsController::class, 'show'])->middleware($perm('purchases.view'));
         Route::put('purchase-settings', [PurchaseSettingsController::class, 'update'])->middleware($perm('company.manage'));
+
+        // إعدادات الترقيم المتسلسل — الموضع الواحد لسلاسل المستندات السبع عشرة
+        Route::get('numbering-settings', [NumberingSettingsController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::put('numbering-settings', [NumberingSettingsController::class, 'update'])->middleware($perm('company.manage'));
+
+        // إعدادات الفوترة الإلكترونية (نطاق عدّاد ICV) — منفصلة عن بادئات ترقيم المستندات
+        Route::get('zatca-settings', [ZatcaSettingsController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::put('zatca-settings', [ZatcaSettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // أقسام إعدادات المبيعات المتعددة (حالات/تصميمات/قوائم أسعار/شحن…)
         Route::get('sales-config/{section}', [SalesConfigController::class, 'show'])->middleware($perm('invoices.view'));

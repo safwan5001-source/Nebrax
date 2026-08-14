@@ -415,6 +415,142 @@ class ReturnFromSourceTest extends TestCase
         $this->getJson("/api/returns/returnable/sales/{$theirs->id}")->assertNotFound();
     }
 
+    // ── قائمة المستندات القابلة للردّ ────────────────────────────
+
+    /** @test */
+    public function the_sources_endpoint_lists_only_this_partners_posted_documents(): void
+    {
+        $mine = $this->invoice();
+
+        // فاتورة عميلٍ آخر، وأخرى مسوّدة — كلتاهما خارج القائمة.
+        $other = Partner::create(['name' => 'عميل آخر', 'type' => 'customer']);
+        app(InvoiceService::class)->post(app(InvoiceService::class)->create(
+            ['partner_id' => $other->id, 'payment_type' => 'credit'],
+            [['product_id' => $this->product->id, 'quantity' => 1, 'unit_price' => 10000]]
+        ));
+        app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['product_id' => $this->product->id, 'quantity' => 1, 'unit_price' => 10000]]
+        );
+
+        $data = $this->getJson("/api/returns/sources/sales?partner_id={$this->customer->id}")
+            ->assertOk()->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertSame($mine->id, $data[0]['id']);
+        $this->assertSame(5, $data[0]['remaining']);
+        $this->assertNull($data[0]['blocked_reason']);
+    }
+
+    /** @test */
+    public function a_fully_returned_document_is_listed_with_its_reason(): void
+    {
+        // يُعرَض ولا يُخفى: إخفاء فاتورةٍ يعرف المستخدم رقمها يجعله يظنّ أنه
+        // أخطأ فيه بدل أن يعرف أنها رُدَّت.
+        $invoice = $this->invoice();
+
+        $id = $this->ret([[
+            'product_id' => $this->product->id, 'source_line_id' => $this->line($invoice)->id,
+            'quantity' => 5, 'unit_price' => 10000, 'tax_rate' => 15,
+        ]], ['original_id' => $invoice->id])->assertCreated()->json('data.id');
+        $this->postJson("/api/returns/{$id}/post")->assertOk();
+
+        $data = $this->getJson("/api/returns/sources/sales?partner_id={$this->customer->id}")
+            ->assertOk()->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertSame(0, $data[0]['remaining']);
+        $this->assertSame('fully_returned', $data[0]['blocked_reason']);
+    }
+
+    /** @test */
+    public function a_document_past_its_window_is_listed_with_its_reason(): void
+    {
+        Settings::put('sales', ['return_window_days' => 14]);
+        $this->invoice(); // بتاريخ اليوم — داخل المهلة
+
+        $old = app(InvoiceService::class)->post(app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit',
+             'invoice_date' => now()->subDays(90)->toDateString()],
+            [['product_id' => $this->product->id, 'quantity' => 1, 'unit_price' => 10000]]
+        ));
+
+        $data = collect($this->getJson("/api/returns/sources/sales?partner_id={$this->customer->id}")
+            ->assertOk()->json('data'))->keyBy('id');
+
+        $this->assertSame('out_of_window', $data[$old->id]['blocked_reason']);
+        $this->assertSame(90, $data[$old->id]['elapsed_days']);
+    }
+
+    /** @test */
+    public function fully_returned_outranks_out_of_window_as_a_reason(): void
+    {
+        // سببٌ واحد يكفي، والنهائي أسبق من القابل للتفاوض خارج النظام.
+        Settings::put('sales', ['return_window_days' => 14]);
+
+        $invoice = app(InvoiceService::class)->post(app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit',
+             'invoice_date' => now()->subDays(90)->toDateString()],
+            [['product_id' => $this->product->id, 'quantity' => 2, 'unit_price' => 10000]]
+        ));
+
+        // ردٌّ كاملٌ بتاريخٍ داخل المهلة وقتها
+        $id = $this->ret([[
+            'product_id' => $this->product->id, 'source_line_id' => $this->line($invoice)->id,
+            'quantity' => 2, 'unit_price' => 10000, 'tax_rate' => 15,
+        ]], ['original_id' => $invoice->id, 'return_date' => now()->subDays(85)->toDateString()])
+            ->assertCreated()->json('data.id');
+        $this->postJson("/api/returns/{$id}/post")->assertOk();
+
+        $data = $this->getJson("/api/returns/sources/sales?partner_id={$this->customer->id}")
+            ->assertOk()->json('data');
+
+        $this->assertSame('fully_returned', $data[0]['blocked_reason']);
+    }
+
+    /** @test */
+    public function the_sources_endpoint_returns_nothing_without_a_partner(): void
+    {
+        $this->invoice();
+
+        $this->getJson('/api/returns/sources/sales')->assertOk()->assertJsonPath('data', []);
+    }
+
+    /** @test */
+    public function another_tenants_documents_never_appear(): void
+    {
+        $other = Tenant::create(['name' => 'آخر', 'slug' => 'other', 'currency' => 'SAR']);
+        $ctx   = app(TenantContext::class);
+        $ctx->set($other->id);
+        app(ChartOfAccountsSeeder::class)->seed($other->id);
+        $theirCustomer = Partner::create(['name' => 'عميلهم', 'type' => 'customer']);
+        $theirProduct  = Product::create(['name' => 'بضاعتهم', 'track_inventory' => false]);
+        app(InvoiceService::class)->post(app(InvoiceService::class)->create(
+            ['partner_id' => $theirCustomer->id, 'payment_type' => 'credit'],
+            [['product_id' => $theirProduct->id, 'quantity' => 1, 'unit_price' => 10000]]
+        ));
+        $ctx->set($this->tenant->id);
+
+        $this->getJson("/api/returns/sources/sales?partner_id={$theirCustomer->id}")
+            ->assertOk()->assertJsonPath('data', []);
+    }
+
+    /** @test */
+    public function purchase_sources_follow_the_purchase_window(): void
+    {
+        Settings::put('sales', ['return_window_days' => 1]);      // لا يحكمها
+        Settings::put('purchases', ['return_window_days' => 30]);
+
+        $purchase = $this->purchase();
+
+        $data = $this->getJson("/api/returns/sources/purchase?partner_id={$this->supplier->id}")
+            ->assertOk()->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertNull($data[0]['blocked_reason']);
+        $this->assertSame($purchase->number, $data[0]['number']);
+    }
+
     // ── ما لم يتغيّر ─────────────────────────────────────────────
 
     /** @test */

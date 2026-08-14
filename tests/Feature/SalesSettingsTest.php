@@ -53,7 +53,6 @@ class SalesSettingsTest extends TestCase
         $this->assertSame('', $data['default_terms']);
         $this->assertSame('credit', $data['default_payment_type']);
         $this->assertSame(14, $data['quote_validity_days']);
-        $this->assertSame('INV', $data['invoice_prefix']);
     }
 
     /**
@@ -68,7 +67,9 @@ class SalesSettingsTest extends TestCase
 
         $this->assertStringStartsWith('INV-', $this->invoice($auth['token'], $customer['id'])['number']);
 
-        $this->withToken($auth['token'])->putJson('/api/sales-settings', ['invoice_prefix' => 'FTR'])->assertOk();
+        // البادئة انتقلت إلى شاشة الترقيم المركزية — والأثر هو الأثر نفسه.
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'FTR'])->assertOk();
 
         $this->assertStringStartsWith('FTR-', $this->invoice($auth['token'], $customer['id'])['number']);
     }
@@ -195,8 +196,8 @@ class SalesSettingsTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/sales-settings', ['invoice_prefix' => 'فاتورة مبيعات!'])
-            ->assertStatus(422)->assertJsonValidationErrors('invoice_prefix');
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'فاتورة مبيعات!'])
+            ->assertStatus(422)->assertJsonValidationErrors('prefix');
     }
 
     /**
@@ -229,10 +230,12 @@ class SalesSettingsTest extends TestCase
         $a = $this->registerTenant();
         $b = $this->registerTenant('other', 'other@nibras.test');
 
-        $this->withToken($a['token'])->putJson('/api/sales-settings', ['invoice_prefix' => 'AAA'])->assertOk();
+        $this->withToken($a['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'AAA'])->assertOk();
 
-        $this->assertSame('INV', $this->withToken($b['token'])
-            ->getJson('/api/sales-settings')['data']['invoice_prefix']);
+        $invoice = collect($this->withToken($b['token'])->getJson('/api/numbering-settings')['data'])
+            ->firstWhere('key', 'invoice');
+        $this->assertSame('INV', $invoice['prefix']);
     }
 
     /** المجموعتان مستقلّتان: تفضيل المبيعات لا يسري على المشتريات. */
@@ -262,10 +265,9 @@ class SalesSettingsTest extends TestCase
             'default_tax_rate'     => 5,
             'default_payment_type' => 'cash',
             'quote_validity_days'  => 30,
-            'invoice_prefix'       => 'SAL',
             'default_terms'        => 'الدفع خلال 30 يوماً.',
         ])->assertOk()->assertJsonPath('data.default_tax_rate', 5)
-            ->assertJsonPath('data.invoice_prefix', 'SAL');
+            ->assertJsonPath('data.quote_validity_days', 30);
 
         // التغييرات محفوظة (قراءة لاحقة تعيدها)
         $this->withToken($token)->getJson('/api/sales-settings')

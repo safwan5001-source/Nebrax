@@ -202,11 +202,19 @@ class InvoiceService
             $rate      = (int) ($item['tax_rate'] ?? (int) Settings::get('sales', 'default_tax_rate'));
             $lineDisc  = (int) ($item['discount'] ?? 0);
 
+            $product = ! empty($item['product_id']) ? Product::find($item['product_id']) : null;
+
             // الوحدة تُحلّ وتُنسَخ على السطر لقطةً — لا تُحوَّل النقود، الكمية وحدها.
-            [$unitName, $unitFactor] = $this->units->resolve(
-                ! empty($item['product_id']) ? Product::find($item['product_id']) : null,
-                $item['unit'] ?? null
-            );
+            [$unitName, $unitFactor] = $this->units->resolve($product, $item['unit'] ?? null);
+
+            // والوصف يُنسَخ من اسم المنتج عند غيابه — لقطةً كالوحدة تماماً،
+            // فتغيير اسم المنتج لاحقاً لا يعيد تفسير فاتورةٍ صدرت للعميل.
+            //
+            // بدونه يخرج المستند المطبوع بسطرٍ عنوانه «—»: بلا هوية للعميل ولا
+            // للمراجع، ولا لشاشة المرتجع التي تسحب سطور الفاتورة. والشاشة
+            // تملؤه، لكن الحقل `nullable` في العقد فلعميل الـ API أن يتركه.
+            // (نظيرُه في `PurchaseService` منذ #190 — وهذا يُغلق التناظر.)
+            $description = $item['description'] ?? $product?->name;
 
             if ($qty <= 0 || $unitPrice < 0) {
                 throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
@@ -240,7 +248,7 @@ class InvoiceService
             InvoiceLine::create([
                 'invoice_id'    => $invoice->id,
                 'product_id'    => $item['product_id'] ?? null,
-                'description'   => $item['description'] ?? null,
+                'description'   => $description,
                 'quantity'      => $qty,
                 'unit_name'     => $unitName,
                 'unit_factor'   => $unitFactor,
@@ -584,10 +592,8 @@ class InvoiceService
      */
     protected function nextNumber(string $date): string
     {
-        $year   = substr($date, 0, 4);
         $prefix = (string) Settings::get('sales', 'invoice_prefix');
-        $count  = Invoice::whereYear('invoice_date', $year)->count() + 1;
 
-        return sprintf('%s-%s-%05d', $prefix ?: 'INV', $year, $count);
+        return Invoice::nextDocumentNumber($prefix ?: 'INV', $date);
     }
 }

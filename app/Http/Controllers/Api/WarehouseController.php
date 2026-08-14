@@ -26,9 +26,10 @@ class WarehouseController extends ApiController
     {
         $data = $request->validated();
         $this->assertTenantOwned(Branch::class, $data['branch_id'] ?? null, 'الفرع');
-        $data['code'] = $this->uniqueCode($data['code'] ?? null);
-
         $warehouse = DB::transaction(function () use ($data) {
+            // التوليد داخل المعاملة: قفل المِرساة لا يُسلسِل شيئاً خارجها.
+            $data['code'] = $this->uniqueCode($data['code'] ?? null);
+
             // أول مخزن للمنشأة يصير الافتراضي تلقائياً.
             $data['is_default'] = ($data['is_default'] ?? false) || ! Warehouse::query()->exists();
             $w = Warehouse::create($data);

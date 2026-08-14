@@ -26,7 +26,12 @@ interface Line {
   /** المتبقي القابل للردّ من ذلك السطر — سقفٌ يُعرَض لا يُكتشَف عند الرفض. */
   remaining: number | null;
 }
-interface SourceDoc { id: string; number: string; status: string; partner_id: string; total: string }
+interface SourceDoc {
+  id: string; number: string; date: string | null; total: string; remaining: number;
+  /** سبب المنع إن وُجد — تعرضه الشاشة على الخيار المعطّل. */
+  blocked_reason: 'fully_returned' | 'out_of_window' | null;
+  elapsed_days: number;
+}
 interface ReturnableLine {
   source_line_id: string; product_id: string | null; description: string | null;
   quantity: number; returned: number; remaining: number; unit_price: string; tax_rate: number;
@@ -75,19 +80,27 @@ export function CreateReturnDialog({
       .catch(() => {});
   }, [open]);
 
-  // المستندات المرحَّلة القابلة للردّ عليها + سياسة إلزام المصدر — كلاهما
-  // يتبع نوع المرتجع، فيُعاد جلبهما عند تبديله.
+  // سياسة إلزام المصدر — تتبع نوع المرتجع، فتُعاد عند تبديله.
   useEffect(() => {
     if (!open) return;
-    const path = type === 'sales' ? '/invoices' : '/purchases';
-    api<{ data: SourceDoc[] }>(path)
-      .then((r) => setSources(r.data.filter((d) => d.status === 'posted')))
-      .catch(() => setSources([]));
-
     api<{ data: Record<string, unknown> }>(type === 'sales' ? '/sales-settings' : '/purchase-settings')
       .then((r) => setRequireSource(!!r.data.require_return_source))
       .catch(() => setRequireSource(false));
   }, [open, type]);
+
+  /**
+   * مستندات الطرف المرحَّلة **بأهليتها محسوبةً في الخادم**.
+   *
+   * كانت الشاشة تجلب كل الفواتير وتُصفّيها بالطرف والحالة، فلا تعرف «رُدَّ
+   * بالكامل» ولا «خارج المهلة» إلا برفضٍ بعد ملء النموذج. والحدّ يجب أن
+   * يُعرَض لا أن يُكتشَف.
+   */
+  useEffect(() => {
+    if (!open || !partnerId) { setSources([]); return; }
+    api<{ data: SourceDoc[] }>(`/returns/sources/${type}?partner_id=${partnerId}`)
+      .then((r) => setSources(r.data))
+      .catch(() => setSources([]));
+  }, [open, type, partnerId]);
 
   const eligible = useMemo(
     () =>
@@ -114,13 +127,19 @@ export function CreateReturnDialog({
     [products, t]
   );
 
-  // مستندات هذا الطرف وحده — قائمةٌ تعرض فواتير عميلٍ آخر تدعو لخطأ يرفضه
-  // الخادم بعد ملء النموذج.
+  // غير الصالح يُعرَض معطّلاً بسببه لا يُخفى: إخفاءُ فاتورةٍ يعرف المستخدم
+  // رقمها يجعله يظنّ أنه أخطأ فيه.
   const sourceOptions = useMemo<ComboOption[]>(
-    () => sources
-      .filter((d) => d.partner_id === partnerId)
-      .map((d) => ({ value: d.id, label: d.number, hint: d.total })),
-    [sources, partnerId]
+    () => sources.map((d) => ({
+      value: d.id,
+      label: d.number,
+      sub: d.date ?? undefined,
+      hint: d.blocked_reason
+        ? t(d.blocked_reason === 'fully_returned' ? 'blocked_returned' : 'blocked_window')
+        : d.total,
+      disabled: !!d.blocked_reason,
+    })),
+    [sources, t]
   );
 
   const setLine = (i: number, patch: Partial<Line>) =>

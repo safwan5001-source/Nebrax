@@ -11,6 +11,14 @@ export interface ComboOption {
   sub?: string;
   /** قيمة على الطرف المقابل — الرصيد أو الهاتف. */
   hint?: string;
+  /**
+   * خيارٌ يُعرَض ولا يُختار — ومعه `hint` يشرح السبب.
+   *
+   * **يُعرَض ولا يُخفى بقصد:** إخفاء ما لا يصلح يترك المستخدم يبحث عمّا يراه
+   * بعينيه في مكانٍ آخر ظانّاً أنه أخطأ. والسبب المكتوب أوقف للسؤال من
+   * الغياب الصامت.
+   */
+  disabled?: boolean;
 }
 
 /**
@@ -91,14 +99,24 @@ export function Combobox({
   }, [open]);
 
   function pick(option: ComboOption) {
+    if (option.disabled) return;
     onChange(option.value);
     setOpen(false);
   }
 
+  /** الفهرس التالي القابل للاختيار في اتجاهٍ ما، أو الحالي إن لم يوجد. */
+  function step(from: number, dir: 1 | -1): number {
+    for (let i = from + dir; i >= 0 && i < filtered.length; i += dir) {
+      if (!filtered[i].disabled) return i;
+    }
+    return from;
+  }
+
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') { setOpen(false); return; }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(i + 1, filtered.length - 1)); return; }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); return; }
+    // الأسهم تقفز فوق المعطّل: الوقوف عليه يوهم أنه قابل للاختيار.
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => step(i, +1)); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => step(i, -1)); return; }
     if (e.key === 'Enter' && filtered[active]) { e.preventDefault(); pick(filtered[active]); }
   }
 
@@ -165,12 +183,16 @@ export function Combobox({
                     type="button"
                     role="option"
                     aria-selected={option.value === value}
-                    onMouseEnter={() => setActive(i)}
+                    aria-disabled={option.disabled || undefined}
+                    disabled={option.disabled}
+                    onMouseEnter={() => !option.disabled && setActive(i)}
                     onClick={() => pick(option)}
                     className={cn(
                       'flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors',
-                      i === active ? 'bg-primary-soft' : 'bg-transparent',
-                      option.value === value ? 'text-primary' : 'text-text'
+                      i === active && !option.disabled ? 'bg-primary-soft' : 'bg-transparent',
+                      option.disabled
+                        ? 'cursor-not-allowed text-muted'
+                        : option.value === value ? 'text-primary' : 'text-text'
                     )}
                   >
                     <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0 self-start', option.value === value ? 'opacity-100' : 'opacity-0')} strokeWidth={2} />

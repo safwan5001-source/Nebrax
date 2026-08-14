@@ -86,12 +86,17 @@ class BranchAssetHrIsolationTest extends TestCase
     }
 
     /**
-     * الفخّ الذي كشفته هذه الموجة: التسلسل `(tenant_id, number)` فريد على مستوى
-     * المستأجر. لو حُسب داخل عزل الفرع لبدأ كل فرع من ١ فانفجر القيد الفريد.
+     * لكل فرع سجلُّ أصولٍ مستقلٌّ يبدأ من ١.
+     *
+     * كان التسلسل مؤسسياً لسببٍ تقنيٍّ بحت: القيد `(tenant_id, number)` كان
+     * ينفجر لو بدأ كل فرع من ١. وقد توسّع القيد إلى `(tenant_id, branch_id,
+     * number)` فزال السبب. والفرع هنا **لا يرى** أصول غيره (`BranchScoped`)،
+     * فلو بقي التسلسل مؤسسياً لظهر سجلُّ كل فرع مثقوباً بأرقامٍ غائبة تخصّ
+     * أصولاً لا يملك رؤيتها أصلاً.
      *
      * @test
      */
-    public function asset_numbering_stays_unique_across_branches(): void
+    public function each_branch_keeps_its_own_asset_sequence(): void
     {
         $auth = $this->registerTenant();
         app(TenantContext::class)->set($auth['tenant_id']);
@@ -102,10 +107,14 @@ class BranchAssetHrIsolationTest extends TestCase
 
         $first  = $this->createAsset($auth['token'], $main, $account);
         $second = $this->createAsset($auth['token'], $khobar, $account);
+        $third  = $this->createAsset($auth['token'], $main, $account);
 
+        // الرقم نفسه في فرعين — يتعايشان تحت القيد الموسَّع.
         $this->assertSame('FA-2026-00001', $first['number']);
-        $this->assertSame('FA-2026-00002', $second['number']);
-        $this->assertNotSame($first['number'], $second['number']);
+        $this->assertSame('FA-2026-00001', $second['number']);
+
+        // ولكلٍّ تسلسله المتصل داخل فرعه.
+        $this->assertSame('FA-2026-00002', $third['number']);
     }
 
     /**

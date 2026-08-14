@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 /** @see design-system/foundations/multi-branch-architecture.md — مشترك: الفرع نفسه لا يُعزل بفرع */
 class Branch extends BaseModel implements CompanyWide
 {
+    use GeneratesDocumentNumbers;
+
     protected $fillable = [
         'tenant_id', 'code', 'name', 'is_main', 'phone', 'mobile',
         'address_line1', 'address_line2', 'city', 'region', 'country',
@@ -66,17 +69,18 @@ class Branch extends BaseModel implements CompanyWide
         }
     }
 
+    /** عمود الرقم هنا اسمه `code` لا `number`. */
+    public static function documentNumberColumn(): string
+    {
+        return 'code';
+    }
+
     /**
      * الكود التسلسلي التالي للمستأجر الحالي: خمس خانات مصفَّرة (00001).
-     * يُشتقّ من أكبر كود رقمي قائم فلا يتصادم بعد الحذف.
+     * بلا بادئة وبلا سنة — سلسلة واحدة مستمرة على مستوى المؤسسة.
      */
     public static function nextCode(): string
     {
-        $max = static::query()
-            ->pluck('code')
-            ->map(fn ($c) => (int) preg_replace('/\D/', '', (string) $c))
-            ->max() ?? 0;
-
-        return str_pad((string) ($max + 1), 5, '0', STR_PAD_LEFT);
+        return static::nextDocumentNumber();
     }
 }

@@ -2,8 +2,10 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\Branch;
 use App\Models\Invoice;
 use App\Models\Tenant;
+use App\Support\ZatcaIcvScope;
 use Illuminate\Support\Str;
 
 /**
@@ -33,8 +35,32 @@ class ZatcaService
 
         $uuid = (string) Str::uuid();
 
-        // سلسلة الهاش: آخر فاتورة مُرحَّلة (بهاش) تحدّد العدّاد والهاش السابق.
+        // ═══════════════════════════════════════════════════════════
+        //  عدّاد ZATCA — نطاقه مضبوط، وافتراضه المستأجر
+        // ═══════════════════════════════════════════════════════════
+        //  ICV يمثّل سلسلة إصدار الفاتورة الإلكترونية لرقمٍ ضريبيٍّ مسجَّل.
+        //  الافتراض `tenant` — سلسلة واحدة للكيان القانوني — ولا يتغيّر
+        //  لمستأجر قائم أو جديد. و`branch` خيارٌ يتطلّب تفعيلاً صريحاً
+        //  **ورقماً ضريبياً مستقلاً لكل فرع**؛ يحرسه `ZatcaIcvScope` فيتجاهل
+        //  المخزَّن إن لم تتحقّق شروطه. لذلك يُقرأ النطاق منه لا من الإعداد
+        //  مباشرةً — ولا يمرّ هذا العدّاد بطبقة `GeneratesDocumentNumbers`
+        //  إطلاقاً، فهو ليس رقم مستند.
+        //
+        //  القفل يُسلسِل الترحيلات المتزامنة على **مِرساة نطاقه**: بدونه يقرأ
+        //  ترحيلان العدّادَ نفسه فيُنتجان ICV مكرراً **بصمت** — والقيد الفريد
+        //  هو الحاجز الأخير خلفه.
+        $branchScoped = ZatcaIcvScope::current() === ZatcaIcvScope::BRANCH
+            && $invoice->branch_id !== null;
+
+        $branchScoped
+            ? Branch::whereKey($invoice->branch_id)->lockForUpdate()->first()
+            : Tenant::whereKey($invoice->tenant_id)->lockForUpdate()->first();
+
+        // سلسلة الهاش: آخر فاتورة مُرحَّلة (بهاش) **في النطاق نفسه** تحدّد
+        // العدّاد والهاش السابق. فالسلسلتان تنفصلان معاً — عدّاداً وهاشاً —
+        // إذ لا معنى لعدّادٍ منفصل يتسلسل هاشُه مع سلسلةٍ أخرى.
         $last = Invoice::whereNotNull('zatca_hash')
+            ->when($branchScoped, fn ($q) => $q->where('branch_id', $invoice->branch_id))
             ->orderByDesc('zatca_icv')
             ->first();
 

@@ -10,6 +10,7 @@ use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
 use App\Support\Money;
 use App\Support\Settings;
+use Carbon\Carbon;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -198,7 +199,44 @@ class ReturnService
             throw new RuntimeException('المستند المصدر لا يخصّ طرف المرتجع.');
         }
 
+        $this->assertWithinWindow($source, $data, $type);
+
         return $source;
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  مهلة الردّ — سياسةٌ تُقاس من تاريخ المستند المصدر
+     * ═══════════════════════════════════════════════════════════════
+     *  **سياسة عمل لا صحّة تقنية:** التجزئة تضع مهلةً معلنة، والمقاولات لا
+     *  مهلة فيها. الافتراض `0` = بلا حدّ، وهو سلوك اليوم حرفياً.
+     *
+     *  ولا تُقاس إلا بوجود مصدر: المرتجع الحرّ بلا مرجعٍ زمني يُقاس عليه.
+     */
+    protected function assertWithinWindow(Invoice|Purchase $source, array $data, string $type): void
+    {
+        $group = $type === 'sales' ? 'sales' : 'purchases';
+        $days  = (int) Settings::get($group, 'return_window_days');
+
+        if ($days <= 0) {
+            return;
+        }
+
+        $sourceDate = $type === 'sales' ? $source->invoice_date : $source->purchase_date;
+        $returnDate = Carbon::parse($data['return_date'] ?? now()->toDateString());
+
+        // سالبٌ يعني ردّاً بتاريخٍ **قبل** الفاتورة — يُرفض بالقدر نفسه، فهو
+        // ليس «داخل المهلة» بل خارج المنطق.
+        $elapsed = Carbon::parse($sourceDate)->diffInDays($returnDate, false);
+
+        if ($elapsed < 0) {
+            throw new RuntimeException('تاريخ المرتجع يسبق تاريخ المستند المصدر.');
+        }
+        if ($elapsed > $days) {
+            throw new RuntimeException(
+                "مهلة الردّ {$days} يوماً من تاريخ المستند، وقد مضى {$elapsed} يوماً."
+            );
+        }
     }
 
     /**
@@ -291,6 +329,7 @@ class ReturnService
                     'original_id'   => $return->original_id,
                     'original_type' => $return->original_type,
                     'partner_id'    => $return->partner_id,
+                    'return_date'   => $return->return_date->toDateString(),
                 ], $return->type);
 
                 if ($source) {
@@ -517,12 +556,6 @@ class ReturnService
      */
     protected function nextNumber(string $type, string $date): string
     {
-        $prefix = $type === 'sales' ? 'SRET' : 'PRET';
-        $year   = substr($date, 0, 4);
-        $count  = ReturnDocument::where('type', $type)
-            ->whereYear('return_date', $year)
-            ->count() + 1;
-
-        return sprintf('%s-%s-%05d', $prefix, $year, $count);
+        return ReturnDocument::nextDocumentNumber($type === 'sales' ? 'SRET' : 'PRET', $date);
     }
 }

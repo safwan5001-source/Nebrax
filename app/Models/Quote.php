@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Support\RecordsRevisions;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
@@ -18,6 +19,7 @@ class Quote extends BaseModel
     use ResolvesBranchReferences;
     use RecordsRevisions;
     use BelongsToBranch;
+    use GeneratesDocumentNumbers;
 
     protected $fillable = [
         'branch_id',

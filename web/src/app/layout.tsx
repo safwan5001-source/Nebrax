@@ -18,10 +18,9 @@ const mono = IBM_Plex_Mono({
   display: 'swap',
   variable: '--font-ibm-mono',
 });
-
 export const metadata: Metadata = {
-  title: 'نبراس ERP',
-  description: 'نظام محاسبي سحابي متعدد المستأجرين',
+  title: 'نبراكس',
+  description: 'منصة سحابية متكاملة لإدارة المؤسسات',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
