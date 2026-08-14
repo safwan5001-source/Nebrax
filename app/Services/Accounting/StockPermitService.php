@@ -346,16 +346,9 @@ class StockPermitService
         return $account->id;
     }
 
-    /**
-     * تسلسل مستقلّ لكل نوع خارج عزل الفرع — القيد الفريد `(tenant_id, number)`
-     * على مستوى المستأجر، ولولا ذلك لبدأ كل فرع من ١ فاصطدمت الأرقام.
-     */
+    /** تسلسل مستقلّ لكل نوع ولكل فرع: SR · SI · ST. */
     protected function nextNumber(string $type, string $date): string
     {
-        $year  = substr($date, 0, 4);
-        $count = StockPermit::withoutGlobalScope(BranchScope::class)
-            ->where('type', $type)->whereYear('permit_date', $year)->count() + 1;
-
-        return sprintf('%s-%s-%05d', self::PREFIX[$type], $year, $count);
+        return StockPermit::nextDocumentNumber(self::PREFIX[$type], $date);
     }
 }

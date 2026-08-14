@@ -7,6 +7,7 @@ use App\Http\Resources\BranchResource;
 use App\Models\Branch;
 use App\Support\BranchSettings;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class BranchController extends ApiController
 {
@@ -25,11 +26,16 @@ class BranchController extends ApiController
     public function store(StoreBranchRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $code = $this->uniqueCode($data['code'] ?? null);
 
         // `is_main` لا يُقبل من المدخل — يتغيّر حصراً من «إعدادات الفروع».
         unset($data['is_main']);
-        $branch = Branch::create([...$data, 'code' => $code]);
+
+        // التوليد داخل المعاملة: قفل المِرساة لا يُسلسِل شيئاً خارجها.
+        $branch = DB::transaction(function () use ($data) {
+            $code = $this->uniqueCode($data['code'] ?? null);
+
+            return Branch::create([...$data, 'code' => $code]);
+        });
 
         // يصير رئيسياً **فقط** إن لم يكن للمؤسسة فرع رئيسي بعد (أول فرع).
         // إضافة فرع لاحق لا تمسّ الرئيسي إطلاقاً.

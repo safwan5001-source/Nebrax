@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,7 @@ class ReturnDocument extends BaseModel
 {
     use ResolvesBranchReferences;
     use BelongsToBranch;
+    use GeneratesDocumentNumbers;
 
     protected $table = 'return_documents';
 

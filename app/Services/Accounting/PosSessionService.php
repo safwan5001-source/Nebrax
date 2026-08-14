@@ -114,9 +114,6 @@ class PosSessionService
 
     protected function nextNumber(): string
     {
-        $year  = Carbon::now()->year;
-        $count = PosSession::whereYear('opened_at', $year)->count() + 1;
-
-        return sprintf('POS-%s-%05d', $year, $count);
+        return PosSession::nextDocumentNumber('POS', Carbon::now()->toDateString());
     }
 }

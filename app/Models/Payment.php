@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +19,7 @@ class Payment extends BaseModel
 {
     use ResolvesBranchReferences;
     use BelongsToBranch;
+    use GeneratesDocumentNumbers;
 
     protected $fillable = [
         'branch_id',

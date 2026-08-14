@@ -8,6 +8,7 @@ use App\Http\Resources\EmployeeResource;
 use App\Models\Branch;
 use App\Models\Employee;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class EmployeeController extends ApiController
 {
@@ -20,9 +21,12 @@ class EmployeeController extends ApiController
     {
         $data = $request->validated();
         $this->assertTenantOwned(Branch::class, $data['branch_id'] ?? null, 'الفرع');
-        $data['employee_no'] ??= $this->nextEmployeeNo();
+        // الترقيم داخل معاملة: قفل المِرساة في طبقة الترقيم لا يُسلسِل شيئاً بدونها.
+        $employee = DB::transaction(function () use ($data) {
+            $data['employee_no'] ??= Employee::nextDocumentNumber('EMP');
 
-        $employee = Employee::create($data);
+            return Employee::create($data);
+        });
 
         return (new EmployeeResource($employee))->response()->setStatusCode(201);
     }
@@ -47,11 +51,5 @@ class EmployeeController extends ApiController
         Employee::findOrFail($id)->delete();
 
         return response()->json(['message' => 'تم الحذف.']);
-    }
-
-    /** توليد رقم موظف تسلسلي: EMP-00001 */
-    protected function nextEmployeeNo(): string
-    {
-        return sprintf('EMP-%05d', Employee::count() + 1);
     }
 }

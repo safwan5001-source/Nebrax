@@ -5,7 +5,6 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\Asset;
 use App\Models\Partner;
-use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -212,18 +211,9 @@ class AssetService
         return $account->id;
     }
 
-    /**
-     * توليد رقم تسلسلي: FA-2025-00001
-     *
-     * التسلسل **على مستوى المؤسسة** لا الفرع — لأن القيد الفريد `(tenant_id, number)`.
-     * لذا يتجاوز عزل الفرع عمداً؛ لولا ذلك لبدأ كل فرع من ١ فاصطدمت الأرقام.
-     */
+    /** توليد رقم تسلسلي: FA-2025-00001 — تسلسل مستقلّ لكل فرع. */
     protected function nextNumber(string $date): string
     {
-        $year  = substr($date, 0, 4);
-        $count = Asset::withoutGlobalScope(BranchScope::class)
-            ->whereYear('acquisition_date', $year)->count() + 1;
-
-        return sprintf('FA-%s-%05d', $year, $count);
+        return Asset::nextDocumentNumber('FA', $date);
     }
 }

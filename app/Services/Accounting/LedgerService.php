@@ -208,9 +208,6 @@ class LedgerService
      */
     protected function nextNumber(string $date): string
     {
-        $year = substr($date, 0, 4);
-        $count = JournalEntry::whereYear('entry_date', $year)->count() + 1;
-
-        return sprintf('JE-%s-%05d', $year, $count);
+        return JournalEntry::nextDocumentNumber('JE', $date);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BelongsToBranch;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -17,6 +18,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Employee extends BaseModel
 {
     use BelongsToBranch;
+    use GeneratesDocumentNumbers;
+
+    /** عمود الرقم هنا اسمه `employee_no` لا `number`. */
+    public static function documentNumberColumn(): string
+    {
+        return 'employee_no';
+    }
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'employee_no', 'name', 'national_id', 'job_title',

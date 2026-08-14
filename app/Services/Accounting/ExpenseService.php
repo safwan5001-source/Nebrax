@@ -160,9 +160,6 @@ class ExpenseService
     /** توليد رقم تسلسلي: EXP-2025-00001 */
     protected function nextNumber(string $date): string
     {
-        $year  = substr($date, 0, 4);
-        $count = Expense::whereYear('expense_date', $year)->count() + 1;
-
-        return sprintf('EXP-%s-%05d', $year, $count);
+        return Expense::nextDocumentNumber('EXP', $date);
     }
 }
