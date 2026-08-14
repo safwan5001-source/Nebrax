@@ -29,20 +29,24 @@ rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null 
 
 echo "▶ 4/6  دمج ملفات النواة وطبقة الـ API..."
 # نسخ النماذج والخدمات والـ migrations فوق المشروع
-cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 mkdir -p app/Services/Accounting app/Services/Reporting app/Support \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
-         app/Http/Requests app/Http/Resources tests/Feature routes
+         app/Http/Requests app/Http/Resources tests/Feature routes \
+         app/Models/Concerns app/Console/Commands
+cp -r "$CORE_DIR/app/Models/"*.php               app/Models/
+# المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
+cp -r "$CORE_DIR/app/Models/Concerns/"*.php      app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
 cp -r "$CORE_DIR/app/Services/Reporting/"*.php   app/Services/Reporting/
 cp -r "$CORE_DIR/app/Support/"*.php              app/Support/
 cp -r "$CORE_DIR/app/Tenancy/"*.php              app/Tenancy/
 cp -r "$CORE_DIR/app/Http/Middleware/"*.php      app/Http/Middleware/
-cp -r "$CORE_DIR/app/Http/Controllers/"*.php     app/Http/Controllers/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Http/Controllers/Api/"*.php app/Http/Controllers/Api/
 cp -r "$CORE_DIR/app/Http/Requests/"*.php        app/Http/Requests/
 cp -r "$CORE_DIR/app/Http/Resources/"*.php       app/Http/Resources/
 cp -r "$CORE_DIR/app/Providers/"*.php            app/Providers/
+# أوامر artisan (تشخيص/صيانة) — بلا هذا السطر توجد في المستودع ولا تصل الاختبار
+cp -r "$CORE_DIR/app/Console/Commands/"*.php     app/Console/Commands/ 2>/dev/null || true
 cp -r "$CORE_DIR/database/migrations/"*.php      database/migrations/
 cp -r "$CORE_DIR/routes/api.php"                 routes/api.php
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/

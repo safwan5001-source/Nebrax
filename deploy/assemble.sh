@@ -36,7 +36,6 @@ cp -r "$CORE_DIR/app/Services/Reporting/"*.php   app/Services/Reporting/
 cp -r "$CORE_DIR/app/Support/"*.php              app/Support/
 cp -r "$CORE_DIR/app/Tenancy/"*.php              app/Tenancy/
 cp -r "$CORE_DIR/app/Http/Middleware/"*.php      app/Http/Middleware/
-cp -r "$CORE_DIR/app/Http/Controllers/"*.php     app/Http/Controllers/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Http/Controllers/Api/"*.php app/Http/Controllers/Api/
 cp -r "$CORE_DIR/app/Http/Requests/"*.php        app/Http/Requests/
 cp -r "$CORE_DIR/app/Http/Resources/"*.php       app/Http/Resources/
