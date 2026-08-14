@@ -6,7 +6,6 @@ use App\Models\Account;
 use App\Models\CreditNote;
 use App\Models\CreditNoteLine;
 use App\Models\Partner;
-use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -215,19 +214,9 @@ class CreditNoteService
         return $account->id;
     }
 
-    /** توليد رقم تسلسلي: CN-2025-00001 */
-    /**
-     * تسلسل مستقلّ لكل نوع: CN للإشعار الدائن، DN للمدين.
-     * يُحسب **خارج عزل الفرع** لأن القيد الفريد `(tenant_id, number)` على
-     * مستوى المستأجر — ولولا ذلك لبدأ كل فرع من ١ فاصطدمت الأرقام.
-     */
+    /** تسلسل مستقلّ لكل نوع ولكل فرع: CN للإشعار الدائن، DN للمدين. */
     protected function nextNumber(string $date, string $type = 'sales'): string
     {
-        $year   = substr($date, 0, 4);
-        $prefix = $type === 'purchase' ? 'DN' : 'CN';
-        $count  = CreditNote::withoutGlobalScope(BranchScope::class)
-            ->where('type', $type)->whereYear('note_date', $year)->count() + 1;
-
-        return sprintf('%s-%s-%05d', $prefix, $year, $count);
+        return CreditNote::nextDocumentNumber($type === 'purchase' ? 'DN' : 'CN', $date);
     }
 }

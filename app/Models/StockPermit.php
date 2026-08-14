@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Support\RecordsRevisions;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
@@ -21,6 +22,7 @@ class StockPermit extends BaseModel
     use RecordsRevisions;
     use ResolvesBranchReferences;
     use BelongsToBranch;
+    use GeneratesDocumentNumbers;
 
     public const TYPES = ['receipt', 'issue', 'transfer'];
 

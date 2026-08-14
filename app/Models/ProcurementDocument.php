@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Support\RecordsRevisions;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
@@ -21,6 +22,7 @@ class ProcurementDocument extends BaseModel
     use ResolvesBranchReferences;
     use RecordsRevisions;
     use BelongsToBranch;
+    use GeneratesDocumentNumbers;
 
     /** أنواع المستندات بترتيب السلسلة. */
     public const TYPES = ['request', 'rfq', 'quotation', 'order'];

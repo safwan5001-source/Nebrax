@@ -242,12 +242,6 @@ class PaymentService
      */
     protected function nextNumber(string $direction, string $date): string
     {
-        $prefix = $direction === 'received' ? 'REC' : 'PAY';
-        $year   = substr($date, 0, 4);
-        $count  = Payment::where('direction', $direction)
-            ->whereYear('payment_date', $year)
-            ->count() + 1;
-
-        return sprintf('%s-%s-%05d', $prefix, $year, $count);
+        return Payment::nextDocumentNumber($direction === 'received' ? 'REC' : 'PAY', $date);
     }
 }

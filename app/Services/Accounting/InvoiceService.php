@@ -499,10 +499,8 @@ class InvoiceService
      */
     protected function nextNumber(string $date): string
     {
-        $year   = substr($date, 0, 4);
         $prefix = (string) Settings::get('sales', 'invoice_prefix');
-        $count  = Invoice::whereYear('invoice_date', $year)->count() + 1;
 
-        return sprintf('%s-%s-%05d', $prefix ?: 'INV', $year, $count);
+        return Invoice::nextDocumentNumber($prefix ?: 'INV', $date);
     }
 }

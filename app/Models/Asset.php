@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BranchScoped;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,7 @@ class Asset extends BaseModel
 {
     use ResolvesBranchReferences;
     use BranchScoped;
+    use GeneratesDocumentNumbers;
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'number', 'name', 'account_id', 'partner_id', 'acquisition_date',

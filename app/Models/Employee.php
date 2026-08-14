@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BelongsToBranch;
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -13,10 +15,23 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @see design-system/foundations/multi-branch-architecture.md
  * موسوم بالفرع **وصفياً فقط** (مكان العمل) — شؤون الموظفين مركزية على مستوى
  * المؤسسة، فلا Global Scope هنا: كل الفروع ترى كل الموظفين.
+ *
+ * **`CompanyWide` إقرارٌ صريح بذلك، ومن ثمّ رقم الموظف مؤسسيٌّ لا فرعي:**
+ * `PayrollRun` مؤسسيٌّ يضمّ كل الموظفين بلا تمييز فرع، فترقيمٌ بالفرع كان
+ * يُدخل `EMP-00001` مرّتين في المسيّر الواحد. ورقم الموظف معرّف **إداري**
+ * يُتداول في العقود والبنوك والتأمينات، لا رقم مستندٍ تشغيليّ يخصّ فرعاً.
+ * والوسم بالفرع يبقى كما هو: مكان العمل، لا نطاق ترقيم.
  */
-class Employee extends BaseModel
+class Employee extends BaseModel implements CompanyWide
 {
     use BelongsToBranch;
+    use GeneratesDocumentNumbers;
+
+    /** عمود الرقم هنا اسمه `employee_no` لا `number`. */
+    public static function documentNumberColumn(): string
+    {
+        return 'employee_no';
+    }
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'employee_no', 'name', 'national_id', 'job_title',

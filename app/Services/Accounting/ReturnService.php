@@ -556,12 +556,6 @@ class ReturnService
      */
     protected function nextNumber(string $type, string $date): string
     {
-        $prefix = $type === 'sales' ? 'SRET' : 'PRET';
-        $year   = substr($date, 0, 4);
-        $count  = ReturnDocument::where('type', $type)
-            ->whereYear('return_date', $year)
-            ->count() + 1;
-
-        return sprintf('%s-%s-%05d', $prefix, $year, $count);
+        return ReturnDocument::nextDocumentNumber($type === 'sales' ? 'SRET' : 'PRET', $date);
     }
 }

@@ -318,15 +318,9 @@ class ProcurementService
         $this->assertTransition($doc, 'converted');
     }
 
-    /**
-     * تسلسل مستقلّ لكل نوع: PR · RFQ · PQ · PO. الترقيم على مستوى المستأجر
-     * (`unique(tenant_id, number)`) لا الفرع — ولولا ذلك لبدأ كل فرع من ١.
-     */
+    /** تسلسل مستقلّ لكل نوع ولكل فرع: PR · RFQ · PQ · PO. */
     protected function nextNumber(string $type, string $date): string
     {
-        $year  = substr($date, 0, 4);
-        $count = ProcurementDocument::where('type', $type)->whereYear('doc_date', $year)->count() + 1;
-
-        return sprintf('%s-%s-%05d', self::PREFIX[$type], $year, $count);
+        return ProcurementDocument::nextDocumentNumber(self::PREFIX[$type], $date);
     }
 }

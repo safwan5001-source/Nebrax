@@ -248,9 +248,6 @@ class PayrollService
      */
     protected function nextNumber(string $date): string
     {
-        $year  = substr($date, 0, 4);
-        $count = PayrollRun::whereYear('period_start', $year)->count() + 1;
-
-        return sprintf('PR-%s-%05d', $year, $count);
+        return PayrollRun::nextDocumentNumber('PR', $date);
     }
 }

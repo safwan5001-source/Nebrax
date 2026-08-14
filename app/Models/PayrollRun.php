@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class PayrollRun extends BaseModel implements CompanyWide
 {
+    use GeneratesDocumentNumbers;
+
     protected $fillable = [
         'tenant_id', 'number', 'period', 'period_start', 'period_end',
         'status', 'pay_method', 'total_gross', 'total_gosi', 'total_other_deductions',

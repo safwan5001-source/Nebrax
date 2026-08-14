@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Support\RecordsRevisions;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
@@ -20,6 +21,7 @@ class Stocktake extends BaseModel
     use RecordsRevisions;
     use ResolvesBranchReferences;
     use BelongsToBranch;
+    use GeneratesDocumentNumbers;
 
     protected $fillable = [
         'branch_id', 'tenant_id', 'number', 'warehouse_id', 'stocktake_date',

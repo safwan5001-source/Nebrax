@@ -7,7 +7,6 @@ use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\Stocktake;
 use App\Models\StocktakeLine;
-use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -232,13 +231,9 @@ class StocktakeService
         return $account->id;
     }
 
-    /** تسلسل خارج عزل الفرع — القيد الفريد `(tenant_id, number)` للمستأجر. */
+    /** توليد رقم تسلسلي: STK-2026-00001 — تسلسل مستقلّ لكل فرع. */
     protected function nextNumber(string $date): string
     {
-        $year  = substr($date, 0, 4);
-        $count = Stocktake::withoutGlobalScope(BranchScope::class)
-            ->whereYear('stocktake_date', $year)->count() + 1;
-
-        return sprintf('STK-%s-%05d', $year, $count);
+        return Stocktake::nextDocumentNumber('STK', $date);
     }
 }
