@@ -871,7 +871,8 @@
       "operations": "Operations",
       "finance": "Finance and resources",
       "admin": "Administration"
-    }
+    },
+    "numberingSettings": "Document numbering"
   },
   "partnerProfile": {
     "back": "Back",
@@ -1647,7 +1648,9 @@
     "require_return_source_on": "Required — no return without a source",
     "require_return_source_hint": "A business policy, not an accounting rule: retail wants “no refund without a receipt”, while services issue standalone credit notes for negotiated settlements. Either way, a linked return can never exceed its invoice’s quantity or price — that limit cannot be switched off.",
     "return_window_days": "Return window (days)",
-    "return_window_days_hint": "Measured from the invoice date. “0” means no limit — the default. A business policy, not an accounting rule: retail publishes a fixed window, while contracting and long-term agreements have none. It does not apply to a return without a source document, which has no reference date."
+    "return_window_days_hint": "Measured from the invoice date. “0” means no limit — the default. A business policy, not an accounting rule: retail publishes a fixed window, while contracting and long-term agreements have none. It does not apply to a return without a source document, which has no reference date.",
+    "prefix_moved": "The prefix is now set from",
+    "prefix_moved_link": "Document numbering"
   },
   "settings": {
     "title": "Settings",
@@ -1986,7 +1989,9 @@
     "require_return_source_on": "Required — no return without a source",
     "require_return_source_hint": "Independent of the sales switch: you may require a receipt to refund a customer yet not require an invoice to return goods to a supplier. Either way, a linked return can never exceed its source quantity or price.",
     "return_window_days": "Return window (days)",
-    "return_window_days_hint": "Measured from the bill date. “0” means no limit — the default. Independent of the sales window: you may set a window for your customers yet be bound by none with your suppliers."
+    "return_window_days_hint": "Measured from the bill date. “0” means no limit — the default. Independent of the sales window: you may set a window for your customers yet be bound by none with your suppliers.",
+    "prefix_moved": "The prefix is now set from",
+    "prefix_moved_link": "Document numbering"
   },
   "revisions": {
     "title": "Change log",
@@ -2085,5 +2090,61 @@
     "draft_hint": "Counting: no quantity moved and no entry posted yet. An empty field means \"not counted\" and is skipped; zero means \"counted, none found\" and writes the balance off.",
     "entry_posted": "Posted: quantities corrected and the difference entry created in the same operation.",
     "no_difference": "Posted with no difference — the count matched exactly, so no entry."
+  },
+  "numberingSettings": {
+    "title": "Document numbering",
+    "picker_title": "Document type",
+    "document_type": "Document type",
+    "pick_type": "Choose a document type",
+    "search_type": "Search types…",
+    "no_type": "No matching type",
+    "loading_type": "Loading…",
+    "excludes_icv": "Does not cover the e-invoice counter (ICV) — managed by a separate setting on the invoices screen.",
+    "excludes_icv_link": "Invoice settings",
+    "next_number": "Next number",
+    "next_number_hint": "Computed by the same layer that issues the document — this is what the next document will actually carry. Branch-tagged types show your active branch.",
+    "series_default": "Series",
+    "prefix": "Prefix",
+    "prefix_hint": "Latin letters, digits and hyphen only. Leave empty to fall back to the default.",
+    "prefix_fixed": "This type's prefix is fixed in the system and is not configurable yet.",
+    "format": "Format",
+    "format_numeric": "Numeric",
+    "padding": "Digits",
+    "scope": "Sequence scope",
+    "scope_branch": "Per branch",
+    "scope_company": "Whole organisation",
+    "readonly_hint": "Format and digit count are fixed in the numbering layer, and scope is decided by the type's classification — shown for reference; changing them is outside this screen.",
+    "resets_yearly": "The sequence restarts each year.",
+    "never_resets": "The sequence runs continuously with no yearly reset.",
+    "entity_invoice": "Sales invoice",
+    "entity_purchase": "Purchase bill",
+    "entity_quote": "Quotation",
+    "entity_return": "Return",
+    "entity_payment": "Payment voucher",
+    "entity_credit_note": "Credit / debit note",
+    "entity_procurement": "Procurement document",
+    "entity_stock_permit": "Stock permit",
+    "entity_stocktake": "Stocktake",
+    "entity_expense": "Expense",
+    "entity_asset": "Fixed asset",
+    "entity_pos_session": "POS session",
+    "entity_journal_entry": "Journal entry",
+    "entity_payroll_run": "Payroll run",
+    "entity_employee": "Employee",
+    "entity_branch": "Branch",
+    "entity_warehouse": "Warehouse",
+    "series_return_sales": "Sales return",
+    "series_return_purchase": "Purchase return",
+    "series_payment_received": "Receipt voucher",
+    "series_payment_paid": "Payment voucher",
+    "series_credit_note_sales": "Credit note",
+    "series_credit_note_purchase": "Debit note",
+    "series_procurement_request": "Purchase request",
+    "series_procurement_rfq": "RFQ",
+    "series_procurement_quotation": "Supplier quotation",
+    "series_procurement_order": "Purchase order",
+    "series_stock_permit_receipt": "Goods receipt",
+    "series_stock_permit_issue": "Goods issue",
+    "series_stock_permit_transfer": "Transfer note"
   }
 }

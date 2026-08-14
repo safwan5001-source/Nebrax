@@ -59,7 +59,6 @@ class PurchaseSettingsTest extends TestCase
         $this->assertSame(15, $data['default_tax_rate']);
         $this->assertSame('credit', $data['default_payment_type']);
         $this->assertFalse($data['default_tax_inclusive']);
-        $this->assertSame('BILL', $data['purchase_prefix']);
     }
 
     /** المفاتيح غير المرسلة تبقى كما هي — الحفظ دمجٌ لا استبدال. */
@@ -69,11 +68,11 @@ class PurchaseSettingsTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])->putJson('/api/purchase-settings', ['default_tax_rate' => 5])->assertOk();
-        $data = $this->withToken($auth['token'])->putJson('/api/purchase-settings', ['purchase_prefix' => 'PO'])
-            ->assertOk()['data'];
+        $data = $this->withToken($auth['token'])
+            ->putJson('/api/purchase-settings', ['default_payment_type' => 'cash'])->assertOk()['data'];
 
         $this->assertSame(5, $data['default_tax_rate']);
-        $this->assertSame('PO', $data['purchase_prefix']);
+        $this->assertSame('cash', $data['default_payment_type']);
     }
 
     /**
@@ -88,7 +87,8 @@ class PurchaseSettingsTest extends TestCase
 
         $this->assertStringStartsWith('BILL-', $this->bill($auth['token'], $supplier['id'])['number']);
 
-        $this->withToken($auth['token'])->putJson('/api/purchase-settings', ['purchase_prefix' => 'FTR'])->assertOk();
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'purchase', 'prefix' => 'FTR'])->assertOk();
 
         $this->assertStringStartsWith('FTR-', $this->bill($auth['token'], $supplier['id'])['number']);
     }
@@ -154,8 +154,8 @@ class PurchaseSettingsTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/purchase-settings', ['purchase_prefix' => 'فاتورة شراء!'])
-            ->assertStatus(422)->assertJsonValidationErrors('purchase_prefix');
+            ->putJson('/api/numbering-settings', ['entity' => 'purchase', 'prefix' => 'فاتورة شراء!'])
+            ->assertStatus(422)->assertJsonValidationErrors('prefix');
     }
 
     /** مفتاح غير معرَّف في العقد يُهمَل بدل أن يتسلّل إلى التخزين. */
@@ -179,10 +179,12 @@ class PurchaseSettingsTest extends TestCase
         $a = $this->registerTenant();
         $b = $this->registerTenant('other', 'other@nibras.test');
 
-        $this->withToken($a['token'])->putJson('/api/purchase-settings', ['purchase_prefix' => 'AAA'])->assertOk();
+        $this->withToken($a['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'purchase', 'prefix' => 'AAA'])->assertOk();
 
-        $this->assertSame('BILL', $this->withToken($b['token'])
-            ->getJson('/api/purchase-settings')['data']['purchase_prefix']);
+        $purchase = collect($this->withToken($b['token'])->getJson('/api/numbering-settings')['data'])
+            ->firstWhere('key', 'purchase');
+        $this->assertSame('BILL', $purchase['prefix']);
     }
 
     /** خارج سياق مستأجر (أوامر artisan) تُعاد الافتراضات بلا انهيار. */

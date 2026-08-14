@@ -84,7 +84,6 @@ export default function InvoiceSettingsPage() {
         body: {
           default_tax_rate: Number(form.default_tax_rate) || 0,
           default_payment_type: form.default_payment_type,
-          invoice_prefix: form.invoice_prefix || null,
           require_return_source: form.require_return_source,
           return_window_days: form.return_window_days,
           default_terms: form.default_terms || null,
@@ -126,12 +125,15 @@ export default function InvoiceSettingsPage() {
                     <option value="credit">{t('credit')}</option>
                   </Select>
                 </div>
+                {/* البادئة انتقلت إلى «إعدادات الترقيم المتسلسل» — تُعرَض هنا
+                    للاطّلاع مع رابطها، فلا يبحث عنها من اعتادها في هذا الموضع. */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="prefix">{t('invoice_prefix')}</Label>
-                  <Input id="prefix" dir="ltr" maxLength={10} value={form.invoice_prefix} onChange={(e) => set('invoice_prefix', e.target.value)} />
-                  <p className="num text-xs text-muted">{t('invoice_prefix_hint')} {(form.invoice_prefix || 'INV')}-2026-00001</p>
-                  {/* التباسٌ متوقَّع: «ترقيم المستند» ≠ «ترقيم ZATCA». يُقطع هنا لا في التوثيق. */}
-                  <p className="text-xs leading-relaxed text-muted">{t('numbering_excludes_icv')}</p>
+                  <Label>{t('invoice_prefix')}</Label>
+                  <p className="num text-sm text-text" dir="ltr">{form.invoice_prefix || 'INV'}</p>
+                  <p className="text-xs leading-relaxed text-muted">
+                    {t('prefix_moved')}{' '}
+                    <Link href="/numbering-settings" className="text-primary hover:underline">{t('prefix_moved_link')}</Link>
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">
