@@ -1543,7 +1543,9 @@
     "post_now": "Post now",
     "total": "Total",
     "cancel": "Cancel",
-    "create": "Create"
+    "create": "Create",
+    "blocked_returned": "Fully returned",
+    "blocked_window": "Outside the return window"
   },
   "returns": {
     "title": "Returns",
