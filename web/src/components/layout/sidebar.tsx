@@ -174,7 +174,7 @@ const GROUPS: NavGroup[] = [
     title: 'employeeHub',
     icon: Users,
     items: [
-      { href: '/employee-management', icon: UserCog, key: 'employeeManagement' },
+      { href: '/employee-management', icon: UserCog, key: 'employeeManagement', built: true },
       { href: '/employee-roles', icon: Users, key: 'employeeRoles' },
       { href: '/employee-shifts', icon: Clock, key: 'employeeShifts' },
       { href: '/employee-assets', icon: Package, key: 'employeeAssets' },
