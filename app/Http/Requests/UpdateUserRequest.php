@@ -18,6 +18,8 @@ class UpdateUserRequest extends FormRequest
             'role'      => ['sometimes', 'required', 'in:owner,admin,accountant,staff'],
             'password'  => ['nullable', 'string', 'min:8'],
             'is_active' => ['boolean'],
+            // ربط/فكّ الربط بموظف. الغياب يُبقي الحالي؛ `null` صريحة تفكّ الربط.
+            'employee_id' => ['nullable', 'uuid'],
         ];
     }
 }

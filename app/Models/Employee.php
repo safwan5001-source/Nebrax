@@ -6,6 +6,7 @@ use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * موظف. الرواتب بالـ minor units (هللات) كـ bigint — لا float إطلاقاً.
@@ -59,6 +60,15 @@ class Employee extends BaseModel implements CompanyWide
     public function items(): HasMany
     {
         return $this->hasMany(PayrollItem::class);
+    }
+
+    /**
+     * حساب دخول هذا الموظف (إن مُنح). موظفٌ بلا `user` = سجلّ موارد بشرية
+     * لا يدخل النظام — وهو الغالب. العلاقة واحدٌ-لواحد (`users.employee_id` فريد).
+     */
+    public function user(): HasOne
+    {
+        return $this->hasOne(User::class);
     }
 
     /** إجمالي استحقاق الموظف الشهري (الأساسي + البدلات) بالهللات. */
