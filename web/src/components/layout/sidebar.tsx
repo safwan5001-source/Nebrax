@@ -175,8 +175,8 @@ const GROUPS: NavGroup[] = [
     icon: Users,
     items: [
       { href: '/employee-management', icon: UserCog, key: 'employeeManagement', built: true },
-      { href: '/employee-roles', icon: Users, key: 'employeeRoles' },
-      { href: '/employee-shifts', icon: Clock, key: 'employeeShifts' },
+      { href: '/employee-roles', icon: Users, key: 'employeeRoles', built: true },
+      { href: '/employee-shifts', icon: Clock, key: 'employeeShifts', built: true },
       { href: '/employee-assets', icon: Package, key: 'employeeAssets' },
       { href: '/employee-settings', icon: SlidersHorizontal, key: 'employeeSettings' },
     ],
