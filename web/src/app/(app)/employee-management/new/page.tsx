@@ -12,6 +12,7 @@ import {
   Save,
   ShieldCheck,
   UserRoundPlus,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -94,6 +95,8 @@ export default function NewEmployeePreviewPage() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [notice, setNotice] = useState('');
   const [selectedFile, setSelectedFile] = useState('');
+  const [allowedBranches, setAllowedBranches] = useState(['الفرع الرئيسي']);
+  const branchOptions = ['الفرع الرئيسي', 'فرع المبيعات', 'فرع المستودع'];
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -102,6 +105,14 @@ export default function NewEmployeePreviewPage() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNotice('تمت محاكاة حفظ السجل داخل المتصفح فقط. لا تُنشأ أي بيانات موظف أو مستخدم، ولا تُرسل بيانات دخول أو مرفقات.');
+  }
+
+  function addAllowedBranch(branch: string) {
+    if (branch && !allowedBranches.includes(branch)) setAllowedBranches((current) => [...current, branch]);
+  }
+
+  function removeAllowedBranch(branch: string) {
+    setAllowedBranches((current) => current.filter((item) => item !== branch));
   }
 
   return (
@@ -152,6 +163,29 @@ export default function NewEmployeePreviewPage() {
             <div className="mt-4 grid grid-cols-1 gap-3 rounded border border-border bg-background p-3 sm:grid-cols-2">
               <ToggleField id="allow-login" checked={form.allowLogin} onChange={(checked) => update('allowLogin', checked)} label="السماح بالدخول إلى النظام" description="إعداد مرئي في المعاينة ولا ينشئ حساب دخول." />
               <ToggleField id="send-credentials" checked={form.sendCredentials} onChange={(checked) => update('sendCredentials', checked)} label="إرسال بيانات الدخول بالبريد" description="لا يُرسل أي بريد في وضع المعاينة." />
+            </div>
+            <div className="mt-4 space-y-1.5">
+              <Label htmlFor="allowed-branch">الفروع المسموح الدخول بها <span className="text-negative">*</span></Label>
+              <div className="rounded border border-border bg-surface p-2">
+                <div className="flex min-h-9 flex-wrap items-center gap-2">
+                  {allowedBranches.map((branch) => (
+                    <span key={branch} className="inline-flex items-center gap-1.5 rounded border border-primary/30 bg-primary-soft px-2.5 py-1 text-sm text-primary">
+                      {branch}
+                      <button type="button" onClick={() => removeAllowedBranch(branch)} className="rounded p-0.5 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={`إزالة ${branch} من الفروع المسموح بها`}>
+                        <X className="h-3.5 w-3.5" strokeWidth={2} />
+                      </button>
+                    </span>
+                  ))}
+                  {allowedBranches.length === 0 && <span className="px-1 text-sm text-muted">لم يُحدد أي فرع بعد</span>}
+                </div>
+                <div className="mt-2 border-t border-border pt-2">
+                  <Select id="allowed-branch" value="" onChange={(event) => addAllowedBranch(event.target.value)} aria-describedby="allowed-branch-hint">
+                    <option value="">أضف فرعاً إلى نطاق الدخول</option>
+                    {branchOptions.filter((branch) => !allowedBranches.includes(branch)).map((branch) => <option key={branch} value={branch}>{branch}</option>)}
+                  </Select>
+                </div>
+              </div>
+              <p id="allowed-branch-hint" className="text-xs leading-5 text-muted">اختيار مرئي محلي للمعاينة فقط؛ لا يمنح أو يغيّر وصولاً فعلياً إلى الفروع.</p>
             </div>
             {form.recordType === 'user' && <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.7} />نوع «مستخدم» يُعرض لتجربة النموذج فقط؛ لا تتغير الصلاحيات ولا تُنشأ حسابات من هذه الصفحة.</p>}
           </FormSection>
@@ -219,6 +253,7 @@ export default function NewEmployeePreviewPage() {
                 <SummaryLine label="نوع السجل" value={form.recordType === 'user' ? 'مستخدم' : 'موظف'} />
                 <SummaryLine label="الاسم" value={[form.firstName, form.middleName, form.lastName].filter(Boolean).join(' ') || 'لم يُدخل بعد'} />
                 <SummaryLine label="الفرع" value={form.branch || 'غير محدد'} />
+                <SummaryLine label="الفروع المسموح بها" value={allowedBranches.length ? allowedBranches.join('، ') : 'لم تُحدد'} />
                 <SummaryLine label="الدخول للنظام" value={form.allowLogin ? 'معروض للمعاينة' : 'غير مفعّل'} />
               </div>
               <div className="border-t border-border pt-4">
