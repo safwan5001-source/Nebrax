@@ -127,6 +127,8 @@ export default function PurchaseSettingsPage() {
                   <p className="num text-xs text-muted">
                     {t('purchase_prefix_hint')} {(form.purchase_prefix || 'BILL')}-2026-00001
                   </p>
+                  {/* التباسٌ متوقَّع: «ترقيم المستند» ≠ «ترقيم ZATCA». */}
+                  <p className="text-xs leading-relaxed text-muted">{t('numbering_excludes_icv')}</p>
                 </div>
 
                 <div className="space-y-1.5">
