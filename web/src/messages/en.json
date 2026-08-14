@@ -792,22 +792,6 @@
     "purchaseSettings": "Purchase settings",
     "inventorySettings": "Inventory and product settings",
     "superGroups": {
-    "return_window_days": "Return window (days)",
-    "return_window_days_hint": "Measured from the bill date. “0” means no limit — the default. Independent of the sales window: you may set a window for your customers yet be bound by none with your suppliers.",
-    "return_window_days": "Return window (days)",
-    "return_window_days_hint": "Measured from the invoice date. “0” means no limit — the default. A business policy, not an accounting rule: retail publishes a fixed window, while contracting and long-term agreements have none. It does not apply to a return without a source document, which has no reference date.",
-    "returns": "Sales returns",
-    "restock_sales_returns": "Return goods to stock",
-    "restock_sales_returns_hint": "A business policy, not an accounting rule: retail puts sound goods back on the shelf, while restaurants and food shops never restock a return. Either way, the amount refunded to the customer is unchanged.",
-    "restock_off_note": "When off: returned goods do not enter stock and the moving average is untouched; their cost is posted to “5180 Inventory Adjustments” instead of “1140 Inventory”. You can override this per return on its creation screen.",
-    "require_return_source": "Link returns to their source",
-    "require_return_source_off": "Optional — free-standing returns allowed",
-    "require_return_source_on": "Required — no return without a source",
-    "require_return_source_hint": "Independent of the sales switch: you may require a receipt to refund a customer yet not require an invoice to return goods to a supplier. Either way, a linked return can never exceed its source quantity or price.",
-    "require_return_source": "Link returns to their source",
-    "require_return_source_off": "Optional — free-standing returns allowed",
-    "require_return_source_on": "Required — no return without a source",
-    "require_return_source_hint": "A business policy, not an accounting rule: retail wants “no refund without a receipt”, while services issue standalone credit notes for negotiated settlements. Either way, a linked return can never exceed its invoice’s quantity or price — that limit cannot be switched off.",
       "revenue": "Revenue",
       "operations": "Operations",
       "finance": "Finance and resources",
@@ -991,7 +975,8 @@
     "date": "Date",
     "amount": "Amount",
     "search": "Search…",
-    "empty": "No payments"
+    "empty": "No payments",
+    "status": "Status"
   },
   "pos": {
     "search_products": "Search by name, barcode or code…",
@@ -1571,7 +1556,13 @@
     "ord_prefix": "Sales order prefix",
     "invoice_prefix_hint": "Example:",
     "default_terms_hint": "Terms printed on the invoice are set in",
-    "designs_link": "document design"
+    "designs_link": "document design",
+    "require_return_source": "Link returns to their source",
+    "require_return_source_off": "Optional — free-standing returns allowed",
+    "require_return_source_on": "Required — no return without a source",
+    "require_return_source_hint": "A business policy, not an accounting rule: retail wants “no refund without a receipt”, while services issue standalone credit notes for negotiated settlements. Either way, a linked return can never exceed its invoice’s quantity or price — that limit cannot be switched off.",
+    "return_window_days": "Return window (days)",
+    "return_window_days_hint": "Measured from the invoice date. “0” means no limit — the default. A business policy, not an accounting rule: retail publishes a fixed window, while contracting and long-term agreements have none. It does not apply to a return without a source document, which has no reference date."
   },
   "settings": {
     "title": "Settings",
@@ -1881,7 +1872,11 @@
     "unit_factor_hint": "The factor is how many “{base}” make one unit. It starts at 2 and takes no fractions: a unit smaller than the base is handled by making the smaller one the base. Changing a factor later never touches a posted document — the line copies its factor when it is created.",
     "unit_list": "Templates",
     "unit_empty": "No unit templates yet.",
-    "unit_none": "No alternative units — base only."
+    "unit_none": "No alternative units — base only.",
+    "returns": "Sales returns",
+    "restock_sales_returns": "Return goods to stock",
+    "restock_sales_returns_hint": "A business policy, not an accounting rule: retail puts sound goods back on the shelf, while restaurants and food shops never restock a return. Either way, the amount refunded to the customer is unchanged.",
+    "restock_off_note": "When off: returned goods do not enter stock and the moving average is untouched; their cost is posted to “5180 Inventory Adjustments” instead of “1140 Inventory”. You can override this per return on its creation screen."
   },
   "purchaseSettings": {
     "title": "Purchase settings",
@@ -1899,7 +1894,13 @@
     "tax_exclusive": "Tax exclusive",
     "purchase_prefix": "Purchase bill number prefix",
     "purchase_prefix_hint": "Example:",
-    "save": "Save settings"
+    "save": "Save settings",
+    "require_return_source": "Link returns to their source",
+    "require_return_source_off": "Optional — free-standing returns allowed",
+    "require_return_source_on": "Required — no return without a source",
+    "require_return_source_hint": "Independent of the sales switch: you may require a receipt to refund a customer yet not require an invoice to return goods to a supplier. Either way, a linked return can never exceed its source quantity or price.",
+    "return_window_days": "Return window (days)",
+    "return_window_days_hint": "Measured from the bill date. “0” means no limit — the default. Independent of the sales window: you may set a window for your customers yet be bound by none with your suppliers."
   },
   "revisions": {
     "title": "Change log",
