@@ -73,6 +73,45 @@ jobs:
           [ "$MISSING" -eq 0 ] || exit 1
           echo "✔ كل ملفات النواة مشمولة بقائمة النسخ."
 
+      # ═══════════════════════════════════════════════════════════════
+      #  حارس تزامن القوائم الثلاث — حقيقةٌ واحدة مكتوبة ثلاث مرّات
+      # ═══════════════════════════════════════════════════════════════
+      #  الدمج موصوفٌ في ثلاثة ملفات: هذا الملف (الاختبار)، و`deploy/assemble.sh`
+      #  (النشر)، و`setup.sh` (التطوير المحلي). والحارس أعلاه يحمي هذا الملف
+      #  وحده — فمجلدٌ يُضاف هنا ويُنسى هناك يمرّ الـ CI **أخضر** ويسقط النشر،
+      #  أو يكسر جهاز المطوّر. وهو أسوأ موضعٍ لاكتشاف الخطأ.
+      #
+      #  حدث هذا فعلاً: `app/Models/Concerns` و`app/Console/Commands` كانا هنا
+      #  وفي النشر، وسقطا من `setup.sh` — فكان `bash setup.sh` ينتج مشروعاً
+      #  يفشل على `HasUnitConversion` عند أول فاتورة.
+      - name: حارس تزامن قوائم النسخ
+        run: |
+          extract() {
+            grep -oE 'cp -r "\$\{?CORE(_DIR)?\}?/[^"]*"' "$1" \
+              | sed -E 's|.*\$\{?CORE(_DIR)?\}?/||; s|"$||; s|/$||' \
+              | sort -u
+          }
+
+          extract .github/workflows/ci.yml > /tmp/list-ci
+          extract deploy/assemble.sh       > /tmp/list-deploy
+          extract setup.sh                 > /tmp/list-setup
+
+          STATUS=0
+          for pair in "deploy:/tmp/list-deploy" "setup:/tmp/list-setup"; do
+            name="${pair%%:*}"; file="${pair#*:}"
+            if ! diff -u /tmp/list-ci "$file" > /tmp/list-diff; then
+              echo "::error::قائمة النسخ في «$name» تفترق عن ci.yml — الفرق أدناه (- ناقصٌ منها · + زائدٌ فيها):"
+              sed -n '3,$p' /tmp/list-diff
+              STATUS=1
+            fi
+          done
+
+          [ "$STATUS" -eq 0 ] || {
+            echo "::error::وحّد القوائم الثلاث: .github/workflows/ci.yml · deploy/assemble.sh · setup.sh"
+            exit 1
+          }
+          echo "✔ قوائم النسخ الثلاث متطابقة."
+
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
