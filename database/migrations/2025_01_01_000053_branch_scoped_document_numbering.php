@@ -30,7 +30,13 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
-    /** الجداول الموسومة بالفرع: اسم الجدول => عمود الرقم. */
+    /**
+     * الجداول المرقَّمة بالفرع: اسم الجدول => عمود الرقم.
+     *
+     * `employees` **ليس منها** رغم وسمه بالفرع: مصنَّف `CompanyWide` لأن
+     * `PayrollRun` مؤسسيٌّ يضمّ كل الموظفين، فترقيمٌ بالفرع كان يُدخل
+     * `EMP-00001` مرّتين في المسيّر الواحد. يبقى على `(tenant_id, employee_no)`.
+     */
     private const BRANCH_NUMBERED = [
         'invoices'              => 'number',
         'purchases'             => 'number',
@@ -44,7 +50,6 @@ return new class extends Migration
         'stock_permits'         => 'number',
         'stocktakes'            => 'number',
         'pos_sessions'          => 'number',
-        'employees'             => 'employee_no',
     ];
 
     public function up(): void

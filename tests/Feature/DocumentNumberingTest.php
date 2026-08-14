@@ -301,17 +301,41 @@ class DocumentNumberingTest extends TestCase
         $this->assertSame('JE-2026-00002', JournalEntry::nextDocumentNumber('JE', '2026-03-01'));
     }
 
-    /** سلسلة بلا سنة: رقم الموظف يستمرّ عبر السنوات. @test */
-    public function employee_numbers_run_as_one_continuous_series(): void
+    /**
+     * رقم الموظف: سلسلة واحدة **للمؤسسة** بلا سنة ولا فرع.
+     *
+     * `Employee` موسوم بالفرع (مكان العمل) لكنه مصنَّف `CompanyWide`: الوسم
+     * وصفيٌّ لا نطاقُ ترقيم. ولولا ذلك لتكرّر `EMP-00001` في مسيّر الرواتب
+     * الواحد — و`PayrollRun` مؤسسيٌّ يضمّ كل الموظفين بلا تمييز فرع.
+     *
+     * @test
+     */
+    public function employee_numbers_run_as_one_company_wide_series(): void
     {
-        $this->assertSame('EMP-00001', Employee::nextDocumentNumber('EMP'));
+        $riyadh = \App\Models\Branch::create(['name' => 'الرياض', 'code' => '00001']);
+        $khobar = \App\Models\Branch::create(['name' => 'الخبر', 'code' => '00002']);
 
-        Employee::create([
-            'employee_no' => 'EMP-00001', 'name' => 'موظف', 'basic_salary' => 500000,
-            'hire_date'   => '2026-01-01',
-        ]);
+        $hire = function (string $branchId): string {
+            app(BranchContext::class)->set($branchId);
+            $no = Employee::nextDocumentNumber('EMP');
 
-        $this->assertSame('EMP-00002', Employee::nextDocumentNumber('EMP'));
+            Employee::create([
+                'employee_no' => $no, 'name' => 'موظف', 'basic_salary' => 500000,
+                'hire_date'   => '2026-01-01',
+            ]);
+
+            return $no;
+        };
+
+        // السلسلة تتّصل عبر الفروع ولا تنقسم بها.
+        $this->assertSame('EMP-00001', $hire($riyadh->id));
+        $this->assertSame('EMP-00002', $hire($khobar->id));
+        $this->assertSame('EMP-00003', $hire($riyadh->id));
+
+        // ومع ذلك يبقى الوسم الوصفي بمكان العمل قائماً.
+        $this->assertSame($khobar->id, Employee::where('employee_no', 'EMP-00002')->value('branch_id'));
+
+        app(BranchContext::class)->forget();
     }
 
     // ═══════════════════════════════════════════════════════════
