@@ -47,16 +47,19 @@ return new class extends Migration
             $table->boolean('is_paid')->default(false)->after('payment_status');
             $table->string('payment_method')->default('cash')->after('is_paid');
             $table->string('payment_reference')->nullable()->after('payment_method');
-            $table->foreignUuid('cash_account_id')->nullable()->after('payment_reference')
-                ->constrained('accounts')->nullOnDelete();
+            // عمودٌ عادي **بلا مفتاح أجنبي** عمداً — كنظيره في هجرة المدفوعات
+            // (000054): إضافة FK لجدولٍ قائم تُعيد بناءه على SQLite فتُسقط شرط
+            // الفهرس الجزئي (`WHERE branch_id IS NULL`) لهجرة الترقيم بالفرع
+            // (000053) ويكسر استقلال تسلسل الفروع. التكامل المرجعي يضمنه
+            // `PaymentService::validCashAccountId` (السند هو من يقيّد الخزينة).
+            $table->uuid('cash_account_id')->nullable()->after('payment_reference');
         });
     }
 
     public function down(): void
     {
         Schema::table('invoices', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('cash_account_id');
-            $table->dropColumn(['is_paid', 'payment_method', 'payment_reference']);
+            $table->dropColumn(['cash_account_id', 'is_paid', 'payment_method', 'payment_reference']);
         });
     }
 };

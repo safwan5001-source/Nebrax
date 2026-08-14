@@ -31,16 +31,21 @@ return new class extends Migration
     {
         Schema::table('payments', function (Blueprint $table) {
             $table->string('reference')->nullable()->after('method');
-            $table->foreignUuid('cash_account_id')->nullable()->after('reference')
-                ->constrained('accounts')->nullOnDelete();
+            // عمودٌ عادي **بلا مفتاح أجنبي** عمداً: إضافة FK لجدولٍ قائم تُعيد
+            // بناءه على SQLite، وإعادةُ البناء تُسقط شرط الفهرس الجزئي
+            // (`WHERE branch_id IS NULL`) الذي تنشئه هجرة الترقيم بالفرع
+            // (000053) — فيتحوّل قيداً كاملاً يكسر استقلال تسلسل كل فرع.
+            // والتكامل المرجعي مضمونٌ أقوى في `PaymentService::validCashAccountId`
+            // (مستأجر + عائلة نقد/بنك + غير تجميعي)، والحسابات `is_system` لا تُحذف
+            // فـ`nullOnDelete` كان حِملاً ميتاً.
+            $table->uuid('cash_account_id')->nullable()->after('reference');
         });
     }
 
     public function down(): void
     {
         Schema::table('payments', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('cash_account_id');
-            $table->dropColumn('reference');
+            $table->dropColumn(['cash_account_id', 'reference']);
         });
     }
 };
