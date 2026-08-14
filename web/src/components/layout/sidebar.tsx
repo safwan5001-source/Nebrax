@@ -169,6 +169,19 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
+    // مجموعة الموظفين مستقلة عن الموارد البشرية: فروعها معروضة كخريطة مستقبلية
+    // ومعلّمة «قريباً»، فلا تتصل بأي API أو بيانات ولا تتداخل مع مسارات HR الحالية.
+    title: 'employeeHub',
+    icon: Users,
+    items: [
+      { href: '/employee-management', icon: UserCog, key: 'employeeManagement' },
+      { href: '/employee-roles', icon: Users, key: 'employeeRoles' },
+      { href: '/employee-shifts', icon: Clock, key: 'employeeShifts' },
+      { href: '/employee-assets', icon: Package, key: 'employeeAssets' },
+      { href: '/employee-settings', icon: SlidersHorizontal, key: 'employeeSettings' },
+    ],
+  },
+  {
     title: 'operations',
     icon: Workflow,
     items: [
@@ -223,7 +236,7 @@ const GROUPS: NavGroup[] = [
 const SUPER_GROUPS: { label: string; titles: string[] }[] = [
   { label: 'revenue', titles: ['sales', 'pos', 'customers'] },
   { label: 'operations', titles: ['inventory', 'purchases', 'logistics'] },
-  { label: 'finance', titles: ['accounting', 'hr', 'operations'] },
+  { label: 'finance', titles: ['accounting', 'hr', 'employeeHub', 'operations'] },
   { label: 'admin', titles: ['branches', 'system'] },
 ];
 
