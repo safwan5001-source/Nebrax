@@ -7,6 +7,12 @@ import {
   ArrowLeft,
   BarChart3,
   BookOpen,
+  Building2,
+  CalendarCog,
+  Factory,
+  Truck,
+  UsersRound,
+  Wrench,
   Check,
   ChevronLeft,
   Package,
@@ -37,6 +43,22 @@ const ABOUT_PILLARS: { icon: LucideIcon; title: string; desc: string }[] = [
   { icon: Sparkles, title: 'about_flex_title', desc: 'about_flex_desc' },
   { icon: BookOpen, title: 'about_arabic_title', desc: 'about_arabic_desc' },
   { icon: Package, title: 'about_ops_title', desc: 'about_ops_desc' },
+];
+
+const INDUSTRIES: { icon: LucideIcon; title: string; desc: string }[] = [
+  { icon: Store, title: 'industry_retail_title', desc: 'industry_retail_desc' },
+  { icon: Wrench, title: 'industry_services_title', desc: 'industry_services_desc' },
+  { icon: Building2, title: 'industry_contracting_title', desc: 'industry_contracting_desc' },
+  { icon: Truck, title: 'industry_logistics_title', desc: 'industry_logistics_desc' },
+  { icon: CalendarCog, title: 'industry_hospitality_title', desc: 'industry_hospitality_desc' },
+  { icon: Factory, title: 'industry_operations_title', desc: 'industry_operations_desc' },
+];
+
+const JOURNEY: { icon: LucideIcon; title: string; desc: string }[] = [
+  { icon: Store, title: 'journey_sell_title', desc: 'journey_sell_desc' },
+  { icon: Package, title: 'journey_stock_title', desc: 'journey_stock_desc' },
+  { icon: BookOpen, title: 'journey_finance_title', desc: 'journey_finance_desc' },
+  { icon: UsersRound, title: 'journey_team_title', desc: 'journey_team_desc' },
 ];
 
 export default function LandingPage() {
@@ -168,7 +190,35 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="modules" className="border-y border-border bg-surface">
+        <section id="industries" className="border-y border-border bg-surface">
+          <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+            <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-end">
+              <div>
+                <p className="text-sm font-bold text-primary">{t('industries_kicker')}</p>
+                <h2 className="mt-3 text-2xl font-bold leading-tight tracking-tight sm:text-3xl">{t('industries_title')}</h2>
+                <p className="mt-4 text-base leading-7 text-muted">{t('industries_subtitle')}</p>
+              </div>
+              <div className="rounded-2xl border border-primary/15 bg-primary-soft/70 p-5 text-sm leading-7 text-text">
+                <p className="font-bold text-primary">{t('industries_note_title')}</p>
+                <p className="mt-1">{t('industries_note')}</p>
+              </div>
+            </div>
+            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {INDUSTRIES.map((industry) => {
+                const Icon = industry.icon;
+                return (
+                  <article key={industry.title} className="rounded-2xl border border-border bg-background p-5 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-soft text-primary"><Icon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" /></span>
+                    <h3 className="mt-5 text-base font-bold">{t(industry.title)}</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted">{t(industry.desc)}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section id="modules" className="border-b border-border bg-background">
           <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
             <div className="mx-auto max-w-2xl text-center">
               <p className="text-sm font-bold text-primary">{t('features_kicker')}</p>
@@ -186,6 +236,29 @@ export default function LandingPage() {
                     </span>
                     <h3 className="mt-5 text-base font-bold">{t(feature.title)}</h3>
                     <p className="mt-2 text-sm leading-6 text-muted">{t(feature.desc)}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section id="journey" className="border-b border-border bg-surface">
+          <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-sm font-bold text-primary">{t('journey_kicker')}</p>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{t('journey_title')}</h2>
+              <p className="mt-3 text-base leading-7 text-muted">{t('journey_subtitle')}</p>
+            </div>
+            <div className="mt-10 grid gap-4 md:grid-cols-4">
+              {JOURNEY.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <article key={step.title} className="relative rounded-2xl border border-border bg-background p-5">
+                    <span className="absolute end-4 top-4 text-3xl font-bold text-primary/15">0{index + 1}</span>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-soft text-primary"><Icon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" /></span>
+                    <h3 className="mt-5 text-base font-bold">{t(step.title)}</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted">{t(step.desc)}</p>
                   </article>
                 );
               })}
@@ -232,6 +305,25 @@ export default function LandingPage() {
                 <p className="text-sm font-bold text-primary">{t('about_vision_title')}</p>
                 <p className="mt-3 text-lg font-medium leading-8 text-background/90">{t('about_vision')}</p>
               </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="start" className="border-b border-border bg-surface">
+          <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-sm font-bold text-primary">{t('start_kicker')}</p>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{t('start_title')}</h2>
+              <p className="mt-3 text-base leading-7 text-muted">{t('start_subtitle')}</p>
+            </div>
+            <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3">
+              {(['start_step_one', 'start_step_two', 'start_step_three'] as const).map((step, index) => (
+                <article key={step} className="rounded-2xl border border-border bg-background p-6">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">{index + 1}</span>
+                  <h3 className="mt-5 text-base font-bold">{t(`${step}_title`)}</h3>
+                  <p className="mt-2 text-sm leading-6 text-muted">{t(`${step}_desc`)}</p>
+                </article>
+              ))}
             </div>
           </div>
         </section>
