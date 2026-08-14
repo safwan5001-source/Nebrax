@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Sans_Arabic, IBM_Plex_Mono, Tajawal } from 'next/font/google';
+import { IBM_Plex_Sans_Arabic, IBM_Plex_Mono } from 'next/font/google';
 import { getLocale, getMessages } from 'next-intl/server';
 import { Providers } from '@/components/providers';
 import './globals.css';
@@ -18,13 +18,6 @@ const mono = IBM_Plex_Mono({
   display: 'swap',
   variable: '--font-ibm-mono',
 });
-const landing = Tajawal({
-  subsets: ['arabic', 'latin'],
-  weight: ['400', '500', '700'],
-  display: 'swap',
-  variable: '--font-tajawal',
-});
-
 export const metadata: Metadata = {
   title: 'نبراكس',
   description: 'منصة سحابية متكاملة لإدارة المؤسسات',
@@ -36,7 +29,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
 
   return (
-    <html lang={locale} dir={dir} className={`${sans.variable} ${mono.variable} ${landing.variable}`} suppressHydrationWarning>
+    <html lang={locale} dir={dir} className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body suppressHydrationWarning>
         <Providers locale={locale} messages={messages}>
           {children}

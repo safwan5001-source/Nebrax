@@ -18,7 +18,6 @@ import {
   Package,
   QrCode,
   ShieldCheck,
-  Sparkles,
   Store,
   UserCog,
   type LucideIcon,
@@ -40,7 +39,7 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
 const TRUST_ITEMS = ['trust_fast', 'trust_arabic', 'trust_secure'] as const;
 
 const ABOUT_PILLARS: { icon: LucideIcon; title: string; desc: string }[] = [
-  { icon: Sparkles, title: 'about_flex_title', desc: 'about_flex_desc' },
+  { icon: Wrench, title: 'about_flex_title', desc: 'about_flex_desc' },
   { icon: BookOpen, title: 'about_arabic_title', desc: 'about_arabic_desc' },
   { icon: Package, title: 'about_ops_title', desc: 'about_ops_desc' },
 ];
@@ -73,7 +72,6 @@ export default function LandingPage() {
   return (
     <div
       className="min-h-screen overflow-x-hidden bg-background text-text"
-      style={{ fontFamily: 'var(--font-tajawal), var(--font-sans)' }}
     >
       <header className="sticky top-0 z-20 border-b border-border/80 bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
@@ -99,24 +97,21 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section className="relative isolate overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_85%_18%,color-mix(in_srgb,var(--primary)_24%,transparent),transparent_29rem),radial-gradient(circle_at_12%_82%,color-mix(in_srgb,var(--positive)_14%,transparent),transparent_24rem)]" />
-          <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.16] [background-image:linear-gradient(color-mix(in_srgb,var(--primary)_22%,transparent)_1px,transparent_1px),linear-gradient(90deg,color-mix(in_srgb,var(--primary)_22%,transparent)_1px,transparent_1px)] [background-size:42px_42px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" />
-          <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1.02fr_0.98fr] lg:gap-16 lg:px-8 lg:py-28">
+        <section className="border-b border-border bg-primary-soft/35">
+          <div className="mx-auto grid w-full max-w-7xl items-center gap-10 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1.02fr_0.98fr] lg:gap-14 lg:px-8 lg:py-24">
             <div className="max-w-2xl">
-              <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary sm:text-sm">
-                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+              <p className="mb-5 text-sm font-semibold text-primary">
                 {t('tagline')}
               </p>
-              <h1 className="max-w-xl text-4xl font-bold leading-[1.18] tracking-tight sm:text-5xl lg:text-[3.55rem]">
-                <span className="bg-gradient-to-l from-primary via-primary to-positive bg-clip-text text-transparent">{t('hero_title')}</span>
+              <h1 className="max-w-xl text-4xl font-bold leading-[1.18] tracking-tight sm:text-5xl lg:text-[3.35rem]">
+                {t('hero_title')}
               </h1>
               <p className="mt-5 max-w-xl text-base leading-8 text-muted sm:text-lg">
                 {t('hero_subtitle')}
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button size="md" className="h-11 w-full px-5 text-base shadow-lg shadow-primary/20 sm:w-auto" onClick={enterDemo}>
+                <Button size="md" className="h-11 w-full px-5 text-base sm:w-auto" onClick={enterDemo}>
                   {t('cta_demo')}
                   <ArrowLeft className="h-4 w-4" strokeWidth={2} />
                 </Button>
@@ -130,25 +125,18 @@ export default function LandingPage() {
               <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted" aria-label={t('trust_aria')}>
                 {TRUST_ITEMS.map((item) => (
                   <li key={item} className="inline-flex items-center gap-1.5">
-                    <Check className="h-4 w-4 shrink-0 text-positive" strokeWidth={2.4} aria-hidden="true" />
+                    <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={1.8} aria-hidden="true" />
                     {t(item)}
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="relative mx-auto w-full max-w-xl lg:max-w-none" aria-label={t('preview_aria')}>
-              <div className="absolute -inset-8 -z-10 rounded-[3rem] bg-primary/15 blur-3xl" />
-              <div className="absolute -end-5 top-10 z-10 hidden rounded-2xl border border-white/30 bg-surface/80 px-3 py-2 text-xs font-bold shadow-xl backdrop-blur-xl sm:block">
-                <span className="me-1.5 inline-block h-2 w-2 rounded-full bg-positive shadow-[0_0_12px_var(--positive)]" />{t('hero_live_badge')}
-              </div>
-              <div className="absolute -start-5 bottom-12 z-10 hidden rounded-2xl border border-primary/20 bg-surface/80 px-3 py-2 text-xs font-semibold text-primary shadow-xl backdrop-blur-xl sm:block">
-                {t('hero_flow_badge')}
-              </div>
-              <div className="overflow-hidden rounded-[1.75rem] border border-white/20 bg-surface/75 shadow-2xl shadow-primary/20 backdrop-blur-xl">
+            <div className="mx-auto w-full max-w-xl lg:max-w-none" aria-label={t('preview_aria')}>
+              <div className="overflow-hidden rounded-2xl border border-border bg-surface">
                 <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-positive" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-primary" />
                     <span className="text-xs font-semibold text-muted">{t('preview_badge')}</span>
                   </div>
                   <div className="flex gap-1.5" aria-hidden="true">
@@ -157,22 +145,22 @@ export default function LandingPage() {
                     <span className="h-2 w-2 rounded-full bg-border" />
                   </div>
                 </div>
-                <div className="bg-gradient-to-br from-primary-soft/80 via-surface to-positive/5 p-4 sm:p-5">
+                <div className="bg-background p-4 sm:p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold text-primary">{t('preview_eyebrow')}</p>
                       <h2 className="mt-1 text-lg font-bold sm:text-xl">{t('preview_title')}</h2>
                     </div>
-                    <div className="rounded-lg bg-surface px-2.5 py-1.5 text-xs font-medium text-muted shadow-sm">{t('preview_realtime')}</div>
+                    <div className="rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-muted">{t('preview_realtime')}</div>
                   </div>
 
                   <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-3">
-                    <PreviewMetric label={t('preview_cash')} value="217,840" tone="primary" />
-                    <PreviewMetric label={t('preview_invoices')} value="63,200" tone="positive" />
-                    <PreviewMetric label={t('preview_income')} value="482,500" tone="text" />
+                    <PreviewMetric label={t('preview_cash')} value="217,840.00 ﷼" tone="primary" />
+                    <PreviewMetric label={t('preview_invoices')} value="63,200.00 ﷼" tone="positive" />
+                    <PreviewMetric label={t('preview_income')} value="482,500.00 ﷼" tone="text" />
                   </div>
 
-                  <div className="mt-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
+                  <div className="mt-4 rounded-lg border border-border bg-surface p-4">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold">{t('preview_balance')}</p>
                       <BarChart3 className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -188,7 +176,7 @@ export default function LandingPage() {
                     </div>
                     <div className="mt-3 flex items-center justify-between text-[11px] text-muted">
                       <span>{t('preview_status')}</span>
-                      <span className="font-semibold text-positive">{t('preview_balanced')}</span>
+                      <span className="font-semibold text-primary">{t('preview_balanced')}</span>
                     </div>
                   </div>
                 </div>
@@ -197,8 +185,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="industries" className="relative border-y border-border bg-surface">
-          <div className="pointer-events-none absolute start-0 top-0 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
+        <section id="industries" className="border-y border-border bg-surface">
           <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
             <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-end">
               <div>
@@ -206,7 +193,7 @@ export default function LandingPage() {
                 <h2 className="mt-3 text-2xl font-bold leading-tight tracking-tight sm:text-3xl">{t('industries_title')}</h2>
                 <p className="mt-4 text-base leading-7 text-muted">{t('industries_subtitle')}</p>
               </div>
-              <div className="rounded-2xl border border-primary/15 bg-primary-soft/70 p-5 text-sm leading-7 text-text">
+              <div className="rounded-lg border border-primary/15 bg-primary-soft p-5 text-sm leading-7 text-text">
                 <p className="font-bold text-primary">{t('industries_note_title')}</p>
                 <p className="mt-1">{t('industries_note')}</p>
               </div>
@@ -215,9 +202,9 @@ export default function LandingPage() {
               {INDUSTRIES.map((industry) => {
                 const Icon = industry.icon;
                 return (
-                  <article key={industry.title} className="rounded-2xl border border-border bg-background p-5 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-soft text-primary"><Icon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" /></span>
-                    <h3 className="mt-5 text-base font-bold">{t(industry.title)}</h3>
+                  <article key={industry.title} className="rounded-lg border border-border bg-background p-5 transition-colors duration-200 hover:border-primary/40">
+                    <Icon className="h-5 w-5 text-muted" strokeWidth={1.8} aria-hidden="true" />
+                    <h3 className="mt-4 text-base font-bold">{t(industry.title)}</h3>
                     <p className="mt-2 text-sm leading-6 text-muted">{t(industry.desc)}</p>
                   </article>
                 );
@@ -238,11 +225,9 @@ export default function LandingPage() {
               {FEATURES.map((feature) => {
                 const Icon = feature.icon;
                 return (
-                  <article key={feature.title} className="group rounded-2xl border border-border bg-background p-5 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-soft text-primary">
-                      <Icon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
-                    </span>
-                    <h3 className="mt-5 text-base font-bold">{t(feature.title)}</h3>
+                  <article key={feature.title} className="group rounded-lg border border-border bg-background p-5 transition-colors duration-200 hover:border-primary/40">
+                    <Icon className="h-5 w-5 text-muted" strokeWidth={1.8} aria-hidden="true" />
+                    <h3 className="mt-4 text-base font-bold">{t(feature.title)}</h3>
                     <p className="mt-2 text-sm leading-6 text-muted">{t(feature.desc)}</p>
                   </article>
                 );
@@ -251,23 +236,24 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="journey" className="relative border-b border-border bg-surface">
-          <div className="pointer-events-none absolute end-0 top-12 h-64 w-64 rounded-full bg-positive/10 blur-3xl" />
+        <section id="journey" className="border-b border-border bg-surface">
           <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
             <div className="mx-auto max-w-2xl text-center">
               <p className="text-sm font-bold text-primary">{t('journey_kicker')}</p>
               <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{t('journey_title')}</h2>
               <p className="mt-3 text-base leading-7 text-muted">{t('journey_subtitle')}</p>
             </div>
-            <div className="mt-10 grid gap-4 md:grid-cols-4">
+            <div className="mx-auto mt-10 max-w-5xl divide-y divide-border rounded-lg border border-border bg-background">
               {JOURNEY.map((step, index) => {
                 const Icon = step.icon;
                 return (
-                  <article key={step.title} className="relative rounded-2xl border border-border bg-background p-5">
-                    <span className="absolute end-4 top-4 text-3xl font-bold text-primary/15">0{index + 1}</span>
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-soft text-primary"><Icon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" /></span>
-                    <h3 className="mt-5 text-base font-bold">{t(step.title)}</h3>
-                    <p className="mt-2 text-sm leading-6 text-muted">{t(step.desc)}</p>
+                  <article key={step.title} className="grid gap-4 p-5 sm:grid-cols-[2.5rem_1fr_auto] sm:items-center">
+                    <span className="font-mono text-sm font-semibold text-primary">0{index + 1}</span>
+                    <div>
+                      <h3 className="text-base font-bold">{t(step.title)}</h3>
+                      <p className="mt-1 text-sm leading-6 text-muted">{t(step.desc)}</p>
+                    </div>
+                    <Icon className="h-5 w-5 text-muted" strokeWidth={1.8} aria-hidden="true" />
                   </article>
                 );
               })}
@@ -281,18 +267,18 @@ export default function LandingPage() {
               <p className="text-sm font-bold text-primary">{t('about_kicker')}</p>
               <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{t('about_title')}</h2>
               <p className="mt-5 text-base leading-8 text-muted">{t('about_lead')}</p>
-              <div className="mt-8 inline-flex items-end gap-3 rounded-2xl border border-primary/15 bg-primary-soft px-5 py-4">
+              <div className="mt-8 inline-flex items-end gap-3 rounded-lg border border-primary/15 bg-primary-soft px-5 py-4">
                 <strong className="text-3xl font-bold tracking-tight text-primary">{t('about_stat')}</strong>
                 <span className="mb-1 max-w-28 text-xs font-semibold leading-5 text-primary/80">{t('about_stat_label')}</span>
               </div>
             </div>
 
             <div className="space-y-5">
-              <article className="rounded-2xl border border-border bg-surface p-6 sm:p-7">
+              <article className="rounded-lg border border-border bg-surface p-6 sm:p-7">
                 <p className="text-sm font-bold text-primary">{t('about_story_title')}</p>
                 <h3 className="mt-3 text-xl font-bold sm:text-2xl">{t('about_story_heading')}</h3>
                 <p className="mt-4 text-sm leading-7 text-muted sm:text-base">{t('about_story')}</p>
-                <div className="mt-5 rounded-xl border-s-4 border-primary bg-primary-soft/60 px-4 py-3 text-sm font-medium leading-7 text-text">
+                <div className="mt-5 rounded-lg border-s-4 border-primary bg-primary-soft px-4 py-3 text-sm font-medium leading-7 text-text">
                   {t('about_origin')}
                 </div>
               </article>
@@ -301,7 +287,7 @@ export default function LandingPage() {
                 {ABOUT_PILLARS.map((pillar) => {
                   const Icon = pillar.icon;
                   return (
-                    <article key={pillar.title} className="rounded-2xl border border-border bg-surface p-5">
+                    <article key={pillar.title} className="rounded-lg border border-border bg-surface p-5">
                       <Icon className="h-5 w-5 text-primary" strokeWidth={1.8} aria-hidden="true" />
                       <h3 className="mt-4 text-sm font-bold">{t(pillar.title)}</h3>
                       <p className="mt-2 text-sm leading-6 text-muted">{t(pillar.desc)}</p>
@@ -310,9 +296,9 @@ export default function LandingPage() {
                 })}
               </div>
 
-              <article className="rounded-2xl bg-text p-6 text-background sm:p-7">
+              <article className="rounded-lg border border-border bg-surface p-6 text-text sm:p-7">
                 <p className="text-sm font-bold text-primary">{t('about_vision_title')}</p>
-                <p className="mt-3 text-lg font-medium leading-8 text-background/90">{t('about_vision')}</p>
+                <p className="mt-3 text-lg font-medium leading-8 text-muted">{t('about_vision')}</p>
               </article>
             </div>
           </div>
@@ -327,9 +313,9 @@ export default function LandingPage() {
             </div>
             <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3">
               {(['start_step_one', 'start_step_two', 'start_step_three'] as const).map((step, index) => (
-                <article key={step} className="rounded-2xl border border-border bg-background p-6">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">{index + 1}</span>
-                  <h3 className="mt-5 text-base font-bold">{t(`${step}_title`)}</h3>
+                <article key={step} className="rounded-lg border border-border bg-background p-6">
+                  <span className="font-mono text-sm font-semibold text-primary">0{index + 1}</span>
+                  <h3 className="mt-4 text-base font-bold">{t(`${step}_title`)}</h3>
                   <p className="mt-2 text-sm leading-6 text-muted">{t(`${step}_desc`)}</p>
                 </article>
               ))}
@@ -338,7 +324,7 @@ export default function LandingPage() {
         </section>
 
         <section className="px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl bg-primary px-6 py-10 text-white shadow-xl shadow-primary/20 sm:px-10 sm:py-12">
+          <div className="mx-auto max-w-5xl rounded-lg border border-primary bg-primary px-6 py-10 text-white sm:px-10 sm:py-12">
             <div className="grid items-center gap-8 md:grid-cols-[1fr_auto]">
               <div>
                 <ShieldCheck className="h-7 w-7 text-white/85" strokeWidth={1.8} aria-hidden="true" />
@@ -347,7 +333,7 @@ export default function LandingPage() {
               </div>
               <Button
                 size="md"
-                className="h-11 w-full bg-white px-5 text-base text-primary shadow-md hover:bg-white/90 md:w-auto"
+                className="h-11 w-full bg-white px-5 text-base text-primary hover:bg-primary-soft md:w-auto"
                 onClick={enterDemo}
               >
                 {t('cta_demo')}
@@ -371,9 +357,9 @@ export default function LandingPage() {
 function PreviewMetric({ label, value, tone }: { label: string; value: string; tone: 'primary' | 'positive' | 'text' }) {
   const toneClass = tone === 'positive' ? 'text-positive' : tone === 'primary' ? 'text-primary' : 'text-text';
   return (
-    <div className="rounded-xl border border-border bg-surface p-3 shadow-sm">
+    <div className="rounded-lg border border-border bg-surface p-3">
       <p className="truncate text-[10px] font-medium text-muted sm:text-xs">{label}</p>
-      <p className={`mt-2 text-sm font-bold tracking-tight sm:text-base ${toneClass}`}>{value}</p>
+      <p dir="ltr" className={`mt-2 text-end font-mono text-sm font-bold tabular-nums tracking-tight sm:text-base ${toneClass}`}>{value}</p>
     </div>
   );
 }
