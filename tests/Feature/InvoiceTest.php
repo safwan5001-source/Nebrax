@@ -633,4 +633,54 @@ class InvoiceTest extends TestCase
         $this->assertSame(15000,  $invoice->tax_amount);
         $this->assertSame(115000, $invoice->total); // الضريبة أُضيفت فوق السعر
     }
+
+    // ── هوية السطر في المستند المطبوع ────────────────────────────
+
+    /**
+     * سطرٌ بلا وصف يأخذ اسم المنتج — لقطةً كالوحدة تماماً.
+     *
+     * الوصف `nullable` في العقد والشاشة تملؤه، لكن لعميل الـ API أن يتركه.
+     * وبدون هذا الاحتياط يخرج المستند المطبوع بسطرٍ عنوانه «—»: بلا هوية
+     * للعميل ولا للمراجع، ولا لشاشة المرتجع التي تسحب سطور الفاتورة.
+     * (نظيرُه في `PurchaseService` منذ #190.)
+     */
+    /** @test */
+    public function a_line_without_a_description_takes_the_product_name(): void
+    {
+        $product = Product::create(['name' => 'كرتون مياه', 'sale_price' => 14000]);
+
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 14000]]
+        );
+
+        $this->assertSame('كرتون مياه', $invoice->lines->first()->description);
+    }
+
+    /** ووصفٌ مكتوبٌ صراحةً لا يُستبدَل باسم المنتج. */
+    /** @test */
+    public function an_explicit_description_wins_over_the_product_name(): void
+    {
+        $product = Product::create(['name' => 'كرتون مياه', 'sale_price' => 14000]);
+
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['product_id' => $product->id, 'description' => 'مياه — دفعة الخبر',
+              'quantity' => 1, 'unit_price' => 14000]]
+        );
+
+        $this->assertSame('مياه — دفعة الخبر', $invoice->lines->first()->description);
+    }
+
+    /** وسطرٌ بلا منتج أصلاً يبقى بلا وصف — لا اسم يُنسَخ منه. */
+    /** @test */
+    public function a_line_without_a_product_keeps_a_null_description(): void
+    {
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000]]
+        );
+
+        $this->assertNull($invoice->lines->first()->description);
+    }
 }
