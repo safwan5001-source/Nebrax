@@ -100,15 +100,16 @@ export default function LandingPage() {
 
       <main>
         <section className="relative isolate overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_85%_18%,color-mix(in_srgb,var(--primary)_16%,transparent),transparent_29rem),radial-gradient(circle_at_12%_82%,color-mix(in_srgb,var(--positive)_10%,transparent),transparent_24rem)]" />
-          <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1.02fr_0.98fr] lg:gap-16 lg:px-8 lg:py-24">
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_85%_18%,color-mix(in_srgb,var(--primary)_24%,transparent),transparent_29rem),radial-gradient(circle_at_12%_82%,color-mix(in_srgb,var(--positive)_14%,transparent),transparent_24rem)]" />
+          <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.16] [background-image:linear-gradient(color-mix(in_srgb,var(--primary)_22%,transparent)_1px,transparent_1px),linear-gradient(90deg,color-mix(in_srgb,var(--primary)_22%,transparent)_1px,transparent_1px)] [background-size:42px_42px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" />
+          <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1.02fr_0.98fr] lg:gap-16 lg:px-8 lg:py-28">
             <div className="max-w-2xl">
               <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary sm:text-sm">
                 <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('tagline')}
               </p>
-              <h1 className="max-w-xl text-4xl font-bold leading-[1.22] tracking-tight sm:text-5xl lg:text-[3.35rem]">
-                {t('hero_title')}
+              <h1 className="max-w-xl text-4xl font-bold leading-[1.18] tracking-tight sm:text-5xl lg:text-[3.55rem]">
+                <span className="bg-gradient-to-l from-primary via-primary to-positive bg-clip-text text-transparent">{t('hero_title')}</span>
               </h1>
               <p className="mt-5 max-w-xl text-base leading-8 text-muted sm:text-lg">
                 {t('hero_subtitle')}
@@ -137,8 +138,14 @@ export default function LandingPage() {
             </div>
 
             <div className="relative mx-auto w-full max-w-xl lg:max-w-none" aria-label={t('preview_aria')}>
-              <div className="absolute -inset-5 -z-10 rounded-[2rem] bg-primary/10 blur-3xl" />
-              <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl shadow-primary/10">
+              <div className="absolute -inset-8 -z-10 rounded-[3rem] bg-primary/15 blur-3xl" />
+              <div className="absolute -end-5 top-10 z-10 hidden rounded-2xl border border-white/30 bg-surface/80 px-3 py-2 text-xs font-bold shadow-xl backdrop-blur-xl sm:block">
+                <span className="me-1.5 inline-block h-2 w-2 rounded-full bg-positive shadow-[0_0_12px_var(--positive)]" />{t('hero_live_badge')}
+              </div>
+              <div className="absolute -start-5 bottom-12 z-10 hidden rounded-2xl border border-primary/20 bg-surface/80 px-3 py-2 text-xs font-semibold text-primary shadow-xl backdrop-blur-xl sm:block">
+                {t('hero_flow_badge')}
+              </div>
+              <div className="overflow-hidden rounded-[1.75rem] border border-white/20 bg-surface/75 shadow-2xl shadow-primary/20 backdrop-blur-xl">
                 <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-positive" />
@@ -150,7 +157,7 @@ export default function LandingPage() {
                     <span className="h-2 w-2 rounded-full bg-border" />
                   </div>
                 </div>
-                <div className="bg-gradient-to-b from-primary-soft/70 to-surface p-4 sm:p-5">
+                <div className="bg-gradient-to-br from-primary-soft/80 via-surface to-positive/5 p-4 sm:p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold text-primary">{t('preview_eyebrow')}</p>
@@ -190,7 +197,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="industries" className="border-y border-border bg-surface">
+        <section id="industries" className="relative border-y border-border bg-surface">
+          <div className="pointer-events-none absolute start-0 top-0 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
           <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
             <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-end">
               <div>
@@ -243,7 +251,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="journey" className="border-b border-border bg-surface">
+        <section id="journey" className="relative border-b border-border bg-surface">
+          <div className="pointer-events-none absolute end-0 top-12 h-64 w-64 rounded-full bg-positive/10 blur-3xl" />
           <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
             <div className="mx-auto max-w-2xl text-center">
               <p className="text-sm font-bold text-primary">{t('journey_kicker')}</p>
