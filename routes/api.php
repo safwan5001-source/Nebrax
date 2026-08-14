@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\RecurringInvoiceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\ReturnableController;
+use App\Http\Controllers\Api\ReturnSourcesController;
 use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\StockPermitController;
@@ -280,6 +281,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // سطور مستندٍ مصدر بكمياتها المتبقية للردّ — تسبق `returns/{id}` في
         // الترتيب فلا تبتلعها كمعرّف.
         Route::get('returns/returnable/{type}/{id}', ReturnableController::class)
+            ->middleware($perm('returns.view'));
+        // مستندات طرفٍ القابلة للردّ عليها، بسبب المنع لغير الصالح منها.
+        Route::get('returns/sources/{type}', ReturnSourcesController::class)
             ->middleware($perm('returns.view'));
         Route::get('returns', [ReturnController::class, 'index'])->middleware($perm('returns.view'));
         Route::get('returns/{id}', [ReturnController::class, 'show'])->middleware($perm('returns.view'));

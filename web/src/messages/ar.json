@@ -1543,7 +1543,9 @@
     "post_now": "ترحيل فوري",
     "total": "الإجمالي",
     "cancel": "إلغاء",
-    "create": "إنشاء"
+    "create": "إنشاء",
+    "blocked_returned": "رُدَّ بالكامل",
+    "blocked_window": "خارج مهلة الردّ"
   },
   "returns": {
     "title": "المرتجعات",
