@@ -34,6 +34,8 @@ export interface LineDocumentPdfInput {
   company: SourceCompany | null;
   party: SourceCustomer | null;
   logoUrl?: string | null;
+  /** تذييل القالب المثبت وقت إصدار المستند، إن وُجد. */
+  footerText?: string | null;
   documentMeta: Array<[string, string | null | undefined]>;
   adjustments?: InvoicePdfAdjustment[];
   labels: InvoicePdfLabels;
@@ -59,6 +61,7 @@ export async function createLineDocumentPdf(input: LineDocumentPdfInput): Promis
     company: input.company,
     customer: input.party,
     logoUrl: input.logoUrl,
+    footerText: input.footerText,
     documentMeta: input.documentMeta,
     adjustments: input.adjustments,
     labels: input.labels,
