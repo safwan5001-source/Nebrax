@@ -118,6 +118,20 @@ export function DocTable({
   );
 }
 
+export interface StatementAllocation {
+  kind: string;
+  id: string;
+  number: string | null;
+  amount: string;
+}
+
+export interface StatementSource {
+  kind: string;
+  id: string;
+  label: string | null;
+  allocations: StatementAllocation[];
+}
+
 export interface StatementRow {
   date: string;
   number: string;
@@ -125,6 +139,7 @@ export interface StatementRow {
   debit: string;
   credit: string;
   balance: string;
+  source?: StatementSource | null;
 }
 
 /** حركة الحساب — سطور القيد المرحّلة المرتبطة بالطرف، برصيد متحرّك. */
@@ -132,13 +147,17 @@ export function LedgerTable({
   opening,
   rows,
   labels,
+  sourceHref,
+  allocationHref,
 }: {
   opening: string;
   rows: StatementRow[];
   labels: {
-    date: string; number: string; description: string; debit: string; credit: string;
-    balance: string; opening: string; empty: string;
+    date: string; number: string; source: string; description: string; settlement: string;
+    debit: string; credit: string; balance: string; opening: string; empty: string;
   };
+  sourceHref?: (source: StatementSource) => string | undefined;
+  allocationHref?: (allocation: StatementAllocation) => string | undefined;
 }) {
   return (
     <Table>
@@ -146,7 +165,9 @@ export function LedgerTable({
         <TR>
           <TH>{labels.date}</TH>
           <TH>{labels.number}</TH>
+          <TH>{labels.source}</TH>
           <TH>{labels.description}</TH>
+          <TH>{labels.settlement}</TH>
           <TH className="text-end">{labels.debit}</TH>
           <TH className="text-end">{labels.credit}</TH>
           <TH className="text-end">{labels.balance}</TH>
@@ -156,7 +177,9 @@ export function LedgerTable({
         <TR className="text-muted">
           <TD />
           <TD />
+          <TD />
           <TD>{labels.opening}</TD>
+          <TD />
           <TD />
           <TD />
           <TD className="num text-end">{formatRiyal(opening)}</TD>
@@ -165,7 +188,29 @@ export function LedgerTable({
           <TR key={i}>
             <TD className="num text-muted">{r.date}</TD>
             <TD className="num">{r.number}</TD>
+            <TD>
+              {r.source?.label && sourceHref?.(r.source) ? (
+                <Link href={sourceHref(r.source)!} className="font-medium text-primary hover:underline">
+                  {r.source.label}
+                </Link>
+              ) : r.source?.label ?? '—'}
+            </TD>
             <TD>{r.description ?? '—'}</TD>
+            <TD>
+              {r.source?.allocations?.length ? (
+                <div className="flex min-w-[10rem] flex-col gap-1 text-xs">
+                  {r.source.allocations.map((allocation, allocationIndex) => {
+                    const label = `${allocation.number ?? '—'} · ${formatRiyal(allocation.amount)}`;
+                    const href = allocationHref?.(allocation);
+                    return href ? (
+                      <Link key={`${allocation.id}-${allocationIndex}`} href={href} className="num text-primary hover:underline">
+                        {label}
+                      </Link>
+                    ) : <span key={`${allocation.id}-${allocationIndex}`} className="num text-muted">{label}</span>;
+                  })}
+                </div>
+              ) : '—'}
+            </TD>
             <TD className="num text-end">{r.debit !== '0.00' ? formatRiyal(r.debit) : '—'}</TD>
             <TD className="num text-end">{r.credit !== '0.00' ? formatRiyal(r.credit) : '—'}</TD>
             <TD className={cn('num text-end', isNegative(r.balance) && 'text-negative')}>
@@ -175,7 +220,7 @@ export function LedgerTable({
         ))}
         {rows.length === 0 && (
           <TR>
-            <TD colSpan={6} className="py-8 text-center text-muted">{labels.empty}</TD>
+            <TD colSpan={8} className="py-8 text-center text-muted">{labels.empty}</TD>
           </TR>
         )}
       </TBody>

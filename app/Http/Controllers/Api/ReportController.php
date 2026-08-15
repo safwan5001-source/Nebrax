@@ -98,6 +98,17 @@ class ReportController extends ApiController
                 'debit'       => Money::toRiyal($r['debit']),
                 'credit'      => Money::toRiyal($r['credit']),
                 'balance'     => Money::toRiyal($r['balance']),
+                'source'      => $r['source'] ? [
+                    'kind'        => $r['source']['kind'],
+                    'id'          => $r['source']['id'],
+                    'label'       => $r['source']['label'],
+                    'allocations' => array_map(fn ($allocation) => [
+                        'kind'   => $allocation['kind'],
+                        'id'     => $allocation['id'],
+                        'number' => $allocation['number'],
+                        'amount' => Money::toRiyal($allocation['amount']),
+                    ], $r['source']['allocations']),
+                ] : null,
             ], $st['rows']),
             'closing_balance' => Money::toRiyal($st['closing_balance']),
         ]);

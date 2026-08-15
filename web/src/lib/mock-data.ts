@@ -1070,8 +1070,19 @@ function partnerStatement(id: string) {
     partner: { id: p.id, name: p.name, type: p.type },
     opening_balance: '0.00',
     rows: [
-      { date: '2026-06-01', number: 'INV-2026-0117', description: 'فاتورة مبيعات', debit: '12650.00', credit: '0.00', balance: '12650.00' },
-      { date: '2026-06-22', number: 'PMT-2026-0050', description: 'دفعة مستلمة', debit: '0.00', credit: '6325.00', balance: '6325.00' },
+      {
+        date: '2026-06-01', number: 'JRN-2026-0117', description: 'فاتورة مبيعات INV-2026-0117',
+        debit: '12650.00', credit: '0.00', balance: '12650.00',
+        source: { kind: 'invoice', id: 'inv-0117', label: 'فاتورة INV-2026-0117', allocations: [] },
+      },
+      {
+        date: '2026-06-22', number: 'JRN-2026-0050', description: 'دفعة مستلمة PMT-2026-0050',
+        debit: '0.00', credit: '6325.00', balance: '6325.00',
+        source: {
+          kind: 'payment', id: 'pmt-0050', label: 'دفعة PMT-2026-0050',
+          allocations: [{ kind: 'invoice', id: 'inv-0117', number: 'INV-2026-0117', amount: '6325.00' }],
+        },
+      },
     ],
     closing_balance: '6325.00',
   };

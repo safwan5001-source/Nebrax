@@ -7,6 +7,7 @@ use App\Models\CostCenter;
 use App\Models\Invoice;
 use App\Models\JournalLine;
 use App\Models\Partner;
+use App\Models\Payment;
 use App\Models\Purchase;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Carbon;
@@ -388,6 +389,18 @@ class ReportService
             $rows[] = $line;
         }
 
+        // التخصيصات هي مصدر الحقيقة لعلاقة سند القبض/الصرف بالمستندات التي سُدّدت.
+        // نحمّلها دفعة واحدة لتبقى شاشة حركة الحساب بلا N+1 عند كثرة الحركات.
+        $paymentIds = collect($rows)
+            ->filter(fn (JournalLine $line) => $line->entry->source_type === Payment::class)
+            ->map(fn (JournalLine $line) => $line->entry->source_id)
+            ->filter()
+            ->unique()
+            ->values();
+        $payments = $paymentIds->isEmpty()
+            ? collect()
+            : Payment::with('allocations.allocatable')->whereIn('id', $paymentIds)->get()->keyBy('id');
+
         $running = $opening;
         $mapped = [];
         foreach ($rows as $line) {
@@ -399,6 +412,7 @@ class ReportService
                 'debit'       => (int) $line->debit,
                 'credit'      => (int) $line->credit,
                 'balance'     => $running,
+                'source'      => $this->partnerStatementSource($line, $payments),
             ];
         }
 
@@ -407,6 +421,49 @@ class ReportService
             'opening_balance' => $opening,
             'rows'            => $mapped,
             'closing_balance' => $running,
+        ];
+    }
+
+    /**
+     * يطبع مصدر السطر إلى نوع واجهة ثابت، ويعرض تسويات سندات الدفع بلا افتراضات
+     * عن وجود فاتورة واحدة فقط لكل سند.
+     */
+    protected function partnerStatementSource(JournalLine $line, Collection $payments): ?array
+    {
+        $entry = $line->entry;
+        if (!$entry->source_type || !$entry->source_id) {
+            return null;
+        }
+
+        $kind = match ($entry->source_type) {
+            Invoice::class => 'invoice',
+            Payment::class => 'payment',
+            Purchase::class => 'purchase',
+            Partner::class => 'opening',
+            \App\Models\CreditNote::class => 'credit_note',
+            \App\Models\ReturnDocument::class => 'return',
+            default => 'journal',
+        };
+
+        $allocations = [];
+        if ($kind === 'payment' && ($payment = $payments->get($entry->source_id))) {
+            $allocations = $payment->allocations->map(fn ($allocation) => [
+                'kind'   => match ($allocation->allocatable_type) {
+                    Invoice::class => 'invoice',
+                    Purchase::class => 'purchase',
+                    default => 'document',
+                },
+                'id'     => (string) $allocation->allocatable_id,
+                'number' => $allocation->allocatable?->number,
+                'amount' => (int) $allocation->amount,
+            ])->values()->all();
+        }
+
+        return [
+            'kind'        => $kind,
+            'id'          => (string) $entry->source_id,
+            'label'       => $entry->description,
+            'allocations' => $allocations,
         ];
     }
 

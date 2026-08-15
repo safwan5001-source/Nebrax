@@ -14,6 +14,7 @@ import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { LangToggle } from '@/components/layout/lang-toggle';
 import { login } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { enableDemo } from '@/lib/demo';
 
 const schema = z.object({
   email: z.string().email(),
@@ -41,6 +42,11 @@ export default function LoginPage() {
     } catch (e) {
       setServerError(e instanceof ApiError ? e.message : t('error'));
     }
+  }
+
+  function enterDemo() {
+    enableDemo();
+    router.replace('/dashboard');
   }
 
   return (
@@ -103,6 +109,16 @@ export default function LoginPage() {
               {t('submit')}
             </Button>
           </form>
+
+          <div className="my-5 flex items-center gap-3 text-xs text-muted" aria-hidden="true">
+            <span className="h-px flex-1 bg-border" />
+            <span>{t('or')}</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <Button type="button" variant="outline" className="h-10 w-full" onClick={enterDemo}>
+            {t('demo')}
+          </Button>
+          <p className="mt-2 text-center text-xs text-muted">{t('demo_hint')}</p>
         </div>
 
         {/* روابط أسفل البطاقة */}
