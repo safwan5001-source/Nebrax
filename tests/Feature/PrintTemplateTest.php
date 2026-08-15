@@ -223,6 +223,42 @@ class PrintTemplateTest extends TestCase
     }
 
     /** @test */
+    public function template_layout_rejects_unsupported_duplicate_and_hidden_required_blocks(): void
+    {
+        ['token' => $token] = $this->registerTenant('template-layout', 'owner@template-layout.test');
+
+        $requiredLayout = [
+            ['key' => 'header', 'visible' => true],
+            ['key' => 'parties', 'visible' => true],
+            ['key' => 'items', 'visible' => true],
+            ['key' => 'summary', 'visible' => true],
+            ['key' => 'footer', 'visible' => true],
+        ];
+
+        $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'كتلة غير مدعومة',
+            'document_types' => ['receipt_voucher'],
+            'definition' => ['layout' => [...$requiredLayout, ['key' => 'items', 'visible' => true]]],
+        ])->assertUnprocessable();
+
+        $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'كتلة مكررة',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['layout' => [...$requiredLayout, ['key' => 'footer', 'visible' => true]]],
+        ])->assertUnprocessable();
+
+        $hiddenSummary = array_map(
+            static fn (array $item): array => $item['key'] === 'summary' ? [...$item, 'visible' => false] : $item,
+            $requiredLayout,
+        );
+        $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'إخفاء كتلة إلزامية',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['layout' => $hiddenSummary],
+        ])->assertUnprocessable();
+    }
+
+    /** @test */
     public function legacy_sales_design_is_copied_without_removing_the_legacy_setting(): void
     {
         ['tenant_id' => $tenantId] = $this->registerTenant('legacy', 'owner@legacy.test');
