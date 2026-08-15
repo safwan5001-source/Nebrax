@@ -30,7 +30,7 @@ class Invoice extends BaseModel
         'is_paid', 'payment_method', 'payment_reference', 'cash_account_id',
         'notes', 'journal_entry_id', 'cogs_entry_id', 'created_by',
         'zatca_qr', 'zatca_hash',
-        'zatca_uuid', 'zatca_icv', 'zatca_previous_hash', 'zatca_xml',
+        'zatca_uuid', 'zatca_icv', 'zatca_previous_hash', 'zatca_xml', 'print_template_revision_id',
     ];
 
     protected $casts = [
@@ -83,6 +83,12 @@ class Invoice extends BaseModel
     public function cogsEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'cogs_entry_id');
+    }
+
+    /** مراجعة القالب المثبتة عند الترحيل؛ لا يعيد تغيير القالب تفسير الفاتورة. */
+    public function printTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'print_template_revision_id');
     }
 
     public function isDraft(): bool

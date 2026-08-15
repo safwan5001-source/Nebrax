@@ -29,6 +29,14 @@ class InvoiceResource extends JsonResource
             'notes'          => $this->notes,
             'cost_center_id' => $this->cost_center_id,
             'salesperson_id' => $this->salesperson_id,
+            // لقطة مرجع الطباعة عند الترحيل؛ null للمسوّدات والبيانات التاريخية.
+            'print_template_revision_id' => $this->print_template_revision_id,
+            'print_template_revision' => $this->whenLoaded('printTemplateRevision', fn () => [
+                'id' => $this->printTemplateRevision->id,
+                'version' => $this->printTemplateRevision->version,
+                'definition' => $this->printTemplateRevision->definition,
+                'document_types' => $this->printTemplateRevision->document_types,
+            ]),
             'subtotal'       => Money::toRiyal($this->subtotal),
             'discount'       => Money::toRiyal($this->discount),
             'shipping'       => Money::toRiyal($this->shipping),

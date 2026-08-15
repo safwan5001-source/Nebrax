@@ -9,6 +9,7 @@ use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Support\Settings;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -45,7 +46,8 @@ class InvoiceService
         protected InventoryService $inventory,
         protected ZatcaService $zatca,
         protected UnitConversion $units,
-        protected PaymentService $payments
+        protected PaymentService $payments,
+        protected PrintTemplateService $printTemplates
     ) {}
 
     /**
@@ -425,8 +427,13 @@ class InvoiceService
             $invoice->total      = $total;
             $zatca = $this->zatca->buildFor($invoice);
 
+            // تُحل المراجعة داخل معاملة الترحيل وتُخزَّن لقطةً؛ لا تغيّر
+            // تعيينات الفرع أو القالب لاحقاً إعادة طباعة فاتورة صدرت بالفعل.
+            $printAssignment = $this->printTemplates->resolve('tax_invoice', 'print', $invoice->branch_id);
+
             $invoice->update([
                 'status'              => 'posted',
+                'print_template_revision_id' => $printAssignment?->print_template_revision_id,
                 'subtotal'            => $subtotal,
                 'discount'            => $discount,
                 'shipping'            => $shipping,
