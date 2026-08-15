@@ -109,7 +109,18 @@ class InvoiceTest extends TestCase
         );
         $posted = $this->invoices->post($invoice);
 
-        $this->assertSame($template->published_revision_id, $posted->print_template_revision_id);
+        $frozenRevisionId = $template->published_revision_id;
+        $this->assertSame($frozenRevisionId, $posted->print_template_revision_id);
+
+        $templates->updateDraft($template, [
+            'definition' => ['template_id' => 'tax-invoice-modern', 'theme_id' => 'violet'],
+        ], null);
+        $newlyPublished = $templates->publish($template);
+
+        $frozenInvoice = Invoice::with('printTemplateRevision')->findOrFail($posted->id);
+        $this->assertSame($frozenRevisionId, $frozenInvoice->print_template_revision_id);
+        $this->assertSame('tax-invoice-classic', $frozenInvoice->printTemplateRevision?->definition['template_id']);
+        $this->assertNotSame($frozenRevisionId, $newlyPublished->published_revision_id);
     }
 
     /** @test */
