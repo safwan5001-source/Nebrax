@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { LangToggle } from '@/components/layout/lang-toggle';
+import { NebraxLogo } from '@/components/layout/nebrax-logo';
 import { register as registerTenant } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 
@@ -61,11 +62,8 @@ export default function RegisterPage() {
 
       <div className="w-full max-w-md py-10">
         {/* الشعار */}
-        <Link href="/" className="mb-6 flex items-center justify-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-base font-bold text-white">
-            نـ
-          </div>
-          <span className="text-lg font-semibold text-text">نبراس</span>
+        <Link href="/" className="mb-6 flex items-center justify-center">
+          <NebraxLogo alt="نبراكس" className="h-14 w-auto" priority />
         </Link>
 
         {/* البطاقة */}
