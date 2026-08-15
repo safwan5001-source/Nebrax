@@ -211,7 +211,12 @@
     "print": "Print",
     "subtotal": "Subtotal",
     "tax_total": "Total tax",
-    "save": "Save credit note"
+    "save": "Save credit note",
+    "document_title": "Credit note",
+    "document_subtitle": "Customer balance reduction or refund",
+    "debit_document_title": "Debit note",
+    "debit_document_subtitle": "Supplier allowance or compensation",
+    "supplier": "Supplier"
   },
   "crm": {
     "title": "Customer relations (CRM)",
@@ -384,6 +389,7 @@
     "tax_invoice": "Tax Invoice",
     "quotation": "Quotation",
     "credit_note": "Credit Note",
+    "debit_note": "Debit Note",
     "receipt_voucher": "Receipt Voucher",
     "payment_voucher": "Payment Voucher"
   },
@@ -391,8 +397,36 @@
     "tax_invoice": "فاتورة ضريبية",
     "quotation": "عرض سعر",
     "credit_note": "إشعار دائن",
+    "debit_note": "إشعار مدين",
     "receipt_voucher": "سند قبض",
     "payment_voucher": "سند صرف"
+  },
+  "documentPrint": {
+    "seller": "Company",
+    "customer": "Customer",
+    "supplier": "Supplier",
+    "document_data": "Document details",
+    "document_number": "Document number",
+    "description": "Description",
+    "quantity": "Quantity",
+    "unit_price": "Unit price",
+    "tax": "Tax",
+    "total": "Total",
+    "subtotal": "Subtotal",
+    "vat": "Value-added tax (15%)",
+    "grand_total": "Grand total",
+    "vat_number": "VAT number",
+    "cr_number": "Commercial registration",
+    "city": "City",
+    "due_date": "Valid until",
+    "footer": "Document issued by Nebrax accounting system.",
+    "preview": "Document preview",
+    "download_pdf": "Download PDF",
+    "share_pdf": "Share PDF",
+    "generating": "Generating…",
+    "downloaded_ok": "Download completed",
+    "shared_ok": "Shared successfully",
+    "export_failed": "Unable to create the file. Please try again."
   },
   "expenses": {
     "title": "Expenses",
@@ -1151,7 +1185,19 @@
     "load_error": "Could not load voucher",
     "retry": "Retry",
     "not_found": "Voucher not found",
-    "template": "Template"
+    "template": "Template",
+    "receipt_title": "Receipt voucher",
+    "payment_title": "Payment voucher",
+    "receipt_subtitle": "Collection from customer",
+    "payment_subtitle": "Disbursement to supplier",
+    "voucher_number": "Voucher number",
+    "reference": "Reference",
+    "allocations": "Voucher allocations",
+    "on_account": "On account",
+    "amount": "Amount",
+    "notes": "Notes",
+    "customer": "Customer",
+    "supplier": "Supplier"
   },
   "paymentForm": {
     "title": "Record payment",
@@ -1530,7 +1576,9 @@
     "subtotal": "Subtotal",
     "tax_total": "Total tax",
     "save": "Save quote",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "document_title": "Quotation",
+    "document_subtitle": "Non-tax commercial offer"
   },
   "recurring": {
     "title": "Recurring invoices",
@@ -1623,7 +1671,10 @@
     "b90_plus": "90+",
     "empty": "No balances",
     "csv": "CSV",
-    "pdf": "Print PDF",
+    "pdf": "Download PDF",
+    "share_pdf": "Share PDF",
+    "print": "Print",
+    "preview": "Report preview",
     "from": "From",
     "to": "To",
     "all_branches": "All branches",
@@ -1708,7 +1759,14 @@
     "search": "Search…",
     "empty": "No returns",
     "doc_title_credit": "Credit note (sales return)",
-    "doc_title_debit": "Debit note (purchase return)"
+    "doc_title_debit": "Debit note (purchase return)",
+    "customer": "Customer",
+    "supplier": "Supplier",
+    "document_subtitle_credit": "Sales return",
+    "document_subtitle_debit": "Purchase return",
+    "details": "Return details",
+    "lines": "Lines",
+    "preview": "Document preview"
   },
   "salesSettings": {
     "title": "Sales settings",

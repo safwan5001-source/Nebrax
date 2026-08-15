@@ -18,6 +18,7 @@ import { useCompany } from '@/lib/company';
 import { exportXlsx } from '@/lib/xlsx';
 import { createPurchaseInvoicePdf, downloadPurchaseInvoicePdf, sharePurchaseInvoicePdf } from '@/modules/purchases/services/purchase-pdf';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
+import { printDocument } from '@/modules/documents/services/export';
 
 interface Purchase {
   id: string;
@@ -251,7 +252,7 @@ export default function PurchaseDetailPage() {
             <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
             {tp('delete')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!!busy}>
+          <Button variant="outline" size="sm" onClick={() => printDocument({ widthMm: 210, heightMm: 297 })} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>

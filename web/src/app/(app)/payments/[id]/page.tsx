@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, Printer, Download, Share2, LayoutTemplate, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,8 @@ import {
 } from '@/components/payments/payment-document';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { documentExporter, printDocument } from '@/modules/documents/services/export';
+import { printDocument } from '@/modules/documents/services/export';
+import { createPaymentPdf, downloadPaymentPdf, sharePaymentPdf } from '@/modules/payments/services/payment-pdf';
 import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import type { ThemeId } from '@/modules/documents/types';
@@ -44,6 +45,8 @@ export default function PaymentDetailPage() {
   const tp = useTranslations('payments');
   const ts = useTranslations('status');
   const tt = useTranslations('invoiceTemplates');
+  const tPrint = useTranslations('documentPrint');
+  const locale = useLocale();
   const { success, error: errorToast } = useToast();
 
   const [payment, setPayment] = useState<Payment | null>(null);
@@ -131,33 +134,66 @@ export default function PaymentDetailPage() {
     [tp('amount'), <span key="a" className="num font-semibold">{formatRiyal(payment.amount)}</span>],
   ];
 
-  const doc = () => document.getElementById('print-root');
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
 
+  async function createPdf() {
+    if (!payment) throw new Error('Payment unavailable');
+    return createPaymentPdf({
+      payment,
+      company,
+      partner,
+      logoUrl,
+      labels: {
+        receiptTitle: t('receipt_title'),
+        paymentTitle: t('payment_title'),
+        receiptSubtitle: t('receipt_subtitle'),
+        paymentSubtitle: t('payment_subtitle'),
+        company: tPrint('seller'),
+        customer: t('customer'),
+        supplier: t('supplier'),
+        voucherNumber: t('voucher_number'),
+        date: tp('date'),
+        method: tp('method'),
+        reference: t('reference'),
+        status: tp('status'),
+        amount: t('amount'),
+        allocations: t('allocations'),
+        onAccount: t('on_account'),
+        notes: t('notes'),
+        cash: tp('cash'),
+        bank: tp('bank'),
+        vatNumber: tPrint('vat_number'),
+        crNumber: tPrint('cr_number'),
+        description: tPrint('description'),
+        total: tPrint('total'),
+        footer: tPrint('footer'),
+      },
+      locale,
+    });
+  }
+
   async function handleDownloadPdf() {
-    const el = doc();
-    if (!el || !payment) return;
+    if (!payment) return;
     setBusy('pdf');
     try {
-      await documentExporter.download({ element: el, fileName: payment.number, paper });
-      success(t('downloaded_ok'));
+      downloadPaymentPdf(await createPdf(), payment.number);
+      success(tPrint('downloaded_ok'));
     } catch {
-      errorToast(t('export_failed'));
+      errorToast(tPrint('export_failed'));
     } finally {
       setBusy(null);
     }
   }
 
   async function handleShare() {
-    const el = doc();
-    if (!el || !payment) return;
+    if (!payment) return;
     setBusy('share');
     try {
-      const r = await documentExporter.share({ element: el, fileName: payment.number, title: payment.number, paper });
-      success(r === 'shared' ? t('shared_ok') : t('downloaded_ok'));
-    } catch (e) {
-      if ((e as Error)?.name !== 'AbortError') errorToast(t('export_failed'));
+      const result = await sharePaymentPdf(await createPdf(), payment.number, payment.direction === 'received' ? t('receipt_title') : t('payment_title'));
+      success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
     } finally {
       setBusy(null);
     }

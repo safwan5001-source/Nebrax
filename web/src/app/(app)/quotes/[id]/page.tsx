@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { ArrowRight, Printer, Download, FileCheck } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { ArrowRight, Printer, Download, FileCheck, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,8 @@ import { useToast } from '@/components/ui/toast';
 import { QuoteDocument, type QuoteCompany, type QuoteCustomer } from '@/components/quotes/quote-document';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { documentExporter, printDocument } from '@/modules/documents/services/export';
+import { printDocument } from '@/modules/documents/services/export';
+import { createLineDocumentPdf, downloadLineDocumentPdf, shareLineDocumentPdf } from '@/modules/documents/services/line-document-pdf';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
@@ -36,7 +37,9 @@ export default function QuoteDetailPage() {
   const router = useRouter();
   const t = useTranslations('quotes');
   const td = useTranslations('invoiceDetail');
+  const tPrint = useTranslations('documentPrint');
   const tc = useTranslations('common');
+  const locale = useLocale();
   const { success, error: errorToast } = useToast();
 
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -44,7 +47,7 @@ export default function QuoteDetailPage() {
   const [company, setCompany] = useState<QuoteCompany | null>(null);
   const [loading, setLoading] = useState(true);
   const [converting, setConverting] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
   const [templateId, setTemplateId] = useState<string>('tax-invoice-classic');
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
@@ -116,17 +119,75 @@ export default function QuoteDetailPage() {
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
 
+  async function createPdf() {
+    if (!quote) throw new Error('Quote unavailable');
+    return createLineDocumentPdf({
+      document: {
+        number: quote.number,
+        date: quote.quote_date,
+        subtotal: quote.subtotal,
+        tax_amount: quote.tax_amount,
+        total: quote.total,
+        lines: quote.lines,
+      },
+      company,
+      party: customer,
+      logoUrl,
+      documentMeta: [
+        [t('date'), quote.quote_date],
+        [t('valid_until'), quote.valid_until ?? '—'],
+      ],
+      labels: {
+        title: t('document_title'),
+        titleSecondary: t('document_subtitle'),
+        seller: tPrint('seller'),
+        billTo: t('partner'),
+        invoiceNumber: tPrint('document_number'),
+        vatNumber: tPrint('vat_number'),
+        crNumber: tPrint('cr_number'),
+        city: tPrint('city'),
+        date: t('date'),
+        paymentType: tPrint('document_data'),
+        cash: '',
+        credit: '',
+        description: tPrint('description'),
+        quantity: tPrint('quantity'),
+        unitPrice: tPrint('unit_price'),
+        tax: tPrint('tax'),
+        total: tPrint('total'),
+        subtotal: tPrint('subtotal'),
+        vat: tPrint('vat'),
+        grandTotal: tPrint('grand_total'),
+        qrNote: '',
+        footer: tPrint('footer'),
+      },
+      locale,
+    });
+  }
+
   async function handleDownloadPdf() {
-    const el = document.getElementById('print-root');
-    if (!el || !quote) return;
-    setBusy(true);
+    if (!quote) return;
+    setBusy('pdf');
     try {
-      await documentExporter.download({ element: el, fileName: quote.number, paper });
-      success(td('downloaded_ok'));
+      downloadLineDocumentPdf(await createPdf(), quote.number);
+      success(tPrint('downloaded_ok'));
     } catch {
-      errorToast(td('export_failed'));
+      errorToast(tPrint('export_failed'));
     } finally {
-      setBusy(false);
+      setBusy(null);
+    }
+  }
+
+  async function handleShare() {
+    if (!quote) return;
+    setBusy('share');
+    try {
+      const result = await shareLineDocumentPdf(await createPdf(), quote.number, t('document_title'));
+      success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -150,11 +211,15 @@ export default function QuoteDetailPage() {
               {t('convert')}
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={busy}>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={!!busy}>
             <Download className="h-4 w-4" strokeWidth={1.7} />
-            {busy ? td('generating') : td('download_pdf')}
+            {busy === 'pdf' ? tPrint('generating') : tPrint('download_pdf')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={busy}>
+          <Button variant="outline" size="sm" onClick={handleShare} disabled={!!busy}>
+            <Share2 className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'share' ? tPrint('generating') : tPrint('share_pdf')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
@@ -175,7 +240,7 @@ export default function QuoteDetailPage() {
 
       {/* معاينة مستند عرض السعر (مرئية + مصدر الطباعة/الـ PDF) عبر محرّك المستندات. */}
       <Card>
-        <CardHeader className="no-print"><CardTitle>{td('preview')}</CardTitle></CardHeader>
+        <CardHeader className="no-print"><CardTitle>{tPrint('preview')}</CardTitle></CardHeader>
         <CardContent className="print:p-0">
           <div className="rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
             <DocumentScaler>

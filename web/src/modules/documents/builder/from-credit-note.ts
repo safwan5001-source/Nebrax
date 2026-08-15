@@ -18,6 +18,8 @@ export interface SourceCreditNote {
   tax_amount: string;
   total: string;
   reason?: string | null;
+  /** إشعار مبيعات دائن أو إشعار مشتريات مدين؛ يحدد دلالة الطرف في القالب. */
+  type?: 'sales' | 'purchase';
   lines: SourceCreditNoteLine[];
 }
 
@@ -37,7 +39,7 @@ export function buildCreditNoteDocumentModel(input: {
   const { note, company, customer, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
 
   return {
-    type: 'credit_note',
+    type: note.type === 'purchase' ? 'debit_note' : 'credit_note',
     currency: 'SAR',
     direction: 'rtl',
     seller: {

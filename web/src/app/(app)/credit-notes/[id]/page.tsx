@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { ArrowRight, Printer, Download, CheckCircle2 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { ArrowRight, Printer, Download, CheckCircle2, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,8 @@ import { useToast } from '@/components/ui/toast';
 import { CreditNoteDocument, type CreditNoteCompany, type CreditNoteCustomer } from '@/components/credit-notes/credit-note-document';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { documentExporter, printDocument } from '@/modules/documents/services/export';
+import { printDocument } from '@/modules/documents/services/export';
+import { createLineDocumentPdf, downloadLineDocumentPdf, shareLineDocumentPdf } from '@/modules/documents/services/line-document-pdf';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
@@ -20,7 +21,7 @@ import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
 interface CreditNote {
-  id: string; number: string; partner_id: string; refund_type: string; status: string;
+  id: string; number: string; partner_id: string; type?: 'sales' | 'purchase'; refund_type: string; status: string;
   note_date: string; subtotal: string; tax_amount: string; total: string; reason: string | null; lines: Line[];
 }
 
@@ -31,7 +32,9 @@ export default function CreditNoteDetailPage() {
   const router = useRouter();
   const t = useTranslations('creditNotes');
   const td = useTranslations('invoiceDetail');
+  const tPrint = useTranslations('documentPrint');
   const tc = useTranslations('common');
+  const locale = useLocale();
   const { success, error: errorToast } = useToast();
 
   const [note, setNote] = useState<CreditNote | null>(null);
@@ -39,7 +42,7 @@ export default function CreditNoteDetailPage() {
   const [company, setCompany] = useState<CreditNoteCompany | null>(null);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
   const [templateId, setTemplateId] = useState<string>('tax-invoice-classic');
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
@@ -102,9 +105,14 @@ export default function CreditNoteDetailPage() {
   }
   if (!note) return <div className="text-muted">{t('not_found')}</div>;
 
+  const isDebitNote = note.type === 'purchase';
+  const counterpartLabel = isDebitNote ? t('supplier') : t('partner');
+  const treatmentLabel = isDebitNote
+    ? t('debit_document_subtitle')
+    : (note.refund_type === 'cash' ? t('refund_cash') : t('refund_credit'));
   const info: [string, React.ReactNode][] = [
-    [t('partner'), customer?.name ?? '—'],
-    [t('refund_type'), note.refund_type === 'cash' ? t('refund_cash') : t('refund_credit')],
+    [counterpartLabel, customer?.name ?? '—'],
+    [t('refund_type'), treatmentLabel],
     [t('date'), <span key="d" className="num">{note.note_date}</span>],
     [t('total'), <span key="t" className="num font-semibold">{formatRiyal(note.total)}</span>],
   ];
@@ -112,17 +120,77 @@ export default function CreditNoteDetailPage() {
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
 
+  async function createPdf() {
+    if (!note) throw new Error('Credit note unavailable');
+    const refundType = treatmentLabel;
+    return createLineDocumentPdf({
+      document: {
+        number: note.number,
+        date: note.note_date,
+        subtotal: note.subtotal,
+        tax_amount: note.tax_amount,
+        total: note.total,
+        lines: note.lines,
+      },
+      company,
+      party: customer,
+      logoUrl,
+      documentMeta: [
+        [t('date'), note.note_date],
+        [t('refund_type'), refundType],
+        [t('reason'), note.reason ?? '—'],
+      ],
+      labels: {
+        title: isDebitNote ? t('debit_document_title') : t('document_title'),
+        titleSecondary: isDebitNote ? t('debit_document_subtitle') : t('document_subtitle'),
+        seller: tPrint('seller'),
+        billTo: counterpartLabel,
+        invoiceNumber: tPrint('document_number'),
+        vatNumber: tPrint('vat_number'),
+        crNumber: tPrint('cr_number'),
+        city: tPrint('city'),
+        date: t('date'),
+        paymentType: tPrint('document_data'),
+        cash: '',
+        credit: '',
+        description: tPrint('description'),
+        quantity: tPrint('quantity'),
+        unitPrice: tPrint('unit_price'),
+        tax: tPrint('tax'),
+        total: tPrint('total'),
+        subtotal: tPrint('subtotal'),
+        vat: tPrint('vat'),
+        grandTotal: tPrint('grand_total'),
+        qrNote: '',
+        footer: tPrint('footer'),
+      },
+      locale,
+    });
+  }
+
   async function handleDownloadPdf() {
-    const el = document.getElementById('print-root');
-    if (!el || !note) return;
-    setBusy(true);
+    if (!note) return;
+    setBusy('pdf');
     try {
-      await documentExporter.download({ element: el, fileName: note.number, paper });
-      success(td('downloaded_ok'));
+      downloadLineDocumentPdf(await createPdf(), note.number);
+      success(tPrint('downloaded_ok'));
     } catch {
-      errorToast(td('export_failed'));
+      errorToast(tPrint('export_failed'));
     } finally {
-      setBusy(false);
+      setBusy(null);
+    }
+  }
+
+  async function handleShare() {
+    if (!note) return;
+    setBusy('share');
+    try {
+      const result = await shareLineDocumentPdf(await createPdf(), note.number, note.type === 'purchase' ? t('debit_document_title') : t('document_title'));
+      success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -141,11 +209,15 @@ export default function CreditNoteDetailPage() {
               {t('post')}
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={busy}>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={!!busy}>
             <Download className="h-4 w-4" strokeWidth={1.7} />
-            {busy ? td('generating') : td('download_pdf')}
+            {busy === 'pdf' ? tPrint('generating') : tPrint('download_pdf')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={busy}>
+          <Button variant="outline" size="sm" onClick={handleShare} disabled={!!busy}>
+            <Share2 className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'share' ? tPrint('generating') : tPrint('share_pdf')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
@@ -166,7 +238,7 @@ export default function CreditNoteDetailPage() {
 
       {/* معاينة مستند الإشعار الدائن (مرئية + مصدر الطباعة/الـ PDF) عبر محرّك المستندات. */}
       <Card>
-        <CardHeader className="no-print"><CardTitle>{td('preview')}</CardTitle></CardHeader>
+        <CardHeader className="no-print"><CardTitle>{tPrint('preview')}</CardTitle></CardHeader>
         <CardContent className="print:p-0">
           <div className="rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
             <DocumentScaler>
