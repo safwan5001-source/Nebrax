@@ -19,6 +19,7 @@ export type DocumentTypeId =
   | 'proforma_invoice'
   | 'sales_order'
   | 'purchase_order'
+  | 'purchase_invoice'
   | 'delivery_note'
   | 'packing_list'
   | 'receipt_voucher'

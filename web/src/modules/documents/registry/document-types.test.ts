@@ -11,7 +11,7 @@ import {
 
 const DOCUMENT_TYPES: readonly DocumentTypeId[] = [
   'tax_invoice', 'simplified_tax_invoice', 'quotation', 'proforma_invoice',
-  'sales_order', 'purchase_order', 'delivery_note', 'packing_list',
+  'sales_order', 'purchase_order', 'purchase_invoice', 'delivery_note', 'packing_list',
   'receipt_voucher', 'payment_voucher', 'credit_note', 'debit_note',
   'statement_of_account',
 ];
@@ -72,6 +72,14 @@ describe('Document preview samples', () => {
     expect(preview.lines).toHaveLength(2);
     expect(preview.totals.total).toBe(172500);
     expect(preview.qr?.value).toContain('preview');
+  });
+
+  it('provides a safe line-item body for purchase invoices', () => {
+    const preview = getDocumentPreviewModel('purchase_invoice');
+
+    expect(preview.type).toBe('purchase_invoice');
+    expect(preview.lines).toHaveLength(2);
+    expect(preview.qr).toBeNull();
   });
 
   it('provides a voucher body without line items for payment documents', () => {

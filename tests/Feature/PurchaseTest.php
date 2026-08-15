@@ -12,6 +12,7 @@ use App\Models\Purchase;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\PurchaseService;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Services\Reporting\ReportService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,6 +106,40 @@ class PurchaseTest extends TestCase
 
         // (ج) الإجماليات مشتقة من السطور
         $this->assertEquals($posted->lines->sum('line_total'), $entry->lines->sum('debit'));
+    }
+
+    /** @test */
+    public function posting_a_purchase_freezes_the_published_purchase_invoice_template_revision(): void
+    {
+        $templates = app(PrintTemplateService::class);
+        $template = $templates->create([
+            'name' => 'فاتورة مشتريات ثابتة',
+            'document_types' => ['purchase_invoice'],
+            'definition' => ['template_id' => 'purchase-v1'],
+        ], null);
+        $template = $templates->publish($template);
+        $revisionId = $template->published_revision_id;
+        $templates->assign([
+            'document_type' => 'purchase_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $revisionId,
+        ], null);
+
+        $purchase = $this->purchases->create(
+            ['partner_id' => $this->supplier->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $posted = $this->purchases->post($purchase);
+        $this->assertSame($revisionId, $posted->print_template_revision_id);
+
+        $templates->updateDraft($template, [
+            'definition' => ['template_id' => 'purchase-v2'],
+        ], null);
+        $templates->publish($template);
+
+        $frozen = Purchase::with('printTemplateRevision')->findOrFail($posted->id);
+        $this->assertSame($revisionId, $frozen->print_template_revision_id);
+        $this->assertSame('purchase-v1', $frozen->printTemplateRevision?->definition['template_id']);
     }
 
     /** @test */

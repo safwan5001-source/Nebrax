@@ -57,7 +57,7 @@
 
 ## عقد أنواع المستندات والاستخدامات
 
-تقبل الطبقة الخلفية الأنواع التالية فقط: `tax_invoice` و`simplified_tax_invoice` و`quotation` و`proforma_invoice` و`sales_order` و`purchase_order` و`delivery_note` و`packing_list` و`receipt_voucher` و`payment_voucher` و`credit_note` و`debit_note` و`statement_of_account`.
+تقبل الطبقة الخلفية الأنواع التالية فقط: `tax_invoice` و`simplified_tax_invoice` و`quotation` و`proforma_invoice` و`sales_order` و`purchase_order` و`purchase_invoice` و`delivery_note` و`packing_list` و`receipt_voucher` و`payment_voucher` و`credit_note` و`debit_note` و`statement_of_account`.
 
 | قيمة `usage` | الدلالة |
 |---|---|
@@ -86,6 +86,8 @@
 وعند ترحيل إشعار، يتبع `CreditNoteService::post()` المسار نفسه داخل معاملة القيد العكسي. يستخدم إشعار العميل نوع `credit_note`، بينما يستخدم إشعار المورد نوع `debit_note`؛ لذلك لا يمكن لتعيين قالب إشعار دائن أن يتسرب إلى إشعار مدين أو العكس. يعيد `CreditNoteResource` المرجع المثبت مع تعريفه في استجابة الترحيل والعرض.
 
 وعند ترحيل سند، يحل `PaymentService::post()` تعيين `receipt_voucher` للقبض أو `payment_voucher` للصرف داخل معاملة القيد والتخصيصات، ثم يثبت مرجع المراجعة على السند. يعيد `PaymentResource` المرجع المثبت، وتفضله صفحة السند على إعدادات التصميم الحية، مع إبقاء اختيار القالب متاحاً للمسودات والبيانات القديمة فقط.
+
+وعند ترحيل فاتورة مشتريات، يحل `PurchaseService::post()` تعيين `purchase_invoice` داخل معاملة القيد والاستلام المخزني، ثم يثبت مرجع المراجعة على الفاتورة. يعيد `PurchaseResource` المرجع المثبت، وتستخدم صفحة الفاتورة تذييل تلك المراجعة في المعاينة والطباعة وPDF المتجهي؛ لا تعيد قراءة إعداد تصميم حي لمستند مرحّل.
 
 | لحظة العمل | المرجع المستخدم |
 |---|---|
@@ -142,6 +144,7 @@
 | تجميد الفاتورة | الفاتورة المرحّلة تحتفظ بالمراجعة القديمة حتى بعد نشر مراجعة أحدث |
 | تجميد الإشعارات | الإشعار الدائن يحل `credit_note` وإشعار المورد يحل `debit_note`، وكلاهما يحتفظ بمراجعته بعد نشر إصدار أحدث |
 | تجميد السندات | سند القبض يحل `receipt_voucher` وسند الصرف يحل `payment_voucher`، وكلاهما يحتفظ بمراجعته بعد نشر إصدار أحدث |
+| تجميد فاتورة المشتريات | فاتورة المشتريات تحل `purchase_invoice` وتحتفظ بمراجعتها وتذييلها بعد نشر إصدار أحدث |
 
 ## الديون والنطاق المؤجل
 
@@ -150,7 +153,7 @@
 | البند | الحالة | سبب التأجيل / الخطوة التالية |
 |---|---|---|
 | إدارة التعيينات من محرر الواجهة | غير معروضة بعد | API والخدمة جاهزان؛ تحتاج واجهة تدير نطاق المؤسسة والفرع والاستخدام بوضوح |
-| التجميد للمستندات الأخرى | غير منفذ | المشتريات تحتاج نوع قالب مستقل وربطاً مماثلاً عند نقطة إصدارها الصحيحة؛ أما عروض الأسعار وأوامر الشراء فتحتاج أولاً تعريف لحظة إصدار تجارية منفصلة عن التحويل إلى مسودة |
+| التجميد للمستندات الأخرى | غير منفذ | عروض الأسعار وأوامر الشراء تحتاج أولاً تعريف لحظة إصدار تجارية منفصلة عن التحويل إلى مسودة قبل تطبيق نمط التجميد |
 | محرر كتل كامل | جزئي | المحرر الحالي يحرر تعريفاً منظماً ومعاينة؛ بناء خصائص كل كتلة وتخطيط الصفحة المتقدم مرحلة مستقلة |
 | اعتماد مخرجات `pdf` و`thermal` لكل نوع | جزئي | العقد يدعم الاستخدامات، لكن كل مسار إخراج يحتاج ربطاً وتنفيذاً واختبارات قبول خاصة به |
 | إزالة المسار القديم | غير مخطط قبل انتقال المسارات | `sales_config.designs` يبقى للتوافق حتى تنتقل جميع المستهلكات بأمان |
@@ -164,5 +167,5 @@
 | نماذج المكتبة والمراجعة والتعيين | `app/Models/PrintTemplate*.php` |
 | مسارات API | `routes/api.php` |
 | محرر الواجهة | `web/src/modules/print-templates/components/print-template-studio.tsx` |
-| تجميد الفاتورة والإشعارات والسندات | `app/Services/Accounting/InvoiceService.php` و`app/Services/Accounting/CreditNoteService.php` و`app/Services/Accounting/PaymentService.php` ونماذجها |
-| الاختبارات | `tests/Feature/PrintTemplateTest.php` و`tests/Feature/InvoiceTest.php` و`tests/Feature/CreditNoteTest.php` و`tests/Feature/PaymentTest.php` |
+| تجميد الفاتورة والإشعارات والسندات والمشتريات | `app/Services/Accounting/InvoiceService.php` و`app/Services/Accounting/CreditNoteService.php` و`app/Services/Accounting/PaymentService.php` و`app/Services/Accounting/PurchaseService.php` ونماذجها |
+| الاختبارات | `tests/Feature/PrintTemplateTest.php` و`tests/Feature/InvoiceTest.php` و`tests/Feature/CreditNoteTest.php` و`tests/Feature/PaymentTest.php` و`tests/Feature/PurchaseTest.php` |

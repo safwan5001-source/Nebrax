@@ -7,6 +7,7 @@ use App\Models\Partner;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseLine;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -47,7 +48,8 @@ class PurchaseService
         protected LedgerService $ledger,
         protected InventoryService $inventory,
         protected UnitConversion $units,
-        protected PaymentService $payments
+        protected PaymentService $payments,
+        protected PrintTemplateService $printTemplates
     ) {}
 
     /**
@@ -441,8 +443,13 @@ class PurchaseService
                 );
             }
 
+            // تحل المراجعة المنشورة داخل معاملة الترحيل وتُثبت على الفاتورة؛
+            // تعديل التعيين أو نشر نسخة أحدث لاحقاً لا يغير مستنداً صدر بالفعل.
+            $printAssignment = $this->printTemplates->resolve('purchase_invoice', 'print', $purchase->branch_id);
+
             $purchase->update([
                 'status'           => 'posted',
+                'print_template_revision_id' => $printAssignment?->print_template_revision_id,
                 'subtotal'         => $subtotal,
                 'tax_amount'       => $taxTotal,
                 'total'            => $total,

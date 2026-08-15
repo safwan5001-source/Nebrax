@@ -20,6 +20,13 @@ import { createPurchaseInvoicePdf, downloadPurchaseInvoicePdf, sharePurchaseInvo
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 
+interface FrozenPrintTemplateRevision {
+  id: string;
+  version: number;
+  definition: { footer_text?: string };
+  document_types: string[];
+}
+
 interface Purchase {
   id: string;
   number: string;
@@ -41,6 +48,8 @@ interface Purchase {
   received_status: string;
   received_date: string | null;
   lines: DocLine[];
+  print_template_revision_id?: string | null;
+  print_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
@@ -114,6 +123,7 @@ export default function PurchaseDetailPage() {
   const isDraft = purchase.status === 'draft';
   const receivedStatusKey = receiptKey(purchase.received_status);
   const receivedStatusLabel = tpp(`received_${receivedStatusKey}`);
+  const frozenFooter = purchase.print_template_revision?.definition.footer_text ?? null;
 
   /**
    * الخصم والشحن والتسوية كانت تُحذَف من المستند المطبوع، فيقرأ المورّد
@@ -139,6 +149,7 @@ export default function PurchaseDetailPage() {
     company,
     supplier,
     adjustments,
+    footerText: frozenFooter,
     locale,
     labels: {
       title: tpp('title'), titleSecondary: tpp('title_secondary'), seller: tpp('buyer'), billTo: tpp('supplier'),
@@ -332,6 +343,7 @@ export default function PurchaseDetailPage() {
             adjustments={adjustments}
             tax={purchase.tax_amount}
             total={purchase.total}
+            footerText={frozenFooter}
           />
         </DocumentScaler>
       </div>

@@ -35,6 +35,8 @@ export async function createPurchaseInvoicePdf(input: {
   company: Company | null;
   supplier: Party | null;
   adjustments: DocAdjustment[];
+  /** تذييل مراجعة القالب المثبتة عند ترحيل الفاتورة. */
+  footerText?: string | null;
   labels: PurchasePdfLabels;
   locale: string;
 }): Promise<Blob> {
@@ -68,6 +70,7 @@ export async function createPurchaseInvoicePdf(input: {
     company: input.company,
     customer: input.supplier,
     adjustments: input.adjustments,
+    footerText: input.footerText,
     documentMeta: [
       [input.labels.date, input.purchase.purchase_date],
       [input.labels.paymentType, input.purchase.payment_type === 'cash' ? input.labels.cash : input.labels.credit],
