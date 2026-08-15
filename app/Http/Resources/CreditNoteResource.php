@@ -23,6 +23,8 @@ class CreditNoteResource extends JsonResource
             'total'               => Money::toRiyal($this->total),
             'reason'              => $this->reason,
             'original_invoice_id' => $this->original_invoice_id,
+            'print_template_revision_id' => $this->print_template_revision_id,
+            'print_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('printTemplateRevision')),
             'lines'               => CreditNoteLineResource::collection($this->whenLoaded('lines')),
         ];
     }
