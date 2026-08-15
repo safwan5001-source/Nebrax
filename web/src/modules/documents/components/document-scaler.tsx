@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * يقيس عرض الحاوية ويُصغّر المستند بصرياً ليملأ العرض على الشاشات الضيّقة (الجوال)
@@ -13,33 +13,55 @@ export function DocumentScaler({ children }: { children: React.ReactNode }) {
   const innerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<{ scale: number; offsetX: number; height?: number }>({ scale: 1, offsetX: 0 });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const outer = outerRef.current;
     const inner = innerRef.current;
     if (!outer || !inner) return;
 
+    let frame = 0;
     const recalc = () => {
-      const avail = outer.clientWidth;
-      const contentW = inner.scrollWidth || avail; // العرض الطبيعي (غير متأثّر بالتحويل)
-      const scale = contentW > 0 ? Math.min(1, avail / contentW) : 1;
-      const offsetX = Math.max(0, (avail - contentW * scale) / 2); // توسيط أفقي
-      const height = inner.offsetHeight * scale; // ارتفاع طبيعي مضروب في المقياس
-      setState({ scale, offsetX, height });
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const avail = outer.getBoundingClientRect().width;
+        const contentW = inner.scrollWidth;
+        if (!avail || !contentW) return;
+        const scale = Math.min(1, avail / contentW);
+        const offsetX = Math.max(0, (avail - contentW * scale) / 2);
+        const height = inner.offsetHeight * scale;
+        setState((previous) => (
+          previous.scale === scale && previous.offsetX === offsetX && previous.height === height
+            ? previous
+            : { scale, offsetX, height }
+        ));
+      });
     };
 
     const ro = new ResizeObserver(recalc);
     ro.observe(outer);
     ro.observe(inner);
+    window.addEventListener('resize', recalc);
+    // تحميل الخط أو QR أو الشعار قد يغيّر ارتفاع المستند بعد أول قياس على الجوال.
+    void document.fonts?.ready.then(recalc);
     recalc();
-    return () => ro.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+      window.removeEventListener('resize', recalc);
+    };
   }, []);
 
   return (
-    <div ref={outerRef} className="doc-scaler-outer w-full overflow-hidden print:overflow-visible" style={{ height: state.height }}>
+    <div
+      ref={outerRef}
+      dir="ltr"
+      className="doc-scaler-outer w-full overflow-hidden print:overflow-visible"
+      style={state.height ? { height: state.height } : undefined}
+    >
       <div
         ref={innerRef}
+        dir="ltr"
         className="doc-scaler-inner w-max"
-        style={{ transform: `translateX(${state.offsetX}px) scale(${state.scale})`, transformOrigin: 'top left' }}
+        style={{ transform: `translate3d(${state.offsetX}px, 0, 0) scale(${state.scale})`, transformOrigin: 'top left', willChange: 'transform' }}
       >
         {children}
       </div>
