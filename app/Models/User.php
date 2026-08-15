@@ -17,7 +17,7 @@ class User extends Authenticatable
     protected $keyType = 'string';
 
     protected $fillable = [
-        'tenant_id', 'name', 'email', 'phone', 'password', 'role', 'permissions', 'is_active',
+        'tenant_id', 'employee_id', 'name', 'email', 'phone', 'password', 'role', 'permissions', 'is_active',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -32,6 +32,15 @@ class User extends Authenticatable
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * سجلّ الموظف الذي يمثّله هذا المستخدم (إن وُجد).
+     * غيابه يعني حساب دخول غير مرتبط بموظف (المالك الأول مثلاً) — توافق رجعي.
+     */
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
     }
 
     /** هل يملك المستخدم الصلاحية المطلوبة حسب دوره؟ */
