@@ -1186,6 +1186,7 @@
     "retry": "Retry",
     "not_found": "Voucher not found",
     "template": "Template",
+    "frozen_template": "Frozen template",
     "receipt_title": "Receipt voucher",
     "payment_title": "Payment voucher",
     "receipt_subtitle": "Collection from customer",

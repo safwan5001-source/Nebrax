@@ -26,10 +26,19 @@ import type { ThemeId } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 
 /** دفعة من الـ API — أرقام بالريال نصّاً. */
+interface FrozenPrintTemplateRevision {
+  id: string;
+  version: number;
+  definition: { template_id?: string; theme_id?: ThemeId; footer_text?: string; show_logo?: boolean };
+  document_types: string[];
+}
+
 interface Payment extends PaymentDoc {
   id: string;
   partner_id: string;
   status: string;
+  print_template_revision_id?: string | null;
+  print_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = {
@@ -81,7 +90,21 @@ export default function PaymentDetailPage() {
         ]);
         if (p.status === 'fulfilled') setPartner(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
-        if (d.status === 'fulfilled') {
+        // السند المرحّل يقرأ مراجعته المثبتة حصراً؛ لا يعيد تعديل القالب أو
+        // إعدادات التصميم الحية تفسير مستند تاريخي. المسودات والبيانات القديمة
+        // تستخدم إعدادات التوافق الحية إلى أن تُرحّل.
+        const frozen = r.data.print_template_revision?.definition;
+        if (frozen) {
+          setTemplateId(getTemplate(frozen.template_id ?? DEFAULT_TEMPLATE_ID).id);
+          setThemeId(frozen.theme_id ?? null);
+          setFooterText(frozen.footer_text ?? null);
+          setShowLogo(frozen.show_logo !== false);
+          setLogoUrl(null);
+          setLogoHeight(null);
+          setBankText(null);
+          setStampUrl(null);
+          setSignatureUrl(null);
+        } else if (d.status === 'fulfilled') {
           const dg = d.value.data ?? {};
           setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
           if (dg.theme) setThemeId(dg.theme as ThemeId);
@@ -246,24 +269,32 @@ export default function PaymentDetailPage() {
       <Card>
         <CardHeader className="no-print flex flex-row items-center justify-between gap-3">
           <CardTitle>{t('preview')}</CardTitle>
-          <Dropdown
-            align="end"
-            menuLabel={t('template')}
-            triggerClassName="h-8 gap-2 border border-border px-3 text-sm text-text hover:bg-primary-soft"
-            trigger={
-              <>
-                <LayoutTemplate className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
-                <span>{tt(getTemplate(templateId).nameKey)}</span>
-                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.8} />
-              </>
-            }
-          >
-            {listTemplates().map((d) => (
-              <DropdownItem key={d.id} onClick={() => setTemplateId(d.id)}>
-                {tt(d.nameKey)}
-              </DropdownItem>
-            ))}
-          </Dropdown>
+          {payment.print_template_revision ? (
+            <div className="flex min-w-0 items-center gap-2 text-sm text-text">
+              <LayoutTemplate className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
+              <span className="truncate">{tt(getTemplate(templateId).nameKey)}</span>
+              <Badge tone="muted" className="shrink-0 whitespace-nowrap">{t('frozen_template')}</Badge>
+            </div>
+          ) : (
+            <Dropdown
+              align="end"
+              menuLabel={t('template')}
+              triggerClassName="h-8 gap-2 border border-border px-3 text-sm text-text hover:bg-primary-soft"
+              trigger={
+                <>
+                  <LayoutTemplate className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
+                  <span>{tt(getTemplate(templateId).nameKey)}</span>
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.8} />
+                </>
+              }
+            >
+              {listTemplates().map((d) => (
+                <DropdownItem key={d.id} onClick={() => setTemplateId(d.id)}>
+                  {tt(d.nameKey)}
+                </DropdownItem>
+              ))}
+            </Dropdown>
+          )}
         </CardHeader>
         <CardContent className="print:p-0">
           <div className="rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">

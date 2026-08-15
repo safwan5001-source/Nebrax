@@ -22,6 +22,8 @@ class PaymentResource extends JsonResource
             'payment_date' => optional($this->payment_date)->toDateString(),
             'amount'       => Money::toRiyal($this->amount),
             'notes'        => $this->notes,
+            'print_template_revision_id' => $this->print_template_revision_id,
+            'print_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('printTemplateRevision')),
             // تخصيصات السند: ما غطّاه من فواتير/مشتريات (نصّ المستند + مبلغ بالريال).
             'allocations'  => $this->whenLoaded('allocations', fn () => $this->allocations->map(fn ($a) => [
                 'label'  => optional($a->allocatable)->number ?? '—',

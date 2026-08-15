@@ -11,6 +11,7 @@ use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\PaymentService;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -125,6 +126,57 @@ class PaymentTest extends TestCase
         $this->assertEquals(60000, $this->line($entry, '2110')->debit);
         $this->assertEquals($this->supplier->id, $this->line($entry, '2110')->partner_id);
         $this->assertEquals(60000, $this->line($entry, '1110')->credit);
+    }
+
+    /** @test */
+    public function posting_a_payment_freezes_the_matching_published_template_revision(): void
+    {
+        $templates = app(PrintTemplateService::class);
+
+        $receiptTemplate = $templates->create([
+            'name' => 'سند قبض ثابت',
+            'document_types' => ['receipt_voucher'],
+            'definition' => ['template_id' => 'receipt-v1'],
+        ], null);
+        $receiptTemplate = $templates->publish($receiptTemplate);
+        $receiptRevisionId = $receiptTemplate->published_revision_id;
+        $templates->assign([
+            'document_type' => 'receipt_voucher',
+            'usage' => 'print',
+            'print_template_revision_id' => $receiptRevisionId,
+        ], null);
+
+        $paymentTemplate = $templates->create([
+            'name' => 'سند صرف ثابت',
+            'document_types' => ['payment_voucher'],
+            'definition' => ['template_id' => 'payment-v1'],
+        ], null);
+        $paymentTemplate = $templates->publish($paymentTemplate);
+        $paymentRevisionId = $paymentTemplate->published_revision_id;
+        $templates->assign([
+            'document_type' => 'payment_voucher',
+            'usage' => 'print',
+            'print_template_revision_id' => $paymentRevisionId,
+        ], null);
+
+        $received = $this->payments->post($this->payments->create([
+            'partner_id' => $this->customer->id, 'amount' => 115000, 'direction' => 'received',
+        ]));
+        $paid = $this->payments->post($this->payments->create([
+            'partner_id' => $this->supplier->id, 'amount' => 60000, 'direction' => 'paid',
+        ]));
+
+        $this->assertSame($receiptRevisionId, $received->print_template_revision_id);
+        $this->assertSame($paymentRevisionId, $paid->print_template_revision_id);
+
+        $templates->updateDraft($receiptTemplate, [
+            'definition' => ['template_id' => 'receipt-v2'],
+        ], null);
+        $templates->publish($receiptTemplate);
+
+        $frozen = Payment::with('printTemplateRevision')->findOrFail($received->id);
+        $this->assertSame($receiptRevisionId, $frozen->print_template_revision_id);
+        $this->assertSame('receipt-v1', $frozen->printTemplateRevision?->definition['template_id']);
     }
 
     /** @test */

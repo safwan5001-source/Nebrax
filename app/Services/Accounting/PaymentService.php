@@ -8,6 +8,7 @@ use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\Purchase;
+use App\Services\PrintTemplates\PrintTemplateService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -41,7 +42,8 @@ class PaymentService
     private const CASH_CODE_PREFIXES = ['111', '112'];
 
     public function __construct(
-        protected LedgerService $ledger
+        protected LedgerService $ledger,
+        protected PrintTemplateService $printTemplates
     ) {}
 
     /**
@@ -208,8 +210,14 @@ class PaymentService
                 'created_by'  => $payment->created_by,
             ]);
 
+            // يُختار قالب السند داخل معاملة الترحيل ثم يُثبت على المستند؛
+            // لا يؤدي نشر مراجعة أحدث لاحقاً إلى إعادة تفسير سندٍ صدر بالفعل.
+            $documentType = $payment->direction === 'received' ? 'receipt_voucher' : 'payment_voucher';
+            $printAssignment = $this->printTemplates->resolve($documentType, 'print', $payment->branch_id);
+
             $payment->update([
                 'status'           => 'posted',
+                'print_template_revision_id' => $printAssignment?->print_template_revision_id,
                 'journal_entry_id' => $entry->id,
             ]);
 
