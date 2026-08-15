@@ -58,7 +58,7 @@ jobs:
       - name: حارس قائمة النسخ
         run: |
           ALLOWED="app/Models app/Models/Concerns app/Services/Accounting \
-                   app/Services/Reporting app/Support app/Tenancy \
+                   app/Services/Reporting app/Services/PrintTemplates app/Support app/Tenancy \
                    app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Providers \
                    app/Console/Commands"
@@ -99,7 +99,7 @@ jobs:
         run: |
           CORE="$GITHUB_WORKSPACE"
           cd "$APP_DIR"
-          mkdir -p app/Services/Accounting app/Services/Reporting app/Support \
+          mkdir -p app/Services/Accounting app/Services/Reporting app/Services/PrintTemplates app/Support \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
                    app/Models/Concerns tests/Feature routes
@@ -108,6 +108,7 @@ jobs:
           cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
           cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
           cp -r "$CORE/app/Services/Reporting/"*.php      app/Services/Reporting/
+          cp -r "$CORE/app/Services/PrintTemplates/"*.php app/Services/PrintTemplates/
           cp -r "$CORE/app/Support/"*.php                 app/Support/
           cp -r "$CORE/app/Tenancy/"*.php                 app/Tenancy/
           cp -r "$CORE/app/Http/Middleware/"*.php         app/Http/Middleware/

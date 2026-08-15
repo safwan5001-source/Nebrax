@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\PosSessionController;
+use App\Http\Controllers\Api\PrintTemplateController;
 use App\Http\Controllers\Api\ProcurementController;
 use App\Http\Controllers\Api\PurchaseSettingsController;
 use App\Http\Controllers\Api\PurchaseController;
@@ -327,6 +328,16 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // أقسام إعدادات المبيعات المتعددة (حالات/تصميمات/قوائم أسعار/شحن…)
         Route::get('sales-config/{section}', [SalesConfigController::class, 'show'])->middleware($perm('invoices.view'));
         Route::put('sales-config/{section}', [SalesConfigController::class, 'update'])->middleware($perm('company.manage'));
+
+        // مكتبة قوالب الطباعة: القراءة لمن يطبع مستندات، والإدارة لمالك/مدير الشركة.
+        Route::get('print-templates', [PrintTemplateController::class, 'index'])->middleware($perm('invoices.view'));
+        Route::get('print-templates/assignments', [PrintTemplateController::class, 'assignments'])->middleware($perm('invoices.view'));
+        Route::get('print-templates/{id}', [PrintTemplateController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::post('print-templates', [PrintTemplateController::class, 'store'])->middleware($perm('company.manage'));
+        Route::put('print-templates/{id}/draft', [PrintTemplateController::class, 'updateDraft'])->middleware($perm('company.manage'));
+        Route::post('print-templates/{id}/publish', [PrintTemplateController::class, 'publish'])->middleware($perm('company.manage'));
+        Route::post('print-templates/{id}/duplicate', [PrintTemplateController::class, 'duplicate'])->middleware($perm('company.manage'));
+        Route::put('print-templates/assignments/default', [PrintTemplateController::class, 'assign'])->middleware($perm('company.manage'));
 
         // إعدادات العميل (تفضيلات غير محاسبية)
         Route::get('customer-settings', [CustomerSettingsController::class, 'show'])->middleware($perm('partners.view'));
