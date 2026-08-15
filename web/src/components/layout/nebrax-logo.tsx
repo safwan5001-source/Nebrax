@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
  * شعار نبراكس الرسمي الملوّن بالأزرق المعتمد للعلامة.
  *
  * يبقى اللون جزءاً من الأصل البصري نفسه، لا من رموز ألوان الواجهة، حتى لا
- * تتغير هوية الشعار عند تبديل وضع العرض أو تعديل لون primary لاحقاً.
+ * تتغير هوية الشعار عند تبديل وضع العرض أو تعديل لون primary لاحقاً. وتضمن
+ * الخلفية البيضاء المحايدة وضوح الأزرق الرسمي على الأسطح الداكنة أيضاً.
  */
 export function NebraxLogo({
   alt = '',
@@ -24,7 +25,7 @@ export function NebraxLogo({
       height={680}
       priority={priority}
       sizes="(max-width: 640px) 72px, 96px"
-      className={cn('h-auto w-auto object-contain', className)}
+      className={cn('h-auto w-auto rounded-sm bg-white p-0.5 object-contain', className)}
     />
   );
 }
