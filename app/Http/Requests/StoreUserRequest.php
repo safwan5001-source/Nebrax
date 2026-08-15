@@ -19,6 +19,9 @@ class StoreUserRequest extends FormRequest
             'password'  => ['required', 'string', 'min:8'],
             'role'      => ['required', 'in:owner,admin,accountant,staff'],
             'is_active' => ['boolean'],
+            // ربط اختياري بسجلّ موظف قائم (المستخدم موظفٌ يدخل النظام).
+            // ملكية المعرّف وعدم ارتباطه بمستخدم آخر يُتحقّقان في المتحكّم.
+            'employee_id' => ['nullable', 'uuid'],
         ];
     }
 }
