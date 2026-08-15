@@ -107,10 +107,12 @@ class CreditNoteTest extends TestCase
             ['document_type' => 'credit_note', 'print_template_revision_id' => $creditRevisionId],
             ['document_type' => 'debit_note', 'print_template_revision_id' => $debitRevisionId],
         ] as $assignment) {
-            $this->withToken($auth['token'])->putJson('/api/print-templates/assignments/default', [
-                ...$assignment,
-                'usage' => 'print',
-            ])->assertOk();
+            foreach (['print', 'pdf'] as $usage) {
+                $this->withToken($auth['token'])->putJson('/api/print-templates/assignments/default', [
+                    ...$assignment,
+                    'usage' => $usage,
+                ])->assertOk();
+            }
         }
 
         $creditNoteId = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
@@ -121,7 +123,9 @@ class CreditNoteTest extends TestCase
         $this->withToken($auth['token'])->postJson("/api/credit-notes/{$creditNoteId}/post")
             ->assertOk()
             ->assertJsonPath('data.print_template_revision_id', $creditRevisionId)
-            ->assertJsonPath('data.print_template_revision.definition.template_id', 'credit-note-v1');
+            ->assertJsonPath('data.print_template_revision.definition.template_id', 'credit-note-v1')
+            ->assertJsonPath('data.pdf_template_revision_id', $creditRevisionId)
+            ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'credit-note-v1');
 
         $debitNoteId = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
             'partner_id' => $supplierId,
@@ -131,7 +135,9 @@ class CreditNoteTest extends TestCase
         $this->withToken($auth['token'])->postJson("/api/credit-notes/{$debitNoteId}/post")
             ->assertOk()
             ->assertJsonPath('data.print_template_revision_id', $debitRevisionId)
-            ->assertJsonPath('data.print_template_revision.definition.template_id', 'debit-note-v1');
+            ->assertJsonPath('data.print_template_revision.definition.template_id', 'debit-note-v1')
+            ->assertJsonPath('data.pdf_template_revision_id', $debitRevisionId)
+            ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'debit-note-v1');
 
         $this->withToken($auth['token'])->putJson("/api/print-templates/{$creditTemplateId}/draft", [
             'definition' => ['template_id' => 'credit-note-v2'],
@@ -141,7 +147,9 @@ class CreditNoteTest extends TestCase
         $this->withToken($auth['token'])->getJson("/api/credit-notes/{$creditNoteId}")
             ->assertOk()
             ->assertJsonPath('data.print_template_revision_id', $creditRevisionId)
-            ->assertJsonPath('data.print_template_revision.definition.template_id', 'credit-note-v1');
+            ->assertJsonPath('data.print_template_revision.definition.template_id', 'credit-note-v1')
+            ->assertJsonPath('data.pdf_template_revision_id', $creditRevisionId)
+            ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'credit-note-v1');
     }
 
     /** @test */

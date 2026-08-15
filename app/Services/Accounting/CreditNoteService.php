@@ -140,10 +140,12 @@ class CreditNoteService
             // المستند؛ لا يعدّل نشر مراجعة أحدث لاحقاً هيئة إشعار صدر بالفعل.
             $documentType = $note->isPurchase() ? 'debit_note' : 'credit_note';
             $printAssignment = $this->printTemplates->resolve($documentType, 'print', $note->branch_id);
+            $pdfAssignment = $this->printTemplates->resolve($documentType, 'pdf', $note->branch_id);
 
             $note->update([
                 'status'           => 'posted',
                 'print_template_revision_id' => $printAssignment?->print_template_revision_id,
+                'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
                 'subtotal'         => $subtotal,
                 'tax_amount'       => $taxAmount,
                 'total'            => $total,

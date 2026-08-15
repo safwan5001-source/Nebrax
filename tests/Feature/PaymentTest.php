@@ -140,11 +140,13 @@ class PaymentTest extends TestCase
         ], null);
         $receiptTemplate = $templates->publish($receiptTemplate);
         $receiptRevisionId = $receiptTemplate->published_revision_id;
-        $templates->assign([
-            'document_type' => 'receipt_voucher',
-            'usage' => 'print',
-            'print_template_revision_id' => $receiptRevisionId,
-        ], null);
+        foreach (['print', 'pdf'] as $usage) {
+            $templates->assign([
+                'document_type' => 'receipt_voucher',
+                'usage' => $usage,
+                'print_template_revision_id' => $receiptRevisionId,
+            ], null);
+        }
 
         $paymentTemplate = $templates->create([
             'name' => 'سند صرف ثابت',
@@ -153,11 +155,13 @@ class PaymentTest extends TestCase
         ], null);
         $paymentTemplate = $templates->publish($paymentTemplate);
         $paymentRevisionId = $paymentTemplate->published_revision_id;
-        $templates->assign([
-            'document_type' => 'payment_voucher',
-            'usage' => 'print',
-            'print_template_revision_id' => $paymentRevisionId,
-        ], null);
+        foreach (['print', 'pdf'] as $usage) {
+            $templates->assign([
+                'document_type' => 'payment_voucher',
+                'usage' => $usage,
+                'print_template_revision_id' => $paymentRevisionId,
+            ], null);
+        }
 
         $received = $this->payments->post($this->payments->create([
             'partner_id' => $this->customer->id, 'amount' => 115000, 'direction' => 'received',
@@ -167,16 +171,20 @@ class PaymentTest extends TestCase
         ]));
 
         $this->assertSame($receiptRevisionId, $received->print_template_revision_id);
+        $this->assertSame($receiptRevisionId, $received->pdf_template_revision_id);
         $this->assertSame($paymentRevisionId, $paid->print_template_revision_id);
+        $this->assertSame($paymentRevisionId, $paid->pdf_template_revision_id);
 
         $templates->updateDraft($receiptTemplate, [
             'definition' => ['template_id' => 'receipt-v2'],
         ], null);
         $templates->publish($receiptTemplate);
 
-        $frozen = Payment::with('printTemplateRevision')->findOrFail($received->id);
+        $frozen = Payment::with(['printTemplateRevision', 'pdfTemplateRevision'])->findOrFail($received->id);
         $this->assertSame($receiptRevisionId, $frozen->print_template_revision_id);
         $this->assertSame('receipt-v1', $frozen->printTemplateRevision?->definition['template_id']);
+        $this->assertSame($receiptRevisionId, $frozen->pdf_template_revision_id);
+        $this->assertSame('receipt-v1', $frozen->pdfTemplateRevision?->definition['template_id']);
     }
 
     /** @test */

@@ -22,6 +22,7 @@ import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { exportXlsx } from '@/lib/xlsx';
 import { createInvoicePdf, downloadInvoicePdf, shareInvoicePdf } from '@/modules/invoices/services/invoice-pdf';
+import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
 
 interface Line {
   id: string;
@@ -56,6 +57,8 @@ interface Invoice {
   lines: Line[];
   print_template_revision_id?: string | null;
   print_template_revision?: FrozenPrintTemplateRevision | null;
+  pdf_template_revision_id?: string | null;
+  pdf_template_revision?: FrozenPrintTemplateRevision | null;
 }
 interface Zatca {
   qr: string | null;
@@ -214,6 +217,10 @@ export default function InvoiceDetailPage() {
   // حجم ورق القالب المختار (A4 افتراضياً، أو الحراري) — يوجّه الـ PDF والطباعة.
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+  const frozenPdfDefinition = resolveFrozenOutputDefinition(
+    invoice.pdf_template_revision,
+    invoice.print_template_revision,
+  );
 
   const buildVectorInvoicePdf = async () => {
     if (!invoice) throw new Error('Invoice is not loaded');
@@ -224,7 +231,7 @@ export default function InvoiceDetailPage() {
       customer,
       qrImage,
       logoUrl,
-      footerText,
+      footerText: frozenPdfDefinition?.footer_text ?? footerText,
       locale,
       labels: {
         title: td('title'), titleSecondary: td('title_en'), seller: td('seller'), billTo: td('bill_to'),

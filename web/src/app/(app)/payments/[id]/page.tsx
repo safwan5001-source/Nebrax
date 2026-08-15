@@ -24,6 +24,7 @@ import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/docum
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import type { ThemeId } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
 
 /** دفعة من الـ API — أرقام بالريال نصّاً. */
 interface FrozenPrintTemplateRevision {
@@ -39,6 +40,8 @@ interface Payment extends PaymentDoc {
   status: string;
   print_template_revision_id?: string | null;
   print_template_revision?: FrozenPrintTemplateRevision | null;
+  pdf_template_revision_id?: string | null;
+  pdf_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = {
@@ -159,6 +162,10 @@ export default function PaymentDetailPage() {
 
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+  const frozenPdfDefinition = resolveFrozenOutputDefinition(
+    payment.pdf_template_revision,
+    payment.print_template_revision,
+  );
 
   async function createPdf() {
     if (!payment) throw new Error('Payment unavailable');
@@ -167,6 +174,7 @@ export default function PaymentDetailPage() {
       company,
       partner,
       logoUrl,
+      footerText: frozenPdfDefinition?.footer_text ?? footerText,
       labels: {
         receiptTitle: t('receipt_title'),
         paymentTitle: t('payment_title'),

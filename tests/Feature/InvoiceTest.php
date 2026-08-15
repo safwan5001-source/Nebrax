@@ -102,6 +102,17 @@ class InvoiceTest extends TestCase
             'usage' => 'print',
             'print_template_revision_id' => $template->published_revision_id,
         ], null);
+        $pdfTemplate = $templates->create([
+            'name' => 'قالب PDF ثابت',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-minimal', 'footer_text' => 'أرشيف PDF'],
+        ], null);
+        $pdfTemplate = $templates->publish($pdfTemplate);
+        $templates->assign([
+            'document_type' => 'tax_invoice',
+            'usage' => 'pdf',
+            'print_template_revision_id' => $pdfTemplate->published_revision_id,
+        ], null);
 
         $invoice = $this->invoices->create(
             ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
@@ -110,16 +121,20 @@ class InvoiceTest extends TestCase
         $posted = $this->invoices->post($invoice);
 
         $frozenRevisionId = $template->published_revision_id;
+        $frozenPdfRevisionId = $pdfTemplate->published_revision_id;
         $this->assertSame($frozenRevisionId, $posted->print_template_revision_id);
+        $this->assertSame($frozenPdfRevisionId, $posted->pdf_template_revision_id);
 
         $templates->updateDraft($template, [
             'definition' => ['template_id' => 'tax-invoice-modern', 'theme_id' => 'violet'],
         ], null);
         $newlyPublished = $templates->publish($template);
 
-        $frozenInvoice = Invoice::with('printTemplateRevision')->findOrFail($posted->id);
+        $frozenInvoice = Invoice::with(['printTemplateRevision', 'pdfTemplateRevision'])->findOrFail($posted->id);
         $this->assertSame($frozenRevisionId, $frozenInvoice->print_template_revision_id);
         $this->assertSame('tax-invoice-classic', $frozenInvoice->printTemplateRevision?->definition['template_id']);
+        $this->assertSame($frozenPdfRevisionId, $frozenInvoice->pdf_template_revision_id);
+        $this->assertSame('tax-invoice-minimal', $frozenInvoice->pdfTemplateRevision?->definition['template_id']);
         $this->assertNotSame($frozenRevisionId, $newlyPublished->published_revision_id);
     }
 

@@ -25,6 +25,8 @@ class CreditNoteResource extends JsonResource
             'original_invoice_id' => $this->original_invoice_id,
             'print_template_revision_id' => $this->print_template_revision_id,
             'print_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('printTemplateRevision')),
+            'pdf_template_revision_id' => $this->pdf_template_revision_id,
+            'pdf_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('pdfTemplateRevision')),
             'lines'               => CreditNoteLineResource::collection($this->whenLoaded('lines')),
         ];
     }
