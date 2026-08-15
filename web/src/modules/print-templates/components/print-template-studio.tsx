@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { SectionDesigner } from '@/components/settings/section-designer';
+import { PrintTemplateAssignments } from './print-template-assignments';
 import { api } from '@/lib/api';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { DocumentView } from '@/modules/documents/components/document-view';
@@ -224,6 +225,8 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
           <Card className="overflow-hidden"><CardHeader className="flex flex-row items-center justify-between border-b border-border py-3"><div><CardTitle className="text-sm">معاينة حية</CardTitle><p className="mt-1 text-xs text-muted">بيانات تجريبية فقط — لا يظهر أي سجل عميل حقيقي.</p></div><span className="rounded bg-surface px-2 py-1 text-xs text-muted">مراجعة {revision.version}</span></CardHeader><CardContent className="min-h-[620px] bg-slate-100 p-3 dark:bg-slate-950"><DocumentScaler><DocumentView model={preview} templateId={definition.template_id} themeId={definition.theme_id} showLogo={definition.show_logo} layout={definition.layout} rootId="print-template-preview" /></DocumentScaler></CardContent></Card>
         </div>
       </div>
+
+      <PrintTemplateAssignments template={selected} canManage={canManage} />
     </div>
   );
 }
