@@ -17,12 +17,25 @@ import { createLineDocumentPdf, downloadLineDocumentPdf, shareLineDocumentPdf } 
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
-import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
+import {
+  resolveCreditNoteTemplateDesign,
+  type CreditNoteTemplateDefinition,
+  type LegacyCreditNoteDesign,
+} from '@/modules/credit-notes/services/credit-note-template-design';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
+interface FrozenPrintTemplateRevision {
+  id: string;
+  version: number;
+  definition: CreditNoteTemplateDefinition;
+  document_types: string[];
+}
+
 interface CreditNote {
   id: string; number: string; partner_id: string; type?: 'sales' | 'purchase'; refund_type: string; status: string;
   note_date: string; subtotal: string; tax_amount: string; total: string; reason: string | null; lines: Line[];
+  print_template_revision_id?: string | null;
+  print_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
@@ -43,17 +56,7 @@ export default function CreditNoteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
-  const [templateId, setTemplateId] = useState<string>('tax-invoice-classic');
-  const [themeId, setThemeId] = useState<ThemeId | null>(null);
-  const [footerText, setFooterText] = useState<string | null>(null);
-  const [showLogo, setShowLogo] = useState(true);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [logoHeight, setLogoHeight] = useState<number | null>(null);
-  const [layout, setLayout] = useState<DocSectionLayoutItem[] | null>(null);
-  const [termsText, setTermsText] = useState<string | null>(null);
-  const [bankText, setBankText] = useState<string | null>(null);
-  const [stampUrl, setStampUrl] = useState<string | null>(null);
-  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [design, setDesign] = useState(() => resolveCreditNoteTemplateDesign(null, null));
 
   function load() {
     setLoading(true);
@@ -63,24 +66,17 @@ export default function CreditNoteDetailPage() {
         const [p, m, d] = await Promise.allSettled([
           api<{ data: CreditNoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: CreditNoteCompany }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
+          api<{ data: LegacyCreditNoteDesign }>(`/sales-config/designs`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
-        if (d.status === 'fulfilled') {
-          const dg = d.value.data ?? {};
-          setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
-          if (dg.theme) setThemeId(dg.theme as ThemeId);
-          setFooterText(dg.footer_text ?? null);
-          setShowLogo(dg.show_logo !== false);
-          setLogoUrl(dg.logo ?? null);
-          setLogoHeight(dg.logo_height ?? null);
-          setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
-          setTermsText(dg.terms_text ?? null);
-          setBankText(dg.bank_text ?? null);
-          setStampUrl(dg.stamp ?? null);
-          setSignatureUrl(dg.signature ?? null);
-        }
+
+        // المراجعة المثبتة حد تاريخي: لا تخلط خصائصها بإعداد حي تغيّر بعد ترحيل الإشعار.
+        const frozen = r.data.print_template_revision?.definition ?? null;
+        setDesign(resolveCreditNoteTemplateDesign(
+          frozen,
+          d.status === 'fulfilled' ? d.value.data : null,
+        ));
       })
       .finally(() => setLoading(false));
   }
@@ -117,7 +113,7 @@ export default function CreditNoteDetailPage() {
     [t('total'), <span key="t" className="num font-semibold">{formatRiyal(note.total)}</span>],
   ];
 
-  const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
+  const paperId = getTemplate(design.templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
 
   async function createPdf() {
@@ -134,7 +130,8 @@ export default function CreditNoteDetailPage() {
       },
       company,
       party: customer,
-      logoUrl,
+      logoUrl: design.logoUrl,
+      footerText: design.footerText,
       documentMeta: [
         [t('date'), note.note_date],
         [t('refund_type'), refundType],
@@ -246,17 +243,17 @@ export default function CreditNoteDetailPage() {
                 note={note}
                 company={company}
                 customer={customer}
-                templateId={templateId}
-                themeId={themeId}
-                footerText={footerText}
-                terms={termsText}
-                bank={bankText}
-                stampUrl={stampUrl}
-                signatureUrl={signatureUrl}
-                showLogo={showLogo}
-                logoUrl={logoUrl}
-                logoHeight={logoHeight}
-                layout={layout}
+                templateId={design.templateId}
+                themeId={design.themeId}
+                footerText={design.footerText}
+                terms={design.termsText}
+                bank={design.bankText}
+                stampUrl={design.stampUrl}
+                signatureUrl={design.signatureUrl}
+                showLogo={design.showLogo}
+                logoUrl={design.logoUrl}
+                logoHeight={design.logoHeight}
+                layout={design.layout}
               />
             </DocumentScaler>
           </div>

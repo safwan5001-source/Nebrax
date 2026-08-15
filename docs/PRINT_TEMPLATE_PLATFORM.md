@@ -83,7 +83,7 @@
 
 عند ترحيل فاتورة، يستدعي `InvoiceService::post()` خدمة القوالب داخل المعاملة نفسها. إن حُلّ تعيين صالح لفاتورة ضريبية واستخدام طباعة، يُحفظ `print_template_revision_id` في الفاتورة. يُحمّل `InvoiceResource` المراجعة المثبتة، وتفضّل شاشة تفاصيل الفاتورة ومولد PDF تعريفها على أي إعداد تصميم حي.
 
-وعند ترحيل إشعار، يتبع `CreditNoteService::post()` المسار نفسه داخل معاملة القيد العكسي. يستخدم إشعار العميل نوع `credit_note`، بينما يستخدم إشعار المورد نوع `debit_note`؛ لذلك لا يمكن لتعيين قالب إشعار دائن أن يتسرب إلى إشعار مدين أو العكس. يعيد `CreditNoteResource` المرجع المثبت مع تعريفه في استجابة الترحيل والعرض.
+وعند ترحيل إشعار، يتبع `CreditNoteService::post()` المسار نفسه داخل معاملة القيد العكسي. يستخدم إشعار العميل نوع `credit_note`، بينما يستخدم إشعار المورد نوع `debit_note`؛ لذلك لا يمكن لتعيين قالب إشعار دائن أن يتسرب إلى إشعار مدين أو العكس. يعيد `CreditNoteResource` المرجع المثبت مع تعريفه في استجابة الترحيل والعرض. تفضّل شاشة تفاصيل الإشعار ومعاينته وPDF المتجهي تعريف المراجعة المثبتة كاملاً، بما فيه القالب والسمة والتذييل والشعار والتخطيط والملحقات؛ ولا تعود إلى `sales_config.designs` إلا لمسودة أو سجل قديم بلا مرجع مثبت.
 
 وعند ترحيل سند، يحل `PaymentService::post()` تعيين `receipt_voucher` للقبض أو `payment_voucher` للصرف داخل معاملة القيد والتخصيصات، ثم يثبت مرجع المراجعة على السند. يعيد `PaymentResource` المرجع المثبت، وتفضله صفحة السند على إعدادات التصميم الحية، مع إبقاء اختيار القالب متاحاً للمسودات والبيانات القديمة فقط.
 
@@ -106,7 +106,7 @@
 |---|---|---|
 | API القوالب والمراجعات والتعيينات | `invoices.view` | `company.manage` |
 | صفحة محرر القوالب والتعيينات | مستخدم يملك حق عرض الفواتير؛ يرى التعيينات فقط | مالك أو مدير الشركة يحفظ تعييناً منشوراً في الواجهة، مع فرض `company.manage` في الخادم |
-| صفحة الفاتورة وPDF | يقرأان المرجع المثبّت إن وجد | لا يعدّلان مراجعة القالب |
+| صفحات الفاتورة والإشعار والسند والمشتريات ومخرجاتها | تقرأ المرجع المثبّت إن وجد | لا تعدّل مراجعة القالب |
 
 ## واجهات API
 
@@ -142,7 +142,7 @@
 | العزل | مستأجر لا يرى قوالب مستأجر آخر |
 | الترحيل القديم | نسخ غير هدمي لإعداد التصميم السابق |
 | تجميد الفاتورة | الفاتورة المرحّلة تحتفظ بالمراجعة القديمة حتى بعد نشر مراجعة أحدث |
-| تجميد الإشعارات | الإشعار الدائن يحل `credit_note` وإشعار المورد يحل `debit_note`، وكلاهما يحتفظ بمراجعته بعد نشر إصدار أحدث |
+| تجميد الإشعارات | الإشعار الدائن يحل `credit_note` وإشعار المورد يحل `debit_note`، وكلاهما يحتفظ بمراجعته بعد نشر إصدار أحدث؛ وتفضّل واجهتهما وPDF تعريف تلك المراجعة من دون مزجه بإعداد حي |
 | تجميد السندات | سند القبض يحل `receipt_voucher` وسند الصرف يحل `payment_voucher`، وكلاهما يحتفظ بمراجعته بعد نشر إصدار أحدث |
 | تجميد فاتورة المشتريات | فاتورة المشتريات تحل `purchase_invoice` وتحتفظ بمراجعتها وتذييلها بعد نشر إصدار أحدث |
 
@@ -167,4 +167,4 @@
 | مسارات API | `routes/api.php` |
 | محرر الواجهة والتعيينات | `web/src/modules/print-templates/components/print-template-studio.tsx` و`print-template-assignments.tsx` |
 | تجميد الفاتورة والإشعارات والسندات والمشتريات | `app/Services/Accounting/InvoiceService.php` و`app/Services/Accounting/CreditNoteService.php` و`app/Services/Accounting/PaymentService.php` و`app/Services/Accounting/PurchaseService.php` ونماذجها |
-| الاختبارات | `tests/Feature/PrintTemplateTest.php` و`tests/Feature/InvoiceTest.php` و`tests/Feature/CreditNoteTest.php` و`tests/Feature/PaymentTest.php` و`tests/Feature/PurchaseTest.php` |
+| الاختبارات | `tests/Feature/PrintTemplateTest.php` و`tests/Feature/InvoiceTest.php` و`tests/Feature/CreditNoteTest.php` و`tests/Feature/PaymentTest.php` و`tests/Feature/PurchaseTest.php`، واختبار واجهة أولوية المراجعة في `web/src/modules/credit-notes/services/credit-note-template-design.test.ts` |
