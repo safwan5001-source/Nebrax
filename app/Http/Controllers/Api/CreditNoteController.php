@@ -42,7 +42,7 @@ class CreditNoteController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        return (new CreditNoteResource(CreditNote::with('lines')->findOrFail($id)))->response();
+        return (new CreditNoteResource(CreditNote::with(['lines', 'printTemplateRevision'])->findOrFail($id)))->response();
     }
 
     public function post(string $id): JsonResponse
@@ -50,6 +50,6 @@ class CreditNoteController extends ApiController
         $note = CreditNote::findOrFail($id);
         $posted = $this->domain(fn () => $this->creditNotes->post($note));
 
-        return (new CreditNoteResource($posted->load('lines')))->response();
+        return (new CreditNoteResource($posted->load(['lines', 'printTemplateRevision'])))->response();
     }
 }

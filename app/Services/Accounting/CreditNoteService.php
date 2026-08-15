@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\CreditNote;
 use App\Models\CreditNoteLine;
 use App\Models\Partner;
+use App\Services\PrintTemplates\PrintTemplateService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -34,7 +35,10 @@ class CreditNoteService
     private const ACC_INPUT_VAT  = '1150'; // ضريبة المدخلات — تُعكس مع الخصم
     private const ACC_ALLOWANCE  = '5115'; // مردودات ومسموحات المشتريات (مصروف مقابل)
 
-    public function __construct(protected LedgerService $ledger) {}
+    public function __construct(
+        protected LedgerService $ledger,
+        protected PrintTemplateService $printTemplates
+    ) {}
 
     /**
      * @param  array  $data   ['partner_id'=>uuid, 'refund_type'=>'credit|cash', 'note_date'=>?, 'reason'=>?, 'original_invoice_id'=>?, 'number'=>?]
@@ -132,8 +136,14 @@ class CreditNoteService
                 'created_by'  => $note->created_by,
             ]);
 
+            // يُختار القالب بحسب الجهة داخل معاملة الترحيل ثم يُثبت على
+            // المستند؛ لا يعدّل نشر مراجعة أحدث لاحقاً هيئة إشعار صدر بالفعل.
+            $documentType = $note->isPurchase() ? 'debit_note' : 'credit_note';
+            $printAssignment = $this->printTemplates->resolve($documentType, 'print', $note->branch_id);
+
             $note->update([
                 'status'           => 'posted',
+                'print_template_revision_id' => $printAssignment?->print_template_revision_id,
                 'subtotal'         => $subtotal,
                 'tax_amount'       => $taxAmount,
                 'total'            => $total,
