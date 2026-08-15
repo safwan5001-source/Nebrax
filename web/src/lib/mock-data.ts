@@ -1314,6 +1314,27 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: found });
   }
 
+  // تفاصيل سند القبض/الصرف: القوائم تشير إلى هذا المسار، لذلك نعيد عقداً كاملاً
+  // يطابق API الإنتاج ويمنع ظهور سند فارغ في المعاينة أو التصدير.
+  const paymentMatch = clean.match(/^\/payments\/([^/]+)$/);
+  if (paymentMatch) {
+    const found = mockPayments.find((p) => p.id === paymentMatch[1]) ?? mockPayments[0];
+    const allocations = found.id === 'pm-49'
+      ? [{ label: 'فاتورة شراء PUR-2026-0043', amount: '6900.00' }]
+      : found.id === 'pm-50'
+        ? [{ label: 'فاتورة مبيعات INV-2026-0117', amount: found.amount }]
+        : [];
+    return resolve({
+      data: {
+        ...found,
+        status: 'posted',
+        reference: found.method === 'bank' ? `BNK-${found.number.slice(-4)}` : null,
+        notes: found.direction === 'paid' ? 'سداد مستحق للمورد' : 'تحصيل من العميل',
+        allocations,
+      },
+    });
+  }
+
   const runMatch = clean.match(/^\/payroll-runs\/([^/]+)$/);
   if (runMatch) {
     const found = mockPayrollRuns.find((r) => r.id === runMatch[1]) ?? mockPayrollRuns[0];

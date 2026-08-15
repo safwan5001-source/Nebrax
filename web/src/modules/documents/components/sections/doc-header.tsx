@@ -7,6 +7,7 @@ import { useDocStyle } from '../doc-style-context';
 /** ترويسة المستند: الشعار + اسم البائع + عنوان المستند ورقمه + شريط الهوية. */
 export function DocHeader({ model, showLogo = true }: { model: DocumentModel; showLogo?: boolean }) {
   const t = useTranslations('invoiceDoc');
+  const tPrint = useTranslations('documentPrint');
   const dt = useTranslations('documentTypes');
   const dtAlt = useTranslations('documentTypesAlt');
   const style = useDocStyle();
@@ -44,7 +45,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
           </div>
           <div className="text-[11px] text-gray-500">{dtAlt(model.type)}</div>
           <div className="mt-2 inline-block rounded-md bg-gray-100 px-3 py-1">
-            <span className="text-gray-500">{t('number')}: </span>
+            <span className="text-gray-500">{model.type === 'tax_invoice' ? t('number') : tPrint('document_number')}: </span>
             <span className="num font-bold text-black">{meta.number}</span>
           </div>
         </div>

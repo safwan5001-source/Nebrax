@@ -211,7 +211,12 @@
     "print": "طباعة",
     "subtotal": "الإجمالي قبل الضريبة",
     "tax_total": "إجمالي الضريبة",
-    "save": "حفظ الإشعار"
+    "save": "حفظ الإشعار",
+    "document_title": "إشعار دائن",
+    "document_subtitle": "تخفيض أو استرداد للعميل",
+    "debit_document_title": "إشعار مدين",
+    "debit_document_subtitle": "تخفيض أو تعويض من المورد",
+    "supplier": "المورد"
   },
   "crm": {
     "title": "إدارة علاقات العملاء",
@@ -384,6 +389,7 @@
     "tax_invoice": "فاتورة ضريبية",
     "quotation": "عرض سعر",
     "credit_note": "إشعار دائن",
+    "debit_note": "إشعار مدين",
     "receipt_voucher": "سند قبض",
     "payment_voucher": "سند صرف"
   },
@@ -391,8 +397,36 @@
     "tax_invoice": "Tax Invoice",
     "quotation": "Quotation",
     "credit_note": "Credit Note",
+    "debit_note": "Debit Note",
     "receipt_voucher": "Receipt Voucher",
     "payment_voucher": "Payment Voucher"
+  },
+  "documentPrint": {
+    "seller": "المنشأة",
+    "customer": "العميل",
+    "supplier": "المورد",
+    "document_data": "بيانات المستند",
+    "document_number": "رقم المستند",
+    "description": "البيان",
+    "quantity": "الكمية",
+    "unit_price": "سعر الوحدة",
+    "tax": "الضريبة",
+    "total": "الإجمالي",
+    "subtotal": "المجموع قبل الضريبة",
+    "vat": "ضريبة القيمة المضافة (15%)",
+    "grand_total": "الإجمالي شامل الضريبة",
+    "vat_number": "الرقم الضريبي",
+    "cr_number": "السجل التجاري",
+    "city": "المدينة",
+    "due_date": "صالح حتى",
+    "footer": "مستند صادر من نظام نبراكس المحاسبي.",
+    "preview": "معاينة المستند",
+    "download_pdf": "تنزيل PDF",
+    "share_pdf": "مشاركة PDF",
+    "generating": "جارٍ التوليد…",
+    "downloaded_ok": "تم التنزيل بنجاح",
+    "shared_ok": "تمت المشاركة",
+    "export_failed": "تعذّر إنشاء الملف، حاول مرة أخرى."
   },
   "expenses": {
     "title": "المصروفات",
@@ -1151,7 +1185,19 @@
     "load_error": "تعذّر تحميل السند",
     "retry": "إعادة المحاولة",
     "not_found": "السند غير موجود",
-    "template": "القالب"
+    "template": "القالب",
+    "receipt_title": "سند قبض",
+    "payment_title": "سند صرف",
+    "receipt_subtitle": "تحصيل من عميل",
+    "payment_subtitle": "صرف لمورد",
+    "voucher_number": "رقم السند",
+    "reference": "المرجع",
+    "allocations": "تخصيصات السند",
+    "on_account": "على الحساب",
+    "amount": "المبلغ",
+    "notes": "ملاحظات",
+    "customer": "العميل",
+    "supplier": "المورد"
   },
   "paymentForm": {
     "title": "تسجيل دفعة",
@@ -1530,7 +1576,9 @@
     "subtotal": "الإجمالي قبل الضريبة",
     "tax_total": "إجمالي الضريبة",
     "save": "حفظ العرض",
-    "cancel": "إلغاء"
+    "cancel": "إلغاء",
+    "document_title": "عرض سعر",
+    "document_subtitle": "عرض تجاري غير ضريبي"
   },
   "recurring": {
     "title": "الفواتير الدورية",
@@ -1623,7 +1671,10 @@
     "b90_plus": "+90",
     "empty": "لا توجد أرصدة",
     "csv": "CSV",
-    "pdf": "طباعة PDF",
+    "pdf": "تنزيل PDF",
+    "share_pdf": "مشاركة PDF",
+    "print": "طباعة",
+    "preview": "معاينة التقرير",
     "from": "من تاريخ",
     "to": "إلى تاريخ",
     "all_branches": "كل الفروع",
@@ -1708,7 +1759,14 @@
     "search": "بحث…",
     "empty": "لا توجد مرتجعات",
     "doc_title_credit": "إشعار دائن (مرتجع مبيعات)",
-    "doc_title_debit": "إشعار مدين (مرتجع مشتريات)"
+    "doc_title_debit": "إشعار مدين (مرتجع مشتريات)",
+    "customer": "العميل",
+    "supplier": "المورد",
+    "document_subtitle_credit": "مرتجع مبيعات",
+    "document_subtitle_debit": "مرتجع مشتريات",
+    "details": "تفاصيل المرتجع",
+    "lines": "السطور",
+    "preview": "معاينة المستند"
   },
   "salesSettings": {
     "title": "إعدادات المبيعات",

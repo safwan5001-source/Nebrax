@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { Printer, Download, Info } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { Printer, Download, Info, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,10 @@ import { formatRiyal } from '@/lib/money';
 import { useCompany } from '@/lib/company';
 import { toCsv, downloadCsv } from '@/lib/export';
 import { ReportFilters, filtersToQuery, EMPTY_FILTERS, type ReportFilterState } from '@/components/reports/report-filters';
+import { useToast } from '@/components/ui/toast';
+import { DocumentScaler } from '@/modules/documents/components/document-scaler';
+import { printDocument } from '@/modules/documents/services/export';
+import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
 
 type Tab = 'trial' | 'income' | 'balance' | 'costcenter' | 'aging';
 
@@ -57,7 +61,11 @@ interface ReportDoc {
 
 export default function ReportsPage() {
   const t = useTranslations('reports');
+  const tReport = useTranslations('reportDoc');
+  const tPrint = useTranslations('documentPrint');
+  const locale = useLocale();
   const company = useCompany();
+  const { success, error: errorToast } = useToast();
   const [tab, setTab] = useState<Tab>('trial');
   const [agingType, setAgingType] = useState<'receivable' | 'payable'>('receivable');
   const [loading, setLoading] = useState(true);
@@ -68,6 +76,7 @@ export default function ReportsPage() {
   const [balance, setBalance] = useState<BalanceSheet | null>(null);
   // مرشّحات مشتركة: مدى تاريخي + فروع (فارغة = كل الفروع مجمّعة).
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_FILTERS);
+  const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -210,18 +219,68 @@ export default function ReportsPage() {
     downloadCsv(doc.exportName, toCsv(headers, rows));
   }
 
+  async function createPdf() {
+    if (!doc) throw new Error('Report unavailable');
+    return createReportPdf({
+      ...doc,
+      company,
+      labels: {
+        asOf: tReport('as_of'),
+        vatNumber: tReport('vat_number'),
+        crNumber: tPrint('cr_number'),
+        footer: tReport('footer'),
+        empty: t('empty'),
+      },
+      locale,
+    });
+  }
+
+  async function handleDownloadPdf() {
+    if (!doc) return;
+    setBusy('pdf');
+    try {
+      downloadReportPdf(await createPdf(), doc.exportName);
+      success(tPrint('downloaded_ok'));
+    } catch {
+      errorToast(tPrint('export_failed'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleSharePdf() {
+    if (!doc) return;
+    setBusy('share');
+    try {
+      const result = await shareReportPdf(await createPdf(), doc.exportName, doc.title);
+      success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={!doc} onClick={exportCsv}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={exportCsv}>
             <Download className="h-4 w-4" strokeWidth={1.7} />
             {t('csv')}
           </Button>
-          <Button variant="outline" size="sm" disabled={!doc} onClick={() => window.print()}>
+          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={handleDownloadPdf}>
+            <Download className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'pdf' ? tPrint('generating') : t('pdf')}
+          </Button>
+          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={handleSharePdf}>
+            <Share2 className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'share' ? tPrint('generating') : t('share_pdf')}
+          </Button>
+          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={() => printDocument({ widthMm: 210, heightMm: 297 })}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
-            {t('pdf')}
+            {t('print')}
           </Button>
         </div>
       </div>
@@ -581,16 +640,24 @@ export default function ReportsPage() {
         </Card>
       )}
 
-      {/* مستند التقرير A4 — يظهر عند الطباعة / حفظ PDF فقط */}
       {doc && (
-        <ReportDocument
-          title={doc.title}
-          asOf={doc.asOf}
-          company={company}
-          columns={doc.columns}
-          rows={doc.rows}
-          totalRow={doc.totalRow}
-        />
+        <Card>
+          <CardHeader className="no-print"><CardTitle>{t('preview')}</CardTitle></CardHeader>
+          <CardContent className="print:p-0">
+            <div className="rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0 [&_.print-only]:block">
+              <DocumentScaler>
+                <ReportDocument
+                  title={doc.title}
+                  asOf={doc.asOf}
+                  company={company}
+                  columns={doc.columns}
+                  rows={doc.rows}
+                  totalRow={doc.totalRow}
+                />
+              </DocumentScaler>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
