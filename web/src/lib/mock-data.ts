@@ -390,6 +390,8 @@ export const mockPurchases: MockPurchase[] = [
   purchase('pu-41', 'PUR-2026-0041', 'p5', '2026-06-15', 'posted', 'partial', 'S-8842', [line('l1', 'خدمة شحن حاويات', 1, 4000)]),
   purchase('pu-40', 'PUR-2026-0040', 'p4', '2026-05-30', 'posted', 'unpaid', 'S-8810', [line('l1', 'قطع غيار معدّات', 20, 150)]),
   purchase('pu-39', 'PUR-2026-0039', 'p2', '2026-06-22', 'draft', 'unpaid', null, [line('l1', 'أدوات مكتبية', 1, 1200)]),
+  // بيانات مورد حقيقية في وضع المعاينة: فاتورة آجلة + إشعار مدين + سند صرف.
+  purchase('pu-43', 'PUR-2026-0043', 'p7', '2026-06-15', 'posted', 'partial', 'JZ-4412', [line('l1', 'مضخات صناعية', 10, 1200)]),
 ];
 
 // ── المرتجعات ──────────────────────────────────────────────────────────────
@@ -1066,9 +1068,40 @@ function agingFor(type: string) {
 
 function partnerStatement(id: string) {
   const p = mockPartners.find((x) => x.id === id) ?? mockPartners[0];
+  const base = { partner: { id: p.id, name: p.name, type: p.type }, opening_balance: '0.00' };
+
+  // عند فتح التقرير عبر المورد، لا نعيد إطلاقاً مستندات مبيعات أو سندات قبض.
+  // المورد p7 لديه دورة متكاملة: شراء آجل، إشعار مدين، ثم سند صرف.
+  if (p.type === 'supplier' || p.type === 'both') {
+    if (p.id !== 'p7') return { ...base, rows: [], closing_balance: '0.00' };
+    return {
+      ...base,
+      rows: [
+        {
+          date: '2026-06-15', number: 'JRN-2026-0043', description: 'فاتورة شراء PUR-2026-0043',
+          debit: '0.00', credit: '13800.00', balance: '-13800.00',
+          source: { kind: 'purchase', id: 'pu-43', label: 'فاتورة شراء PUR-2026-0043', allocations: [] },
+        },
+        {
+          date: '2026-06-19', number: 'JRN-2026-0044', description: 'إشعار مدين DN-2026-0002',
+          debit: '1200.00', credit: '0.00', balance: '-12600.00',
+          source: { kind: 'credit_note', id: 'dn-2', label: 'إشعار مدين DN-2026-0002', allocations: [] },
+        },
+        {
+          date: '2026-06-20', number: 'JRN-2026-0049', description: 'سند صرف PMT-2026-0049',
+          debit: '6900.00', credit: '0.00', balance: '-5700.00',
+          source: {
+            kind: 'payment', id: 'pm-49', label: 'سند صرف PMT-2026-0049',
+            allocations: [{ kind: 'purchase', id: 'pu-43', number: 'PUR-2026-0043', amount: '6900.00' }],
+          },
+        },
+      ],
+      closing_balance: '-5700.00',
+    };
+  }
+
   return {
-    partner: { id: p.id, name: p.name, type: p.type },
-    opening_balance: '0.00',
+    ...base,
     rows: [
       {
         date: '2026-06-01', number: 'JRN-2026-0117', description: 'فاتورة مبيعات INV-2026-0117',

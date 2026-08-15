@@ -27,6 +27,12 @@ export interface StatementFilters {
   branchIds: string[];
 }
 
+function displayBalance(value: string, creditBalance: boolean): string {
+  if (!creditBalance) return value;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.abs(numeric).toFixed(2) : value;
+}
+
 function humanDate(value: string, locale: string): string {
   if (!value) return '—';
   const parsed = new Date(`${value}T12:00:00`);
@@ -45,12 +51,20 @@ export function PartnerStatementDocument({
   statement,
   company,
   filters,
+  translationNamespace = 'partnerStatement',
+  creditBalance = false,
+  closingBalanceLabel,
 }: {
   statement: PartnerStatementData;
   company: Company | null;
   filters: StatementFilters;
+  /** يفصل نصوص المورد عن العميل مع الاحتفاظ بقالب المستند المالي نفسه. */
+  translationNamespace?: 'partnerStatement' | 'supplierStatement';
+  /** للمورّد طبيعة دائنة؛ تعرض الأرصدة بقيم موجبة مع بقاء عمودي المدين/الدائن مصدر الحقيقة. */
+  creditBalance?: boolean;
+  closingBalanceLabel?: string;
 }) {
-  const t = useTranslations('partnerStatement');
+  const t = useTranslations(translationNamespace);
   const locale = useLocale();
 
   const period = useMemo(() => {
@@ -72,7 +86,7 @@ export function PartnerStatementDocument({
       id="print-root"
       className="w-full bg-white text-slate-900 print:w-[794px]"
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
-      aria-label={t('document_aria_label', { customer: statement.partner.name })}
+      aria-label={t('document_aria_label', { party: statement.partner.name })}
     >
       <div className="border-b-4 border-primary px-4 pt-6 sm:px-6 sm:pt-8 md:px-10 md:pt-10 print:px-10 print:pt-10">
         <div className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:gap-8">
@@ -95,7 +109,7 @@ export function PartnerStatementDocument({
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-x-12 gap-y-4 border-t border-slate-200 py-5 text-sm sm:mt-8 sm:grid-cols-2">
-          <Meta label={t('customer')} value={statement.partner.name} strong />
+          <Meta label={t('party')} value={statement.partner.name} strong />
           <Meta label={t('party_type')} value={statement.partner.type === 'customer' ? t('customer_type') : t('supplier_type')} />
           <Meta label={t('period')} value={period} mono />
           <Meta label={t('branch_scope')} value={branchScope} />
@@ -104,8 +118,8 @@ export function PartnerStatementDocument({
 
       <div className="px-4 py-5 sm:px-6 sm:py-6 md:px-10 md:py-7 print:px-10 print:py-7">
         <div className="grid grid-cols-1 gap-px overflow-hidden border border-slate-200 bg-slate-200 sm:grid-cols-2">
-          <BalanceCell label={t('opening_balance')} value={statement.opening_balance} subtle />
-          <BalanceCell label={t('closing_balance')} value={statement.closing_balance} negative={isNegative(statement.closing_balance)} />
+          <BalanceCell label={t('opening_balance')} value={displayBalance(statement.opening_balance, creditBalance)} subtle />
+          <BalanceCell label={closingBalanceLabel ?? t('closing_balance')} value={displayBalance(statement.closing_balance, creditBalance)} negative={!creditBalance && isNegative(statement.closing_balance)} />
         </div>
 
         <div className="mt-5 overflow-x-auto border border-slate-200 sm:mt-7">
@@ -127,7 +141,7 @@ export function PartnerStatementDocument({
                 <td className="px-3 py-3 font-medium">{t('opening_balance')}</td>
                 <td className="px-3 py-3" />
                 <td className="px-3 py-3" />
-                <td className="num px-3 py-3 text-end font-semibold">{formatRiyal(statement.opening_balance)}</td>
+                <td className="num px-3 py-3 text-end font-semibold">{formatRiyal(displayBalance(statement.opening_balance, creditBalance))}</td>
               </tr>
               {statement.rows.map((row, index) => (
                 <tr key={`${row.number}-${index}`} className="border-b border-slate-100 last:border-b-0">
@@ -136,8 +150,8 @@ export function PartnerStatementDocument({
                   <td className="max-w-[210px] px-3 py-3 text-slate-700">{row.description ?? '—'}</td>
                   <td className="num whitespace-nowrap px-3 py-3 text-end">{row.debit !== '0.00' ? formatRiyal(row.debit) : '—'}</td>
                   <td className="num whitespace-nowrap px-3 py-3 text-end">{row.credit !== '0.00' ? formatRiyal(row.credit) : '—'}</td>
-                  <td className={`num whitespace-nowrap px-3 py-3 text-end font-semibold ${isNegative(row.balance) ? 'text-rose-700' : 'text-slate-900'}`}>
-                    {formatRiyal(row.balance)}
+                  <td className={`num whitespace-nowrap px-3 py-3 text-end font-semibold ${!creditBalance && isNegative(row.balance) ? 'text-rose-700' : 'text-slate-900'}`}>
+                    {formatRiyal(displayBalance(row.balance, creditBalance))}
                   </td>
                 </tr>
               ))}

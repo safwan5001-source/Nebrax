@@ -86,7 +86,12 @@ class ReportController extends ApiController
 
     public function partnerStatement(Request $request, string $partnerId): JsonResponse
     {
-        $st = $this->reports->partnerStatement($partnerId, $this->filters($request));
+        $filters = $this->filters($request);
+        $role = $request->query('partner_role');
+        if (in_array($role, ['customer', 'supplier'], true)) {
+            $filters['partner_role'] = $role;
+        }
+        $st = $this->reports->partnerStatement($partnerId, $filters);
 
         return response()->json([
             'partner'         => $st['partner'],

@@ -4,11 +4,13 @@ namespace App\Services\Reporting;
 
 use App\Models\Account;
 use App\Models\CostCenter;
+use App\Models\CreditNote;
 use App\Models\Invoice;
 use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Purchase;
+use App\Models\ReturnDocument;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -375,6 +377,19 @@ class ReportService
             ->where('journal_lines.partner_type', Partner::class)
             ->where('journal_lines.partner_id', $partnerId), $this->branchIds($filters));
 
+        $role = $filters['partner_role'] ?? null;
+        if (in_array($role, ['customer', 'supplier'], true)) {
+            $sourceRoles = $this->partnerStatementSourceRoles($lines);
+            $lines = $lines->filter(function (JournalLine $line) use ($sourceRoles, $role) {
+                $key = ($line->entry->source_type ?? '') . '#' . ($line->entry->source_id ?? '');
+                // الرصيد الافتتاحي للطرف يُفصل بطبيعة السطر: مدين للعميل، دائن للمورد.
+                if ($line->entry->source_type === Partner::class) {
+                    return $role === 'supplier' ? $line->credit > $line->debit : $line->debit >= $line->credit;
+                }
+                return ($sourceRoles[$key] ?? null) === $role;
+            })->values();
+        }
+
         $opening = 0;
         $rows = [];
         foreach ($lines as $line) {
@@ -422,6 +437,41 @@ class ReportService
             'rows'            => $mapped,
             'closing_balance' => $running,
         ];
+    }
+
+    /**
+     * يعين كل مستند محاسبي إلى دور طرف واحد. لا تُستخدم الخريطة إلا عندما تطلب
+     * الشاشة كشف المورد أو العميل صراحةً لطرف ذي صفتين؛ التقرير العام لا يتغيّر.
+     *
+     * @return array<string, 'customer'|'supplier'>
+     */
+    protected function partnerStatementSourceRoles(Collection $lines): array
+    {
+        $idsFor = fn (string $type) => $lines
+            ->filter(fn (JournalLine $line) => $line->entry->source_type === $type)
+            ->map(fn (JournalLine $line) => $line->entry->source_id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $roles = [];
+        foreach ($idsFor(Invoice::class) as $id) {
+            $roles[Invoice::class . '#' . $id] = 'customer';
+        }
+        foreach ($idsFor(Purchase::class) as $id) {
+            $roles[Purchase::class . '#' . $id] = 'supplier';
+        }
+        foreach (Payment::whereIn('id', $idsFor(Payment::class))->get(['id', 'direction']) as $payment) {
+            $roles[Payment::class . '#' . $payment->id] = $payment->direction === 'paid' ? 'supplier' : 'customer';
+        }
+        foreach (CreditNote::whereIn('id', $idsFor(CreditNote::class))->get(['id', 'type']) as $note) {
+            $roles[CreditNote::class . '#' . $note->id] = $note->type === 'purchase' ? 'supplier' : 'customer';
+        }
+        foreach (ReturnDocument::whereIn('id', $idsFor(ReturnDocument::class))->get(['id', 'type']) as $return) {
+            $roles[ReturnDocument::class . '#' . $return->id] = $return->type === 'purchase' ? 'supplier' : 'customer';
+        }
+
+        return $roles;
     }
 
     /**

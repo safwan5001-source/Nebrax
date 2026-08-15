@@ -29,6 +29,8 @@ export interface StatementPdfLabels {
   footer: string;
   currency: string;
   empty: string;
+  /** رصيد المورد طبيعته دائنة؛ يعرض كمبلغ موجب دلالياً في عمود الرصيد. */
+  creditBalance?: boolean;
 }
 
 export interface StatementPdfInput {
@@ -163,6 +165,11 @@ export async function createPartnerStatementPdf(input: StatementPdfInput): Promi
   const totalDebit = input.statement.rows.reduce((sum, row) => sum + Number(row.debit || 0), 0);
   const totalCredit = input.statement.rows.reduce((sum, row) => sum + Number(row.credit || 0), 0);
   const summaryMoney = (value: number | string) => money(String(value), currency);
+  const displayBalance = (value: number | string) => {
+    if (!input.labels.creditBalance) return String(value);
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? String(Math.abs(numeric)) : String(value);
+  };
   let y = 18;
 
   const drawHeader = (continued = false) => {
@@ -229,10 +236,10 @@ export async function createPartnerStatementPdf(input: StatementPdfInput): Promi
       writeArabicRight(pdf, label, x + summaryW - 3, summaryY + 10.5, 6.8);
       writeLatinRight(pdf, value, x + summaryW - 3, summaryY + 20.5, 10.5, true);
     };
-    summaryCard(right - summaryW, input.labels.closingBalance, summaryMoney(input.statement.closing_balance), [15, 39, 72]);
+    summaryCard(right - summaryW, input.labels.closingBalance, summaryMoney(displayBalance(input.statement.closing_balance)), [15, 39, 72]);
     summaryCard(right - summaryW * 2 - summaryGap, input.labels.totalCredit ?? input.labels.credit, summaryMoney(totalCredit), [22, 163, 74]);
     summaryCard(right - summaryW * 3 - summaryGap * 2, input.labels.totalDebit ?? input.labels.debit, summaryMoney(totalDebit), [37, 99, 235]);
-    summaryCard(left, input.labels.openingBalance, summaryMoney(input.statement.opening_balance), [148, 163, 184]);
+    summaryCard(left, input.labels.openingBalance, summaryMoney(displayBalance(input.statement.opening_balance)), [148, 163, 184]);
     y = 126;
   };
 
@@ -303,7 +310,7 @@ export async function createPartnerStatementPdf(input: StatementPdfInput): Promi
     { text: input.labels.openingBalance, kind: 'arabic' },
     { text: '', kind: 'latin' },
     { text: '', kind: 'latin' },
-    { text: money(input.statement.opening_balance, currency), kind: 'money' },
+    { text: money(displayBalance(input.statement.opening_balance), currency), kind: 'money' },
   ], [248, 250, 252]);
 
   if (input.statement.rows.length === 0) {
@@ -319,7 +326,7 @@ export async function createPartnerStatementPdf(input: StatementPdfInput): Promi
         { text: row.description ?? '—', kind: 'arabic' },
         { text: row.debit !== '0.00' ? money(row.debit, currency) : '—', kind: 'money' },
         { text: row.credit !== '0.00' ? money(row.credit, currency) : '—', kind: 'money' },
-        { text: money(row.balance, currency), kind: 'money' },
+        { text: money(displayBalance(row.balance), currency), kind: 'money' },
       ], index % 2 === 1 ? [248, 250, 252] : undefined);
     });
   }

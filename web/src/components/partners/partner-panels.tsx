@@ -149,6 +149,7 @@ export function LedgerTable({
   labels,
   sourceHref,
   allocationHref,
+  creditBalance = false,
 }: {
   opening: string;
   rows: StatementRow[];
@@ -158,7 +159,15 @@ export function LedgerTable({
   };
   sourceHref?: (source: StatementSource) => string | undefined;
   allocationHref?: (allocation: StatementAllocation) => string | undefined;
+  /** الطرف المورد طبيعته دائنة؛ يعرض الرصيد بمقدار موجب لتفادي إيهام المستخدم بخطأ. */
+  creditBalance?: boolean;
 }) {
+  const displayBalance = (value: string) => {
+    if (!creditBalance) return value;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.abs(numeric).toFixed(2) : value;
+  };
+
   return (
     <Table>
       <THead>
@@ -182,7 +191,7 @@ export function LedgerTable({
           <TD />
           <TD />
           <TD />
-          <TD className="num text-end">{formatRiyal(opening)}</TD>
+          <TD className="num text-end">{formatRiyal(displayBalance(opening))}</TD>
         </TR>
         {rows.map((r, i) => (
           <TR key={i}>
@@ -213,8 +222,8 @@ export function LedgerTable({
             </TD>
             <TD className="num text-end">{r.debit !== '0.00' ? formatRiyal(r.debit) : '—'}</TD>
             <TD className="num text-end">{r.credit !== '0.00' ? formatRiyal(r.credit) : '—'}</TD>
-            <TD className={cn('num text-end', isNegative(r.balance) && 'text-negative')}>
-              {formatRiyal(r.balance)}
+            <TD className={cn('num text-end', !creditBalance && isNegative(r.balance) && 'text-negative')}>
+              {formatRiyal(displayBalance(r.balance))}
             </TD>
           </TR>
         ))}
