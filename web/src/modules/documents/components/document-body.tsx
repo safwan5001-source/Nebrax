@@ -9,7 +9,7 @@ import type {
   TemplateSectionsConfig,
   TemplateStyle,
 } from '../types';
-import { DEFAULT_SECTION_ORDER } from '../types';
+import { getDefaultDocumentLayout } from '../registry/document-types';
 import { DocLayout } from './sections/doc-layout';
 import { DocHeader } from './sections/doc-header';
 import { DocBarcode } from './sections/doc-barcode';
@@ -91,10 +91,15 @@ export function DocumentBody({
   rootId,
 }: DocumentTemplateProps & { style: TemplateStyle }) {
   const s = { ...DEFAULT_SECTIONS, ...sections };
+  // التخطيط المحفوظ يتقدم للمحافظة على مخرجات المستأجرين القائمة. عند غيابه،
+  // يحدد سجل النوع العقد الافتراضي بدلاً من افتراض أن كل مستند فاتورة.
   const items: DocSectionLayoutItem[] =
     layout && layout.length > 0
       ? layout
-      : DEFAULT_SECTION_ORDER.map((key) => ({ key, visible: isVisible(key, s) }));
+      : getDefaultDocumentLayout(model.type).map((item) => ({
+          ...item,
+          visible: item.visible && isVisible(item.key, s),
+        }));
 
   return (
     <DocLayout
