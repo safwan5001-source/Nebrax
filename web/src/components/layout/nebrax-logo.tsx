@@ -2,11 +2,11 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 /**
- * شعار نبراكس الرسمي الملوّن بالأزرق المعتمد للعلامة.
+ * شعار نبراكس الرسمي بدرجتين معتمدتين من الهوية.
  *
- * يبقى اللون جزءاً من الأصل البصري نفسه، لا من رموز ألوان الواجهة، حتى لا
- * تتغير هوية الشعار عند تبديل وضع العرض أو تعديل لون primary لاحقاً. وتضمن
- * الخلفية البيضاء المحايدة وضوح الأزرق الرسمي على الأسطح الداكنة أيضاً.
+ * يظهر الأزرق العميق (#1E40AF) في الوضع الفاتح، والأزرق الفاتح (#4F8CFF)
+ * في الوضع الداكن. تعتمد كل نسخة على شفافية الأصل نفسه بلا خلفية أو إطار،
+ * ولا تُغيّر رموز ألوان الواجهة أو متغيرات الثيم.
  */
 export function NebraxLogo({
   alt = '',
@@ -18,14 +18,25 @@ export function NebraxLogo({
   priority?: boolean;
 }) {
   return (
-    <Image
-      src="/brand/nebrax-logo.png"
-      alt={alt}
-      width={1026}
-      height={680}
-      priority={priority}
-      sizes="(max-width: 640px) 72px, 96px"
-      className={cn('h-auto w-auto rounded-sm bg-white p-0.5 object-contain', className)}
-    />
+    <>
+      <Image
+        src="/brand/nebrax-logo.png"
+        alt={alt}
+        width={1026}
+        height={680}
+        priority={priority}
+        sizes="(max-width: 640px) 72px, 96px"
+        className={cn('h-auto w-auto object-contain dark:hidden', className)}
+      />
+      <Image
+        src="/brand/nebrax-logo-dark.png"
+        alt={alt}
+        width={1026}
+        height={680}
+        priority={priority}
+        sizes="(max-width: 640px) 72px, 96px"
+        className={cn('hidden h-auto w-auto object-contain dark:block', className)}
+      />
+    </>
   );
 }
