@@ -1379,6 +1379,19 @@
     "received_date": "Receipt date",
     "receipt_hint": "Two informational fields separating the bill date from the date the goods arrived. Stock still enters on posting either way."
   },
+  "purchasePdf": {
+    "title": "Purchase Invoice",
+    "title_secondary": "فاتورة مشتريات",
+    "buyer": "Buyer",
+    "supplier": "Supplier",
+    "supplier_invoice_number": "Supplier invoice no.",
+    "due_date": "Due date",
+    "receipt_status": "Receipt status",
+    "received_pending": "Pending receipt",
+    "received_partial": "Partially received",
+    "received_full": "Received",
+    "footer": "Internal purchase document issued by Nebrax accounting system."
+  },
   "purchaseReturns": {
     "title": "Purchase returns",
     "create": "New purchase return",

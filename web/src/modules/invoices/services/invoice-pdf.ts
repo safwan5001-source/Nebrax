@@ -32,6 +32,12 @@ export interface InvoicePdfLabels {
   footer: string;
 }
 
+export interface InvoicePdfAdjustment {
+  label: string;
+  amount: string;
+  negative?: boolean;
+}
+
 export interface InvoicePdfInput {
   invoice: InvoiceDoc;
   company: Company | null;
@@ -40,6 +46,10 @@ export interface InvoicePdfInput {
   qrImage?: string | null;
   /** شعار إعدادات التصميم له أولوية، ثم شعار هوية الشركة. */
   logoUrl?: string | null;
+  /** حقول إضافية للمستندات غير البيعية، مثل رقم فاتورة المورد وتاريخ الاستحقاق. */
+  documentMeta?: Array<[string, string | null | undefined]>;
+  /** الخصم أو الشحن أو التسوية؛ تظهر بين الإجمالي الفرعي والضريبة. */
+  adjustments?: InvoicePdfAdjustment[];
   labels: InvoicePdfLabels;
   locale: string;
 }
@@ -206,7 +216,7 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     infoCard(right - cardW * 2 - 4, input.labels.billTo, [
       [input.labels.vatNumber, input.customer?.vat_number], [input.labels.city, input.customer?.city],
     ]);
-    infoCard(left, input.labels.paymentType, [
+    infoCard(left, input.labels.paymentType, input.documentMeta ?? [
       [input.labels.date, date(input.invoice.invoice_date, input.locale)],
       [input.labels.paymentType, input.invoice.payment_type === 'cash' ? input.labels.cash : input.labels.credit],
     ]);
@@ -293,12 +303,18 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     writeLatinRight(pdf, value, totalsX + 31, rowY + 7, 8.5, true);
     pdf.setTextColor(21, 24, 29);
   };
-  drawTotalRow(bottomY, input.labels.subtotal, money(input.invoice.subtotal));
-  // نحذف نسبة الضريبة بين الأقواس في النص المرسوم، لأن مزج الأقواس والأرقام بالعربية
-  // قد يُظهر «15» منفصلاً في jsPDF رغم سلامة باقي النص.
-  const vatLabel = input.labels.vat.replace(/\s*\([^)]*\)/, '');
-  drawTotalRow(bottomY + 11, vatLabel, money(input.invoice.tax_amount));
-  drawTotalRow(bottomY + 22, input.labels.grandTotal, money(input.invoice.total), true);
+  const totalRows: Array<{ label: string; value: string; emphasized?: boolean }> = [
+    { label: input.labels.subtotal, value: money(input.invoice.subtotal) },
+    ...(input.adjustments ?? []).map((adjustment) => ({
+      label: adjustment.label,
+      value: `${adjustment.negative ? '− ' : ''}${money(adjustment.amount)}`,
+    })),
+    // نحذف نسبة الضريبة بين الأقواس في النص المرسوم، لأن مزج الأقواس والأرقام بالعربية
+    // قد يُظهر «15» منفصلاً في jsPDF رغم سلامة باقي النص.
+    { label: input.labels.vat.replace(/\s*\([^)]*\)/, ''), value: money(input.invoice.tax_amount) },
+    { label: input.labels.grandTotal, value: money(input.invoice.total), emphasized: true },
+  ];
+  totalRows.forEach((row, index) => drawTotalRow(bottomY + index * 11, row.label, row.value, row.emphasized));
 
   if (input.qrImage) {
     const qrSize = 39;

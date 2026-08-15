@@ -1379,6 +1379,19 @@
     "received_date": "تاريخ الاستلام",
     "receipt_hint": "حقلان إعلاميان للتفريق بين تاريخ الفاتورة وتاريخ وصول البضاعة. المخزون يدخل عند الترحيل في كل الأحوال."
   },
+  "purchasePdf": {
+    "title": "فاتورة مشتريات",
+    "title_secondary": "Purchase Invoice",
+    "buyer": "المشتري",
+    "supplier": "المورد",
+    "supplier_invoice_number": "رقم فاتورة المورد",
+    "due_date": "تاريخ الاستحقاق",
+    "receipt_status": "حالة الاستلام",
+    "received_pending": "بانتظار الاستلام",
+    "received_partial": "مستلَم جزئياً",
+    "received_full": "مستلَم",
+    "footer": "مستند مشتريات داخلي صادر من نظام نبراس المحاسبي."
+  },
   "purchaseReturns": {
     "title": "مرتجعات المشتريات",
     "create": "إنشاء مرتجع شراء",

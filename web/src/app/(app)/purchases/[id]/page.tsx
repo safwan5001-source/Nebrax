@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { ArrowRight, Printer, Eye, EyeOff, Pencil, Trash2 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { ArrowRight, Printer, Eye, EyeOff, Pencil, Trash2, Download, Share2, FileSpreadsheet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,9 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { useCompany } from '@/lib/company';
+import { exportXlsx } from '@/lib/xlsx';
+import { createPurchaseInvoicePdf, downloadPurchaseInvoicePdf, sharePurchaseInvoicePdf } from '@/modules/purchases/services/purchase-pdf';
+import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 
 interface Purchase {
   id: string;
@@ -42,13 +45,22 @@ interface Purchase {
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
 const payTone: Record<string, 'positive' | 'warning' | 'muted'> = { paid: 'positive', partial: 'warning', unpaid: 'muted' };
 
+function receiptKey(status: string | null | undefined): 'pending' | 'partial' | 'full' {
+  if (status === 'partial') return 'partial';
+  if (status === 'received' || status === 'full') return 'full';
+  return 'pending';
+}
+
 export default function PurchaseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const t = useTranslations('invoiceDetail');
   const tp = useTranslations('purchases');
   const tpf = useTranslations('purchaseForm');
+  const tpp = useTranslations('purchasePdf');
+  const td = useTranslations('invoiceDoc');
   const ts = useTranslations('status');
+  const locale = useLocale();
   const company = useCompany();
 
   const [purchase, setPurchase] = useState<Purchase | null>(null);
@@ -59,6 +71,7 @@ export default function PurchaseDetailPage() {
   const [preview, setPreview] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [busy, setBusy] = useState<null | 'pdf' | 'share' | 'excel'>(null);
   const { success, error: errorToast } = useToast();
 
   async function remove() {
@@ -98,24 +111,85 @@ export default function PurchaseDetailPage() {
   if (!purchase) return <div className="text-muted">{t('not_found')}</div>;
 
   const isDraft = purchase.status === 'draft';
+  const receivedStatusKey = receiptKey(purchase.received_status);
+  const receivedStatusLabel = tpp(`received_${receivedStatusKey}`);
 
   /**
    * الخصم والشحن والتسوية كانت تُحذَف من المستند المطبوع، فيقرأ المورّد
    * «المجموع + الضريبة ≠ الإجمالي» ويبدو المستندُ خاطئ الحساب. والقيمة تُرسَل
    * **موجبة دائماً** و`negative` للعرض وحده — وإلا ضُوعفت إشارةُ السالب.
    */
+  const adjustmentValue = Number(purchase.adjustment ?? 0);
   const adjustments: DocAdjustment[] = [
     ...(Number(purchase.discount) > 0
       ? [{ label: tpf('discount'), amount: purchase.discount, negative: true }] : []),
     ...(Number(purchase.shipping) > 0
       ? [{ label: tpf('shipping'), amount: purchase.shipping }] : []),
-    ...(Number(purchase.adjustment) !== 0
+    ...(Number.isFinite(adjustmentValue) && adjustmentValue !== 0
       ? [{
           label: tpf('adjustment'),
-          amount: String(Math.abs(Number(purchase.adjustment))),
-          negative: Number(purchase.adjustment) < 0,
+          amount: String(Math.abs(adjustmentValue)),
+          negative: adjustmentValue < 0,
         }] : []),
   ];
+
+  const buildPurchasePdf = async () => createPurchaseInvoicePdf({
+    purchase,
+    company,
+    supplier,
+    adjustments,
+    locale,
+    labels: {
+      title: tpp('title'), titleSecondary: tpp('title_secondary'), seller: tpp('buyer'), billTo: tpp('supplier'),
+      invoiceNumber: tp('number'), vatNumber: td('vat_number'), crNumber: td('cr_number'), city: td('city'),
+      date: td('date'), paymentType: td('payment_type'), cash: td('cash'), credit: td('credit'),
+      description: td('description'), quantity: td('qty'), unitPrice: td('unit_price'), tax: td('tax'), total: tp('total'),
+      subtotal: tpf('subtotal'), vat: tpf('tax_amount'), grandTotal: tp('total'), qrNote: '', footer: tpp('footer'),
+      supplierInvoiceNumber: tpp('supplier_invoice_number'), dueDate: tpp('due_date'), receiptStatus: tpp('receipt_status'),
+      receivedPending: tpp('received_pending'), receivedPartial: tpp('received_partial'), receivedFull: tpp('received_full'),
+    },
+  });
+
+  const handleDownloadPdf = async () => {
+    setBusy('pdf');
+    try {
+      downloadPurchaseInvoicePdf(await buildPurchasePdf(), purchase.number);
+      success(t('downloaded_ok'));
+    } catch {
+      errorToast(t('export_failed'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleSharePdf = async () => {
+    setBusy('share');
+    try {
+      const result = await sharePurchaseInvoicePdf(await buildPurchasePdf(), purchase.number, purchase.number);
+      success(result === 'shared' ? t('shared_ok') : t('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(t('export_failed'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleExcel = async () => {
+    setBusy('excel');
+    try {
+      await exportXlsx(purchase.number, {
+        meta: [[tp('number'), purchase.number], [tp('supplier'), supplier?.name ?? '—'], [t('date'), purchase.purchase_date], [tp('total'), Number(purchase.total)]],
+        columns: [t('description'), t('qty'), t('unit_price'), t('tax'), tp('total')],
+        rows: purchase.lines.map((line) => [line.description ?? '—', line.quantity, Number(line.unit_price), Number(line.line_tax), Number(line.line_total)]),
+        sheetName: 'Purchase invoice',
+      });
+      success(t('downloaded_ok'));
+    } catch {
+      errorToast(t('export_failed'));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const info: [string, React.ReactNode][] = [
     [tp('supplier'), supplier?.name ?? '—'],
@@ -125,7 +199,7 @@ export default function PurchaseDetailPage() {
     [t('paid'), <span key="p" className="num">{formatRiyal(purchase.paid_amount)}</span>],
     [t('remaining'), <span key="r" className="num">{formatRiyal(purchase.remaining)}</span>],
     // الاستلام إعلامي: تاريخُ وصول البضاعة قد يخالف تاريخ الفاتورة.
-    [tpf('received_status'), tpf(`received_${purchase.received_status === 'received' ? 'full' : purchase.received_status}`)],
+    [tpf('received_status'), receivedStatusLabel],
     [tpf('received_date'), <span key="rd" className="num">{purchase.received_date ?? '—'}</span>],
   ];
 
@@ -141,9 +215,21 @@ export default function PurchaseDetailPage() {
         {/* المرحّلة لا تُعدَّل ولا تُحذف: لها قيدٌ في الدفتر وحركةُ مخزون
             غيّرت المتوسط المتحرك. الزرّان معطّلان بسبب مكتوب لا مخفيّان. */}
         <div className="no-print ms-auto flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPreview((v) => !v)}>
+          <Button variant="outline" size="sm" onClick={() => setPreview((v) => !v)} disabled={!!busy}>
             {preview ? <EyeOff className="h-4 w-4" strokeWidth={1.7} /> : <Eye className="h-4 w-4" strokeWidth={1.7} />}
             {preview ? tp('hide_preview') : tp('view')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExcel} disabled={!!busy}>
+            <FileSpreadsheet className="h-4 w-4" strokeWidth={1.7} />
+            {t('excel')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={!!busy}>
+            <Download className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'pdf' ? t('generating') : t('download_pdf')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleSharePdf} disabled={!!busy}>
+            <Share2 className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'share' ? t('generating') : t('share')}
           </Button>
           <Button
             variant="outline"
@@ -165,7 +251,7 @@ export default function PurchaseDetailPage() {
             <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
             {tp('delete')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
+          <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
@@ -226,25 +312,27 @@ export default function PurchaseDetailPage() {
 
       {/* مستند فاتورة المشتريات A4 — للطباعة دائماً، وعلى الشاشة عند المعاينة */}
       <div className={preview ? 'rounded border border-border bg-surface p-2 [&_.print-only]:block' : undefined}>
-      <TaxDocument
-        title={tp('doc_title')}
-        company={company}
-        partyLabel={tp('supplier')}
-        party={supplier}
-        metaRows={[
-          [tp('number'), purchase.number],
-          [t('date'), purchase.purchase_date],
-          [t('payment_type'), purchase.payment_type === 'cash' ? t('cash') : t('credit')],
-          ...(purchase.due_date ? [[tpf('due_date'), purchase.due_date] as [string, string]] : []),
-          [tpf('received_status'), tpf(`received_${purchase.received_status === 'received' ? 'full' : purchase.received_status}`)],
-          ...(purchase.received_date ? [[tpf('received_date'), purchase.received_date] as [string, string]] : []),
-        ]}
-        lines={purchase.lines}
-        subtotal={purchase.subtotal}
-        adjustments={adjustments}
-        tax={purchase.tax_amount}
-        total={purchase.total}
-      />
+        <DocumentScaler>
+          <TaxDocument
+            title={tp('doc_title')}
+            company={company}
+            partyLabel={tp('supplier')}
+            party={supplier}
+            metaRows={[
+              [tp('number'), purchase.number],
+              [t('date'), purchase.purchase_date],
+              [t('payment_type'), purchase.payment_type === 'cash' ? t('cash') : t('credit')],
+              ...(purchase.due_date ? [[tpf('due_date'), purchase.due_date] as [string, string]] : []),
+              [tpf('received_status'), receivedStatusLabel],
+              ...(purchase.received_date ? [[tpf('received_date'), purchase.received_date] as [string, string]] : []),
+            ]}
+            lines={purchase.lines}
+            subtotal={purchase.subtotal}
+            adjustments={adjustments}
+            tax={purchase.tax_amount}
+            total={purchase.total}
+          />
+        </DocumentScaler>
       </div>
 
       <Dialog open={confirmDelete} onClose={() => (deleting ? null : setConfirmDelete(false))} title={tp('delete_title')}>
