@@ -51,6 +51,7 @@ export function TaxDocument({
   adjustments = [],
   tax,
   total,
+  footerText,
 }: {
   title: string;
   subtitle?: string;
@@ -63,6 +64,8 @@ export function TaxDocument({
   adjustments?: DocAdjustment[];
   tax: string;
   total: string;
+  /** تذييل المراجعة المثبتة عند إصدار المستند؛ لا يعاد تفسيره من إعدادات حية. */
+  footerText?: string | null;
 }) {
   const t = useTranslations('taxDoc');
 
@@ -172,7 +175,7 @@ export function TaxDocument({
         </div>
 
         <div className="mt-6 border-t border-gray-300 pt-2 text-center text-[10px] text-gray-500">
-          {t('footer')}
+          {footerText?.trim() || t('footer')}
         </div>
       </div>
     </div>

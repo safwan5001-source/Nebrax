@@ -130,7 +130,7 @@ const STATEMENT_DEFAULT = layoutWithVisibility(
 
 const TAX_INVOICE_TYPES = ['tax_invoice', 'simplified_tax_invoice'] as const satisfies readonly DocumentTypeId[];
 const STANDARD_LINE_ITEM_TYPES = [
-  'quotation', 'proforma_invoice', 'sales_order', 'purchase_order', 'credit_note', 'debit_note',
+  'quotation', 'proforma_invoice', 'sales_order', 'purchase_order', 'purchase_invoice', 'credit_note', 'debit_note',
 ] as const satisfies readonly DocumentTypeId[];
 const DELIVERY_TYPES = ['delivery_note', 'packing_list'] as const satisfies readonly DocumentTypeId[];
 const VOUCHER_TYPES = ['receipt_voucher', 'payment_voucher'] as const satisfies readonly DocumentTypeId[];
@@ -171,6 +171,7 @@ export const DOCUMENT_TYPE_REGISTRY: Readonly<Record<DocumentTypeId, DocumentTyp
   proforma_invoice: lineItemDefinition('proforma_invoice', 'proformaInvoice'),
   sales_order: lineItemDefinition('sales_order', 'salesOrder'),
   purchase_order: lineItemDefinition('purchase_order', 'purchaseOrder'),
+  purchase_invoice: lineItemDefinition('purchase_invoice', 'purchaseInvoice'),
   delivery_note: lineItemDefinition('delivery_note', 'deliveryNote', { requiredBlocks: ['header', 'parties', 'items', 'footer'] }),
   packing_list: lineItemDefinition('packing_list', 'packingList', { requiredBlocks: ['header', 'parties', 'items', 'footer'] }),
   receipt_voucher: voucherDefinition('receipt_voucher', 'receiptVoucher'),

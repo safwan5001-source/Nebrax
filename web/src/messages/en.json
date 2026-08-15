@@ -388,6 +388,7 @@
   "documentTypes": {
     "tax_invoice": "Tax Invoice",
     "quotation": "Quotation",
+    "purchase_invoice": "Purchase Invoice",
     "credit_note": "Credit Note",
     "debit_note": "Debit Note",
     "receipt_voucher": "Receipt Voucher",
@@ -396,6 +397,7 @@
   "documentTypesAlt": {
     "tax_invoice": "فاتورة ضريبية",
     "quotation": "عرض سعر",
+    "purchase_invoice": "فاتورة مشتريات",
     "credit_note": "إشعار دائن",
     "debit_note": "إشعار مدين",
     "receipt_voucher": "سند قبض",
