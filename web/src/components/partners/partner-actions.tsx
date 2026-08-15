@@ -37,7 +37,7 @@ export function primaryActions(t: (k: string) => string, partnerId: string): Par
     { key: 'appointment',   label: t('appointment'),   icon: Calendar },
     { key: 'new_quote',     label: t('new_quote'),     icon: Receipt,       href: '/quotes/new' },
     { key: 'new_credit',    label: t('new_credit'),    icon: CreditCard,    href: '/credit-notes/new' },
-    { key: 'statement',     label: t('statement'),     icon: CalendarRange, href: `/partners/${partnerId}?section=ledger`, separatorBefore: true },
+    { key: 'statement',     label: t('statement'),     icon: CalendarRange, href: `/partners/${partnerId}/statement`, separatorBefore: true },
     { key: 'payment_credit', label: t('payment_credit'), icon: Wallet },
     { key: 'parcels_in',    label: t('parcels_in'),    icon: PackageOpen },
     { key: 'parcels_out',   label: t('parcels_out'),   icon: Package },

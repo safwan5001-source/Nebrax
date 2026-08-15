@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
-import { ArrowRight, ChevronDown, Plus, type LucideIcon } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { ArrowRight, ChevronDown, Download, FileSpreadsheet, Plus, Printer, Search, Share2, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/toast';
 import { Accordion, AccordionItem } from '@/components/ui/accordion';
 import { Tabs, TabPanel, type TabDef } from '@/components/ui/tabs';
 import { ActionBar, OverflowMenu, overflowActions, primaryActions } from '@/components/partners/partner-actions';
@@ -18,6 +20,11 @@ import {
 } from '@/components/partners/partner-panels';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { ReportFilters, filtersToQuery, EMPTY_FILTERS, type ReportFilterState } from '@/components/reports/report-filters';
+import { createPartnerStatementPdf, downloadPartnerStatementPdf, sharePartnerStatementPdf } from '@/modules/partners/services/statement-pdf';
+import { printDocument } from '@/modules/documents/services/export';
+import { exportXlsx } from '@/lib/xlsx';
+import { useCompany } from '@/lib/company';
 
 interface Partner {
   id: string; code: string | null; type: string; entity_type: string; name: string; name_en: string | null;
@@ -54,6 +61,10 @@ export default function PartnerProfilePage() {
   const t = useTranslations('partnerProfile');
   const tp = useTranslations('partners');
   const ts = useTranslations('status');
+  const tStatement = useTranslations('partnerStatement');
+  const locale = useLocale();
+  const company = useCompany();
+  const { success, error: errorToast } = useToast();
 
   const [partner, setPartner] = useState<Partner | null>(null);
   const [statement, setStatement] = useState<Statement | null>(null);
@@ -63,6 +74,10 @@ export default function PartnerProfilePage() {
   const [creditNotes, setCreditNotes] = useState<ApiDoc[]>([]);
   const [returns, setReturns] = useState<ApiDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerFilters, setLedgerFilters] = useState<ReportFilterState>(EMPTY_FILTERS);
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [ledgerBusy, setLedgerBusy] = useState<'pdf' | 'share' | 'xlsx' | null>(null);
 
   // القسم النشط مشترك بين تبويبات الديسكتوب وأكورديون الجوال — فلا يفقد
   // المستخدم موضعه عند تغيّر المقاس. `?section=` يسمح بالربط المباشر إليه.
@@ -90,7 +105,6 @@ export default function PartnerProfilePage() {
       // المورد مغلَّف بـ `{data}` (JsonResource) — تفريغه هنا، وإلا بقيت كل
       // حقول البطاقة فارغة صامتةً كما كان يحدث قبل هذه الشاشة.
       api<{ data: Partner }>(`/partners/${id}`).then((r) => setPartner(r.data)).catch(() => setPartner(null)),
-      api<Statement>(`/reports/partner-statement/${id}`).then(setStatement).catch(() => setStatement(null)),
       list('/invoices').then(setInvoices),
       list('/payments').then(setPayments),
       list('/quotes').then(setQuotes),
@@ -98,6 +112,15 @@ export default function PartnerProfilePage() {
       list('/returns').then(setReturns),
     ]).finally(() => setLoading(false));
   }, [id]);
+
+  // حركة الحساب تستجيب لمرشحات الفترة والفروع مستقلةً عن بيانات الملف الأساسية.
+  useEffect(() => {
+    setLedgerLoading(true);
+    api<Statement>(`/reports/partner-statement/${id}${filtersToQuery(ledgerFilters)}`)
+      .then(setStatement)
+      .catch(() => setStatement(null))
+      .finally(() => setLedgerLoading(false));
+  }, [id, ledgerFilters]);
 
   // ── اشتقاقات عرضية بحتة: كلها مجاميع لقيم يحسبها الـ backend، بلا حساب مالي جديد ──
   const mine = useMemo(() => {
@@ -151,6 +174,127 @@ export default function PartnerProfilePage() {
     total: t('col_total'), remaining: t('col_remaining'), empty: t('empty_docs'),
   };
   const statusLabel = (s: string) => ts(s);
+
+  const ledgerRows = useMemo(() => {
+    const term = ledgerSearch.trim().toLowerCase();
+    if (!term) return statement?.rows ?? [];
+    return (statement?.rows ?? []).filter((row) => [
+      row.number, row.description, row.source?.label,
+      ...(row.source?.allocations ?? []).flatMap((allocation) => [allocation.number, allocation.amount]),
+    ].filter(Boolean).some((value) => String(value).toLowerCase().includes(term)));
+  }, [ledgerSearch, statement?.rows]);
+
+  const sourceHref = (source: NonNullable<StatementRow['source']>) => {
+    const routes: Record<string, string> = {
+      invoice: `/invoices/${source.id}`,
+      payment: `/payments/${source.id}`,
+      purchase: `/purchases/${source.id}`,
+      credit_note: `/credit-notes/${source.id}`,
+      return: `/returns/${source.id}`,
+    };
+    return routes[source.kind];
+  };
+
+  const allocationHref = (allocation: NonNullable<StatementRow['source']>['allocations'][number]) => {
+    const routes: Record<string, string> = {
+      invoice: `/invoices/${allocation.id}`,
+      purchase: `/purchases/${allocation.id}`,
+    };
+    return routes[allocation.kind];
+  };
+
+  const ledgerFileName = useMemo(() => {
+    const safeName = (partner?.name ?? 'customer').replace(/[\\/:*?"<>|]/g, '-').trim();
+    return `${t('ledger_file_prefix')}-${safeName || 'customer'}`;
+  }, [partner?.name, t]);
+
+  const ledgerExport = () => statement ? ({
+    ...statement,
+    rows: ledgerRows.map((row) => ({
+      ...row,
+      description: [
+        row.source?.label,
+        row.description,
+        ...(row.source?.allocations ?? []).map((allocation) => `${allocation.number ?? '—'} · ${formatRiyal(allocation.amount)}`),
+      ].filter(Boolean).join(' — '),
+    })),
+  }) : null;
+
+  async function exportLedgerPdf() {
+    const data = ledgerExport();
+    if (!data) return;
+    setLedgerBusy('pdf');
+    try {
+      const blob = await createPartnerStatementPdf({
+        statement: data, company, filters: ledgerFilters, locale,
+        labels: {
+          title: t('ledger_title'), customer: tStatement('customer'), period: tStatement('period'),
+          allPeriods: tStatement('all_periods'), branchScope: tStatement('branch_scope'),
+          allBranches: tStatement('all_branches'), selectedBranches: (count: number) => tStatement('branches_selected', { count }),
+          openingBalance: t('opening'), totalDebit: t('col_debit'), totalCredit: t('col_credit'), closingBalance: t('col_balance'), date: t('col_date'),
+          entryNumber: t('col_entry'), description: t('col_description'), debit: t('col_debit'),
+          credit: t('col_credit'), balance: t('col_balance'), generatedAt: t('ledger_generated_at'),
+          vatNumber: tStatement('vat_number'), crNumber: tStatement('cr_number'),
+          footer: t('ledger_footer'), currency: t('col_currency'), empty: t('empty_ledger'),
+        },
+      });
+      downloadPartnerStatementPdf(blob, ledgerFileName);
+      success(tStatement('downloaded_ok'));
+    } catch {
+      errorToast(tStatement('export_failed'));
+    } finally {
+      setLedgerBusy(null);
+    }
+  }
+
+  async function shareLedgerPdf() {
+    const data = ledgerExport();
+    if (!data) return;
+    setLedgerBusy('share');
+    try {
+      const blob = await createPartnerStatementPdf({
+        statement: data, company, filters: ledgerFilters, locale,
+        labels: {
+          title: t('ledger_title'), customer: tStatement('customer'), period: tStatement('period'),
+          allPeriods: tStatement('all_periods'), branchScope: tStatement('branch_scope'),
+          allBranches: tStatement('all_branches'), selectedBranches: (count: number) => tStatement('branches_selected', { count }),
+          openingBalance: t('opening'), totalDebit: t('col_debit'), totalCredit: t('col_credit'), closingBalance: t('col_balance'), date: t('col_date'),
+          entryNumber: t('col_entry'), description: t('col_description'), debit: t('col_debit'),
+          credit: t('col_credit'), balance: t('col_balance'), generatedAt: t('ledger_generated_at'),
+          vatNumber: tStatement('vat_number'), crNumber: tStatement('cr_number'),
+          footer: t('ledger_footer'), currency: t('col_currency'), empty: t('empty_ledger'),
+        },
+      });
+      const result = await sharePartnerStatementPdf(blob, ledgerFileName, t('ledger_title'));
+      success(result === 'shared' ? tStatement('shared_ok') : tStatement('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') errorToast(tStatement('export_failed'));
+    } finally {
+      setLedgerBusy(null);
+    }
+  }
+
+  async function exportLedgerXlsx() {
+    if (!statement) return;
+    setLedgerBusy('xlsx');
+    try {
+      await exportXlsx(ledgerFileName, {
+        meta: [[tStatement('customer'), partner?.name ?? ''], [tStatement('opening_balance'), Number(statement.opening_balance)], [tStatement('closing_balance'), Number(statement.closing_balance)]],
+        columns: [t('col_date'), t('col_entry'), t('ledger_source'), t('col_description'), t('ledger_settlement'), t('col_debit'), t('col_credit'), t('col_balance')],
+        rows: ledgerRows.map((row) => [
+          row.date, row.number, row.source?.label ?? '', row.description ?? '',
+          (row.source?.allocations ?? []).map((allocation) => `${allocation.number ?? '—'} · ${allocation.amount}`).join(' | '),
+          Number(row.debit), Number(row.credit), Number(row.balance),
+        ]),
+        sheetName: t('tab_ledger'),
+      });
+      success(tStatement('downloaded_ok'));
+    } catch {
+      errorToast(tStatement('export_failed'));
+    } finally {
+      setLedgerBusy(null);
+    }
+  }
 
   function panel(s: SectionId) {
     switch (s) {
@@ -207,15 +351,63 @@ export default function PartnerProfilePage() {
         );
       case 'ledger':
         return statement ? (
-          <LedgerTable
-            opening={statement.opening_balance}
-            rows={statement.rows}
-            labels={{
-              date: t('col_date'), number: t('col_entry'), description: t('col_description'),
-              debit: t('col_debit'), credit: t('col_credit'), balance: t('col_balance'),
-              opening: t('opening'), empty: t('empty_ledger'),
-            }}
-          />
+          <div className="space-y-3">
+            <div className="no-print space-y-2 border-b border-border p-3">
+              <ReportFilters value={ledgerFilters} onChange={setLedgerFilters} />
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" strokeWidth={1.7} />
+                  <Input
+                    value={ledgerSearch}
+                    onChange={(event) => setLedgerSearch(event.target.value)}
+                    placeholder={t('ledger_search')}
+                    className="h-9 ps-9"
+                    aria-label={t('ledger_search')}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button variant="outline" size="sm" onClick={() => void exportLedgerXlsx()} disabled={ledgerBusy !== null}>
+                    <FileSpreadsheet className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    {t('ledger_export_excel')}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => void exportLedgerPdf()} disabled={ledgerBusy !== null}>
+                    <Download className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    {t('ledger_download_pdf')}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => void shareLedgerPdf()} disabled={ledgerBusy !== null}>
+                    <Share2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    {t('ledger_share_pdf')}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => printDocument({ widthMm: 210, heightMm: 297 })}>
+                    <Printer className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    {t('ledger_print')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div id="print-root" className="bg-surface">
+              <div className="print-only border-b border-border px-6 py-5">
+                <p className="text-xs text-muted">{partner?.name}</p>
+                <h2 className="mt-1 text-xl font-bold text-text">{t('ledger_title')}</h2>
+                <p className="mt-1 text-xs text-muted">{t('ledger_generated_at')}: {new Date().toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-GB')}</p>
+              </div>
+              {ledgerLoading ? <Skeleton className="m-4 h-48 w-auto" /> : (
+                <LedgerTable
+                  opening={statement.opening_balance}
+                  rows={ledgerRows}
+                  sourceHref={sourceHref}
+                  allocationHref={allocationHref}
+                  labels={{
+                    date: t('col_date'), number: t('col_entry'), source: t('ledger_source'), description: t('col_description'),
+                    settlement: t('ledger_settlement'), debit: t('col_debit'), credit: t('col_credit'),
+                    balance: t('col_balance'), opening: t('opening'), empty: t('empty_ledger'),
+                  }}
+                />
+              )}
+              <p className="print-only border-t border-border px-6 py-3 text-xs text-muted">{t('ledger_footer')}</p>
+            </div>
+          </div>
         ) : (
           <EmptyPanel>{t('empty_ledger')}</EmptyPanel>
         );

@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
 import { ArrowRight, Printer, Download, Share2, FileSpreadsheet, LayoutTemplate, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,13 +14,14 @@ import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { documentExporter, printDocument } from '@/modules/documents/services/export';
+import { printDocument } from '@/modules/documents/services/export';
 import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { RevisionLog } from '@/components/documents/revision-log';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { exportXlsx } from '@/lib/xlsx';
+import { createInvoicePdf, downloadInvoicePdf, shareInvoicePdf } from '@/modules/invoices/services/invoice-pdf';
 
 interface Line {
   id: string;
@@ -66,12 +67,42 @@ const payTone: Record<string, 'positive' | 'warning' | 'muted'> = {
   unpaid: 'muted',
 };
 
+/** يحوّل SVG الـ QR المعروض إلى PNG لاستخدامه داخل PDF المتجهي من دون التقاط المستند كاملاً. */
+async function qrSvgToPng(svg: SVGSVGElement | null): Promise<string | null> {
+  if (!svg) return null;
+  const source = new XMLSerializer().serializeToString(svg);
+  const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  try {
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('QR image could not be rendered'));
+      image.src = url;
+    });
+    const size = 480;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, size, size);
+    context.drawImage(image, 0, 0, size, size);
+    return canvas.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const t = useTranslations('invoiceDetail');
   const ti = useTranslations('invoices');
+  const td = useTranslations('invoiceDoc');
   const ts = useTranslations('status');
+  const locale = useLocale();
   const { success, error: errorToast } = useToast();
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -92,6 +123,7 @@ export default function InvoiceDetailPage() {
   const [bankText, setBankText] = useState<string | null>(null);
   const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const qrRef = useRef<HTMLDivElement>(null);
   const tt = useTranslations('invoiceTemplates');
 
   const partnerName = customer?.name ?? '—';
@@ -169,12 +201,32 @@ export default function InvoiceDetailPage() {
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
 
+  const buildVectorInvoicePdf = async () => {
+    if (!invoice) throw new Error('Invoice is not loaded');
+    const qrImage = await qrSvgToPng(qrRef.current?.querySelector('svg') ?? null);
+    return createInvoicePdf({
+      invoice,
+      company,
+      customer,
+      qrImage,
+      logoUrl,
+      locale,
+      labels: {
+        title: td('title'), titleSecondary: td('title_en'), seller: td('seller'), billTo: td('bill_to'),
+        invoiceNumber: td('number'), vatNumber: td('vat_number'), crNumber: td('cr_number'), city: td('city'),
+        date: td('date'), paymentType: td('payment_type'), cash: td('cash'), credit: td('credit'),
+        description: td('description'), quantity: td('qty'), unitPrice: td('unit_price'), tax: td('tax'), total: td('total'),
+        subtotal: td('subtotal'), vat: td('vat'), grandTotal: td('grand_total'), qrNote: td('zatca_note'), footer: td('footer'),
+      },
+    });
+  };
+
   async function handleDownloadPdf() {
-    const el = doc();
-    if (!el || !invoice) return;
+    if (!invoice) return;
     setBusy('pdf');
     try {
-      await documentExporter.download({ element: el, fileName: invoice.number, paper });
+      const blob = await buildVectorInvoicePdf();
+      downloadInvoicePdf(blob, invoice.number);
       success(t('downloaded_ok'));
     } catch {
       errorToast(t('export_failed'));
@@ -184,14 +236,14 @@ export default function InvoiceDetailPage() {
   }
 
   async function handleShare() {
-    const el = doc();
-    if (!el || !invoice) return;
+    if (!invoice) return;
     setBusy('share');
     try {
-      const r = await documentExporter.share({ element: el, fileName: invoice.number, title: invoice.number, paper });
-      success(r === 'shared' ? t('shared_ok') : t('downloaded_ok'));
-    } catch (e) {
-      if ((e as Error)?.name !== 'AbortError') errorToast(t('export_failed')); // إلغاء المستخدم لا يُعدّ خطأ
+      const blob = await buildVectorInvoicePdf();
+      const result = await shareInvoicePdf(blob, invoice.number, invoice.number);
+      success(result === 'shared' ? t('shared_ok') : t('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(t('export_failed'));
     } finally {
       setBusy(null);
     }
@@ -280,7 +332,7 @@ export default function InvoiceDetailPage() {
           <CardContent className="flex flex-col items-center gap-3">
             {zatca?.qr ? (
               <>
-                <div className="rounded bg-white p-3">
+                <div ref={qrRef} className="rounded bg-white p-3">
                   <QRCodeSVG value={zatca.qr} size={140} level="M" />
                 </div>
                 <div className="w-full space-y-1 text-xs text-muted">

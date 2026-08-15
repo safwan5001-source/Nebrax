@@ -109,6 +109,10 @@ class ReportStatementsTest extends TestCase
         $this->assertSame(230000, $st['rows'][0]['balance']);
         $this->assertSame(100000, $st['rows'][1]['credit']);  // التحصيل
         $this->assertSame(130000, $st['rows'][1]['balance']); // المتبقي
+        $this->assertSame('invoice', $st['rows'][0]['source']['kind']);
+        $this->assertSame('payment', $st['rows'][1]['source']['kind']);
+        $this->assertSame($inv->number, $st['rows'][1]['source']['allocations'][0]['number']);
+        $this->assertSame(100000, $st['rows'][1]['source']['allocations'][0]['amount']);
         $this->assertSame(130000, $st['closing_balance']);
     }
 

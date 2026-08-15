@@ -86,7 +86,12 @@ class ReportController extends ApiController
 
     public function partnerStatement(Request $request, string $partnerId): JsonResponse
     {
-        $st = $this->reports->partnerStatement($partnerId, $this->filters($request));
+        $filters = $this->filters($request);
+        $role = $request->query('partner_role');
+        if (in_array($role, ['customer', 'supplier'], true)) {
+            $filters['partner_role'] = $role;
+        }
+        $st = $this->reports->partnerStatement($partnerId, $filters);
 
         return response()->json([
             'partner'         => $st['partner'],
@@ -98,6 +103,17 @@ class ReportController extends ApiController
                 'debit'       => Money::toRiyal($r['debit']),
                 'credit'      => Money::toRiyal($r['credit']),
                 'balance'     => Money::toRiyal($r['balance']),
+                'source'      => $r['source'] ? [
+                    'kind'        => $r['source']['kind'],
+                    'id'          => $r['source']['id'],
+                    'label'       => $r['source']['label'],
+                    'allocations' => array_map(fn ($allocation) => [
+                        'kind'   => $allocation['kind'],
+                        'id'     => $allocation['id'],
+                        'number' => $allocation['number'],
+                        'amount' => Money::toRiyal($allocation['amount']),
+                    ], $r['source']['allocations']),
+                ] : null,
             ], $st['rows']),
             'closing_balance' => Money::toRiyal($st['closing_balance']),
         ]);

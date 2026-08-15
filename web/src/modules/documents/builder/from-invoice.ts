@@ -28,6 +28,8 @@ export interface SourceCompany {
   name: string;
   vat_number?: string | null;
   cr_number?: string | null;
+  /** شعار هوية المنشأة كما يعيده /me؛ يُستخدم عند غياب شعار مخصص لتصميم الفاتورة. */
+  logo?: string | null;
 }
 export interface SourceCustomer {
   name: string;
@@ -68,7 +70,9 @@ export function buildInvoiceDocumentModel(input: {
       crNumber: company?.cr_number ?? null,
       tagline: null,
       logoText: null,
-      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : null,
+      // أولوية الشعار: تصميم الفاتورة المخصص ثم شعار هوية المؤسسة. لا تُظهر علامة
+      // احتياطية ما دام الشعار المرفوع للشركة متوفراً عبر /me.
+      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : (company?.logo ?? null),
       logoHeight: logoHeight ?? null,
     },
     buyer: {

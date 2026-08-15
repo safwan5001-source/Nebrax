@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus, Pencil } from 'lucide-react';
+import { BookOpen, FileText, Plus, Pencil } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -59,21 +59,39 @@ export default function SuppliersPage() {
         id: 'actions',
         header: '',
         cell: ({ row }) => (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={tp('edit')}
-            onClick={() => {
-              setEditing(row.original);
-              setDialogOpen(true);
-            }}
-          >
-            <Pencil className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
+          <div className="flex items-center justify-end gap-1">
+            <Link
+              href={`/suppliers/${row.original.id}/statement`}
+              className="inline-flex h-9 w-9 items-center justify-center rounded text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              aria-label={ts('statement')}
+              title={ts('statement')}
+            >
+              <FileText className="h-4 w-4" strokeWidth={1.7} />
+            </Link>
+            <Link
+              href={`/suppliers/${row.original.id}/ledger`}
+              className="inline-flex h-9 w-9 items-center justify-center rounded text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              aria-label={ts('ledger')}
+              title={ts('ledger')}
+            >
+              <BookOpen className="h-4 w-4" strokeWidth={1.7} />
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={tp('edit')}
+              onClick={() => {
+                setEditing(row.original);
+                setDialogOpen(true);
+              }}
+            >
+              <Pencil className="h-4 w-4" strokeWidth={1.7} />
+            </Button>
+          </div>
         ),
       },
     ],
-    [tp]
+    [tp, ts]
   );
 
   return (
