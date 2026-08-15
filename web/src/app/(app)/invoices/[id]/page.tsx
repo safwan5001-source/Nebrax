@@ -33,6 +33,12 @@ interface Line {
   line_tax: string;
   line_total: string;
 }
+interface FrozenPrintTemplateRevision {
+  id: string;
+  version: number;
+  definition: { template_id?: string; theme_id?: ThemeId; footer_text?: string; show_logo?: boolean; layout?: DocSectionLayoutItem[] };
+  document_types: string[];
+}
 interface Invoice {
   id: string;
   number: string;
@@ -48,6 +54,8 @@ interface Invoice {
   remaining: string;
   notes: string | null;
   lines: Line[];
+  print_template_revision_id?: string | null;
+  print_template_revision?: FrozenPrintTemplateRevision | null;
 }
 interface Zatca {
   qr: string | null;
@@ -143,20 +151,26 @@ export default function InvoiceDetailPage() {
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
         if (m.status === 'fulfilled') setCompany(m.value.company);
-        // القالب والهوية الافتراضية من إعدادات التصاميم (تتراجع للافتراضي إن غابت).
-        if (d.status === 'fulfilled') {
+        // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
+        // إعدادات الهوية تفسير مستند تاريخي. المسودات والبيانات القديمة تستخدم
+        // إعدادات التوافق الحية إلى أن تصدر.
+        const frozen = r.data.print_template_revision?.definition;
+        if (frozen) {
+          setTemplateId(frozen.template_id ?? DEFAULT_TEMPLATE_ID);
+          setThemeId(frozen.theme_id ?? null);
+          setFooterText(frozen.footer_text ?? null);
+          setShowLogo(frozen.show_logo !== false);
+          setLayout(Array.isArray(frozen.layout) && frozen.layout.length ? frozen.layout : null);
+          setLogoUrl(null); setLogoHeight(null); setTermsText(null); setBankText(null); setStampUrl(null); setSignatureUrl(null);
+        } else if (d.status === 'fulfilled') {
           const dg = d.value.data ?? {};
           setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
           if (dg.theme) setThemeId(dg.theme as ThemeId);
           setFooterText(dg.footer_text ?? null);
           setShowLogo(dg.show_logo !== false);
-          setLogoUrl(dg.logo ?? null);
-          setLogoHeight(dg.logo_height ?? null);
+          setLogoUrl(dg.logo ?? null); setLogoHeight(dg.logo_height ?? null);
           setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
-          setTermsText(dg.terms_text ?? null);
-          setBankText(dg.bank_text ?? null);
-          setStampUrl(dg.stamp ?? null);
-          setSignatureUrl(dg.signature ?? null);
+          setTermsText(dg.terms_text ?? null); setBankText(dg.bank_text ?? null); setStampUrl(dg.stamp ?? null); setSignatureUrl(dg.signature ?? null);
         }
       })
       .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
@@ -210,6 +224,7 @@ export default function InvoiceDetailPage() {
       customer,
       qrImage,
       logoUrl,
+      footerText,
       locale,
       labels: {
         title: td('title'), titleSecondary: td('title_en'), seller: td('seller'), billTo: td('bill_to'),

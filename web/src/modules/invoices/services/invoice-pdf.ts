@@ -46,6 +46,8 @@ export interface InvoicePdfInput {
   qrImage?: string | null;
   /** شعار إعدادات التصميم له أولوية، ثم شعار هوية الشركة. */
   logoUrl?: string | null;
+  /** تذييل المراجعة المثبتة عند إصدار المستند؛ لا يُعاد قراءته من الإعدادات الحية. */
+  footerText?: string | null;
   /** حقول إضافية للمستندات غير البيعية، مثل رقم فاتورة المورد وتاريخ الاستحقاق. */
   documentMeta?: Array<[string, string | null | undefined]>;
   /** الخصم أو الشحن أو التسوية؛ تظهر بين الإجمالي الفرعي والضريبة. */
@@ -333,7 +335,7 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     const footerY = PAGE.height - 12;
     pdf.setDrawColor(203, 213, 225);
     pdf.line(left, footerY - 5, right, footerY - 5);
-    writeArabicRight(pdf, input.labels.footer, right, footerY + 0.5, 6.3);
+    writeArabicRight(pdf, input.footerText?.trim() || input.labels.footer, right, footerY + 0.5, 6.3);
     writeLatinCenter(pdf, `${page} / ${pages}`, PAGE.width / 2, footerY + 0.5, 6.7);
   }
 

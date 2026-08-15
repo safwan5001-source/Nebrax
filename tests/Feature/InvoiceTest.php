@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -84,6 +85,31 @@ class InvoiceTest extends TestCase
         // (ج) الإجماليات مشتقة من السطور
         $this->assertEquals($posted->lines->sum('line_total'), $entry->lines->sum('debit'));
         $this->assertSame($posted->total, $posted->subtotal + $posted->tax_amount);
+    }
+
+    /** @test */
+    public function posting_an_invoice_freezes_the_published_print_template_revision(): void
+    {
+        $templates = app(PrintTemplateService::class);
+        $template = $templates->create([
+            'name' => 'قالب فاتورة ثابت',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-classic', 'theme_id' => 'blue'],
+        ], null);
+        $template = $templates->publish($template);
+        $templates->assign([
+            'document_type' => 'tax_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $template->published_revision_id,
+        ], null);
+
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $posted = $this->invoices->post($invoice);
+
+        $this->assertSame($template->published_revision_id, $posted->print_template_revision_id);
     }
 
     /** @test */
