@@ -52,7 +52,7 @@ class PaymentController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        return (new PaymentResource(Payment::with('allocations.allocatable')->findOrFail($id)))->response();
+        return (new PaymentResource(Payment::with(['allocations.allocatable', 'printTemplateRevision'])->findOrFail($id)))->response();
     }
 
     public function post(string $id): JsonResponse
@@ -60,6 +60,6 @@ class PaymentController extends ApiController
         $payment = Payment::findOrFail($id);
         $posted = $this->domain(fn () => $this->payments->post($payment));
 
-        return (new PaymentResource($posted))->response();
+        return (new PaymentResource($posted->load('printTemplateRevision')))->response();
     }
 }

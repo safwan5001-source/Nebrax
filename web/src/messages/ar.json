@@ -1186,6 +1186,7 @@
     "retry": "إعادة المحاولة",
     "not_found": "السند غير موجود",
     "template": "القالب",
+    "frozen_template": "قالب مثبت",
     "receipt_title": "سند قبض",
     "payment_title": "سند صرف",
     "receipt_subtitle": "تحصيل من عميل",
