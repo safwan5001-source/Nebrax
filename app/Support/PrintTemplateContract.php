@@ -3,7 +3,7 @@
 namespace App\Support;
 
 use App\Models\PrintTemplateAssignment;
-use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * قائمة بيضاء خلفية لعقود القوالب.
@@ -46,12 +46,12 @@ class PrintTemplateContract
         )));
 
         if ($normalized === []) {
-            throw new InvalidArgumentException('اختر نوع مستند واحداً على الأقل للقالب.');
+            throw new RuntimeException('اختر نوع مستند واحداً على الأقل للقالب.');
         }
 
         foreach ($normalized as $type) {
             if (! in_array($type, self::DOCUMENT_TYPES, true)) {
-                throw new InvalidArgumentException("نوع المستند «{$type}» غير مدعوم للقوالب.");
+                throw new RuntimeException("نوع المستند «{$type}» غير مدعوم للقوالب.");
             }
         }
 
@@ -63,24 +63,94 @@ class PrintTemplateContract
     public static function assertUsage(string $usage): string
     {
         if (! in_array($usage, self::USAGES, true)) {
-            throw new InvalidArgumentException('استعمال القالب غير مدعوم.');
+            throw new RuntimeException('استعمال القالب غير مدعوم.');
         }
 
         return $usage;
     }
 
     /**
-     * يحمي المرحلة الحالية من حفظ تعريف غير منظم. التفصيل البنيوي للكتل
-     * والأعمدة سيستخدم نفس العقد في مرحلة محرر القوالب؛ لكن لا نقبل نصاً أو
-     * قائمة بدلاً من كائن JSON من الآن حتى لا يصعب ترحيل بيانات سيئة لاحقاً.
+     * يتحقق من تعريف القالب قبل حفظ مسودة أو نشر مراجعة. التعريفات القديمة التي
+     * لا تتضمن `layout` تبقى صالحة؛ أما التخطيط المصرح به فيخضع لعقد نوع المستند
+     * حتى لا تحفظ الواجهة كتلة لا يستطيع محرك المستند رسمها لاحقاً.
+     *
+     * @param array<int, string> $documentTypes
      */
-    public static function assertDefinition(array $definition): array
+    public static function assertDefinition(array $definition, array $documentTypes): array
     {
         if (array_is_list($definition)) {
-            throw new InvalidArgumentException('تعريف القالب يجب أن يكون كائناً منظماً لا قائمة.');
+            throw new RuntimeException('تعريف القالب يجب أن يكون كائناً منظماً لا قائمة.');
+        }
+
+        if (array_key_exists('layout', $definition)) {
+            self::assertLayout($definition['layout'], $documentTypes);
         }
 
         return self::canonicalize($definition);
+    }
+
+    /**
+     * @param mixed $layout
+     * @param array<int, string> $documentTypes
+     */
+    private static function assertLayout(mixed $layout, array $documentTypes): void
+    {
+        if (! is_array($layout) || ! array_is_list($layout)) {
+            throw new RuntimeException('تخطيط الكتل يجب أن يكون قائمة مرتبة.');
+        }
+
+        $supported = null;
+        $required = [];
+        foreach ($documentTypes as $documentType) {
+            $contract = self::layoutContract($documentType);
+            $supported = $supported === null
+                ? $contract['allowed']
+                : array_values(array_intersect($supported, $contract['allowed']));
+            $required = array_values(array_unique([...$required, ...$contract['required']]));
+        }
+
+        $seen = [];
+        foreach ($layout as $item) {
+            if (! is_array($item) || array_is_list($item) || ! isset($item['key']) || ! is_string($item['key'])) {
+                throw new RuntimeException('كل كتلة في التخطيط تحتاج مفتاحاً منظماً.');
+            }
+            if (! array_key_exists('visible', $item) || ! is_bool($item['visible'])) {
+                throw new RuntimeException('كل كتلة في التخطيط تحتاج حالة ظهور منطقية.');
+            }
+
+            $key = $item['key'];
+            if (! in_array($key, $supported ?? [], true)) {
+                throw new RuntimeException("الكتلة «{$key}» غير مدعومة لكل أنواع المستندات المختارة.");
+            }
+            if (isset($seen[$key])) {
+                throw new RuntimeException("الكتلة «{$key}» مكررة في التخطيط.");
+            }
+            $seen[$key] = (bool) $item['visible'];
+        }
+
+        foreach ($required as $key) {
+            if (($seen[$key] ?? false) !== true) {
+                throw new RuntimeException("الكتلة الإلزامية «{$key}» يجب أن تبقى ظاهرة.");
+            }
+        }
+    }
+
+    /** @return array{allowed: array<int, string>, required: array<int, string>} */
+    private static function layoutContract(string $documentType): array
+    {
+        $lineItems = [
+            'header', 'barcode', 'parties', 'items', 'summary', 'amountWords',
+            'notes', 'terms', 'bank', 'stamp', 'signature', 'footer',
+        ];
+        $vouchers = ['header', 'parties', 'voucher', 'amountWords', 'notes', 'bank', 'stamp', 'signature', 'footer'];
+        $statement = ['header', 'parties', 'items', 'summary', 'notes', 'footer'];
+
+        return match ($documentType) {
+            'receipt_voucher', 'payment_voucher' => ['allowed' => $vouchers, 'required' => ['header', 'parties', 'voucher', 'footer']],
+            'statement_of_account' => ['allowed' => $statement, 'required' => ['header', 'parties', 'items', 'footer']],
+            'delivery_note', 'packing_list' => ['allowed' => $lineItems, 'required' => ['header', 'parties', 'items', 'footer']],
+            default => ['allowed' => $lineItems, 'required' => ['header', 'parties', 'items', 'summary', 'footer']],
+        };
     }
 
     /** ترتيب مفاتيح JSON عودياً يجعل بصمة الإصدار حتمية. */

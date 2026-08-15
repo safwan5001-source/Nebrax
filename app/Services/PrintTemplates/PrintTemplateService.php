@@ -24,7 +24,7 @@ class PrintTemplateService
     {
         return DB::transaction(function () use ($data, $actor) {
             $types = PrintTemplateContract::assertDocumentTypes($data['document_types']);
-            $definition = PrintTemplateContract::assertDefinition($data['definition']);
+            $definition = PrintTemplateContract::assertDefinition($data['definition'], $types);
             $name = $this->normalizedName($data['name']);
             $this->assertNameFree($name);
 
@@ -56,8 +56,8 @@ class PrintTemplateService
 
             $revision = $this->draftFor($template, $types, $actor);
             $definition = array_key_exists('definition', $data)
-                ? PrintTemplateContract::assertDefinition($data['definition'])
-                : $revision->definition;
+                ? PrintTemplateContract::assertDefinition($data['definition'], $types)
+                : PrintTemplateContract::assertDefinition($revision->definition, $types);
 
             if (array_key_exists('name', $data)) {
                 $name = $this->normalizedName($data['name']);
@@ -101,7 +101,7 @@ class PrintTemplateService
 
             // إعادة الفحص هنا مهمة: لا تُنشر بياناتٍ أدخلتها رحلة API قديمة أو عميلٌ متجاوز.
             $types = PrintTemplateContract::assertDocumentTypes($revision->document_types);
-            $definition = PrintTemplateContract::assertDefinition($revision->definition);
+            $definition = PrintTemplateContract::assertDefinition($revision->definition, $types);
 
             PrintTemplateRevision::where('print_template_id', $template->id)
                 ->where('status', PrintTemplateRevision::STATUS_PUBLISHED)
@@ -138,7 +138,7 @@ class PrintTemplateService
             $name = $this->normalizedName($name);
             $this->assertNameFree($name);
             $types = PrintTemplateContract::assertDocumentTypes($base->document_types);
-            $definition = PrintTemplateContract::assertDefinition($base->definition);
+            $definition = PrintTemplateContract::assertDefinition($base->definition, $types);
 
             $template = PrintTemplate::create([
                 'name'           => $name,
