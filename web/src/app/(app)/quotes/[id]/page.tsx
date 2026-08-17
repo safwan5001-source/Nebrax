@@ -138,6 +138,8 @@ export default function QuoteDetailPage() {
       company,
       party: customer,
       logoUrl,
+      stampUrl,
+      signatureUrl,
       footerText,
       templateLayout: layout,
       termsText,
