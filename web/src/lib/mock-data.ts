@@ -1121,6 +1121,66 @@ function partnerStatement(id: string) {
   };
 }
 
+// ── تقرير المبيعات في وضع العرض التجريبي ───────────────────────────────────
+// يبقى هذا المسار محصوراً في `isDemo()`؛ الواجهة الحقيقية تقرأ عقد Laravel نفسه.
+function salesReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'period';
+  const from = query.get('from') ?? '';
+  const to = query.get('to') ?? '';
+  const customerId = query.get('customer_id') ?? '';
+  const paymentStatus = query.get('payment_status') ?? '';
+  const receiptMethod = query.get('receipt_method') ?? '';
+  const money = (value: number) => value.toFixed(2);
+  const inRange = (date: string) => (!from || date >= from) && (!to || date <= to);
+  const invoices = mockInvoices.filter((invoice) => invoice.status === 'posted'
+    && inRange(invoice.invoice_date)
+    && (!customerId || invoice.partner_id === customerId)
+    && (!paymentStatus || invoice.payment_status === paymentStatus));
+  const amount = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const netSales = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.subtotal), 0);
+  const tax = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.tax_amount), 0);
+  const invoiceTotals = { invoices: invoices.length, amount: money(amount(invoices)), net_sales: money(netSales(invoices)), tax: money(tax(invoices)) };
+  const group = <T extends { key: string; label: string }>(items: T[], value: (item: T) => number, countKey: 'invoices' | 'quantity' | 'receipts') => {
+    const buckets = new Map<string, { key: string; label: string; count: number; amount: number }>();
+    items.forEach((item) => {
+      const bucket = buckets.get(item.key) ?? { key: item.key, label: item.label, count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += value(item);
+      buckets.set(item.key, bucket);
+    });
+    return [...buckets.values()].sort((a, b) => b.amount - a.amount).map((bucket) => ({ key: bucket.key, label: bucket.label, [countKey]: bucket.count, amount: money(bucket.amount) }));
+  };
+
+  if (view === 'payments') {
+    const receipts = mockPayments.filter((payment) => payment.direction === 'received' && inRange(payment.payment_date) && (!receiptMethod || payment.method === receiptMethod));
+    const rows = group(receipts.map((payment) => ({ key: payment.payment_date.slice(0, 7), label: payment.payment_date.slice(0, 7), amount: Number(payment.amount) })), (row) => row.amount, 'receipts');
+    return { view, data: rows, totals: { receipts: receipts.length, amount: money(receipts.reduce((sum, receipt) => sum + Number(receipt.amount), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_receipts' } };
+  }
+
+  if (view === 'product') {
+    const rows = group(invoices.flatMap((invoice) => invoice.lines.map((line) => ({ key: line.description ?? 'manual', label: line.description ?? 'بند وصفي', amount: Number(line.line_total), quantity: line.quantity }))), (row) => row.amount, 'quantity');
+    const quantityByProduct = new Map(invoices.flatMap((invoice) => invoice.lines).map((line) => [line.description ?? 'manual', line.quantity]));
+    return { view, data: rows.map((row) => ({ ...row, quantity: quantityByProduct.get(row.key) ?? row.quantity })), totals: { invoices: invoices.length, amount: money(invoices.flatMap((invoice) => invoice.lines).reduce((sum, line) => sum + Number(line.line_total), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+
+  if (view === 'customer') {
+    const rows = group(invoices.map((invoice) => ({ key: invoice.partner_id, label: mockPartners.find((partner) => partner.id === invoice.partner_id)?.name ?? 'غير مسند', amount: Number(invoice.total) })), (row) => row.amount, 'invoices');
+    return { view, data: rows, totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+
+  const periods = group(invoices.map((invoice) => ({ key: invoice.invoice_date.slice(0, 7), label: invoice.invoice_date.slice(0, 7), amount: Number(invoice.total) })), (row) => row.amount, 'invoices');
+  if (view === 'profit') {
+    const rows = periods.map((row) => ({ ...row, revenue: row.amount, cost: '0.00', profit: row.amount, margin_bp: 10000 }));
+    const revenue = netSales(invoices);
+    return { view, data: rows, totals: { revenue: money(revenue), cost: '0.00', profit: money(revenue), margin_bp: 10000 }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+  if (view === 'salesperson') {
+    return { view, data: [{ key: 'unassigned', label: 'غير مسند', invoices: invoices.length, amount: money(amount(invoices)) }], totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+  return { view, data: periods, totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+}
+
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
@@ -1243,6 +1303,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const movementsMatch = clean.match(/^\/inventory\/([^/]+)\/movements$/);
   if (movementsMatch) return resolve(mockMovements(movementsMatch[1]));
 
+  if (clean === '/reports/sales') return resolve(salesReportFor(path));
   if (clean === '/reports/income-statement') return resolve(incomeStatementFor(path));
   if (clean === '/reports/balance-sheet') return resolve(mockBalanceSheet);
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);

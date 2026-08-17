@@ -1977,6 +1977,83 @@
           "description": "Measure item turnover speed during the selected period."
         }
       }
+    },
+    "sales": {
+      "backToSalesReports": "Back to sales reports",
+      "advancedFilters": "Advanced filters",
+      "filtersActive": "Filters active",
+      "resetAll": "Reset all",
+      "invoicesScopeHint": "Results are read from posted sales invoices only; drafts never enter the report.",
+      "profitScopeHint": "Gross profit = net sales before VAT − cost of goods recorded at posting.",
+      "receiptsScopeHint": "Results are read from posted receipt vouchers only, by receipt date rather than invoice date.",
+      "interval": "Time grouping",
+      "intervals": {
+        "day": "Daily",
+        "week": "Weekly",
+        "month": "Monthly",
+        "year": "Yearly"
+      },
+      "customer": "Customer",
+      "allCustomers": "All customers",
+      "searchCustomer": "Search by name, tax number, or phone",
+      "noCustomers": "No matching customers",
+      "salesperson": "Sales representative",
+      "allSalespeople": "All representatives",
+      "searchSalesperson": "Search by representative name",
+      "noSalespeople": "No matching representatives",
+      "product": "Product",
+      "allProducts": "All products",
+      "searchProduct": "Search by name, SKU, or barcode",
+      "noProducts": "No matching products",
+      "productInvoiceScope": "For this report, the scope is limited to invoices that contain the selected product.",
+      "paymentStatus": "Payment status",
+      "allPaymentStatuses": "All payment statuses",
+      "paymentStatuses": {
+        "paid": "Paid",
+        "partial": "Partially paid",
+        "unpaid": "Unpaid"
+      },
+      "receiptMethod": "Receipt method",
+      "allReceiptMethods": "All receipt methods",
+      "receiptMethods": {
+        "cash": "Cash",
+        "bank": "Bank"
+      },
+      "views": {
+        "period": "Sales by period",
+        "customer": "Sales by customer",
+        "product": "Product sales",
+        "salesperson": "Sales by representative",
+        "profit": "Profit by period",
+        "payments": "Sales receipts by period"
+      },
+      "descriptions": {
+        "period": "Posted sales invoices grouped by the selected time interval.",
+        "customer": "Posted invoice value and count for each customer in the filtered scope.",
+        "product": "Sales line value and quantity for each product; it excludes header-level invoice amounts such as shipping.",
+        "salesperson": "Compare the value and count of posted invoices between sales representatives.",
+        "profit": "Gross profit before operating expenses and VAT, derived from net sales and cost of goods sold.",
+        "payments": "Posted receipt vouchers by receipt date and collection method."
+      },
+      "period": "Period",
+      "invoices": "Invoices",
+      "quantity": "Quantity",
+      "revenue": "Net sales",
+      "cogs": "Cost of goods sold",
+      "margin": "Gross margin",
+      "receipts": "Receipt vouchers",
+      "receivedAmount": "Collected amount",
+      "netSales": "Net sales before VAT",
+      "vat": "Output VAT",
+      "totalSales": "Total sales",
+      "details": "Report details",
+      "sourcePostedInvoices": "Posted invoices",
+      "sourceReceipts": "Posted receipt vouchers",
+      "manualItem": "Descriptive item",
+      "unassigned": "Unassigned",
+      "empty": "There is no data in the selected filter scope.",
+      "loadFailed": "The report could not be loaded. Check your connection and try again.",
+      "retry": "Try again"
     }
   },
   "returnForm": {

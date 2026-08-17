@@ -55,12 +55,12 @@ const REPORT_CATEGORIES: ReportCategoryDefinition[] = [
     icon: BarChart3,
     reports: [
       { key: 'posSession', href: '/pos/report', icon: Receipt, status: 'ready' },
-      { key: 'salesByPeriod', icon: CalendarDays, status: 'soon' },
-      { key: 'salesByCustomer', icon: Users, status: 'soon' },
-      { key: 'salesByProduct', icon: Package, status: 'soon' },
-      { key: 'salesByRepresentative', icon: Contact, status: 'soon' },
-      { key: 'salesProfitability', icon: Scale, status: 'soon' },
-      { key: 'salesPaymentsByPeriod', icon: WalletCards, status: 'soon' },
+      { key: 'salesByPeriod', href: '/reports/sales/by-period', icon: CalendarDays, status: 'ready' },
+      { key: 'salesByCustomer', href: '/reports/sales/by-customer', icon: Users, status: 'ready' },
+      { key: 'salesByProduct', href: '/reports/sales/by-product', icon: Package, status: 'ready' },
+      { key: 'salesByRepresentative', href: '/reports/sales/by-salesperson', icon: Contact, status: 'ready' },
+      { key: 'salesProfitability', href: '/reports/sales/profitability', icon: Scale, status: 'ready' },
+      { key: 'salesPaymentsByPeriod', href: '/reports/sales/payments', icon: WalletCards, status: 'ready' },
     ],
   },
   {

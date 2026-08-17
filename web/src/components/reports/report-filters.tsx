@@ -37,9 +37,12 @@ export function filtersToQuery(f: ReportFilterState): string {
 export function ReportFilters({
   value,
   onChange,
+  onClear,
 }: {
   value: ReportFilterState;
   onChange: (next: ReportFilterState) => void;
+  /** يسمح لتقرير متخصص بمسح مرشحاته الإضافية مع المرشحات المشتركة. */
+  onClear?: () => void;
 }) {
   const t = useTranslations('reports');
   const tb = useTranslations('branches');
@@ -80,6 +83,7 @@ export function ReportFilters({
     return t('branches_selected', { n: value.branchIds.length });
   }, [value.branchIds, branches, t]);
 
+  const clear = () => onClear ? onClear() : onChange(EMPTY_FILTERS);
   const dirty = !!value.from || !!value.to || value.branchIds.length > 0;
   const dateSet = !!value.from || !!value.to;
 
@@ -134,7 +138,7 @@ export function ReportFilters({
         </button>
 
         {dirty && (
-          <button type="button" onClick={() => onChange(EMPTY_FILTERS)} className={chip(false)}>
+          <button type="button" onClick={clear} className={chip(false)}>
             <X className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
             {t('clear_filters')}
           </button>
@@ -228,7 +232,7 @@ export function ReportFilters({
       </div>
 
       {dirty && (
-        <Button variant="ghost" size="sm" onClick={() => onChange(EMPTY_FILTERS)}>
+        <Button variant="ghost" size="sm" onClick={clear}>
           <X className="h-3.5 w-3.5" strokeWidth={1.8} />
           {t('clear_filters')}
         </Button>

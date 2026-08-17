@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\ReturnableController;
 use App\Http\Controllers\Api\ReturnSourcesController;
 use App\Http\Controllers\Api\SalesConfigController;
+use App\Http\Controllers\Api\SalesReportController;
 use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\StocktakeController;
@@ -278,6 +279,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // لوحة التحكم: تفصيل المبيعات ببُعد (يوم/منتج/فئة/فرع/بائع) — قراءة فقط
         Route::get('dashboard/sales-breakdown', [DashboardController::class, 'salesBreakdown'])->middleware($perm('reports.view'));
+        // تقارير المبيعات: تجميعات قراءة فقط مع نطاق تاريخ/فرع/عميل/صنف/مندوب وسداد.
+        Route::get('reports/sales', [SalesReportController::class, 'show'])->middleware($perm('reports.view'));
 
         // المرتجعات
         // سطور مستندٍ مصدر بكمياتها المتبقية للردّ — تسبق `returns/{id}` في
