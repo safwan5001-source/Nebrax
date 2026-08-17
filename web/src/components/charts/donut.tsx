@@ -7,7 +7,7 @@ export interface DonutSegment {
 }
 
 // رسم دائري مجوّف بـ SVG خالص — بلا مكتبات.
-export function Donut({ segments, size = 120 }: { segments: DonutSegment[]; size?: number }) {
+export function Donut({ segments, size = 120, formatValue }: { segments: DonutSegment[]; size?: number; formatValue?: (value: number) => string }) {
   const total = segments.reduce((s, x) => s + x.value, 0);
   const r = 45;
   const c = 2 * Math.PI * r;
@@ -42,7 +42,7 @@ export function Donut({ segments, size = 120 }: { segments: DonutSegment[]; size
           <li key={seg.label} className="flex items-center gap-2">
             <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: seg.color }} />
             <span className="text-muted">{seg.label}</span>
-            <span className="num ms-auto text-text">{seg.value}</span>
+            <span className="num ms-auto text-text">{formatValue ? formatValue(seg.value) : seg.value}</span>
           </li>
         ))}
       </ul>

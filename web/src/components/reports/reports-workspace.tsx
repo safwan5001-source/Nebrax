@@ -24,6 +24,7 @@ import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
 import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader, type ReportMetric } from '@/components/reports/report-workspace-ui';
+import { CustomerAgingChart } from '@/components/reports/customer-aging-chart';
 
 export type ReportTab = 'trial' | 'income' | 'balance' | 'costcenter' | 'aging';
 type Tab = ReportTab;
@@ -370,6 +371,13 @@ export function ReportsWorkspace({
       <ReportFilters value={filters} onChange={setFilters} />
 
       <ReportMetricGrid metrics={metrics} />
+
+      {aging && agingType === 'receivable' && (
+        <CustomerAgingChart
+          totals={aging.totals}
+          labels={{ title: t('aging'), b0_30: t('b0_30'), b31_60: t('b31_60'), b61_90: t('b61_90'), b90_plus: t('b90_plus'), total: t('total') }}
+        />
+      )}
 
       {tab === 'trial' ? (
         <Card>
