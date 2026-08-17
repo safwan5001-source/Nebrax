@@ -1,5 +1,6 @@
 import type { DocSectionLayoutItem, ThemeId } from '@/modules/documents/types';
 import { getTemplate } from '@/modules/documents/registry/templates';
+import type { ResolvedLiveTemplate } from '@/modules/print-templates/services/live-template-definition';
 
 export interface CreditNoteTemplateDefinition {
   template_id?: string;
@@ -52,6 +53,28 @@ function nonEmpty(value: string | undefined): string | null {
 
 function validLayout(value: DocSectionLayoutItem[] | undefined): DocSectionLayoutItem[] | null {
   return Array.isArray(value) && value.length > 0 ? value : null;
+}
+
+/** يحول تعريف المنصة الحي إلى عقد العارض، بلا صور محلية لا يحفظها العقد الحديث. */
+export function resolveLiveCreditNoteTemplateDesign(
+  definition: ResolvedLiveTemplate | null | undefined,
+): ResolvedCreditNoteTemplateDesign | null {
+  if (!definition) return null;
+
+  return {
+    templateId: definition.templateId,
+    themeId: definition.themeId,
+    footerText: definition.footerText,
+    showLogo: definition.showLogo,
+    logoUrl: null,
+    logoHeight: null,
+    layout: definition.layout,
+    termsText: definition.termsText,
+    bankText: definition.bankText,
+    stampUrl: null,
+    signatureUrl: null,
+    frozen: false,
+  };
 }
 
 /**

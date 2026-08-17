@@ -12,6 +12,7 @@ class CreditNoteResource extends JsonResource
     {
         return [
             'id'                  => $this->id,
+            'branch_id'           => $this->branch_id,
             'number'              => $this->number,
             'type'                => $this->type,
             'partner_id'          => $this->partner_id,
