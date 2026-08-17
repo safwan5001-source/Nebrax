@@ -68,10 +68,9 @@ export default function QuoteDetailPage() {
       .then(async (r) => {
         setQuote(r.data);
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, m, legacy, live] = await Promise.allSettled([
+        const [p, m, live] = await Promise.allSettled([
           api<{ data: QuoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: QuoteCompany }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
           api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=quotation&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
@@ -85,26 +84,12 @@ export default function QuoteDetailPage() {
           setFooterText(resolved.footerText);
           setShowLogo(resolved.showLogo);
           setLogoUrl(null);
-          setLogoHeight(null);
+          setLogoHeight(resolved.logoHeight);
           setLayout(resolved.layout);
           setTermsText(resolved.termsText);
           setBankText(resolved.bankText);
-          setStampUrl(null);
-          setSignatureUrl(null);
-        } else if (legacy.status === 'fulfilled') {
-          // لا يتجمد عرض السعر تجارياً؛ هذا رجوع توافق صريح لا تعريف حي جزئي.
-          const dg = legacy.value.data ?? {};
-          setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
-          if (dg.theme) setThemeId(dg.theme as ThemeId);
-          setFooterText(dg.footer_text ?? null);
-          setShowLogo(dg.show_logo !== false);
-          setLogoUrl(dg.logo ?? null);
-          setLogoHeight(dg.logo_height ?? null);
-          setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
-          setTermsText(dg.terms_text ?? null);
-          setBankText(dg.bank_text ?? null);
-          setStampUrl(dg.stamp ?? null);
-          setSignatureUrl(dg.signature ?? null);
+          setStampUrl(resolved.stampUrl);
+          setSignatureUrl(resolved.signatureUrl);
         }
       })
       .finally(() => setLoading(false));

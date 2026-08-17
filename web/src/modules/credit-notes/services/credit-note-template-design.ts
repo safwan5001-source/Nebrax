@@ -55,7 +55,8 @@ function validLayout(value: DocSectionLayoutItem[] | undefined): DocSectionLayou
   return Array.isArray(value) && value.length > 0 ? value : null;
 }
 
-/** يحول تعريف المنصة الحي إلى عقد العارض، بلا صور محلية لا يحفظها العقد الحديث. */
+/** يحول تعريف المنصة الحي إلى عقد العارض، بما في ذلك خصائص الهوية المهاجرة
+ * التي تحفظها المراجعة الحديثة نفسها ولا تحتاج إلى endpoint التوافق. */
 export function resolveLiveCreditNoteTemplateDesign(
   definition: ResolvedLiveTemplate | null | undefined,
 ): ResolvedCreditNoteTemplateDesign | null {
@@ -67,12 +68,12 @@ export function resolveLiveCreditNoteTemplateDesign(
     footerText: definition.footerText,
     showLogo: definition.showLogo,
     logoUrl: null,
-    logoHeight: null,
+    logoHeight: definition.logoHeight,
     layout: definition.layout,
     termsText: definition.termsText,
     bankText: definition.bankText,
-    stampUrl: null,
-    signatureUrl: null,
+    stampUrl: definition.stampUrl ?? null,
+    signatureUrl: definition.signatureUrl ?? null,
     frozen: false,
   };
 }

@@ -21,7 +21,6 @@ import {
   resolveCreditNoteTemplateDesign,
   resolveLiveCreditNoteTemplateDesign,
   type CreditNoteTemplateDefinition,
-  type LegacyCreditNoteDesign,
 } from '@/modules/credit-notes/services/credit-note-template-design';
 import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
 import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
@@ -73,10 +72,9 @@ export default function CreditNoteDetailPage() {
         setNote(r.data);
         const documentType = r.data.type === 'purchase' ? 'debit_note' : 'credit_note';
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, m, legacy, live] = await Promise.allSettled([
+        const [p, m, live] = await Promise.allSettled([
           api<{ data: CreditNoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: CreditNoteCompany }>(`/me`),
-          api<{ data: LegacyCreditNoteDesign }>(`/sales-config/designs`),
           api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=${documentType}&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
@@ -92,10 +90,7 @@ export default function CreditNoteDetailPage() {
         setDesign(
           frozen
             ? resolveCreditNoteTemplateDesign(frozen, null)
-            : liveDesign ?? resolveCreditNoteTemplateDesign(
-              null,
-              legacy.status === 'fulfilled' ? legacy.value.data : null,
-            ),
+            : liveDesign ?? resolveCreditNoteTemplateDesign(null, null),
         );
       })
       .finally(() => setLoading(false));
