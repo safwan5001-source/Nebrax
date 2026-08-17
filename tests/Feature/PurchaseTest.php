@@ -119,11 +119,13 @@ class PurchaseTest extends TestCase
         ], null);
         $template = $templates->publish($template);
         $revisionId = $template->published_revision_id;
-        $templates->assign([
-            'document_type' => 'purchase_invoice',
-            'usage' => 'print',
-            'print_template_revision_id' => $revisionId,
-        ], null);
+        foreach (['print', 'pdf'] as $usage) {
+            $templates->assign([
+                'document_type' => 'purchase_invoice',
+                'usage' => $usage,
+                'print_template_revision_id' => $revisionId,
+            ], null);
+        }
 
         $purchase = $this->purchases->create(
             ['partner_id' => $this->supplier->id, 'payment_type' => 'credit'],
@@ -131,15 +133,18 @@ class PurchaseTest extends TestCase
         );
         $posted = $this->purchases->post($purchase);
         $this->assertSame($revisionId, $posted->print_template_revision_id);
+        $this->assertSame($revisionId, $posted->pdf_template_revision_id);
 
         $templates->updateDraft($template, [
             'definition' => ['template_id' => 'purchase-v2'],
         ], null);
         $templates->publish($template);
 
-        $frozen = Purchase::with('printTemplateRevision')->findOrFail($posted->id);
+        $frozen = Purchase::with(['printTemplateRevision', 'pdfTemplateRevision'])->findOrFail($posted->id);
         $this->assertSame($revisionId, $frozen->print_template_revision_id);
         $this->assertSame('purchase-v1', $frozen->printTemplateRevision?->definition['template_id']);
+        $this->assertSame($revisionId, $frozen->pdf_template_revision_id);
+        $this->assertSame('purchase-v1', $frozen->pdfTemplateRevision?->definition['template_id']);
     }
 
     /** @test */

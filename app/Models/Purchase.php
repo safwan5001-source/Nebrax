@@ -27,7 +27,7 @@ class Purchase extends BaseModel
         'discount', 'shipping', 'adjustment',
         'paid_amount', 'payment_status', 'paid_on_post', 'payment_method',
         'received_status', 'received_date',
-        'notes', 'journal_entry_id', 'print_template_revision_id', 'created_by',
+        'notes', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'created_by',
     ];
 
     protected $casts = [
@@ -75,6 +75,12 @@ class Purchase extends BaseModel
     public function printTemplateRevision(): BelongsTo
     {
         return $this->belongsTo(PrintTemplateRevision::class, 'print_template_revision_id');
+    }
+
+    /** المرجع التاريخي للمراجعة المختارة لإخراج PDF. */
+    public function pdfTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'pdf_template_revision_id');
     }
 
     public function isDraft(): bool

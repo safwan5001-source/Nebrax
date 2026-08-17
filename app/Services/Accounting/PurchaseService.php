@@ -446,10 +446,12 @@ class PurchaseService
             // تحل المراجعة المنشورة داخل معاملة الترحيل وتُثبت على الفاتورة؛
             // تعديل التعيين أو نشر نسخة أحدث لاحقاً لا يغير مستنداً صدر بالفعل.
             $printAssignment = $this->printTemplates->resolve('purchase_invoice', 'print', $purchase->branch_id);
+            $pdfAssignment = $this->printTemplates->resolve('purchase_invoice', 'pdf', $purchase->branch_id);
 
             $purchase->update([
                 'status'           => 'posted',
                 'print_template_revision_id' => $printAssignment?->print_template_revision_id,
+                'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
                 'subtotal'         => $subtotal,
                 'tax_amount'       => $taxTotal,
                 'total'            => $total,

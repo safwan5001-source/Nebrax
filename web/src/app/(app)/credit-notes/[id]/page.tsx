@@ -22,6 +22,7 @@ import {
   type CreditNoteTemplateDefinition,
   type LegacyCreditNoteDesign,
 } from '@/modules/credit-notes/services/credit-note-template-design';
+import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
 interface FrozenPrintTemplateRevision {
@@ -36,6 +37,8 @@ interface CreditNote {
   note_date: string; subtotal: string; tax_amount: string; total: string; reason: string | null; lines: Line[];
   print_template_revision_id?: string | null;
   print_template_revision?: FrozenPrintTemplateRevision | null;
+  pdf_template_revision_id?: string | null;
+  pdf_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
@@ -115,6 +118,13 @@ export default function CreditNoteDetailPage() {
 
   const paperId = getTemplate(design.templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+  const frozenPdfDefinition = resolveFrozenOutputDefinition(
+    note.pdf_template_revision,
+    note.print_template_revision,
+  );
+  const pdfDesign = frozenPdfDefinition
+    ? resolveCreditNoteTemplateDesign(frozenPdfDefinition, null)
+    : design;
 
   async function createPdf() {
     if (!note) throw new Error('Credit note unavailable');
@@ -130,8 +140,8 @@ export default function CreditNoteDetailPage() {
       },
       company,
       party: customer,
-      logoUrl: design.logoUrl,
-      footerText: design.footerText,
+      logoUrl: pdfDesign.logoUrl,
+      footerText: pdfDesign.footerText,
       documentMeta: [
         [t('date'), note.note_date],
         [t('refund_type'), refundType],

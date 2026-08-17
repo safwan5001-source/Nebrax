@@ -25,7 +25,7 @@ class Payment extends BaseModel
         'branch_id',
         'tenant_id', 'number', 'partner_id', 'invoice_id',
         'direction', 'method', 'reference', 'cash_account_id', 'payment_date', 'amount',
-        'status', 'notes', 'journal_entry_id', 'print_template_revision_id', 'created_by',
+        'status', 'notes', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'created_by',
     ];
 
     protected $casts = [
@@ -66,6 +66,12 @@ class Payment extends BaseModel
     public function printTemplateRevision(): BelongsTo
     {
         return $this->belongsTo(PrintTemplateRevision::class, 'print_template_revision_id');
+    }
+
+    /** المرجع التاريخي للمراجعة المختارة لإخراج PDF. */
+    public function pdfTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'pdf_template_revision_id');
     }
 
     public function allocations(): HasMany

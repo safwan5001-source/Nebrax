@@ -430,10 +430,12 @@ class InvoiceService
             // تُحل المراجعة داخل معاملة الترحيل وتُخزَّن لقطةً؛ لا تغيّر
             // تعيينات الفرع أو القالب لاحقاً إعادة طباعة فاتورة صدرت بالفعل.
             $printAssignment = $this->printTemplates->resolve('tax_invoice', 'print', $invoice->branch_id);
+            $pdfAssignment = $this->printTemplates->resolve('tax_invoice', 'pdf', $invoice->branch_id);
 
             $invoice->update([
                 'status'              => 'posted',
                 'print_template_revision_id' => $printAssignment?->print_template_revision_id,
+                'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
                 'subtotal'            => $subtotal,
                 'discount'            => $discount,
                 'shipping'            => $shipping,

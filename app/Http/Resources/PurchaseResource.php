@@ -35,6 +35,8 @@ class PurchaseResource extends JsonResource
             'due_date'            => optional($this->due_date)->toDateString(),
             'print_template_revision_id' => $this->print_template_revision_id,
             'print_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('printTemplateRevision')),
+            'pdf_template_revision_id' => $this->pdf_template_revision_id,
+            'pdf_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('pdfTemplateRevision')),
             'remaining'           => Money::toRiyal($this->remaining()),
             'lines'               => InvoiceLineResource::collection($this->whenLoaded('lines')),
         ];

@@ -40,6 +40,8 @@ export interface PaymentPdfInput {
   company: SourceCompany | null;
   partner: SourceCustomer | null;
   logoUrl?: string | null;
+  /** تذييل مراجعة PDF المثبتة وقت ترحيل السند، إن وُجد. */
+  footerText?: string | null;
   labels: PaymentPdfLabels;
   locale: string;
 }
@@ -258,7 +260,7 @@ export async function createPaymentPdf(input: PaymentPdfInput): Promise<Blob> {
     const footerY = PAGE.height - 12;
     pdf.setDrawColor(203, 213, 225);
     pdf.line(left, footerY - 5, right, footerY - 5);
-    writeArabicRight(pdf, input.labels.footer, right, footerY + 0.5, 6.3);
+    writeArabicRight(pdf, input.footerText?.trim() || input.labels.footer, right, footerY + 0.5, 6.3);
     writeLatinCenter(pdf, `${page} / ${pages}`, PAGE.width / 2, footerY + 0.5, 6.7);
   }
 

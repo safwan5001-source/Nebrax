@@ -19,6 +19,7 @@ import { exportXlsx } from '@/lib/xlsx';
 import { createPurchaseInvoicePdf, downloadPurchaseInvoicePdf, sharePurchaseInvoicePdf } from '@/modules/purchases/services/purchase-pdf';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
+import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
 
 interface FrozenPrintTemplateRevision {
   id: string;
@@ -50,6 +51,8 @@ interface Purchase {
   lines: DocLine[];
   print_template_revision_id?: string | null;
   print_template_revision?: FrozenPrintTemplateRevision | null;
+  pdf_template_revision_id?: string | null;
+  pdf_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
@@ -123,7 +126,12 @@ export default function PurchaseDetailPage() {
   const isDraft = purchase.status === 'draft';
   const receivedStatusKey = receiptKey(purchase.received_status);
   const receivedStatusLabel = tpp(`received_${receivedStatusKey}`);
-  const frozenFooter = purchase.print_template_revision?.definition.footer_text ?? null;
+  const frozenPrintFooter = purchase.print_template_revision?.definition.footer_text ?? null;
+  const frozenPdfDefinition = resolveFrozenOutputDefinition(
+    purchase.pdf_template_revision,
+    purchase.print_template_revision,
+  );
+  const frozenPdfFooter = frozenPdfDefinition?.footer_text ?? null;
 
   /**
    * الخصم والشحن والتسوية كانت تُحذَف من المستند المطبوع، فيقرأ المورّد
@@ -149,7 +157,7 @@ export default function PurchaseDetailPage() {
     company,
     supplier,
     adjustments,
-    footerText: frozenFooter,
+    footerText: frozenPdfFooter,
     locale,
     labels: {
       title: tpp('title'), titleSecondary: tpp('title_secondary'), seller: tpp('buyer'), billTo: tpp('supplier'),
@@ -343,7 +351,7 @@ export default function PurchaseDetailPage() {
             adjustments={adjustments}
             tax={purchase.tax_amount}
             total={purchase.total}
-            footerText={frozenFooter}
+            footerText={frozenPrintFooter}
           />
         </DocumentScaler>
       </div>

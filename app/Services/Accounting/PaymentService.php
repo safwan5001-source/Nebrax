@@ -214,10 +214,12 @@ class PaymentService
             // لا يؤدي نشر مراجعة أحدث لاحقاً إلى إعادة تفسير سندٍ صدر بالفعل.
             $documentType = $payment->direction === 'received' ? 'receipt_voucher' : 'payment_voucher';
             $printAssignment = $this->printTemplates->resolve($documentType, 'print', $payment->branch_id);
+            $pdfAssignment = $this->printTemplates->resolve($documentType, 'pdf', $payment->branch_id);
 
             $payment->update([
                 'status'           => 'posted',
                 'print_template_revision_id' => $printAssignment?->print_template_revision_id,
+                'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
                 'journal_entry_id' => $entry->id,
             ]);
 
