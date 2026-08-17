@@ -41,7 +41,7 @@ class InvoiceController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        return (new InvoiceResource(Invoice::with(['lines', 'printTemplateRevision', 'pdfTemplateRevision'])->findOrFail($id)))->response();
+        return (new InvoiceResource(Invoice::with(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])->findOrFail($id)))->response();
     }
 
     /**
@@ -80,7 +80,7 @@ class InvoiceController extends ApiController
         $invoice = Invoice::findOrFail($id);
         $posted = $this->domain(fn () => $this->invoices->post($invoice));
 
-        return (new InvoiceResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision'])))->response();
+        return (new InvoiceResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
     }
 
     public function zatca(string $id): JsonResponse

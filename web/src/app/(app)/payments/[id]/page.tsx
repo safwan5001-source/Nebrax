@@ -42,6 +42,8 @@ interface Payment extends PaymentDoc {
   print_template_revision?: FrozenPrintTemplateRevision | null;
   pdf_template_revision_id?: string | null;
   pdf_template_revision?: FrozenPrintTemplateRevision | null;
+  thermal_template_revision_id?: string | null;
+  thermal_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = {
@@ -166,6 +168,14 @@ export default function PaymentDetailPage() {
     payment.pdf_template_revision,
     payment.print_template_revision,
   );
+  const frozenThermalDefinition = payment.thermal_template_revision?.definition ?? null;
+  const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
+  const thermalPaperId = thermalTemplateId
+    ? getTemplate(thermalTemplateId).supportedPaper.find((candidate) => candidate.startsWith('thermal_'))
+    : null;
+  const thermalPaper = thermalPaperId
+    ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
+    : null;
 
   async function createPdf() {
     if (!payment) throw new Error('Payment unavailable');
@@ -250,10 +260,16 @@ export default function PaymentDetailPage() {
             <Share2 className="h-4 w-4" strokeWidth={1.7} />
             {busy === 'share' ? t('generating') : t('share')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={!!busy}>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'print-root')} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
+          {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+            <Button variant="outline" size="sm" onClick={() => printDocument(thermalPaper, 'thermal-print-root')} disabled={!!busy}>
+              <Printer className="h-4 w-4" strokeWidth={1.7} />
+              {tPrint('thermal_print')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -325,6 +341,19 @@ export default function PaymentDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+        <PaymentDocument
+          payment={paymentDoc}
+          company={company}
+          partner={partner}
+          templateId={thermalTemplateId}
+          themeId={frozenThermalDefinition.theme_id ?? null}
+          footerText={frozenThermalDefinition.footer_text ?? null}
+          showLogo={frozenThermalDefinition.show_logo !== false}
+          rootId="thermal-print-root"
+        />
+      )}
     </div>
   );
 }

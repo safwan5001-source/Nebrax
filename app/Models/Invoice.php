@@ -30,7 +30,7 @@ class Invoice extends BaseModel
         'is_paid', 'payment_method', 'payment_reference', 'cash_account_id',
         'notes', 'journal_entry_id', 'cogs_entry_id', 'created_by',
         'zatca_qr', 'zatca_hash',
-        'zatca_uuid', 'zatca_icv', 'zatca_previous_hash', 'zatca_xml', 'print_template_revision_id', 'pdf_template_revision_id',
+        'zatca_uuid', 'zatca_icv', 'zatca_previous_hash', 'zatca_xml', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id',
     ];
 
     protected $casts = [
@@ -95,6 +95,12 @@ class Invoice extends BaseModel
     public function pdfTemplateRevision(): BelongsTo
     {
         return $this->belongsTo(PrintTemplateRevision::class, 'pdf_template_revision_id');
+    }
+
+    /** مراجعة الطباعة الحرارية المثبتة؛ لا تحل تعييناً حياً وقت إعادة الطباعة. */
+    public function thermalTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'thermal_template_revision_id');
     }
 
     public function isDraft(): bool

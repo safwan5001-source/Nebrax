@@ -41,8 +41,18 @@ const PRINT_PAGE_STYLE_ID = 'nebrax-doc-print-page';
  * طباعة عبر المتصفح (نفس القالب المرئي). عند تمرير حجم ورق يُحقن `@page` مؤقّتاً
  * ليطبع بالمقاس الصحيح (A4 أو 58/80mm حراري بارتفاع مفتوح).
  */
-export function printDocument(paper?: PdfPaper): void {
+export function printDocument(paper?: PdfPaper, targetId = 'print-root'): void {
   if (typeof window === 'undefined') return;
+
+  // لا تطبع العملية إلا الجذر المطلوب؛ تتناوب معاينة A4 والإيصال الحراري في
+  // الصفحة نفسها، ولذلك لا يكفي الاعتماد على معرّف ثابت واحد.
+  document.querySelectorAll('[data-print-target]').forEach((element) => {
+    element.removeAttribute('data-print-target');
+  });
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  target.setAttribute('data-print-target', '');
+
   document.getElementById(PRINT_PAGE_STYLE_ID)?.remove();
   if (paper) {
     const style = document.createElement('style');
@@ -53,5 +63,9 @@ export function printDocument(paper?: PdfPaper): void {
         : `@media print { @page { size: ${paper.widthMm}mm auto; margin: 4mm; } }`;
     document.head.appendChild(style);
   }
+  window.addEventListener('afterprint', () => {
+    target.removeAttribute('data-print-target');
+    document.getElementById(PRINT_PAGE_STYLE_ID)?.remove();
+  }, { once: true });
   window.print();
 }

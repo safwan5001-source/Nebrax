@@ -44,6 +44,13 @@ class InvoiceResource extends JsonResource
                 'definition' => $this->pdfTemplateRevision->definition,
                 'document_types' => $this->pdfTemplateRevision->document_types,
             ]),
+            'thermal_template_revision_id' => $this->thermal_template_revision_id,
+            'thermal_template_revision' => $this->whenLoaded('thermalTemplateRevision', fn () => [
+                'id' => $this->thermalTemplateRevision->id,
+                'version' => $this->thermalTemplateRevision->version,
+                'definition' => $this->thermalTemplateRevision->definition,
+                'document_types' => $this->thermalTemplateRevision->document_types,
+            ]),
             'subtotal'       => Money::toRiyal($this->subtotal),
             'discount'       => Money::toRiyal($this->discount),
             'shipping'       => Money::toRiyal($this->shipping),

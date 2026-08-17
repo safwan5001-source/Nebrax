@@ -472,6 +472,7 @@
     "due_date": "Valid until",
     "footer": "Document issued by Nebrax accounting system.",
     "preview": "Document preview",
+    "thermal_print": "Thermal print",
     "download_pdf": "Download PDF",
     "share_pdf": "Share PDF",
     "generating": "Generating…",

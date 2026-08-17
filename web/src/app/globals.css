@@ -66,6 +66,11 @@
   }
 }
 
+/* الإيصال الحراري يُرسم في الصفحة ليبقى مصدر طباعة مستقلاً، لكنه لا يظهر على الشاشة. */
+#thermal-print-root {
+  display: none;
+}
+
 /* عناصر تظهر عند الطباعة فقط (مستند PDF مخصّص كالفاتورة الضريبية) */
 .print-only {
   display: none;
@@ -85,15 +90,15 @@
     overflow: visible !important;
   }
 
-  /* عند وجود مستند طباعة مخصّص (#print-root): لا يُطبع سواه */
-  body:has(#print-root) * {
+  /* تُوسَم وجهة الطباعة لحظياً؛ فلا يُطبع مع الإيصال الحراري مستند A4 آخر. */
+  body:has([data-print-target]) * {
     visibility: hidden !important;
   }
-  #print-root,
-  #print-root * {
+  [data-print-target],
+  [data-print-target] * {
     visibility: visible !important;
   }
-  #print-root {
+  [data-print-target] {
     display: block !important;
     position: absolute;
     inset-inline: 0;
