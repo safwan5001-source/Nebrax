@@ -1,8 +1,13 @@
 'use client';
 
+/**
+ * أسلوب «دفتر التحليل»: التقرير على الشاشة يقدّم النطاق والنتيجة والصفوف القابلة
+ * للمس أولاً؛ أما مستند A4 فمسار معاينة مستقل. تبقى الجداول الكثيفة لسطح المكتب.
+ */
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Printer, Download, Info, Share2 } from 'lucide-react';
+import { Printer, Download, FileText, Info, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +23,7 @@ import { useToast } from '@/components/ui/toast';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
+import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader, type ReportMetric } from '@/components/reports/report-workspace-ui';
 
 export type ReportTab = 'trial' | 'income' | 'balance' | 'costcenter' | 'aging';
 type Tab = ReportTab;
@@ -92,6 +98,7 @@ export function ReportsWorkspace({
   // مرشّحات مشتركة: مدى تاريخي + فروع (فارغة = كل الفروع مجمّعة).
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_FILTERS);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -267,7 +274,7 @@ export function ReportsWorkspace({
     }
   }
 
-  async function handleSharePdf() {
+  async function handleShare() {
     if (!doc) return;
     setBusy('share');
     try {
@@ -280,32 +287,58 @@ export function ReportsWorkspace({
     }
   }
 
+  const scope = useMemo(() => {
+    const branchScope = filters.branchIds.length === 0
+      ? t('all_branches')
+      : t('branches_selected', { n: filters.branchIds.length });
+    const periodScope = !filters.from && !filters.to
+      ? t('all_periods')
+      : [filters.from || '…', filters.to || '…'].join(' ← ');
+    return `${branchScope} · ${periodScope}`;
+  }, [filters.branchIds, filters.from, filters.to, t]);
+
+  const metrics = useMemo<ReportMetric[]>(() => {
+    if (tab === 'trial' && trial) return [
+      { label: t('debit'), value: formatRiyal(trial.total_debit) },
+      { label: t('credit'), value: formatRiyal(trial.total_credit) },
+      { label: t('trial_balance'), value: trial.balanced ? t('balanced') : t('unbalanced'), tone: trial.balanced ? 'positive' : 'negative' },
+    ];
+    if (tab === 'income' && income) return [
+      { label: t('net_income'), value: formatRiyal(income.net_income), tone: Number(income.net_income) < 0 ? 'negative' : 'positive' },
+      { label: t('total_revenue'), value: formatRiyal(income.total_revenue), tone: 'positive' },
+      { label: t('total_expense'), value: formatRiyal(income.total_expense), tone: 'negative' },
+    ];
+    if (tab === 'balance' && balance) return [
+      { label: t('total_assets'), value: formatRiyal(balance.total_assets) },
+      { label: t('total_liabilities'), value: formatRiyal(balance.total_liabilities) },
+      { label: t('equity_and_income'), value: formatRiyal(balance.total_equity_and_income), tone: balance.balanced ? 'positive' : 'negative' },
+    ];
+    if (tab === 'costcenter' && cc) return [
+      { label: t('profit'), value: formatRiyal(cc.total_profit), tone: Number(cc.total_profit) < 0 ? 'negative' : 'positive' },
+      { label: t('revenue'), value: formatRiyal(cc.total_revenue), tone: 'positive' },
+      { label: t('expense'), value: formatRiyal(cc.total_expense), tone: 'negative' },
+    ];
+    if (tab === 'aging' && aging) return [
+      { label: t('total'), value: formatRiyal(aging.totals.total) },
+      { label: t('b90_plus'), value: formatRiyal(aging.totals.b90_plus), tone: Number(aging.totals.b90_plus) > 0 ? 'warning' : undefined },
+    ];
+    return [];
+  }, [aging, balance, cc, income, t, tab, trial]);
+
+  const actions = [
+    { id: 'csv', label: t('csv'), icon: Download, onSelect: exportCsv, disabled: !doc || !!busy },
+    { id: 'pdf', label: busy === 'pdf' ? tPrint('generating') : t('pdf'), icon: Download, onSelect: () => void handleDownloadPdf(), disabled: !doc || !!busy, busy: busy === 'pdf' },
+    { id: 'share', label: busy === 'share' ? tPrint('generating') : t('share_pdf'), icon: Share2, onSelect: () => void handleShare(), disabled: !doc || !!busy, busy: busy === 'share' },
+    { id: 'print', label: t('print'), icon: Printer, onSelect: () => printDocument({ widthMm: 210, heightMm: 297 }), disabled: !doc || !!busy },
+    { id: 'preview', label: t('preview'), icon: FileText, onSelect: () => setShowPreview((visible) => !visible), disabled: !doc },
+  ];
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-text">{heading ?? t('title')}</h1>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={exportCsv}>
-            <Download className="h-4 w-4" strokeWidth={1.7} />
-            {t('csv')}
-          </Button>
-          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={handleDownloadPdf}>
-            <Download className="h-4 w-4" strokeWidth={1.7} />
-            {busy === 'pdf' ? tPrint('generating') : t('pdf')}
-          </Button>
-          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={handleSharePdf}>
-            <Share2 className="h-4 w-4" strokeWidth={1.7} />
-            {busy === 'share' ? tPrint('generating') : t('share_pdf')}
-          </Button>
-          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={() => printDocument({ widthMm: 210, heightMm: 297 })}>
-            <Printer className="h-4 w-4" strokeWidth={1.7} />
-            {t('print')}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ReportScreenHeader title={heading ?? t('title')} scope={scope} actions={actions} actionsLabel={t('report_actions')} />
 
       {allowedTabs.length > 1 && (
-        <div className="flex flex-wrap gap-1">
+        <div className="no-print -mx-1 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {allowedTabs.includes('trial') && (
             <Button variant={tab === 'trial' ? 'primary' : 'outline'} size="sm" onClick={() => setTab('trial')}>
               {t('trial_balance')}
@@ -336,6 +369,8 @@ export function ReportsWorkspace({
 
       <ReportFilters value={filters} onChange={setFilters} />
 
+      <ReportMetricGrid metrics={metrics} />
+
       {tab === 'trial' ? (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -350,7 +385,9 @@ export function ReportsWorkspace({
             {loading || !trial ? (
               <Skeleton className="h-40 w-full" />
             ) : (
-              <Table>
+              <>
+              <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={1} secondaryIndex={0} />
+              <Table className="hidden md:table">
                 <THead>
                   <TR>
                     <TH>{t('code')}</TH>
@@ -370,12 +407,13 @@ export function ReportsWorkspace({
                   ))}
                   <TR className="font-semibold">
                     <TD />
-                    <TD>{t('total')}</TD>
-                    <TD className="num text-end">{formatRiyal(trial.total_debit)}</TD>
-                    <TD className="num text-end">{formatRiyal(trial.total_credit)}</TD>
-                  </TR>
-                </TBody>
+                      <TD>{t('total')}</TD>
+                      <TD className="num text-end">{formatRiyal(trial.total_debit)}</TD>
+                      <TD className="num text-end">{formatRiyal(trial.total_credit)}</TD>
+                    </TR>
+                  </TBody>
               </Table>
+              </>
             )}
           </CardContent>
         </Card>
@@ -393,7 +431,9 @@ export function ReportsWorkspace({
             {loading || !income ? (
               <Skeleton className="h-40 w-full" />
             ) : (
-              <Table>
+              <>
+              <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={2} secondaryIndex={1} />
+              <Table className="hidden md:table">
                 <THead>
                   <TR>
                     <TH>{t('code')}</TH>
@@ -451,6 +491,7 @@ export function ReportsWorkspace({
                   </TR>
                 </TBody>
               </Table>
+              </>
             )}
 
             {/* عند التصفية بفرع: ما لا يخصّ أي فرع يُكشَف صراحةً، فلا تبدو
@@ -497,7 +538,8 @@ export function ReportsWorkspace({
               <Skeleton className="h-40 w-full" />
             ) : (
               <>
-                <Table>
+                <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={2} secondaryIndex={1} />
+                <Table className="hidden md:table">
                   <THead>
                     <TR>
                       <TH>{t('code')}</TH>
@@ -561,7 +603,9 @@ export function ReportsWorkspace({
             {loading || !cc ? (
               <Skeleton className="h-40 w-full" />
             ) : (
-              <Table>
+              <>
+              <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={1} secondaryIndex={0} />
+              <Table className="hidden md:table">
                 <THead>
                   <TR>
                     <TH>{t('code')}</TH>
@@ -596,6 +640,7 @@ export function ReportsWorkspace({
                   )}
                 </TBody>
               </Table>
+              </>
             )}
           </CardContent>
         </Card>
@@ -626,7 +671,9 @@ export function ReportsWorkspace({
             {loading || !aging ? (
               <Skeleton className="h-40 w-full" />
             ) : (
-              <Table>
+              <>
+              <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={0} />
+              <Table className="hidden md:table">
                 <THead>
                   <TR>
                     <TH>{t('partner')}</TH>
@@ -668,12 +715,13 @@ export function ReportsWorkspace({
                   )}
                 </TBody>
               </Table>
+              </>
             )}
           </CardContent>
         </Card>
       )}
 
-      {doc && (
+      {doc && showPreview && (
         <Card>
           <CardHeader className="no-print"><CardTitle>{t('preview')}</CardTitle></CardHeader>
           <CardContent className="print:p-0">

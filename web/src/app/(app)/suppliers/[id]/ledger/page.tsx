@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * أسلوب «دفتر التحليل»: حركة المورد تُعرض كنطاق ورصيد وحركات قابلة للبحث؛
+ * لا تتزاحم إجراءات التصدير مع تفاصيل الحركة، والجوال يعتمد البطاقات المشتركة.
+ */
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -17,6 +22,7 @@ import { exportXlsx } from '@/lib/xlsx';
 import { api } from '@/lib/api';
 import { useCompany } from '@/lib/company';
 import { formatRiyal } from '@/lib/money';
+import { ReportMetricGrid, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
 
 interface Supplier {
   id: string;
@@ -181,6 +187,17 @@ export default function SupplierLedgerPage() {
     return routes[source.kind];
   };
   const allocationHref = (allocation: NonNullable<StatementRow['source']>['allocations'][number]) => allocation.kind === 'purchase' ? `/purchases/${allocation.id}` : undefined;
+  const scope = useMemo(() => {
+    const period = !filters.from && !filters.to ? ts('all_periods') : [filters.from || '…', filters.to || '…'].join(' ← ');
+    const branches = filters.branchIds.length === 0 ? ts('all_branches') : ts('branches_selected', { count: filters.branchIds.length });
+    return `${branches} · ${period}`;
+  }, [filters.branchIds, filters.from, filters.to, ts]);
+  const actions = [
+    { id: 'xlsx', label: busy === 'xlsx' ? t('generating') : t('export_excel'), icon: FileSpreadsheet, onSelect: () => void handleXlsx(), disabled: !!busy, busy: busy === 'xlsx' },
+    { id: 'pdf', label: busy === 'pdf' ? t('generating') : t('download_pdf'), icon: Download, onSelect: () => void handlePdf(), disabled: !!busy, busy: busy === 'pdf' },
+    { id: 'share', label: busy === 'share' ? t('generating') : t('share_pdf'), icon: Share2, onSelect: () => void handleShare(), disabled: !!busy, busy: busy === 'share' },
+    { id: 'print', label: t('print'), icon: Printer, onSelect: () => printDocument(A4), disabled: !!busy },
+  ];
 
   if (loading && !statement) return <div className="space-y-4"><Skeleton className="h-9 w-64" /><Skeleton className="h-16 w-full" /><Skeleton className="h-[560px] w-full" /></div>;
 
@@ -189,22 +206,22 @@ export default function SupplierLedgerPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="space-y-5">
+      <div className="no-print flex items-center gap-3">
         <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/suppliers')} aria-label={t('back_to_supplier')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button>
-        <div className="min-w-0"><p className="text-xs text-muted">{supplier.name}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1></div>
-        <div className="no-print ms-auto flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void handleXlsx()} disabled={!!busy}><FileSpreadsheet className="h-4 w-4" strokeWidth={1.7} />{busy === 'xlsx' ? t('generating') : t('export_excel')}</Button>
-          <Button variant="outline" size="sm" onClick={() => void handlePdf()} disabled={!!busy}><Download className="h-4 w-4" strokeWidth={1.7} />{busy === 'pdf' ? t('generating') : t('download_pdf')}</Button>
-          <Button variant="outline" size="sm" onClick={() => void handleShare()} disabled={!!busy}><Share2 className="h-4 w-4" strokeWidth={1.7} />{busy === 'share' ? t('generating') : t('share_pdf')}</Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(A4)} disabled={!!busy}><Printer className="h-4 w-4" strokeWidth={1.7} />{t('print')}</Button>
-        </div>
       </div>
+
+      <ReportScreenHeader title={t('title')} description={supplier.name} scope={scope} actions={actions} actionsLabel={ts('report_actions')} />
 
       <ReportFilters value={filters} onChange={setFilters} />
 
+      <ReportMetricGrid metrics={[
+        { label: ts('opening_balance'), value: formatRiyal(statement.opening_balance) },
+        { label: ts('closing_credit_balance'), value: formatRiyal(statement.closing_balance) },
+      ]} />
+
       <Card>
-        <CardHeader className="no-print"><CardTitle>{t('preview')}</CardTitle><p className="mt-1 text-xs text-muted">{t('preview_hint')}</p></CardHeader>
+        <CardHeader className="no-print"><CardTitle>{ts('entries')}</CardTitle><p className="mt-1 text-xs text-muted">{t('preview_hint')}</p></CardHeader>
         <CardContent className="space-y-3 print:p-0">
           <div className="no-print relative"><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" strokeWidth={1.7} /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('search')} aria-label={t('search')} className="h-10 ps-9" /></div>
           <div id="print-root" className="overflow-x-auto bg-surface"><div className="print-only border-b border-border px-6 py-5"><p className="text-xs text-muted">{supplier.name}</p><h2 className="mt-1 text-xl font-bold text-text">{t('title')}</h2><p className="mt-1 text-xs text-muted">{t('generated_at')}: {new Date().toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-GB')}</p></div><LedgerTable opening={statement.opening_balance} rows={rows} sourceHref={sourceHref} allocationHref={allocationHref} creditBalance labels={{ date: ts('date'), number: ts('entry_number'), source: t('source'), description: ts('description'), settlement: t('settlement'), debit: ts('debit'), credit: ts('credit'), balance: ts('balance'), opening: ts('opening_balance'), empty: t('empty') }} /><p className="print-only border-t border-border px-6 py-3 text-xs text-muted">{t('footer')}</p></div>
