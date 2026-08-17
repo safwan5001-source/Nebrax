@@ -1309,6 +1309,55 @@ function purchasesReportFor(path: string) {
   return { view, data: periods, totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
 }
 
+// تقارير العملاء في وضع العرض: عقود مطابقة للـ API، لا استجابة افتراضية فارغة.
+function customersReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'sales';
+  const customer = query.get('customer_id') ?? 'p-customer-1';
+  const customers = [
+    { key: customer, label: 'شركة الروّاد', invoices: 7, amount: '38250.00', balance: '9450.00' },
+    { key: 'p-customer-2', label: 'مؤسسة المدى', invoices: 4, amount: '17400.00', balance: '2200.00' },
+  ];
+
+  if (view === 'balances') {
+    return {
+      view,
+      data: customers,
+      totals: { invoices: 11, amount: '55650.00', balance: '11650.00' },
+      scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_invoices' },
+    };
+  }
+  if (view === 'payments') {
+    return {
+      view,
+      data: [
+        { key: '2026-05', label: '2026-05', receipts: 5, amount: '14800.00' },
+        { key: '2026-06', label: '2026-06', receipts: 8, amount: '21400.00' },
+      ],
+      totals: { receipts: 13, amount: '36200.00' },
+      scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_receipts' },
+    };
+  }
+  if (view === 'appointments') {
+    return {
+      view,
+      data: [
+        { key: customer, label: 'شركة الروّاد', appointments: 4, scheduled: 2, done: 1, cancelled: 1 },
+        { key: 'p-customer-2', label: 'مؤسسة المدى', appointments: 3, scheduled: 1, done: 2, cancelled: 0 },
+      ],
+      totals: { appointments: 7, scheduled: 3, done: 3, cancelled: 1 },
+      scope: { interval: query.get('interval') ?? 'month', source: 'customer_appointments' },
+    };
+  }
+
+  return {
+    view: 'sales',
+    data: customers,
+    totals: { invoices: 11, amount: '55650.00', net_sales: '48391.30', tax: '7258.70' },
+    scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_invoices' },
+  };
+}
+
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
@@ -1433,6 +1482,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
 
   if (clean === '/reports/sales') return resolve(salesReportFor(path));
   if (clean === '/reports/purchases') return resolve(purchasesReportFor(path));
+  if (clean === '/reports/customers') return resolve(customersReportFor(path));
   if (clean === '/reports/income-statement') return resolve(incomeStatementFor(path));
   if (clean === '/reports/balance-sheet') return resolve(mockBalanceSheet);
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);

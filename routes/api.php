@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CostCenterController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\CrmActivityController;
+use App\Http\Controllers\Api\CustomerReportController;
 use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentRevisionController;
@@ -285,6 +286,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // تقارير المشتريات: فواتير شراء وسندات صرف مرحّلة فقط؛ لا أثر محاسبي جديد.
         Route::get('reports/purchases', [PurchaseReportController::class, 'show'])->middleware($perm('reports.view'));
         Route::get('reports/purchases/creators', [PurchaseReportController::class, 'creators'])->middleware($perm('reports.view'));
+        // تقارير العملاء: قراءة من الفواتير وسندات القبض والمواعيد، بلا أثر محاسبي جديد.
+        Route::get('reports/customers', [CustomerReportController::class, 'show'])->middleware($perm('reports.view'));
 
         // المرتجعات
         // سطور مستندٍ مصدر بكمياتها المتبقية للردّ — تسبق `returns/{id}` في
