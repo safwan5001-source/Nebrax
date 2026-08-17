@@ -50,6 +50,8 @@ interface FrozenPrintTemplateRevision {
     layout?: DocSectionLayoutItem[];
     terms_text?: string;
     bank_text?: string;
+    stamp?: string;
+    signature?: string;
   };
   document_types: string[];
 }
@@ -261,6 +263,8 @@ export default function InvoiceDetailPage() {
       customer,
       qrImage,
       logoUrl,
+      stampUrl: frozenPdfDefinition ? frozenPdfDefinition.stamp ?? null : stampUrl,
+      signatureUrl: frozenPdfDefinition ? frozenPdfDefinition.signature ?? null : signatureUrl,
       // المخرج المؤرشف حدّ تاريخي كامل: لا نملأ فراغه بإعداد حي أحدث.
       footerText: frozenPdfDefinition ? frozenPdfDefinition.footer_text ?? null : footerText,
       templateLayout: frozenPdfDefinition

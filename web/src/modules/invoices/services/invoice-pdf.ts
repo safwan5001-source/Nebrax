@@ -54,6 +54,9 @@ export interface InvoicePdfInput {
   qrImage?: string | null;
   /** شعار إعدادات التصميم له أولوية، ثم شعار هوية الشركة. */
   logoUrl?: string | null;
+  /** ختم وتوقيع المراجعة المثبتة؛ لا يُعاد حلهما من إعدادات حية عند التنزيل. */
+  stampUrl?: string | null;
+  signatureUrl?: string | null;
   /** تذييل المراجعة المثبتة عند إصدار المستند؛ لا يُعاد قراءته من الإعدادات الحية. */
   footerText?: string | null;
   /** تخطيط مراجعة المخرج المثبتة؛ يزوّد PDF بخصائص الكتل نفسها التي يستهلكها العارض. */
@@ -175,6 +178,24 @@ function pdfAlignment(alignment: DocBlockAlignment): 'left' | 'center' | 'right'
   return alignments[alignment];
 }
 
+async function toPdfImage(source: string | null | undefined): Promise<string | null> {
+  if (!source) return null;
+  if (source.startsWith('data:image/')) return source;
+  try {
+    const response = await fetch(source);
+    const blob = await response.blob();
+    if (!response.ok || !blob.type.startsWith('image/')) return null;
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 function drawLogo(pdf: PdfDoc, logo: string | null | undefined, x: number, y: number, maxWidth: number, maxHeight: number): boolean {
   if (!logo?.startsWith('data:image/')) return false;
   try {
@@ -201,7 +222,10 @@ function drawLogo(pdf: PdfDoc, logo: string | null | undefined, x: number, y: nu
  * في PDF، ولا تتأثر بنتيجة html2canvas أو اختلاف أبعاد شاشة المصدر.
  */
 export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
-  const [{ jsPDF }, fontData] = await Promise.all([import('jspdf'), arabicFontData()]);
+  const logoSource = input.logoUrl?.trim() ? input.logoUrl : input.company?.logo;
+  const [{ jsPDF }, fontData, logo, stamp, signature] = await Promise.all([
+    import('jspdf'), arabicFontData(), toPdfImage(logoSource), toPdfImage(input.stampUrl), toPdfImage(input.signatureUrl),
+  ]);
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', putOnlyUsedFonts: true }) as ArabicPdfDoc;
   pdf.addFileToVFS(FONT_FILE, fontData);
   pdf.addFont(FONT_FILE, FONT_FAMILY, 'normal');
@@ -209,7 +233,6 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
 
   const right = PAGE.width - PAGE.margin;
   const left = PAGE.margin;
-  const logo = input.logoUrl?.trim() ? input.logoUrl : input.company?.logo;
   const generated = new Intl.DateTimeFormat('en-GB', {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date()).replace(',', '');
@@ -284,6 +307,8 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   const termsProperties = blockProperties(input.templateLayout, 'terms');
   const bankProperties = blockProperties(input.templateLayout, 'bank');
   const footerProperties = blockProperties(input.templateLayout, 'footer');
+  const stampBlock = layoutBlock(input.templateLayout, 'stamp');
+  const signatureBlock = layoutBlock(input.templateLayout, 'signature');
   const termsContent = resolvePdfBlockContent(input.templateLayout, 'terms', input.termsText);
   const bankContent = resolvePdfBlockContent(input.templateLayout, 'bank', input.bankText);
   const columnLabels: Record<DocItemsColumnId, string> = {
@@ -465,6 +490,19 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
 
   drawContentBlock(input.labels.terms, termsContent, termsProperties);
   drawContentBlock(input.labels.bank, bankContent, bankProperties);
+
+  const assets = [
+    { image: stamp, visible: stampBlock?.visible === true },
+    { image: signature, visible: signatureBlock?.visible === true },
+  ].filter((asset): asset is { image: string; visible: true } => Boolean(asset.image) && asset.visible);
+  if (assets.length) {
+    if (y + 31 > contentBottom) { pdf.addPage(); drawHeader(true); }
+    const assetWidth = 32;
+    const gap = 8;
+    const startX = right - assets.length * assetWidth - (assets.length - 1) * gap;
+    assets.forEach((asset, index) => drawLogo(pdf, asset.image, startX + index * (assetWidth + gap), y, assetWidth, 24));
+    y += 29;
+  }
 
   const pages = pdf.getNumberOfPages();
   for (let page = 1; page <= pages; page += 1) {
