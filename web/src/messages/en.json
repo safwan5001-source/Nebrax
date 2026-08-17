@@ -922,21 +922,24 @@
   },
   "login": {
     "title": "Sign in",
-    "subtitle": "Access your organization account",
-    "slug": "Organization ID",
+    "subtitle": "Enter your account securely",
+    "slug": "Account ID",
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",
     "error": "Sign-in failed",
     "demo": "Demo login",
-    "demo_hint": "For review & design only",
+    "demo_hint": "Explore the experience before connecting your account",
     "back_home": "Back to home",
     "no_account": "Don't have an account?",
-    "register_link": "Create a new company",
+    "register_link": "Create a new account",
     "or": "or",
     "show_pw": "Show password",
     "hide_pw": "Hide password",
-    "required_hint": "Please fill the required fields correctly."
+    "required_hint": "Please fill the required fields correctly.",
+    "email_invalid": "Enter a valid email address.",
+    "password_invalid": "Enter your password to continue.",
+    "submitting": "Signing in…"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -1744,10 +1747,10 @@
     "save": "Save template"
   },
   "register": {
-    "title": "Create a new company",
-    "subtitle": "Get started with Nibras in minutes",
-    "company_name": "Company name",
-    "company_name_ph": "Nibras Trading Est.",
+    "title": "Create a new account",
+    "subtitle": "Set up your account and start accounting in minutes",
+    "company_name": "Account name",
+    "company_name_ph": "e.g. Nebrax account",
     "slug": "Login page",
     "slug_hint": "Letters, numbers and dashes only — you use it to sign in later.",
     "slug_invalid": "ID: letters/numbers/dashes only.",
@@ -1768,7 +1771,16 @@
     "hide_pw": "Hide password",
     "terms": "By creating an account you agree to the Terms and Privacy Policy.",
     "phone": "Mobile number",
-    "phone_invalid": "Enter a valid mobile number."
+    "phone_invalid": "Enter a valid Saudi mobile number starting with 5.",
+    "phone_country": "Saudi Arabia",
+    "email_invalid": "Enter a valid email address.",
+    "submitting": "Creating account…",
+    "field_required": "This field is required.",
+    "password_strength": "Password strength",
+    "strength_weak": "Weak",
+    "strength_fair": "Fair",
+    "strength_good": "Good",
+    "strength_strong": "Strong"
   },
   "reportDoc": {
     "vat_number": "VAT number",

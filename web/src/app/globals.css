@@ -14,6 +14,8 @@
   --positive: #16a34a;
   --negative: #dc2626;
   --warning: #d97706;
+  --flag-saudi: #006c35;
+  --flag-mark: #ffffff;
   --font-sans: var(--font-ibm-sans), 'IBM Plex Sans Arabic', system-ui, sans-serif;
   --font-mono: var(--font-ibm-mono), 'IBM Plex Mono', ui-monospace, monospace;
 }
@@ -30,6 +32,8 @@
   --positive: #16a34a;
   --negative: #dc2626;
   --warning: #d97706;
+  --flag-saudi: #006c35;
+  --flag-mark: #ffffff;
 }
 
 @layer base {
