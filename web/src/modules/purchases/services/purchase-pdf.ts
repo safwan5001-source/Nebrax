@@ -36,6 +36,9 @@ export async function createPurchaseInvoicePdf(input: {
   company: Company | null;
   supplier: Party | null;
   adjustments: DocAdjustment[];
+  /** الختم والتوقيع من مراجعة مخرج PDF المثبتة. */
+  stampUrl?: string | null;
+  signatureUrl?: string | null;
   /** تذييل مراجعة القالب المثبتة عند ترحيل الفاتورة. */
   footerText?: string | null;
   /** تخطيط مراجعة PDF المثبتة، ويشمل خصائص الكتل المتقدمة. */
@@ -77,6 +80,8 @@ export async function createPurchaseInvoicePdf(input: {
     company: input.company,
     customer: input.supplier,
     adjustments: input.adjustments,
+    stampUrl: input.stampUrl,
+    signatureUrl: input.signatureUrl,
     footerText: input.footerText,
     templateLayout: input.templateLayout,
     termsText: input.termsText,

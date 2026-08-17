@@ -184,6 +184,8 @@ export default function PurchaseDetailPage() {
     company,
     supplier,
     adjustments,
+    stampUrl: frozenPdfDefinition?.stamp ?? null,
+    signatureUrl: frozenPdfDefinition?.signature ?? null,
     footerText: frozenPdfFooter,
     templateLayout: Array.isArray(frozenPdfDefinition?.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : null,
     termsText: frozenPdfDefinition?.terms_text ?? null,

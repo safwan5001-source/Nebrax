@@ -161,6 +161,8 @@ export default function CreditNoteDetailPage() {
       company,
       party: customer,
       logoUrl: pdfDesign.logoUrl,
+      stampUrl: pdfDesign.stampUrl,
+      signatureUrl: pdfDesign.signatureUrl,
       footerText: pdfDesign.footerText,
       templateLayout: frozenPdfDefinition
         ? (Array.isArray(frozenPdfDefinition.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : null)

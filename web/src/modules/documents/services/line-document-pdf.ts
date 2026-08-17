@@ -35,6 +35,9 @@ export interface LineDocumentPdfInput {
   company: SourceCompany | null;
   party: SourceCustomer | null;
   logoUrl?: string | null;
+  /** أصول الختم والتوقيع من مراجعة المخرج المثبتة أو القالب الحي قبل الإصدار. */
+  stampUrl?: string | null;
+  signatureUrl?: string | null;
   /** تذييل القالب المثبت وقت إصدار المستند، إن وُجد. */
   footerText?: string | null;
   /** تخطيط مراجعة PDF المثبتة؛ يمرّ إلى العارض المتجهي كما هو. */
@@ -68,6 +71,8 @@ export async function createLineDocumentPdf(input: LineDocumentPdfInput): Promis
     company: input.company,
     customer: input.party,
     logoUrl: input.logoUrl,
+    stampUrl: input.stampUrl,
+    signatureUrl: input.signatureUrl,
     footerText: input.footerText,
     templateLayout: input.templateLayout,
     termsText: input.termsText,
