@@ -69,11 +69,12 @@ const REPORT_CATEGORIES: ReportCategoryDefinition[] = [
     reports: [
       { key: 'supplierAging', href: '/reports/purchases/aging', icon: CalendarDays, status: 'ready' },
       { key: 'supplierStatement', href: '/suppliers', icon: BookOpen, status: 'ready' },
-      { key: 'purchasesBySupplier', icon: Users, status: 'soon' },
-      { key: 'purchasesByProduct', icon: Package, status: 'soon' },
-      { key: 'purchasesByEmployee', icon: Contact, status: 'soon' },
-      { key: 'supplierBalances', icon: WalletCards, status: 'soon' },
-      { key: 'supplierPaymentsByPeriod', icon: CalendarDays, status: 'soon' },
+      { key: 'purchasesByPeriod', href: '/reports/purchases/by-period', icon: BarChart3, status: 'ready' },
+      { key: 'purchasesBySupplier', href: '/reports/purchases/by-supplier', icon: Users, status: 'ready' },
+      { key: 'purchasesByProduct', href: '/reports/purchases/by-product', icon: Package, status: 'ready' },
+      { key: 'purchasesByEmployee', href: '/reports/purchases/by-employee', icon: Contact, status: 'ready' },
+      { key: 'supplierBalances', href: '/reports/purchases/balances', icon: WalletCards, status: 'ready' },
+      { key: 'supplierPaymentsByPeriod', href: '/reports/purchases/payments', icon: CalendarDays, status: 'ready' },
     ],
   },
   {
