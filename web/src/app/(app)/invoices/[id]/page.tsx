@@ -37,7 +37,15 @@ interface Line {
 interface FrozenPrintTemplateRevision {
   id: string;
   version: number;
-  definition: { template_id?: string; theme_id?: ThemeId; footer_text?: string; show_logo?: boolean; layout?: DocSectionLayoutItem[] };
+  definition: {
+    template_id?: string;
+    theme_id?: ThemeId;
+    footer_text?: string;
+    show_logo?: boolean;
+    layout?: DocSectionLayoutItem[];
+    terms_text?: string;
+    bank_text?: string;
+  };
   document_types: string[];
 }
 interface Invoice {
@@ -167,7 +175,7 @@ export default function InvoiceDetailPage() {
           setFooterText(frozen.footer_text ?? null);
           setShowLogo(frozen.show_logo !== false);
           setLayout(Array.isArray(frozen.layout) && frozen.layout.length ? frozen.layout : null);
-          setLogoUrl(null); setLogoHeight(null); setTermsText(null); setBankText(null); setStampUrl(null); setSignatureUrl(null);
+          setLogoUrl(null); setLogoHeight(null); setTermsText(frozen.terms_text ?? null); setBankText(frozen.bank_text ?? null); setStampUrl(null); setSignatureUrl(null);
         } else if (d.status === 'fulfilled') {
           const dg = d.value.data ?? {};
           setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
@@ -242,15 +250,21 @@ export default function InvoiceDetailPage() {
       customer,
       qrImage,
       logoUrl,
-      footerText: frozenPdfDefinition?.footer_text ?? footerText,
-      templateLayout: Array.isArray(frozenPdfDefinition?.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : layout,
+      // المخرج المؤرشف حدّ تاريخي كامل: لا نملأ فراغه بإعداد حي أحدث.
+      footerText: frozenPdfDefinition ? frozenPdfDefinition.footer_text ?? null : footerText,
+      templateLayout: frozenPdfDefinition
+        ? (Array.isArray(frozenPdfDefinition.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : null)
+        : layout,
+      termsText: frozenPdfDefinition ? frozenPdfDefinition.terms_text ?? null : termsText,
+      bankText: frozenPdfDefinition ? frozenPdfDefinition.bank_text ?? null : bankText,
       locale,
       labels: {
         title: td('title'), titleSecondary: td('title_en'), seller: td('seller'), billTo: td('bill_to'),
         invoiceNumber: td('number'), vatNumber: td('vat_number'), crNumber: td('cr_number'), city: td('city'),
         date: td('date'), paymentType: td('payment_type'), cash: td('cash'), credit: td('credit'),
         description: td('description'), quantity: td('qty'), unitPrice: td('unit_price'), tax: td('tax'), total: td('total'),
-        subtotal: td('subtotal'), vat: td('vat'), grandTotal: td('grand_total'), qrNote: td('zatca_note'), footer: td('footer'),
+        subtotal: td('subtotal'), vat: td('vat'), grandTotal: td('grand_total'), qrNote: td('zatca_note'),
+        terms: td('terms'), bank: td('bank'), footer: td('footer'),
       },
     });
   };
