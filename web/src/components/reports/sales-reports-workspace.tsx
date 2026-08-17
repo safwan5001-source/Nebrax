@@ -24,7 +24,7 @@ import { useToast } from '@/components/ui/toast';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
-import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
+import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader, type ReportMetric } from '@/components/reports/report-workspace-ui';
 
 export type SalesReportView = 'period' | 'customer' | 'product' | 'salesperson' | 'profit' | 'payments';
 
@@ -159,8 +159,8 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
     };
   }, [report, view, t, tr, count, percentage, rowLabel]);
 
-  const summary = useMemo(() => {
-    if (!report) return [] as { label: string; value: string; tone?: 'positive' | 'negative' }[];
+  const summary = useMemo<ReportMetric[]>(() => {
+    if (!report) return [];
     if (view === 'profit') return [
       { label: t('revenue'), value: formatRiyal(report.totals.revenue ?? '0') },
       { label: t('cogs'), value: formatRiyal(report.totals.cost ?? '0') },
