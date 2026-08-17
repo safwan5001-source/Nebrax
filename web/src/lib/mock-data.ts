@@ -1044,6 +1044,63 @@ export const mockCostCenterProfit = {
   total_profit: '150950.00',
 };
 
+// تقارير الحسابات العامة في وضع العرض: تطابق عقود Laravel الحقيقية كي يبقى
+// اختبار الواجهة التجريبية كاشفاً لانحراف العقد لا سبباً لانهيار وقت التشغيل.
+export const mockCashFlow = {
+  operating: {
+    inflows: '38250.00', outflows: '14400.00', net: '23850.00',
+    entries: [
+      { date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', inflow: '5750.00', outflow: '0.00', net: '5750.00' },
+      { date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', inflow: '0.00', outflow: '6900.00', net: '-6900.00' },
+    ],
+  },
+  investing: {
+    inflows: '0.00', outflows: '45000.00', net: '-45000.00',
+    entries: [{ date: '2026-06-15', number: 'JRN-2026-0042', description: 'شراء معدات', inflow: '0.00', outflow: '45000.00', net: '-45000.00' }],
+  },
+  financing: {
+    inflows: '60000.00', outflows: '0.00', net: '60000.00',
+    entries: [{ date: '2026-06-01', number: 'JRN-2026-0038', description: 'ضخ رأس مال', inflow: '60000.00', outflow: '0.00', net: '60000.00' }],
+  },
+  net_cash_flow: '38850.00',
+};
+
+export const mockTaxReport = {
+  input_vat: '12150.00',
+  output_vat: '21300.00',
+  net_vat: '9150.00',
+  status: 'payable',
+};
+
+export const mockJournalEntries = {
+  rows: [
+    {
+      entry_id: 'jrn-51', date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', debit: '5750.00', credit: '5750.00',
+      lines: [
+        { account_id: 'a1120', account_code: '1120', account_name: 'البنك', description: null, debit: '5750.00', credit: '0.00' },
+        { account_id: 'a1130', account_code: '1130', account_name: 'العملاء (المدينون)', description: null, debit: '0.00', credit: '5750.00' },
+      ],
+    },
+    {
+      entry_id: 'jrn-49', date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', debit: '6900.00', credit: '6900.00',
+      lines: [
+        { account_id: 'a2110', account_code: '2110', account_name: 'الموردون (الدائنون)', description: null, debit: '6900.00', credit: '0.00' },
+        { account_id: 'a1110', account_code: '1110', account_name: 'الصندوق', description: null, debit: '0.00', credit: '6900.00' },
+      ],
+    },
+  ],
+  total_debit: '12650.00',
+  total_credit: '12650.00',
+};
+
+function accountLedgerFor(accountId: string) {
+  const account = mockAccounts.find((candidate) => candidate.id === accountId) ?? mockAccounts.find((candidate) => candidate.code === '1110')!;
+  const rows = account.code === '1120'
+    ? [{ date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', debit: '5750.00', credit: '0.00', balance: '163520.00' }]
+    : [{ date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', debit: '0.00', credit: '6900.00', balance: '54320.00' }];
+  return { account: { id: account.id, code: account.code, name: account.name }, opening_balance: account.code === '1120' ? '157770.00' : '61220.00', rows, closing_balance: rows[rows.length - 1].balance };
+}
+
 function agingFor(type: string) {
   if (type === 'payable') {
     return {
@@ -1380,6 +1437,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/reports/balance-sheet') return resolve(mockBalanceSheet);
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);
   if (clean === '/reports/cost-center-profitability') return resolve(mockCostCenterProfit);
+  if (clean === '/reports/cash-flow') return resolve(mockCashFlow);
+  if (clean === '/reports/tax-report') return resolve(mockTaxReport);
+  if (clean === '/reports/journal-entries') return resolve(mockJournalEntries);
+  const ledgerMatch = clean.match(/^\/reports\/account-ledger\/([^/]+)$/);
+  if (ledgerMatch) return resolve(accountLedgerFor(ledgerMatch[1]));
   const agingMatch = clean.match(/^\/reports\/aging\/([^/]+)$/);
   if (agingMatch) return resolve(agingFor(agingMatch[1]));
   const stmtMatch = clean.match(/^\/reports\/partner-statement\/([^/]+)$/);
