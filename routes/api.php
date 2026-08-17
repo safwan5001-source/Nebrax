@@ -159,9 +159,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('inventory-settings', [InventorySettingsController::class, 'show'])->middleware($perm('products.view'));
         Route::put('inventory-settings', [InventorySettingsController::class, 'update'])->middleware($perm('company.manage'));
 
-        // دليل الحسابات (قراءة)
+        // دليل الحسابات: إدارة شجرية بلا حذف؛ التعطيل يمنع الترحيل الجديد ويحفظ الأثر التاريخي.
         Route::get('accounts', [AccountController::class, 'index'])->middleware($perm('accounts.view'));
         Route::get('accounts/{id}', [AccountController::class, 'show'])->middleware($perm('accounts.view'));
+        Route::post('accounts', [AccountController::class, 'store'])->middleware($perm('accounts.manage'));
+        Route::put('accounts/{id}', [AccountController::class, 'update'])->middleware($perm('accounts.manage'));
 
         // المصروفات (مستند مالي؛ الترحيل يولّد قيداً متوازناً)
         Route::get('expenses', [ExpenseController::class, 'index'])->middleware($perm('expenses.view'));
