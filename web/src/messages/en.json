@@ -1780,7 +1780,189 @@
     "all_periods": "All periods",
     "date_range": "Date range",
     "apply": "Apply",
-    "today": "Today"
+    "today": "Today",
+    "catalog": {
+      "title": "Reports center",
+      "description": "Choose a category to access the reports currently available and the roadmap for reports that will be built next.",
+      "backToReports": "Back to reports center",
+      "reportCount": "{available} available of {total}",
+      "available": "Available now",
+      "soon": "Coming soon",
+      "open": "Open report",
+      "soonHint": "In development",
+      "categories": {
+        "sales": {
+          "title": "Sales reports",
+          "description": "Track revenue, invoices, payments, and sales profitability."
+        },
+        "purchases": {
+          "title": "Purchase reports",
+          "description": "Track purchases, suppliers, and outstanding payments."
+        },
+        "general": {
+          "title": "General ledger reports",
+          "description": "Financial statements, ledgers, and control reports."
+        },
+        "customers": {
+          "title": "Customer reports",
+          "description": "Track receivables, account statements, and customer relationships."
+        },
+        "inventory": {
+          "title": "Inventory reports",
+          "description": "Balances, movements, stocktaking, and inventory efficiency analysis."
+        }
+      },
+      "reports": {
+        "posSession": {
+          "title": "Point-of-sale session report",
+          "description": "Summary of cash and expected sales for the active sales session."
+        },
+        "salesByPeriod": {
+          "title": "Sales by period",
+          "description": "Daily, weekly, and monthly sales invoices."
+        },
+        "salesByCustomer": {
+          "title": "Sales by customer",
+          "description": "Analyse sales value by customer."
+        },
+        "salesByProduct": {
+          "title": "Product sales by period",
+          "description": "Product performance across a selected date range."
+        },
+        "salesByRepresentative": {
+          "title": "Sales by representative",
+          "description": "Compare revenue and volume between sales representatives."
+        },
+        "salesProfitability": {
+          "title": "Profit by period",
+          "description": "Analyse daily, weekly, and monthly profitability."
+        },
+        "salesPaymentsByPeriod": {
+          "title": "Sales payments by period",
+          "description": "Analyse customer receipts by period and payment method."
+        },
+        "supplierAging": {
+          "title": "Supplier aging",
+          "description": "Open purchase invoices grouped by time outstanding."
+        },
+        "supplierStatement": {
+          "title": "Supplier statement",
+          "description": "Available from the supplier page with transactions and running balance."
+        },
+        "purchasesBySupplier": {
+          "title": "Purchases by supplier",
+          "description": "Analyse purchase totals by supplier."
+        },
+        "purchasesByProduct": {
+          "title": "Purchases by product",
+          "description": "Analyse purchased quantities and values by product."
+        },
+        "purchasesByEmployee": {
+          "title": "Purchases by employee",
+          "description": "Compare purchases by responsible employee."
+        },
+        "supplierBalances": {
+          "title": "Supplier balances",
+          "description": "Summary of payables and open obligations."
+        },
+        "supplierPaymentsByPeriod": {
+          "title": "Supplier payments by period",
+          "description": "Analyse daily, weekly, and monthly disbursements."
+        },
+        "trialBalance": {
+          "title": "Trial balance",
+          "description": "Debit and credit account balances with balance verification."
+        },
+        "incomeStatement": {
+          "title": "Income statement",
+          "description": "Revenue, expenses, and net income for the selected period."
+        },
+        "balanceSheet": {
+          "title": "Balance sheet",
+          "description": "Assets, liabilities, and equity as of a selected date."
+        },
+        "costCenterProfitability": {
+          "title": "Cost-center profitability",
+          "description": "Revenue, expense, and profit for each cost center."
+        },
+        "accountLedger": {
+          "title": "Account ledger",
+          "description": "Will be available as a standalone report with account selection."
+        },
+        "cashFlow": {
+          "title": "Cash flow",
+          "description": "Summary of operating, investing, and financing cash flows."
+        },
+        "journalEntries": {
+          "title": "Journal entries",
+          "description": "View posted entries with filters and exports."
+        },
+        "taxReport": {
+          "title": "Tax report",
+          "description": "Aggregate output and input tax for the selected period."
+        },
+        "customerAging": {
+          "title": "Customer aging",
+          "description": "Open invoices grouped by time outstanding."
+        },
+        "customerStatement": {
+          "title": "Customer statement",
+          "description": "Available from the customer page with transactions and running balance."
+        },
+        "customerDirectory": {
+          "title": "Customer directory",
+          "description": "Available from the existing customer management page."
+        },
+        "customerBalances": {
+          "title": "Customer balances",
+          "description": "Summary of receivables and balances by customer."
+        },
+        "customerSales": {
+          "title": "Customer sales",
+          "description": "Analyse sales by customer and period."
+        },
+        "customerPayments": {
+          "title": "Customer payments",
+          "description": "Analyse receipts and allocations by customer."
+        },
+        "customerAppointments": {
+          "title": "Customer appointments",
+          "description": "Customer appointment report and status over the selected period."
+        },
+        "stockBalances": {
+          "title": "Inventory balances",
+          "description": "Available from the current inventory page."
+        },
+        "productMovements": {
+          "title": "Stock movements per product",
+          "description": "Available from a product row on the inventory page."
+        },
+        "stockCount": {
+          "title": "Stock count sheet",
+          "description": "Available from the current stocktaking page."
+        },
+        "inventoryValue": {
+          "title": "Inventory value",
+          "description": "Inventory valuation using the configured cost basis."
+        },
+        "inventoryOperations": {
+          "title": "Inventory operations summary",
+          "description": "Aggregate incoming, outgoing, and transfer movements."
+        },
+        "warehouseBalances": {
+          "title": "Warehouse balance summary",
+          "description": "Balances by warehouse and product."
+        },
+        "inventoryAging": {
+          "title": "Inventory aging",
+          "description": "Age of stocked quantities and their inbound date."
+        },
+        "inventoryTurnover": {
+          "title": "Inventory turnover",
+          "description": "Measure item turnover speed during the selected period."
+        }
+      }
+    }
   },
   "returnForm": {
     "title": "New return",
