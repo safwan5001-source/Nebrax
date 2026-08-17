@@ -31,6 +31,8 @@ export interface InvoicePdfLabels {
   vat: string;
   grandTotal: string;
   qrNote: string;
+  terms: string;
+  bank: string;
   footer: string;
 }
 
@@ -52,6 +54,10 @@ export interface InvoicePdfInput {
   footerText?: string | null;
   /** تخطيط مراجعة المخرج المثبتة؛ يزوّد PDF بخصائص الكتل نفسها التي يستهلكها العارض. */
   templateLayout?: DocSectionLayoutItem[] | null;
+  /** الشروط التي جُمّدت مع مراجعة القالب أو قُرئت من التصميم الحي قبل الإصدار. */
+  termsText?: string | null;
+  /** بيانات التحويل البنكي التي جُمّدت مع مراجعة القالب أو قُرئت من التصميم الحي قبل الإصدار. */
+  bankText?: string | null;
   /** حقول إضافية للمستندات غير البيعية، مثل رقم فاتورة المورد وتاريخ الاستحقاق. */
   documentMeta?: Array<[string, string | null | undefined]>;
   /** الخصم أو الشحن أو التسوية؛ تظهر بين الإجمالي الفرعي والضريبة. */
@@ -129,8 +135,34 @@ const DEFAULT_ITEM_COLUMNS: readonly DocItemsColumn[] = [
   { id: 'unit_price' }, { id: 'tax' }, { id: 'total' },
 ];
 
+function layoutBlock(layout: DocSectionLayoutItem[] | null | undefined, key: DocSectionLayoutItem['key']): DocSectionLayoutItem | undefined {
+  return layout?.find((item) => item.key === key);
+}
+
 function blockProperties(layout: DocSectionLayoutItem[] | null | undefined, key: DocSectionLayoutItem['key']): DocSectionProperties {
-  return layout?.find((item) => item.key === key)?.properties ?? {};
+  return layoutBlock(layout, key)?.properties ?? {};
+}
+
+/**
+ * لا يكفي وجود محتوى للكتلة: PDF يلتزم بظهورها المنشور كما تفعل معاينة المستند.
+ * المحتوى الثابت، حتى إن كان فارغاً، يحجب القيمة الديناميكية كي لا يتسرّب إعداد
+ * حي إلى مستند يستند إلى مراجعة تاريخية.
+ */
+export function resolvePdfBlockContent(
+  layout: DocSectionLayoutItem[] | null | undefined,
+  key: 'terms' | 'bank',
+  fallback: string | null | undefined,
+): string | null {
+  const block = layoutBlock(layout, key);
+  if (!block?.visible) return null;
+  const value = block.properties?.static_content ?? fallback;
+  const content = value?.trim();
+  return content ? content : null;
+}
+
+function pdfBlockFontSize(properties: DocSectionProperties): number {
+  const sizes: Record<NonNullable<DocSectionProperties['font_size']>, number> = { sm: 7, md: 8, lg: 9 };
+  return properties.font_size ? sizes[properties.font_size] : 7.6;
 }
 
 function itemColumns(properties: DocSectionProperties): readonly DocItemsColumn[] {
@@ -248,7 +280,11 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   };
 
   const itemsProperties = blockProperties(input.templateLayout, 'items');
+  const termsProperties = blockProperties(input.templateLayout, 'terms');
+  const bankProperties = blockProperties(input.templateLayout, 'bank');
   const footerProperties = blockProperties(input.templateLayout, 'footer');
+  const termsContent = resolvePdfBlockContent(input.templateLayout, 'terms', input.termsText);
+  const bankContent = resolvePdfBlockContent(input.templateLayout, 'bank', input.bankText);
   const columnLabels: Record<DocItemsColumnId, string> = {
     number: '#', description: input.labels.description, quantity: input.labels.quantity,
     unit_price: input.labels.unitPrice, tax: input.labels.tax, total: input.labels.total,
@@ -365,6 +401,7 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   ];
   totalRows.forEach((row, index) => drawTotalRow(bottomY + index * 11, row.label, row.value, row.emphasized));
 
+  let contentStartY = bottomY + totalRows.length * 11 + 6;
   if (input.qrImage) {
     const qrSize = 39;
     const qrX = right - qrSize;
@@ -374,7 +411,47 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     pdf.roundedRect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4, 1.5, 1.5, 'FD');
     pdf.addImage(input.qrImage, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
     writeArabicRight(pdf, input.labels.qrNote, right, qrY + qrSize + 8, 6.2);
+    contentStartY = Math.max(contentStartY, qrY + qrSize + 13);
   }
+
+  y = contentStartY;
+  const contentBottom = PAGE.height - 20;
+  const drawContentBlock = (label: string, content: string | null, properties: DocSectionProperties) => {
+    if (!content) return;
+    const alignment = pdfAlignment(properties.alignment ?? 'start');
+    const fontSize = pdfBlockFontSize(properties);
+    const lineHeight = fontSize * 0.62;
+    setArabic(pdf, fontSize);
+    const lines = pdf.splitTextToSize(asArabic(pdf, content), PAGE.contentWidth - 8) as string[];
+    let offset = 0;
+
+    while (offset < lines.length) {
+      // لا نسمح لمحتوى ثابت طويل أن يطغى على تذييل الصفحة أو ينقطع في منتصف سطر.
+      if (y + 14 > contentBottom) {
+        pdf.addPage();
+        drawHeader(true);
+      }
+      const availableLines = Math.max(1, Math.floor((contentBottom - y - 10) / lineHeight));
+      const chunk = lines.slice(offset, offset + availableLines);
+      const height = 8 + chunk.length * lineHeight;
+      pdf.setFillColor(248, 250, 252);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.roundedRect(left, y, PAGE.contentWidth, height, 1.5, 1.5, 'FD');
+      writeArabicRight(pdf, label, right - 3, y + 5, 6.8, true);
+      const textX = alignment === 'left' ? left + 4 : alignment === 'center' ? PAGE.width / 2 : right - 4;
+      setArabic(pdf, fontSize);
+      pdf.text(chunk, textX, y + 9, { align: alignment, lineHeightFactor: 1 });
+      y += height + 5;
+      offset += chunk.length;
+      if (offset < lines.length) {
+        pdf.addPage();
+        drawHeader(true);
+      }
+    }
+  };
+
+  drawContentBlock(input.labels.terms, termsContent, termsProperties);
+  drawContentBlock(input.labels.bank, bankContent, bankProperties);
 
   const pages = pdf.getNumberOfPages();
   for (let page = 1; page <= pages; page += 1) {

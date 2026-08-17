@@ -40,6 +40,10 @@ export async function createPurchaseInvoicePdf(input: {
   footerText?: string | null;
   /** تخطيط مراجعة PDF المثبتة، ويشمل خصائص الكتل المتقدمة. */
   templateLayout?: DocSectionLayoutItem[] | null;
+  /** محتوى الشروط من مراجعة المخرج المثبتة. */
+  termsText?: string | null;
+  /** بيانات البنك من مراجعة المخرج المثبتة. */
+  bankText?: string | null;
   labels: PurchasePdfLabels;
   locale: string;
 }): Promise<Blob> {
@@ -75,6 +79,8 @@ export async function createPurchaseInvoicePdf(input: {
     adjustments: input.adjustments,
     footerText: input.footerText,
     templateLayout: input.templateLayout,
+    termsText: input.termsText,
+    bankText: input.bankText,
     documentMeta: [
       [input.labels.date, input.purchase.purchase_date],
       [input.labels.paymentType, input.purchase.payment_type === 'cash' ? input.labels.cash : input.labels.credit],

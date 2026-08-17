@@ -41,6 +41,7 @@ export default function ReturnDetailPage() {
   const tr = useTranslations('returns');
   const ts = useTranslations('status');
   const tPrint = useTranslations('documentPrint');
+  const tDoc = useTranslations('invoiceDoc');
   const locale = useLocale();
   const company = useCompany();
   const { success, error: errorToast } = useToast();
@@ -125,6 +126,8 @@ export default function ReturnDetailPage() {
         vat: tPrint('vat'),
         grandTotal: tPrint('grand_total'),
         qrNote: '',
+        terms: tDoc('terms'),
+        bank: tDoc('bank'),
         footer: tPrint('footer'),
       },
       locale,

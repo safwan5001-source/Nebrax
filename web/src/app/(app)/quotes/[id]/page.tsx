@@ -38,6 +38,7 @@ export default function QuoteDetailPage() {
   const t = useTranslations('quotes');
   const td = useTranslations('invoiceDetail');
   const tPrint = useTranslations('documentPrint');
+  const tDoc = useTranslations('invoiceDoc');
   const tc = useTranslations('common');
   const locale = useLocale();
   const { success, error: errorToast } = useToast();
@@ -133,6 +134,10 @@ export default function QuoteDetailPage() {
       company,
       party: customer,
       logoUrl,
+      footerText,
+      templateLayout: layout,
+      termsText,
+      bankText,
       documentMeta: [
         [t('date'), quote.quote_date],
         [t('valid_until'), quote.valid_until ?? '—'],
@@ -159,6 +164,8 @@ export default function QuoteDetailPage() {
         vat: tPrint('vat'),
         grandTotal: tPrint('grand_total'),
         qrNote: '',
+        terms: tDoc('terms'),
+        bank: tDoc('bank'),
         footer: tPrint('footer'),
       },
       locale,

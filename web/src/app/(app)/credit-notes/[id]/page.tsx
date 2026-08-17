@@ -51,6 +51,7 @@ export default function CreditNoteDetailPage() {
   const t = useTranslations('creditNotes');
   const td = useTranslations('invoiceDetail');
   const tPrint = useTranslations('documentPrint');
+  const tDoc = useTranslations('invoiceDoc');
   const tc = useTranslations('common');
   const locale = useLocale();
   const { success, error: errorToast } = useToast();
@@ -152,7 +153,11 @@ export default function CreditNoteDetailPage() {
       party: customer,
       logoUrl: pdfDesign.logoUrl,
       footerText: pdfDesign.footerText,
-      templateLayout: Array.isArray(frozenPdfDefinition?.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : design.layout,
+      templateLayout: frozenPdfDefinition
+        ? (Array.isArray(frozenPdfDefinition.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : null)
+        : design.layout,
+      termsText: pdfDesign.termsText,
+      bankText: pdfDesign.bankText,
       documentMeta: [
         [t('date'), note.note_date],
         [t('refund_type'), refundType],
@@ -180,6 +185,8 @@ export default function CreditNoteDetailPage() {
         vat: tPrint('vat'),
         grandTotal: tPrint('grand_total'),
         qrNote: '',
+        terms: tDoc('terms'),
+        bank: tDoc('bank'),
         footer: tPrint('footer'),
       },
       locale,

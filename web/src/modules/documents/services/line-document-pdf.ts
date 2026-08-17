@@ -39,6 +39,10 @@ export interface LineDocumentPdfInput {
   footerText?: string | null;
   /** تخطيط مراجعة PDF المثبتة؛ يمرّ إلى العارض المتجهي كما هو. */
   templateLayout?: DocSectionLayoutItem[] | null;
+  /** محتوى الشروط من المراجعة المثبتة أو التصميم الحي قبل الإصدار. */
+  termsText?: string | null;
+  /** بيانات البنك من المراجعة المثبتة أو التصميم الحي قبل الإصدار. */
+  bankText?: string | null;
   documentMeta: Array<[string, string | null | undefined]>;
   adjustments?: InvoicePdfAdjustment[];
   labels: InvoicePdfLabels;
@@ -66,6 +70,8 @@ export async function createLineDocumentPdf(input: LineDocumentPdfInput): Promis
     logoUrl: input.logoUrl,
     footerText: input.footerText,
     templateLayout: input.templateLayout,
+    termsText: input.termsText,
+    bankText: input.bankText,
     documentMeta: input.documentMeta,
     adjustments: input.adjustments,
     labels: input.labels,
