@@ -1878,6 +1878,10 @@
           "title": "Supplier statement",
           "description": "Available from the supplier page with transactions and running balance."
         },
+        "purchasesByPeriod": {
+          "title": "Purchases by period",
+          "description": "Analyse posted purchase invoices by the selected time grouping."
+        },
         "purchasesBySupplier": {
           "title": "Purchases by supplier",
           "description": "Analyse purchase totals by supplier."
@@ -2063,6 +2067,87 @@
       "details": "Report details",
       "sourcePostedInvoices": "Posted invoices",
       "sourceReceipts": "Posted receipt vouchers",
+      "manualItem": "Descriptive item",
+      "unassigned": "Unassigned",
+      "empty": "There is no data in the selected filter scope.",
+      "loadFailed": "The report could not be loaded. Check your connection and try again.",
+      "retry": "Try again"
+    },
+    "purchases": {
+      "backToPurchasesReports": "Back to purchase reports",
+      "advancedFilters": "Advanced filters",
+      "filtersActive": "Filters active",
+      "resetAll": "Reset all",
+      "purchasesScopeHint": "Results are read from posted purchase invoices only; drafts never enter the report.",
+      "paymentsScopeHint": "Results are read from posted supplier payment vouchers only, by payment date rather than purchase invoice date.",
+      "interval": "Time grouping",
+      "intervals": {
+        "day": "Daily",
+        "week": "Weekly",
+        "month": "Monthly",
+        "year": "Yearly"
+      },
+      "supplier": "Supplier",
+      "allSuppliers": "All suppliers",
+      "searchSupplier": "Search by name, tax number, or phone",
+      "noSuppliers": "No matching suppliers",
+      "creator": "Invoice creator",
+      "allCreators": "All invoice creators",
+      "searchCreator": "Search by employee or user name",
+      "noCreators": "No matching invoice creators",
+      "product": "Product",
+      "allProducts": "All products",
+      "searchProduct": "Search by name, SKU, or barcode",
+      "noProducts": "No matching products",
+      "productInvoiceScope": "For this report, the scope is limited to purchase invoices that contain the selected product.",
+      "paymentStatus": "Payment status",
+      "allPaymentStatuses": "All payment statuses",
+      "paymentStatuses": {
+        "paid": "Paid",
+        "partial": "Partially paid",
+        "unpaid": "Unpaid"
+      },
+      "receivedStatus": "Receipt status",
+      "allReceivedStatuses": "All receipt statuses",
+      "receivedStatuses": {
+        "pending": "Pending",
+        "partial": "Partially received",
+        "received": "Received"
+      },
+      "paymentMethod": "Payment method",
+      "allPaymentMethods": "All payment methods",
+      "paymentMethods": {
+        "cash": "Cash",
+        "bank": "Bank"
+      },
+      "views": {
+        "period": "Purchases by period",
+        "supplier": "Purchases by supplier",
+        "product": "Product purchases",
+        "employee": "Purchases by employee",
+        "balances": "Supplier balances",
+        "payments": "Supplier payments by period"
+      },
+      "descriptions": {
+        "period": "Posted purchase invoices grouped by the selected time interval.",
+        "supplier": "Posted purchase invoice value and count for each supplier in the filtered scope.",
+        "product": "Purchase line value and quantity for each product; header-level discounts and shipping are not distributed to lines.",
+        "employee": "Compare the value and count of posted purchase invoices by their creating user or linked employee.",
+        "balances": "A summary of posted purchase values and open balances for each supplier.",
+        "payments": "Posted supplier payment vouchers by payment date and method."
+      },
+      "period": "Period",
+      "purchases": "Purchase invoices",
+      "quantity": "Quantity",
+      "payments": "Payment vouchers",
+      "paidAmount": "Paid out",
+      "netPurchases": "Net purchases before VAT",
+      "vat": "Input VAT",
+      "totalPurchases": "Total purchases",
+      "outstanding": "Outstanding balance",
+      "details": "Report details",
+      "sourcePostedPurchases": "Posted purchase invoices",
+      "sourceSupplierPayments": "Posted supplier payment vouchers",
       "manualItem": "Descriptive item",
       "unassigned": "Unassigned",
       "empty": "There is no data in the selected filter scope.",

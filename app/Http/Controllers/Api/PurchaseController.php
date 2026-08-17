@@ -24,6 +24,8 @@ class PurchaseController extends ApiController
     public function store(StorePurchaseRequest $request): JsonResponse
     {
         $data = $request->validated();
+        // مصدر التقرير هو المستخدم الموثق، لا قيمة يرسلها العميل ويستطيع انتحالها.
+        $data['created_by'] = $request->user()?->id;
 
         Partner::findOrFail($data['partner_id']); // عزل المورد
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
