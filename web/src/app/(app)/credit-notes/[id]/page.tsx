@@ -19,10 +19,12 @@ import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import {
   resolveCreditNoteTemplateDesign,
+  resolveLiveCreditNoteTemplateDesign,
   type CreditNoteTemplateDefinition,
   type LegacyCreditNoteDesign,
 } from '@/modules/credit-notes/services/credit-note-template-design';
 import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
+import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
 interface FrozenPrintTemplateRevision {
@@ -33,7 +35,7 @@ interface FrozenPrintTemplateRevision {
 }
 
 interface CreditNote {
-  id: string; number: string; partner_id: string; type?: 'sales' | 'purchase'; refund_type: string; status: string;
+  id: string; branch_id: string | null; number: string; partner_id: string; type?: 'sales' | 'purchase'; refund_type: string; status: string;
   note_date: string; subtotal: string; tax_amount: string; total: string; reason: string | null; lines: Line[];
   print_template_revision_id?: string | null;
   print_template_revision?: FrozenPrintTemplateRevision | null;
@@ -69,20 +71,32 @@ export default function CreditNoteDetailPage() {
     api<{ data: CreditNote }>(`/credit-notes/${id}`)
       .then(async (r) => {
         setNote(r.data);
-        const [p, m, d] = await Promise.allSettled([
+        const documentType = r.data.type === 'purchase' ? 'debit_note' : 'credit_note';
+        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
+        const [p, m, legacy, live] = await Promise.allSettled([
           api<{ data: CreditNoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: CreditNoteCompany }>(`/me`),
           api<{ data: LegacyCreditNoteDesign }>(`/sales-config/designs`),
+          api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=${documentType}&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
 
         // المراجعة المثبتة حد تاريخي: لا تخلط خصائصها بإعداد حي تغيّر بعد ترحيل الإشعار.
         const frozen = r.data.print_template_revision?.definition ?? null;
-        setDesign(resolveCreditNoteTemplateDesign(
-          frozen,
-          d.status === 'fulfilled' ? d.value.data : null,
-        ));
+        const liveDesign = frozen || live.status !== 'fulfilled'
+          ? null
+          : resolveLiveCreditNoteTemplateDesign(
+            resolveLiveTemplateDefinition(live.value.data, documentType),
+          );
+        setDesign(
+          frozen
+            ? resolveCreditNoteTemplateDesign(frozen, null)
+            : liveDesign ?? resolveCreditNoteTemplateDesign(
+              null,
+              legacy.status === 'fulfilled' ? legacy.value.data : null,
+            ),
+        );
       })
       .finally(() => setLoading(false));
   }

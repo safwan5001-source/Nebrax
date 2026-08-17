@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCreditNoteTemplateDesign } from './credit-note-template-design';
+import { resolveCreditNoteTemplateDesign, resolveLiveCreditNoteTemplateDesign } from './credit-note-template-design';
 
 describe('resolveCreditNoteTemplateDesign', () => {
   const legacyDesign = {
@@ -66,6 +66,31 @@ describe('resolveCreditNoteTemplateDesign', () => {
       stampUrl: null,
       signatureUrl: null,
       frozen: true,
+    });
+  });
+
+  it('maps a resolved live template without borrowing legacy images or signatures', () => {
+    const resolved = resolveLiveCreditNoteTemplateDesign({
+      templateId: 'tax-invoice-retail',
+      themeId: 'blue',
+      footerText: 'تذييل القالب المنشور',
+      showLogo: false,
+      layout: [{ key: 'header', visible: true }],
+      termsText: 'شروط منشورة',
+      bankText: 'بيانات بنك منشورة',
+    });
+
+    expect(resolved).toMatchObject({
+      templateId: 'tax-invoice-retail',
+      themeId: 'blue',
+      footerText: 'تذييل القالب المنشور',
+      showLogo: false,
+      termsText: 'شروط منشورة',
+      bankText: 'بيانات بنك منشورة',
+      logoUrl: null,
+      stampUrl: null,
+      signatureUrl: null,
+      frozen: false,
     });
   });
 
