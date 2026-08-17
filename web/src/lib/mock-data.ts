@@ -1181,6 +1181,77 @@ function salesReportFor(path: string) {
   return { view, data: periods, totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
 }
 
+// ── تقرير المشتريات في وضع العرض التجريبي ───────────────────────────────────
+// هذا الموجّه لا يُستدعى إلا مع `isDemo()`؛ وهو يسهّل مراجعة واجهة التقارير
+// المتجاوبة من دون طلب أي بيانات حقيقية أو تغيير منطق تقارير Laravel.
+function purchasesReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'period';
+  const from = query.get('from') ?? '';
+  const to = query.get('to') ?? '';
+  const supplierId = query.get('supplier_id') ?? '';
+  const paymentStatus = query.get('payment_status') ?? '';
+  const paymentMethod = query.get('payment_method') ?? '';
+  const money = (value: number) => value.toFixed(2);
+  const inRange = (date: string) => (!from || date >= from) && (!to || date <= to);
+  const purchases = mockPurchases.filter((purchase) => purchase.status === 'posted'
+    && inRange(purchase.purchase_date)
+    && (!supplierId || purchase.partner_id === supplierId)
+    && (!paymentStatus || purchase.payment_status === paymentStatus));
+  const amount = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.total), 0);
+  const net = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.subtotal), 0);
+  const tax = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.tax_amount), 0);
+  const balance = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.remaining), 0);
+  const totals = {
+    purchases: purchases.length,
+    amount: money(amount(purchases)),
+    net_purchases: money(net(purchases)),
+    tax: money(tax(purchases)),
+    balance: money(balance(purchases)),
+  };
+  const group = <T extends { key: string; label: string }>(items: T[], value: (item: T) => number, countKey: 'purchases' | 'payments') => {
+    const buckets = new Map<string, { key: string; label: string; count: number; amount: number }>();
+    items.forEach((item) => {
+      const bucket = buckets.get(item.key) ?? { key: item.key, label: item.label, count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += value(item);
+      buckets.set(item.key, bucket);
+    });
+    return [...buckets.values()].sort((a, b) => b.amount - a.amount).map((bucket) => ({ key: bucket.key, label: bucket.label, [countKey]: bucket.count, amount: money(bucket.amount) }));
+  };
+
+  if (view === 'payments') {
+    const payments = mockPayments.filter((payment) => payment.direction === 'paid'
+      && inRange(payment.payment_date)
+      && (!paymentMethod || payment.method === paymentMethod));
+    const rows = group(payments.map((payment) => ({ key: payment.payment_date.slice(0, 7), label: payment.payment_date.slice(0, 7), amount: Number(payment.amount) })), (row) => row.amount, 'payments');
+    return { view, data: rows, totals: { payments: payments.length, amount: money(payments.reduce((sum, payment) => sum + Number(payment.amount), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_supplier_payments' } };
+  }
+
+  if (view === 'product') {
+    const rows = group(purchases.flatMap((purchase) => purchase.lines.map((line) => ({ key: line.description ?? 'manual', label: line.description ?? 'بند وصفي', amount: Number(line.line_total), quantity: line.quantity }))), (row) => row.amount, 'purchases');
+    const quantityByProduct = new Map(purchases.flatMap((purchase) => purchase.lines).map((line) => [line.description ?? 'manual', line.quantity]));
+    return { view, data: rows.map((row) => ({ ...row, quantity: quantityByProduct.get(row.key) ?? row.purchases })), totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  if (view === 'supplier' || view === 'balances') {
+    const rows = group(purchases.map((purchase) => ({ key: purchase.partner_id, label: mockPartners.find((partner) => partner.id === purchase.partner_id)?.name ?? 'غير مسند', amount: Number(purchase.total), balance: Number(purchase.remaining) })), (row) => row.amount, 'purchases');
+    if (view === 'balances') {
+      const balances = new Map<string, number>();
+      purchases.forEach((purchase) => balances.set(purchase.partner_id, (balances.get(purchase.partner_id) ?? 0) + Number(purchase.remaining)));
+      return { view, data: rows.map((row) => ({ ...row, balance: money(balances.get(row.key) ?? 0) })), totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+    }
+    return { view, data: rows, totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  if (view === 'employee') {
+    return { view, data: [{ key: 'unassigned', label: 'غير مسند', purchases: purchases.length, amount: money(amount(purchases)) }], totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  const periods = group(purchases.map((purchase) => ({ key: purchase.purchase_date.slice(0, 7), label: purchase.purchase_date.slice(0, 7), amount: Number(purchase.total) })), (row) => row.amount, 'purchases');
+  return { view, data: periods, totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+}
+
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
@@ -1304,6 +1375,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (movementsMatch) return resolve(mockMovements(movementsMatch[1]));
 
   if (clean === '/reports/sales') return resolve(salesReportFor(path));
+  if (clean === '/reports/purchases') return resolve(purchasesReportFor(path));
   if (clean === '/reports/income-statement') return resolve(incomeStatementFor(path));
   if (clean === '/reports/balance-sheet') return resolve(mockBalanceSheet);
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);
