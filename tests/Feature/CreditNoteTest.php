@@ -93,6 +93,15 @@ class CreditNoteTest extends TestCase
             ->postJson("/api/print-templates/{$creditTemplateId}/publish")
             ->assertOk()['data']['published_revision']['id'];
 
+        $creditThermalTemplate = $this->withToken($auth['token'])->postJson('/api/print-templates', [
+            'name' => 'إيصال إشعار دائن حراري ثابت',
+            'document_types' => ['credit_note'],
+            'definition' => ['template_id' => 'tax-invoice-thermal58'],
+        ])->assertCreated();
+        $creditThermalRevisionId = $this->withToken($auth['token'])
+            ->postJson('/api/print-templates/'.$creditThermalTemplate['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+
         $debitTemplate = $this->withToken($auth['token'])->postJson('/api/print-templates', [
             'name' => 'إشعار مدين ثابت',
             'document_types' => ['debit_note'],
@@ -101,6 +110,15 @@ class CreditNoteTest extends TestCase
         $debitTemplateId = $debitTemplate['data']['id'];
         $debitRevisionId = $this->withToken($auth['token'])
             ->postJson("/api/print-templates/{$debitTemplateId}/publish")
+            ->assertOk()['data']['published_revision']['id'];
+
+        $debitThermalTemplate = $this->withToken($auth['token'])->postJson('/api/print-templates', [
+            'name' => 'إيصال إشعار مدين حراري ثابت',
+            'document_types' => ['debit_note'],
+            'definition' => ['template_id' => 'tax-invoice-thermal80'],
+        ])->assertCreated();
+        $debitThermalRevisionId = $this->withToken($auth['token'])
+            ->postJson('/api/print-templates/'.$debitThermalTemplate['data']['id'].'/publish')
             ->assertOk()['data']['published_revision']['id'];
 
         foreach ([
@@ -115,6 +133,16 @@ class CreditNoteTest extends TestCase
             }
         }
 
+        foreach ([
+            ['document_type' => 'credit_note', 'print_template_revision_id' => $creditThermalRevisionId],
+            ['document_type' => 'debit_note', 'print_template_revision_id' => $debitThermalRevisionId],
+        ] as $assignment) {
+            $this->withToken($auth['token'])->putJson('/api/print-templates/assignments/default', [
+                ...$assignment,
+                'usage' => 'thermal',
+            ])->assertOk();
+        }
+
         $creditNoteId = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
             'partner_id' => $customerId,
             'type' => 'sales',
@@ -125,7 +153,9 @@ class CreditNoteTest extends TestCase
             ->assertJsonPath('data.print_template_revision_id', $creditRevisionId)
             ->assertJsonPath('data.print_template_revision.definition.template_id', 'credit-note-v1')
             ->assertJsonPath('data.pdf_template_revision_id', $creditRevisionId)
-            ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'credit-note-v1');
+            ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'credit-note-v1')
+            ->assertJsonPath('data.thermal_template_revision_id', $creditThermalRevisionId)
+            ->assertJsonPath('data.thermal_template_revision.definition.template_id', 'tax-invoice-thermal58');
 
         $debitNoteId = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
             'partner_id' => $supplierId,
@@ -137,7 +167,9 @@ class CreditNoteTest extends TestCase
             ->assertJsonPath('data.print_template_revision_id', $debitRevisionId)
             ->assertJsonPath('data.print_template_revision.definition.template_id', 'debit-note-v1')
             ->assertJsonPath('data.pdf_template_revision_id', $debitRevisionId)
-            ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'debit-note-v1');
+            ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'debit-note-v1')
+            ->assertJsonPath('data.thermal_template_revision_id', $debitThermalRevisionId)
+            ->assertJsonPath('data.thermal_template_revision.definition.template_id', 'tax-invoice-thermal80');
 
         $this->withToken($auth['token'])->putJson("/api/print-templates/{$creditTemplateId}/draft", [
             'definition' => ['template_id' => 'credit-note-v2'],
@@ -149,7 +181,9 @@ class CreditNoteTest extends TestCase
             ->assertJsonPath('data.print_template_revision_id', $creditRevisionId)
             ->assertJsonPath('data.print_template_revision.definition.template_id', 'credit-note-v1')
             ->assertJsonPath('data.pdf_template_revision_id', $creditRevisionId)
-            ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'credit-note-v1');
+            ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'credit-note-v1')
+            ->assertJsonPath('data.thermal_template_revision_id', $creditThermalRevisionId)
+            ->assertJsonPath('data.thermal_template_revision.definition.template_id', 'tax-invoice-thermal58');
     }
 
     /** @test */

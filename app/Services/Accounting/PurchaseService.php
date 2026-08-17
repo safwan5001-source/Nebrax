@@ -447,11 +447,13 @@ class PurchaseService
             // تعديل التعيين أو نشر نسخة أحدث لاحقاً لا يغير مستنداً صدر بالفعل.
             $printAssignment = $this->printTemplates->resolve('purchase_invoice', 'print', $purchase->branch_id);
             $pdfAssignment = $this->printTemplates->resolve('purchase_invoice', 'pdf', $purchase->branch_id);
+            $thermalAssignment = $this->printTemplates->resolve('purchase_invoice', 'thermal', $purchase->branch_id);
 
             $purchase->update([
                 'status'           => 'posted',
                 'print_template_revision_id' => $printAssignment?->print_template_revision_id,
                 'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
+                'thermal_template_revision_id' => $thermalAssignment?->print_template_revision_id,
                 'subtotal'         => $subtotal,
                 'tax_amount'       => $taxTotal,
                 'total'            => $total,

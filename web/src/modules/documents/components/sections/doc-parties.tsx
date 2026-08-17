@@ -10,10 +10,14 @@ import { useDocStyle } from '../doc-style-context';
 export function DocParties({ model }: { model: DocumentModel }) {
   const t = useTranslations('invoiceDoc');
   const tPrint = useTranslations('documentPrint');
+  const tp = useTranslations('purchasePdf');
   const style = useDocStyle();
   const { seller, buyer, meta } = model;
-  const isInvoice = model.type === 'tax_invoice';
-  const partyLabel = model.type === 'payment_voucher' || model.type === 'debit_note'
+  const isTaxInvoice = model.type === 'tax_invoice';
+  const isPurchaseInvoice = model.type === 'purchase_invoice';
+  const isInvoice = isTaxInvoice || isPurchaseInvoice;
+  const issuerLabel = isPurchaseInvoice ? tp('buyer') : (isTaxInvoice ? t('seller') : tPrint('seller'));
+  const partyLabel = model.type === 'payment_voucher' || model.type === 'debit_note' || isPurchaseInvoice
     ? tPrint('supplier')
     : model.type === 'receipt_voucher' || model.type === 'quotation' || model.type === 'credit_note'
       ? tPrint('customer')
@@ -23,7 +27,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
   return (
     <div className={cn('grid grid-cols-3 gap-4', style.sectionGap)}>
       <div className={card}>
-        <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">{isInvoice ? t('seller') : tPrint('seller')}</div>
+        <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">{issuerLabel}</div>
         <div className="font-semibold text-black">{seller.name || '—'}</div>
         <DocInfoRow label={t('vat_number')} value={seller.vatNumber ? <span className="num">{seller.vatNumber}</span> : null} />
         <DocInfoRow label={t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />

@@ -12,6 +12,7 @@ export function DocTotals({
   formatMoney: (minor: number) => string;
 }) {
   const t = useTranslations('invoiceDoc');
+  const tp = useTranslations('purchaseForm');
   const { totals } = model;
 
   return (
@@ -20,6 +21,24 @@ export function DocTotals({
         <span>{t('subtotal')}</span>
         <span className="num">{formatMoney(totals.subtotal)}</span>
       </div>
+      {totals.discount && totals.discount > 0 ? (
+        <div className="flex justify-between border-t border-gray-100 px-3 py-1.5 text-gray-600">
+          <span>{tp('discount')}</span>
+          <span className="num">− {formatMoney(totals.discount)}</span>
+        </div>
+      ) : null}
+      {totals.shipping && totals.shipping > 0 ? (
+        <div className="flex justify-between border-t border-gray-100 px-3 py-1.5 text-gray-600">
+          <span>{tp('shipping')}</span>
+          <span className="num">{formatMoney(totals.shipping)}</span>
+        </div>
+      ) : null}
+      {totals.adjustment ? (
+        <div className="flex justify-between border-t border-gray-100 px-3 py-1.5 text-gray-600">
+          <span>{tp('adjustment')}</span>
+          <span className="num">{totals.adjustment < 0 ? '− ' : ''}{formatMoney(Math.abs(totals.adjustment))}</span>
+        </div>
+      ) : null}
       <div className="flex justify-between border-t border-gray-100 px-3 py-1.5 text-gray-600">
         <span>{t('vat')}</span>
         <span className="num">{formatMoney(totals.tax)}</span>
