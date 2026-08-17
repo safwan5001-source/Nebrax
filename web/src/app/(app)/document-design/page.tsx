@@ -1,3 +1,5 @@
+'use client';
+
 import { PrintTemplateStudio } from '@/modules/print-templates/components/print-template-studio';
 import { currentUser } from '@/lib/auth';
 
