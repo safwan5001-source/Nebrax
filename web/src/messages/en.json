@@ -462,7 +462,22 @@
     "column_label": "Label: {column}",
     "drag_column": "Drag to reorder {column}",
     "move_column_up": "Move {column} up",
-    "move_column_down": "Move {column} down"
+    "move_column_down": "Move {column} down",
+    "revision_history": "Revision history and comparison",
+    "revision_history_hint": "Compare two stored template definitions without modifying any published revision.",
+    "revision_history_loading": "Loading revision history…",
+    "revision_history_failed": "Could not load revision history. Please try again later.",
+    "revision_history_single": "Publish or create a later revision to make comparison available.",
+    "revision_before": "Earlier revision",
+    "revision_after": "Later revision",
+    "revision_select_distinct": "Choose two different revisions to compare.",
+    "revision_change_count": "{count} definition changes",
+    "revision_no_changes": "The selected revisions have no difference in the template definition.",
+    "revision_field": "Field",
+    "revision_empty_value": "—",
+    "revision_status_draft": "Draft",
+    "revision_status_published": "Published",
+    "revision_status_superseded": "Previously published"
   },
   "documentTypesAlt": {
     "tax_invoice": "فاتورة ضريبية",

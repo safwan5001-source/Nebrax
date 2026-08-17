@@ -93,6 +93,33 @@ class PrintTemplateTest extends TestCase
     }
 
     /** @test */
+    public function template_details_return_the_full_revision_history_in_descending_version_order(): void
+    {
+        ['token' => $token] = $this->registerTenant('template-history', 'owner@template-history.test');
+
+        $created = $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'قالب له سجل مراجعات',
+            'document_types' => ['tax_invoice'],
+            'definition' => $this->definition('classic'),
+        ])->assertCreated();
+        $templateId = $created['data']['id'];
+
+        $this->withToken($token)->postJson("/api/print-templates/{$templateId}/publish")->assertOk();
+        $this->withToken($token)->putJson("/api/print-templates/{$templateId}/draft", [
+            'definition' => $this->definition('modern'),
+        ])->assertOk();
+
+        $this->withToken($token)->getJson("/api/print-templates/{$templateId}")
+            ->assertOk()
+            ->assertJsonPath('data.revisions.0.version', 2)
+            ->assertJsonPath('data.revisions.0.status', 'draft')
+            ->assertJsonPath('data.revisions.0.definition.template', 'modern')
+            ->assertJsonPath('data.revisions.1.version', 1)
+            ->assertJsonPath('data.revisions.1.status', 'published')
+            ->assertJsonPath('data.revisions.1.definition.template', 'classic');
+    }
+
+    /** @test */
     public function duplicating_a_template_creates_an_independent_draft_from_the_published_revision(): void
     {
         ['token' => $token] = $this->registerTenant('template-copy', 'owner@template-copy.test');

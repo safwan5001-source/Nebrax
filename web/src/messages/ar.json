@@ -462,7 +462,22 @@
     "column_label": "عنوان: {column}",
     "drag_column": "اسحب لترتيب عمود {column}",
     "move_column_up": "نقل عمود {column} لأعلى",
-    "move_column_down": "نقل عمود {column} لأسفل"
+    "move_column_down": "نقل عمود {column} لأسفل",
+    "revision_history": "سجل المراجعات والمقارنة",
+    "revision_history_hint": "قارن تعريفين محفوظين من القالب من دون تعديل أي مراجعة منشورة.",
+    "revision_history_loading": "يجري تحميل سجل المراجعات…",
+    "revision_history_failed": "تعذر تحميل سجل المراجعات. أعد المحاولة لاحقاً.",
+    "revision_history_single": "انشر أو أنشئ مراجعة لاحقة حتى تصبح المقارنة متاحة.",
+    "revision_before": "المراجعة السابقة",
+    "revision_after": "المراجعة اللاحقة",
+    "revision_select_distinct": "اختر مراجعتين مختلفتين للمقارنة.",
+    "revision_change_count": "{count} تغييرات في التعريف",
+    "revision_no_changes": "لا يوجد اختلاف في تعريف القالب بين المراجعتين المحددتين.",
+    "revision_field": "الحقل",
+    "revision_empty_value": "—",
+    "revision_status_draft": "مسودة",
+    "revision_status_published": "منشورة",
+    "revision_status_superseded": "سابقاً منشورة"
   },
   "documentTypesAlt": {
     "tax_invoice": "Tax Invoice",
