@@ -1,8 +1,13 @@
 'use client';
 
+/**
+ * أسلوب «دفتر التحليل»: نطاق مشتريات واضح وملخص مالي قبل التفاصيل، مع بطاقات
+ * للجوال وجدول كامل لسطح المكتب، ومعاينة مستند اختيارية لا تتقدم على التحليل.
+ */
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Download, Printer, Share2 } from 'lucide-react';
+import { ArrowRight, Download, FileText, Printer, Share2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,6 +24,7 @@ import { useToast } from '@/components/ui/toast';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
+import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
 
 export type PurchaseReportView = 'period' | 'supplier' | 'product' | 'employee' | 'balances' | 'payments';
 
@@ -82,6 +88,7 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -191,24 +198,33 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
     finally { setBusy(null); }
   }
 
+  const scope = useMemo(() => {
+    const branchScope = filters.branchIds.length === 0
+      ? tr('all_branches')
+      : tr('branches_selected', { n: filters.branchIds.length });
+    const periodScope = !filters.from && !filters.to
+      ? tr('all_periods')
+      : [filters.from || '…', filters.to || '…'].join(' ← ');
+    return `${branchScope} · ${periodScope}`;
+  }, [filters.branchIds, filters.from, filters.to, tr]);
+
+  const actions = [
+    { id: 'csv', label: tr('csv'), icon: Download, onSelect: exportCsv, disabled: !doc || !!busy },
+    { id: 'pdf', label: busy === 'pdf' ? tPrint('generating') : tr('pdf'), icon: Download, onSelect: () => void downloadPdf(), disabled: !doc || !!busy, busy: busy === 'pdf' },
+    { id: 'share', label: busy === 'share' ? tPrint('generating') : tr('share_pdf'), icon: Share2, onSelect: () => void sharePdf(), disabled: !doc || !!busy, busy: busy === 'share' },
+    { id: 'print', label: tr('print'), icon: Printer, onSelect: () => printDocument({ widthMm: 210, heightMm: 297 }), disabled: !doc || !!busy },
+    { id: 'preview', label: tr('preview'), icon: FileText, onSelect: () => setShowPreview((visible) => !visible), disabled: !doc },
+  ];
+
   return (
     <div className="space-y-5">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <Link href="/reports/purchases" className="inline-flex items-center gap-1 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-            <ArrowRight className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />
-            {t('backToPurchasesReports')}
-          </Link>
-          <h1 className="mt-3 text-xl font-semibold text-text">{t(`views.${view}`)}</h1>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{t(`descriptions.${view}`)}</p>
-        </div>
-        <div className="no-print flex flex-wrap gap-2 sm:justify-end">
-          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={exportCsv}><Download className="h-4 w-4" strokeWidth={1.7} />{tr('csv')}</Button>
-          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={downloadPdf}><Download className="h-4 w-4" strokeWidth={1.7} />{busy === 'pdf' ? tPrint('generating') : tr('pdf')}</Button>
-          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={sharePdf}><Share2 className="h-4 w-4" strokeWidth={1.7} />{busy === 'share' ? tPrint('generating') : tr('share_pdf')}</Button>
-          <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={() => printDocument({ widthMm: 210, heightMm: 297 })}><Printer className="h-4 w-4" strokeWidth={1.7} />{tr('print')}</Button>
-        </div>
-      </header>
+      <div className="space-y-3">
+        <Link href="/reports/purchases" className="no-print inline-flex items-center gap-1 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <ArrowRight className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />
+          {t('backToPurchasesReports')}
+        </Link>
+        <ReportScreenHeader title={t(`views.${view}`)} description={t(`descriptions.${view}`)} scope={scope} actions={actions} actionsLabel={tr('report_actions')} />
+      </div>
 
       <PurchaseReportFilters view={view} value={filters} onChange={setFilters} />
 
@@ -218,11 +234,7 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
         <Card><CardContent className="py-10 text-center"><p className="text-sm text-negative">{t('loadFailed')}</p><Button className="mt-3" variant="outline" size="sm" onClick={load}>{t('retry')}</Button></CardContent></Card>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {summary.map((item) => (
-              <Card key={item.label}><CardContent className="p-4"><p className="text-xs text-muted">{item.label}</p><p className={`num mt-2 text-lg font-semibold ${item.tone === 'negative' ? 'text-negative' : item.tone === 'positive' ? 'text-positive' : 'text-text'}`}>{item.value}</p></CardContent></Card>
-            ))}
-          </div>
+          <ReportMetricGrid metrics={summary} />
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{t('details')}</CardTitle><Badge tone="neutral">{t(view === 'payments' ? 'sourceSupplierPayments' : 'sourcePostedPurchases')}</Badge></CardHeader>
@@ -230,18 +242,21 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
               {!doc || doc.rows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
               ) : (
-                <Table>
+                <>
+                <ReportMobileRows columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} emptyText={t('empty')} primaryIndex={0} />
+                <Table className="hidden md:table">
                   <THead><TR>{doc.columns.map((column) => <TH key={column.label} className={column.align === 'end' ? 'text-end' : undefined}>{column.label}</TH>)}</TR></THead>
                   <TBody>
                     {doc.rows.map((row, rowIndex) => <TR key={`${row[0]}-${rowIndex}`}>{row.map((cell, cellIndex) => <TD key={cellIndex} className={doc.columns[cellIndex]?.align === 'end' ? 'num text-end' : undefined}>{cell}</TD>)}</TR>)}
                     <TR className="font-semibold">{doc.totalRow.map((cell, cellIndex) => <TD key={cellIndex} className={doc.columns[cellIndex]?.align === 'end' ? 'num text-end' : undefined}>{cell}</TD>)}</TR>
                   </TBody>
                 </Table>
+                </>
               )}
             </CardContent>
           </Card>
 
-          {doc && (
+          {doc && showPreview && (
             <Card>
               <CardHeader className="no-print"><CardTitle>{tr('preview')}</CardTitle></CardHeader>
               <CardContent className="print:p-0"><div className="rounded bg-background p-3 print:bg-transparent print:p-0 [&_.print-only]:block"><DocumentScaler><ReportDocument title={doc.title} company={company} columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} /></DocumentScaler></div></CardContent>
