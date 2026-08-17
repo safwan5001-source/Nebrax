@@ -2,7 +2,24 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Check } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Check, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -29,6 +46,84 @@ const REQUIRED_COLUMNS: readonly DocItemsColumnId[] = ['description', 'total'];
 function withoutEmptyProperties(properties: DocSectionProperties): DocSectionProperties | undefined {
   const next = Object.fromEntries(Object.entries(properties).filter(([, value]) => value !== undefined)) as DocSectionProperties;
   return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function SortableItemsColumnEditor({
+  column,
+  label,
+  onChange,
+  onMove,
+  isFirst,
+  isLast,
+  disabled,
+}: {
+  column: DocItemsColumn;
+  label: string;
+  onChange: (changes: Partial<DocItemsColumn>) => void;
+  onMove: (direction: 'up' | 'down') => void;
+  isFirst: boolean;
+  isLast: boolean;
+  disabled?: boolean;
+}) {
+  const t = useTranslations('printTemplateStudio');
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: column.id, disabled });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        'grid grid-cols-[auto_minmax(0,1fr)] gap-2 rounded border border-border p-2',
+        isDragging && 'z-10 opacity-60 shadow-md',
+      )}
+    >
+      <div className="flex flex-col items-center gap-0.5 pt-0.5">
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label={t('drag_column', { column: label })}
+          className="cursor-grab touch-none rounded p-1 text-muted focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-default disabled:opacity-40"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          disabled={disabled || isFirst}
+          onClick={() => onMove('up')}
+          aria-label={t('move_column_up', { column: label })}
+          className="rounded p-1 text-muted hover:bg-primary-soft hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronUp className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          disabled={disabled || isLast}
+          onClick={() => onMove('down')}
+          aria-label={t('move_column_down', { column: label })}
+          className="rounded p-1 text-muted hover:bg-primary-soft hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_140px]">
+        <div className="space-y-1">
+          <Label htmlFor={`template-column-label-${column.id}`} className="text-xs text-muted">{t('column_label', { column: label })}</Label>
+          <Input id={`template-column-label-${column.id}`} value={column.label ?? ''} disabled={disabled} maxLength={80} placeholder={label} onChange={(event) => onChange({ label: event.target.value || undefined })} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`template-column-alignment-${column.id}`} className="text-xs text-muted">{t('alignment')}</Label>
+          <Select id={`template-column-alignment-${column.id}`} value={column.alignment ?? ''} disabled={disabled} onChange={(event) => onChange({ alignment: (event.target.value || undefined) as DocBlockAlignment | undefined })}>
+            <option value="">{t('inherit_default')}</option>
+            <option value="start">{t('alignment_start')}</option>
+            <option value="center">{t('alignment_center')}</option>
+            <option value="end">{t('alignment_end')}</option>
+          </Select>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** محرر خصائص الكتل؛ لا يعرض إلا المفاتيح التي يستطيع السجل والعارض استهلاكها. */
@@ -90,6 +185,22 @@ export function BlockPropertiesEditor({
   };
   const updateColumn = (id: DocItemsColumnId, changes: Partial<DocItemsColumn>) => {
     update({ columns: columns.map((column) => column.id === id ? { ...column, ...changes } : column) });
+  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const reorderColumns = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= columns.length || to >= columns.length) return;
+    update({ columns: arrayMove([...columns], from, to) });
+  };
+  const onColumnDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    reorderColumns(
+      columns.findIndex((column) => column.id === active.id),
+      columns.findIndex((column) => column.id === over.id),
+    );
   };
 
   return (
@@ -177,25 +288,24 @@ export function BlockPropertiesEditor({
               );
             })}
           </div>
-          <div className="space-y-2">
-            {columns.map((column) => (
-              <div key={column.id} className="grid grid-cols-1 gap-2 rounded border border-border p-2 sm:grid-cols-[minmax(0,1fr)_140px]">
-                <div className="space-y-1">
-                  <Label htmlFor={`template-column-label-${column.id}`} className="text-xs text-muted">{t('column_label', { column: columnLabels[column.id] })}</Label>
-                  <Input id={`template-column-label-${column.id}`} value={column.label ?? ''} disabled={disabled} maxLength={80} placeholder={columnLabels[column.id]} onChange={(event) => updateColumn(column.id, { label: event.target.value || undefined })} />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`template-column-alignment-${column.id}`} className="text-xs text-muted">{t('alignment')}</Label>
-                  <Select id={`template-column-alignment-${column.id}`} value={column.alignment ?? ''} disabled={disabled} onChange={(event) => updateColumn(column.id, { alignment: (event.target.value || undefined) as DocBlockAlignment | undefined })}>
-                    <option value="">{t('inherit_default')}</option>
-                    <option value="start">{t('alignment_start')}</option>
-                    <option value="center">{t('alignment_center')}</option>
-                    <option value="end">{t('alignment_end')}</option>
-                  </Select>
-                </div>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onColumnDragEnd}>
+            <SortableContext items={columns.map((column) => column.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {columns.map((column, index) => (
+                  <SortableItemsColumnEditor
+                    key={column.id}
+                    column={column}
+                    label={columnLabels[column.id]}
+                    onChange={(changes) => updateColumn(column.id, changes)}
+                    onMove={(direction) => reorderColumns(index, direction === 'up' ? index - 1 : index + 1)}
+                    isFirst={index === 0}
+                    isLast={index === columns.length - 1}
+                    disabled={disabled}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         </div>
       )}
     </div>

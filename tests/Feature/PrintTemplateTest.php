@@ -271,7 +271,10 @@ class PrintTemplateTest extends TestCase
                 'columns' => [
                     ['id' => 'number', 'alignment' => 'center'],
                     ['id' => 'description', 'label' => 'الصنف'],
+                    ['id' => 'product_code', 'label' => 'رمز الصنف'],
+                    ['id' => 'barcode'],
                     ['id' => 'quantity'],
+                    ['id' => 'price_before_tax', 'alignment' => 'end'],
                     ['id' => 'total', 'label' => 'الإجمالي'],
                 ],
             ]],
@@ -287,9 +290,21 @@ class PrintTemplateTest extends TestCase
             'definition' => ['layout' => $layout],
         ])->assertCreated()
             ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.1.label', 'الصنف')
+            ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.2.id', 'product_code')
+            ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.3.id', 'barcode')
+            ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.5.id', 'price_before_tax')
             ->assertJsonPath('data.draft_revision.definition.layout.6.properties.static_content', 'نص تذييل ثابت');
 
         $templateId = $created['data']['id'];
+        $this->withToken($token)->putJson("/api/print-templates/{$templateId}/draft", [
+            'name' => 'خصائص متقدمة محدثة',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['layout' => $layout],
+        ])->assertOk()
+            ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.2.id', 'product_code')
+            ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.3.id', 'barcode')
+            ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.5.id', 'price_before_tax');
+
         $revisionId = $this->withToken($token)->postJson("/api/print-templates/{$templateId}/publish")
             ->assertOk()['data']['published_revision']['id'];
         $published = PrintTemplateRevision::findOrFail($revisionId);
