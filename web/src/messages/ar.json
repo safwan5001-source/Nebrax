@@ -477,7 +477,9 @@
     "revision_empty_value": "—",
     "revision_status_draft": "مسودة",
     "revision_status_published": "منشورة",
-    "revision_status_superseded": "سابقاً منشورة"
+    "revision_status_superseded": "سابقاً منشورة",
+    "revision_visual_comparison": "مقارنة مرئية",
+    "revision_visual_comparison_hint": "معاينتان ببيانات تجريبية آمنة من التعريفين المحفوظين؛ لا تتغير أي مراجعة عند العرض."
   },
   "documentTypesAlt": {
     "tax_invoice": "Tax Invoice",

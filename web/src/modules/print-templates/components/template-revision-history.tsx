@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { compareTemplateRevisions, formatRevisionValue } from '@/modules/print-templates/services/revision-comparison';
+import { TemplateRevisionVisualComparison } from './template-revision-visual-comparison';
 
 export interface TemplateRevisionHistoryItem {
   id: string;
@@ -118,6 +119,8 @@ export function TemplateRevisionHistory({ revisions, loading, failed }: Template
             ) : (
               <p className="text-sm text-muted">{t('revision_no_changes')}</p>
             )}
+
+            {before && after && before.id !== after.id && <TemplateRevisionVisualComparison before={before} after={after} />}
           </>
         )}
       </CardContent>

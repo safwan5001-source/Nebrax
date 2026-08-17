@@ -477,7 +477,9 @@
     "revision_empty_value": "—",
     "revision_status_draft": "Draft",
     "revision_status_published": "Published",
-    "revision_status_superseded": "Previously published"
+    "revision_status_superseded": "Previously published",
+    "revision_visual_comparison": "Visual comparison",
+    "revision_visual_comparison_hint": "Two safe sample previews from the stored definitions; viewing does not change either revision."
   },
   "documentTypesAlt": {
     "tax_invoice": "فاتورة ضريبية",
