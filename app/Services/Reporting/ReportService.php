@@ -3,6 +3,7 @@
 namespace App\Services\Reporting;
 
 use App\Models\Account;
+use App\Models\Asset;
 use App\Models\CostCenter;
 use App\Models\CreditNote;
 use App\Models\Invoice;
@@ -359,6 +360,183 @@ class ReportService
             'rows'            => $mapped,
             'closing_balance' => $running,
         ];
+    }
+
+    /**
+     * القيود اليومية المرحّلة: كل قيد يُعرض مع سطوره المتوازنة ومصدره المحاسبي.
+     * لا تُستبدل القيود المعكوسة ولا تُخفى: الأصل والعاكس معاً مصدر الحقيقة.
+     *
+     * @param  array  $filters  ['from'=>'Y-m-d'?, 'to'=>'Y-m-d'?, 'branch_id'=>array?, 'account_id'=>uuid?]
+     */
+    public function journalEntries(array $filters = []): array
+    {
+        // نحمّل سطور القيد كاملةً أولاً. مرشح الحساب يختار القيد الذي يظهر، لكنه
+        // لا يبتّر سطوره الأخرى؛ وإلا بدا القيد غير متوازن في التقرير.
+        $from = $filters['from'] ?? null;
+        $to = $filters['to'] ?? null;
+        $allLines = $this->postedLines(fn ($query) => $query, $this->branchIds($filters))
+            ->filter(function (JournalLine $line) use ($from, $to) {
+                $date = $line->entry->entry_date->toDateString();
+                return (! $from || $date >= $from) && (! $to || $date <= $to);
+            })
+            ->values();
+        $entries = $allLines->groupBy('journal_entry_id');
+
+        if (! empty($filters['account_id'])) {
+            $entries = $entries->filter(fn (Collection $lines) => $lines->contains('account_id', $filters['account_id']));
+        }
+        if ($entries->isEmpty()) {
+            return ['rows' => [], 'total_debit' => 0, 'total_credit' => 0];
+        }
+
+        $accountIds = $entries->flatten(1)->pluck('account_id')->unique();
+        $accounts = Account::whereIn('id', $accountIds)->get()->keyBy('id');
+        $rows = [];
+        $totalDebit = $totalCredit = 0;
+
+        foreach ($entries as $lines) {
+            $entry = $lines->first()->entry;
+            $debit = $credit = 0;
+            $mappedLines = [];
+            foreach ($lines as $line) {
+                $lineDebit = (int) $line->debit;
+                $lineCredit = (int) $line->credit;
+                $debit += $lineDebit;
+                $credit += $lineCredit;
+                $account = $accounts->get($line->account_id);
+                $mappedLines[] = [
+                    'account_id'   => $line->account_id,
+                    'account_code' => $account?->code,
+                    'account_name' => $account?->name,
+                    'description'  => $line->description,
+                    'debit'        => $lineDebit,
+                    'credit'       => $lineCredit,
+                ];
+            }
+
+            $rows[] = [
+                'entry_id'     => $entry->id,
+                'date'         => $entry->entry_date->toDateString(),
+                'number'       => $entry->number,
+                'description'  => $entry->description,
+                'source_type'  => $entry->source_type,
+                'source_id'    => $entry->source_id,
+                'debit'        => $debit,
+                'credit'       => $credit,
+                'lines'        => $mappedLines,
+            ];
+            $totalDebit += $debit;
+            $totalCredit += $credit;
+        }
+
+        return ['rows' => $rows, 'total_debit' => $totalDebit, 'total_credit' => $totalCredit];
+    }
+
+    /**
+     * تقرير الضريبة من الحسابين النظاميين فقط: 1150 ضريبة المدخلات و2120 ضريبة
+     * المخرجات. صافي موجب = مستحق للهيئة، وسالب = رصيد قابل للاسترداد/الترحيل.
+     */
+    public function taxReport(array $filters = []): array
+    {
+        $movements = $this->movementsByAccount($filters)->keyBy(fn ($m) => $m['account']->code);
+        $input = (int) ($movements->get('1150')['net'] ?? 0);       // مدين − دائن
+        $output = -(int) ($movements->get('2120')['net'] ?? 0);    // دائن − مدين
+
+        return [
+            'input_vat'  => $input,
+            'output_vat' => $output,
+            'net_vat'    => $output - $input,
+            'status'     => $output - $input >= 0 ? 'payable' : 'recoverable',
+        ];
+    }
+
+    /**
+     * تدفقات نقدية بالطريقة المباشرة: يُجمع أثر النقد والبنك الفعلي لكل قيد
+     * مرحّل، فتُلغى التحويلات الداخلية بين الصندوق والبنك تلقائياً لأن صافيها صفر.
+     * التصنيف شفاف ومحدود: أصل ثابت = استثماري، مقابل حقوق ملكية = تمويلي، وما
+     * عداه تشغيلي. لا تُشتق حركة نقدية من تغيّر الذمم أو اللقطات.
+     */
+    public function cashFlow(array $filters = []): array
+    {
+        $cashAccounts = Account::whereIn('code', ['1110', '1120'])->pluck('id');
+        if ($cashAccounts->isEmpty()) {
+            return $this->emptyCashFlow();
+        }
+
+        $cashLines = $this->postedLines(
+            fn ($query) => $query->whereIn('journal_lines.account_id', $cashAccounts),
+            $this->branchIds($filters),
+        );
+        // نحمل السطور المقابلة دفعة واحدة: التصنيف لا يقرأ وصفاً حراً ولا ينفذ N+1.
+        $cashLines->load('entry.lines');
+        $equityAccountIds = Account::where('type', 'equity')->pluck('id')->all();
+
+        $from = $filters['from'] ?? null;
+        $to = $filters['to'] ?? null;
+        $cashLines = $cashLines->filter(function (JournalLine $line) use ($from, $to) {
+            $date = $line->entry->entry_date->toDateString();
+            return (! $from || $date >= $from) && (! $to || $date <= $to);
+        })->groupBy('journal_entry_id');
+
+        $results = [
+            'operating'  => ['inflows' => 0, 'outflows' => 0, 'net' => 0, 'entries' => []],
+            'investing'  => ['inflows' => 0, 'outflows' => 0, 'net' => 0, 'entries' => []],
+            'financing'  => ['inflows' => 0, 'outflows' => 0, 'net' => 0, 'entries' => []],
+        ];
+
+        foreach ($cashLines as $lines) {
+            $entry = $lines->first()->entry;
+            $net = $lines->sum(fn (JournalLine $line) => (int) $line->debit - (int) $line->credit);
+            if ($net === 0) {
+                continue; // تحويل داخلي بين نقد وبنك، لا تدفق للمنشأة.
+            }
+
+            $category = $this->cashFlowCategory($entry, $cashAccounts->all(), $equityAccountIds);
+            $inflow = $net > 0 ? $net : 0;
+            $outflow = $net < 0 ? -$net : 0;
+            $results[$category]['inflows'] += $inflow;
+            $results[$category]['outflows'] += $outflow;
+            $results[$category]['net'] += $net;
+            $results[$category]['entries'][] = [
+                'date'        => $entry->entry_date->toDateString(),
+                'number'      => $entry->number,
+                'description' => $entry->description,
+                'inflow'      => $inflow,
+                'outflow'     => $outflow,
+                'net'         => $net,
+            ];
+        }
+
+        $netCashFlow = array_sum(array_column($results, 'net'));
+        return [
+            ...$results,
+            'net_cash_flow' => $netCashFlow,
+        ];
+    }
+
+    /** @return array{operating:array, investing:array, financing:array, net_cash_flow:int} */
+    protected function emptyCashFlow(): array
+    {
+        $empty = ['inflows' => 0, 'outflows' => 0, 'net' => 0, 'entries' => []];
+        return ['operating' => $empty, 'investing' => $empty, 'financing' => $empty, 'net_cash_flow' => 0];
+    }
+
+    /**
+     * التصنيف لا يعتمد على نصّ الوصف: الأصل الثابت مصدر استثماري صريح، وتمويل
+     * رأس المال يُعرَف من الطرف المقابل في حقوق الملكية. الباقي نشاط يومي.
+     */
+    protected function cashFlowCategory($entry, array $cashAccountIds, array $equityAccountIds): string
+    {
+        if ($entry->source_type === Asset::class) {
+            return 'investing';
+        }
+
+        $counterpartIds = $entry->lines
+            ->whereNotIn('account_id', $cashAccountIds)
+            ->pluck('account_id');
+        $hasEquity = $counterpartIds->intersect($equityAccountIds)->isNotEmpty();
+
+        return $hasEquity ? 'financing' : 'operating';
     }
 
     /**

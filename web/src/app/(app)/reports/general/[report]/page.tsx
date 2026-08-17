@@ -3,30 +3,34 @@
 import { notFound, useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ReportsWorkspace, type ReportTab } from '@/components/reports/reports-workspace';
+import { GeneralAdvancedReportsWorkspace, type GeneralAdvancedReportTab } from '@/components/reports/general-advanced-reports-workspace';
 
-const GENERAL_REPORTS: Record<string, ReportTab> = {
-  'trial-balance': 'trial',
-  'income-statement': 'income',
-  'balance-sheet': 'balance',
-  'cost-center-profitability': 'costcenter',
-};
+type GeneralReport =
+  | { kind: 'standard'; tab: ReportTab; key: 'trialBalance' | 'incomeStatement' | 'balanceSheet' | 'costCenterProfitability' }
+  | { kind: 'advanced'; tab: GeneralAdvancedReportTab; key: 'accountLedger' | 'cashFlow' | 'journalEntries' | 'taxReport' };
 
-const REPORT_KEYS: Record<ReportTab, string> = {
-  trial: 'trialBalance',
-  income: 'incomeStatement',
-  balance: 'balanceSheet',
-  costcenter: 'costCenterProfitability',
-  aging: 'aging',
+const GENERAL_REPORTS: Record<string, GeneralReport> = {
+  'trial-balance': { kind: 'standard', tab: 'trial', key: 'trialBalance' },
+  'income-statement': { kind: 'standard', tab: 'income', key: 'incomeStatement' },
+  'balance-sheet': { kind: 'standard', tab: 'balance', key: 'balanceSheet' },
+  'cost-center-profitability': { kind: 'standard', tab: 'costcenter', key: 'costCenterProfitability' },
+  'account-ledger': { kind: 'advanced', tab: 'ledger', key: 'accountLedger' },
+  'cash-flow': { kind: 'advanced', tab: 'cashflow', key: 'cashFlow' },
+  'journal-entries': { kind: 'advanced', tab: 'journal', key: 'journalEntries' },
+  'tax-report': { kind: 'advanced', tab: 'tax', key: 'taxReport' },
 };
 
 export default function GeneralReportPage() {
   const params = useParams<{ report: string }>();
   const t = useTranslations('reports.catalog');
-  const tab = GENERAL_REPORTS[params.report];
+  const report = GENERAL_REPORTS[params.report];
 
-  if (!tab) {
-    notFound();
+  if (!report) notFound();
+
+  const heading = t(`reports.${report.key}.title`);
+  if (report.kind === 'standard') {
+    return <ReportsWorkspace initialTab={report.tab} allowedTabs={[report.tab]} heading={heading} />;
   }
 
-  return <ReportsWorkspace initialTab={tab} allowedTabs={[tab]} heading={t(`reports.${REPORT_KEYS[tab]}.title`)} />;
+  return <GeneralAdvancedReportsWorkspace tab={report.tab} heading={heading} />;
 }

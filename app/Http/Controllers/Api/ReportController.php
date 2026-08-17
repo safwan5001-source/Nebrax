@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\GeneralReportRequest;
 use App\Services\Reporting\ReportService;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
@@ -135,6 +136,74 @@ class ReportController extends ApiController
             'total_revenue' => Money::toRiyal($r['total_revenue']),
             'total_expense' => Money::toRiyal($r['total_expense']),
             'total_profit'  => Money::toRiyal($r['total_profit']),
+        ]);
+    }
+
+    /** القيود المرحّلة مع سطورها الكاملة؛ مرشح الحساب لا يبتّر القيد المتوازن. */
+    public function journalEntries(GeneralReportRequest $request): JsonResponse
+    {
+        $report = $this->reports->journalEntries($request->validated());
+
+        return response()->json([
+            'rows' => array_map(fn ($row) => [
+                'entry_id'    => $row['entry_id'],
+                'date'        => $row['date'],
+                'number'      => $row['number'],
+                'description' => $row['description'],
+                'source_type' => $row['source_type'],
+                'source_id'   => $row['source_id'],
+                'debit'       => Money::toRiyal($row['debit']),
+                'credit'      => Money::toRiyal($row['credit']),
+                'lines'       => array_map(fn ($line) => [
+                    'account_id'   => $line['account_id'],
+                    'account_code' => $line['account_code'],
+                    'account_name' => $line['account_name'],
+                    'description'  => $line['description'],
+                    'debit'        => Money::toRiyal($line['debit']),
+                    'credit'       => Money::toRiyal($line['credit']),
+                ], $row['lines']),
+            ], $report['rows']),
+            'total_debit'  => Money::toRiyal($report['total_debit']),
+            'total_credit' => Money::toRiyal($report['total_credit']),
+        ]);
+    }
+
+    /** التدفقات النقدية المباشرة من النقد والبنك في القيود المرحّلة. */
+    public function cashFlow(GeneralReportRequest $request): JsonResponse
+    {
+        $flow = $this->reports->cashFlow($request->validated());
+        $section = fn (array $value) => [
+            'inflows'  => Money::toRiyal($value['inflows']),
+            'outflows' => Money::toRiyal($value['outflows']),
+            'net'      => Money::toRiyal($value['net']),
+            'entries'  => array_map(fn ($entry) => [
+                'date'        => $entry['date'],
+                'number'      => $entry['number'],
+                'description' => $entry['description'],
+                'inflow'      => Money::toRiyal($entry['inflow']),
+                'outflow'     => Money::toRiyal($entry['outflow']),
+                'net'         => Money::toRiyal($entry['net']),
+            ], $value['entries']),
+        ];
+
+        return response()->json([
+            'operating'     => $section($flow['operating']),
+            'investing'     => $section($flow['investing']),
+            'financing'     => $section($flow['financing']),
+            'net_cash_flow' => Money::toRiyal($flow['net_cash_flow']),
+        ]);
+    }
+
+    /** حركة ضريبة القيمة المضافة من حسابي المدخلات والمخرجات النظاميين. */
+    public function taxReport(GeneralReportRequest $request): JsonResponse
+    {
+        $report = $this->reports->taxReport($request->validated());
+
+        return response()->json([
+            'input_vat'  => Money::toRiyal($report['input_vat']),
+            'output_vat' => Money::toRiyal($report['output_vat']),
+            'net_vat'    => Money::toRiyal($report['net_vat']),
+            'status'     => $report['status'],
         ]);
     }
 

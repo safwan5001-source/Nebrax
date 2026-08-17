@@ -1815,6 +1815,38 @@
     "date_range": "Date range",
     "apply": "Apply",
     "today": "Today",
+    "general": {
+      "account": "Account",
+      "date": "Date",
+      "description": "Description",
+      "debit": "Debit",
+      "credit": "Credit",
+      "balance": "Balance",
+      "allAccounts": "Select an account",
+      "selectAccount": "Select an account to view its ledger activity and running balance.",
+      "openingBalance": "Opening balance",
+      "closingBalance": "Closing balance",
+      "journalEntries": "Journal entries",
+      "entryNumber": "Entry number",
+      "entryLines": "Entry lines",
+      "cashFlow": "Cash flow",
+      "directCashFlowHint": "Direct cash flow from the cash and bank effect in posted entries; internal transfers are excluded.",
+      "operating": "Operating activities",
+      "investing": "Investing activities",
+      "financing": "Financing activities",
+      "inflows": "Cash inflows",
+      "outflows": "Cash outflows",
+      "netCashFlow": "Net cash flow",
+      "taxReport": "VAT report",
+      "inputVat": "Input VAT",
+      "outputVat": "Output VAT",
+      "netVat": "Net VAT",
+      "taxPayable": "VAT payable",
+      "taxRecoverable": "VAT recoverable or carried forward",
+      "taxHint": "A control summary of the input and output VAT account movements in posted entries; it is not a tax filing or a submission to the authority.",
+      "loadFailed": "The report could not be loaded. Check your connection and try again.",
+      "retry": "Try again"
+    },
     "catalog": {
       "title": "Reports center",
       "description": "Choose a category to access the reports currently available and the roadmap for reports that will be built next.",
@@ -1925,7 +1957,7 @@
         },
         "accountLedger": {
           "title": "Account ledger",
-          "description": "Will be available as a standalone report with account selection."
+          "description": "Posted account activity with opening, running, and closing balances."
         },
         "cashFlow": {
           "title": "Cash flow",
