@@ -1,4 +1,5 @@
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
+import type { DocSectionLayoutItem } from '@/modules/documents/types';
 import {
   createInvoicePdf,
   downloadInvoicePdf,
@@ -36,6 +37,8 @@ export interface LineDocumentPdfInput {
   logoUrl?: string | null;
   /** تذييل القالب المثبت وقت إصدار المستند، إن وُجد. */
   footerText?: string | null;
+  /** تخطيط مراجعة PDF المثبتة؛ يمرّ إلى العارض المتجهي كما هو. */
+  templateLayout?: DocSectionLayoutItem[] | null;
   documentMeta: Array<[string, string | null | undefined]>;
   adjustments?: InvoicePdfAdjustment[];
   labels: InvoicePdfLabels;
@@ -62,6 +65,7 @@ export async function createLineDocumentPdf(input: LineDocumentPdfInput): Promis
     customer: input.party,
     logoUrl: input.logoUrl,
     footerText: input.footerText,
+    templateLayout: input.templateLayout,
     documentMeta: input.documentMeta,
     adjustments: input.adjustments,
     labels: input.labels,

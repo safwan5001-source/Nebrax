@@ -185,6 +185,7 @@ export default function PurchaseDetailPage() {
     supplier,
     adjustments,
     footerText: frozenPdfFooter,
+    templateLayout: Array.isArray(frozenPdfDefinition?.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : null,
     locale,
     labels: {
       title: tpp('title'), titleSecondary: tpp('title_secondary'), seller: tpp('buyer'), billTo: tpp('supplier'),

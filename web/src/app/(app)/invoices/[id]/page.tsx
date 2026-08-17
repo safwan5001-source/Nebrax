@@ -243,6 +243,7 @@ export default function InvoiceDetailPage() {
       qrImage,
       logoUrl,
       footerText: frozenPdfDefinition?.footer_text ?? footerText,
+      templateLayout: Array.isArray(frozenPdfDefinition?.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : layout,
       locale,
       labels: {
         title: td('title'), titleSecondary: td('title_en'), seller: td('seller'), billTo: td('bill_to'),

@@ -443,7 +443,7 @@
     "layout_invalid": "Correct the block layout before saving or publishing.",
     "restore_default_layout": "Restore default layout",
     "block_properties": "Block properties",
-    "block_properties_hint": "Only supported options are shown in preview and browser printing and frozen with the template revision; the vector PDF generator is separate.",
+    "block_properties_hint": "Options are frozen with the template revision; vector PDF uses line item columns and footer, while the remaining options apply to preview and browser printing.",
     "property_block": "Block",
     "alignment": "Alignment",
     "inherit_default": "Use default",

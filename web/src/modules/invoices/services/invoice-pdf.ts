@@ -1,5 +1,7 @@
 import type { Company, Customer, InvoiceDoc } from '@/components/invoices/invoice-document';
 
+import type { DocBlockAlignment, DocItemsColumn, DocItemsColumnId, DocSectionLayoutItem, DocSectionProperties } from '@/modules/documents/types';
+
 const PAGE = { width: 210, height: 297, margin: 10, contentWidth: 190 };
 const FONT_FILE = 'NotoSansArabic-Regular.ttf';
 const FONT_FAMILY = 'NotoSansArabic';
@@ -48,6 +50,8 @@ export interface InvoicePdfInput {
   logoUrl?: string | null;
   /** تذييل المراجعة المثبتة عند إصدار المستند؛ لا يُعاد قراءته من الإعدادات الحية. */
   footerText?: string | null;
+  /** تخطيط مراجعة المخرج المثبتة؛ يزوّد PDF بخصائص الكتل نفسها التي يستهلكها العارض. */
+  templateLayout?: DocSectionLayoutItem[] | null;
   /** حقول إضافية للمستندات غير البيعية، مثل رقم فاتورة المورد وتاريخ الاستحقاق. */
   documentMeta?: Array<[string, string | null | undefined]>;
   /** الخصم أو الشحن أو التسوية؛ تظهر بين الإجمالي الفرعي والضريبة. */
@@ -118,6 +122,24 @@ function date(value: string, locale: string): string {
   if (Number.isNaN(parsed.valueOf())) return value;
   // التاريخ المالي يُكتب بأرقام لاتينية محايدة داخل PDF لتجنّب أثر bidi مع العربية.
   return new Intl.DateTimeFormat(locale === 'ar' ? 'en-GB' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(parsed);
+}
+
+const DEFAULT_ITEM_COLUMNS: readonly DocItemsColumn[] = [
+  { id: 'number' }, { id: 'description' }, { id: 'quantity' },
+  { id: 'unit_price' }, { id: 'tax' }, { id: 'total' },
+];
+
+function blockProperties(layout: DocSectionLayoutItem[] | null | undefined, key: DocSectionLayoutItem['key']): DocSectionProperties {
+  return layout?.find((item) => item.key === key)?.properties ?? {};
+}
+
+function itemColumns(properties: DocSectionProperties): readonly DocItemsColumn[] {
+  return properties.columns?.length ? properties.columns : DEFAULT_ITEM_COLUMNS;
+}
+
+function pdfAlignment(alignment: DocBlockAlignment): 'left' | 'center' | 'right' {
+  const alignments: Record<DocBlockAlignment, 'left' | 'center' | 'right'> = { start: 'right', center: 'center', end: 'left' };
+  return alignments[alignment];
 }
 
 function drawLogo(pdf: PdfDoc, logo: string | null | undefined, x: number, y: number, maxWidth: number, maxHeight: number): boolean {
@@ -225,14 +247,25 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     y = 100;
   };
 
-  const columns = [
-    { label: '#', width: 10, kind: 'latin' as const },
-    { label: input.labels.description, width: 56, kind: 'arabic' as const },
-    { label: input.labels.quantity, width: 20, kind: 'arabic' as const },
-    { label: input.labels.unitPrice, width: 32, kind: 'arabic' as const },
-    { label: input.labels.tax, width: 32, kind: 'arabic' as const },
-    { label: input.labels.total, width: 40, kind: 'arabic' as const },
-  ];
+  const itemsProperties = blockProperties(input.templateLayout, 'items');
+  const footerProperties = blockProperties(input.templateLayout, 'footer');
+  const columnLabels: Record<DocItemsColumnId, string> = {
+    number: '#', description: input.labels.description, quantity: input.labels.quantity,
+    unit_price: input.labels.unitPrice, tax: input.labels.tax, total: input.labels.total,
+  };
+  const columnWeights: Record<DocItemsColumnId, number> = {
+    number: 10, description: 56, quantity: 20, unit_price: 32, tax: 32, total: 40,
+  };
+  const selectedColumns = itemColumns(itemsProperties);
+  const totalWeight = selectedColumns.reduce((sum, column) => sum + columnWeights[column.id], 0);
+  const defaultAlignment = (id: DocItemsColumnId): DocBlockAlignment => id === 'number' || id === 'description' ? 'start' : 'end';
+  const columns = selectedColumns.map((column) => ({
+    ...column,
+    label: column.label?.trim() || columnLabels[column.id],
+    width: PAGE.contentWidth * columnWeights[column.id] / totalWeight,
+    kind: column.id === 'description' ? 'arabic' as const : 'latin' as const,
+    alignment: column.alignment ?? itemsProperties.alignment ?? defaultAlignment(column.id),
+  }));
 
   const drawTableHeader = () => {
     pdf.setFillColor(15, 39, 72);
@@ -241,8 +274,16 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     pdf.setTextColor(255, 255, 255);
     let cursor = right;
     columns.forEach((column) => {
-      if (column.kind === 'arabic') writeArabicRight(pdf, column.label, cursor - 2, y + 6.35, 7.1, true);
-      else writeLatinCenter(pdf, column.label, cursor - column.width / 2, y + 6.35, 7.2, true);
+      const cellStart = cursor - column.width;
+      const alignment = pdfAlignment(column.alignment);
+      const x = alignment === 'left' ? cellStart + 2 : alignment === 'center' ? cellStart + column.width / 2 : cursor - 2;
+      if (column.kind === 'arabic') {
+        setArabic(pdf, 7.1, true);
+        pdf.text(asArabic(pdf, column.label), x, y + 6.35, { align: alignment });
+      } else {
+        setLatin(pdf, 7.2, true);
+        pdf.text(column.label, x, y + 6.35, { align: alignment });
+      }
       cursor -= column.width;
       if (cursor > left) pdf.line(cursor, y, cursor, y + 10);
     });
@@ -257,27 +298,33 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   };
 
   const drawLine = (line: InvoiceDoc['lines'][number], index: number) => {
+    const descriptionColumn = columns.find((column) => column.id === 'description');
+    if (!descriptionColumn) return;
     setArabic(pdf, 7.6);
-    const description = pdf.splitTextToSize(asArabic(pdf, line.description ?? '—'), columns[1].width - 4) as string[];
+    const description = pdf.splitTextToSize(asArabic(pdf, line.description ?? '—'), descriptionColumn.width - 4) as string[];
     const height = Math.max(12, description.length * 4.5 + 4.5);
     if (y + height > PAGE.height - 62) nextPage();
     if (index % 2 === 1) pdf.setFillColor(248, 250, 252);
     else pdf.setFillColor(255, 255, 255);
     pdf.setDrawColor(226, 232, 240);
     pdf.rect(left, y, PAGE.contentWidth, height, 'FD');
+    const values: Record<DocItemsColumnId, string> = {
+      number: String(index + 1), description: line.description ?? '—', quantity: String(line.quantity),
+      unit_price: money(line.unit_price), tax: money(line.line_tax), total: money(line.line_total),
+    };
     let cursor = right;
-    const cells = [
-      String(index + 1), line.description ?? '—', String(line.quantity), money(line.unit_price), money(line.line_tax), money(line.line_total),
-    ];
-    cells.forEach((value, cellIndex) => {
-      const width = columns[cellIndex].width;
-      if (cellIndex === 1) {
+    columns.forEach((column) => {
+      const cellStart = cursor - column.width;
+      const alignment = pdfAlignment(column.alignment);
+      const x = alignment === 'left' ? cellStart + 2 : alignment === 'center' ? cellStart + column.width / 2 : cursor - 2;
+      if (column.id === 'description') {
         setArabic(pdf, 7.6);
-        pdf.text(description, cursor - 2, y + 5.6, { align: 'right', lineHeightFactor: 1.08 });
+        pdf.text(description, x, y + 5.6, { align: alignment, lineHeightFactor: 1.08 });
       } else {
-        writeLatinCenter(pdf, value, cursor - width / 2, y + height / 2 + 2.5, cellIndex >= 3 ? 7.2 : 7.4, cellIndex >= 3);
+        setLatin(pdf, column.id === 'unit_price' || column.id === 'tax' || column.id === 'total' ? 7.2 : 7.4, column.id === 'unit_price' || column.id === 'tax' || column.id === 'total');
+        pdf.text(values[column.id], x, y + height / 2 + 2.5, { align: alignment });
       }
-      cursor -= width;
+      cursor -= column.width;
       if (cursor > left) pdf.line(cursor, y, cursor, y + height);
     });
     y += height;
@@ -335,7 +382,7 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     const footerY = PAGE.height - 12;
     pdf.setDrawColor(203, 213, 225);
     pdf.line(left, footerY - 5, right, footerY - 5);
-    writeArabicRight(pdf, input.footerText?.trim() || input.labels.footer, right, footerY + 0.5, 6.3);
+    writeArabicRight(pdf, footerProperties.static_content?.trim() || input.footerText?.trim() || input.labels.footer, right, footerY + 0.5, 6.3);
     writeLatinCenter(pdf, `${page} / ${pages}`, PAGE.width / 2, footerY + 0.5, 6.7);
   }
 

@@ -152,6 +152,7 @@ export default function CreditNoteDetailPage() {
       party: customer,
       logoUrl: pdfDesign.logoUrl,
       footerText: pdfDesign.footerText,
+      templateLayout: Array.isArray(frozenPdfDefinition?.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : design.layout,
       documentMeta: [
         [t('date'), note.note_date],
         [t('refund_type'), refundType],
