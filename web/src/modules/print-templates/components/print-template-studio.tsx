@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { SectionDesigner } from '@/components/settings/section-designer';
 import { PrintTemplateAssignments } from './print-template-assignments';
 import { BlockPropertiesEditor } from './block-properties-editor';
+import { TemplateRevisionHistory } from './template-revision-history';
 import { ApiError, api } from '@/lib/api';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { DocumentView } from '@/modules/documents/components/document-view';
@@ -39,6 +40,8 @@ interface Revision {
   status: 'draft' | 'published' | 'superseded';
   document_types: DocumentTypeId[];
   definition: TemplateDefinition;
+  published_at?: string | null;
+  created_at?: string | null;
 }
 
 interface PrintTemplate {
@@ -49,6 +52,7 @@ interface PrintTemplate {
   document_types: DocumentTypeId[];
   published_revision?: Revision | null;
   draft_revision?: Revision | null;
+  revisions?: Revision[];
 }
 
 const FALLBACK: PrintTemplate = {
@@ -101,6 +105,9 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   const [selectedId, setSelectedId] = useState(FALLBACK.id);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [templateDetails, setTemplateDetails] = useState<Record<string, PrintTemplate>>({});
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsFailed, setDetailsFailed] = useState(false);
 
   useEffect(() => {
     api<{ data: PrintTemplate[] }>('/print-templates')
@@ -114,6 +121,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   }, []);
 
   const selected = templates.find((template) => template.id === selectedId) ?? templates[0] ?? FALLBACK;
+  const detailedSelected = templateDetails[selected.id] ?? selected;
   const revision = activeRevision(selected);
   const type = revision.document_types[0] ?? selected.document_types[0] ?? 'tax_invoice';
   const documentType = getDocumentTypeDefinition(type);
@@ -168,9 +176,11 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
         const response = await api<{ data: PrintTemplate }>('/print-templates', { method: 'POST', body });
         setTemplates((current) => current.map((template) => template.id === selected.id ? response.data : template));
         setSelectedId(response.data.id);
+        void loadTemplateDetails(response.data.id);
       } else {
         const response = await api<{ data: PrintTemplate }>(`/print-templates/${selected.id}/draft`, { method: 'PUT', body });
         setTemplates((current) => current.map((template) => template.id === selected.id ? response.data : template));
+        void loadTemplateDetails(response.data.id);
       }
       success(t('saved'));
     } catch (caught) {
@@ -194,6 +204,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
     try {
       const response = await api<{ data: PrintTemplate }>(`/print-templates/${selected.id}/publish`, { method: 'POST' });
       setTemplates((current) => current.map((template) => template.id === selected.id ? response.data : template));
+      void loadTemplateDetails(response.data.id);
       success(t('published_success'));
     } catch {
       error(t('publish_failed'));
@@ -218,6 +229,27 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
       setSaving(false);
     }
   }
+
+  async function loadTemplateDetails(templateId: string) {
+    if (templateId === FALLBACK.id || templateId.startsWith('new-')) {
+      setDetailsFailed(false);
+      setDetailsLoading(false);
+      return;
+    }
+
+    setDetailsLoading(true);
+    setDetailsFailed(false);
+    try {
+      const response = await api<{ data: PrintTemplate }>(`/print-templates/${templateId}`);
+      setTemplateDetails((current) => ({ ...current, [templateId]: response.data }));
+    } catch {
+      setDetailsFailed(true);
+    } finally {
+      setDetailsLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadTemplateDetails(selected.id); }, [selected.id]);
 
   const templatesCatalog = listTemplates();
   const selectedName = selected.name || t('preview_template_name');
@@ -278,6 +310,8 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
           <Card className="overflow-hidden"><CardHeader className="flex flex-row items-center justify-between border-b border-border py-3"><div><CardTitle className="text-sm">{t('preview')}</CardTitle><p className="mt-1 text-xs text-muted">{t('preview_hint')}</p></div><span className="rounded bg-surface px-2 py-1 text-xs text-muted">{t('revision', { version: revision.version })}</span></CardHeader><CardContent className="min-h-[620px] bg-background p-3"><DocumentScaler><DocumentView model={preview} templateId={definition.template_id} themeId={definition.theme_id} showLogo={definition.show_logo} layout={definition.layout} rootId="print-template-preview" /></DocumentScaler></CardContent></Card>
         </div>
       </div>
+
+      <TemplateRevisionHistory revisions={detailedSelected.revisions} loading={detailsLoading} failed={detailsFailed} />
 
       <PrintTemplateAssignments template={selected} canManage={canManage} />
     </div>
