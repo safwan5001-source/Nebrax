@@ -339,4 +339,77 @@ class PrintTemplateTest extends TestCase
         $this->assertSame($legacy, Tenant::findOrFail($tenantId)->settings['sales_config']['designs']);
         $this->assertSame(1, $template->assignments()->whereNull('branch_id')->count());
     }
+
+    /** @test */
+    public function live_resolution_endpoint_prefers_branch_then_falls_back_to_company_assignment(): void
+    {
+        ['token' => $token, 'tenant_id' => $tenantId] = $this->registerTenant('template-live-resolution', 'owner@template-live-resolution.test');
+
+        $company = $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'قالب المؤسسة الحي',
+            'document_types' => ['tax_invoice'],
+            'definition' => $this->definition('classic'),
+        ])->assertCreated();
+        $companyRevisionId = $this->withToken($token)
+            ->postJson('/api/print-templates/'.$company['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+
+        $branchTemplate = $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'قالب الفرع الحي',
+            'document_types' => ['tax_invoice'],
+            'definition' => $this->definition('modern'),
+        ])->assertCreated();
+        $branchRevisionId = $this->withToken($token)
+            ->postJson('/api/print-templates/'.$branchTemplate['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+
+        app(TenantContext::class)->set($tenantId);
+        $riyadh = Branch::create(['name' => 'الرياض', 'code' => '90003']);
+        $khobar = Branch::create(['name' => 'الخبر', 'code' => '90004']);
+
+        $this->withToken($token)->putJson('/api/print-templates/assignments/default', [
+            'document_type' => 'tax_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $companyRevisionId,
+        ])->assertOk();
+        $this->withToken($token)->putJson('/api/print-templates/assignments/default', [
+            'branch_id' => $riyadh->id,
+            'document_type' => 'tax_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $branchRevisionId,
+        ])->assertOk();
+
+        $this->withToken($token)->getJson('/api/print-templates/resolve?document_type=tax_invoice&usage=print&branch_id='.$riyadh->id)
+            ->assertOk()
+            ->assertJsonPath('data.scope', 'branch')
+            ->assertJsonPath('data.branch_id', $riyadh->id)
+            ->assertJsonPath('data.print_template_revision_id', $branchRevisionId)
+            ->assertJsonPath('data.revision.id', $branchRevisionId)
+            ->assertJsonPath('data.revision.definition.template', 'modern');
+
+        $this->withToken($token)->getJson('/api/print-templates/resolve?document_type=tax_invoice&usage=print&branch_id='.$khobar->id)
+            ->assertOk()
+            ->assertJsonPath('data.scope', 'company')
+            ->assertJsonPath('data.branch_id', null)
+            ->assertJsonPath('data.print_template_revision_id', $companyRevisionId);
+    }
+
+    /** @test */
+    public function live_resolution_endpoint_returns_null_when_no_assignment_exists(): void
+    {
+        ['token' => $token] = $this->registerTenant('template-live-empty', 'owner@template-live-empty.test');
+
+        $this->withToken($token)->getJson('/api/print-templates/resolve?document_type=tax_invoice&usage=print')
+            ->assertOk()
+            ->assertJsonPath('data', null);
+    }
+
+    /** @test */
+    public function live_resolution_endpoint_rejects_an_unknown_or_foreign_branch(): void
+    {
+        ['token' => $token] = $this->registerTenant('template-live-branch-guard', 'owner@template-live-branch-guard.test');
+
+        $this->withToken($token)->getJson('/api/print-templates/resolve?document_type=tax_invoice&usage=print&branch_id=00000000-0000-0000-0000-000000000001')
+            ->assertUnprocessable();
+    }
 }

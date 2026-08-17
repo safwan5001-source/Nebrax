@@ -332,6 +332,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // مكتبة قوالب الطباعة: القراءة لمن يطبع مستندات، والإدارة لمالك/مدير الشركة.
         Route::get('print-templates', [PrintTemplateController::class, 'index'])->middleware($perm('invoices.view'));
         Route::get('print-templates/assignments', [PrintTemplateController::class, 'assignments'])->middleware($perm('invoices.view'));
+        Route::get('print-templates/resolve', [PrintTemplateController::class, 'resolve'])->middleware($perm('invoices.view'));
         Route::get('print-templates/{id}', [PrintTemplateController::class, 'show'])->middleware($perm('invoices.view'));
         Route::post('print-templates', [PrintTemplateController::class, 'store'])->middleware($perm('company.manage'));
         Route::put('print-templates/{id}/draft', [PrintTemplateController::class, 'updateDraft'])->middleware($perm('company.manage'));
