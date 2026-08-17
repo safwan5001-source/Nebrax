@@ -19,10 +19,11 @@ import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { RevisionLog } from '@/components/documents/revision-log';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
+import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
 interface Quote {
-  id: string; number: string; partner_id: string; status: string;
+  id: string; branch_id: string | null; number: string; partner_id: string; status: string;
   quote_date: string; valid_until: string | null;
   subtotal: string; tax_amount: string; total: string; notes: string | null;
   converted_invoice_id: string | null; lines: Line[];
@@ -66,15 +67,33 @@ export default function QuoteDetailPage() {
     api<{ data: Quote }>(`/quotes/${id}`)
       .then(async (r) => {
         setQuote(r.data);
-        const [p, m, d] = await Promise.allSettled([
+        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
+        const [p, m, legacy, live] = await Promise.allSettled([
           api<{ data: QuoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: QuoteCompany }>(`/me`),
           api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
+          api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=quotation&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
-        if (d.status === 'fulfilled') {
-          const dg = d.value.data ?? {};
+        const resolved = live.status === 'fulfilled'
+          ? resolveLiveTemplateDefinition(live.value.data, 'quotation')
+          : null;
+        if (resolved) {
+          setTemplateId(resolved.templateId);
+          setThemeId(resolved.themeId);
+          setFooterText(resolved.footerText);
+          setShowLogo(resolved.showLogo);
+          setLogoUrl(null);
+          setLogoHeight(null);
+          setLayout(resolved.layout);
+          setTermsText(resolved.termsText);
+          setBankText(resolved.bankText);
+          setStampUrl(null);
+          setSignatureUrl(null);
+        } else if (legacy.status === 'fulfilled') {
+          // لا يتجمد عرض السعر تجارياً؛ هذا رجوع توافق صريح لا تعريف حي جزئي.
+          const dg = legacy.value.data ?? {};
           setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
           if (dg.theme) setThemeId(dg.theme as ThemeId);
           setFooterText(dg.footer_text ?? null);

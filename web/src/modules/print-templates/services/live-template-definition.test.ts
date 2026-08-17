@@ -56,6 +56,23 @@ describe('محول تعريف القالب الحي', () => {
     expect(resolved?.layout.map((block) => block.key)).toContain('items');
   });
 
+  it('يطبق تعريف عرض السعر الحي على التذييل والشروط المنشورة', () => {
+    const resolved = resolveLiveTemplateDefinition({
+      print_template_revision_id: 'quote-revision',
+      revision: {
+        id: 'quote-revision',
+        definition: { template_id: 'tax-invoice-modern', footer_text: 'تذييل عرض منشور', terms_text: 'شروط العرض' },
+      },
+    }, 'quotation');
+
+    expect(resolved).toMatchObject({
+      templateId: 'tax-invoice-modern',
+      footerText: 'تذييل عرض منشور',
+      termsText: 'شروط العرض',
+    });
+    expect(resolved?.layout.map((block) => block.key)).toContain('summary');
+  });
+
   it('يطبق تعريف السند الحي على كتلة السند والبيانات البنكية', () => {
     const resolved = resolveLiveTemplateDefinition({
       print_template_revision_id: 'voucher-revision',
