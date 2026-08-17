@@ -457,9 +457,12 @@
     "static_content": "محتوى ثابت",
     "static_content_placeholder": "أدخل النص الذي يظهر في هذه الكتلة.",
     "items_columns": "أعمدة البنود",
-    "items_columns_hint": "يمكن إخفاء الأعمدة الاختيارية وإعادة تسمية الأعمدة الظاهرة.",
+    "items_columns_hint": "يمكن إخفاء الأعمدة الاختيارية وإعادة تسمية الأعمدة الظاهرة وترتيبها بالسحب.",
     "required_column": "إلزامي",
-    "column_label": "عنوان: {column}"
+    "column_label": "عنوان: {column}",
+    "drag_column": "اسحب لترتيب عمود {column}",
+    "move_column_up": "نقل عمود {column} لأعلى",
+    "move_column_down": "نقل عمود {column} لأسفل"
   },
   "documentTypesAlt": {
     "tax_invoice": "Tax Invoice",

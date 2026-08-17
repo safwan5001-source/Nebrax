@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { SectionDesigner } from '@/components/settings/section-designer';
 import { PrintTemplateAssignments } from './print-template-assignments';
 import { BlockPropertiesEditor } from './block-properties-editor';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import { getDocumentPreviewModel } from '@/modules/documents/registry/document-samples';
@@ -173,8 +173,8 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
         setTemplates((current) => current.map((template) => template.id === selected.id ? response.data : template));
       }
       success(t('saved'));
-    } catch {
-      error(t('save_failed'));
+    } catch (caught) {
+      error(caught instanceof ApiError ? caught.message : t('save_failed'));
     } finally {
       setSaving(false);
     }

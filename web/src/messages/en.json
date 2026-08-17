@@ -457,9 +457,12 @@
     "static_content": "Static content",
     "static_content_placeholder": "Enter the text shown in this block.",
     "items_columns": "Line item columns",
-    "items_columns_hint": "Optional columns can be hidden and visible columns can be renamed.",
+    "items_columns_hint": "Optional columns can be hidden, visible columns can be renamed, and their order can be changed by dragging.",
     "required_column": "Required",
-    "column_label": "Label: {column}"
+    "column_label": "Label: {column}",
+    "drag_column": "Drag to reorder {column}",
+    "move_column_up": "Move {column} up",
+    "move_column_down": "Move {column} down"
   },
   "documentTypesAlt": {
     "tax_invoice": "فاتورة ضريبية",

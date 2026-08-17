@@ -54,7 +54,17 @@ class PrintTemplateContract
         'footer' => ['alignment', 'font_size', 'static_content'],
     ];
 
-    private const ITEM_COLUMNS = ['number', 'description', 'quantity', 'unit_price', 'tax', 'total'];
+    private const ITEM_COLUMNS = [
+        'number',
+        'description',
+        'product_code',
+        'barcode',
+        'quantity',
+        'price_before_tax',
+        'unit_price',
+        'tax',
+        'total',
+    ];
     private const REQUIRED_ITEM_COLUMNS = ['description', 'total'];
     private const ALIGNMENTS = ['start', 'center', 'end'];
     private const FONT_SIZES = ['sm', 'md', 'lg'];
