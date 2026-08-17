@@ -1,5 +1,6 @@
 import type { Company } from '@/lib/company';
 import type { Party, DocAdjustment, DocLine } from '@/components/documents/tax-document';
+import type { DocSectionLayoutItem } from '@/modules/documents/types';
 import {
   createInvoicePdf,
   downloadInvoicePdf,
@@ -37,6 +38,8 @@ export async function createPurchaseInvoicePdf(input: {
   adjustments: DocAdjustment[];
   /** تذييل مراجعة القالب المثبتة عند ترحيل الفاتورة. */
   footerText?: string | null;
+  /** تخطيط مراجعة PDF المثبتة، ويشمل خصائص الكتل المتقدمة. */
+  templateLayout?: DocSectionLayoutItem[] | null;
   labels: PurchasePdfLabels;
   locale: string;
 }): Promise<Blob> {
@@ -71,6 +74,7 @@ export async function createPurchaseInvoicePdf(input: {
     customer: input.supplier,
     adjustments: input.adjustments,
     footerText: input.footerText,
+    templateLayout: input.templateLayout,
     documentMeta: [
       [input.labels.date, input.purchase.purchase_date],
       [input.labels.paymentType, input.purchase.payment_type === 'cash' ? input.labels.cash : input.labels.credit],
