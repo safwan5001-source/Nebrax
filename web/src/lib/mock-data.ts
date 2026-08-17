@@ -1358,6 +1358,68 @@ function customersReportFor(path: string) {
   };
 }
 
+// تقارير المخزون في وضع العرض: نفس العقود الصادقة لمسارات API الحية.
+function inventoryReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'value';
+  const snapshot = (source: string) => ({ source, snapshot: true });
+  const history = (source: string) => ({ source, snapshot: false });
+
+  if (view === 'warehouses') {
+    return {
+      view,
+      data: [
+        { key: 'pr2', warehouse_id: 'wh1', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', quantity: 22 },
+        { key: 'pr3', warehouse_id: 'wh2', warehouse: 'مخزن الخبر', branch: 'فرع الخبر', sku: 'SKU-003', label: 'كرتون ورق A4', unit: 'carton', quantity: 130 },
+      ],
+      totals: { items: 2, warehouses: 2, quantity: 152 },
+      scope: snapshot('warehouse_stock_quantities'),
+    };
+  }
+  if (view === 'movements') {
+    return {
+      view,
+      data: [
+        { key: 'mv2', date: '2026-06-24', type: 'out', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', quantity: 3, unit_cost: '760.00', total_cost: '2280.00', balance_quantity: 22, notes: 'بيع عبر فاتورة INV-2026-0118' },
+        { key: 'mv1', date: '2026-06-20', type: 'in', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', quantity: 25, unit_cost: '760.00', total_cost: '19000.00', balance_quantity: 25, notes: 'استلام مخزون مرحّل' },
+      ],
+      totals: { movements: 2, in_quantity: 25, out_quantity: 3, in_cost: '19000.00', out_cost: '2280.00', total_cost: '21280.00' },
+      scope: history('posted_stock_movements'),
+    };
+  }
+  if (view === 'operations') {
+    return {
+      view,
+      data: [
+        { key: 'op2', number: 'ST-2026-00012', date: '2026-06-24', type: 'transfer', warehouse: 'المخزن الرئيسي', target_warehouse: 'مخزن الخبر', branch: 'الفرع الرئيسي', target_branch: 'فرع الخبر', lines: 1, quantity: 3, total_cost: '2280.00' },
+        { key: 'op1', number: 'SR-2026-00008', date: '2026-06-20', type: 'receipt', warehouse: 'المخزن الرئيسي', target_warehouse: null, branch: 'الفرع الرئيسي', target_branch: null, lines: 2, quantity: 31, total_cost: '21850.00' },
+      ],
+      totals: { operations: 2, lines: 3, quantity: 34, total_cost: '24130.00' },
+      scope: history('posted_stock_permits'),
+    };
+  }
+  if (view === 'stocktakes') {
+    return {
+      view,
+      data: [
+        { key: 'stk1', number: 'STK-2026-00004', date: '2026-06-18', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', counted_lines: 4, quantity_difference: -2, difference_value: '-1520.00' },
+      ],
+      totals: { stocktakes: 1, counted_lines: 4, quantity_difference: -2, difference_value: '-1520.00' },
+      scope: history('posted_stocktakes'),
+    };
+  }
+
+  return {
+    view: 'value',
+    data: [
+      { key: 'pr2', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', quantity: 22, reorder_level: 10, avg_cost: '760.00', stock_value: '16720.00' },
+      { key: 'pr3', sku: 'SKU-003', label: 'كرتون ورق A4', unit: 'carton', quantity: 130, reorder_level: 10, avg_cost: '58.00', stock_value: '7540.00' },
+    ],
+    totals: { products: 2, quantity: 152, stock_value: '24260.00' },
+    scope: snapshot('current_tracked_products'),
+  };
+}
+
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
@@ -1483,6 +1545,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/reports/sales') return resolve(salesReportFor(path));
   if (clean === '/reports/purchases') return resolve(purchasesReportFor(path));
   if (clean === '/reports/customers') return resolve(customersReportFor(path));
+  if (clean === '/reports/inventory') return resolve(inventoryReportFor(path));
   if (clean === '/reports/income-statement') return resolve(incomeStatementFor(path));
   if (clean === '/reports/balance-sheet') return resolve(mockBalanceSheet);
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);

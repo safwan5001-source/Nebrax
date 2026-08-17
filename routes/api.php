@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\InventoryReportController;
 use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
@@ -290,6 +291,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('reports/purchases/creators', [PurchaseReportController::class, 'creators'])->middleware($perm('reports.view'));
         // تقارير العملاء: قراءة من الفواتير وسندات القبض والمواعيد، بلا أثر محاسبي جديد.
         Route::get('reports/customers', [CustomerReportController::class, 'show'])->middleware($perm('reports.view'));
+        // تقارير المخزون: قراءة من الأرصدة والحركات والأذون والجرد المرحّل فقط.
+        Route::get('reports/inventory', [InventoryReportController::class, 'show'])->middleware($perm('reports.view'));
 
         // المرتجعات
         // سطور مستندٍ مصدر بكمياتها المتبقية للردّ — تسبق `returns/{id}` في
