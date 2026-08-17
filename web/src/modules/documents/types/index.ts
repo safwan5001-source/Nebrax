@@ -69,6 +69,8 @@ export interface DocumentTotals {
   subtotal: number;
   discount?: number;
   shipping?: number;
+  /** فرق تسوية موجب أو سالب؛ يستخدمه الشراء للحفاظ على تطابق الإجمالي المطبوع. */
+  adjustment?: number;
   tax: number;
   total: number;
 }

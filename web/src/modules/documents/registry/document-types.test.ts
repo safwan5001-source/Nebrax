@@ -31,6 +31,12 @@ describe('Document type registry', () => {
     }
   });
 
+  it('declares thermal paper for posted purchase and note outputs', () => {
+    for (const type of ['purchase_invoice', 'credit_note', 'debit_note'] as const) {
+      expect(DOCUMENT_TYPE_REGISTRY[type].supportedPaper).toEqual(expect.arrayContaining(['thermal_58', 'thermal_80']));
+    }
+  });
+
   it('rejects blocks that do not belong to the document family', () => {
     expect(isDocumentBlockAllowed('receipt_voucher', 'items')).toBe(false);
     expect(isDocumentBlockAllowed('tax_invoice', 'voucher')).toBe(false);

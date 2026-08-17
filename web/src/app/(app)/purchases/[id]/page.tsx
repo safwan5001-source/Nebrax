@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { TaxDocument, type Party, type DocLine, type DocAdjustment } from '@/components/documents/tax-document';
+import { PurchaseDocument } from '@/components/purchases/purchase-document';
 import { Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
@@ -20,11 +21,26 @@ import { createPurchaseInvoicePdf, downloadPurchaseInvoicePdf, sharePurchaseInvo
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
+import { getTemplate } from '@/modules/documents/registry/templates';
+import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 
 interface FrozenPrintTemplateRevision {
   id: string;
   version: number;
-  definition: { footer_text?: string };
+  definition: {
+    template_id?: string;
+    theme_id?: ThemeId;
+    footer_text?: string;
+    show_logo?: boolean;
+    logo?: string;
+    logo_height?: number;
+    layout?: DocSectionLayoutItem[];
+    terms_text?: string;
+    bank_text?: string;
+    stamp?: string;
+    signature?: string;
+  };
   document_types: string[];
 }
 
@@ -53,6 +69,8 @@ interface Purchase {
   print_template_revision?: FrozenPrintTemplateRevision | null;
   pdf_template_revision_id?: string | null;
   pdf_template_revision?: FrozenPrintTemplateRevision | null;
+  thermal_template_revision_id?: string | null;
+  thermal_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
@@ -73,6 +91,7 @@ export default function PurchaseDetailPage() {
   const tpp = useTranslations('purchasePdf');
   const td = useTranslations('invoiceDoc');
   const ts = useTranslations('status');
+  const tPrint = useTranslations('documentPrint');
   const locale = useLocale();
   const company = useCompany();
 
@@ -132,6 +151,14 @@ export default function PurchaseDetailPage() {
     purchase.print_template_revision,
   );
   const frozenPdfFooter = frozenPdfDefinition?.footer_text ?? null;
+  const frozenThermalDefinition = purchase.thermal_template_revision?.definition ?? null;
+  const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
+  const thermalPaperId = thermalTemplateId
+    ? getTemplate(thermalTemplateId).supportedPaper.find((candidate) => candidate.startsWith('thermal_'))
+    : null;
+  const thermalPaper = thermalPaperId
+    ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
+    : null;
 
   /**
    * الخصم والشحن والتسوية كانت تُحذَف من المستند المطبوع، فيقرأ المورّد
@@ -271,10 +298,16 @@ export default function PurchaseDetailPage() {
             <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
             {tp('delete')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument({ widthMm: 210, heightMm: 297 })} disabled={!!busy}>
+          <Button variant="outline" size="sm" onClick={() => printDocument({ widthMm: 210, heightMm: 297 }, 'print-root')} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
+          {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+            <Button variant="outline" size="sm" onClick={() => printDocument(thermalPaper, 'thermal-print-root')} disabled={!!busy}>
+              <Printer className="h-4 w-4" strokeWidth={1.7} />
+              {tPrint('thermal_print')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -355,6 +388,26 @@ export default function PurchaseDetailPage() {
           />
         </DocumentScaler>
       </div>
+
+      {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+        <PurchaseDocument
+          purchase={purchase}
+          company={company}
+          supplier={supplier}
+          templateId={thermalTemplateId}
+          themeId={frozenThermalDefinition.theme_id ?? null}
+          footerText={frozenThermalDefinition.footer_text ?? null}
+          terms={frozenThermalDefinition.terms_text ?? null}
+          bank={frozenThermalDefinition.bank_text ?? null}
+          stampUrl={frozenThermalDefinition.stamp ?? null}
+          signatureUrl={frozenThermalDefinition.signature ?? null}
+          showLogo={frozenThermalDefinition.show_logo !== false}
+          logoUrl={frozenThermalDefinition.logo ?? null}
+          logoHeight={frozenThermalDefinition.logo_height ?? null}
+          layout={Array.isArray(frozenThermalDefinition.layout) && frozenThermalDefinition.layout.length ? frozenThermalDefinition.layout : null}
+          rootId="thermal-print-root"
+        />
+      )}
 
       <Dialog open={confirmDelete} onClose={() => (deleting ? null : setConfirmDelete(false))} title={tp('delete_title')}>
         <p className="text-sm text-text">

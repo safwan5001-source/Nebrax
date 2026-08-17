@@ -23,7 +23,7 @@ class CreditNote extends BaseModel
         'branch_id',
         'tenant_id', 'number', 'type', 'partner_id', 'refund_type', 'note_date',
         'status', 'subtotal', 'tax_amount', 'total', 'reason',
-        'original_invoice_id', 'original_purchase_id', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'created_by',
+        'original_invoice_id', 'original_purchase_id', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by',
     ];
 
     protected $casts = [
@@ -62,6 +62,12 @@ class CreditNote extends BaseModel
     public function pdfTemplateRevision(): BelongsTo
     {
         return $this->belongsTo(PrintTemplateRevision::class, 'pdf_template_revision_id');
+    }
+
+    /** المرجع التاريخي للمراجعة المختارة للطباعة الحرارية. */
+    public function thermalTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'thermal_template_revision_id');
     }
 
     public function isDraft(): bool

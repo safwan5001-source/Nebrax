@@ -37,6 +37,8 @@ class PurchaseResource extends JsonResource
             'print_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('printTemplateRevision')),
             'pdf_template_revision_id' => $this->pdf_template_revision_id,
             'pdf_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('pdfTemplateRevision')),
+            'thermal_template_revision_id' => $this->thermal_template_revision_id,
+            'thermal_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('thermalTemplateRevision')),
             'remaining'           => Money::toRiyal($this->remaining()),
             'lines'               => InvoiceLineResource::collection($this->whenLoaded('lines')),
         ];

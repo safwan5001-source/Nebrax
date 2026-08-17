@@ -36,7 +36,7 @@ class PurchaseController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        return (new PurchaseResource(Purchase::with(['lines', 'printTemplateRevision', 'pdfTemplateRevision'])->findOrFail($id)))->response();
+        return (new PurchaseResource(Purchase::with(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])->findOrFail($id)))->response();
     }
 
     /**
@@ -71,6 +71,6 @@ class PurchaseController extends ApiController
         $purchase = Purchase::findOrFail($id);
         $posted = $this->domain(fn () => $this->purchases->post($purchase));
 
-        return (new PurchaseResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision'])))->response();
+        return (new PurchaseResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
     }
 }

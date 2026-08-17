@@ -39,6 +39,8 @@ interface CreditNote {
   print_template_revision?: FrozenPrintTemplateRevision | null;
   pdf_template_revision_id?: string | null;
   pdf_template_revision?: FrozenPrintTemplateRevision | null;
+  thermal_template_revision_id?: string | null;
+  thermal_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
@@ -125,6 +127,14 @@ export default function CreditNoteDetailPage() {
   const pdfDesign = frozenPdfDefinition
     ? resolveCreditNoteTemplateDesign(frozenPdfDefinition, null)
     : design;
+  const frozenThermalDefinition = note.thermal_template_revision?.definition ?? null;
+  const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
+  const thermalPaperId = thermalTemplateId
+    ? getTemplate(thermalTemplateId).supportedPaper.find((candidate) => candidate.startsWith('thermal_'))
+    : null;
+  const thermalPaper = thermalPaperId
+    ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
+    : null;
 
   async function createPdf() {
     if (!note) throw new Error('Credit note unavailable');
@@ -224,10 +234,16 @@ export default function CreditNoteDetailPage() {
             <Share2 className="h-4 w-4" strokeWidth={1.7} />
             {busy === 'share' ? tPrint('generating') : tPrint('share_pdf')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={!!busy}>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'print-root')} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
+          {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+            <Button variant="outline" size="sm" onClick={() => printDocument(thermalPaper, 'thermal-print-root')} disabled={!!busy}>
+              <Printer className="h-4 w-4" strokeWidth={1.7} />
+              {tPrint('thermal_print')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -269,6 +285,26 @@ export default function CreditNoteDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+        <CreditNoteDocument
+          note={note}
+          company={company}
+          customer={customer}
+          templateId={thermalTemplateId}
+          themeId={frozenThermalDefinition.theme_id ?? null}
+          footerText={frozenThermalDefinition.footer_text ?? null}
+          terms={frozenThermalDefinition.terms_text ?? null}
+          bank={frozenThermalDefinition.bank_text ?? null}
+          stampUrl={frozenThermalDefinition.stamp ?? null}
+          signatureUrl={frozenThermalDefinition.signature ?? null}
+          showLogo={frozenThermalDefinition.show_logo !== false}
+          logoUrl={frozenThermalDefinition.logo ?? null}
+          logoHeight={frozenThermalDefinition.logo_height ?? null}
+          layout={Array.isArray(frozenThermalDefinition.layout) && frozenThermalDefinition.layout.length ? frozenThermalDefinition.layout : null}
+          rootId="thermal-print-root"
+        />
+      )}
     </div>
   );
 }
