@@ -215,11 +215,13 @@ class PaymentService
             $documentType = $payment->direction === 'received' ? 'receipt_voucher' : 'payment_voucher';
             $printAssignment = $this->printTemplates->resolve($documentType, 'print', $payment->branch_id);
             $pdfAssignment = $this->printTemplates->resolve($documentType, 'pdf', $payment->branch_id);
+            $thermalAssignment = $this->printTemplates->resolve($documentType, 'thermal', $payment->branch_id);
 
             $payment->update([
                 'status'           => 'posted',
                 'print_template_revision_id' => $printAssignment?->print_template_revision_id,
                 'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
+                'thermal_template_revision_id' => $thermalAssignment?->print_template_revision_id,
                 'journal_entry_id' => $entry->id,
             ]);
 

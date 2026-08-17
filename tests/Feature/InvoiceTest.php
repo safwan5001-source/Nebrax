@@ -113,6 +113,17 @@ class InvoiceTest extends TestCase
             'usage' => 'pdf',
             'print_template_revision_id' => $pdfTemplate->published_revision_id,
         ], null);
+        $thermalTemplate = $templates->create([
+            'name' => 'إيصال حراري ثابت',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-thermal80', 'footer_text' => 'أرشيف حراري'],
+        ], null);
+        $thermalTemplate = $templates->publish($thermalTemplate);
+        $templates->assign([
+            'document_type' => 'tax_invoice',
+            'usage' => 'thermal',
+            'print_template_revision_id' => $thermalTemplate->published_revision_id,
+        ], null);
 
         $invoice = $this->invoices->create(
             ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
@@ -122,19 +133,23 @@ class InvoiceTest extends TestCase
 
         $frozenRevisionId = $template->published_revision_id;
         $frozenPdfRevisionId = $pdfTemplate->published_revision_id;
+        $frozenThermalRevisionId = $thermalTemplate->published_revision_id;
         $this->assertSame($frozenRevisionId, $posted->print_template_revision_id);
         $this->assertSame($frozenPdfRevisionId, $posted->pdf_template_revision_id);
+        $this->assertSame($frozenThermalRevisionId, $posted->thermal_template_revision_id);
 
         $templates->updateDraft($template, [
             'definition' => ['template_id' => 'tax-invoice-modern', 'theme_id' => 'violet'],
         ], null);
         $newlyPublished = $templates->publish($template);
 
-        $frozenInvoice = Invoice::with(['printTemplateRevision', 'pdfTemplateRevision'])->findOrFail($posted->id);
+        $frozenInvoice = Invoice::with(['printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])->findOrFail($posted->id);
         $this->assertSame($frozenRevisionId, $frozenInvoice->print_template_revision_id);
         $this->assertSame('tax-invoice-classic', $frozenInvoice->printTemplateRevision?->definition['template_id']);
         $this->assertSame($frozenPdfRevisionId, $frozenInvoice->pdf_template_revision_id);
         $this->assertSame('tax-invoice-minimal', $frozenInvoice->pdfTemplateRevision?->definition['template_id']);
+        $this->assertSame($frozenThermalRevisionId, $frozenInvoice->thermal_template_revision_id);
+        $this->assertSame('tax-invoice-thermal80', $frozenInvoice->thermalTemplateRevision?->definition['template_id']);
         $this->assertNotSame($frozenRevisionId, $newlyPublished->published_revision_id);
     }
 

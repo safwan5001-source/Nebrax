@@ -26,6 +26,8 @@ class PaymentResource extends JsonResource
             'print_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('printTemplateRevision')),
             'pdf_template_revision_id' => $this->pdf_template_revision_id,
             'pdf_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('pdfTemplateRevision')),
+            'thermal_template_revision_id' => $this->thermal_template_revision_id,
+            'thermal_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('thermalTemplateRevision')),
             // تخصيصات السند: ما غطّاه من فواتير/مشتريات (نصّ المستند + مبلغ بالريال).
             'allocations'  => $this->whenLoaded('allocations', fn () => $this->allocations->map(fn ($a) => [
                 'label'  => optional($a->allocatable)->number ?? '—',
