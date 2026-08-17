@@ -1,8 +1,10 @@
 'use client';
 
+/** أسلوب «دفتر التحليل»: تفاصيل قابلة للقراءة أولاً، ومستند الطباعة إجراء اختياري. */
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Download, Printer, Share2 } from 'lucide-react';
+import { Download, Eye, EyeOff, Printer, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -58,6 +60,7 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [journal, setJournal] = useState<JournalReport | null>(null);
   const [cashFlow, setCashFlow] = useState<CashFlow | null>(null);
@@ -192,6 +195,7 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
           <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={downloadPdf}><Download className="h-4 w-4" strokeWidth={1.7} />{busy === 'pdf' ? tPrint('generating') : t('pdf')}</Button>
           <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={sharePdf}><Share2 className="h-4 w-4" strokeWidth={1.7} />{busy === 'share' ? tPrint('generating') : t('share_pdf')}</Button>
           <Button variant="outline" size="sm" disabled={!doc || !!busy} onClick={() => printDocument({ widthMm: 210, heightMm: 297 })}><Printer className="h-4 w-4" strokeWidth={1.7} />{t('print')}</Button>
+          <Button variant="outline" size="sm" disabled={!doc} aria-pressed={showPreview} onClick={() => setShowPreview((visible) => !visible)}>{showPreview ? <EyeOff className="h-4 w-4" strokeWidth={1.7} /> : <Eye className="h-4 w-4" strokeWidth={1.7} />}{t('preview')}</Button>
         </div>
       </div>
 
@@ -203,13 +207,24 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
       {tab === 'tax' && <p className="rounded border border-border bg-background p-3 text-xs leading-relaxed text-muted">{g('taxHint')}</p>}
       {reportBody}
 
-      {doc && <Card><CardHeader className="no-print"><CardTitle>{t('preview')}</CardTitle></CardHeader><CardContent className="print:p-0"><div className="rounded bg-background p-3 print:bg-transparent print:p-0 [&_.print-only]:block"><DocumentScaler><ReportDocument title={doc.title} company={company} columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} /></DocumentScaler></div></CardContent></Card>}
+      {showPreview && doc && <Card><CardHeader className="no-print"><CardTitle>{t('preview')}</CardTitle></CardHeader><CardContent className="print:p-0"><div className="rounded bg-background p-3 print:bg-transparent print:p-0 [&_.print-only]:block"><DocumentScaler><ReportDocument title={doc.title} company={company} columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} /></DocumentScaler></div></CardContent></Card>}
     </div>
   );
 }
 
 function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: boolean; g: ReturnType<typeof useTranslations> }) {
-  return <Card><CardHeader className="flex flex-row items-center justify-between"><CardTitle>{ledger?.account.name ?? g('account')}</CardTitle>{ledger && <Badge tone="neutral" className="num">{g('closingBalance')}: {formatRiyal(ledger.closing_balance)}</Badge>}</CardHeader><CardContent>{loading || !ledger ? <Skeleton className="h-40 w-full" /> : <Table><THead><TR><TH>{g('date')}</TH><TH>{g('entryNumber')}</TH><TH>{g('description')}</TH><TH className="text-end">{g('debit')}</TH><TH className="text-end">{g('credit')}</TH><TH className="text-end">{g('balance')}</TH></TR></THead><TBody><TR className="bg-background"><TD colSpan={5}>{g('openingBalance')}</TD><TD className="num text-end">{formatRiyal(ledger.opening_balance)}</TD></TR>{ledger.rows.length === 0 ? <TR><TD colSpan={6} className="py-8 text-center text-muted">—</TD></TR> : ledger.rows.map((row) => <TR key={`${row.number}-${row.date}`}><TD className="num">{row.date}</TD><TD className="num">{row.number}</TD><TD>{row.description}</TD><TD className="num text-end">{formatRiyal(row.debit)}</TD><TD className="num text-end">{formatRiyal(row.credit)}</TD><TD className="num text-end font-medium">{formatRiyal(row.balance)}</TD></TR>)}</TBody></Table>}</CardContent></Card>;
+  if (loading || !ledger) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
+  return <Card>
+    <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{ledger.account.name}</CardTitle><Badge tone="neutral" className="num">{g('closingBalance')}: {formatRiyal(ledger.closing_balance)}</Badge></CardHeader>
+    <CardContent>
+      <div className="space-y-3 md:hidden">
+        <div className="flex items-center justify-between gap-3 rounded-lg bg-background px-3 py-2.5 text-sm"><span className="text-muted">{g('openingBalance')}</span><strong className="num">{formatRiyal(ledger.opening_balance)}</strong></div>
+        {ledger.rows.length === 0 ? <p className="py-8 text-center text-sm text-muted">—</p> : ledger.rows.map((row) => <article key={`${row.number}-${row.date}`} className="rounded-xl border border-border bg-surface p-3"><div className="mb-2 flex items-start justify-between gap-3"><div><p className="num text-xs text-muted">{row.date}</p><p className="num mt-1 text-sm font-medium text-text">{row.number}</p></div><strong className="num text-sm">{formatRiyal(row.balance)}</strong></div><p className="mb-3 text-sm leading-5 text-text">{row.description}</p><dl className="grid grid-cols-2 gap-2 border-t border-border pt-2 text-xs"><div><dt className="text-muted">{g('debit')}</dt><dd className="num mt-1 font-medium">{formatRiyal(row.debit)}</dd></div><div><dt className="text-muted">{g('credit')}</dt><dd className="num mt-1 font-medium">{formatRiyal(row.credit)}</dd></div></dl></article>)}
+        <div className="flex items-center justify-between gap-3 rounded-lg bg-background px-3 py-2.5 text-sm font-semibold"><span>{g('closingBalance')}</span><strong className="num">{formatRiyal(ledger.closing_balance)}</strong></div>
+      </div>
+      <div className="hidden md:block"><Table><THead><TR><TH>{g('date')}</TH><TH>{g('entryNumber')}</TH><TH>{g('description')}</TH><TH className="text-end">{g('debit')}</TH><TH className="text-end">{g('credit')}</TH><TH className="text-end">{g('balance')}</TH></TR></THead><TBody><TR className="bg-background"><TD colSpan={5}>{g('openingBalance')}</TD><TD className="num text-end">{formatRiyal(ledger.opening_balance)}</TD></TR>{ledger.rows.length === 0 ? <TR><TD colSpan={6} className="py-8 text-center text-muted">—</TD></TR> : ledger.rows.map((row) => <TR key={`${row.number}-${row.date}`}><TD className="num">{row.date}</TD><TD className="num">{row.number}</TD><TD>{row.description}</TD><TD className="num text-end">{formatRiyal(row.debit)}</TD><TD className="num text-end">{formatRiyal(row.credit)}</TD><TD className="num text-end font-medium">{formatRiyal(row.balance)}</TD></TR>)}</TBody></Table></div>
+    </CardContent>
+  </Card>;
 }
 
 function JournalTable({ journal, loading, g, t }: { journal: JournalReport | null; loading: boolean; g: ReturnType<typeof useTranslations>; t: ReturnType<typeof useTranslations> }) {
