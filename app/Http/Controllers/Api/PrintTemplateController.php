@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\DuplicatePrintTemplateRequest;
+use App\Http\Requests\ResolvePrintTemplateAssignmentRequest;
 use App\Http\Requests\StorePrintTemplateRequest;
 use App\Http\Requests\UpdatePrintTemplateDraftRequest;
 use App\Http\Requests\UpsertPrintTemplateAssignmentRequest;
 use App\Http\Resources\PrintTemplateAssignmentResource;
 use App\Http\Resources\PrintTemplateResource;
+use App\Models\Branch;
 use App\Models\PrintTemplate;
 use App\Models\PrintTemplateAssignment;
 use App\Services\PrintTemplates\PrintTemplateService;
@@ -38,6 +40,30 @@ class PrintTemplateController extends ApiController
             PrintTemplate::with(['publishedRevision', 'draftRevision', 'revisions' => fn ($q) => $q->orderByDesc('version')])
                 ->findOrFail($id)
         );
+    }
+
+    /**
+     * يعيد المراجعة المنشورة المناسبة لمعاينة مستند حي: تجاوز الفرع أولاً ثم
+     * افتراض المؤسسة. لا تنقل الواجهة قاعدة الأولوية إلى العميل ولا تستقبل
+     * فرعاً من مستأجر آخر.
+     */
+    public function resolve(ResolvePrintTemplateAssignmentRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $branchId = $data['branch_id'] ?? null;
+        $this->assertTenantOwned(Branch::class, $branchId, 'الفرع المحدد');
+
+        $assignment = $this->templates->resolve(
+            $data['document_type'],
+            $data['usage'] ?? PrintTemplateAssignment::USAGE_PRINT,
+            $branchId,
+        );
+
+        return response()->json([
+            'data' => $assignment === null
+                ? null
+                : (new PrintTemplateAssignmentResource($assignment))->resolve($request),
+        ]);
     }
 
     public function store(StorePrintTemplateRequest $request): JsonResponse
