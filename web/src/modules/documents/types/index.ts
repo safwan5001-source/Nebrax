@@ -57,9 +57,15 @@ export interface DocumentSeller extends DocumentParty {
 /** سطر بند — كل المبالغ بالوحدات الصغرى. */
 export interface DocumentLine {
   id: string;
+  /** لقطة هوية المنتج؛ تبقى اختيارية لمستندات لا تملك كتالوج منتجات. */
+  productName?: string | null;
+  productCode?: string | null;
+  barcode?: string | null;
   description: string;
   quantity: number;
   unitPrice: number; // minor units
+  /** سعر الوحدة قبل الضريبة؛ تجهزه طبقة المصدر ولا يُشتق في العارض. */
+  priceBeforeTax?: number | null;
   tax: number;       // minor units
   total: number;     // minor units (شامل الضريبة للسطر)
 }
@@ -215,7 +221,9 @@ export type DocBlockAlignment = 'start' | 'center' | 'end';
 export type DocBlockFontSize = 'sm' | 'md' | 'lg';
 
 /** أعمدة جدول البنود التي يستطيع العارض رسمها بالفعل. */
-export type DocItemsColumnId = 'number' | 'description' | 'quantity' | 'unit_price' | 'tax' | 'total';
+export type DocItemsColumnId =
+  | 'number' | 'description' | 'product_code' | 'barcode'
+  | 'quantity' | 'price_before_tax' | 'unit_price' | 'tax' | 'total';
 
 /** تخصيص عمود واحد: عنوان ثابت اختياري ومحاذاة منطقية. */
 export interface DocItemsColumn {

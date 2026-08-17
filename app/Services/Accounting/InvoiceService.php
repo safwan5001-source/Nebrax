@@ -222,6 +222,11 @@ class InvoiceService
                 throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
             }
 
+            // لقطة سعر الوحدة الصافي تُحسب من سعر الوحدة نفسه قبل خصم السطر،
+            // فتظل مستقلة عن كمية السطر ولا تُشتق في طبقة العرض.
+            $unitPriceBeforeTax = $inclusive
+                ? $unitPrice - $this->extractTax($unitPrice, $rate)
+                : $unitPrice;
             $lineGross = $qty * $unitPrice;                    // إجمالي السطر قبل خصمه (متضمِّن أو غير متضمِّن حسب الوضع)
             if ($lineDisc < 0 || $lineDisc > $lineGross) {
                 throw new RuntimeException('خصم السطر لا يمكن أن يتجاوز إجمالي السطر.');
@@ -248,14 +253,18 @@ class InvoiceService
             }
 
             InvoiceLine::create([
-                'invoice_id'    => $invoice->id,
-                'product_id'    => $item['product_id'] ?? null,
-                'description'   => $description,
-                'quantity'      => $qty,
-                'unit_name'     => $unitName,
-                'unit_factor'   => $unitFactor,
-                'unit_price'    => $unitPrice,
-                'tax_rate'      => $rate,
+                'invoice_id'               => $invoice->id,
+                'product_id'               => $item['product_id'] ?? null,
+                'product_name_snapshot'    => $product?->name ?? $description,
+                'product_sku_snapshot'     => $product?->sku,
+                'product_barcode_snapshot' => $product?->barcode,
+                'description'              => $description,
+                'quantity'                 => $qty,
+                'unit_name'                => $unitName,
+                'unit_factor'              => $unitFactor,
+                'unit_price'               => $unitPrice,
+                'unit_price_before_tax'    => $unitPriceBeforeTax,
+                'tax_rate'                 => $rate,
                 'line_subtotal' => $storedSubtotal,
                 'line_discount' => $storedDiscount,
                 'line_tax'      => $lineTax,

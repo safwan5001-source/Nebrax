@@ -7,9 +7,13 @@ import type { DocumentModel } from '../types';
  */
 export interface SourceInvoiceLine {
   id: string;
+  product_name?: string | null;
+  product_code?: string | null;
+  barcode?: string | null;
   description: string | null;
   quantity: number;
   unit_price: string;
+  unit_price_before_tax?: string | null;
   tax_rate: number;
   line_tax: string;
   line_total: string;
@@ -87,9 +91,15 @@ export function buildInvoiceDocumentModel(input: {
     },
     lines: invoice.lines.map((l) => ({
       id: l.id,
+      productName: l.product_name ?? l.description ?? null,
+      productCode: l.product_code ?? null,
+      barcode: l.barcode ?? null,
       description: l.description ?? '',
       quantity: l.quantity,
       unitPrice: riyalToMinor(l.unit_price),
+      priceBeforeTax: l.unit_price_before_tax === null || l.unit_price_before_tax === undefined
+        ? null
+        : riyalToMinor(l.unit_price_before_tax),
       tax: riyalToMinor(l.line_tax),
       total: riyalToMinor(l.line_total),
     })),

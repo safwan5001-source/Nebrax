@@ -3,18 +3,12 @@
 import { useTranslations } from 'next-intl';
 import type { CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
+import { DEFAULT_DOCUMENT_ITEMS_COLUMNS } from '@/modules/documents/registry/document-types';
 import type { DocBlockAlignment, DocItemsColumn, DocItemsColumnId, DocumentModel, TemplateStyle } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { blockTextClassName, useDocBlockProperties } from '../doc-block-properties-context';
 
-const DEFAULT_COLUMNS: readonly DocItemsColumn[] = [
-  { id: 'number' },
-  { id: 'description' },
-  { id: 'quantity' },
-  { id: 'unit_price' },
-  { id: 'tax' },
-  { id: 'total' },
-];
+const DEFAULT_COLUMNS: readonly DocItemsColumn[] = DEFAULT_DOCUMENT_ITEMS_COLUMNS.map((id) => ({ id }));
 
 /** خصائص صفّ رأس الجدول حسب نمط القالب. */
 function headRow(style: TemplateStyle): { className: string; style?: CSSProperties } {
@@ -34,7 +28,7 @@ function textAlignmentClass(alignment: DocBlockAlignment): string {
 }
 
 function defaultAlignment(column: DocItemsColumnId): DocBlockAlignment {
-  return column === 'description' || column === 'number' ? 'start' : 'end';
+  return column === 'description' || column === 'product_code' || column === 'barcode' || column === 'number' ? 'start' : 'end';
 }
 
 /** جدول البنود — أعمدة معتمدة قابلة للترتيب والإخفاء والتسمية والمحاذاة. */
@@ -52,8 +46,11 @@ export function DocItemsTable({
   const columns = properties.columns ?? DEFAULT_COLUMNS;
   const labels: Record<DocItemsColumnId, string> = {
     number: '#',
-    description: t('description'),
+    description: t('product'),
+    product_code: t('product_code'),
+    barcode: t('barcode'),
     quantity: t('qty'),
+    price_before_tax: t('price_before_tax'),
     unit_price: t('unit_price'),
     tax: t('tax'),
     total: t('total'),
@@ -62,8 +59,11 @@ export function DocItemsTable({
   const valueFor = (column: DocItemsColumnId, line: DocumentModel['lines'][number], index: number): string | number => {
     switch (column) {
       case 'number': return index + 1;
-      case 'description': return line.description || '—';
+      case 'description': return line.productName || line.description || '—';
+      case 'product_code': return line.productCode || '—';
+      case 'barcode': return line.barcode || '—';
       case 'quantity': return line.quantity;
+      case 'price_before_tax': return line.priceBeforeTax === null || line.priceBeforeTax === undefined ? '—' : formatMoney(line.priceBeforeTax);
       case 'unit_price': return formatMoney(line.unitPrice);
       case 'tax': return formatMoney(line.tax);
       case 'total': return formatMoney(line.total);
