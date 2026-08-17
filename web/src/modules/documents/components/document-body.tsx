@@ -6,6 +6,7 @@ import type {
   DocumentTemplateProps,
   DocSectionKey,
   DocSectionLayoutItem,
+  DocBlockPropertiesMap,
   TemplateSectionsConfig,
   TemplateStyle,
 } from '../types';
@@ -24,6 +25,7 @@ import { DocBank } from './sections/doc-bank';
 import { DocStamp } from './sections/doc-stamp';
 import { DocSignature } from './sections/doc-signature';
 import { DocFooter } from './sections/doc-footer';
+import { DocBlockPropertiesProvider } from './doc-block-properties-context';
 
 /** الأقسام الظاهرة افتراضياً (فاتورة ضريبية كاملة). */
 const DEFAULT_SECTIONS: TemplateSectionsConfig = {
@@ -101,15 +103,22 @@ export function DocumentBody({
           visible: item.visible && isVisible(item.key, s),
         }));
 
+  const blockProperties = items.reduce<DocBlockPropertiesMap>((properties, item) => {
+    if (item.properties) properties[item.key] = item.properties;
+    return properties;
+  }, {});
+
   return (
-    <DocLayout
-      theme={theme}
-      direction={model.direction}
-      directionSample={model.seller.name || model.buyer.name}
-      style={style}
-      rootId={rootId}
-    >
-      {items.map((it) => (it.visible ? <Fragment key={it.key}>{renderSection(it.key, model, formatMoney, s)}</Fragment> : null))}
-    </DocLayout>
+    <DocBlockPropertiesProvider value={blockProperties}>
+      <DocLayout
+        theme={theme}
+        direction={model.direction}
+        directionSample={model.seller.name || model.buyer.name}
+        style={style}
+        rootId={rootId}
+      >
+        {items.map((it) => (it.visible ? <Fragment key={it.key}>{renderSection(it.key, model, formatMoney, s)}</Fragment> : null))}
+      </DocLayout>
+    </DocBlockPropertiesProvider>
   );
 }
