@@ -479,7 +479,19 @@
     "revision_status_published": "Published",
     "revision_status_superseded": "Previously published",
     "revision_visual_comparison": "Visual comparison",
-    "revision_visual_comparison_hint": "Two safe sample previews from the stored definitions; viewing does not change either revision."
+    "revision_visual_comparison_hint": "Two safe sample previews from the stored definitions; viewing does not change either revision.",
+    "revision_path_document_types": "Document types",
+    "revision_path_template_id": "Template style",
+    "revision_path_theme_id": "Colour theme",
+    "revision_path_show_logo": "Show logo",
+    "revision_path_footer_text": "Template footer",
+    "revision_path_terms_text": "Terms and conditions",
+    "revision_path_bank_text": "Bank details",
+    "revision_path_logo_height": "Logo height",
+    "revision_path_stamp": "Stamp",
+    "revision_path_signature": "Signature",
+    "revision_path_layout": "Block order",
+    "revision_path_unknown": "Template property: {path}"
   },
   "documentTypesAlt": {
     "tax_invoice": "فاتورة ضريبية",

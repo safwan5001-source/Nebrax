@@ -479,7 +479,19 @@
     "revision_status_published": "منشورة",
     "revision_status_superseded": "سابقاً منشورة",
     "revision_visual_comparison": "مقارنة مرئية",
-    "revision_visual_comparison_hint": "معاينتان ببيانات تجريبية آمنة من التعريفين المحفوظين؛ لا تتغير أي مراجعة عند العرض."
+    "revision_visual_comparison_hint": "معاينتان ببيانات تجريبية آمنة من التعريفين المحفوظين؛ لا تتغير أي مراجعة عند العرض.",
+    "revision_path_document_types": "أنواع المستندات",
+    "revision_path_template_id": "نمط القالب",
+    "revision_path_theme_id": "السمة اللونية",
+    "revision_path_show_logo": "إظهار الشعار",
+    "revision_path_footer_text": "تذييل القالب",
+    "revision_path_terms_text": "الشروط",
+    "revision_path_bank_text": "البيانات البنكية",
+    "revision_path_logo_height": "ارتفاع الشعار",
+    "revision_path_stamp": "الختم",
+    "revision_path_signature": "التوقيع",
+    "revision_path_layout": "ترتيب الكتل",
+    "revision_path_unknown": "خاصية القالب: {path}"
   },
   "documentTypesAlt": {
     "tax_invoice": "Tax Invoice",

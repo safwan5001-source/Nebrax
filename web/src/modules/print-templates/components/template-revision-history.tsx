@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { compareTemplateRevisions, formatRevisionValue } from '@/modules/print-templates/services/revision-comparison';
+import { getRevisionPathLabelKey } from '@/modules/print-templates/services/revision-path-label';
 import { TemplateRevisionVisualComparison } from './template-revision-visual-comparison';
 
 export interface TemplateRevisionHistoryItem {
@@ -107,7 +108,7 @@ export function TemplateRevisionHistory({ revisions, loading, failed }: Template
                     <tbody className="divide-y divide-border">
                       {changes.map((change) => (
                         <tr key={change.path}>
-                          <th scope="row" className="whitespace-nowrap px-3 py-2 text-start font-medium text-text">{change.path.replace(/^definition\./, '')}</th>
+                          <th scope="row" className="whitespace-nowrap px-3 py-2 text-start font-medium text-text">{t(getRevisionPathLabelKey(change.path), { path: change.path.replace(/^definition\./, '') })}</th>
                           <td className="max-w-72 px-3 py-2 align-top text-muted"><code className="break-words">{formatRevisionValue(change.before, t('revision_empty_value'))}</code></td>
                           <td className="max-w-72 px-3 py-2 align-top text-text"><code className="break-words">{formatRevisionValue(change.after, t('revision_empty_value'))}</code></td>
                         </tr>
