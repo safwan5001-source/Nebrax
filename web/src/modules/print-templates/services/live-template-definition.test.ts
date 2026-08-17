@@ -55,4 +55,17 @@ describe('محول تعريف القالب الحي', () => {
     expect(resolved?.templateId).toBe('tax-invoice-retail');
     expect(resolved?.layout.map((block) => block.key)).toContain('items');
   });
+
+  it('يطبق تعريف السند الحي على كتلة السند والبيانات البنكية', () => {
+    const resolved = resolveLiveTemplateDefinition({
+      print_template_revision_id: 'voucher-revision',
+      revision: {
+        id: 'voucher-revision',
+        definition: { template_id: 'tax-invoice-classic', bank_text: 'IBAN SA0000000000000000000000' },
+      },
+    }, 'receipt_voucher');
+
+    expect(resolved?.bankText).toBe('IBAN SA0000000000000000000000');
+    expect(resolved?.layout.map((block) => block.key)).toContain('voucher');
+  });
 });

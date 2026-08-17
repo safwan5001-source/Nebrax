@@ -25,6 +25,7 @@ import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import type { ThemeId } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
+import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
 
 /** دفعة من الـ API — أرقام بالريال نصّاً. */
 interface FrozenPrintTemplateRevision {
@@ -36,6 +37,7 @@ interface FrozenPrintTemplateRevision {
 
 interface Payment extends PaymentDoc {
   id: string;
+  branch_id: string | null;
   partner_id: string;
   status: string;
   print_template_revision_id?: string | null;
@@ -88,10 +90,13 @@ export default function PaymentDetailPage() {
     api<{ data: Payment }>(`/payments/${id}`)
       .then(async (r) => {
         setPayment(r.data);
-        const [p, m, d] = await Promise.allSettled([
+        const documentType = r.data.direction === 'received' ? 'receipt_voucher' : 'payment_voucher';
+        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
+        const [p, m, legacy, live] = await Promise.allSettled([
           api<{ data: PaymentPartner }>(`/partners/${r.data.partner_id}`),
           api<{ company: PaymentCompany }>(`/me`),
           api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
+          api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=${documentType}&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setPartner(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
@@ -109,17 +114,33 @@ export default function PaymentDetailPage() {
           setBankText(null);
           setStampUrl(null);
           setSignatureUrl(null);
-        } else if (d.status === 'fulfilled') {
-          const dg = d.value.data ?? {};
-          setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
-          if (dg.theme) setThemeId(dg.theme as ThemeId);
-          setFooterText(dg.footer_text ?? null);
-          setShowLogo(dg.show_logo !== false);
-          setLogoUrl(dg.logo ?? null);
-          setLogoHeight(dg.logo_height ?? null);
-          setBankText(dg.bank_text ?? null);
-          setStampUrl(dg.stamp ?? null);
-          setSignatureUrl(dg.signature ?? null);
+        } else {
+          const resolved = live.status === 'fulfilled'
+            ? resolveLiveTemplateDefinition(live.value.data, documentType)
+            : null;
+          if (resolved) {
+            setTemplateId(resolved.templateId);
+            setThemeId(resolved.themeId);
+            setFooterText(resolved.footerText);
+            setShowLogo(resolved.showLogo);
+            setLogoUrl(null);
+            setLogoHeight(null);
+            setBankText(resolved.bankText);
+            setStampUrl(null);
+            setSignatureUrl(null);
+          } else if (legacy.status === 'fulfilled') {
+            // التوافق صريح: تعريف الهجرة القديم أو غياب تعيين حي لا يفسران جزئياً.
+            const dg = legacy.value.data ?? {};
+            setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
+            if (dg.theme) setThemeId(dg.theme as ThemeId);
+            setFooterText(dg.footer_text ?? null);
+            setShowLogo(dg.show_logo !== false);
+            setLogoUrl(dg.logo ?? null);
+            setLogoHeight(dg.logo_height ?? null);
+            setBankText(dg.bank_text ?? null);
+            setStampUrl(dg.stamp ?? null);
+            setSignatureUrl(dg.signature ?? null);
+          }
         }
       })
       .catch(() => setLoadError(true))
