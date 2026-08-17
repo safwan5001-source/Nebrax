@@ -163,11 +163,10 @@ export default function InvoiceDetailPage() {
       .then(async (r) => {
         setInvoice(r.data);
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, z, m, legacy, live] = await Promise.allSettled([
+        const [p, z, m, live] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
           api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=tax_invoice&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
@@ -193,19 +192,9 @@ export default function InvoiceDetailPage() {
             setThemeId(resolved.themeId);
             setFooterText(resolved.footerText);
             setShowLogo(resolved.showLogo);
-            setLogoUrl(null); setLogoHeight(null);
+            setLogoUrl(null); setLogoHeight(resolved.logoHeight);
             setLayout(resolved.layout);
-            setTermsText(resolved.termsText); setBankText(resolved.bankText); setStampUrl(null); setSignatureUrl(null);
-          } else if (legacy.status === 'fulfilled') {
-            // التوافق صريح: تعريف الهجرة القديم أو غياب تعيين حي لا يفسران جزئياً.
-            const dg = legacy.value.data ?? {};
-            setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
-            if (dg.theme) setThemeId(dg.theme as ThemeId);
-            setFooterText(dg.footer_text ?? null);
-            setShowLogo(dg.show_logo !== false);
-            setLogoUrl(dg.logo ?? null); setLogoHeight(dg.logo_height ?? null);
-            setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
-            setTermsText(dg.terms_text ?? null); setBankText(dg.bank_text ?? null); setStampUrl(dg.stamp ?? null); setSignatureUrl(dg.signature ?? null);
+            setTermsText(resolved.termsText); setBankText(resolved.bankText); setStampUrl(resolved.stampUrl); setSignatureUrl(resolved.signatureUrl);
           }
         }
       })

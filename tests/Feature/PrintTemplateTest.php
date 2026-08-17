@@ -341,6 +341,106 @@ class PrintTemplateTest extends TestCase
     }
 
     /** @test */
+    public function migrated_legacy_design_is_upgraded_to_current_revisions_without_mutating_its_original_snapshot(): void
+    {
+        ['tenant_id' => $tenantId] = $this->registerTenant('legacy-upgrade', 'owner@legacy-upgrade.test');
+        app(TenantContext::class)->set($tenantId);
+
+        $legacy = [
+            'template' => 'modern',
+            'theme' => 'green',
+            'show_logo' => false,
+            'logo_height' => 72,
+            'footer_text' => 'تذييل موروث',
+            'terms_text' => 'شروط موروثة',
+            'bank_text' => 'IBAN SA0000000000000000000000',
+            'stamp' => 'data:image/png;base64,stamp',
+            'signature' => 'data:image/png;base64,signature',
+            'sections' => [
+                ['key' => 'header', 'visible' => true],
+                ['key' => 'parties', 'visible' => true],
+                ['key' => 'items', 'visible' => true],
+                ['key' => 'summary', 'visible' => true],
+                ['key' => 'footer', 'visible' => true],
+            ],
+        ];
+        Tenant::findOrFail($tenantId)->update(['settings' => ['sales_config' => ['designs' => $legacy]]]);
+
+        $initialMigration = require base_path('database/migrations/2025_01_01_000058_migrate_legacy_print_designs.php');
+        $initialMigration->up();
+        $template = PrintTemplate::where('source', 'migrated')->firstOrFail();
+        $originalRevision = $template->publishedRevision;
+
+        $upgradeMigration = require base_path('database/migrations/2025_01_01_000068_upgrade_migrated_print_template_definitions.php');
+        $upgradeMigration->up();
+
+        $template->refresh()->load('publishedRevision');
+        $this->assertNotSame($originalRevision->id, $template->published_revision_id);
+        $original = PrintTemplateRevision::findOrFail($originalRevision->id);
+        $this->assertSame('superseded', $original->status);
+        $this->assertSame(['schema_version' => 1, 'legacy_sales_designs' => $legacy], $original->definition);
+        $this->assertSame('tax-invoice-modern', $template->publishedRevision->definition['template_id']);
+        $this->assertSame('green', $template->publishedRevision->definition['theme_id']);
+        $this->assertSame(72, $template->publishedRevision->definition['logo_height']);
+        $this->assertSame('data:image/png;base64,stamp', $template->publishedRevision->definition['stamp']);
+        $this->assertSame('data:image/png;base64,signature', $template->publishedRevision->definition['signature']);
+
+        $assignments = $template->assignments()->whereNull('branch_id')->where('usage', 'print')->get();
+        $this->assertSame(['tax_invoice'], $assignments->pluck('document_type')->sort()->values()->all());
+        $this->assertSame($template->published_revision_id, $assignments->first()->print_template_revision_id);
+        $this->assertSame($legacy, Tenant::findOrFail($tenantId)->settings['sales_config']['designs']);
+
+        $compatibilityTypes = PrintTemplate::where('source', 'migrated')
+            ->where('id', '!=', $template->id)
+            ->get()
+            ->flatMap(fn (PrintTemplate $compatibility) => $compatibility->assignments()->whereNull('branch_id')->where('usage', 'print')->pluck('document_type'))
+            ->sort()
+            ->values()
+            ->all();
+        $this->assertSame(['credit_note', 'debit_note', 'payment_voucher', 'quotation', 'receipt_voucher'], $compatibilityTypes);
+    }
+
+    /** @test */
+    public function migrated_upgrade_preserves_an_existing_company_assignment_for_a_compatibility_type(): void
+    {
+        ['token' => $token, 'tenant_id' => $tenantId] = $this->registerTenant('legacy-upgrade-explicit', 'owner@legacy-upgrade-explicit.test');
+        app(TenantContext::class)->set($tenantId);
+        Tenant::findOrFail($tenantId)->update(['settings' => ['sales_config' => ['designs' => ['template' => 'classic']]]]);
+
+        $initialMigration = require base_path('database/migrations/2025_01_01_000058_migrate_legacy_print_designs.php');
+        $initialMigration->up();
+
+        $created = $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'عرض سعر مؤسسي صريح',
+            'document_types' => ['quotation'],
+            'definition' => $this->definition(),
+        ])->assertCreated();
+        $templateId = $created['data']['id'];
+        $published = $this->withToken($token)->postJson("/api/print-templates/{$templateId}/publish")->assertOk();
+        $explicitRevisionId = $published['data']['published_revision']['id'];
+
+        $this->withToken($token)->putJson('/api/print-templates/assignments/default', [
+            'document_type' => 'quotation',
+            'usage' => 'print',
+            'print_template_revision_id' => $explicitRevisionId,
+        ])->assertOk();
+
+        $upgradeMigration = require base_path('database/migrations/2025_01_01_000068_upgrade_migrated_print_template_definitions.php');
+        $upgradeMigration->up();
+
+        $assignment = PrintTemplate::findOrFail($templateId)->assignments()
+            ->whereNull('branch_id')
+            ->where('document_type', 'quotation')
+            ->where('usage', 'print')
+            ->get();
+        $this->assertCount(1, $assignment);
+        $this->assertSame($explicitRevisionId, $assignment->sole()->print_template_revision_id);
+        $this->assertSame(0, PrintTemplate::where('source', 'migrated')
+            ->whereJsonContains('document_types', 'quotation')
+            ->count());
+    }
+
+    /** @test */
     public function live_resolution_endpoint_prefers_branch_then_falls_back_to_company_assignment(): void
     {
         ['token' => $token, 'tenant_id' => $tenantId] = $this->registerTenant('template-live-resolution', 'owner@template-live-resolution.test');
