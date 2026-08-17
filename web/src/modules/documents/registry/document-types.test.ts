@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { DocumentTypeId } from '../types';
 import { getDocumentPreviewModel } from './document-samples';
 import {
+  DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  DOCUMENT_ITEMS_COLUMN_IDS,
   DOCUMENT_TYPE_REGISTRY,
   getDefaultDocumentLayout,
   isDocumentBlockAllowed,
@@ -67,7 +69,13 @@ describe('Document type registry', () => {
         return {
           ...item,
           properties: {
-            columns: [{ id: 'description' as const, label: 'الصنف' }, { id: 'total' as const }],
+            columns: [
+              { id: 'description' as const, label: 'الصنف' },
+              { id: 'product_code' as const },
+              { id: 'barcode' as const },
+              { id: 'price_before_tax' as const },
+              { id: 'total' as const },
+            ],
             font_size: 'md' as const,
           },
         };
@@ -97,6 +105,15 @@ describe('Document type registry', () => {
     });
   });
 
+  it('keeps product identity and net-price columns optional by default', () => {
+    expect(DOCUMENT_ITEMS_COLUMN_IDS).toEqual(expect.arrayContaining([
+      'product_code', 'barcode', 'price_before_tax',
+    ]));
+    expect(DEFAULT_DOCUMENT_ITEMS_COLUMNS).not.toEqual(expect.arrayContaining([
+      'product_code', 'barcode', 'price_before_tax',
+    ]));
+  });
+
   it('exposes only compatible variables for vouchers', () => {
     const variables = listDocumentVariables('receipt_voucher').map((variable) => variable.id);
 
@@ -115,6 +132,12 @@ describe('Document preview samples', () => {
     expect(preview.lines).toHaveLength(2);
     expect(preview.totals.total).toBe(172500);
     expect(preview.qr?.value).toContain('preview');
+    expect(preview.lines[0]).toMatchObject({
+      productName: 'خدمة استشارية شهرية',
+      productCode: 'SRV-100',
+      barcode: '628100000001',
+      priceBeforeTax: 100000,
+    });
   });
 
   it('provides a safe line-item body for purchase invoices', () => {

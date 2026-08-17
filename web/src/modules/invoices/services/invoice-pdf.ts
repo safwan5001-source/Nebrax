@@ -1,5 +1,6 @@
 import type { Company, Customer, InvoiceDoc } from '@/components/invoices/invoice-document';
 
+import { DEFAULT_DOCUMENT_ITEMS_COLUMNS } from '@/modules/documents/registry/document-types';
 import type { DocBlockAlignment, DocItemsColumn, DocItemsColumnId, DocSectionLayoutItem, DocSectionProperties } from '@/modules/documents/types';
 
 const PAGE = { width: 210, height: 297, margin: 10, contentWidth: 190 };
@@ -23,7 +24,10 @@ export interface InvoicePdfLabels {
   cash: string;
   credit: string;
   description: string;
+  productCode?: string;
+  barcode?: string;
   quantity: string;
+  priceBeforeTax?: string;
   unitPrice: string;
   tax: string;
   total: string;
@@ -130,10 +134,7 @@ function date(value: string, locale: string): string {
   return new Intl.DateTimeFormat(locale === 'ar' ? 'en-GB' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(parsed);
 }
 
-const DEFAULT_ITEM_COLUMNS: readonly DocItemsColumn[] = [
-  { id: 'number' }, { id: 'description' }, { id: 'quantity' },
-  { id: 'unit_price' }, { id: 'tax' }, { id: 'total' },
-];
+const DEFAULT_ITEM_COLUMNS: readonly DocItemsColumn[] = DEFAULT_DOCUMENT_ITEMS_COLUMNS.map((id) => ({ id }));
 
 function layoutBlock(layout: DocSectionLayoutItem[] | null | undefined, key: DocSectionLayoutItem['key']): DocSectionLayoutItem | undefined {
   return layout?.find((item) => item.key === key);
@@ -286,15 +287,21 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   const termsContent = resolvePdfBlockContent(input.templateLayout, 'terms', input.termsText);
   const bankContent = resolvePdfBlockContent(input.templateLayout, 'bank', input.bankText);
   const columnLabels: Record<DocItemsColumnId, string> = {
-    number: '#', description: input.labels.description, quantity: input.labels.quantity,
+    number: '#', description: input.labels.description, product_code: input.labels.productCode ?? 'SKU',
+    barcode: input.labels.barcode ?? 'Barcode', quantity: input.labels.quantity, price_before_tax: input.labels.priceBeforeTax ?? 'Net price',
     unit_price: input.labels.unitPrice, tax: input.labels.tax, total: input.labels.total,
   };
   const columnWeights: Record<DocItemsColumnId, number> = {
-    number: 10, description: 56, quantity: 20, unit_price: 32, tax: 32, total: 40,
+    number: 10, description: 52, product_code: 28, barcode: 34, quantity: 20,
+    price_before_tax: 34, unit_price: 32, tax: 32, total: 40,
   };
   const selectedColumns = itemColumns(itemsProperties);
   const totalWeight = selectedColumns.reduce((sum, column) => sum + columnWeights[column.id], 0);
-  const defaultAlignment = (id: DocItemsColumnId): DocBlockAlignment => id === 'number' || id === 'description' ? 'start' : 'end';
+  const defaultAlignment = (id: DocItemsColumnId): DocBlockAlignment => (
+    id === 'number' || id === 'description' || id === 'product_code' || id === 'barcode'
+      ? 'start'
+      : 'end'
+  );
   const columns = selectedColumns.map((column) => ({
     ...column,
     label: column.label?.trim() || columnLabels[column.id],
@@ -337,7 +344,8 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     const descriptionColumn = columns.find((column) => column.id === 'description');
     if (!descriptionColumn) return;
     setArabic(pdf, 7.6);
-    const description = pdf.splitTextToSize(asArabic(pdf, line.description ?? '—'), descriptionColumn.width - 4) as string[];
+    const descriptionValue = line.product_name ?? line.description ?? '—';
+    const description = pdf.splitTextToSize(asArabic(pdf, descriptionValue), descriptionColumn.width - 4) as string[];
     const height = Math.max(12, description.length * 4.5 + 4.5);
     if (y + height > PAGE.height - 62) nextPage();
     if (index % 2 === 1) pdf.setFillColor(248, 250, 252);
@@ -345,7 +353,11 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     pdf.setDrawColor(226, 232, 240);
     pdf.rect(left, y, PAGE.contentWidth, height, 'FD');
     const values: Record<DocItemsColumnId, string> = {
-      number: String(index + 1), description: line.description ?? '—', quantity: String(line.quantity),
+      number: String(index + 1), description: descriptionValue, product_code: line.product_code ?? '—',
+      barcode: line.barcode ?? '—', quantity: String(line.quantity),
+      price_before_tax: line.unit_price_before_tax === null || line.unit_price_before_tax === undefined
+        ? '—'
+        : money(line.unit_price_before_tax),
       unit_price: money(line.unit_price), tax: money(line.line_tax), total: money(line.line_total),
     };
     let cursor = right;
@@ -357,7 +369,8 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
         setArabic(pdf, 7.6);
         pdf.text(description, x, y + 5.6, { align: alignment, lineHeightFactor: 1.08 });
       } else {
-        setLatin(pdf, column.id === 'unit_price' || column.id === 'tax' || column.id === 'total' ? 7.2 : 7.4, column.id === 'unit_price' || column.id === 'tax' || column.id === 'total');
+        const isMoney = column.id === 'price_before_tax' || column.id === 'unit_price' || column.id === 'tax' || column.id === 'total';
+        setLatin(pdf, isMoney ? 7.2 : 7.4, isMoney);
         pdf.text(values[column.id], x, y + height / 2 + 2.5, { align: alignment });
       }
       cursor -= column.width;

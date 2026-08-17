@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
+  DEFAULT_DOCUMENT_ITEMS_COLUMNS,
   DOCUMENT_BLOCK_PROPERTY_CONTRACT,
   DOCUMENT_ITEMS_COLUMN_IDS,
   getDocumentTypeDefinition,
@@ -67,13 +68,16 @@ export function BlockPropertiesEditor({
 
   const columnLabels: Record<DocItemsColumnId, string> = {
     number: '#',
-    description: tInvoice('description'),
+    description: tInvoice('product'),
+    product_code: tInvoice('product_code'),
+    barcode: tInvoice('barcode'),
     quantity: tInvoice('qty'),
+    price_before_tax: tInvoice('price_before_tax'),
     unit_price: tInvoice('unit_price'),
     tax: tInvoice('tax'),
     total: tInvoice('total'),
   };
-  const columns: readonly DocItemsColumn[] = properties.columns ?? DOCUMENT_ITEMS_COLUMN_IDS.map((id) => ({ id }));
+  const columns: readonly DocItemsColumn[] = properties.columns ?? DEFAULT_DOCUMENT_ITEMS_COLUMNS.map((id) => ({ id }));
   const columnFor = (id: DocItemsColumnId) => columns.find((column) => column.id === id);
   const toggleColumn = (id: DocItemsColumnId) => {
     const current = columnFor(id);

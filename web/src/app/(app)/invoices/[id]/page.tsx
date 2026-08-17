@@ -27,9 +27,13 @@ import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from 
 
 interface Line {
   id: string;
+  product_name: string | null;
+  product_code: string | null;
+  barcode: string | null;
   description: string | null;
   quantity: number;
   unit_price: string;
+  unit_price_before_tax: string;
   tax_rate: number;
   line_subtotal: string;
   line_tax: string;
@@ -280,7 +284,8 @@ export default function InvoiceDetailPage() {
         title: td('title'), titleSecondary: td('title_en'), seller: td('seller'), billTo: td('bill_to'),
         invoiceNumber: td('number'), vatNumber: td('vat_number'), crNumber: td('cr_number'), city: td('city'),
         date: td('date'), paymentType: td('payment_type'), cash: td('cash'), credit: td('credit'),
-        description: td('description'), quantity: td('qty'), unitPrice: td('unit_price'), tax: td('tax'), total: td('total'),
+        description: td('product'), productCode: td('product_code'), barcode: td('barcode'),
+        quantity: td('qty'), priceBeforeTax: td('price_before_tax'), unitPrice: td('unit_price'), tax: td('tax'), total: td('total'),
         subtotal: td('subtotal'), vat: td('vat'), grandTotal: td('grand_total'), qrNote: td('zatca_note'),
         terms: td('terms'), bank: td('bank'), footer: td('footer'),
       },

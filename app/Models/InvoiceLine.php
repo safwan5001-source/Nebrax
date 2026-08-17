@@ -18,16 +18,18 @@ class InvoiceLine extends BaseModel implements CompanyWide
     use ResolvesBranchReferences;
 
     protected $fillable = [
-        'tenant_id', 'invoice_id', 'product_id', 'description',
-        'quantity', 'unit_name', 'unit_factor', 'unit_price', 'tax_rate',
+        'tenant_id', 'invoice_id', 'product_id', 'product_name_snapshot',
+        'product_sku_snapshot', 'product_barcode_snapshot', 'description',
+        'quantity', 'unit_name', 'unit_factor', 'unit_price', 'unit_price_before_tax', 'tax_rate',
         'line_subtotal', 'line_discount', 'line_tax', 'line_total',
     ];
 
     protected $casts = [
         'quantity'      => 'integer',
         'unit_factor'   => 'integer',
-        'unit_price'    => 'integer',
-        'tax_rate'      => 'integer',
+        'unit_price'            => 'integer',
+        'unit_price_before_tax' => 'integer',
+        'tax_rate'              => 'integer',
         'line_subtotal' => 'integer',
         'line_discount' => 'integer',
         'line_tax'      => 'integer',
