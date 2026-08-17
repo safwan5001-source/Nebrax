@@ -7,6 +7,7 @@ import {
   isDocumentBlockAllowed,
   listDocumentVariables,
   validateDocumentLayout,
+  validateDocumentBlockProperties,
 } from './document-types';
 
 const DOCUMENT_TYPES: readonly DocumentTypeId[] = [
@@ -57,6 +58,42 @@ describe('Document type registry', () => {
     expect(validateDocumentLayout('tax_invoice', layout)).toEqual({
       valid: false,
       errors: ['required_block_hidden:items'],
+    });
+  });
+
+  it('validates advanced block properties against the rendered contract', () => {
+    const layout = getDefaultDocumentLayout('tax_invoice').map((item) => {
+      if (item.key === 'items') {
+        return {
+          ...item,
+          properties: {
+            columns: [{ id: 'description' as const, label: 'الصنف' }, { id: 'total' as const }],
+            font_size: 'md' as const,
+          },
+        };
+      }
+      if (item.key === 'footer') return { ...item, properties: { static_content: 'تذييل ثابت', alignment: 'center' as const } };
+      return item;
+    });
+
+    expect(validateDocumentBlockProperties('tax_invoice', layout)).toEqual({ valid: true, errors: [] });
+
+    const invalid = layout.map((item) => item.key === 'items'
+      ? { ...item, properties: { columns: [{ id: 'description' as const }] } }
+      : item,
+    );
+    expect(validateDocumentBlockProperties('tax_invoice', invalid)).toEqual({
+      valid: false,
+      errors: ['required_items_column_missing'],
+    });
+
+    const unsupported = layout.map((item) => item.key === 'header'
+      ? { ...item, properties: { static_content: 'غير مدعوم' } }
+      : item,
+    );
+    expect(validateDocumentBlockProperties('tax_invoice', unsupported)).toEqual({
+      valid: false,
+      errors: ['unsupported_block_property:header:static_content'],
     });
   });
 

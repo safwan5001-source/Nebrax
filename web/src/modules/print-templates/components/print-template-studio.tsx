@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { SectionDesigner } from '@/components/settings/section-designer';
 import { PrintTemplateAssignments } from './print-template-assignments';
+import { BlockPropertiesEditor } from './block-properties-editor';
 import { api } from '@/lib/api';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { DocumentView } from '@/modules/documents/components/document-view';
@@ -269,6 +270,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
                 <div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-medium text-text">{t('layout_title')}</p>{!layoutValidation.valid && <Button variant="ghost" size="sm" onClick={() => patch({}, { layout: getDefaultDocumentLayout(type) })}>{t('restore_default_layout')}</Button>}</div>
                 {canManage ? <SectionDesigner value={definition.layout} onChange={(layout) => patch({}, { layout })} allowedBlocks={documentType.allowedBlocks} requiredBlocks={documentType.requiredBlocks} /> : <p className="text-xs text-muted">{t('read_only')}</p>}
               </div>
+              {canManage && <BlockPropertiesEditor value={definition.layout} onChange={(layout) => patch({}, { layout })} documentType={type} disabled={saving} />}
               {canManage && <div className="grid grid-cols-2 gap-2 border-t border-border pt-4"><Button variant="outline" onClick={() => void duplicate()} disabled={saving}><Copy className="h-4 w-4" aria-hidden="true" />{t('copy')}</Button><Button onClick={() => void saveDraft()} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}{t('save_draft')}</Button><Button className="col-span-2" variant="primary" onClick={() => void publish()} disabled={saving}><Send className="h-4 w-4" aria-hidden="true" />{t('publish_revision', { version: revision.version })}</Button></div>}
             </CardContent>
           </Card>

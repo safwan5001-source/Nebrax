@@ -2,6 +2,8 @@ import type {
   DocumentTypeId,
   DocSectionKey,
   DocSectionLayoutItem,
+  DocSectionProperties,
+  DocItemsColumnId,
   PaperSizeId,
 } from '../types';
 
@@ -89,6 +91,28 @@ export interface DocumentLayoutValidationResult {
   valid: boolean;
   errors: readonly string[];
 }
+
+/** مفاتيح الخصائص التي يستطيع كل عارض كتلة استهلاكها فعلياً. */
+export const DOCUMENT_BLOCK_PROPERTY_CONTRACT: Readonly<Record<DocSectionKey, readonly (keyof DocSectionProperties)[]>> = {
+  header: [],
+  barcode: [],
+  parties: [],
+  items: ['columns', 'alignment', 'font_size'],
+  summary: [],
+  voucher: [],
+  amountWords: [],
+  notes: ['alignment', 'font_size'],
+  terms: ['alignment', 'font_size', 'static_content'],
+  bank: ['alignment', 'font_size', 'static_content'],
+  stamp: ['alignment'],
+  signature: ['alignment'],
+  footer: ['alignment', 'font_size', 'static_content'],
+};
+
+export const DOCUMENT_ITEMS_COLUMN_IDS = ['number', 'description', 'quantity', 'unit_price', 'tax', 'total'] as const satisfies readonly DocItemsColumnId[];
+const REQUIRED_ITEMS_COLUMNS = ['description', 'total'] as const satisfies readonly DocItemsColumnId[];
+const ALIGNMENTS = ['start', 'center', 'end'] as const;
+const FONT_SIZES = ['sm', 'md', 'lg'] as const;
 
 const PAGE_PAPERS = ['a4', 'a4_landscape', 'letter', 'legal'] as const satisfies readonly PaperSizeId[];
 const THERMAL_PAPERS = ['thermal_58', 'thermal_80'] as const satisfies readonly PaperSizeId[];
@@ -244,6 +268,52 @@ export function isDocumentBlockAllowed(type: DocumentTypeId, block: DocSectionKe
   return getDocumentTypeDefinition(type).allowedBlocks.includes(block);
 }
 
+/** يتحقق من خصائص الكتل قبل الحفظ من دون تغييرها أو رسمها. */
+export function validateDocumentBlockProperties(
+  type: DocumentTypeId,
+  layout: readonly DocSectionLayoutItem[],
+): DocumentLayoutValidationResult {
+  const errors: string[] = [];
+  const definition = getDocumentTypeDefinition(type);
+
+  for (const item of layout) {
+    if (!item.properties) continue;
+    if (!definition.allowedBlocks.includes(item.key)) {
+      errors.push(`unsupported_block:${item.key}`);
+      continue;
+    }
+
+    const allowed = DOCUMENT_BLOCK_PROPERTY_CONTRACT[item.key];
+    for (const key of Object.keys(item.properties) as (keyof DocSectionProperties)[]) {
+      if (!allowed.includes(key)) errors.push(`unsupported_block_property:${item.key}:${key}`);
+    }
+
+    const { alignment, font_size: fontSize, static_content: staticContent, columns } = item.properties;
+    if (alignment !== undefined && !ALIGNMENTS.includes(alignment)) errors.push(`invalid_block_alignment:${item.key}`);
+    if (fontSize !== undefined && !FONT_SIZES.includes(fontSize)) errors.push(`invalid_block_font_size:${item.key}`);
+    if (staticContent !== undefined && (typeof staticContent !== 'string' || staticContent.length > 2000)) {
+      errors.push(`invalid_static_content:${item.key}`);
+    }
+
+    if (columns !== undefined) {
+      if (!Array.isArray(columns) || columns.length === 0) {
+        errors.push('invalid_items_columns');
+        continue;
+      }
+      const columnIds = columns.map((column) => column.id);
+      if (columnIds.some((id) => !DOCUMENT_ITEMS_COLUMN_IDS.includes(id))) errors.push('invalid_items_column');
+      if (new Set(columnIds).size !== columnIds.length) errors.push('duplicate_items_column');
+      if (REQUIRED_ITEMS_COLUMNS.some((id) => !columnIds.includes(id))) errors.push('required_items_column_missing');
+      for (const column of columns) {
+        if (column.label !== undefined && (typeof column.label !== 'string' || column.label.length > 80)) errors.push('invalid_items_column_label');
+        if (column.alignment !== undefined && !ALIGNMENTS.includes(column.alignment)) errors.push('invalid_items_column_alignment');
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 /**
  * يتحقق من بنية التخطيط قبل الحفظ أو النشر. لا يغيرها ولا يرسمها؛ لذلك يبقى
  * قابلاً لإعادة الاستخدام في واجهة المحرر وواجهة API الخادمية مستقبلاً.
@@ -272,5 +342,9 @@ export function validateDocumentLayout(
     if (!item || !item.visible) errors.push(`required_block_hidden:${required}`);
   }
 
-  return { valid: errors.length === 0, errors };
+  const propertyValidation = validateDocumentBlockProperties(type, layout);
+  return {
+    valid: errors.length === 0 && propertyValidation.valid,
+    errors: [...errors, ...propertyValidation.errors],
+  };
 }

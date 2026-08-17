@@ -259,6 +259,68 @@ class PrintTemplateTest extends TestCase
     }
 
     /** @test */
+    public function template_layout_persists_supported_advanced_block_properties_and_rejects_invalid_ones(): void
+    {
+        ['token' => $token] = $this->registerTenant('template-properties', 'owner@template-properties.test');
+
+        $layout = [
+            ['key' => 'header', 'visible' => true],
+            ['key' => 'parties', 'visible' => true],
+            ['key' => 'items', 'visible' => true, 'properties' => [
+                'font_size' => 'md',
+                'columns' => [
+                    ['id' => 'number', 'alignment' => 'center'],
+                    ['id' => 'description', 'label' => 'الصنف'],
+                    ['id' => 'quantity'],
+                    ['id' => 'total', 'label' => 'الإجمالي'],
+                ],
+            ]],
+            ['key' => 'summary', 'visible' => true],
+            ['key' => 'terms', 'visible' => true, 'properties' => ['alignment' => 'center', 'static_content' => 'الشروط الثابتة']],
+            ['key' => 'bank', 'visible' => true, 'properties' => ['font_size' => 'sm', 'static_content' => 'IBAN: SA00']],
+            ['key' => 'footer', 'visible' => true, 'properties' => ['alignment' => 'end', 'static_content' => 'نص تذييل ثابت']],
+        ];
+
+        $created = $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'خصائص متقدمة',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['layout' => $layout],
+        ])->assertCreated()
+            ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.1.label', 'الصنف')
+            ->assertJsonPath('data.draft_revision.definition.layout.6.properties.static_content', 'نص تذييل ثابت');
+
+        $templateId = $created['data']['id'];
+        $revisionId = $this->withToken($token)->postJson("/api/print-templates/{$templateId}/publish")
+            ->assertOk()['data']['published_revision']['id'];
+        $published = PrintTemplateRevision::findOrFail($revisionId);
+        $this->assertSame('الشروط الثابتة', $published->definition['layout'][4]['properties']['static_content']);
+
+        $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'خاصية غير مدعومة',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['layout' => [
+                ['key' => 'header', 'visible' => true, 'properties' => ['static_content' => 'غير مسموح']],
+                ['key' => 'parties', 'visible' => true],
+                ['key' => 'items', 'visible' => true],
+                ['key' => 'summary', 'visible' => true],
+                ['key' => 'footer', 'visible' => true],
+            ]],
+        ])->assertUnprocessable();
+
+        $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'عمود إلزامي مفقود',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['layout' => [
+                ['key' => 'header', 'visible' => true],
+                ['key' => 'parties', 'visible' => true],
+                ['key' => 'items', 'visible' => true, 'properties' => ['columns' => [['id' => 'description']]]],
+                ['key' => 'summary', 'visible' => true],
+                ['key' => 'footer', 'visible' => true],
+            ]],
+        ])->assertUnprocessable();
+    }
+
+    /** @test */
     public function legacy_sales_design_is_copied_without_removing_the_legacy_setting(): void
     {
         ['tenant_id' => $tenantId] = $this->registerTenant('legacy', 'owner@legacy.test');

@@ -208,10 +208,42 @@ export type DocSectionKey =
   | 'header' | 'barcode' | 'parties' | 'items' | 'summary' | 'voucher'
   | 'amountWords' | 'notes' | 'terms' | 'bank' | 'stamp' | 'signature' | 'footer';
 
-/** عنصر تخطيط: قسم + ظهوره. ترتيب المصفوفة = ترتيب العرض. */
+/** محاذاة منطقية متوافقة مع RTL/LTR؛ لا تستعمل `left` أو `right`. */
+export type DocBlockAlignment = 'start' | 'center' | 'end';
+
+/** درجات حجم النص المتاحة للكتل؛ تبقى عائلة الخط من قالب المستند نفسه. */
+export type DocBlockFontSize = 'sm' | 'md' | 'lg';
+
+/** أعمدة جدول البنود التي يستطيع العارض رسمها بالفعل. */
+export type DocItemsColumnId = 'number' | 'description' | 'quantity' | 'unit_price' | 'tax' | 'total';
+
+/** تخصيص عمود واحد: عنوان ثابت اختياري ومحاذاة منطقية. */
+export interface DocItemsColumn {
+  id: DocItemsColumnId;
+  label?: string;
+  alignment?: DocBlockAlignment;
+}
+
+/**
+ * خصائص اختيارية ملازمة للكتلة في تخطيطها. العقد الخلفي وسجل أنواع المستندات
+ * يحددان المفاتيح المسموحة لكل كتلة؛ يظل هذا النوع واسعاً لتفادي تمثيل منفصل
+ * لكل عنصر تخطيط قبل التحقق وقت الحفظ.
+ */
+export interface DocSectionProperties {
+  columns?: DocItemsColumn[];
+  alignment?: DocBlockAlignment;
+  font_size?: DocBlockFontSize;
+  static_content?: string;
+}
+
+/** خصائص مفهرسة بمفتاح الكتلة، تلحق بتعريف القالب والمراجعة المثبتة. */
+export type DocBlockPropertiesMap = Partial<Record<DocSectionKey, DocSectionProperties>>;
+
+/** عنصر تخطيط: قسم + ظهوره وخصائصه المصرح بها. ترتيب المصفوفة = ترتيب العرض. */
 export interface DocSectionLayoutItem {
   key: DocSectionKey;
   visible: boolean;
+  properties?: DocSectionProperties;
 }
 
 /** الترتيب الافتراضي للأقسام (يطابق التركيب الأصلي). */
@@ -229,6 +261,8 @@ export interface DocumentTemplateProps {
   sections?: Partial<TemplateSectionsConfig>;
   /** تخطيط مخصّص (ترتيب/إظهار الأقسام) من مصمّم المستند؛ يتجاوز الترتيب الافتراضي. */
   layout?: DocSectionLayoutItem[] | null;
+  /** خصائص الكتل المعتمدة من المراجعة؛ لا يعاد حل إعداد حي عند وجودها. */
+  blockProperties?: DocBlockPropertiesMap | null;
   /**
    * معرّف عنصر الجذر: 'print-root' (افتراضي) لمصدر الطباعة/التصدير،
    * أو `null` لمعاينة لا تخطف الطباعة (كمعاينة الإعدادات).
