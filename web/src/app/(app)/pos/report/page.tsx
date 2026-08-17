@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * أسلوب «دفتر التحليل»: تظهر الوردية ونطاقها ومؤشراتها قبل التفاصيل، وتتحول
+ * الفواتير النقدية إلى صفوف قابلة للقراءة باللمس على الجوال.
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +15,7 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { formatRiyal, formatRiyalShort, isNegative } from '@/lib/money';
 import { cn } from '@/lib/utils';
+import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
 
 interface Invoice { id: string; number: string; invoice_date: string; total: string; status: string; payment_type: string }
 interface Session {
@@ -67,15 +73,22 @@ export default function PosReportPage() {
     : [];
 
   const recentCash = invoices.filter((i) => i.payment_type === 'cash' && i.status === 'posted').slice(0, 10);
+  const scope = session
+    ? `${closed ? ts('closed_status') : ts('open_status')} · ${session.opened_at?.slice(0, 16).replace('T', ' ') ?? '—'}`
+    : ts('no_open');
+  const metrics = kpis.map((k) => ({ label: k.label, value: k.value, tone: k.tone === 'negative' ? 'negative' as const : undefined }));
+  const recentColumns = [
+    { label: t('number') },
+    { label: t('date') },
+    { label: t('total'), align: 'end' as const },
+  ];
+  const recentRows = recentCash.map((invoice) => [invoice.number, invoice.invoice_date, formatRiyal(invoice.total)]);
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-          <p className="mt-1 text-sm text-muted">{t('subtitle')}</p>
-        </div>
-        <div className="min-w-56">
+      <div className="space-y-3">
+        <ReportScreenHeader title={t('title')} description={t('subtitle')} scope={scope} />
+        <div className="no-print w-full sm:max-w-xs">
           {sessions.length > 0 ? (
             <Select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
               {sessions.map((s) => (
@@ -97,24 +110,9 @@ export default function PosReportPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {(reportLoading && !report ? Array.from({ length: 5 }) : kpis).map((k, i) => (
-          <Card key={(k as { label?: string })?.label ?? i}>
-            {reportLoading && !report ? (
-              <CardContent className="py-6"><Skeleton className="h-6 w-24" /></CardContent>
-            ) : (
-              <>
-                <CardHeader><CardTitle>{(k as { label: string }).label}</CardTitle></CardHeader>
-                <CardContent>
-                  <div className={cn('num text-lg font-semibold', (k as { tone?: string }).tone === 'negative' ? 'text-negative' : 'text-text')}>
-                    {(k as { value: string }).value}
-                  </div>
-                </CardContent>
-              </>
-            )}
-          </Card>
-        ))}
-      </div>
+      {reportLoading && !report ? (
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)}</div>
+      ) : <ReportMetricGrid metrics={metrics} />}
 
       <Card>
         <CardHeader><CardTitle>{t('recent')}</CardTitle></CardHeader>
@@ -124,7 +122,9 @@ export default function PosReportPage() {
           ) : recentCash.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
           ) : (
-            <Table>
+            <>
+            <ReportMobileRows columns={recentColumns} rows={recentRows} primaryIndex={0} secondaryIndex={1} />
+            <Table className="hidden md:table">
               <THead>
                 <TR><TH>{t('number')}</TH><TH>{t('date')}</TH><TH className="text-end">{t('total')}</TH></TR>
               </THead>
@@ -138,6 +138,7 @@ export default function PosReportPage() {
                 ))}
               </TBody>
             </Table>
+            </>
           )}
         </CardContent>
       </Card>

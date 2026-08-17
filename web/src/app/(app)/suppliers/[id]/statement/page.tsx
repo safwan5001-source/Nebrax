@@ -1,9 +1,14 @@
 'use client';
 
+/**
+ * أسلوب «دفتر التحليل»: كشف المورد يعرض نطاقه ورصيده وحركاته في واجهة عمل
+ * متجاوبة؛ تُفتح معاينة المستند الورقي فقط عند طلب المستخدم.
+ */
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, Download, FileSpreadsheet, Printer, RefreshCw, Share2 } from 'lucide-react';
+import { ArrowRight, Download, FileSpreadsheet, FileText, Printer, RefreshCw, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,6 +20,9 @@ import { createPartnerStatementPdf, downloadPartnerStatementPdf, sharePartnerSta
 import { exportXlsx } from '@/lib/xlsx';
 import { api } from '@/lib/api';
 import { useCompany } from '@/lib/company';
+import { formatRiyal } from '@/lib/money';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
+import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
 
 interface Supplier {
   id: string;
@@ -48,6 +56,7 @@ export default function SupplierStatementPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<BusyAction>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -144,6 +153,28 @@ export default function SupplierStatementPage() {
     }
   }
 
+  const scope = useMemo(() => {
+    const period = !filters.from && !filters.to ? t('all_periods') : [filters.from || '…', filters.to || '…'].join(' ← ');
+    const branches = filters.branchIds.length === 0 ? t('all_branches') : t('branches_selected', { count: filters.branchIds.length });
+    return `${branches} · ${period}`;
+  }, [filters.branchIds, filters.from, filters.to, t]);
+
+  const statementColumns = [
+    { label: t('date') }, { label: t('entry_number') }, { label: t('description') },
+    { label: t('debit'), align: 'end' as const }, { label: t('credit'), align: 'end' as const }, { label: t('balance'), align: 'end' as const },
+  ];
+  const statementRows = statement?.rows.map((row) => [
+    row.date, row.number, row.description ?? '—',
+    row.debit !== '0.00' ? formatRiyal(row.debit) : '—', row.credit !== '0.00' ? formatRiyal(row.credit) : '—', formatRiyal(row.balance),
+  ]) ?? [];
+  const actions = [
+    { id: 'xlsx', label: busy === 'xlsx' ? t('generating') : t('export_excel'), icon: FileSpreadsheet, onSelect: () => void handleXlsx(), disabled: !!busy, busy: busy === 'xlsx' },
+    { id: 'pdf', label: busy === 'pdf' ? t('generating') : t('download_pdf'), icon: Download, onSelect: () => void handlePdf(), disabled: !!busy, busy: busy === 'pdf' },
+    { id: 'share', label: busy === 'share' ? t('generating') : t('share_pdf'), icon: Share2, onSelect: () => void handleShare(), disabled: !!busy, busy: busy === 'share' },
+    { id: 'print', label: t('print'), icon: Printer, onSelect: () => printDocument(A4), disabled: !!busy },
+    { id: 'preview', label: t('preview'), icon: FileText, onSelect: () => setShowPreview((visible) => !visible), disabled: !statement },
+  ];
+
   if (loading && !statement) {
     return <div className="space-y-4"><Skeleton className="h-9 w-64" /><Skeleton className="h-16 w-full" /><Skeleton className="h-[560px] w-full" /></div>;
   }
@@ -158,24 +189,29 @@ export default function SupplierStatementPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="space-y-5">
+      <div className="no-print flex items-center gap-3">
         <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/suppliers')} aria-label={t('back_to_supplier')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button>
-        <div className="min-w-0"><p className="text-xs text-muted">{supplier.name}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1></div>
-        <div className="no-print ms-auto flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void handleXlsx()} disabled={!!busy}><FileSpreadsheet className="h-4 w-4" strokeWidth={1.7} />{busy === 'xlsx' ? t('generating') : t('export_excel')}</Button>
-          <Button variant="outline" size="sm" onClick={() => void handlePdf()} disabled={!!busy}><Download className="h-4 w-4" strokeWidth={1.7} />{busy === 'pdf' ? t('generating') : t('download_pdf')}</Button>
-          <Button variant="outline" size="sm" onClick={() => void handleShare()} disabled={!!busy}><Share2 className="h-4 w-4" strokeWidth={1.7} />{busy === 'share' ? t('generating') : t('share_pdf')}</Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(A4)} disabled={!!busy}><Printer className="h-4 w-4" strokeWidth={1.7} />{t('print')}</Button>
-        </div>
       </div>
+
+      <ReportScreenHeader title={t('title')} description={supplier.name} scope={scope} actions={actions} actionsLabel={t('report_actions')} />
 
       <ReportFilters value={filters} onChange={setFilters} />
 
+      <ReportMetricGrid metrics={[
+        { label: t('opening_balance'), value: formatRiyal(statement.opening_balance) },
+        { label: t('closing_credit_balance'), value: formatRiyal(statement.closing_balance) },
+      ]} />
+
       <Card>
-        <CardHeader className="no-print flex flex-row items-center justify-between gap-3"><div><CardTitle>{t('preview')}</CardTitle><p className="mt-1 text-xs text-muted">{t('preview_hint')}</p></div>{loading && <RefreshCw className="h-4 w-4 animate-spin text-muted" strokeWidth={1.7} aria-label={t('loading')} />}</CardHeader>
-        <CardContent className="print:p-0"><div className="overflow-x-auto bg-slate-100 p-3 dark:bg-black/30 print:overflow-visible print:bg-transparent print:p-0"><PartnerStatementDocument statement={statement} company={company} filters={filters} translationNamespace="supplierStatement" creditBalance closingBalanceLabel={t('closing_credit_balance')} /></div></CardContent>
+        <CardHeader className="no-print flex flex-row items-center justify-between gap-3"><CardTitle>{t('entries')}</CardTitle>{loading && <RefreshCw className="h-4 w-4 animate-spin text-muted" strokeWidth={1.7} aria-label={t('loading')} />}</CardHeader>
+        <CardContent>
+          <ReportMobileRows columns={statementColumns} rows={statementRows} emptyText={t('empty')} primaryIndex={2} secondaryIndex={0} />
+          <Table className="hidden md:table"><THead><TR>{statementColumns.map((column) => <TH key={column.label} className={column.align === 'end' ? 'text-end' : undefined}>{column.label}</TH>)}</TR></THead><TBody>{statementRows.map((row, rowIndex) => <TR key={`${row[1]}-${rowIndex}`}>{row.map((cell, index) => <TD key={index} className={statementColumns[index]?.align === 'end' ? 'num text-end' : undefined}>{cell}</TD>)}</TR>)}</TBody></Table>
+        </CardContent>
       </Card>
+
+      {showPreview && <Card><CardHeader className="no-print"><CardTitle>{t('preview')}</CardTitle></CardHeader><CardContent className="print:p-0"><div className="overflow-x-auto bg-background p-3 print:overflow-visible print:bg-transparent print:p-0"><PartnerStatementDocument statement={statement} company={company} filters={filters} translationNamespace="supplierStatement" creditBalance closingBalanceLabel={t('closing_credit_balance')} /></div></CardContent></Card>}
     </div>
   );
 }
