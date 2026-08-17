@@ -23,6 +23,7 @@ import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { exportXlsx } from '@/lib/xlsx';
 import { createInvoicePdf, downloadInvoicePdf, shareInvoicePdf } from '@/modules/invoices/services/invoice-pdf';
 import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
+import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
 
 interface Line {
   id: string;
@@ -50,6 +51,7 @@ interface FrozenPrintTemplateRevision {
 }
 interface Invoice {
   id: string;
+  branch_id: string | null;
   number: string;
   partner_id: string;
   payment_type: string;
@@ -156,11 +158,13 @@ export default function InvoiceDetailPage() {
     api<{ data: Invoice }>(`/invoices/${id}`)
       .then(async (r) => {
         setInvoice(r.data);
-        const [p, z, m, d] = await Promise.allSettled([
+        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
+        const [p, z, m, legacy, live] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
           api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
+          api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=tax_invoice&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
@@ -176,15 +180,29 @@ export default function InvoiceDetailPage() {
           setShowLogo(frozen.show_logo !== false);
           setLayout(Array.isArray(frozen.layout) && frozen.layout.length ? frozen.layout : null);
           setLogoUrl(null); setLogoHeight(null); setTermsText(frozen.terms_text ?? null); setBankText(frozen.bank_text ?? null); setStampUrl(null); setSignatureUrl(null);
-        } else if (d.status === 'fulfilled') {
-          const dg = d.value.data ?? {};
-          setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
-          if (dg.theme) setThemeId(dg.theme as ThemeId);
-          setFooterText(dg.footer_text ?? null);
-          setShowLogo(dg.show_logo !== false);
-          setLogoUrl(dg.logo ?? null); setLogoHeight(dg.logo_height ?? null);
-          setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
-          setTermsText(dg.terms_text ?? null); setBankText(dg.bank_text ?? null); setStampUrl(dg.stamp ?? null); setSignatureUrl(dg.signature ?? null);
+        } else {
+          const resolved = live.status === 'fulfilled'
+            ? resolveLiveTemplateDefinition(live.value.data, 'tax_invoice')
+            : null;
+          if (resolved) {
+            setTemplateId(resolved.templateId);
+            setThemeId(resolved.themeId);
+            setFooterText(resolved.footerText);
+            setShowLogo(resolved.showLogo);
+            setLogoUrl(null); setLogoHeight(null);
+            setLayout(resolved.layout);
+            setTermsText(resolved.termsText); setBankText(resolved.bankText); setStampUrl(null); setSignatureUrl(null);
+          } else if (legacy.status === 'fulfilled') {
+            // التوافق صريح: تعريف الهجرة القديم أو غياب تعيين حي لا يفسران جزئياً.
+            const dg = legacy.value.data ?? {};
+            setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
+            if (dg.theme) setThemeId(dg.theme as ThemeId);
+            setFooterText(dg.footer_text ?? null);
+            setShowLogo(dg.show_logo !== false);
+            setLogoUrl(dg.logo ?? null); setLogoHeight(dg.logo_height ?? null);
+            setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
+            setTermsText(dg.terms_text ?? null); setBankText(dg.bank_text ?? null); setStampUrl(dg.stamp ?? null); setSignatureUrl(dg.signature ?? null);
+          }
         }
       })
       .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
