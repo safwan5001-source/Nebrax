@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
@@ -167,6 +168,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('accounts', [AccountController::class, 'store'])->middleware($perm('accounts.manage'));
         Route::put('accounts/{id}', [AccountController::class, 'update'])->middleware($perm('accounts.manage'));
 
+        // تصنيفات المصروفات: بيانات تحليلية بلا أثر محاسبي، تتحكم بها صلاحيات المصروفات.
+        Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->middleware($perm('expenses.view'));
+        Route::post('expense-categories', [ExpenseCategoryController::class, 'store'])->middleware($perm('expenses.manage'));
+        Route::put('expense-categories/{id}', [ExpenseCategoryController::class, 'update'])->middleware($perm('expenses.manage'));
+        Route::delete('expense-categories/{id}', [ExpenseCategoryController::class, 'destroy'])->middleware($perm('expenses.manage'));
         // المصروفات (مستند مالي؛ الترحيل يولّد قيداً متوازناً)
         Route::get('expenses', [ExpenseController::class, 'index'])->middleware($perm('expenses.view'));
         Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware($perm('expenses.view'));
