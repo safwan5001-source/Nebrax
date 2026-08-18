@@ -117,6 +117,7 @@ export default function ReturnDetailPage() {
         paymentType: tPrint('document_data'),
         cash: '',
         credit: '',
+        product: tPrint('product'),
         description: tPrint('description'),
         quantity: tPrint('quantity'),
         unitPrice: tPrint('unit_price'),

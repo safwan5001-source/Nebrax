@@ -187,6 +187,7 @@ export default function CreditNoteDetailPage() {
         paymentType: tPrint('document_data'),
         cash: '',
         credit: '',
+        product: tPrint('product'),
         description: tPrint('description'),
         quantity: tPrint('quantity'),
         unitPrice: tPrint('unit_price'),

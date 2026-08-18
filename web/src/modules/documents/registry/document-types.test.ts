@@ -125,13 +125,15 @@ describe('Document type registry', () => {
     });
   });
 
-  it('keeps product identity and net-price columns optional by default', () => {
-    expect(DOCUMENT_ITEMS_COLUMN_IDS).toEqual(expect.arrayContaining([
-      'product_code', 'barcode', 'price_before_tax',
-    ]));
-    expect(DEFAULT_DOCUMENT_ITEMS_COLUMNS).not.toEqual(expect.arrayContaining([
-      'product_code', 'barcode', 'price_before_tax',
-    ]));
+  it('uses the configured complete default order for item columns', () => {
+    expect(DOCUMENT_ITEMS_COLUMN_IDS).toEqual([
+      'number', 'product_code', 'barcode', 'product', 'description', 'unit_price',
+      'quantity', 'price_before_tax', 'tax', 'total',
+    ]);
+    expect(DEFAULT_DOCUMENT_ITEMS_COLUMNS).toEqual([
+      'number', 'product_code', 'barcode', 'product', 'description', 'unit_price',
+      'quantity', 'price_before_tax', 'tax', 'total',
+    ]);
   });
 
   it('exposes only compatible variables for vouchers', () => {

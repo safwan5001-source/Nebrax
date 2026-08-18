@@ -24,6 +24,7 @@ export interface InvoicePdfLabels {
   paymentType: string;
   cash: string;
   credit: string;
+  product: string;
   description: string;
   productCode?: string;
   barcode?: string;
@@ -313,18 +314,19 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   const termsContent = resolvePdfBlockContent(input.templateLayout, 'terms', input.termsText);
   const bankContent = resolvePdfBlockContent(input.templateLayout, 'bank', input.bankText);
   const columnLabels: Record<DocItemsColumnId, string> = {
-    number: '#', description: input.labels.description, product_code: input.labels.productCode ?? 'SKU',
-    barcode: input.labels.barcode ?? 'Barcode', quantity: input.labels.quantity, price_before_tax: input.labels.priceBeforeTax ?? 'Net price',
+    number: '#', product: input.labels.product, description: input.labels.description,
+    product_code: input.labels.productCode ?? 'SKU', barcode: input.labels.barcode ?? 'Barcode',
+    quantity: input.labels.quantity, price_before_tax: input.labels.priceBeforeTax ?? 'Net price',
     unit_price: input.labels.unitPrice, tax: input.labels.tax, total: input.labels.total,
   };
   const columnWeights: Record<DocItemsColumnId, number> = {
-    number: 10, description: 52, product_code: 28, barcode: 34, quantity: 20,
-    price_before_tax: 34, unit_price: 32, tax: 32, total: 40,
+    number: 10, product_code: 28, barcode: 34, product: 42, description: 52,
+    unit_price: 32, quantity: 20, price_before_tax: 34, tax: 32, total: 40,
   };
   const selectedColumns = itemColumns(itemsProperties);
   const totalWeight = selectedColumns.reduce((sum, column) => sum + columnWeights[column.id], 0);
   const defaultAlignment = (id: DocItemsColumnId): DocBlockAlignment => (
-    id === 'number' || id === 'description' || id === 'product_code' || id === 'barcode'
+    id === 'number' || id === 'product' || id === 'description' || id === 'product_code' || id === 'barcode'
       ? 'start'
       : 'end'
   );
@@ -332,7 +334,7 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     ...column,
     label: column.label?.trim() || columnLabels[column.id],
     width: PAGE.contentWidth * columnWeights[column.id] / totalWeight,
-    kind: column.id === 'description' ? 'arabic' as const : 'latin' as const,
+    kind: column.id === 'product' || column.id === 'description' ? 'arabic' as const : 'latin' as const,
     alignment: column.alignment ?? itemsProperties.alignment ?? defaultAlignment(column.id),
   }));
 
@@ -370,17 +372,22 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     const descriptionColumn = columns.find((column) => column.id === 'description');
     if (!descriptionColumn) return;
     setArabic(pdf, 7.6);
-    const descriptionValue = line.product_name ?? line.description ?? '—';
+    const productValue = line.product_name ?? '—';
+    const descriptionValue = line.description ?? '—';
+    const productColumn = columns.find((column) => column.id === 'product');
+    const product = productColumn
+      ? pdf.splitTextToSize(asArabic(pdf, productValue), productColumn.width - 4) as string[]
+      : [];
     const description = pdf.splitTextToSize(asArabic(pdf, descriptionValue), descriptionColumn.width - 4) as string[];
-    const height = Math.max(12, description.length * 4.5 + 4.5);
+    const height = Math.max(12, product.length * 4.5 + 4.5, description.length * 4.5 + 4.5);
     if (y + height > PAGE.height - 62) nextPage();
     if (index % 2 === 1) pdf.setFillColor(248, 250, 252);
     else pdf.setFillColor(255, 255, 255);
     pdf.setDrawColor(226, 232, 240);
     pdf.rect(left, y, PAGE.contentWidth, height, 'FD');
     const values: Record<DocItemsColumnId, string> = {
-      number: String(index + 1), description: descriptionValue, product_code: line.product_code ?? '—',
-      barcode: line.barcode ?? '—', quantity: String(line.quantity),
+      number: String(index + 1), product: productValue, description: descriptionValue,
+      product_code: line.product_code ?? '—', barcode: line.barcode ?? '—', quantity: String(line.quantity),
       price_before_tax: line.unit_price_before_tax === null || line.unit_price_before_tax === undefined
         ? '—'
         : money(line.unit_price_before_tax),
@@ -391,9 +398,9 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
       const cellStart = cursor - column.width;
       const alignment = pdfAlignment(column.alignment);
       const x = alignment === 'left' ? cellStart + 2 : alignment === 'center' ? cellStart + column.width / 2 : cursor - 2;
-      if (column.id === 'description') {
+      if (column.id === 'product' || column.id === 'description') {
         setArabic(pdf, 7.6);
-        pdf.text(description, x, y + 5.6, { align: alignment, lineHeightFactor: 1.08 });
+        pdf.text(column.id === 'product' ? product : description, x, y + 5.6, { align: alignment, lineHeightFactor: 1.08 });
       } else {
         const isMoney = column.id === 'price_before_tax' || column.id === 'unit_price' || column.id === 'tax' || column.id === 'total';
         setLatin(pdf, isMoney ? 7.2 : 7.4, isMoney);
