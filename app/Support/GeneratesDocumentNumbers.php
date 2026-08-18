@@ -56,14 +56,21 @@ trait GeneratesDocumentNumbers
      *
      * @param  ?string  $prefix  بادئة السلسلة. `null` = بلا بادئة (أكواد الفروع والمخازن: `00001`).
      * @param  ?string  $date    تاريخ المستند — تُشتقّ منه سنة إعادة الضبط. `null` = سلسلة مستمرة بلا سنة (`EMP-00001`).
+     * @param  string|null|false  $branchId  `false` يقرأ السياق النشط؛ أمّا قيمة
+     *                                      صريحة (ومنها `null`) فتثبّت نطاق نسخة
+     *                                      مستند قائم.
      */
-    public static function nextDocumentNumber(?string $prefix = null, ?string $date = null): string
+    public static function nextDocumentNumber(?string $prefix = null, ?string $date = null, string|null|false $branchId = false): string
     {
         $column = static::documentNumberColumn();
 
         // الفروع تُرقَّم مستقلّةً، إلا ما صُنِّف `CompanyWide` صراحةً فيُرقَّم للمؤسسة كلها.
         $branchNumbered = static::isBranchNumbered();
-        $branchId       = $branchNumbered ? app(BranchContext::class)->id() : null;
+        if (! $branchNumbered) {
+            $branchId = null;
+        } elseif ($branchId === false) {
+            $branchId = app(BranchContext::class)->id();
+        }
 
         // المِرساة تتبع نطاق السلسلة نفسه: قفلُ فرعٍ لا يُسلسِل سلسلةً مؤسسية.
         static::lockNumberingAnchor($branchId);

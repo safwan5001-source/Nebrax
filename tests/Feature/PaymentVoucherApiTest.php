@@ -66,6 +66,11 @@ class PaymentVoucherApiTest extends TestCase
             ->assertCreated()['data'];
         $this->assertSame('draft', $copy['status']);
         $this->assertNotSame($payment->id, $copy['id']);
+        $this->assertNotSame($payment->number, $copy['number']);
+        // السند التاريخي بلا فرع يُنسخ في الفرع النشط للطلب، بسلسلة ذلك الفرع؛
+        // أما السند الموسوم فيبقى في نطاق فرعه المصدر داخل الخدمة.
+        $this->assertDatabaseHas('payments', ['id' => $copy['id']]);
+        $this->assertNotNull(\App\Models\Payment::findOrFail($copy['id'])->branch_id);
         $this->assertEmpty($copy['allocations'] ?? []);
 
         $this->withToken($token)->deleteJson("/api/payments/{$payment->id}")->assertOk();

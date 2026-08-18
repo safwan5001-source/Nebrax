@@ -95,8 +95,17 @@ class PaymentService
         $cashAccountId = $this->validCashAccountId($data['cash_account_id'] ?? null);
 
         return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $cashAccountId) {
-            $payment = Payment::create([
-                'number'          => $data['number'] ?? $this->nextNumber($direction, $date),
+            // النسخ قد يكون لمستند تاريخي بلا فرع. نحفظ نطاق المصدر صراحةً،
+            // فلا تنتقل النسخة إلى الفرع الرئيسي للطلب ثم تصطدم برقمه القديم.
+            $hasExplicitBranch = array_key_exists('branch_id', $data);
+            $number = $data['number'] ?? (
+                $hasExplicitBranch
+                    ? $this->nextNumber($direction, $date, $data['branch_id'])
+                    : $this->nextNumber($direction, $date)
+            );
+
+            $attributes = [
+                'number'          => $number,
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null, // مرجع اختياري للقبض
                 'direction'       => $direction,
@@ -108,7 +117,12 @@ class PaymentService
                 'status'          => 'draft',
                 'notes'           => $data['notes'] ?? null,
                 'created_by'      => $data['created_by'] ?? null,
-            ]);
+            ];
+            if ($hasExplicitBranch) {
+                $attributes['branch_id'] = $data['branch_id'];
+            }
+
+            $payment = Payment::create($attributes);
 
             foreach ($allocs as $a) {
                 PaymentAllocation::create([
@@ -192,17 +206,30 @@ class PaymentService
     /** نسخة المسودة لا تنسخ التخصيصات كي لا تحجز متبقي فاتورة مرتين. */
     public function duplicate(Payment $payment, ?string $createdBy = null): Payment
     {
-        return $this->create([
+        $date = now()->toDateString();
+        $data = [
             'partner_id'      => $payment->partner_id,
             'direction'       => $payment->direction,
             'method'          => $payment->method,
             'reference'       => $payment->reference,
             'cash_account_id' => $payment->cash_account_id,
-            'payment_date'    => now()->toDateString(),
+            'payment_date'    => $date,
             'amount'          => $payment->amount,
             'notes'           => $payment->notes,
             'created_by'      => $createdBy,
-        ]);
+        ];
+
+        // فرع المصدر المحدد هو نطاق الوثيقة وسلسلته؛ لا نعتمد على السياق الذي
+        // قد يتبدل بين قراءة السند وتنفيذ طلب API. صفوف ما قبل الفروع تُنشأ
+        // في الفرع النشط، لكن رقمها التالي يُقرأ من سلسلتها القديمة حتى لا
+        // يعاد رقمٌ ما زال محمياً بالقيد الفريد في SQLite.
+        if ($payment->branch_id !== null) {
+            $data['branch_id'] = $payment->branch_id;
+        } else {
+            $data['number'] = $this->nextNumber($payment->direction, $date, null);
+        }
+
+        return $this->create($data);
     }
 
     /**
@@ -383,8 +410,12 @@ class PaymentService
     /**
      * توليد رقم سند تسلسلي: REC-2025-00001 (قبض) | PAY-2025-00001 (صرف)
      */
-    protected function nextNumber(string $direction, string $date): string
+    protected function nextNumber(string $direction, string $date, string|null|false $branchId = false): string
     {
-        return Payment::nextDocumentNumber($direction === 'received' ? 'REC' : 'PAY', $date);
+        return Payment::nextDocumentNumber(
+            $direction === 'received' ? 'REC' : 'PAY',
+            $date,
+            $branchId
+        );
     }
 }
