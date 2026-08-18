@@ -111,12 +111,13 @@ export const DOCUMENT_BLOCK_PROPERTY_CONTRACT: Readonly<Record<DocSectionKey, re
 
 /** جميع الأعمدة التي يستطيع محرر القالب تفعيلها. */
 export const DOCUMENT_ITEMS_COLUMN_IDS = [
-  'number', 'description', 'product_code', 'barcode', 'quantity',
-  'price_before_tax', 'unit_price', 'tax', 'total',
+  'number', 'product_code', 'barcode', 'product', 'description', 'unit_price',
+  'quantity', 'price_before_tax', 'tax', 'total',
 ] as const satisfies readonly DocItemsColumnId[];
-/** الافتراض المتوافق: الأعمدة المستجدة اختيارية ومخفية حتى يفعّلها مالك القالب. */
+/** ترتيب افتراضي كامل لبنود المستند، ويمكن لمالك القالب تخصيصه لاحقاً. */
 export const DEFAULT_DOCUMENT_ITEMS_COLUMNS = [
-  'number', 'description', 'quantity', 'unit_price', 'tax', 'total',
+  'number', 'product_code', 'barcode', 'product', 'description', 'unit_price',
+  'quantity', 'price_before_tax', 'tax', 'total',
 ] as const satisfies readonly DocItemsColumnId[];
 const REQUIRED_ITEMS_COLUMNS = ['description', 'total'] as const satisfies readonly DocItemsColumnId[];
 const ALIGNMENTS = ['start', 'center', 'end'] as const;

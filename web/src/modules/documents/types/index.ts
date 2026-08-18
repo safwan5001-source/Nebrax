@@ -226,7 +226,7 @@ export type DocBlockImageOpacity = 'solid' | 'soft' | 'faint';
 
 /** أعمدة جدول البنود التي يستطيع العارض رسمها بالفعل. */
 export type DocItemsColumnId =
-  | 'number' | 'description' | 'product_code' | 'barcode'
+  | 'number' | 'product_code' | 'barcode' | 'product' | 'description'
   | 'quantity' | 'price_before_tax' | 'unit_price' | 'tax' | 'total';
 
 /** تخصيص عمود واحد: عنوان ثابت اختياري ومحاذاة منطقية. */

@@ -4,7 +4,13 @@ import { DEFAULT_DOCUMENT_ITEMS_COLUMNS } from '@/modules/documents/registry/doc
 import { getDocumentImagePdfOpacity, getDocumentImagePdfSize, getDocumentImagePdfX, withDocumentImagePdfOpacity } from '@/modules/documents/utils/block-image-size';
 import type { DocBlockAlignment, DocBlockImageSize, DocItemsColumn, DocItemsColumnId, DocSectionLayoutItem, DocSectionProperties } from '@/modules/documents/types';
 
-const PAGE = { width: 210, height: 297, margin: 10, contentWidth: 190 };
+type PdfOrientation = 'portrait' | 'landscape';
+type PdfPage = { orientation: PdfOrientation; width: number; height: number; margin: number; contentWidth: number };
+
+const PDF_PAGES: Record<PdfOrientation, PdfPage> = {
+  portrait: { orientation: 'portrait', width: 210, height: 297, margin: 10, contentWidth: 190 },
+  landscape: { orientation: 'landscape', width: 297, height: 210, margin: 10, contentWidth: 277 },
+};
 const FONT_FILE = 'NotoSansArabic-Regular.ttf';
 const FONT_FAMILY = 'NotoSansArabic';
 
@@ -24,6 +30,7 @@ export interface InvoicePdfLabels {
   paymentType: string;
   cash: string;
   credit: string;
+  product: string;
   description: string;
   productCode?: string;
   barcode?: string;
@@ -174,6 +181,11 @@ function itemColumns(properties: DocSectionProperties): readonly DocItemsColumn[
   return properties.columns?.length ? properties.columns : DEFAULT_ITEM_COLUMNS;
 }
 
+/** يحافظ الجدول المختصر على A4 رأسي، ويستخدم العرض الأفقي عند كثافة الأعمدة. */
+export function getInvoicePdfOrientation(columns: readonly DocItemsColumn[]): PdfOrientation {
+  return columns.length >= 8 ? 'landscape' : 'portrait';
+}
+
 function pdfAlignment(alignment: DocBlockAlignment): 'left' | 'center' | 'right' {
   const alignments: Record<DocBlockAlignment, 'left' | 'center' | 'right'> = { start: 'right', center: 'center', end: 'left' };
   return alignments[alignment];
@@ -223,17 +235,22 @@ function drawLogo(pdf: PdfDoc, logo: string | null | undefined, x: number, y: nu
  * في PDF، ولا تتأثر بنتيجة html2canvas أو اختلاف أبعاد شاشة المصدر.
  */
 export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
+  const itemsProperties = blockProperties(input.templateLayout, 'items');
+  const selectedColumns = itemColumns(itemsProperties);
+  const orientation = getInvoicePdfOrientation(selectedColumns);
+  const pdfPage = PDF_PAGES[orientation];
+  const compactTable = orientation === 'landscape';
   const logoSource = input.logoUrl?.trim() ? input.logoUrl : input.company?.logo;
   const [{ jsPDF }, fontData, logo, stamp, signature] = await Promise.all([
     import('jspdf'), arabicFontData(), toPdfImage(logoSource), toPdfImage(input.stampUrl), toPdfImage(input.signatureUrl),
   ]);
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', putOnlyUsedFonts: true }) as ArabicPdfDoc;
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation, putOnlyUsedFonts: true }) as ArabicPdfDoc;
   pdf.addFileToVFS(FONT_FILE, fontData);
   pdf.addFont(FONT_FILE, FONT_FAMILY, 'normal');
   pdf.addFont(FONT_FILE, FONT_FAMILY, 'bold');
 
-  const right = PAGE.width - PAGE.margin;
-  const left = PAGE.margin;
+  const right = pdfPage.width - pdfPage.margin;
+  const left = pdfPage.margin;
   const generated = new Intl.DateTimeFormat('en-GB', {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date()).replace(',', '');
@@ -241,9 +258,9 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
 
   const drawHeader = (continued = false) => {
     pdf.setFillColor(15, 39, 72);
-    pdf.roundedRect(left, 10, PAGE.contentWidth, continued ? 25 : 43, 2, 2, 'F');
+    pdf.roundedRect(left, 10, pdfPage.contentWidth, continued ? 25 : 43, 2, 2, 'F');
     pdf.setFillColor(37, 99, 235);
-    pdf.rect(left, continued ? 33 : 50, PAGE.contentWidth, 3, 'F');
+    pdf.rect(left, continued ? 33 : 50, pdfPage.contentWidth, 3, 'F');
 
     if (continued) {
       drawLogo(pdf, logo, right - 28, 13, 20, 17);
@@ -269,14 +286,16 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
       input.company?.cr_number && `${input.labels.crNumber}: ${input.company.cr_number}`,
     ].filter(Boolean).join('  •  ');
     if (identity) writeArabicRight(pdf, identity, right - 35, 31, 6.5);
-    writeArabicRight(pdf, input.labels.title, 112, 23.5, 14.5, true);
-    writeArabicRight(pdf, input.labels.titleSecondary, 112, 32.5, 7.2);
-    writeArabicRight(pdf, `${input.labels.invoiceNumber}:`, 112, 41, 6.7);
-    writeLatinRight(pdf, input.invoice.number, 73, 41, 7.2, true);
+    const documentTitleX = compactTable ? left + pdfPage.contentWidth * 0.58 : 112;
+    const documentNumberX = compactTable ? left + pdfPage.contentWidth * 0.32 : 73;
+    writeArabicRight(pdf, input.labels.title, documentTitleX, 23.5, 14.5, true);
+    writeArabicRight(pdf, input.labels.titleSecondary, documentTitleX, 32.5, 7.2);
+    writeArabicRight(pdf, `${input.labels.invoiceNumber}:`, documentTitleX, 41, 6.7);
+    writeLatinRight(pdf, input.invoice.number, documentNumberX, 41, 7.2, true);
     pdf.setTextColor(21, 24, 29);
 
     const cardY = 60;
-    const cardW = (PAGE.contentWidth - 8) / 3;
+    const cardW = (pdfPage.contentWidth - 8) / 3;
     const infoCard = (x: number, title: string, details: Array<[string, string | null | undefined]>) => {
       pdf.setFillColor(248, 250, 252);
       pdf.setDrawColor(226, 232, 240);
@@ -301,10 +320,9 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
       [input.labels.date, date(input.invoice.invoice_date, input.locale)],
       [input.labels.paymentType, input.invoice.payment_type === 'cash' ? input.labels.cash : input.labels.credit],
     ]);
-    y = 100;
+    y = compactTable ? 94 : 100;
   };
 
-  const itemsProperties = blockProperties(input.templateLayout, 'items');
   const termsProperties = blockProperties(input.templateLayout, 'terms');
   const bankProperties = blockProperties(input.templateLayout, 'bank');
   const footerProperties = blockProperties(input.templateLayout, 'footer');
@@ -313,51 +331,58 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   const termsContent = resolvePdfBlockContent(input.templateLayout, 'terms', input.termsText);
   const bankContent = resolvePdfBlockContent(input.templateLayout, 'bank', input.bankText);
   const columnLabels: Record<DocItemsColumnId, string> = {
-    number: '#', description: input.labels.description, product_code: input.labels.productCode ?? 'SKU',
-    barcode: input.labels.barcode ?? 'Barcode', quantity: input.labels.quantity, price_before_tax: input.labels.priceBeforeTax ?? 'Net price',
+    number: '#', product: input.labels.product, description: input.labels.description,
+    product_code: input.labels.productCode ?? 'SKU', barcode: input.labels.barcode ?? 'Barcode',
+    quantity: input.labels.quantity, price_before_tax: input.labels.priceBeforeTax ?? 'Net price',
     unit_price: input.labels.unitPrice, tax: input.labels.tax, total: input.labels.total,
   };
   const columnWeights: Record<DocItemsColumnId, number> = {
-    number: 10, description: 52, product_code: 28, barcode: 34, quantity: 20,
-    price_before_tax: 34, unit_price: 32, tax: 32, total: 40,
+    number: 10, product_code: 28, barcode: 34, product: 42, description: 52,
+    unit_price: 32, quantity: 20, price_before_tax: 34, tax: 32, total: 40,
   };
-  const selectedColumns = itemColumns(itemsProperties);
   const totalWeight = selectedColumns.reduce((sum, column) => sum + columnWeights[column.id], 0);
   const defaultAlignment = (id: DocItemsColumnId): DocBlockAlignment => (
-    id === 'number' || id === 'description' || id === 'product_code' || id === 'barcode'
+    id === 'number' || id === 'product' || id === 'description' || id === 'product_code' || id === 'barcode'
       ? 'start'
       : 'end'
   );
   const columns = selectedColumns.map((column) => ({
     ...column,
     label: column.label?.trim() || columnLabels[column.id],
-    width: PAGE.contentWidth * columnWeights[column.id] / totalWeight,
-    kind: column.id === 'description' ? 'arabic' as const : 'latin' as const,
+    width: pdfPage.contentWidth * columnWeights[column.id] / totalWeight,
+    kind: column.id === 'product' || column.id === 'description' ? 'arabic' as const : 'latin' as const,
     alignment: column.alignment ?? itemsProperties.alignment ?? defaultAlignment(column.id),
   }));
+  const tableHeaderHeight = compactTable ? 8 : 10;
+  const tableArabicHeaderFontSize = compactTable ? 6.3 : 7.1;
+  const tableLatinHeaderFontSize = compactTable ? 6.4 : 7.2;
+  const tableArabicBodyFontSize = compactTable ? 6.8 : 7.6;
+  const tableLatinBodyFontSize = compactTable ? 6.3 : 7.4;
+  const tableLineHeight = compactTable ? 3.9 : 4.5;
+  const tablePageBottom = pdfPage.height - (compactTable ? 45 : 62);
 
   const drawTableHeader = () => {
     pdf.setFillColor(15, 39, 72);
     pdf.setDrawColor(15, 39, 72);
-    pdf.rect(left, y, PAGE.contentWidth, 10, 'FD');
+    pdf.rect(left, y, pdfPage.contentWidth, tableHeaderHeight, 'FD');
     pdf.setTextColor(255, 255, 255);
     let cursor = right;
     columns.forEach((column) => {
       const cellStart = cursor - column.width;
       const alignment = pdfAlignment(column.alignment);
-      const x = alignment === 'left' ? cellStart + 2 : alignment === 'center' ? cellStart + column.width / 2 : cursor - 2;
+      const x = alignment === 'left' ? cellStart + 1.5 : alignment === 'center' ? cellStart + column.width / 2 : cursor - 1.5;
       if (column.kind === 'arabic') {
-        setArabic(pdf, 7.1, true);
-        pdf.text(asArabic(pdf, column.label), x, y + 6.35, { align: alignment });
+        setArabic(pdf, tableArabicHeaderFontSize, true);
+        pdf.text(asArabic(pdf, column.label), x, y + tableHeaderHeight / 2 + 2.05, { align: alignment });
       } else {
-        setLatin(pdf, 7.2, true);
-        pdf.text(column.label, x, y + 6.35, { align: alignment });
+        setLatin(pdf, tableLatinHeaderFontSize, true);
+        pdf.text(column.label, x, y + tableHeaderHeight / 2 + 2.05, { align: alignment });
       }
       cursor -= column.width;
-      if (cursor > left) pdf.line(cursor, y, cursor, y + 10);
+      if (cursor > left) pdf.line(cursor, y, cursor, y + tableHeaderHeight);
     });
     pdf.setTextColor(21, 24, 29);
-    y += 10;
+    y += tableHeaderHeight;
   };
 
   const nextPage = () => {
@@ -369,18 +394,27 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   const drawLine = (line: InvoiceDoc['lines'][number], index: number) => {
     const descriptionColumn = columns.find((column) => column.id === 'description');
     if (!descriptionColumn) return;
-    setArabic(pdf, 7.6);
-    const descriptionValue = line.product_name ?? line.description ?? '—';
+    setArabic(pdf, tableArabicBodyFontSize);
+    const productValue = line.product_name ?? '—';
+    const descriptionValue = line.description ?? '—';
+    const productColumn = columns.find((column) => column.id === 'product');
+    const product = productColumn
+      ? pdf.splitTextToSize(asArabic(pdf, productValue), productColumn.width - 4) as string[]
+      : [];
     const description = pdf.splitTextToSize(asArabic(pdf, descriptionValue), descriptionColumn.width - 4) as string[];
-    const height = Math.max(12, description.length * 4.5 + 4.5);
-    if (y + height > PAGE.height - 62) nextPage();
+    const height = Math.max(
+      compactTable ? 10 : 12,
+      product.length * tableLineHeight + (compactTable ? 4 : 4.5),
+      description.length * tableLineHeight + (compactTable ? 4 : 4.5),
+    );
+    if (y + height > tablePageBottom) nextPage();
     if (index % 2 === 1) pdf.setFillColor(248, 250, 252);
     else pdf.setFillColor(255, 255, 255);
     pdf.setDrawColor(226, 232, 240);
-    pdf.rect(left, y, PAGE.contentWidth, height, 'FD');
+    pdf.rect(left, y, pdfPage.contentWidth, height, 'FD');
     const values: Record<DocItemsColumnId, string> = {
-      number: String(index + 1), description: descriptionValue, product_code: line.product_code ?? '—',
-      barcode: line.barcode ?? '—', quantity: String(line.quantity),
+      number: String(index + 1), product: productValue, description: descriptionValue,
+      product_code: line.product_code ?? '—', barcode: line.barcode ?? '—', quantity: String(line.quantity),
       price_before_tax: line.unit_price_before_tax === null || line.unit_price_before_tax === undefined
         ? '—'
         : money(line.unit_price_before_tax),
@@ -390,14 +424,14 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     columns.forEach((column) => {
       const cellStart = cursor - column.width;
       const alignment = pdfAlignment(column.alignment);
-      const x = alignment === 'left' ? cellStart + 2 : alignment === 'center' ? cellStart + column.width / 2 : cursor - 2;
-      if (column.id === 'description') {
-        setArabic(pdf, 7.6);
-        pdf.text(description, x, y + 5.6, { align: alignment, lineHeightFactor: 1.08 });
+      const x = alignment === 'left' ? cellStart + 1.5 : alignment === 'center' ? cellStart + column.width / 2 : cursor - 1.5;
+      if (column.id === 'product' || column.id === 'description') {
+        setArabic(pdf, tableArabicBodyFontSize);
+        pdf.text(column.id === 'product' ? product : description, x, y + (compactTable ? 4.6 : 5.6), { align: alignment, lineHeightFactor: 1.08 });
       } else {
         const isMoney = column.id === 'price_before_tax' || column.id === 'unit_price' || column.id === 'tax' || column.id === 'total';
-        setLatin(pdf, isMoney ? 7.2 : 7.4, isMoney);
-        pdf.text(values[column.id], x, y + height / 2 + 2.5, { align: alignment });
+        setLatin(pdf, isMoney ? tableLatinBodyFontSize : tableLatinBodyFontSize + 0.1, isMoney);
+        pdf.text(values[column.id], x, y + height / 2 + (compactTable ? 2.1 : 2.5), { align: alignment });
       }
       cursor -= column.width;
       if (cursor > left) pdf.line(cursor, y, cursor, y + height);
@@ -409,13 +443,13 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   drawTableHeader();
   input.invoice.lines.forEach(drawLine);
 
-  if (y > PAGE.height - 78) {
+  if (y > pdfPage.height - (compactTable ? 68 : 78)) {
     pdf.addPage();
     drawHeader(true);
   }
 
   const totalsX = left;
-  const totalsW = 79;
+  const totalsW = compactTable ? 95 : 79;
   // يبدأ الملخص فور انتهاء الجدول؛ الفراغ الكبير يجعل الفاتورة القصيرة غير متوازنة بصرياً.
   const bottomY = y + 8;
   const drawTotalRow = (rowY: number, label: string, value: string, emphasized = false) => {
@@ -454,14 +488,14 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   }
 
   y = contentStartY;
-  const contentBottom = PAGE.height - 20;
+  const contentBottom = pdfPage.height - 20;
   const drawContentBlock = (label: string, content: string | null, properties: DocSectionProperties) => {
     if (!content) return;
     const alignment = pdfAlignment(properties.alignment ?? 'start');
     const fontSize = pdfBlockFontSize(properties);
     const lineHeight = fontSize * 0.62;
     setArabic(pdf, fontSize);
-    const lines = pdf.splitTextToSize(asArabic(pdf, content), PAGE.contentWidth - 8) as string[];
+    const lines = pdf.splitTextToSize(asArabic(pdf, content), pdfPage.contentWidth - 8) as string[];
     let offset = 0;
 
     while (offset < lines.length) {
@@ -475,9 +509,9 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
       const height = 8 + chunk.length * lineHeight;
       pdf.setFillColor(248, 250, 252);
       pdf.setDrawColor(226, 232, 240);
-      pdf.roundedRect(left, y, PAGE.contentWidth, height, 1.5, 1.5, 'FD');
+      pdf.roundedRect(left, y, pdfPage.contentWidth, height, 1.5, 1.5, 'FD');
       writeArabicRight(pdf, label, right - 3, y + 5, 6.8, true);
-      const textX = alignment === 'left' ? left + 4 : alignment === 'center' ? PAGE.width / 2 : right - 4;
+      const textX = alignment === 'left' ? left + 4 : alignment === 'center' ? pdfPage.width / 2 : right - 4;
       setArabic(pdf, fontSize);
       pdf.text(chunk, textX, y + 9, { align: alignment, lineHeightFactor: 1 });
       y += height + 5;
@@ -516,7 +550,7 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     assets.filter((asset) => asset.alignment !== undefined).forEach((asset) => {
       if (y + asset.height + 7 > contentBottom) { pdf.addPage(); drawHeader(true); }
       withDocumentImagePdfOpacity(pdf, getDocumentImagePdfOpacity(asset.block, asset.opacity), () => {
-        drawLogo(pdf, asset.image, getDocumentImagePdfX(asset.alignment, PAGE.width, left, right, asset.width), y, asset.width, asset.height);
+        drawLogo(pdf, asset.image, getDocumentImagePdfX(asset.alignment, pdfPage.width, left, right, asset.width), y, asset.width, asset.height);
       });
       y += asset.height + 5;
     });
@@ -525,11 +559,11 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   const pages = pdf.getNumberOfPages();
   for (let page = 1; page <= pages; page += 1) {
     pdf.setPage(page);
-    const footerY = PAGE.height - 12;
+    const footerY = pdfPage.height - 12;
     pdf.setDrawColor(203, 213, 225);
     pdf.line(left, footerY - 5, right, footerY - 5);
     writeArabicRight(pdf, footerProperties.static_content?.trim() || input.footerText?.trim() || input.labels.footer, right, footerY + 0.5, 6.3);
-    writeLatinCenter(pdf, `${page} / ${pages}`, PAGE.width / 2, footerY + 0.5, 6.7);
+    writeLatinCenter(pdf, `${page} / ${pages}`, pdfPage.width / 2, footerY + 0.5, 6.7);
   }
 
   return pdf.output('blob');

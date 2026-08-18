@@ -536,6 +536,7 @@
     "supplier": "Supplier",
     "document_data": "Document details",
     "document_number": "Document number",
+    "product": "Product",
     "description": "Description",
     "quantity": "Quantity",
     "unit_price": "Unit price",

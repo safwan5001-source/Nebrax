@@ -195,7 +195,7 @@ export default function PurchaseDetailPage() {
       title: tpp('title'), titleSecondary: tpp('title_secondary'), seller: tpp('buyer'), billTo: tpp('supplier'),
       invoiceNumber: tp('number'), vatNumber: td('vat_number'), crNumber: td('cr_number'), city: td('city'),
       date: td('date'), paymentType: td('payment_type'), cash: td('cash'), credit: td('credit'),
-      description: td('description'), quantity: td('qty'), unitPrice: td('unit_price'), tax: td('tax'), total: tp('total'),
+      product: td('product'), description: td('description'), quantity: td('qty'), unitPrice: td('unit_price'), tax: td('tax'), total: tp('total'),
       subtotal: tpf('subtotal'), vat: tpf('tax_amount'), grandTotal: tp('total'), qrNote: '',
       terms: td('terms'), bank: td('bank'), footer: tpp('footer'),
       supplierInvoiceNumber: tpp('supplier_invoice_number'), dueDate: tpp('due_date'), receiptStatus: tpp('receipt_status'),

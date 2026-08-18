@@ -28,7 +28,7 @@ function textAlignmentClass(alignment: DocBlockAlignment): string {
 }
 
 function defaultAlignment(column: DocItemsColumnId): DocBlockAlignment {
-  return column === 'description' || column === 'product_code' || column === 'barcode' || column === 'number' ? 'start' : 'end';
+  return column === 'product' || column === 'description' || column === 'product_code' || column === 'barcode' || column === 'number' ? 'start' : 'end';
 }
 
 /** جدول البنود — أعمدة معتمدة قابلة للترتيب والإخفاء والتسمية والمحاذاة. */
@@ -46,7 +46,8 @@ export function DocItemsTable({
   const columns = properties.columns ?? DEFAULT_COLUMNS;
   const labels: Record<DocItemsColumnId, string> = {
     number: '#',
-    description: t('product'),
+    product: t('product'),
+    description: t('description'),
     product_code: t('product_code'),
     barcode: t('barcode'),
     quantity: t('qty'),
@@ -59,7 +60,8 @@ export function DocItemsTable({
   const valueFor = (column: DocItemsColumnId, line: DocumentModel['lines'][number], index: number): string | number => {
     switch (column) {
       case 'number': return index + 1;
-      case 'description': return line.productName || line.description || '—';
+      case 'product': return line.productName || '—';
+      case 'description': return line.description || '—';
       case 'product_code': return line.productCode || '—';
       case 'barcode': return line.barcode || '—';
       case 'quantity': return line.quantity;

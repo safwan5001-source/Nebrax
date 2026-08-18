@@ -1,11 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import type { DocSectionLayoutItem } from '@/modules/documents/types';
-import { resolvePdfBlockContent } from './invoice-pdf';
+import { getInvoicePdfOrientation, resolvePdfBlockContent } from './invoice-pdf';
 
 const visibleTerms = (staticContent?: string): DocSectionLayoutItem[] => [
   { key: 'terms', visible: true, properties: staticContent === undefined ? undefined : { static_content: staticContent } },
   { key: 'bank', visible: false },
 ];
+
+describe('تخطيط جدول PDF المتجهي', () => {
+  it('يستخدم A4 أفقياً مع ترتيب الأعمدة الكامل', () => {
+    expect(getInvoicePdfOrientation([
+      { id: 'number' }, { id: 'product_code' }, { id: 'barcode' }, { id: 'product' },
+      { id: 'description' }, { id: 'unit_price' }, { id: 'quantity' },
+      { id: 'price_before_tax' }, { id: 'tax' }, { id: 'total' },
+    ])).toBe('landscape');
+  });
+
+  it('يبقي الجداول المختصرة على A4 رأسي', () => {
+    expect(getInvoicePdfOrientation([{ id: 'description' }, { id: 'quantity' }, { id: 'total' }])).toBe('portrait');
+  });
+});
 
 describe('محتوى كتل PDF المتجهية', () => {
   it('يستخدم المحتوى الثابت للمراجعة المنشورة قبل القيمة الديناميكية', () => {
