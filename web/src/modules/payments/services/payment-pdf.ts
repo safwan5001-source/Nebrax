@@ -1,5 +1,6 @@
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
 import type { SourcePayment } from '@/modules/documents/builder/from-payment';
+import type { DocBlockAlignment, DocSectionLayoutItem } from '@/modules/documents/types';
 import { downloadInvoicePdf, shareInvoicePdf } from '@/modules/invoices/services/invoice-pdf';
 
 const PAGE = { width: 210, height: 297, margin: 10, contentWidth: 190 };
@@ -40,6 +41,11 @@ export interface PaymentPdfInput {
   company: SourceCompany | null;
   partner: SourceCustomer | null;
   logoUrl?: string | null;
+  /** أصول ومحتوى مراجعة PDF المثبتة، أو التعيين الحي قبل إصدار السند. */
+  stampUrl?: string | null;
+  signatureUrl?: string | null;
+  bankText?: string | null;
+  templateLayout?: DocSectionLayoutItem[] | null;
   /** تذييل مراجعة PDF المثبتة وقت ترحيل السند، إن وُجد. */
   footerText?: string | null;
   labels: PaymentPdfLabels;
@@ -108,6 +114,35 @@ function money(value: string): string {
   return `${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0))} SAR`;
 }
 
+async function toPdfImage(source: string | null | undefined): Promise<string | null> {
+  if (!source) return null;
+  if (source.startsWith('data:image/')) return source;
+  try {
+    const response = await fetch(source);
+    const blob = await response.blob();
+    if (!response.ok || !blob.type.startsWith('image/')) return null;
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+export function resolvePaymentPdfBlockContent(
+  layout: DocSectionLayoutItem[] | null | undefined,
+  key: 'bank',
+  fallback: string | null | undefined,
+): string | null {
+  const block = layout?.find((candidate) => candidate.key === key);
+  if (!block?.visible) return null;
+  const content = (block.properties?.static_content ?? fallback)?.trim();
+  return content || null;
+}
+
 function drawLogo(pdf: PdfDoc, logo: string | null | undefined, x: number, y: number, maxWidth: number, maxHeight: number): boolean {
   if (!logo?.startsWith('data:image/')) return false;
   try {
@@ -131,7 +166,10 @@ function drawLogo(pdf: PdfDoc, logo: string | null | undefined, x: number, y: nu
 
 /** يرسم سند قبض أو صرف عربياً كنص متجهي، لا كتقاط صورة من DOM. */
 export async function createPaymentPdf(input: PaymentPdfInput): Promise<Blob> {
-  const [{ jsPDF }, fontData] = await Promise.all([import('jspdf'), arabicFontData()]);
+  const logoSource = input.logoUrl?.trim() ? input.logoUrl : input.company?.logo;
+  const [{ jsPDF }, fontData, logo, stamp, signature] = await Promise.all([
+    import('jspdf'), arabicFontData(), toPdfImage(logoSource), toPdfImage(input.stampUrl), toPdfImage(input.signatureUrl),
+  ]);
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', putOnlyUsedFonts: true }) as ArabicPdfDoc;
   pdf.addFileToVFS(FONT_FILE, fontData);
   pdf.addFont(FONT_FILE, FONT_FAMILY, 'normal');
@@ -143,7 +181,6 @@ export async function createPaymentPdf(input: PaymentPdfInput): Promise<Blob> {
   const title = isReceipt ? input.labels.receiptTitle : input.labels.paymentTitle;
   const subtitle = isReceipt ? input.labels.receiptSubtitle : input.labels.paymentSubtitle;
   const partyLabel = isReceipt ? input.labels.customer : input.labels.supplier;
-  const logo = input.logoUrl?.trim() ? input.logoUrl : input.company?.logo;
 
   pdf.setFillColor(15, 39, 72);
   pdf.roundedRect(left, 10, PAGE.contentWidth, 43, 2, 2, 'F');
@@ -250,8 +287,42 @@ export async function createPaymentPdf(input: PaymentPdfInput): Promise<Blob> {
     pdf.setFillColor(248, 250, 252);
     pdf.setDrawColor(226, 232, 240);
     const noteHeight = Math.max(14, notes.length * 4.5 + 7);
+    if (y + noteHeight > 268) { pdf.addPage(); y = 25; }
     pdf.roundedRect(left, y, PAGE.contentWidth, noteHeight, 1.5, 1.5, 'FD');
     pdf.text(notes, right - 3, y + 6, { align: 'right', lineHeightFactor: 1.1 });
+    y += noteHeight;
+  }
+
+  const bankBlock = input.templateLayout?.find((block) => block.key === 'bank');
+  const bankContent = resolvePaymentPdfBlockContent(input.templateLayout, 'bank', input.bankText);
+  if (bankContent) {
+    y += 10;
+    const lines = pdf.splitTextToSize(asArabic(pdf, bankContent), PAGE.contentWidth - 8) as string[];
+    const height = Math.max(14, lines.length * 4.5 + 8);
+    if (y + height > 268) { pdf.addPage(); y = 25; }
+    pdf.setFillColor(248, 250, 252);
+    pdf.setDrawColor(226, 232, 240);
+    pdf.roundedRect(left, y, PAGE.contentWidth, height, 1.5, 1.5, 'FD');
+    writeArabicRight(pdf, input.labels.bank, right - 3, y + 5.5, 6.8, true);
+    const alignment: Record<DocBlockAlignment, 'left' | 'center' | 'right'> = { start: 'right', center: 'center', end: 'left' };
+    const textAlign = alignment[bankBlock?.properties?.alignment ?? 'start'];
+    const textX = textAlign === 'left' ? left + 4 : textAlign === 'center' ? PAGE.width / 2 : right - 4;
+    setArabic(pdf, 7.2);
+    pdf.text(lines, textX, y + 10, { align: textAlign, lineHeightFactor: 1.1 });
+    y += height;
+  }
+
+  const assets = [
+    { image: stamp, visible: input.templateLayout?.some((block) => block.key === 'stamp' && block.visible) === true },
+    { image: signature, visible: input.templateLayout?.some((block) => block.key === 'signature' && block.visible) === true },
+  ].filter((asset): asset is { image: string; visible: true } => Boolean(asset.image) && asset.visible);
+  if (assets.length) {
+    y += 8;
+    if (y + 26 > 268) { pdf.addPage(); y = 25; }
+    const width = 32;
+    const gap = 8;
+    const startX = right - assets.length * width - (assets.length - 1) * gap;
+    assets.forEach((asset, index) => drawLogo(pdf, asset.image, startX + index * (width + gap), y, width, 22));
   }
 
   const pages = pdf.getNumberOfPages();
