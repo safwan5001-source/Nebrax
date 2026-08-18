@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Copy, FilePlus2, Loader2, Save, Send, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, FilePlus2, Loader2, Save, Send, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { SectionDesigner } from '@/components/settings/section-designer';
 import { PrintTemplateAssignments } from './print-template-assignments';
+import { PrintTemplateCenter } from './print-template-center';
 import { BlockPropertiesEditor } from './block-properties-editor';
 import { TemplateRevisionHistory } from './template-revision-history';
 import { ApiError, api } from '@/lib/api';
@@ -105,6 +106,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   const [selectedId, setSelectedId] = useState(FALLBACK.id);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [surface, setSurface] = useState<'center' | 'studio'>('center');
   const [templateDetails, setTemplateDetails] = useState<Record<string, PrintTemplate>>({});
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsFailed, setDetailsFailed] = useState(false);
@@ -146,20 +148,41 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
     }));
   };
 
-  async function createTemplate() {
+  function createLocalTemplate(documentType: DocumentTypeId) {
     const now = Date.now();
     const local: PrintTemplate = {
       ...FALLBACK,
       id: `new-${now}`,
       name: t('new_template'),
+      document_types: [documentType],
       draft_revision: {
         ...FALLBACK.draft_revision!,
         id: `new-r-${now}`,
-        definition: { ...FALLBACK.draft_revision!.definition },
+        document_types: [documentType],
+        definition: {
+          ...FALLBACK.draft_revision!.definition,
+          layout: getDefaultDocumentLayout(documentType),
+        },
       },
     };
     setTemplates((current) => [local, ...current]);
     setSelectedId(local.id);
+    return local;
+  }
+
+  function createTemplate() {
+    createLocalTemplate('tax_invoice');
+    setSurface('studio');
+  }
+
+  function openDocumentType(documentType: DocumentTypeId) {
+    const matchingTemplate = templates.find((template) => template.document_types.includes(documentType));
+    if (matchingTemplate) {
+      setSelectedId(matchingTemplate.id);
+    } else {
+      createLocalTemplate(documentType);
+    }
+    setSurface('studio');
   }
 
   async function saveDraft() {
@@ -253,15 +276,34 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
 
   const templatesCatalog = listTemplates();
   const selectedName = selected.name || t('preview_template_name');
+
+  if (surface === 'center') {
+    return (
+      <div dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+        <PrintTemplateCenter
+          templates={templates}
+          loading={loading}
+          onOpenDocumentType={openDocumentType}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
+          <Button variant="ghost" size="sm" className="-ms-2 mb-2" onClick={() => setSurface('center')}>
+            {locale === 'ar'
+              ? <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              : <ChevronLeft className="h-4 w-4" aria-hidden="true" />}
+            {t('back_to_center')}
+          </Button>
           <p className="text-xs font-medium text-primary">{t('library_label')}</p>
           <h1 className="mt-1 text-2xl font-semibold text-text">{t('title')}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">{t('subtitle')}</p>
         </div>
-        {canManage && <Button onClick={() => void createTemplate()}><FilePlus2 className="h-4 w-4" aria-hidden="true" />{t('new_template')}</Button>}
+        {canManage && <Button onClick={createTemplate}><FilePlus2 className="h-4 w-4" aria-hidden="true" />{t('new_template')}</Button>}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
