@@ -109,6 +109,10 @@ function asArabic(pdf: ArabicPdfDoc, text: string): string {
   return pdf.processArabic ? pdf.processArabic(text) : text;
 }
 
+function hasArabicText(text: string): boolean {
+  return /[\u0600-\u06FF]/.test(text);
+}
+
 function setArabic(pdf: PdfDoc, size: number, bold = false) {
   pdf.setFont(FONT_FAMILY, bold ? 'bold' : 'normal');
   pdf.setFontSize(size);
@@ -371,7 +375,7 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
       const cellStart = cursor - column.width;
       const alignment = pdfAlignment(column.alignment);
       const x = alignment === 'left' ? cellStart + 1.5 : alignment === 'center' ? cellStart + column.width / 2 : cursor - 1.5;
-      if (column.kind === 'arabic') {
+      if (hasArabicText(column.label)) {
         setArabic(pdf, tableArabicHeaderFontSize, true);
         pdf.text(asArabic(pdf, column.label), x, y + tableHeaderHeight / 2 + 2.05, { align: alignment });
       } else {
