@@ -223,6 +223,26 @@ class PrintTemplateService
         return $query->whereNull('branch_id')->first();
     }
 
+    /**
+     * يحل لقطة الإخراج الكاملة عند لحظة إصدار واحدة. تبقى القيمة null إن لم
+     * يوجد تعيين؛ يقرأ المستهلك عندها العارض الافتراضي الآمن، لا تعييناً حياً
+     * ينشأ لاحقاً.
+     *
+     * @return array{print_template_revision_id: ?string, pdf_template_revision_id: ?string, thermal_template_revision_id: ?string}
+     */
+    public function resolveOutputRevisionIds(string $documentType, ?string $branchId): array
+    {
+        $print = $this->resolve($documentType, 'print', $branchId);
+        $pdf = $this->resolve($documentType, 'pdf', $branchId);
+        $thermal = $this->resolve($documentType, 'thermal', $branchId);
+
+        return [
+            'print_template_revision_id' => $print?->print_template_revision_id,
+            'pdf_template_revision_id' => $pdf?->print_template_revision_id,
+            'thermal_template_revision_id' => $thermal?->print_template_revision_id,
+        ];
+    }
+
     private function draftFor(PrintTemplate $template, array $types, ?User $actor): PrintTemplateRevision
     {
         $draft = PrintTemplateRevision::where('print_template_id', $template->id)

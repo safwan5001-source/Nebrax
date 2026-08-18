@@ -1715,7 +1715,12 @@
     "save": "Save quote",
     "cancel": "Cancel",
     "document_title": "Quotation",
-    "document_subtitle": "Non-tax commercial offer"
+    "document_subtitle": "Non-tax commercial offer",
+    "issue": "Issue for print",
+    "issued": "Issued for print",
+    "create_revision": "Create working revision",
+    "issued_locked_hint": "This quote is issued for print and locked. Create a working revision to make changes.",
+    "revised_from": "Working revision of"
   },
   "recurring": {
     "title": "Recurring invoices",
@@ -2707,6 +2712,11 @@
     "convert_to_quotation": "Record supplier quote",
     "convert_to_order": "Convert to purchase order",
     "convert_to_purchase": "Generate purchase invoice",
+    "issue": "Issue for print",
+    "issued": "Issued for print",
+    "create_revision": "Create working revision",
+    "issued_locked_hint": "This purchase order is issued for print and locked. Create a working revision to make changes.",
+    "revised_from": "Working revision of",
     "request": {
       "title": "Purchase requests",
       "create": "New purchase request",

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\Quote;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -119,6 +120,72 @@ class QuoteTest extends TestCase
 
         $this->withToken($auth['token'])->postJson("/api/quotes/{$quoteId}/convert")->assertCreated();
         $this->withToken($auth['token'])->postJson("/api/quotes/{$quoteId}/convert")->assertStatus(422);
+    }
+
+    /** @test */
+    public function issuing_a_quote_freezes_templates_locks_the_source_and_creates_a_working_revision(): void
+    {
+        $auth = $this->registerTenant();
+        $partnerId = $this->partner($auth['token']);
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'قالب عرض ثابت',
+            'document_types' => ['quotation'],
+            'definition' => ['template_id' => 'tax-invoice-classic', 'footer_text' => 'نسخة صادرة'],
+        ], null));
+        $pdf = $templates->publish($templates->create([
+            'name' => 'قالب PDF لعرض ثابت',
+            'document_types' => ['quotation'],
+            'definition' => ['template_id' => 'tax-invoice-minimal', 'footer_text' => 'أرشيف PDF'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'quotation',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+        $templates->assign([
+            'document_type' => 'quotation',
+            'usage' => 'pdf',
+            'print_template_revision_id' => $pdf->published_revision_id,
+        ], null);
+
+        $quoteId = $this->withToken($auth['token'])->postJson('/api/quotes', [
+            'partner_id' => $partnerId,
+            'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated()['data']['id'];
+
+        $issued = $this->withToken($auth['token'])->postJson("/api/quotes/{$quoteId}/issue")
+            ->assertOk()
+            ->assertJsonPath('data.print_template_revision_id', $print->published_revision_id)
+            ->assertJsonPath('data.pdf_template_revision_id', $pdf->published_revision_id);
+        $this->assertNotNull($issued['data']['print_issued_at']);
+
+        $this->withToken($auth['token'])->putJson("/api/quotes/{$quoteId}", [
+            'partner_id' => $partnerId,
+            'items' => [['quantity' => 2, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertStatus(422);
+        $this->withToken($auth['token'])->deleteJson("/api/quotes/{$quoteId}")->assertStatus(422);
+
+        $templates->updateDraft($print, [
+            'definition' => ['template_id' => 'tax-invoice-modern', 'footer_text' => 'قالب أحدث'],
+        ], null);
+        $templates->publish($print);
+        $frozen = $this->withToken($auth['token'])->getJson("/api/quotes/{$quoteId}")->assertOk();
+        $this->assertSame('tax-invoice-classic', $frozen['data']['print_template_revision']['definition']['template_id']);
+
+        $revision = $this->withToken($auth['token'])->postJson("/api/quotes/{$quoteId}/revise")
+            ->assertCreated();
+        $this->assertSame('draft', $revision['data']['status']);
+        $this->assertSame($quoteId, $revision['data']['revised_from_id']);
+        $this->assertNull($revision['data']['print_issued_at']);
+        $this->assertSame('1150.00', $revision['data']['total']);
+
+        $invoice = $this->withToken($auth['token'])->postJson("/api/quotes/{$quoteId}/convert")
+            ->assertCreated();
+        $this->assertSame('draft', $invoice['data']['status']);
+        $this->assertSame(0, JournalEntry::where('source_type', Invoice::class)->count());
     }
 
     /** @test */

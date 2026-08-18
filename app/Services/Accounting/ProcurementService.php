@@ -7,6 +7,7 @@ use App\Models\ProcurementDocument;
 use App\Models\ProcurementLine;
 use App\Models\Purchase;
 use App\Models\RfqInvitation;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -57,7 +58,10 @@ class ProcurementService
         'cancelled' => [],
     ];
 
-    public function __construct(protected PurchaseService $purchases) {}
+    public function __construct(
+        protected PurchaseService $purchases,
+        protected PrintTemplateService $printTemplates,
+    ) {}
 
     /**
      * إنشاء مستند شراء بحالة draft مع احتساب الإجماليات من السطور.
@@ -95,6 +99,7 @@ class ProcurementService
                 'tax_inclusive'      => $inclusive,
                 'notes'              => $data['notes'] ?? null,
                 'source_document_id' => $data['source_document_id'] ?? null,
+                'revised_from_id'    => $data['revised_from_id'] ?? null,
                 'created_by'         => $data['created_by'] ?? null,
             ]);
 
@@ -111,6 +116,9 @@ class ProcurementService
      */
     public function update(ProcurementDocument $doc, array $data, ?array $items): ProcurementDocument
     {
+        if ($doc->isPrintIssued()) {
+            throw new RuntimeException('لا يمكن تعديل أمر شراء صادر للطباعة. أنشئ نسخة عمل أولاً.');
+        }
         if ($doc->isClosed()) {
             throw new RuntimeException('لا يمكن تعديل مستند مُحوَّل أو ملغى.');
         }
@@ -147,6 +155,9 @@ class ProcurementService
      */
     public function transition(ProcurementDocument $doc, string $status): ProcurementDocument
     {
+        if ($doc->isPrintIssued()) {
+            throw new RuntimeException('لا يمكن تغيير حالة أمر شراء صادر للطباعة. أنشئ نسخة عمل أولاً.');
+        }
         if ($status === 'converted') {
             throw new RuntimeException('حالة «مُحوَّل» تُضبط بالتحويل لا يدوياً.');
         }
@@ -155,6 +166,62 @@ class ProcurementService
         $doc->update(['status' => $status]);
 
         return $doc->fresh(['lines', 'invitations']);
+    }
+
+    /**
+     * يصدر أمر شراء معتمداً للطباعة في لحظة صريحة. تثبت المراجع الثلاثة داخل
+     * المعاملة؛ والقيمة null تعني العارض الافتراضي الآمن وقت الإصدار.
+     */
+    public function issueForPrint(ProcurementDocument $doc): ProcurementDocument
+    {
+        return DB::transaction(function () use ($doc) {
+            $doc = ProcurementDocument::lockForUpdate()->findOrFail($doc->id);
+
+            if ($doc->type !== 'order') {
+                throw new RuntimeException('إجراء الإصدار للطباعة متاح لأمر الشراء فقط.');
+            }
+            if ($doc->status !== 'approved') {
+                throw new RuntimeException('يجب اعتماد أمر الشراء قبل إصداره للطباعة.');
+            }
+            if ($doc->isPrintIssued()) {
+                throw new RuntimeException('أمر الشراء صادر للطباعة بالفعل. أنشئ نسخة عمل لإجراء تعديل.');
+            }
+
+            $doc->update([
+                ...$this->printTemplates->resolveOutputRevisionIds('purchase_order', $doc->branch_id),
+                'print_issued_at' => now(),
+            ]);
+
+            return $doc->fresh(['lines', 'invitations']);
+        });
+    }
+
+    /** ينشئ نسخة عمل مسودة من أمر شراء صادر مع إبقاء الأصل ولقطته التاريخية ثابتين. */
+    public function createPrintRevision(ProcurementDocument $doc): ProcurementDocument
+    {
+        return DB::transaction(function () use ($doc) {
+            $doc = ProcurementDocument::with(['lines', 'invitations'])->lockForUpdate()->findOrFail($doc->id);
+
+            if ($doc->type !== 'order') {
+                throw new RuntimeException('نسخة العمل متاحة لأمر الشراء فقط.');
+            }
+            if (! $doc->isPrintIssued()) {
+                throw new RuntimeException('لا يمكن إنشاء نسخة عمل من أمر شراء غير صادر للطباعة.');
+            }
+
+            return $this->create([
+                'type'               => $doc->type,
+                'partner_id'         => $doc->partner_id,
+                'doc_date'           => $doc->doc_date?->toDateString(),
+                'due_date'           => $doc->due_date?->toDateString(),
+                'requested_by'       => $doc->requested_by,
+                'tax_inclusive'      => $doc->tax_inclusive,
+                'notes'              => $doc->notes,
+                'source_document_id' => $doc->source_document_id,
+                'revised_from_id'    => $doc->id,
+                'created_by'         => $doc->created_by,
+            ], $this->itemsOf($doc));
+        });
     }
 
     /**

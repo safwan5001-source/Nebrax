@@ -1715,7 +1715,12 @@
     "save": "حفظ العرض",
     "cancel": "إلغاء",
     "document_title": "عرض سعر",
-    "document_subtitle": "عرض تجاري غير ضريبي"
+    "document_subtitle": "عرض تجاري غير ضريبي",
+    "issue": "إصدار للطباعة",
+    "issued": "صادر للطباعة",
+    "create_revision": "إنشاء نسخة عمل",
+    "issued_locked_hint": "هذا العرض صادر للطباعة ومقفل. أنشئ نسخة عمل لإجراء تعديل.",
+    "revised_from": "نسخة عمل من"
   },
   "recurring": {
     "title": "الفواتير الدورية",
@@ -2707,6 +2712,11 @@
     "convert_to_quotation": "تسجيل عرض مورّد",
     "convert_to_order": "تحويل إلى أمر شراء",
     "convert_to_purchase": "توليد فاتورة مشتريات",
+    "issue": "إصدار للطباعة",
+    "issued": "صادر للطباعة",
+    "create_revision": "إنشاء نسخة عمل",
+    "issued_locked_hint": "أمر الشراء صادر للطباعة ومقفل. أنشئ نسخة عمل لإجراء تعديل.",
+    "revised_from": "نسخة عمل من",
     "request": {
       "title": "طلبات الشراء",
       "create": "طلب شراء جديد",

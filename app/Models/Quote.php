@@ -25,7 +25,8 @@ class Quote extends BaseModel
         'branch_id',
         'tenant_id', 'number', 'partner_id', 'quote_date', 'valid_until',
         'status', 'subtotal', 'tax_amount', 'total', 'tax_inclusive', 'notes',
-        'converted_invoice_id', 'created_by',
+        'converted_invoice_id', 'print_issued_at', 'print_template_revision_id',
+        'pdf_template_revision_id', 'thermal_template_revision_id', 'revised_from_id', 'created_by',
     ];
 
     protected $casts = [
@@ -35,6 +36,7 @@ class Quote extends BaseModel
         'tax_amount'    => 'integer',
         'total'         => 'integer',
         'tax_inclusive' => 'boolean',
+        'print_issued_at' => 'datetime',
     ];
 
     protected $attributes = [
@@ -55,8 +57,37 @@ class Quote extends BaseModel
         return $this->referenceBelongsTo(Partner::class);
     }
 
+    /** مراجعة الطباعة المثبتة عند الإصدار الصريح؛ لا تعاد قراءتها من تعيين حي. */
+    public function printTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'print_template_revision_id');
+    }
+
+    /** مراجعة PDF المثبتة عند الإصدار الصريح؛ قد تختلف عن مراجعة الطباعة. */
+    public function pdfTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'pdf_template_revision_id');
+    }
+
+    /** مراجعة الإخراج الحراري المثبتة عند الإصدار الصريح. */
+    public function thermalTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'thermal_template_revision_id');
+    }
+
+    /** المستند الصادر الذي نشأت منه هذه النسخة القابلة للتعديل. */
+    public function revisedFrom(): BelongsTo
+    {
+        return $this->referenceBelongsTo(self::class, 'revised_from_id');
+    }
+
     public function isConverted(): bool
     {
         return $this->status === 'converted';
+    }
+
+    public function isPrintIssued(): bool
+    {
+        return $this->print_issued_at !== null;
     }
 }

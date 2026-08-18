@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { ArrowLeftRight, ArrowRight } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, CopyPlus, FileOutput } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ interface Doc {
   subtotal: string; tax_amount: string; total: string; notes: string | null;
   source_document_id: string | null; source_number?: string | null; source_type?: ProcurementType | null;
   converted_purchase_id: string | null;
+  print_issued_at: string | null; revised_from_id: string | null; revised_from_number?: string | null;
   supplier_ids?: string[]; lines: Line[];
 }
 
@@ -72,6 +73,31 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
     } catch (e) {
       errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function issue() {
+    setBusy(true);
+    try {
+      await api(`/procurement/${id}/issue`, { method: 'POST' });
+      success(tc('updated'));
+      load();
+    } catch (e) {
+      errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revise() {
+    setBusy(true);
+    try {
+      const revision = await api<{ data: { id: string } }>(`/procurement/${id}/revise`, { method: 'POST' });
+      success(tc('created'));
+      router.push(`${PROCUREMENT_ROUTE[type]}/${revision.data.id}`);
+    } catch (e) {
+      errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
       setBusy(false);
     }
   }
@@ -116,9 +142,22 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
         </Button>
         <h1 className="num text-xl font-semibold text-text">{doc.number}</h1>
         <Badge tone={statusTone(doc.status)}>{t(`status_${doc.status}`)}</Badge>
+        {doc.print_issued_at && <Badge tone="neutral">{t('issued')}</Badge>}
 
         <div className="ms-auto flex flex-wrap gap-2">
-          {NEXT_STATUSES[doc.status].map((next) => (
+          {type === 'order' && (doc.print_issued_at ? (
+            <Button variant="outline" size="sm" disabled={busy} onClick={revise}>
+              <CopyPlus className="h-4 w-4" strokeWidth={1.7} />
+              {t('create_revision')}
+            </Button>
+          ) : doc.status === 'approved' && (
+            <Button variant="outline" size="sm" disabled={busy} onClick={issue}>
+              <FileOutput className="h-4 w-4" strokeWidth={1.7} />
+              {t('issue')}
+            </Button>
+          ))}
+
+          {!doc.print_issued_at && NEXT_STATUSES[doc.status].map((next) => (
             <Button
               key={next}
               size="sm"
@@ -151,6 +190,8 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
             ))}
           </dl>
           {doc.notes && <p className="mt-3 text-sm text-muted">{doc.notes}</p>}
+          {doc.print_issued_at && <p className="mt-3 border-t border-border pt-3 text-sm text-muted">{t('issued_locked_hint')}</p>}
+          {doc.revised_from_number && <p className="mt-3 text-sm text-muted">{t('revised_from')}: <span className="num">{doc.revised_from_number}</span></p>}
 
           {/* سلسلة التتبّع: من أين جاء هذا المستند، وإلى أين انتهى. */}
           {(doc.source_document_id || doc.converted_purchase_id) && (
