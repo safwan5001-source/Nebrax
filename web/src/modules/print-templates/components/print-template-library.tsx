@@ -60,6 +60,8 @@ interface PrintTemplateLibraryProps {
   canManage: boolean;
   onBack: () => void;
   onOpenTemplate: (templateId: string, documentType: DocumentTypeId) => void;
+  onReviewAssignments: (templateId: string, documentType: DocumentTypeId) => void;
+  onCompareRevisions: (templateId: string, documentType: DocumentTypeId) => void;
   onCreateDraftFromPublished: (templateId: string, documentType: DocumentTypeId) => void;
   onCreateTemplate: (documentType: DocumentTypeId) => void;
 }
@@ -92,6 +94,8 @@ export function PrintTemplateLibrary({
   canManage,
   onBack,
   onOpenTemplate,
+  onReviewAssignments,
+  onCompareRevisions,
   onCreateDraftFromPublished,
   onCreateTemplate,
 }: PrintTemplateLibraryProps) {
@@ -149,6 +153,8 @@ export function PrintTemplateLibrary({
   const familyTypes = filters.family === 'all'
     ? ASSIGNMENT_DOCUMENT_TYPES
     : TEMPLATE_CENTER_FAMILIES.find((family) => family.id === filters.family)?.documentTypes ?? [];
+  const initialFamily = templateFamilyForDocumentType(initialDocumentType);
+  const libraryContext = initialFamily ? t(`center_family_${initialFamily}_title`) : tTypes(initialDocumentType);
   const showAssignmentContextWarning = assignmentState === 'error' && (filters.usage !== 'all' || filters.assignmentScope !== 'all');
   const selectedDocumentType = filters.documentType === 'all' ? null : filters.documentType;
   const formatDate = (value: string | null | undefined) => value
@@ -178,7 +184,7 @@ export function PrintTemplateLibrary({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Button variant="ghost" size="sm" className="-ms-2 mb-2" onClick={onBack}>{t('library_back')}</Button>
-          <p className="text-xs font-medium text-primary">{t('library_label')}</p>
+          <p className="text-xs font-medium text-primary">{t('library_context', { scope: libraryContext })}</p>
           <h1 className="mt-1 text-2xl font-semibold text-text">{t('library_title')}</h1>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{t('library_subtitle')}</p>
         </div>
@@ -226,7 +232,7 @@ export function PrintTemplateLibrary({
       {showAssignmentContextWarning && <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text">{t('library_assignment_context_failed')}</p>}
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted">{t('library_result_count', { count: filteredTemplates.length })}</p>
+        <p role="status" aria-atomic="true" className="text-sm text-muted">{t('library_result_count', { count: filteredTemplates.length })}</p>
         {assignmentState === 'loading' && <p className="text-xs text-muted">{t('library_loading_assignments')}</p>}
       </div>
 
@@ -277,8 +283,8 @@ export function PrintTemplateLibrary({
                     ) : (
                       <Button size="sm" variant="outline" onClick={() => onOpenTemplate(template.id, previewType)}><FileClock className="h-4 w-4" aria-hidden="true" />{t('library_review_published')}</Button>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => onOpenTemplate(template.id, previewType)}><GitFork className="h-4 w-4" aria-hidden="true" />{t('library_review_assignments')}</Button>
-                    {hasDraft && hasPublished && <Button size="sm" variant="ghost" className="sm:col-span-2" onClick={() => onOpenTemplate(template.id, previewType)}><GitCompareArrows className="h-4 w-4" aria-hidden="true" />{t('library_compare_revisions')}</Button>}
+                    <Button size="sm" variant="outline" onClick={() => onReviewAssignments(template.id, previewType)}><GitFork className="h-4 w-4" aria-hidden="true" />{t('library_review_assignments')}</Button>
+                    {hasDraft && hasPublished && <Button size="sm" variant="ghost" className="sm:col-span-2" onClick={() => onCompareRevisions(template.id, previewType)}><GitCompareArrows className="h-4 w-4" aria-hidden="true" />{t('library_compare_revisions')}</Button>}
                   </div>
                 </CardContent>
               </Card>

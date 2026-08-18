@@ -118,6 +118,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   const [templateDetails, setTemplateDetails] = useState<Record<string, PrintTemplate>>({});
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsFailed, setDetailsFailed] = useState(false);
+  const [studioFocus, setStudioFocus] = useState<'none' | 'history' | 'assignments'>('none');
 
   const loadTemplates = useCallback(async () => {
     setTemplateLoadState('loading');
@@ -203,9 +204,14 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
     setSurface('library');
   }
 
-  function openTemplateFromLibrary(templateId: string, documentType: DocumentTypeId) {
+  function openTemplateFromLibrary(
+    templateId: string,
+    documentType: DocumentTypeId,
+    focus: 'none' | 'history' | 'assignments' = 'none',
+  ) {
     setSelectedId(templateId);
     setActiveDocumentType(documentType);
+    setStudioFocus(focus);
     setSurface('studio');
   }
 
@@ -330,6 +336,18 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
 
   useEffect(() => { void loadTemplateDetails(selected.id); }, [selected.id]);
 
+  useEffect(() => {
+    if (surface !== 'studio' || studioFocus === 'none') return;
+    const targetId = studioFocus === 'history' ? 'template-revision-history' : 'template-assignments';
+    const frame = requestAnimationFrame(() => {
+      const target = document.getElementById(targetId);
+      target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      target?.focus({ preventScroll: true });
+      setStudioFocus('none');
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selected.id, studioFocus, surface]);
+
   const templatesCatalog = listTemplates();
   const selectedName = selected.name || t('preview_template_name');
 
@@ -355,6 +373,8 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
         canManage={canManage}
         onBack={() => setSurface('center')}
         onOpenTemplate={openTemplateFromLibrary}
+        onReviewAssignments={(templateId, documentType) => openTemplateFromLibrary(templateId, documentType, 'assignments')}
+        onCompareRevisions={(templateId, documentType) => openTemplateFromLibrary(templateId, documentType, 'history')}
         onCreateDraftFromPublished={(templateId, documentType) => void createDraftFromPublished(templateId, documentType)}
         onCreateTemplate={createTemplateFromLibrary}
       />
@@ -425,9 +445,13 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
         </div>
       </div>
 
-      <TemplateRevisionHistory revisions={detailedSelected.revisions} loading={detailsLoading} failed={detailsFailed} />
+      <section id="template-revision-history" tabIndex={-1} className="scroll-mt-4 focus:outline-none">
+        <TemplateRevisionHistory revisions={detailedSelected.revisions} loading={detailsLoading} failed={detailsFailed} />
+      </section>
 
-      <PrintTemplateAssignments template={selected} canManage={canManage} />
+      <section id="template-assignments" tabIndex={-1} className="scroll-mt-4 focus:outline-none">
+        <PrintTemplateAssignments template={selected} canManage={canManage} />
+      </section>
     </div>
   );
 }

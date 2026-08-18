@@ -459,6 +459,7 @@
     "center_load_failed_hint": "Check your connection and try again. Preview data is not shown as saved templates.",
     "center_retry": "Try again",
     "library_title": "Print template library",
+    "library_context": "Work area: {scope}",
     "library_subtitle": "Find a template by work area, document type, and status, then open a draft or create one from a published revision.",
     "library_back": "Back to template center",
     "back_to_library": "Back to library",
