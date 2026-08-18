@@ -13,7 +13,7 @@ use App\Services\Accounting\ExpenseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExpenseController extends ApiController
 {
@@ -58,7 +58,7 @@ class ExpenseController extends ApiController
     }
 
     /** تنزيل مرفق خاص بعد إثبات أنه يعود للمصروف المرئي في الفرع النشط. */
-    public function downloadAttachment(Request $request, string $id, string $attachmentId): BinaryFileResponse
+    public function downloadAttachment(Request $request, string $id, string $attachmentId): StreamedResponse
     {
         $expense = $this->visibleExpense($request, $id);
         $attachment = $expense->attachments()->whereKey($attachmentId)->firstOrFail();
