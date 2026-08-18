@@ -269,9 +269,11 @@ class QuoteService
         return $days > 0 ? \Illuminate\Support\Carbon::parse($date)->addDays($days)->toDateString() : null;
     }
 
-    /** توليد رقم عرض تسلسلي: QUO-2025-00001 */
+    /** توليد رقم عرض تسلسلي: QUO-2025-00001 — البادئة مضبوطة كبادئة الفاتورة. */
     protected function nextNumber(string $date): string
     {
-        return Quote::nextDocumentNumber('QUO', $date);
+        $prefix = (string) Settings::get('sales', 'quote_prefix');
+
+        return Quote::nextDocumentNumber($prefix ?: 'QUO', $date);
     }
 }

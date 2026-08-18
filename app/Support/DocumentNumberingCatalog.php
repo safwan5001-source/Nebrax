@@ -35,10 +35,16 @@ use App\Models\Warehouse;
  *
  *  الطبقة تستقبل البادئة من مستدعيها، وتُصفّر الرقم بخمس خانات عشرية دائماً.
  *  فالتنسيق وعدد الأرقام **ثابتان في الطبقة** لا إعدادان — تُعرَض قيمتاهما
- *  للاطّلاع لا للتحرير. ومن السبع عشرة، **اثنتان فقط** تقرآن بادئتهما من
- *  الإعدادات؛ والبقية تمرّر ثوابت مكتوبة في خدماتها. لذلك حقل البادئة
- *  قابلٌ للتحرير في هاتين وحدهما، ومعطَّلٌ فيما عداهما — الشاشة تعرض الواقع
- *  ولا تَعِد بما لا تملك تنفيذه.
+ *  للاطّلاع لا للتحرير. ومن السبع عشرة، **خمس** تقرأ بادئتها من الإعدادات
+ *  (الفاتورة · فاتورة الشراء · عرض السعر · الفرع · المخزن)؛ والبقية تمرّر
+ *  ثوابت مكتوبة في خدماتها. لذلك حقل البادئة قابلٌ للتحرير في هذه الخمس
+ *  وحدها، ومعطَّلٌ فيما عداها — الشاشة تعرض الواقع ولا تَعِد بما لا تملك تنفيذه.
+ *
+ *  وبادئتا الفرع والمخزن **افتراضهما فارغ**، فيبقى الكود `00001` كما كان.
+ *
+ *  التحويل من ثابتٍ إلى إعداد رخيصٌ ومتدرّج: مفتاحٌ في `Settings::DEFAULTS`،
+ *  وقراءتُه في الخدمة، و`setting` هنا — فيصير الحقل قابلاً للتحرير تلقائياً
+ *  في الطلب والشاشة معاً. لا تُمسّ الطبقة ولا `max()` ولا القفل.
  *
  *  ═══ ما لا يدخل هذا الفهرس أبداً ═══
  *
@@ -74,9 +80,10 @@ class DocumentNumberingCatalog
             'series'  => [['key' => 'default', 'prefix' => 'BILL']],
         ],
         'quote' => [
-            'model'  => Quote::class,
-            'yearly' => true,
-            'series' => [['key' => 'default', 'prefix' => 'QUO']],
+            'model'   => Quote::class,
+            'yearly'  => true,
+            'setting' => ['group' => 'sales', 'key' => 'quote_prefix'],
+            'series'  => [['key' => 'default', 'prefix' => 'QUO']],
         ],
         'return' => [
             'model'  => ReturnDocument::class,
@@ -157,14 +164,16 @@ class DocumentNumberingCatalog
             'series' => [['key' => 'default', 'prefix' => 'EMP']],
         ],
         'branch' => [
-            'model'  => Branch::class,
-            'yearly' => false,
-            'series' => [['key' => 'default', 'prefix' => null]],
+            'model'   => Branch::class,
+            'yearly'  => false,
+            'setting' => ['group' => 'numbering', 'key' => 'branch_prefix'],
+            'series'  => [['key' => 'default', 'prefix' => null]],
         ],
         'warehouse' => [
-            'model'  => Warehouse::class,
-            'yearly' => false,
-            'series' => [['key' => 'default', 'prefix' => null]],
+            'model'   => Warehouse::class,
+            'yearly'  => false,
+            'setting' => ['group' => 'numbering', 'key' => 'warehouse_prefix'],
+            'series'  => [['key' => 'default', 'prefix' => null]],
         ],
     ];
 
