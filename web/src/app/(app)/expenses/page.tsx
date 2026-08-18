@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus } from 'lucide-react';
+import { Plus, Settings2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,8 @@ interface Expense {
   id: string;
   number: string;
   account_name?: string | null;
+  category_name?: string | null;
+  vendor_name?: string | null;
   expense_date: string;
   payment_method: string;
   total: string;
@@ -70,6 +72,8 @@ export default function ExpensesPage() {
     () => [
       { accessorKey: 'number', header: t('number'), cell: ({ row }) => <span className="num">{row.original.number}</span> },
       { id: 'account', header: t('account'), accessorFn: (r) => r.account_name ?? '—', cell: ({ row }) => row.original.account_name ?? '—' },
+      { id: 'category', header: t('category'), accessorFn: (r) => r.category_name ?? '—', cell: ({ row }) => row.original.category_name ?? '—' },
+      { id: 'vendor', header: t('vendor_name'), accessorFn: (r) => r.vendor_name ?? '—', cell: ({ row }) => row.original.vendor_name ?? '—' },
       { accessorKey: 'expense_date', header: t('date'), cell: ({ row }) => <span className="num text-muted">{row.original.expense_date}</span> },
       { id: 'method', header: t('payment_method'), accessorFn: (r) => r.payment_method, cell: ({ row }) => t(`method.${row.original.payment_method}`) },
       { accessorKey: 'total', header: t('total'), cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.total)}</div> },
@@ -96,12 +100,20 @@ export default function ExpensesPage() {
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
         {/* نطاق العرض ظاهر في الشاشة نفسها — لا مخفيّاً في الإعدادات. */}
         <BranchViewToggle value={view} onChange={setView} />
-        <Link href="/expenses/new">
-          <Button>
-            <Plus className="h-4 w-4" strokeWidth={1.8} />
-            {t('create')}
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/expenses/categories">
+            <Button variant="outline">
+              <Settings2 className="h-4 w-4" strokeWidth={1.8} />
+              {t('manage_categories')}
+            </Button>
+          </Link>
+          <Link href="/expenses/new">
+            <Button>
+              <Plus className="h-4 w-4" strokeWidth={1.8} />
+              {t('create')}
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="expenses" />

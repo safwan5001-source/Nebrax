@@ -1,27 +1,24 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Paperclip, Plus, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
+import { PartnerDialog } from '@/components/partners/partner-dialog';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
-interface Account {
-  id: string;
-  code: string;
-  name: string;
-  type: string;
-  is_group: boolean;
-}
+interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
 interface Partner { id: string; name: string; type?: string }
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
+interface ExpenseCategory { id: string; name: string; description?: string | null; is_active: boolean }
 
 export default function NewExpensePage() {
   const t = useTranslations('expenses');
@@ -32,27 +29,52 @@ export default function NewExpensePage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [centers, setCenters] = useState<CostCenter[]>([]);
+  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [accountId, setAccountId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [partnerId, setPartnerId] = useState('');
+  const [vendorName, setVendorName] = useState('');
   const [centerId, setCenterId] = useState('');
   const [amount, setAmount] = useState('');
   const [tax, setTax] = useState('15');
   const [method, setMethod] = useState('cash');
   const [date, setDate] = useState('');
   const [description, setDescription] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [newSupplierOpen, setNewSupplierOpen] = useState(false);
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryDescription, setCategoryDescription] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+
+  const loadPartners = useCallback(() => {
+    api<{ data: Partner[] }>('/partners')
+      .then((r) => setPartners(r.data.filter((p) => ['supplier', 'both'].includes(p.type ?? ''))))
+      .catch(() => {});
+  }, []);
+
+  const loadCategories = useCallback(() => {
+    api<{ data: ExpenseCategory[] }>('/expense-categories')
+      .then((r) => setCategories(r.data.filter((c) => c.is_active)))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setDate(new Date().toISOString().slice(0, 10));
     api<{ data: Account[] }>('/accounts').then((r) => {
       const expenseAccounts = r.data.filter((a) => a.type === 'expense' && !a.is_group);
       setAccounts(expenseAccounts);
-      if (expenseAccounts[0]) setAccountId((a) => a || expenseAccounts[0].id);
+      if (expenseAccounts[0]) setAccountId((current) => current || expenseAccounts[0].id);
     });
-    api<{ data: Partner[] }>('/partners').then((r) => setPartners(r.data)).catch(() => {});
-    api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
-  }, []);
+    loadPartners();
+    loadCategories();
+    api<{ data: CostCenter[] }>('/cost-centers')
+      .then((r) => setCenters(r.data.filter((c) => c.is_active)))
+      .catch(() => {});
+  }, [loadCategories, loadPartners]);
 
   const amountMinor = riyalToMinor(amount);
   const taxMinor = useMemo(
@@ -60,28 +82,60 @@ export default function NewExpensePage() {
     [amountMinor, tax],
   );
 
+  function addFiles(nextFiles: FileList | null) {
+    if (!nextFiles) return;
+    setFiles((current) => [...current, ...Array.from(nextFiles)].slice(0, 10));
+  }
+
+  async function createCategory() {
+    if (!categoryName.trim()) {
+      setCategoryError(t('category_name_required'));
+      return;
+    }
+
+    setSavingCategory(true);
+    setCategoryError(null);
+    try {
+      const response = await api<{ data: ExpenseCategory }>('/expense-categories', {
+        method: 'POST',
+        body: { name: categoryName.trim(), description: categoryDescription.trim() || null },
+      });
+      setCategoryId(response.data.id);
+      setCategoryName('');
+      setCategoryDescription('');
+      setNewCategoryOpen(false);
+      loadCategories();
+    } catch (err) {
+      setCategoryError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setSavingCategory(false);
+    }
+  }
+
   async function submit() {
     if (amountMinor <= 0) {
       setError(t('need_amount'));
       return;
     }
+
     setSaving(true);
     setError(null);
     try {
-      await api('/expenses', {
-        method: 'POST',
-        body: {
-          account_id: accountId,
-          partner_id: method === 'credit' && partnerId ? partnerId : null,
-          cost_center_id: centerId || null,
-          amount: amountMinor,
-          tax_rate: Number(tax) || 0,
-          payment_method: method,
-          expense_date: date || null,
-          description: description || null,
-        },
-      });
-      success(tc('created'));
+      const body = new FormData();
+      body.append('account_id', accountId);
+      if (categoryId) body.append('category_id', categoryId);
+      if (partnerId) body.append('partner_id', partnerId);
+      if (vendorName.trim()) body.append('vendor_name', vendorName.trim());
+      if (centerId) body.append('cost_center_id', centerId);
+      body.append('amount', String(amountMinor));
+      body.append('tax_rate', String(Number(tax) || 0));
+      body.append('payment_method', method);
+      if (date) body.append('expense_date', date);
+      if (description.trim()) body.append('description', description.trim());
+      files.forEach((file) => body.append('attachments[]', file));
+
+      await api('/expenses', { method: 'POST', body });
+      success(t('draft_saved'));
       router.push('/expenses');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
@@ -90,83 +144,177 @@ export default function NewExpensePage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/expenses')} aria-label={t('back')}>
-          <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
-        <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
+    <div className="mx-auto max-w-5xl space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/expenses')} aria-label={t('back')}>
+            <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
+            <p className="mt-1 text-sm text-muted">{t('number_generated')}</p>
+          </div>
+        </div>
+        <span className="rounded-md bg-muted px-3 py-1.5 text-sm text-muted">{t('draft_mode')}</span>
       </div>
 
-      <Card className="max-w-3xl">
-        <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="account">{t('account')}</Label>
-              <Select id="account" value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
-                <option value="" disabled>{t('choose_account')}</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="amount">{t('amount')}</Label>
-              <Input id="amount" inputMode="decimal" className="num text-end" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="tax">{t('tax')}</Label>
-              <Input id="tax" type="number" min={0} max={100} className="num text-end" dir="ltr" value={tax} onChange={(e) => setTax(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="method">{t('payment_method')}</Label>
-              <Select id="method" value={method} onChange={(e) => setMethod(e.target.value)}>
-                <option value="cash">{t('method.cash')}</option>
-                <option value="bank">{t('method.bank')}</option>
-                <option value="credit">{t('method.credit')}</option>
-              </Select>
-            </div>
-            {method === 'credit' && (
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="space-y-5">
+          <Card>
+            <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="amount">{t('amount')}</Label>
+                  <div className="flex rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-primary/40">
+                    <Input id="amount" inputMode="decimal" className="num border-0 text-end shadow-none focus-visible:ring-0" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                    <span className="flex items-center border-s border-input px-3 font-medium text-muted" dir="ltr">SAR</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="date">{t('date')}</Label>
+                  <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="description">{t('description')}</Label>
+                  <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-text outline-none transition focus-visible:ring-2 focus-visible:ring-primary/40" />
+                </div>
+              </div>
+
               <div className="space-y-1.5">
-                <Label htmlFor="vendor">{t('vendor')}</Label>
-                <Select id="vendor" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
+                <Label htmlFor="attachments">{t('attachments')}</Label>
+                <label htmlFor="attachments" className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/40 px-4 text-center transition hover:border-primary/50 focus-within:ring-2 focus-within:ring-primary/40">
+                  <Paperclip className="h-5 w-5 text-primary" strokeWidth={1.7} />
+                  <span className="text-sm font-medium text-text">{t('attachment_prompt')}</span>
+                  <span className="text-xs text-muted">{t('attachment_hint')}</span>
+                  <Input id="attachments" type="file" multiple className="sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.zip" onChange={(e) => addFiles(e.target.files)} />
+                </label>
+                {files.length > 0 && (
+                  <div className="space-y-1.5">
+                    {files.map((file, index) => (
+                      <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm">
+                        <span className="truncate text-text">{file.name}</span>
+                        <Button variant="ghost" size="icon" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={t('remove_attachment')}>
+                          <X className="h-4 w-4" strokeWidth={1.8} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>{t('classification')}</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="account">{t('account')}</Label>
+                <Select id="account" value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
+                  <option value="" disabled>{t('choose_account')}</option>
+                  {accounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="category">{t('category')}</Label>
+                  <Button variant="ghost" size="sm" onClick={() => setNewCategoryOpen(true)}><Plus className="h-3.5 w-3.5" />{t('new_category')}</Button>
+                </div>
+                <Select id="category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                  <option value="">{t('no_category')}</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="vendor_name">{t('vendor_name')}</Label>
+                <Input id="vendor_name" value={vendorName} onChange={(e) => setVendorName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="supplier">{t('supplier')}</Label>
+                  <Button variant="ghost" size="sm" onClick={() => setNewSupplierOpen(true)}><Plus className="h-3.5 w-3.5" />{t('new_supplier')}</Button>
+                </div>
+                <Select id="supplier" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
                   <option value="">{t('none')}</option>
-                  {partners.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                  {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
                 </Select>
               </div>
-            )}
-            <div className="space-y-1.5">
-              <Label htmlFor="date">{t('date')}</Label>
-              <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            {centers.length > 0 && (
+              {centers.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="center">{t('cost_center')}</Label>
+                  <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
+                    <option value="">{t('no_center')}</option>
+                    {centers.map((center) => <option key={center.id} value={center.id}>{center.code} — {center.name}</option>)}
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5">
-                <Label htmlFor="center">{t('cost_center')}</Label>
-                <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
-                  <option value="">{t('no_center')}</option>
-                  {centers.map((c) => (<option key={c.id} value={c.id}>{c.code} — {c.name}</option>))}
+                <Label htmlFor="method">{t('payment_method')}</Label>
+                <Select id="method" value={method} onChange={(e) => setMethod(e.target.value)}>
+                  <option value="cash">{t('method.cash')}</option>
+                  <option value="bank">{t('method.bank')}</option>
+                  <option value="credit">{t('method.credit')}</option>
                 </Select>
+                <p className="text-xs text-muted">{t('treasury_deferred')}</p>
               </div>
-            )}
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="desc">{t('description')}</Label>
-              <Input id="desc" value={description} onChange={(e) => setDescription(e.target.value)} />
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="mt-4 flex flex-col gap-1.5 border-t border-border pt-4 text-sm sm:w-64">
-            <div className="flex justify-between text-muted"><span>{t('subtotal')}</span><span className="num">{formatRiyal(amountMinor / 100)}</span></div>
-            <div className="flex justify-between text-muted"><span>{t('tax_total')}</span><span className="num">{formatRiyal(taxMinor / 100)}</span></div>
-            <div className="flex justify-between border-t border-border pt-1.5"><span className="font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal((amountMinor + taxMinor) / 100)}</span></div>
-          </div>
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader><CardTitle>{t('tax_and_controls')}</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="tax">{t('tax')}</Label>
+                <Input id="tax" type="number" min={0} max={100} className="num text-end" dir="ltr" value={tax} onChange={(e) => setTax(e.target.value)} />
+              </div>
+              <div className="flex items-end">
+                <label className="flex w-full cursor-not-allowed items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted">
+                  <input type="checkbox" disabled />
+                  <span>{t('recurring_soon')}</span>
+                </label>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      <div className="flex items-center gap-3">
-        {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
-        <Button disabled={saving || !accountId} onClick={submit}>{t('save')}</Button>
+        <Card className="h-fit lg:sticky lg:top-5">
+          <CardHeader><CardTitle>{t('summary')}</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('subtotal')}</span><span className="num">{formatRiyal(amountMinor / 100)}</span></div>
+            <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('tax_total')}</span><span className="num">{formatRiyal(taxMinor / 100)}</span></div>
+            <div className="flex justify-between gap-4 border-t border-border pt-3"><span className="font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal((amountMinor + taxMinor) / 100)}</span></div>
+            {error && <p className="rounded-md bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
+            <Button className="w-full" disabled={saving || !accountId} onClick={submit}>{saving ? t('saving') : t('save_draft')}</Button>
+            <Button className="w-full" variant="outline" onClick={() => router.push('/expenses')}>{t('cancel')}</Button>
+          </CardContent>
+        </Card>
       </div>
+
+      <PartnerDialog
+        open={newSupplierOpen}
+        onClose={() => setNewSupplierOpen(false)}
+        onSaved={loadPartners}
+        defaultType="supplier"
+        addTitle={t('new_supplier')}
+      />
+
+      <Dialog open={newCategoryOpen} onClose={() => setNewCategoryOpen(false)} title={t('new_category')}>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="category-name">{t('category_name')}</Label>
+            <Input id="category-name" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} autoFocus />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="category-description">{t('category_description')}</Label>
+            <textarea id="category-description" value={categoryDescription} onChange={(e) => setCategoryDescription(e.target.value)} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-text outline-none transition focus-visible:ring-2 focus-visible:ring-primary/40" />
+          </div>
+          {categoryError && <p className="rounded-md bg-negative/10 px-3 py-2 text-xs text-negative">{categoryError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setNewCategoryOpen(false)}>{t('cancel')}</Button>
+            <Button disabled={savingCategory} onClick={createCategory}>{savingCategory ? t('saving') : t('save_category')}</Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
