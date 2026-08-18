@@ -2,17 +2,33 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { ArrowLeftRight, ArrowRight, CopyPlus, FileOutput } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, CopyPlus, Download, Eye, EyeOff, FileOutput, Printer, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RevisionLog } from '@/components/documents/revision-log';
+import {
+  PurchaseOrderDocument,
+  type PurchaseOrderCompany,
+  type PurchaseOrderSupplier,
+} from '@/components/procurement/purchase-order-document';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { printDocument } from '@/modules/documents/services/export';
+import {
+  createLineDocumentPdf,
+  downloadLineDocumentPdf,
+  shareLineDocumentPdf,
+} from '@/modules/documents/services/line-document-pdf';
+import { getTemplate } from '@/modules/documents/registry/templates';
+import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import { DocumentScaler } from '@/modules/documents/components/document-scaler';
+import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
+import type { DocSectionLayoutItem, ThemeId } from '@/modules/documents/types';
 import {
   NEXT_STATUSES,
   NEXT_TARGETS,
@@ -27,6 +43,25 @@ interface Line {
   id: string; description: string | null; quantity: number;
   unit_price: string; tax_rate: number; line_tax: string; line_total: string;
 }
+interface FrozenPrintTemplateDefinition {
+  template_id?: string;
+  theme_id?: ThemeId | null;
+  footer_text?: string | null;
+  terms_text?: string | null;
+  bank_text?: string | null;
+  stamp?: string | null;
+  signature?: string | null;
+  show_logo?: boolean;
+  logo?: string | null;
+  logo_height?: number | null;
+  layout?: DocSectionLayoutItem[] | null;
+}
+
+interface FrozenPrintTemplateRevision {
+  id: string;
+  definition: FrozenPrintTemplateDefinition;
+}
+
 interface Doc {
   id: string; type: ProcurementType; number: string; partner_id: string | null; partner_name?: string | null;
   status: ProcurementStatus; doc_date: string; due_date: string | null; requested_by: string | null;
@@ -34,6 +69,9 @@ interface Doc {
   source_document_id: string | null; source_number?: string | null; source_type?: ProcurementType | null;
   converted_purchase_id: string | null;
   print_issued_at: string | null; revised_from_id: string | null; revised_from_number?: string | null;
+  print_template_revision?: FrozenPrintTemplateRevision | null;
+  pdf_template_revision?: FrozenPrintTemplateRevision | null;
+  thermal_template_revision?: FrozenPrintTemplateRevision | null;
   supplier_ids?: string[]; lines: Line[];
 }
 
@@ -49,16 +87,35 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
   const router = useRouter();
   const t = useTranslations('procurement');
   const tc = useTranslations('common');
+  const tPrint = useTranslations('documentPrint');
+  const tDoc = useTranslations('invoiceDoc');
+  const locale = useLocale();
   const { success, error: errorToast } = useToast();
 
   const [doc, setDoc] = useState<Doc | null>(null);
+  const [supplier, setSupplier] = useState<PurchaseOrderSupplier | null>(null);
+  const [company, setCompany] = useState<PurchaseOrderCompany | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [outputBusy, setOutputBusy] = useState<null | 'pdf' | 'share'>(null);
+  const [preview, setPreview] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
+    setSupplier(null);
+    setCompany(null);
     api<{ data: Doc }>(`/procurement/${id}`)
-      .then((r) => setDoc(r.data))
+      .then(async (response) => {
+        setDoc(response.data);
+        if (response.data.type !== 'order' || !response.data.print_issued_at || !response.data.partner_id) return;
+
+        const [partner, me] = await Promise.allSettled([
+          api<{ data: PurchaseOrderSupplier }>(`/partners/${response.data.partner_id}`),
+          api<{ company: PurchaseOrderCompany }>('/me'),
+        ]);
+        if (partner.status === 'fulfilled') setSupplier(partner.value.data);
+        if (me.status === 'fulfilled') setCompany(me.value.company);
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -120,6 +177,95 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
     }
   }
 
+  function createPurchaseOrderPdf() {
+    if (!doc || doc.type !== 'order') throw new Error('Purchase order unavailable');
+    const frozenPdf = resolveFrozenOutputDefinition(
+      doc.pdf_template_revision,
+      doc.print_template_revision,
+    );
+
+    return createLineDocumentPdf({
+      document: {
+        number: doc.number,
+        date: doc.doc_date,
+        subtotal: doc.subtotal,
+        tax_amount: doc.tax_amount,
+        total: doc.total,
+        lines: doc.lines,
+      },
+      company,
+      party: supplier,
+      logoUrl: frozenPdf?.show_logo !== false ? frozenPdf?.logo ?? null : null,
+      stampUrl: frozenPdf?.stamp ?? null,
+      signatureUrl: frozenPdf?.signature ?? null,
+      footerText: frozenPdf?.footer_text ?? null,
+      templateLayout: Array.isArray(frozenPdf?.layout) && frozenPdf.layout.length ? frozenPdf.layout : null,
+      termsText: frozenPdf?.terms_text ?? null,
+      bankText: frozenPdf?.bank_text ?? null,
+      documentMeta: [
+        [t('date'), doc.doc_date],
+        [t('order.due_label'), doc.due_date ?? '—'],
+      ],
+      labels: {
+        title: t('order.document_title'),
+        titleSecondary: t('order.document_subtitle'),
+        seller: t('buyer'),
+        billTo: t('supplier'),
+        invoiceNumber: tPrint('document_number'),
+        vatNumber: tPrint('vat_number'),
+        crNumber: tPrint('cr_number'),
+        city: tPrint('city'),
+        date: t('date'),
+        paymentType: tPrint('document_data'),
+        cash: '',
+        credit: '',
+        description: tPrint('description'),
+        quantity: tPrint('quantity'),
+        unitPrice: tPrint('unit_price'),
+        tax: tPrint('tax'),
+        total: tPrint('total'),
+        subtotal: tPrint('subtotal'),
+        vat: tPrint('vat'),
+        grandTotal: tPrint('grand_total'),
+        qrNote: '',
+        terms: tDoc('terms'),
+        bank: tDoc('bank'),
+        footer: tPrint('footer'),
+      },
+      locale,
+    });
+  }
+
+  async function downloadPurchaseOrderPdf() {
+    if (!doc || doc.type !== 'order') return;
+    setOutputBusy('pdf');
+    try {
+      downloadLineDocumentPdf(await createPurchaseOrderPdf(), doc.number);
+      success(tPrint('downloaded_ok'));
+    } catch {
+      errorToast(tPrint('export_failed'));
+    } finally {
+      setOutputBusy(null);
+    }
+  }
+
+  async function sharePurchaseOrderPdf() {
+    if (!doc || doc.type !== 'order') return;
+    setOutputBusy('share');
+    try {
+      const result = await shareLineDocumentPdf(
+        await createPurchaseOrderPdf(),
+        doc.number,
+        t('order.document_title'),
+      );
+      success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
+    } finally {
+      setOutputBusy(null);
+    }
+  }
+
   if (loading) {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-40 w-full" /></div>;
   }
@@ -133,6 +279,11 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
     ...(doc.due_date ? [[t(`${type}.due_label`), <span key="u" className="num">{doc.due_date}</span>] as [string, React.ReactNode]] : []),
     [t('total'), <span key="t" className="num font-semibold">{formatRiyal(doc.total)}</span>],
   ];
+  const isIssuedPurchaseOrder = type === 'order' && doc.print_issued_at !== null;
+  const frozenPrint = doc.print_template_revision?.definition ?? doc.pdf_template_revision?.definition ?? null;
+  const printTemplateId = frozenPrint?.template_id ?? 'tax-invoice-classic';
+  const paperId = getTemplate(printTemplateId).supportedPaper[0] ?? 'a4';
+  const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
 
   return (
     <div className="space-y-5">
@@ -145,6 +296,27 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
         {doc.print_issued_at && <Badge tone="neutral">{t('issued')}</Badge>}
 
         <div className="ms-auto flex flex-wrap gap-2">
+          {isIssuedPurchaseOrder && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setPreview((value) => !value)} disabled={busy || !!outputBusy}>
+                {preview ? <EyeOff className="h-4 w-4" strokeWidth={1.7} /> : <Eye className="h-4 w-4" strokeWidth={1.7} />}
+                {preview ? t('hide_preview') : tPrint('preview')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={downloadPurchaseOrderPdf} disabled={busy || !!outputBusy}>
+                <Download className="h-4 w-4" strokeWidth={1.7} />
+                {outputBusy === 'pdf' ? tPrint('generating') : tPrint('download_pdf')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={sharePurchaseOrderPdf} disabled={busy || !!outputBusy}>
+                <Share2 className="h-4 w-4" strokeWidth={1.7} />
+                {outputBusy === 'share' ? tPrint('generating') : tPrint('share_pdf')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'purchase-order-print-root')} disabled={busy || !!outputBusy}>
+                <Printer className="h-4 w-4" strokeWidth={1.7} />
+                {t('print')}
+              </Button>
+            </>
+          )}
+
           {type === 'order' && (doc.print_issued_at ? (
             <Button variant="outline" size="sm" disabled={busy} onClick={revise}>
               <CopyPlus className="h-4 w-4" strokeWidth={1.7} />
@@ -261,6 +433,35 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
           </table>
         </CardContent>
       </Card>
+
+      {isIssuedPurchaseOrder && (
+        <Card className={preview ? undefined : 'hidden print:block'}>
+          <CardHeader className="no-print"><CardTitle>{tPrint('preview')}</CardTitle></CardHeader>
+          <CardContent className="print:p-0">
+            <div className="rounded-lg border border-border bg-surface p-3 print:border-0 print:bg-transparent print:p-0">
+              <DocumentScaler>
+                <PurchaseOrderDocument
+                  order={doc}
+                  company={company}
+                  supplier={supplier}
+                  templateId={printTemplateId}
+                  themeId={frozenPrint?.theme_id ?? null}
+                  footerText={frozenPrint?.footer_text ?? null}
+                  terms={frozenPrint?.terms_text ?? null}
+                  bank={frozenPrint?.bank_text ?? null}
+                  stampUrl={frozenPrint?.stamp ?? null}
+                  signatureUrl={frozenPrint?.signature ?? null}
+                  showLogo={frozenPrint?.show_logo !== false}
+                  logoUrl={frozenPrint?.logo ?? null}
+                  logoHeight={frozenPrint?.logo_height ?? null}
+                  layout={Array.isArray(frozenPrint?.layout) && frozenPrint.layout.length ? frozenPrint.layout : null}
+                  rootId="purchase-order-print-root"
+                />
+              </DocumentScaler>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* سجلّ التغييرات — نفس المكوّن، بنوع المستند فقط. */}
       <RevisionLog type="procurement" id={id} />
