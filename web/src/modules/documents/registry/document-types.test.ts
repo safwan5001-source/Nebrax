@@ -81,6 +81,8 @@ describe('Document type registry', () => {
         };
       }
       if (item.key === 'footer') return { ...item, properties: { static_content: 'تذييل ثابت', alignment: 'center' as const } };
+      if (item.key === 'stamp') return { ...item, properties: { image_size: 'lg' as const } };
+      if (item.key === 'signature') return { ...item, properties: { image_size: 'sm' as const } };
       return item;
     });
 
@@ -102,6 +104,15 @@ describe('Document type registry', () => {
     expect(validateDocumentBlockProperties('tax_invoice', unsupported)).toEqual({
       valid: false,
       errors: ['unsupported_block_property:header:static_content'],
+    });
+
+    const invalidImageSize = layout.map((item) => item.key === 'stamp'
+      ? { ...item, properties: { image_size: 'xl' as never } }
+      : item,
+    );
+    expect(validateDocumentBlockProperties('tax_invoice', invalidImageSize)).toEqual({
+      valid: false,
+      errors: ['invalid_block_image_size:stamp'],
     });
   });
 

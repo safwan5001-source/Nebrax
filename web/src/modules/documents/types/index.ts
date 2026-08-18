@@ -219,6 +219,8 @@ export type DocBlockAlignment = 'start' | 'center' | 'end';
 
 /** درجات حجم النص المتاحة للكتل؛ تبقى عائلة الخط من قالب المستند نفسه. */
 export type DocBlockFontSize = 'sm' | 'md' | 'lg';
+/** حجم نسبي آمن لكتل الصور؛ غيابه يبقي المراجعات التاريخية على مظهرها الأصلي. */
+export type DocBlockImageSize = 'sm' | 'md' | 'lg';
 
 /** أعمدة جدول البنود التي يستطيع العارض رسمها بالفعل. */
 export type DocItemsColumnId =
@@ -241,6 +243,7 @@ export interface DocSectionProperties {
   columns?: DocItemsColumn[];
   alignment?: DocBlockAlignment;
   font_size?: DocBlockFontSize;
+  image_size?: DocBlockImageSize;
   static_content?: string;
 }
 

@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { blockJustifyClassName, useDocBlockProperties } from '../doc-block-properties-context';
+import { getDocumentImagePreviewClass } from '../../utils/block-image-size';
 
 /** ختم الشركة — صورة (يُحاذى للنهاية). لا يظهر بلا صورة. */
 export function DocStamp({ model }: { model: DocumentModel }) {
@@ -14,7 +15,7 @@ export function DocStamp({ model }: { model: DocumentModel }) {
   return (
     <div className={cn('flex', blockJustifyClassName(properties), style.sectionGap)}>
       {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
-      <img src={model.stampUrl} alt="stamp" className="h-24 w-auto object-contain opacity-90" />
+      <img src={model.stampUrl} alt="stamp" className={cn(getDocumentImagePreviewClass('stamp', properties.image_size), 'opacity-90')} />
     </div>
   );
 }

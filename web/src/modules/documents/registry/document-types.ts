@@ -104,8 +104,8 @@ export const DOCUMENT_BLOCK_PROPERTY_CONTRACT: Readonly<Record<DocSectionKey, re
   notes: ['alignment', 'font_size'],
   terms: ['alignment', 'font_size', 'static_content'],
   bank: ['alignment', 'font_size', 'static_content'],
-  stamp: ['alignment'],
-  signature: ['alignment'],
+  stamp: ['alignment', 'image_size'],
+  signature: ['alignment', 'image_size'],
   footer: ['alignment', 'font_size', 'static_content'],
 };
 
@@ -121,6 +121,7 @@ export const DEFAULT_DOCUMENT_ITEMS_COLUMNS = [
 const REQUIRED_ITEMS_COLUMNS = ['description', 'total'] as const satisfies readonly DocItemsColumnId[];
 const ALIGNMENTS = ['start', 'center', 'end'] as const;
 const FONT_SIZES = ['sm', 'md', 'lg'] as const;
+const IMAGE_SIZES = ['sm', 'md', 'lg'] as const;
 
 const PAGE_PAPERS = ['a4', 'a4_landscape', 'letter', 'legal'] as const satisfies readonly PaperSizeId[];
 const THERMAL_PAPERS = ['thermal_58', 'thermal_80'] as const satisfies readonly PaperSizeId[];
@@ -299,6 +300,9 @@ export function validateDocumentBlockProperties(
     const { alignment, font_size: fontSize, static_content: staticContent, columns } = item.properties;
     if (alignment !== undefined && !ALIGNMENTS.includes(alignment)) errors.push(`invalid_block_alignment:${item.key}`);
     if (fontSize !== undefined && !FONT_SIZES.includes(fontSize)) errors.push(`invalid_block_font_size:${item.key}`);
+    if (item.properties.image_size !== undefined && !IMAGE_SIZES.includes(item.properties.image_size)) {
+      errors.push(`invalid_block_image_size:${item.key}`);
+    }
     if (staticContent !== undefined && (typeof staticContent !== 'string' || staticContent.length > 2000)) {
       errors.push(`invalid_static_content:${item.key}`);
     }
