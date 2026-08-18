@@ -2,11 +2,16 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { FileText, Landmark, ReceiptText, Search, ShoppingCart, Truck, type LucideIcon } from 'lucide-react';
+import { CircleAlert, FileText, Landmark, ReceiptText, RotateCcw, Search, ShoppingCart, Truck, type LucideIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { DocumentTypeId } from '@/modules/documents/types';
+import {
+  canOpenTemplateCenterDocumentType,
+  type TemplateCenterLoadState,
+} from '../template-center-state';
 import {
   filterTemplateCenterFamilies,
   TEMPLATE_CENTER_FAMILIES,
@@ -21,8 +26,9 @@ interface TemplateCenterTemplate {
 
 interface PrintTemplateCenterProps {
   templates: readonly TemplateCenterTemplate[];
-  loading: boolean;
+  loadState: TemplateCenterLoadState;
   onOpenDocumentType: (type: DocumentTypeId) => void;
+  onRetry: () => void;
 }
 
 const FAMILY_ICONS: Record<TemplateCenterFamilyId, LucideIcon> = {
@@ -36,10 +42,12 @@ const FAMILY_ICONS: Record<TemplateCenterFamilyId, LucideIcon> = {
  * نقطة الدخول إلى الاستوديو: تعرض مجالات العمل والأنواع المدعومة بالفعل فقط.
  * لا تملك المركز حالة قالب أو مراجعة؛ يبقى هذا مصدره الاستوديو وواجهة API القائمة.
  */
-export function PrintTemplateCenter({ templates, loading, onOpenDocumentType }: PrintTemplateCenterProps) {
+export function PrintTemplateCenter({ templates, loadState, onOpenDocumentType, onRetry }: PrintTemplateCenterProps) {
   const t = useTranslations('printTemplateStudio');
   const tTypes = useTranslations('documentTypes');
   const [query, setQuery] = useState('');
+  const loading = loadState === 'loading';
+  const canOpenDocumentType = canOpenTemplateCenterDocumentType(loadState);
 
   const families = useMemo(() => filterTemplateCenterFamilies(
     query,
@@ -61,12 +69,30 @@ export function PrintTemplateCenter({ templates, loading, onOpenDocumentType }: 
         </div>
       </div>
 
-      <section aria-label={t('center_overview')} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label={t('center_overview')} aria-busy={loading} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <CenterMetric label={t('center_total_templates')} value={loading ? '—' : templates.length} />
         <CenterMetric label={t('center_drafts')} value={loading ? '—' : draftCount} />
         <CenterMetric label={t('center_published')} value={loading ? '—' : publishedCount} />
         <CenterMetric label={t('center_supported_types')} value={TEMPLATE_CENTER_FAMILIES.reduce((total, family) => total + family.documentTypes.length, 0)} />
       </section>
+
+      {loadState === 'error' && (
+        <Card role="alert">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="flex min-w-0 items-start gap-2">
+              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={1.7} aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium text-text">{t('center_load_failed_title')}</p>
+                <p className="mt-1 text-sm text-muted">{t('center_load_failed_hint')}</p>
+              </div>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              <RotateCcw className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              {t('center_retry')}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="max-w-xl space-y-1.5">
         <Label htmlFor="template-center-search">{t('center_search_label')}</Label>
@@ -83,10 +109,10 @@ export function PrintTemplateCenter({ templates, loading, onOpenDocumentType }: 
         </div>
       </div>
 
-      <section aria-labelledby="template-center-families-title" className="space-y-3">
+      <section aria-labelledby="template-center-families-title" aria-busy={loading} className="space-y-3">
         <div>
           <h2 id="template-center-families-title" className="text-base font-semibold text-text">{t('center_families_title')}</h2>
-          <p className="mt-1 text-sm text-muted">{t('center_families_hint')}</p>
+          <p className="mt-1 text-sm text-muted">{loading ? t('center_loading_types') : t('center_families_hint')}</p>
         </div>
 
         {families.length ? (
@@ -94,7 +120,7 @@ export function PrintTemplateCenter({ templates, loading, onOpenDocumentType }: 
             {families.map((family) => {
               const Icon = FAMILY_ICONS[family.id];
               return (
-                <Card key={family.id} className="overflow-hidden">
+                <Card key={family.id} className={loading ? 'animate-pulse overflow-hidden' : 'overflow-hidden'}>
                   <CardHeader className="border-b border-border py-4">
                     <div className="flex items-start gap-3">
                       <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
@@ -112,12 +138,13 @@ export function PrintTemplateCenter({ templates, loading, onOpenDocumentType }: 
                           <li key={type}>
                             <button
                               type="button"
+                              disabled={!canOpenDocumentType}
                               onClick={() => onOpenDocumentType(type)}
-                              className="flex min-h-11 w-full items-center gap-2 rounded border border-border bg-surface px-3 py-2 text-start transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+                              className="flex min-h-11 w-full items-center gap-2 rounded border border-border bg-surface px-3 py-2 text-start transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               <FileText className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} aria-hidden="true" />
                               <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">{tTypes(type)}</span>
-                              <span className="shrink-0 text-xs text-muted">{t('center_template_count', { count })}</span>
+                              <span className="shrink-0 text-xs text-muted">{loading ? '—' : t('center_template_count', { count })}</span>
                             </button>
                           </li>
                         );

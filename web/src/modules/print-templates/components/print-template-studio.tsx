@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ChevronLeft, ChevronRight, Copy, FilePlus2, Loader2, Save, Send, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,13 @@ import { useToast } from '@/components/ui/toast';
 import { SectionDesigner } from '@/components/settings/section-designer';
 import { PrintTemplateAssignments } from './print-template-assignments';
 import { PrintTemplateCenter } from './print-template-center';
+import {
+  canOpenTemplateCenterDocumentType,
+  documentTypesForDraftSave,
+  resolveActiveDocumentType,
+  type TemplateCenterLoadState,
+  validateLayoutForDocumentTypes,
+} from '../template-center-state';
 import { BlockPropertiesEditor } from './block-properties-editor';
 import { TemplateRevisionHistory } from './template-revision-history';
 import { ApiError, api } from '@/lib/api';
@@ -21,7 +28,6 @@ import { getDocumentPreviewModel } from '@/modules/documents/registry/document-s
 import {
   getDefaultDocumentLayout,
   getDocumentTypeDefinition,
-  validateDocumentLayout,
 } from '@/modules/documents/registry/document-types';
 import { listTemplates } from '@/modules/documents/registry/templates';
 import { THEME_IDS } from '@/modules/documents/themes';
@@ -104,31 +110,43 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   const tTemplates = useTranslations('invoiceTemplates');
   const [templates, setTemplates] = useState<PrintTemplate[]>([]);
   const [selectedId, setSelectedId] = useState(FALLBACK.id);
-  const [loading, setLoading] = useState(true);
+  const [activeDocumentType, setActiveDocumentType] = useState<DocumentTypeId | null>(null);
+  const [templateLoadState, setTemplateLoadState] = useState<TemplateCenterLoadState>('loading');
   const [saving, setSaving] = useState(false);
   const [surface, setSurface] = useState<'center' | 'studio'>('center');
   const [templateDetails, setTemplateDetails] = useState<Record<string, PrintTemplate>>({});
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsFailed, setDetailsFailed] = useState(false);
 
-  useEffect(() => {
-    api<{ data: PrintTemplate[] }>('/print-templates')
-      .then((response) => {
-        const next = response.data.length ? response.data : [FALLBACK];
-        setTemplates(next);
-        setSelectedId(next[0].id);
-      })
-      .catch(() => setTemplates([FALLBACK]))
-      .finally(() => setLoading(false));
+  const loadTemplates = useCallback(async () => {
+    setTemplateLoadState('loading');
+    try {
+      const response = await api<{ data: PrintTemplate[] }>('/print-templates');
+      setTemplates(response.data);
+      setSelectedId(response.data[0]?.id ?? FALLBACK.id);
+      setActiveDocumentType(null);
+      setTemplateLoadState(response.data.length ? 'ready' : 'empty');
+    } catch {
+      setTemplates([]);
+      setSelectedId(FALLBACK.id);
+      setActiveDocumentType(null);
+      setTemplateLoadState('error');
+    }
   }, []);
+
+  useEffect(() => { void loadTemplates(); }, [loadTemplates]);
 
   const selected = templates.find((template) => template.id === selectedId) ?? templates[0] ?? FALLBACK;
   const detailedSelected = templateDetails[selected.id] ?? selected;
   const revision = activeRevision(selected);
-  const type = revision.document_types[0] ?? selected.document_types[0] ?? 'tax_invoice';
+  const documentTypes = documentTypesForDraftSave(revision.document_types, selected.document_types);
+  const type = resolveActiveDocumentType(documentTypes, activeDocumentType);
   const documentType = getDocumentTypeDefinition(type);
   const definition = useMemo(() => normalizeDefinition(revision, type), [revision, type]);
-  const layoutValidation = useMemo(() => validateDocumentLayout(type, definition.layout), [definition.layout, type]);
+  const layoutValidation = useMemo(
+    () => validateLayoutForDocumentTypes(documentTypes, definition.layout),
+    [definition.layout, documentTypes],
+  );
   const preview = useMemo(() => {
     const model = getDocumentPreviewModel(type);
     return definition.footer_text ? { ...model, footerText: definition.footer_text } : model;
@@ -167,6 +185,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
     };
     setTemplates((current) => [local, ...current]);
     setSelectedId(local.id);
+    setActiveDocumentType(documentType);
     return local;
   }
 
@@ -176,7 +195,10 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   }
 
   function openDocumentType(documentType: DocumentTypeId) {
+    if (!canOpenTemplateCenterDocumentType(templateLoadState)) return;
+
     const matchingTemplate = templates.find((template) => template.document_types.includes(documentType));
+    setActiveDocumentType(documentType);
     if (matchingTemplate) {
       setSelectedId(matchingTemplate.id);
     } else {
@@ -194,7 +216,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
 
     setSaving(true);
     try {
-      const body = { name: selected.name, document_types: [type], definition };
+      const body = { name: selected.name, document_types: documentTypes, definition };
       if (selected.id === FALLBACK.id || selected.id.startsWith('new-')) {
         const response = await api<{ data: PrintTemplate }>('/print-templates', { method: 'POST', body });
         setTemplates((current) => current.map((template) => template.id === selected.id ? response.data : template));
@@ -282,8 +304,9 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
       <div dir={locale === 'ar' ? 'rtl' : 'ltr'}>
         <PrintTemplateCenter
           templates={templates}
-          loading={loading}
+          loadState={templateLoadState}
           onOpenDocumentType={openDocumentType}
+          onRetry={() => void loadTemplates()}
         />
       </div>
     );
@@ -310,11 +333,14 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
         <Card className="h-fit">
           <CardHeader className="border-b border-border py-3"><CardTitle className="text-sm">{t('library_label')}</CardTitle></CardHeader>
           <CardContent className="space-y-1 p-2">
-            {loading ? <p className="p-3 text-sm text-muted">{t('loading')}</p> : templates.map((template) => (
+            {templateLoadState === 'loading' ? <p className="p-3 text-sm text-muted">{t('loading')}</p> : templates.map((template) => (
               <button
                 key={template.id}
                 type="button"
-                onClick={() => setSelectedId(template.id)}
+                onClick={() => {
+                  setSelectedId(template.id);
+                  setActiveDocumentType(null);
+                }}
                 aria-pressed={template.id === selected.id}
                 className={`w-full rounded-lg p-3 text-start transition focus-visible:ring-2 focus-visible:ring-primary/40 ${template.id === selected.id ? 'bg-primary/10 text-primary' : 'hover:bg-surface'}`}
               >
@@ -333,10 +359,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
             <CardHeader className="flex flex-row items-center justify-between border-b border-border py-3"><CardTitle className="text-sm">{t('draft_settings')}</CardTitle><Sparkles className="h-4 w-4 text-primary" aria-hidden="true" /></CardHeader>
             <CardContent className="space-y-4 p-4">
               <div className="space-y-1.5"><Label htmlFor="template-name">{t('template_name')}</Label><Input id="template-name" value={selected.name} disabled={!canManage} onChange={(event) => patch({ name: event.target.value })} /></div>
-              <div className="space-y-1.5"><Label htmlFor="document-type">{t('document_type')}</Label><Select id="document-type" value={type} disabled={!canManage} onChange={(event) => {
-                const next = event.target.value as DocumentTypeId;
-                patch({ document_types: [next] }, { layout: getDefaultDocumentLayout(next) });
-              }}>{(['tax_invoice', 'simplified_tax_invoice', 'quotation', 'proforma_invoice', 'sales_order', 'purchase_order', 'purchase_invoice', 'delivery_note', 'packing_list', 'receipt_voucher', 'payment_voucher', 'credit_note', 'debit_note', 'statement_of_account'] as DocumentTypeId[]).map((id) => <option key={id} value={id}>{tTypes(id)}</option>)}</Select></div>
+              <div className="space-y-1.5"><Label htmlFor="document-type">{t('document_type')}</Label><Select id="document-type" value={type} disabled={!canManage} onChange={(event) => setActiveDocumentType(event.target.value as DocumentTypeId)}>{documentTypes.map((id) => <option key={id} value={id}>{tTypes(id)}</option>)}</Select></div>
               <div className="space-y-1.5"><Label htmlFor="template-style">{t('display_style')}</Label><Select id="template-style" value={definition.template_id} disabled={!canManage} onChange={(event) => patch({}, { template_id: event.target.value })}>{templatesCatalog.map((item) => <option key={item.id} value={item.id}>{tTemplates(item.nameKey)}</option>)}</Select></div>
               <div className="space-y-1.5"><Label htmlFor="theme">{t('theme')}</Label><Select id="theme" value={definition.theme_id} disabled={!canManage} onChange={(event) => patch({}, { theme_id: event.target.value as ThemeId })}>{THEME_IDS.map((id) => <option key={id} value={id}>{id}</option>)}</Select></div>
               <div className="space-y-1.5"><Label htmlFor="footer">{t('footer')}</Label><Input id="footer" value={definition.footer_text} disabled={!canManage} onChange={(event) => patch({}, { footer_text: event.target.value })} placeholder={t('footer_placeholder')} /></div>
