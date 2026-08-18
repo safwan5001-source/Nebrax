@@ -45,6 +45,25 @@ import type {
 
 const REQUIRED_COLUMNS: readonly DocItemsColumnId[] = ['description', 'total'];
 
+/** مؤشر موضعي بصري لخيارات محاذاة الصورة؛ النص المجاور هو المصدر الميسّر للمعنى. */
+function ImagePositionMarker({ alignment }: { alignment: DocBlockAlignment | undefined }) {
+  if (alignment === undefined) {
+    return (
+      <span aria-hidden="true" className="flex h-4 w-full items-center justify-between border-y border-current/25 px-1">
+        <span className="h-1.5 w-4 rounded-full bg-current" />
+        <span className="h-1.5 w-4 rounded-full bg-current" />
+      </span>
+    );
+  }
+
+  const linePosition = alignment === 'center' ? 'mx-auto' : alignment === 'end' ? 'ms-auto' : 'me-auto';
+  return (
+    <span aria-hidden="true" className="flex h-4 w-full items-center border-y border-current/25 px-1">
+      <span className={cn('h-1.5 w-7 rounded-full bg-current', linePosition)} />
+    </span>
+  );
+}
+
 function withoutEmptyProperties(properties: DocSectionProperties): DocSectionProperties | undefined {
   const next = Object.fromEntries(Object.entries(properties).filter(([, value]) => value !== undefined)) as DocSectionProperties;
   return Object.keys(next).length > 0 ? next : undefined;
@@ -158,6 +177,14 @@ export function BlockPropertiesEditor({
   if (!selected) return null;
   const allowed = DOCUMENT_BLOCK_PROPERTY_CONTRACT[selected.key];
   const properties = selected.properties ?? {};
+  const isImageBlock = selected.key === 'stamp' || selected.key === 'signature';
+  const imagePositionOptions: Array<{ value: DocBlockAlignment | undefined; label: string }> = [
+    { value: undefined, label: t('inherit_default') },
+    { value: 'start', label: t('alignment_start') },
+    { value: 'center', label: t('alignment_center') },
+    { value: 'end', label: t('alignment_end') },
+  ];
+  const imagePositionLabel = imagePositionOptions.find((option) => option.value === properties.alignment)?.label ?? t('inherit_default');
   const update = (changes: Partial<DocSectionProperties>) => {
     const nextProperties = withoutEmptyProperties({ ...properties, ...changes });
     onChange(value.map((item) => item.key === selected.key ? { ...item, properties: nextProperties } : item));
@@ -220,7 +247,7 @@ export function BlockPropertiesEditor({
 
       {(allowed.includes('alignment') || allowed.includes('font_size') || allowed.includes('image_size') || allowed.includes('image_opacity')) && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {allowed.includes('alignment') && (
+          {allowed.includes('alignment') && !isImageBlock && (
             <div className="space-y-1.5">
               <Label htmlFor="template-block-alignment">{t('alignment')}</Label>
               <Select id="template-block-alignment" value={properties.alignment ?? ''} disabled={disabled} onChange={(event) => update({ alignment: (event.target.value || undefined) as DocBlockAlignment | undefined })}>
@@ -230,6 +257,39 @@ export function BlockPropertiesEditor({
                 <option value="end">{t('alignment_end')}</option>
               </Select>
             </div>
+          )}
+          {allowed.includes('alignment') && isImageBlock && (
+            <fieldset className="space-y-2 sm:col-span-2" aria-describedby="template-block-image-position-feedback">
+              <legend className="text-sm font-medium text-text">{t('image_position')}</legend>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {imagePositionOptions.map((option) => {
+                  const checked = properties.alignment === option.value;
+                  return (
+                    <label key={option.value ?? 'default'} className={cn('min-w-0 cursor-pointer', disabled && 'cursor-not-allowed opacity-60')}>
+                      <input
+                        type="radio"
+                        name="template-block-image-alignment"
+                        value={option.value ?? ''}
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={() => update({ alignment: option.value })}
+                        className="peer sr-only"
+                      />
+                      <span className={cn(
+                        'flex min-h-11 flex-col justify-center gap-1.5 rounded border px-2 py-1.5 text-center text-xs transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40',
+                        checked ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-muted hover:border-muted',
+                      )}>
+                        <ImagePositionMarker alignment={option.value} />
+                        <span className="font-medium">{option.label}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p id="template-block-image-position-feedback" aria-live="polite" className="text-xs leading-relaxed text-muted">
+                {t('image_position_feedback', { position: imagePositionLabel })}
+              </p>
+            </fieldset>
           )}
           {allowed.includes('font_size') && (
             <div className="space-y-1.5">
