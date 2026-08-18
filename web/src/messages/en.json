@@ -956,7 +956,8 @@
       "system": "System",
       "pos": "Point of Sale",
       "branches": "Branches",
-      "purchases": "Purchases"
+      "purchases": "Purchases",
+      "finance": "Finance"
     },
     "invoices": "Invoices & Quotes",
     "pos": "POS",
@@ -1041,7 +1042,11 @@
       "finance": "Finance and resources",
       "admin": "Administration"
     },
-    "numberingSettings": "Document numbering"
+    "numberingSettings": "Document numbering",
+    "receiptVouchers": "Receipt Vouchers",
+    "cashAndBank": "Cashboxes & Bank Accounts",
+    "employeeCustodies": "Employee Custodies",
+    "financeSettings": "Finance Settings"
   },
   "partnerProfile": {
     "back": "Back",
