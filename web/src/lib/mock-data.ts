@@ -1423,6 +1423,54 @@ function inventoryReportFor(path: string) {
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
+
+type MockPrintTemplateRevision = {
+  id: string;
+  version: number;
+  status: 'draft' | 'published' | 'superseded';
+  document_types: string[];
+  definition: Record<string, unknown>;
+  created_at: string;
+  published_at?: string | null;
+};
+
+type MockPrintTemplate = {
+  id: string;
+  name: string;
+  status: 'draft' | 'published' | 'archived';
+  source: 'custom';
+  document_types: string[];
+  draft_revision: MockPrintTemplateRevision | null;
+  published_revision: MockPrintTemplateRevision | null;
+  revisions: MockPrintTemplateRevision[];
+};
+
+const mockPrintTemplates: MockPrintTemplate[] = [];
+
+function createMockPrintTemplate(input: { name?: string; document_types?: unknown; definition?: unknown }): MockPrintTemplate {
+  const documentTypes = Array.isArray(input.document_types) && input.document_types.length
+    ? input.document_types.map(String)
+    : ['tax_invoice'];
+  const revision = {
+    id: `demo-template-r${mockPrintTemplates.length + 1}`,
+    version: 1,
+    status: 'draft' as const,
+    document_types: documentTypes,
+    definition: (input.definition && typeof input.definition === 'object' ? input.definition : {}) as Record<string, unknown>,
+    created_at: new Date().toISOString(),
+  };
+  return {
+    id: `demo-template-${mockPrintTemplates.length + 1}`,
+    name: input.name?.trim() || 'قالب معاينة جديد',
+    status: 'draft',
+    source: 'custom',
+    document_types: documentTypes,
+    draft_revision: revision,
+    published_revision: null,
+    revisions: [revision],
+  };
+}
+
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const clean = path.split('?')[0];
   const m = method.toUpperCase();
@@ -1430,6 +1478,70 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   // الطفرات (إنشاء/تعديل/حذف/ترحيل) — نجاح صوري دون أي أثر فعلي.
   if (m !== 'GET') {
     if (clean === '/logout') return resolve(null);
+    if (clean === '/print-templates') {
+      const template = createMockPrintTemplate((body ?? {}) as { name?: string; document_types?: unknown; definition?: unknown });
+      mockPrintTemplates.unshift(template);
+      return resolve({ data: template });
+    }
+    const duplicateTemplate = clean.match(/^\/print-templates\/([^/]+)\/duplicate$/);
+    if (duplicateTemplate) {
+      const source = mockPrintTemplates.find((template) => template.id === duplicateTemplate[1]);
+      const template = createMockPrintTemplate({
+        name: ((body ?? {}) as { name?: string }).name,
+        document_types: source?.document_types,
+        definition: source?.draft_revision?.definition ?? source?.published_revision?.definition,
+      });
+      mockPrintTemplates.unshift(template);
+      return resolve({ data: template });
+    }
+    const draftTemplate = clean.match(/^\/print-templates\/([^/]+)\/draft$/);
+    if (draftTemplate) {
+      const index = mockPrintTemplates.findIndex((template) => template.id === draftTemplate[1]);
+      if (index < 0) return resolve({ data: null });
+      const current = mockPrintTemplates[index];
+      const input = (body ?? {}) as { name?: string; document_types?: unknown; definition?: unknown };
+      const revision: MockPrintTemplateRevision = {
+        id: `${current.id}-r${current.revisions.length + 1}`,
+        version: current.revisions.length + 1,
+        status: 'draft',
+        document_types: Array.isArray(input.document_types) && input.document_types.length
+          ? input.document_types.map(String)
+          : current.document_types,
+        definition: (input.definition && typeof input.definition === 'object'
+          ? input.definition
+          : current.draft_revision?.definition ?? current.published_revision?.definition ?? {}) as Record<string, unknown>,
+        created_at: new Date().toISOString(),
+      };
+      const template: MockPrintTemplate = {
+        ...current,
+        name: input.name?.trim() || current.name,
+        status: 'draft',
+        document_types: revision.document_types,
+        draft_revision: revision,
+        revisions: [...current.revisions, revision],
+      };
+      mockPrintTemplates[index] = template;
+      return resolve({ data: template });
+    }
+    const publishTemplate = clean.match(/^\/print-templates\/([^/]+)\/publish$/);
+    if (publishTemplate) {
+      const index = mockPrintTemplates.findIndex((template) => template.id === publishTemplate[1]);
+      if (index < 0) return resolve({ data: null });
+      const current = mockPrintTemplates[index];
+      const draft = current.draft_revision ?? current.published_revision;
+      if (!draft) return resolve({ data: current });
+      const now = new Date().toISOString();
+      const revision: MockPrintTemplateRevision = { ...draft, status: 'published', published_at: now };
+      const template: MockPrintTemplate = {
+        ...current,
+        status: 'published',
+        draft_revision: null,
+        published_revision: revision,
+        revisions: current.revisions.map((item) => item.id === revision.id ? revision : item),
+      };
+      mockPrintTemplates[index] = template;
+      return resolve({ data: template });
+    }
     // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
     if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
     if (clean === '/pos/checkout') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body), payment_status: 'paid' } });
@@ -1456,6 +1568,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: { id: 'demo-new' } });
   }
 
+  if (clean === '/print-templates') return resolve({ data: mockPrintTemplates });
+  const printTemplateMatch = clean.match(/^\/print-templates\/([^/]+)$/);
+  if (printTemplateMatch) {
+    const template = mockPrintTemplates.find((item) => item.id === printTemplateMatch[1]);
+    return resolve({ data: template ?? null });
+  }
   if (clean === '/me') return resolve({ user: DEMO_USER, company: mockCompany });
   if (clean === '/subscription') return resolve(mockSubscription);
   if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
