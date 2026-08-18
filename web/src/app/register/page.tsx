@@ -114,7 +114,10 @@ export default function RegisterPage() {
             <label htmlFor="register-phone" className="mb-1.5 block text-sm font-semibold text-text">
               {t('phone')} <span className="text-muted" aria-hidden="true">*</span>
             </label>
-            <div className="flex h-12 overflow-hidden border border-border bg-surface transition-shadow focus-within:ring-2 focus-within:ring-primary/40">
+            <div
+              data-invalid={Boolean(errors.phone) || undefined}
+              className="flex h-12 overflow-hidden border border-border bg-surface transition-shadow focus-within:ring-2 focus-within:ring-primary/40 data-[invalid=true]:border-negative data-[invalid=true]:ring-1 data-[invalid=true]:ring-negative/20"
+            >
               <span className="flex shrink-0 items-center gap-1.5 border-e border-border bg-background px-2.5 text-sm text-muted" dir="ltr" aria-label={`${t('phone_country')} +966`}>
                 <SaudiFlag />
                 <span className="font-semibold text-text" lang="ar" dir="rtl">{t('phone_country')}</span>
@@ -141,7 +144,11 @@ export default function RegisterPage() {
             <label htmlFor="register-slug" className="mb-1.5 block text-sm font-semibold text-text">
               {t('slug')} <span className="text-muted" aria-hidden="true">*</span>
             </label>
-            <div className="flex h-12 overflow-hidden border border-border bg-surface transition-shadow focus-within:ring-2 focus-within:ring-primary/40" dir="ltr">
+            <div
+              data-invalid={Boolean(errors.slug) || undefined}
+              className="flex h-12 overflow-hidden border border-border bg-surface transition-shadow focus-within:ring-2 focus-within:ring-primary/40 data-[invalid=true]:border-negative data-[invalid=true]:ring-1 data-[invalid=true]:ring-negative/20"
+              dir="ltr"
+            >
               <input
                 id="register-slug"
                 className="h-full w-full bg-transparent px-3 text-base text-text placeholder:text-muted focus:outline-none"
@@ -170,7 +177,7 @@ export default function RegisterPage() {
                 className="h-12 ps-11 text-base"
                 placeholder={t('password')}
                 aria-invalid={Boolean(errors.password)}
-                aria-describedby={errors.password ? 'register-password-error' : 'register-password-strength'}
+                aria-describedby={errors.password ? 'register-password-error' : password ? 'register-password-strength' : undefined}
                 {...register('password')}
               />
               <button
@@ -184,14 +191,14 @@ export default function RegisterPage() {
             </div>
             {errors.password ? (
               <p id="register-password-error" className="mt-1.5 text-xs text-negative" role="alert">{t('password_hint')}</p>
-            ) : (
+            ) : password ? (
               <div id="register-password-strength" className="mt-1.5 flex min-h-4 items-center justify-between gap-3 text-xs text-muted" aria-live="polite">
                 <span className="flex flex-1 gap-1" aria-hidden="true">
                   {[1, 2, 3, 4].map((segment) => <i key={segment} className={`h-1 flex-1 bg-border ${segment <= passwordScore ? 'bg-primary' : ''}`} />)}
                 </span>
                 <span>{password ? `${t('password_strength')}: ${passwordLabels[Math.max(passwordScore - 1, 0)]}` : ''}</span>
               </div>
-            )}
+            ) : null}
           </div>
 
           {serverError && <p className="border border-negative/20 bg-negative/10 px-3 py-2 text-xs text-negative" role="alert">{serverError}</p>}
