@@ -2904,7 +2904,14 @@
       "admin": "Admin",
       "accountant": "Accountant",
       "staff": "Staff"
-    }
+    },
+    "scope_title": "Access scope",
+    "scope_branches": "Allowed branches",
+    "scope_branches_hint": "Leave empty to give access to all branches. When set, the user works in and sees only their branches — reports included.",
+    "scope_warehouses": "Allowed warehouses",
+    "scope_warehouses_hint": "Leave empty to give access to all warehouses. When set, dealing with any other is refused and they are hidden from lists.",
+    "scope_loading": "Loading…",
+    "scope_none": "No items available."
   },
   "voucherDoc": {
     "received_from": "Received from",
