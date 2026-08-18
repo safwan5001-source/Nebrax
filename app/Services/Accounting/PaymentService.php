@@ -95,8 +95,17 @@ class PaymentService
         $cashAccountId = $this->validCashAccountId($data['cash_account_id'] ?? null);
 
         return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $cashAccountId) {
-            $payment = Payment::create([
-                'number'          => $data['number'] ?? $this->nextNumber($direction, $date),
+            // النسخ قد يكون لمستند تاريخي بلا فرع. نحفظ نطاق المصدر صراحةً،
+            // فلا تنتقل النسخة إلى الفرع الرئيسي للطلب ثم تصطدم برقمه القديم.
+            $hasExplicitBranch = array_key_exists('branch_id', $data);
+            $number = $data['number'] ?? (
+                $hasExplicitBranch
+                    ? $this->nextNumber($direction, $date, $data['branch_id'])
+                    : $this->nextNumber($direction, $date)
+            );
+
+            $attributes = [
+                'number'          => $number,
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null, // مرجع اختياري للقبض
                 'direction'       => $direction,
@@ -108,7 +117,12 @@ class PaymentService
                 'status'          => 'draft',
                 'notes'           => $data['notes'] ?? null,
                 'created_by'      => $data['created_by'] ?? null,
-            ]);
+            ];
+            if ($hasExplicitBranch) {
+                $attributes['branch_id'] = $data['branch_id'];
+            }
+
+            $payment = Payment::create($attributes);
 
             foreach ($allocs as $a) {
                 PaymentAllocation::create([
@@ -121,6 +135,101 @@ class PaymentService
 
             return $payment;
         });
+    }
+
+    /**
+     * تعديل مسودة السند. لا يتغير اتجاه السند بعد إنشائه؛ فاستبدال قبض بصرف
+     * يبدّل طرفي القيد ولا يُعد تعديلاً آمناً. تُستبدل التخصيصات كاملةً داخل
+     * المعاملة نفسها، ثم يُعاد التحقق النهائي عند الترحيل.
+     */
+    public function update(Payment $payment, array $data, array $allocations = []): Payment
+    {
+        if (! $payment->isDraft()) {
+            throw new RuntimeException('لا يمكن تعديل سند مرحّل أو ملغى.');
+        }
+
+        $amount = (int) ($data['amount'] ?? 0);
+        if ($amount <= 0) {
+            throw new RuntimeException('مبلغ السند يجب أن يكون موجباً.');
+        }
+
+        $direction = $payment->direction;
+        [$targetClass, $key] = $direction === 'received'
+            ? [Invoice::class, 'invoice_id']
+            : [Purchase::class, 'purchase_id'];
+        $items = ! empty($allocations)
+            ? $allocations
+            : (! empty($data[$key]) ? [[$key => $data[$key], 'amount' => $amount]] : []);
+
+        $normalized = [];
+        $sum = 0;
+        foreach ($items as $item) {
+            $allocated = (int) ($item['amount'] ?? 0);
+            if (empty($item[$key]) || $allocated <= 0) {
+                throw new RuntimeException('كل تخصيص يحتاج مستنداً ومبلغاً موجباً.');
+            }
+            $normalized[] = ['type' => $targetClass, 'id' => $item[$key], 'amount' => $allocated];
+            $sum += $allocated;
+        }
+        if (! empty($normalized) && $sum !== $amount) {
+            throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
+        }
+
+        $cashAccountId = $this->validCashAccountId($data['cash_account_id'] ?? null);
+
+        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $cashAccountId) {
+            $payment->update([
+                'partner_id'      => $data['partner_id'],
+                'invoice_id'      => $data['invoice_id'] ?? null,
+                'method'          => $data['method'] ?? 'cash',
+                'reference'       => $data['reference'] ?? null,
+                'cash_account_id' => $cashAccountId,
+                'payment_date'    => $data['payment_date'] ?? $payment->payment_date->toDateString(),
+                'amount'          => $amount,
+                'notes'           => $data['notes'] ?? null,
+            ]);
+
+            $payment->allocations()->delete();
+            foreach ($normalized as $allocation) {
+                PaymentAllocation::create([
+                    'payment_id'       => $payment->id,
+                    'allocatable_type' => $allocation['type'],
+                    'allocatable_id'   => $allocation['id'],
+                    'amount'           => $allocation['amount'],
+                ]);
+            }
+
+            return $payment->fresh();
+        });
+    }
+
+    /** نسخة المسودة لا تنسخ التخصيصات كي لا تحجز متبقي فاتورة مرتين. */
+    public function duplicate(Payment $payment, ?string $createdBy = null): Payment
+    {
+        $date = now()->toDateString();
+        $data = [
+            'partner_id'      => $payment->partner_id,
+            'direction'       => $payment->direction,
+            'method'          => $payment->method,
+            'reference'       => $payment->reference,
+            'cash_account_id' => $payment->cash_account_id,
+            'payment_date'    => $date,
+            'amount'          => $payment->amount,
+            'notes'           => $payment->notes,
+            'created_by'      => $createdBy,
+        ];
+
+        // فرع المصدر المحدد هو نطاق الوثيقة وسلسلته؛ لا نعتمد على السياق الذي
+        // قد يتبدل بين قراءة السند وتنفيذ طلب API. صفوف ما قبل الفروع تُنشأ
+        // في الفرع النشط، لكن رقمها التالي يُقرأ من سلسلتها القديمة حتى لا
+        // يعاد رقمٌ ما زال محمياً بالقيد الفريد في SQLite.
+        if ($payment->branch_id !== null) {
+            $data['branch_id'] = $payment->branch_id;
+        } else {
+            $data['number'] = $this->nextNumber($payment->direction, $date, null);
+        }
+
+        return $this->create($data);
     }
 
     /**
@@ -301,8 +410,12 @@ class PaymentService
     /**
      * توليد رقم سند تسلسلي: REC-2025-00001 (قبض) | PAY-2025-00001 (صرف)
      */
-    protected function nextNumber(string $direction, string $date): string
+    protected function nextNumber(string $direction, string $date, string|null|false $branchId = false): string
     {
-        return Payment::nextDocumentNumber($direction === 'received' ? 'REC' : 'PAY', $date);
+        return Payment::nextDocumentNumber(
+            $direction === 'received' ? 'REC' : 'PAY',
+            $date,
+            $branchId
+        );
     }
 }

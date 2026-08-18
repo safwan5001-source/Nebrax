@@ -178,6 +178,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('expenses/{id}/attachments/{attachmentId}', [ExpenseController::class, 'downloadAttachment'])->middleware($perm('expenses.view'));
         Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware($perm('expenses.view'));
         Route::post('expenses', [ExpenseController::class, 'store'])->middleware($perm('expenses.manage'));
+        Route::put('expenses/{id}', [ExpenseController::class, 'update'])->middleware($perm('expenses.manage'));
+        Route::post('expenses/{id}/duplicate', [ExpenseController::class, 'duplicate'])->middleware($perm('expenses.manage'));
+        Route::delete('expenses/{id}', [ExpenseController::class, 'destroy'])->middleware($perm('expenses.manage'));
         Route::post('expenses/{id}/post', [ExpenseController::class, 'post'])->middleware($perm('expenses.manage'));
 
         // الأصول الثابتة (اقتناء + إهلاك؛ كلاهما يولّد قيداً متوازناً)
@@ -253,6 +256,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payments/{id}', [PaymentController::class, 'show'])->middleware($perm('payments.view'));
         Route::post('payments', [PaymentController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('payments/{id}', [PaymentController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::post('payments/{id}/duplicate', [PaymentController::class, 'duplicate'])->middleware($perm('payments.manage'));
+        Route::delete('payments/{id}', [PaymentController::class, 'destroy'])->middleware($perm('payments.manage'));
         Route::post('payments/{id}/post', [PaymentController::class, 'post'])->middleware($perm('payments.manage'));
 
         // المشتريات

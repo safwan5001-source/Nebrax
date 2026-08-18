@@ -162,7 +162,7 @@ const GROUPS: NavGroup[] = [
     icon: Banknote,
     items: [
       { href: '/expenses', icon: Receipt, key: 'expenses', built: true },
-      { href: '/receipt-vouchers', icon: FileText, key: 'receiptVouchers' },
+      { href: '/receipt-vouchers', icon: FileText, key: 'receiptVouchers', built: true },
       { href: '/cash-and-bank', icon: Building2, key: 'cashAndBank' },
       { href: '/employee-custodies', icon: Users, key: 'employeeCustodies' },
       { href: '/finance-settings', icon: SlidersHorizontal, key: 'financeSettings' },

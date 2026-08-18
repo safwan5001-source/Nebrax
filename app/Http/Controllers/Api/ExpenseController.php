@@ -12,6 +12,7 @@ use App\Models\Partner;
 use App\Services\Accounting\ExpenseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -29,12 +30,7 @@ class ExpenseController extends ApiController
     public function store(StoreExpenseRequest $request): JsonResponse
     {
         $data = $request->validated();
-        if (! empty($data['partner_id'])) {
-            Partner::findOrFail($data['partner_id']); // عزل: المورّد يخص المستأجر/الفرع المرئي
-        }
-
-        $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
-        $this->assertActiveCategory($data['category_id'] ?? null);
+        $this->assertReferences($data);
 
         $expense = $this->domain(fn () => $this->expenses->create($data));
         $this->storeAttachments($request, $expense);
@@ -47,6 +43,49 @@ class ExpenseController extends ApiController
         return (new ExpenseResource(
             $this->visibleExpense($request, $id)->load(['account', 'category', 'partner', 'costCenter', 'attachments'])
         ))->response();
+    }
+
+    /** تعديل مسودة قائمة: لا يفتح أي مصروف مرحّل لتعديل البيانات أو المبلغ. */
+    public function update(StoreExpenseRequest $request, string $id): JsonResponse
+    {
+        $expense = $this->visibleExpense($request, $id);
+        $data = $request->validated();
+        $this->assertReferences($data);
+
+        $updated = $this->domain(fn () => $this->expenses->update($expense, $data));
+        $this->storeAttachments($request, $updated);
+
+        return (new ExpenseResource($updated->load(['account', 'category', 'partner', 'costCenter', 'attachments'])))->response();
+    }
+
+    /** ينشئ نسخة مسودة مستقلة بلا مرفقات إثبات، وبترقيم وتاريخ جديدين. */
+    public function duplicate(Request $request, string $id): JsonResponse
+    {
+        $expense = $this->visibleExpense($request, $id);
+        $copy = $this->domain(fn () => $this->expenses->duplicate($expense, $request->user()?->id));
+
+        return (new ExpenseResource($copy->load(['account', 'category', 'partner', 'costCenter', 'attachments'])))->response()->setStatusCode(201);
+    }
+
+    /** الحذف متاح للمسودة فقط؛ السند المرحّل جزء من سجل القيد ولا يُمحى. */
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $expense = $this->visibleExpense($request, $id);
+        if (! $expense->isDraft()) {
+            abort(422, 'لا يمكن حذف مصروف مرحّل أو ملغى.');
+        }
+
+        $attachments = $expense->attachments()->get();
+        DB::transaction(function () use ($expense) {
+            $expense->attachments()->delete();
+            $expense->delete();
+        });
+
+        foreach ($attachments as $attachment) {
+            Storage::disk($attachment->disk)->delete($attachment->path);
+        }
+
+        return response()->json(['message' => 'deleted']);
     }
 
     public function post(Request $request, string $id): JsonResponse
@@ -77,6 +116,17 @@ class ExpenseController extends ApiController
     private function visibleExpense(Request $request, string $id): Expense
     {
         return $this->scopeToActiveBranch(Expense::query(), $request)->whereKey($id)->firstOrFail();
+    }
+
+    /** المراجع يجب أن تكون مرئية في سياق الإنشاء/التعديل، لا مجرد موجودة في المستأجر. */
+    private function assertReferences(array $data): void
+    {
+        if (! empty($data['partner_id'])) {
+            Partner::findOrFail($data['partner_id']);
+        }
+
+        $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
+        $this->assertActiveCategory($data['category_id'] ?? null);
     }
 
     /** لا يقبل سند جديد تصنيفاً معطلاً أو مخفياً بعزل الفرع. */

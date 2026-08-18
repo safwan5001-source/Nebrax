@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Paperclip, Plus, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,8 @@ export default function NewExpensePage() {
   const t = useTranslations('expenses');
   const tc = useTranslations('common');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
   const { success } = useToast();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -75,6 +77,30 @@ export default function NewExpensePage() {
       .then((r) => setCenters(r.data.filter((c) => c.is_active)))
       .catch(() => {});
   }, [loadCategories, loadPartners]);
+
+  useEffect(() => {
+    if (!editId) return;
+
+    api<{ data: { status: string; account_id: string; category_id?: string | null; partner_id?: string | null; vendor_name?: string | null; cost_center_id?: string | null; amount: string; tax_rate: number; payment_method: string; expense_date: string; description?: string | null } }>(`/expenses/${editId}`)
+      .then((response) => {
+        const draft = response.data;
+        if (draft.status !== 'draft') {
+          setError(t('edit_draft_only'));
+          return;
+        }
+        setAccountId(draft.account_id);
+        setCategoryId(draft.category_id ?? '');
+        setPartnerId(draft.partner_id ?? '');
+        setVendorName(draft.vendor_name ?? '');
+        setCenterId(draft.cost_center_id ?? '');
+        setAmount(String(draft.amount));
+        setTax(String(draft.tax_rate));
+        setMethod(draft.payment_method);
+        setDate(draft.expense_date);
+        setDescription(draft.description ?? '');
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : t('load_detail_failed')));
+  }, [editId, t]);
 
   const amountMinor = riyalToMinor(amount);
   const taxMinor = useMemo(
@@ -134,9 +160,12 @@ export default function NewExpensePage() {
       if (description.trim()) body.append('description', description.trim());
       files.forEach((file) => body.append('attachments[]', file));
 
-      await api('/expenses', { method: 'POST', body });
-      success(t('draft_saved'));
-      router.push('/expenses');
+      const target = editId ? `/expenses/${editId}` : '/expenses';
+      // PHP لا يضمن تحليل multipart في PUT؛ التمويه يحافظ على Route::put ويتيح رفع المرفقات.
+      if (editId) body.append('_method', 'PUT');
+      await api(target, { method: 'POST', body });
+      success(editId ? t('draft_updated') : t('draft_saved'));
+      router.push(editId ? `/expenses/${editId}` : '/expenses');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
       setSaving(false);
@@ -151,7 +180,7 @@ export default function NewExpensePage() {
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
           </Button>
           <div>
-            <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
+            <h1 className="text-xl font-semibold text-text">{t(editId ? 'edit_title' : 'new_title')}</h1>
             <p className="mt-1 text-sm text-muted">{t('number_generated')}</p>
           </div>
         </div>

@@ -129,6 +129,38 @@ class ExpenseTest extends TestCase
     }
 
     /** @test */
+    public function draft_expenses_can_be_updated_duplicated_and_deleted_but_posted_ones_cannot(): void
+    {
+        $auth = $this->registerTenant();
+        $accountId = $this->expenseAccountId($auth['tenant_id']);
+
+        $id = $this->withToken($auth['token'])->postJson('/api/expenses', [
+            'account_id' => $accountId, 'amount' => 100000, 'tax_rate' => 15, 'description' => 'الأصل',
+        ])['data']['id'];
+
+        $this->withToken($auth['token'])->putJson("/api/expenses/{$id}", [
+            'account_id' => $accountId, 'amount' => 200000, 'tax_rate' => 5, 'description' => 'محدّث',
+        ])->assertOk()
+            ->assertJsonPath('data.description', 'محدّث')
+            ->assertJsonPath('data.total', '2100.00');
+
+        $copy = $this->withToken($auth['token'])->postJson("/api/expenses/{$id}/duplicate")
+            ->assertCreated()['data'];
+        $this->assertSame('draft', $copy['status']);
+        $this->assertNotSame($id, $copy['id']);
+        $this->assertSame('محدّث', $copy['description']);
+
+        $this->withToken($auth['token'])->deleteJson("/api/expenses/{$id}")->assertOk();
+        $this->withToken($auth['token'])->getJson("/api/expenses/{$id}")->assertNotFound();
+
+        $this->withToken($auth['token'])->postJson("/api/expenses/{$copy['id']}/post")->assertOk();
+        $this->withToken($auth['token'])->putJson("/api/expenses/{$copy['id']}", [
+            'account_id' => $accountId, 'amount' => 100000,
+        ])->assertStatus(422);
+        $this->withToken($auth['token'])->deleteJson("/api/expenses/{$copy['id']}")->assertStatus(422);
+    }
+
+    /** @test */
     public function expenses_are_tenant_isolated(): void
     {
         $a = $this->registerTenant('acme', 'owner@acme.test');

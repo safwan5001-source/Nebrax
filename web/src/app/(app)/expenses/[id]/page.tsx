@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Download, FileText, ReceiptText } from 'lucide-react';
+import { ArrowRight, Copy, Download, FileText, Pencil, Printer, ReceiptText, Trash2 } from 'lucide-react';
+import { Accordion, AccordionItem } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +36,8 @@ interface Expense {
   attachments?: Attachment[];
 }
 
+type MobileSection = 'details' | 'attachments' | 'summary';
+
 const statusTone: Record<string, 'positive' | 'warning' | 'muted'> = {
   posted: 'positive', draft: 'warning', cancelled: 'muted',
 };
@@ -55,7 +58,11 @@ export default function ExpenseDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [acting, setActing] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  // الجوال يحافظ على قسم واحد ظاهر، ويتيح طيّه بالنقر عليه مرة ثانية.
+  const [mobileSection, setMobileSection] = useState<MobileSection>('details');
+  const [mobileCollapsed, setMobileCollapsed] = useState(false);
 
   const load = useCallback(() => {
     if (!params.id) return;
@@ -68,6 +75,16 @@ export default function ExpenseDetailPage() {
   }, [params.id, t]);
 
   useEffect(() => load(), [load]);
+
+  function toggleMobileSection(section: MobileSection) {
+    if (mobileSection === section) {
+      setMobileCollapsed((collapsed) => !collapsed);
+      return;
+    }
+
+    setMobileSection(section);
+    setMobileCollapsed(false);
+  }
 
   async function postExpense() {
     if (!expense || expense.status !== 'draft') return;
@@ -82,6 +99,34 @@ export default function ExpenseDetailPage() {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function duplicateExpense() {
+    if (!expense) return;
+    setActing(true);
+    try {
+      const response = await api<{ data: { id: string } }>(`/expenses/${expense.id}/duplicate`, { method: 'POST' });
+      success(t('duplicate_success'));
+      router.push(`/expenses/new?edit=${response.data.id}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function deleteExpense() {
+    if (!expense || expense.status !== 'draft' || !window.confirm(t('confirm_delete_expense'))) return;
+    setActing(true);
+    try {
+      await api(`/expenses/${expense.id}`, { method: 'DELETE' });
+      success(t('deleted_success'));
+      router.push('/expenses');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setActing(false);
     }
   }
 
@@ -121,6 +166,89 @@ export default function ExpenseDetailPage() {
     [t('payment_method'), t(`method.${expense.payment_method}`)],
   ];
 
+  const mobileOpen = (section: MobileSection) => !mobileCollapsed && mobileSection === section;
+  const actionButtons = (mobile = false) => (
+    <>
+      <Button className={mobile ? 'shrink-0' : undefined} variant="outline" onClick={() => window.print()}>
+        <Printer className="h-4 w-4" strokeWidth={1.7} />
+        {t('prints')}
+      </Button>
+      {expense.status === 'draft' ? (
+        <Link className={mobile ? 'shrink-0' : undefined} href={`/expenses/new?edit=${expense.id}`}>
+          <Button variant="outline"><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Button>
+        </Link>
+      ) : null}
+      <Button className={mobile ? 'shrink-0' : undefined} variant="outline" disabled={acting || posting} onClick={duplicateExpense}>
+        <Copy className="h-4 w-4" strokeWidth={1.7} />
+        {t('duplicate')}
+      </Button>
+      <Button className={mobile ? 'shrink-0' : undefined} variant="outline" disabled={expense.status !== 'draft' || acting || posting} title={expense.status !== 'draft' ? t('draft_action_only') : undefined} onClick={deleteExpense}>
+        <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+        {t('delete')}
+      </Button>
+      {expense.status === 'draft' && (
+        <Button className={mobile ? 'shrink-0' : undefined} disabled={posting || acting} onClick={postExpense}>
+          {posting ? t('posting') : t('post')}
+        </Button>
+      )}
+    </>
+  );
+
+  const detailContent = (
+    <div className="space-y-5 p-4 lg:p-0">
+      <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+        {details.map(([label, value]) => (
+          <div key={label} className="space-y-1">
+            <dt className="text-sm font-medium text-muted">{label}</dt>
+            <dd className="text-sm text-text">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="border-t border-border pt-4">
+        <p className="text-sm font-medium text-muted">{t('description')}</p>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{expense.description || '—'}</p>
+      </div>
+    </div>
+  );
+
+  const attachmentsContent = (
+    <div className="p-4 lg:p-0">
+      {(expense.attachments?.length ?? 0) === 0 ? (
+        <p className="py-5 text-center text-sm text-muted">{t('no_attachments')}</p>
+      ) : (
+        <div className="divide-y divide-border rounded-md border border-border">
+          {expense.attachments?.map((attachment) => (
+            <div key={attachment.id} className="flex items-center justify-between gap-3 px-3 py-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <FileText className="h-4 w-4 shrink-0 text-primary" strokeWidth={1.7} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-text">{attachment.original_name}</p>
+                  <p className="text-xs text-muted">{attachment.mime_type || t('unknown_file_type')} · {bytes(attachment.size)}</p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" disabled={downloading === attachment.id} onClick={() => downloadAttachment(attachment)}>
+                <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
+                {downloading === attachment.id ? t('downloading') : t('download')}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const summaryContent = (
+    <div className="space-y-3 p-4 lg:p-0">
+      <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('subtotal')}</span><span className="num">{formatRiyal(expense.amount)}</span></div>
+      <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('tax_total')} ({expense.tax_rate}%)</span><span className="num">{formatRiyal(expense.tax_amount)}</span></div>
+      <div className="flex justify-between gap-4 border-t border-border pt-3"><span className="font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal(expense.total)}</span></div>
+      <div className="mt-5 rounded-md bg-muted/50 px-3 py-3 text-xs leading-5 text-muted">
+        <ReceiptText className="mb-1 h-4 w-4 text-primary" strokeWidth={1.7} />
+        {expense.status === 'posted' ? t('posted_immutable_note') : t('draft_posting_note')}
+      </div>
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -138,72 +266,41 @@ export default function ExpenseDetailPage() {
             </p>
           </div>
         </div>
-        {expense.status === 'draft' && (
-          <Button disabled={posting} onClick={postExpense}>{posting ? t('posting') : t('post')}</Button>
-        )}
+        <div className="no-print hidden flex-wrap items-center gap-2 lg:flex">{actionButtons()}</div>
+      </div>
+
+      <div className="no-print -mx-4 overflow-x-auto px-4 lg:hidden">
+        <div className="flex w-max gap-2">{actionButtons(true)}</div>
       </div>
 
       {error && <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error}</p>}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <Accordion className="lg:hidden">
+        <AccordionItem id="expense-details" title={t('detail_title')} open={mobileOpen('details')} onToggle={() => toggleMobileSection('details')}>
+          {mobileOpen('details') && detailContent}
+        </AccordionItem>
+        <AccordionItem id="expense-attachments" title={t('attachments')} count={expense.attachments?.length} open={mobileOpen('attachments')} onToggle={() => toggleMobileSection('attachments')}>
+          {mobileOpen('attachments') && attachmentsContent}
+        </AccordionItem>
+        <AccordionItem id="expense-summary" title={t('financial_summary')} open={mobileOpen('summary')} onToggle={() => toggleMobileSection('summary')}>
+          {mobileOpen('summary') && summaryContent}
+        </AccordionItem>
+      </Accordion>
+
+      <div className="hidden gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="space-y-5">
           <Card>
             <CardHeader><CardTitle>{t('detail_title')}</CardTitle></CardHeader>
-            <CardContent className="space-y-5">
-              <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-                {details.map(([label, value]) => (
-                  <div key={label} className="space-y-1">
-                    <dt className="text-sm font-medium text-muted">{label}</dt>
-                    <dd className="text-sm text-text">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <div className="border-t border-border pt-4">
-                <p className="text-sm font-medium text-muted">{t('description')}</p>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{expense.description || '—'}</p>
-              </div>
-            </CardContent>
+            <CardContent>{detailContent}</CardContent>
           </Card>
-
           <Card>
             <CardHeader><CardTitle>{t('attachments')}</CardTitle></CardHeader>
-            <CardContent>
-              {(expense.attachments?.length ?? 0) === 0 ? (
-                <p className="py-5 text-center text-sm text-muted">{t('no_attachments')}</p>
-              ) : (
-                <div className="divide-y divide-border rounded-md border border-border">
-                  {expense.attachments?.map((attachment) => (
-                    <div key={attachment.id} className="flex items-center justify-between gap-3 px-3 py-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <FileText className="h-4 w-4 shrink-0 text-primary" strokeWidth={1.7} />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-text">{attachment.original_name}</p>
-                          <p className="text-xs text-muted">{attachment.mime_type || t('unknown_file_type')} · {bytes(attachment.size)}</p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm" disabled={downloading === attachment.id} onClick={() => downloadAttachment(attachment)}>
-                        <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
-                        {downloading === attachment.id ? t('downloading') : t('download')}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
+            <CardContent>{attachmentsContent}</CardContent>
           </Card>
         </div>
-
         <Card className="h-fit lg:sticky lg:top-5">
           <CardHeader><CardTitle>{t('financial_summary')}</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('subtotal')}</span><span className="num">{formatRiyal(expense.amount)}</span></div>
-            <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('tax_total')} ({expense.tax_rate}%)</span><span className="num">{formatRiyal(expense.tax_amount)}</span></div>
-            <div className="flex justify-between gap-4 border-t border-border pt-3"><span className="font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal(expense.total)}</span></div>
-            <div className="mt-5 rounded-md bg-muted/50 px-3 py-3 text-xs leading-5 text-muted">
-              <ReceiptText className="mb-1 h-4 w-4 text-primary" strokeWidth={1.7} />
-              {expense.status === 'posted' ? t('posted_immutable_note') : t('draft_posting_note')}
-            </div>
-          </CardContent>
+          <CardContent>{summaryContent}</CardContent>
         </Card>
       </div>
     </div>
