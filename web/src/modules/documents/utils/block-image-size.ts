@@ -1,4 +1,4 @@
-import type { DocBlockImageSize } from '../types';
+import type { DocBlockAlignment, DocBlockImageSize } from '../types';
 
 export type ImageBlockKey = 'stamp' | 'signature';
 
@@ -37,4 +37,19 @@ export function getDocumentImagePdfSize(
 ): { width: number; height: number } {
   const multiplier = IMAGE_SIZE_MULTIPLIER[size ?? 'md'];
   return { width: baseWidth * multiplier, height: baseHeight * multiplier };
+}
+
+/** يحول المحاذاة المنطقية للكتلة إلى إحداثي PDF متوافق مع مستند RTL. */
+export function getDocumentImagePdfX(
+  alignment: DocBlockAlignment | undefined,
+  pageWidth: number,
+  left: number,
+  right: number,
+  imageWidth: number,
+): number {
+  switch (alignment ?? 'start') {
+    case 'center': return pageWidth / 2 - imageWidth / 2;
+    case 'end': return left;
+    default: return right - imageWidth;
+  }
 }

@@ -1,7 +1,7 @@
 import type { Company, Customer, InvoiceDoc } from '@/components/invoices/invoice-document';
 
 import { DEFAULT_DOCUMENT_ITEMS_COLUMNS } from '@/modules/documents/registry/document-types';
-import { getDocumentImagePdfSize } from '@/modules/documents/utils/block-image-size';
+import { getDocumentImagePdfSize, getDocumentImagePdfX } from '@/modules/documents/utils/block-image-size';
 import type { DocBlockAlignment, DocBlockImageSize, DocItemsColumn, DocItemsColumnId, DocSectionLayoutItem, DocSectionProperties } from '@/modules/documents/types';
 
 const PAGE = { width: 210, height: 297, margin: 10, contentWidth: 190 };
@@ -493,21 +493,29 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   drawContentBlock(input.labels.bank, bankContent, bankProperties);
 
   const assets = [
-    { image: stamp, visible: stampBlock?.visible === true, size: stampBlock?.properties?.image_size },
-    { image: signature, visible: signatureBlock?.visible === true, size: signatureBlock?.properties?.image_size },
-  ].filter((asset): asset is { image: string; visible: true; size: DocBlockImageSize | undefined } => Boolean(asset.image) && asset.visible)
+    { image: stamp, visible: stampBlock?.visible === true, size: stampBlock?.properties?.image_size, alignment: stampBlock?.properties?.alignment },
+    { image: signature, visible: signatureBlock?.visible === true, size: signatureBlock?.properties?.image_size, alignment: signatureBlock?.properties?.alignment },
+  ].filter((asset): asset is { image: string; visible: true; size: DocBlockImageSize | undefined; alignment: DocBlockAlignment | undefined } => Boolean(asset.image) && asset.visible)
     .map((asset) => ({ ...asset, ...getDocumentImagePdfSize(asset.size, 32, 24) }));
   if (assets.length) {
     const gap = 8;
-    const maxHeight = Math.max(...assets.map((asset) => asset.height));
-    if (y + maxHeight + 7 > contentBottom) { pdf.addPage(); drawHeader(true); }
-    const totalWidth = assets.reduce((sum, asset) => sum + asset.width, 0) + (assets.length - 1) * gap;
-    let x = right - totalWidth;
-    assets.forEach((asset) => {
-      drawLogo(pdf, asset.image, x, y, asset.width, asset.height);
-      x += asset.width + gap;
+    const historicalAssets = assets.filter((asset) => asset.alignment === undefined);
+    if (historicalAssets.length) {
+      const maxHeight = Math.max(...historicalAssets.map((asset) => asset.height));
+      if (y + maxHeight + 7 > contentBottom) { pdf.addPage(); drawHeader(true); }
+      const totalWidth = historicalAssets.reduce((sum, asset) => sum + asset.width, 0) + (historicalAssets.length - 1) * gap;
+      let x = right - totalWidth;
+      historicalAssets.forEach((asset) => {
+        drawLogo(pdf, asset.image, x, y, asset.width, asset.height);
+        x += asset.width + gap;
+      });
+      y += maxHeight + 5;
+    }
+    assets.filter((asset) => asset.alignment !== undefined).forEach((asset) => {
+      if (y + asset.height + 7 > contentBottom) { pdf.addPage(); drawHeader(true); }
+      drawLogo(pdf, asset.image, getDocumentImagePdfX(asset.alignment, PAGE.width, left, right, asset.width), y, asset.width, asset.height);
+      y += asset.height + 5;
     });
-    y += maxHeight + 5;
   }
 
   const pages = pdf.getNumberOfPages();
