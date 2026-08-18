@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\GeneratesDocumentNumbers;
+use App\Support\Settings;
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -47,10 +48,15 @@ class Warehouse extends BaseModel implements CompanyWide
         return 'code';
     }
 
-    /** الكود التسلسلي التالي (خمس خانات مصفَّرة) — كنمط الفروع. */
+    /**
+     * الكود التسلسلي التالي (خمس خانات مصفَّرة) — كنمط الفروع.
+     * البادئة مضبوطة، وافتراضها فارغ فيبقى الكود `00001` كما كان.
+     */
     public static function nextCode(): string
     {
-        return static::nextDocumentNumber();
+        return static::nextDocumentNumber(
+            ((string) Settings::get('numbering', 'warehouse_prefix')) ?: null
+        );
     }
 
     /** المخزن الافتراضي للمستأجر: المُعلَّم افتراضياً، وإلا أول مخزن نشط. */

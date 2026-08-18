@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\GeneratesDocumentNumbers;
+use App\Support\Settings;
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\DB;
@@ -77,10 +78,15 @@ class Branch extends BaseModel implements CompanyWide
 
     /**
      * الكود التسلسلي التالي للمستأجر الحالي: خمس خانات مصفَّرة (00001).
-     * بلا بادئة وبلا سنة — سلسلة واحدة مستمرة على مستوى المؤسسة.
+     * بلا سنة — سلسلة واحدة مستمرة على مستوى المؤسسة.
+     *
+     * البادئة مضبوطة من «إعدادات الترقيم المتسلسل»، وافتراضها فارغ فيبقى
+     * الكود `00001` كما كان لكل مستأجر قائم.
      */
     public static function nextCode(): string
     {
-        return static::nextDocumentNumber();
+        return static::nextDocumentNumber(
+            ((string) Settings::get('numbering', 'branch_prefix')) ?: null
+        );
     }
 }

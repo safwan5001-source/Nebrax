@@ -136,7 +136,10 @@ class NumberingSettingsTest extends TestCase
 
         $this->assertSame('numeric', $res['meta']['format']);
         $this->assertSame(5, $res['meta']['padding']);
-        $this->assertSame(['invoice', 'purchase', 'quote'], $res['meta']['editable_keys']);
+        $this->assertSame(
+            ['invoice', 'purchase', 'quote', 'branch', 'warehouse'],
+            $res['meta']['editable_keys']
+        );
     }
 
     /** السلاسل المتعدّدة في الجدول الواحد تُعرَض منفصلة. @test */
@@ -243,6 +246,38 @@ class NumberingSettingsTest extends TestCase
             ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'FTR'])->assertOk();
 
         $this->assertSame('OFR', $this->entity($auth['token'], 'quote')['prefix']);
+    }
+
+    /**
+     * كود الفرع والمخزن يتبع الإعداد كبقية المستندات — وافتراضه فارغ فيبقى
+     * `00001` كما كان لكل مستأجر قائم، فلا يتغيّر شيء بلا طلبٍ صريح.
+     *
+     * @test
+     */
+    public function branch_and_warehouse_codes_follow_the_configured_prefix(): void
+    {
+        $auth = $this->registerTenant();
+
+        // الافتراض: بلا بادئة.
+        $branch = $this->withToken($auth['token'])
+            ->postJson('/api/branches', ['name' => 'بلا بادئة'])->assertCreated()['data'];
+        $this->assertSame('00002', $branch['code']); // 00001 هو الفرع الرئيسي المُنشأ بالتسجيل
+
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'branch', 'prefix' => 'BR'])
+            ->assertOk()->assertJsonPath('data.prefix', 'BR');
+
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'warehouse', 'prefix' => 'WH'])->assertOk();
+
+        $next = $this->withToken($auth['token'])
+            ->postJson('/api/branches', ['name' => 'ببادئة'])->assertCreated()['data'];
+        $this->assertSame('BR-00001', $next['code']);
+
+        $warehouse = $this->withToken($auth['token'])->postJson('/api/warehouses', [
+            'name' => 'مخزن', 'branch_id' => $branch['id'],
+        ])->assertCreated()['data'];
+        $this->assertSame('WH-00001', $warehouse['code']);
     }
 
     /** البادئة مُعرّف يُطبع ويُبحث به — لا نصّ حرّ. @test */
