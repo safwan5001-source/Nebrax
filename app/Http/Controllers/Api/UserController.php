@@ -99,7 +99,12 @@ class UserController extends ApiController
 
     public function index(): JsonResponse
     {
-        $users = User::where('tenant_id', $this->tenantId())->with('employee')->latest()->get();
+        // تُحمَّل العلاقتان هنا فتصل الشاشةَ مع القائمة — فلا مسار `show`
+        // ولا نداءٌ ثانٍ لكل صفّ لمعرفة نطاق وصوله.
+        $users = User::where('tenant_id', $this->tenantId())
+            ->with('employee', 'branches', 'warehouses')
+            ->latest()
+            ->get();
 
         return UserResource::collection($users)->response();
     }
