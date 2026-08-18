@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, Printer, Download, FileCheck, Share2 } from 'lucide-react';
+import { ArrowRight, Printer, Download, FileCheck, Share2, CopyPlus, FileOutput } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,11 +22,20 @@ import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
+interface FrozenPrintTemplateRevision {
+  id: string;
+  definition?: Record<string, unknown>;
+}
+
 interface Quote {
   id: string; branch_id: string | null; number: string; partner_id: string; status: string;
   quote_date: string; valid_until: string | null;
   subtotal: string; tax_amount: string; total: string; notes: string | null;
-  converted_invoice_id: string | null; lines: Line[];
+  converted_invoice_id: string | null; print_issued_at: string | null;
+  print_template_revision: FrozenPrintTemplateRevision | null;
+  pdf_template_revision: FrozenPrintTemplateRevision | null;
+  revised_from_id: string | null; revised_from_number?: string | null;
+  lines: Line[];
 }
 
 const statusTone: Record<string, 'positive' | 'warning' | 'muted' | 'negative' | 'neutral'> = {
@@ -49,6 +58,8 @@ export default function QuoteDetailPage() {
   const [company, setCompany] = useState<QuoteCompany | null>(null);
   const [loading, setLoading] = useState(true);
   const [converting, setConverting] = useState(false);
+  const [issuing, setIssuing] = useState(false);
+  const [revising, setRevising] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
   const [templateId, setTemplateId] = useState<string>('tax-invoice-classic');
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
@@ -62,40 +73,95 @@ export default function QuoteDetailPage() {
   const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
 
+  function resetTemplate() {
+    setTemplateId('tax-invoice-classic');
+    setThemeId(null);
+    setFooterText(null);
+    setShowLogo(true);
+    setLogoUrl(null);
+    setLogoHeight(null);
+    setLayout(null);
+    setTermsText(null);
+    setBankText(null);
+    setStampUrl(null);
+    setSignatureUrl(null);
+  }
+
+  function applyTemplate(assignment: LivePrintTemplateAssignment | null) {
+    const resolved = resolveLiveTemplateDefinition(assignment, 'quotation');
+    if (!resolved) {
+      resetTemplate();
+      return;
+    }
+    setTemplateId(resolved.templateId);
+    setThemeId(resolved.themeId);
+    setFooterText(resolved.footerText);
+    setShowLogo(resolved.showLogo);
+    setLogoUrl(null);
+    setLogoHeight(resolved.logoHeight);
+    setLayout(resolved.layout);
+    setTermsText(resolved.termsText);
+    setBankText(resolved.bankText);
+    setStampUrl(resolved.stampUrl);
+    setSignatureUrl(resolved.signatureUrl);
+  }
+
   function load() {
     setLoading(true);
     api<{ data: Quote }>(`/quotes/${id}`)
       .then(async (r) => {
         setQuote(r.data);
-        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, m, live] = await Promise.allSettled([
+        const [p, m] = await Promise.allSettled([
           api<{ data: QuoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: QuoteCompany }>(`/me`),
-          api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=quotation&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
-        const resolved = live.status === 'fulfilled'
-          ? resolveLiveTemplateDefinition(live.value.data, 'quotation')
-          : null;
-        if (resolved) {
-          setTemplateId(resolved.templateId);
-          setThemeId(resolved.themeId);
-          setFooterText(resolved.footerText);
-          setShowLogo(resolved.showLogo);
-          setLogoUrl(null);
-          setLogoHeight(resolved.logoHeight);
-          setLayout(resolved.layout);
-          setTermsText(resolved.termsText);
-          setBankText(resolved.bankText);
-          setStampUrl(resolved.stampUrl);
-          setSignatureUrl(resolved.signatureUrl);
+
+        if (r.data.print_issued_at) {
+          const frozen = r.data.print_template_revision ?? r.data.pdf_template_revision;
+          applyTemplate(frozen ? {
+            print_template_revision_id: frozen.id,
+            revision: frozen,
+          } : null);
+          return;
         }
+
+        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
+        const live = await api<{ data: LivePrintTemplateAssignment | null }>(
+          `/print-templates/resolve?document_type=quotation&usage=print${branchQuery}`,
+        ).catch(() => null);
+        applyTemplate(live?.data ?? null);
       })
       .finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, [id]);
+
+  async function issue() {
+    setIssuing(true);
+    try {
+      await api(`/quotes/${id}/issue`, { method: 'POST' });
+      success(tc('updated'));
+      load();
+    } catch (e) {
+      errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
+    } finally {
+      setIssuing(false);
+    }
+  }
+
+  async function revise() {
+    setRevising(true);
+    try {
+      const revision = await api<{ data: { id: string } }>(`/quotes/${id}/revise`, { method: 'POST' });
+      success(tc('created'));
+      router.push(`/quotes/${revision.data.id}`);
+    } catch (e) {
+      errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
+      setRevising(false);
+    }
+  }
 
   async function convert() {
     setConverting(true);
@@ -126,6 +192,14 @@ export default function QuoteDetailPage() {
 
   async function createPdf() {
     if (!quote) throw new Error('Quote unavailable');
+    const frozenPdf = quote.print_issued_at
+      ? quote.pdf_template_revision ?? quote.print_template_revision
+      : null;
+    const pdfTemplate = resolveLiveTemplateDefinition(
+      frozenPdf ? { print_template_revision_id: frozenPdf.id, revision: frozenPdf } : null,
+      'quotation',
+    );
+
     return createLineDocumentPdf({
       document: {
         number: quote.number,
@@ -138,12 +212,12 @@ export default function QuoteDetailPage() {
       company,
       party: customer,
       logoUrl,
-      stampUrl,
-      signatureUrl,
-      footerText,
-      templateLayout: layout,
-      termsText,
-      bankText,
+      stampUrl: pdfTemplate?.stampUrl ?? stampUrl,
+      signatureUrl: pdfTemplate?.signatureUrl ?? signatureUrl,
+      footerText: pdfTemplate?.footerText ?? footerText,
+      templateLayout: pdfTemplate?.layout ?? layout,
+      termsText: pdfTemplate?.termsText ?? termsText,
+      bankText: pdfTemplate?.bankText ?? bankText,
       documentMeta: [
         [t('date'), quote.quote_date],
         [t('valid_until'), quote.valid_until ?? '—'],
@@ -212,7 +286,19 @@ export default function QuoteDetailPage() {
         </Button>
         <h1 className="num text-xl font-semibold text-text">{quote.number}</h1>
         <Badge tone={statusTone[quote.status] ?? 'muted'}>{t(quote.status)}</Badge>
+        {quote.print_issued_at && <Badge tone="neutral">{t('issued')}</Badge>}
         <div className="no-print ms-auto flex flex-wrap gap-2">
+          {quote.print_issued_at ? (
+            <Button variant="outline" size="sm" disabled={revising} onClick={revise}>
+              <CopyPlus className="h-4 w-4" strokeWidth={1.7} />
+              {t('create_revision')}
+            </Button>
+          ) : !quote.converted_invoice_id && (
+            <Button variant="outline" size="sm" disabled={issuing} onClick={issue}>
+              <FileOutput className="h-4 w-4" strokeWidth={1.7} />
+              {t('issue')}
+            </Button>
+          )}
           {quote.converted_invoice_id ? (
             <Button variant="outline" size="sm" onClick={() => router.push(`/invoices/${quote.converted_invoice_id}`)}>
               <FileCheck className="h-4 w-4" strokeWidth={1.7} />
@@ -248,6 +334,8 @@ export default function QuoteDetailPage() {
             ))}
           </dl>
           {quote.notes && <p className="mt-3 border-t border-border pt-3 text-sm text-muted">{quote.notes}</p>}
+          {quote.print_issued_at && <p className="mt-3 border-t border-border pt-3 text-sm text-muted">{t('issued_locked_hint')}</p>}
+          {quote.revised_from_number && <p className="mt-3 text-sm text-muted">{t('revised_from')}: <span className="num">{quote.revised_from_number}</span></p>}
         </CardContent>
       </Card>
 

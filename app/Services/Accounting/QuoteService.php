@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Invoice;
 use App\Models\Quote;
 use App\Models\QuoteLine;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -23,7 +24,10 @@ class QuoteService
 {
     use ComputesLineTax;
 
-    public function __construct(protected InvoiceService $invoices) {}
+    public function __construct(
+        protected InvoiceService $invoices,
+        protected PrintTemplateService $printTemplates,
+    ) {}
 
     /**
      * إنشاء عرض سعر بحالة draft مع احتساب الإجماليات من السطور.
@@ -52,6 +56,7 @@ class QuoteService
                 'status'        => $data['status'] ?? 'draft',
                 'tax_inclusive' => $inclusive,
                 'notes'         => $data['notes'] ?? null,
+                'revised_from_id' => $data['revised_from_id'] ?? null,
                 'created_by'    => $data['created_by'] ?? null,
             ]);
 
@@ -106,13 +111,66 @@ class QuoteService
     }
 
     /**
+     * يصدر عرض السعر للطباعة في لحظة صريحة. تثبت المراجع الثلاثة داخل المعاملة؛
+     * والقيمة null تعني العارض الافتراضي الآمن وقت الإصدار، لا تعييناً حياً لاحقاً.
+     */
+    public function issueForPrint(Quote $quote): Quote
+    {
+        return DB::transaction(function () use ($quote) {
+            $quote = Quote::lockForUpdate()->findOrFail($quote->id);
+
+            if ($quote->isConverted()) {
+                throw new RuntimeException('لا يمكن إصدار عرض سعر مُحوَّل إلى فاتورة.');
+            }
+            if ($quote->isPrintIssued()) {
+                throw new RuntimeException('عرض السعر صادر للطباعة بالفعل. أنشئ نسخة عمل لإجراء تعديل.');
+            }
+
+            $quote->update([
+                ...$this->printTemplates->resolveOutputRevisionIds('quotation', $quote->branch_id),
+                'print_issued_at' => now(),
+            ]);
+
+            return $quote->fresh('lines');
+        });
+    }
+
+    /**
+     * ينشئ نسخة مسودة مستقلة من عرض صادر. تبقى اللقطة والمستند الأصلي ثابتين
+     * ويبدأ التعديل اللاحق من رقم جديد قابل للإصدار بذاته.
+     */
+    public function createPrintRevision(Quote $quote): Quote
+    {
+        return DB::transaction(function () use ($quote) {
+            $quote = Quote::with('lines')->lockForUpdate()->findOrFail($quote->id);
+
+            if (! $quote->isPrintIssued()) {
+                throw new RuntimeException('لا يمكن إنشاء نسخة عمل من عرض غير صادر للطباعة.');
+            }
+
+            return $this->create([
+                'partner_id'      => $quote->partner_id,
+                'quote_date'      => $quote->quote_date?->toDateString(),
+                'valid_until'     => $quote->valid_until?->toDateString(),
+                'tax_inclusive'   => $quote->tax_inclusive,
+                'notes'           => $quote->notes,
+                'revised_from_id' => $quote->id,
+                'created_by'      => $quote->created_by,
+            ], $this->itemsOf($quote));
+        });
+    }
+
+    /**
      * تعديل عرض سعر: حقول الرأس، وإن مُرّرت سطور جديدة تُستبدل القديمة
-     * وتُعاد الإجماليات من السطور. ممنوع تعديل عرض محوّل.
+     * وتُعاد الإجماليات من السطور. المستند الصادر أو المحوّل لا يُعدّل.
      */
     public function update(Quote $quote, array $data, ?array $items): Quote
     {
         if ($quote->isConverted()) {
             throw new RuntimeException('لا يمكن تعديل عرض سعر مُحوَّل إلى فاتورة.');
+        }
+        if ($quote->isPrintIssued()) {
+            throw new RuntimeException('لا يمكن تعديل عرض سعر صادر للطباعة. أنشئ نسخة عمل أولاً.');
         }
 
         return DB::transaction(function () use ($quote, $data, $items) {
@@ -143,6 +201,20 @@ class QuoteService
 
             return $quote->fresh('lines');
         });
+    }
+
+    /** @return array<int, array{product_id: ?string, description: ?string, quantity: int, unit_price: int, tax_rate: int}> */
+    protected function itemsOf(Quote $quote): array
+    {
+        $quote->loadMissing('lines');
+
+        return $quote->lines->map(fn (QuoteLine $line) => [
+            'product_id' => $line->product_id,
+            'description' => $line->description,
+            'quantity' => $line->quantity,
+            'unit_price' => $line->unit_price,
+            'tax_rate' => $line->tax_rate,
+        ])->all();
     }
 
     /**

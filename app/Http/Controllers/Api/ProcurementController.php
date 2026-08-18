@@ -56,7 +56,10 @@ class ProcurementController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        $doc = ProcurementDocument::with(['lines', 'partner', 'invitations', 'sourceDocument'])->findOrFail($id);
+        $doc = ProcurementDocument::with([
+            'lines', 'partner', 'invitations', 'sourceDocument', 'revisedFrom',
+            'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
+        ])->findOrFail($id);
 
         return (new ProcurementDocumentResource($doc))->response();
     }
@@ -80,12 +83,38 @@ class ProcurementController extends ApiController
     {
         $doc = ProcurementDocument::findOrFail($id);
 
+        if ($doc->isPrintIssued()) {
+            abort(422, 'لا يمكن حذف أمر شراء صادر للطباعة. أنشئ نسخة عمل أولاً.');
+        }
         if ($doc->isConverted()) {
             abort(422, 'لا يمكن حذف مستند مُحوَّل — هو مصدر ما تلاه.');
         }
         $doc->delete();
 
         return response()->json(['message' => 'تم الحذف.']);
+    }
+
+    /** يثبت قوالب الإخراج ويقفل أمر الشراء عند إجراء الإصدار الصريح. */
+    public function issue(string $id): JsonResponse
+    {
+        $doc = ProcurementDocument::findOrFail($id);
+        $issued = $this->domain(fn () => $this->procurement->issueForPrint($doc));
+
+        return (new ProcurementDocumentResource($issued->load([
+            'lines', 'partner', 'invitations', 'sourceDocument', 'revisedFrom',
+            'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
+        ])))->response();
+    }
+
+    /** ينشئ نسخة عمل مسودة من أمر شراء صادر من دون تعديل المصدر التاريخي. */
+    public function revise(string $id): JsonResponse
+    {
+        $doc = ProcurementDocument::findOrFail($id);
+        $revision = $this->domain(fn () => $this->procurement->createPrintRevision($doc));
+
+        return (new ProcurementDocumentResource($revision->load([
+            'lines', 'partner', 'invitations', 'sourceDocument', 'revisedFrom',
+        ])))->response()->setStatusCode(201);
     }
 
     /** نقل الحالة: اعتماد/رفض/إرسال/إلغاء. */

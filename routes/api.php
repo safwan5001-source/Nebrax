@@ -218,6 +218,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('quotes', [QuoteController::class, 'store'])->middleware($perm('invoices.manage'));
         Route::put('quotes/{id}', [QuoteController::class, 'update'])->middleware($perm('invoices.manage'));
         Route::delete('quotes/{id}', [QuoteController::class, 'destroy'])->middleware($perm('invoices.manage'));
+        Route::post('quotes/{id}/issue', [QuoteController::class, 'issue'])->middleware($perm('invoices.manage'));
+        Route::post('quotes/{id}/revise', [QuoteController::class, 'revise'])->middleware($perm('invoices.manage'));
         Route::post('quotes/{id}/convert', [QuoteController::class, 'convert'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
 
         // الإشعارات الدائنة (مستند مالي؛ الترحيل يولّد قيداً عكسياً)
@@ -260,6 +262,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('procurement', [ProcurementController::class, 'store'])->middleware($perm('purchases.manage'));
         Route::put('procurement/{id}', [ProcurementController::class, 'update'])->middleware($perm('purchases.manage'));
         Route::delete('procurement/{id}', [ProcurementController::class, 'destroy'])->middleware($perm('purchases.manage'));
+        Route::post('procurement/{id}/issue', [ProcurementController::class, 'issue'])->middleware($perm('purchases.manage'));
+        Route::post('procurement/{id}/revise', [ProcurementController::class, 'revise'])->middleware($perm('purchases.manage'));
         Route::post('procurement/{id}/transition', [ProcurementController::class, 'transition'])->middleware($perm('purchases.manage'));
         Route::post('procurement/{id}/convert', [ProcurementController::class, 'convert'])->middleware($perm('purchases.manage'));
 

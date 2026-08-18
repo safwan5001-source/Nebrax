@@ -31,7 +31,9 @@ class ProcurementDocument extends BaseModel
         'branch_id',
         'tenant_id', 'type', 'number', 'partner_id', 'doc_date', 'due_date',
         'requested_by', 'status', 'subtotal', 'tax_amount', 'total',
-        'tax_inclusive', 'notes', 'source_document_id', 'converted_purchase_id', 'created_by',
+        'tax_inclusive', 'notes', 'source_document_id', 'converted_purchase_id',
+        'print_issued_at', 'print_template_revision_id', 'pdf_template_revision_id',
+        'thermal_template_revision_id', 'revised_from_id', 'created_by',
     ];
 
     protected $casts = [
@@ -41,6 +43,7 @@ class ProcurementDocument extends BaseModel
         'tax_amount'    => 'integer',
         'total'         => 'integer',
         'tax_inclusive' => 'boolean',
+        'print_issued_at' => 'datetime',
     ];
 
     protected $attributes = [
@@ -78,6 +81,30 @@ class ProcurementDocument extends BaseModel
         return $this->referenceBelongsTo(Purchase::class, 'converted_purchase_id');
     }
 
+    /** مراجعة الطباعة المثبتة عند إجراء الإصدار الصريح. */
+    public function printTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'print_template_revision_id');
+    }
+
+    /** مراجعة PDF المثبتة عند إجراء الإصدار الصريح. */
+    public function pdfTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'pdf_template_revision_id');
+    }
+
+    /** مراجعة الإخراج الحراري المثبتة عند إجراء الإصدار الصريح. */
+    public function thermalTemplateRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'thermal_template_revision_id');
+    }
+
+    /** المستند الصادر الذي نشأت منه هذه النسخة القابلة للتعديل. */
+    public function revisedFrom(): BelongsTo
+    {
+        return $this->referenceBelongsTo(self::class, 'revised_from_id');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
@@ -91,6 +118,11 @@ class ProcurementDocument extends BaseModel
     /** حالة نهائية — لا تعديل ولا انتقال بعدها. */
     public function isClosed(): bool
     {
-        return in_array($this->status, ['converted', 'cancelled'], true);
+        return $this->isPrintIssued() || in_array($this->status, ['converted', 'cancelled'], true);
+    }
+
+    public function isPrintIssued(): bool
+    {
+        return $this->print_issued_at !== null;
     }
 }
