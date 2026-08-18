@@ -22,7 +22,7 @@ import { printDocument } from '@/modules/documents/services/export';
 import { createPaymentPdf, downloadPaymentPdf, sharePaymentPdf } from '@/modules/payments/services/payment-pdf';
 import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
-import type { ThemeId } from '@/modules/documents/types';
+import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
 import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
@@ -31,7 +31,16 @@ import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from 
 interface FrozenPrintTemplateRevision {
   id: string;
   version: number;
-  definition: { template_id?: string; theme_id?: ThemeId; footer_text?: string; show_logo?: boolean };
+  definition: {
+    template_id?: string;
+    theme_id?: ThemeId;
+    footer_text?: string;
+    show_logo?: boolean;
+    layout?: DocSectionLayoutItem[];
+    bank_text?: string;
+    stamp?: string;
+    signature?: string;
+  };
   document_types: string[];
 }
 
@@ -77,6 +86,7 @@ export default function PaymentDetailPage() {
   const [showLogo, setShowLogo] = useState(true);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoHeight, setLogoHeight] = useState<number | null>(null);
+  const [layout, setLayout] = useState<DocSectionLayoutItem[] | null>(null);
   const [bankText, setBankText] = useState<string | null>(null);
   const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
@@ -110,9 +120,10 @@ export default function PaymentDetailPage() {
           setShowLogo(frozen.show_logo !== false);
           setLogoUrl(null);
           setLogoHeight(null);
-          setBankText(null);
-          setStampUrl(null);
-          setSignatureUrl(null);
+          setLayout(Array.isArray(frozen.layout) && frozen.layout.length ? frozen.layout : null);
+          setBankText(frozen.bank_text ?? null);
+          setStampUrl(frozen.stamp ?? null);
+          setSignatureUrl(frozen.signature ?? null);
         } else {
           const resolved = live.status === 'fulfilled'
             ? resolveLiveTemplateDefinition(live.value.data, documentType)
@@ -124,6 +135,7 @@ export default function PaymentDetailPage() {
             setShowLogo(resolved.showLogo);
             setLogoUrl(null);
             setLogoHeight(resolved.logoHeight);
+            setLayout(resolved.layout);
             setBankText(resolved.bankText);
             setStampUrl(resolved.stampUrl);
             setSignatureUrl(resolved.signatureUrl);
@@ -192,6 +204,12 @@ export default function PaymentDetailPage() {
       company,
       partner,
       logoUrl,
+      stampUrl: frozenPdfDefinition ? frozenPdfDefinition.stamp ?? null : stampUrl,
+      signatureUrl: frozenPdfDefinition ? frozenPdfDefinition.signature ?? null : signatureUrl,
+      bankText: frozenPdfDefinition ? frozenPdfDefinition.bank_text ?? null : bankText,
+      templateLayout: frozenPdfDefinition
+        ? (Array.isArray(frozenPdfDefinition.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : null)
+        : layout,
       footerText: frozenPdfDefinition?.footer_text ?? footerText,
       labels: {
         receiptTitle: t('receipt_title'),
