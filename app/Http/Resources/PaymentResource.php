@@ -15,10 +15,14 @@ class PaymentResource extends JsonResource
             'branch_id'    => $this->branch_id,
             'number'       => $this->number,
             'partner_id'   => $this->partner_id,
+            'partner_name' => $this->whenLoaded('partner', fn () => $this->partner?->name),
             'direction'    => $this->direction,
             'method'       => $this->method,
             'reference'    => $this->reference,
             'cash_account_id' => $this->cash_account_id,
+            'cash_account_code' => $this->whenLoaded('cashAccount', fn () => $this->cashAccount?->code),
+            'cash_account_name' => $this->whenLoaded('cashAccount', fn () => $this->cashAccount?->name),
+            'journal_entry_id' => $this->journal_entry_id,
             'status'       => $this->status,
             'payment_date' => optional($this->payment_date)->toDateString(),
             'amount'       => Money::toRiyal($this->amount),
@@ -31,8 +35,11 @@ class PaymentResource extends JsonResource
             'thermal_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('thermalTemplateRevision')),
             // تخصيصات السند: ما غطّاه من فواتير/مشتريات (نصّ المستند + مبلغ بالريال).
             'allocations'  => $this->whenLoaded('allocations', fn () => $this->allocations->map(fn ($a) => [
-                'label'  => optional($a->allocatable)->number ?? '—',
-                'amount' => Money::toRiyal($a->amount),
+                'id'               => $a->id,
+                'allocatable_id'   => $a->allocatable_id,
+                'allocatable_type' => $a->allocatable_type,
+                'label'            => optional($a->allocatable)->number ?? '—',
+                'amount'           => Money::toRiyal($a->amount),
             ])->values()),
         ];
     }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Download, FileText, ReceiptText } from 'lucide-react';
+import { ArrowRight, Copy, Download, FileText, Pencil, Printer, ReceiptText, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,6 +55,7 @@ export default function ExpenseDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [acting, setActing] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -82,6 +83,34 @@ export default function ExpenseDetailPage() {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function duplicateExpense() {
+    if (!expense) return;
+    setActing(true);
+    try {
+      const response = await api<{ data: { id: string } }>(`/expenses/${expense.id}/duplicate`, { method: 'POST' });
+      success(t('duplicate_success'));
+      router.push(`/expenses/new?edit=${response.data.id}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function deleteExpense() {
+    if (!expense || expense.status !== 'draft' || !window.confirm(t('confirm_delete_expense'))) return;
+    setActing(true);
+    try {
+      await api(`/expenses/${expense.id}`, { method: 'DELETE' });
+      success(t('deleted_success'));
+      router.push('/expenses');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setActing(false);
     }
   }
 
@@ -138,9 +167,20 @@ export default function ExpenseDetailPage() {
             </p>
           </div>
         </div>
-        {expense.status === 'draft' && (
-          <Button disabled={posting} onClick={postExpense}>{posting ? t('posting') : t('post')}</Button>
-        )}
+        <div className="no-print flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="h-4 w-4" strokeWidth={1.7} />
+            {t('prints')}
+          </Button>
+          {expense.status === 'draft' ? (
+            <Link href={`/expenses/new?edit=${expense.id}`}><Button variant="outline"><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Button></Link>
+          ) : null}
+          <Button variant="outline" disabled={acting || posting} onClick={duplicateExpense}><Copy className="h-4 w-4" strokeWidth={1.7} />{t('duplicate')}</Button>
+          <Button variant="outline" disabled={expense.status !== 'draft' || acting || posting} title={expense.status !== 'draft' ? t('draft_action_only') : undefined} onClick={deleteExpense}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />{t('delete')}</Button>
+          {expense.status === 'draft' && (
+            <Button disabled={posting || acting} onClick={postExpense}>{posting ? t('posting') : t('post')}</Button>
+          )}
+        </div>
       </div>
 
       {error && <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error}</p>}

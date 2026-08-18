@@ -124,6 +124,88 @@ class PaymentService
     }
 
     /**
+     * تعديل مسودة السند. لا يتغير اتجاه السند بعد إنشائه؛ فاستبدال قبض بصرف
+     * يبدّل طرفي القيد ولا يُعد تعديلاً آمناً. تُستبدل التخصيصات كاملةً داخل
+     * المعاملة نفسها، ثم يُعاد التحقق النهائي عند الترحيل.
+     */
+    public function update(Payment $payment, array $data, array $allocations = []): Payment
+    {
+        if (! $payment->isDraft()) {
+            throw new RuntimeException('لا يمكن تعديل سند مرحّل أو ملغى.');
+        }
+
+        $amount = (int) ($data['amount'] ?? 0);
+        if ($amount <= 0) {
+            throw new RuntimeException('مبلغ السند يجب أن يكون موجباً.');
+        }
+
+        $direction = $payment->direction;
+        [$targetClass, $key] = $direction === 'received'
+            ? [Invoice::class, 'invoice_id']
+            : [Purchase::class, 'purchase_id'];
+        $items = ! empty($allocations)
+            ? $allocations
+            : (! empty($data[$key]) ? [[$key => $data[$key], 'amount' => $amount]] : []);
+
+        $normalized = [];
+        $sum = 0;
+        foreach ($items as $item) {
+            $allocated = (int) ($item['amount'] ?? 0);
+            if (empty($item[$key]) || $allocated <= 0) {
+                throw new RuntimeException('كل تخصيص يحتاج مستنداً ومبلغاً موجباً.');
+            }
+            $normalized[] = ['type' => $targetClass, 'id' => $item[$key], 'amount' => $allocated];
+            $sum += $allocated;
+        }
+        if (! empty($normalized) && $sum !== $amount) {
+            throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
+        }
+
+        $cashAccountId = $this->validCashAccountId($data['cash_account_id'] ?? null);
+
+        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $cashAccountId) {
+            $payment->update([
+                'partner_id'      => $data['partner_id'],
+                'invoice_id'      => $data['invoice_id'] ?? null,
+                'method'          => $data['method'] ?? 'cash',
+                'reference'       => $data['reference'] ?? null,
+                'cash_account_id' => $cashAccountId,
+                'payment_date'    => $data['payment_date'] ?? $payment->payment_date->toDateString(),
+                'amount'          => $amount,
+                'notes'           => $data['notes'] ?? null,
+            ]);
+
+            $payment->allocations()->delete();
+            foreach ($normalized as $allocation) {
+                PaymentAllocation::create([
+                    'payment_id'       => $payment->id,
+                    'allocatable_type' => $allocation['type'],
+                    'allocatable_id'   => $allocation['id'],
+                    'amount'           => $allocation['amount'],
+                ]);
+            }
+
+            return $payment->fresh();
+        });
+    }
+
+    /** نسخة المسودة لا تنسخ التخصيصات كي لا تحجز متبقي فاتورة مرتين. */
+    public function duplicate(Payment $payment, ?string $createdBy = null): Payment
+    {
+        return $this->create([
+            'partner_id'      => $payment->partner_id,
+            'direction'       => $payment->direction,
+            'method'          => $payment->method,
+            'reference'       => $payment->reference,
+            'cash_account_id' => $payment->cash_account_id,
+            'payment_date'    => now()->toDateString(),
+            'amount'          => $payment->amount,
+            'notes'           => $payment->notes,
+            'created_by'      => $createdBy,
+        ]);
+    }
+
+    /**
      * ترحيل السند: توليد القيد المتوازن عبر LedgerService + تحديث سداد الفواتير.
      */
     public function post(Payment $payment): Payment
