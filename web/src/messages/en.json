@@ -2676,6 +2676,7 @@
   "procurement": {
     "number": "Number",
     "supplier": "Supplier",
+    "buyer": "Buyer",
     "requested_by": "Requested by",
     "date": "Date",
     "status": "Status",
@@ -2694,6 +2695,7 @@
     "search": "Search documents…",
     "back": "Back",
     "save": "Save document",
+    "print": "Print",
     "not_found": "Document not found",
     "source": "Converted from",
     "converted_purchase": "Resulting purchase invoice",
@@ -2717,6 +2719,7 @@
     "create_revision": "Create working revision",
     "issued_locked_hint": "This purchase order is issued for print and locked. Create a working revision to make changes.",
     "revised_from": "Working revision of",
+    "hide_preview": "Hide preview",
     "request": {
       "title": "Purchase requests",
       "create": "New purchase request",
@@ -2743,7 +2746,9 @@
       "create": "New purchase order",
       "new_title": "New purchase order",
       "empty": "No purchase orders",
-      "due_label": "Delivery date"
+      "due_label": "Delivery date",
+      "document_title": "Purchase order",
+      "document_subtitle": "Commercial document for the supplier"
     }
   },
   "inventorySettings": {

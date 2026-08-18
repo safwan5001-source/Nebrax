@@ -2676,6 +2676,7 @@
   "procurement": {
     "number": "الرقم",
     "supplier": "المورّد",
+    "buyer": "المشتري",
     "requested_by": "الجهة الطالبة",
     "date": "التاريخ",
     "status": "الحالة",
@@ -2694,6 +2695,7 @@
     "search": "بحث في المستندات…",
     "back": "رجوع",
     "save": "حفظ المستند",
+    "print": "طباعة",
     "not_found": "المستند غير موجود",
     "source": "محوّل من",
     "converted_purchase": "فاتورة المشتريات الناتجة",
@@ -2717,6 +2719,7 @@
     "create_revision": "إنشاء نسخة عمل",
     "issued_locked_hint": "أمر الشراء صادر للطباعة ومقفل. أنشئ نسخة عمل لإجراء تعديل.",
     "revised_from": "نسخة عمل من",
+    "hide_preview": "إخفاء المعاينة",
     "request": {
       "title": "طلبات الشراء",
       "create": "طلب شراء جديد",
@@ -2743,7 +2746,9 @@
       "create": "أمر شراء جديد",
       "new_title": "أمر شراء جديد",
       "empty": "لا توجد أوامر شراء",
-      "due_label": "تاريخ التسليم"
+      "due_label": "تاريخ التسليم",
+      "document_title": "أمر شراء",
+      "document_subtitle": "مستند تجاري للمورّد"
     }
   },
   "inventorySettings": {
