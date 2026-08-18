@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { ArrowRight, Printer, Download, FileCheck, Share2, CopyPlus, FileOutput } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,8 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { QuoteDocument, type QuoteCompany, type QuoteCustomer } from '@/components/quotes/quote-document';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { printDocument } from '@/modules/documents/services/export';
-import { createLineDocumentPdf, downloadLineDocumentPdf, shareLineDocumentPdf } from '@/modules/documents/services/line-document-pdf';
+import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
@@ -46,11 +45,8 @@ export default function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const t = useTranslations('quotes');
-  const td = useTranslations('invoiceDetail');
   const tPrint = useTranslations('documentPrint');
-  const tDoc = useTranslations('invoiceDoc');
   const tc = useTranslations('common');
-  const locale = useLocale();
   const { success, error: errorToast } = useToast();
 
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -190,74 +186,13 @@ export default function QuoteDetailPage() {
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
 
-  async function createPdf() {
-    if (!quote) throw new Error('Quote unavailable');
-    const frozenPdf = quote.print_issued_at
-      ? quote.pdf_template_revision ?? quote.print_template_revision
-      : null;
-    const pdfTemplate = resolveLiveTemplateDefinition(
-      frozenPdf ? { print_template_revision_id: frozenPdf.id, revision: frozenPdf } : null,
-      'quotation',
-    );
-
-    return createLineDocumentPdf({
-      document: {
-        number: quote.number,
-        date: quote.quote_date,
-        subtotal: quote.subtotal,
-        tax_amount: quote.tax_amount,
-        total: quote.total,
-        lines: quote.lines,
-      },
-      company,
-      party: customer,
-      logoUrl,
-      stampUrl: pdfTemplate?.stampUrl ?? stampUrl,
-      signatureUrl: pdfTemplate?.signatureUrl ?? signatureUrl,
-      footerText: pdfTemplate?.footerText ?? footerText,
-      templateLayout: pdfTemplate?.layout ?? layout,
-      termsText: pdfTemplate?.termsText ?? termsText,
-      bankText: pdfTemplate?.bankText ?? bankText,
-      documentMeta: [
-        [t('date'), quote.quote_date],
-        [t('valid_until'), quote.valid_until ?? '—'],
-      ],
-      labels: {
-        title: t('document_title'),
-        titleSecondary: t('document_subtitle'),
-        seller: tPrint('seller'),
-        billTo: t('partner'),
-        invoiceNumber: tPrint('document_number'),
-        vatNumber: tPrint('vat_number'),
-        crNumber: tPrint('cr_number'),
-        city: tPrint('city'),
-        date: t('date'),
-        paymentType: tPrint('document_data'),
-        cash: '',
-        credit: '',
-        product: tPrint('product'),
-        description: tPrint('description'),
-        quantity: tPrint('quantity'),
-        unitPrice: tPrint('unit_price'),
-        tax: tPrint('tax'),
-        total: tPrint('total'),
-        subtotal: tPrint('subtotal'),
-        vat: tPrint('vat'),
-        grandTotal: tPrint('grand_total'),
-        qrNote: '',
-        terms: tDoc('terms'),
-        bank: tDoc('bank'),
-        footer: tPrint('footer'),
-      },
-      locale,
-    });
-  }
-
   async function handleDownloadPdf() {
     if (!quote) return;
     setBusy('pdf');
     try {
-      downloadLineDocumentPdf(await createPdf(), quote.number);
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Quote template is unavailable');
+      await documentExporter.download({ element, fileName: quote.number, paper });
       success(tPrint('downloaded_ok'));
     } catch {
       errorToast(tPrint('export_failed'));
@@ -270,7 +205,9 @@ export default function QuoteDetailPage() {
     if (!quote) return;
     setBusy('share');
     try {
-      const result = await shareLineDocumentPdf(await createPdf(), quote.number, t('document_title'));
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Quote template is unavailable');
+      const result = await documentExporter.share({ element, fileName: quote.number, title: t('document_title'), paper });
       success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));

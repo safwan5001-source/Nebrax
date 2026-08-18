@@ -10,6 +10,21 @@ export interface PdfPaper {
 
 const A4: PdfPaper = { widthMm: 210, heightMm: 297 };
 
+/**
+ * بعض صفحات المستند تُبقي القالب الحقيقي في DOM لكنه مخفي إلى أن يطلب المستخدم
+ * معاينته. نكشفه مؤقتاً كي يلتقطه المصدر نفسه في PDF، بدلاً من العودة إلى قالب
+ * متجه موازٍ يختلف عن التصميم المنشور.
+ */
+function revealDocumentForCapture(element: HTMLElement, restore: Array<[HTMLElement, string | null]>): void {
+  for (let current: HTMLElement | null = element; current && current !== document.body; current = current.parentElement) {
+    const computed = window.getComputedStyle(current);
+    if (computed.display !== 'none' && computed.visibility !== 'hidden') continue;
+    restore.push([current, current.getAttribute('style')]);
+    if (computed.display === 'none') current.style.setProperty('display', 'block', 'important');
+    if (computed.visibility === 'hidden') current.style.setProperty('visibility', 'visible', 'important');
+  }
+}
+
 async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<Blob> {
   const [{ default: html2canvas }, jspdf] = await Promise.all([
     import('html2canvas'),
@@ -33,6 +48,7 @@ async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<
   const inner = el.closest<HTMLElement>('.doc-scaler-inner');
   const outer = el.closest<HTMLElement>('.doc-scaler-outer');
   const restore: Array<[HTMLElement, string | null]> = [];
+  revealDocumentForCapture(el, restore);
   if (inner) {
     restore.push([inner, inner.getAttribute('style')]);
     inner.style.transform = 'none';

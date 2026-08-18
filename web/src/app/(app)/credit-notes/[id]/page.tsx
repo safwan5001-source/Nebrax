@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { ArrowRight, Printer, Download, CheckCircle2, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,8 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { CreditNoteDocument, type CreditNoteCompany, type CreditNoteCustomer } from '@/components/credit-notes/credit-note-document';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { printDocument } from '@/modules/documents/services/export';
-import { createLineDocumentPdf, downloadLineDocumentPdf, shareLineDocumentPdf } from '@/modules/documents/services/line-document-pdf';
+import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
@@ -22,7 +21,6 @@ import {
   resolveLiveCreditNoteTemplateDesign,
   type CreditNoteTemplateDefinition,
 } from '@/modules/credit-notes/services/credit-note-template-design';
-import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
 import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
@@ -52,9 +50,7 @@ export default function CreditNoteDetailPage() {
   const t = useTranslations('creditNotes');
   const td = useTranslations('invoiceDetail');
   const tPrint = useTranslations('documentPrint');
-  const tDoc = useTranslations('invoiceDoc');
   const tc = useTranslations('common');
-  const locale = useLocale();
   const { success, error: errorToast } = useToast();
 
   const [note, setNote] = useState<CreditNote | null>(null);
@@ -130,13 +126,6 @@ export default function CreditNoteDetailPage() {
 
   const paperId = getTemplate(design.templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
-  const frozenPdfDefinition = resolveFrozenOutputDefinition(
-    note.pdf_template_revision,
-    note.print_template_revision,
-  );
-  const pdfDesign = frozenPdfDefinition
-    ? resolveCreditNoteTemplateDesign(frozenPdfDefinition, null)
-    : design;
   const frozenThermalDefinition = note.thermal_template_revision?.definition ?? null;
   const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
   const thermalPaperId = thermalTemplateId
@@ -146,70 +135,13 @@ export default function CreditNoteDetailPage() {
     ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
     : null;
 
-  async function createPdf() {
-    if (!note) throw new Error('Credit note unavailable');
-    const refundType = treatmentLabel;
-    return createLineDocumentPdf({
-      document: {
-        number: note.number,
-        date: note.note_date,
-        subtotal: note.subtotal,
-        tax_amount: note.tax_amount,
-        total: note.total,
-        lines: note.lines,
-      },
-      company,
-      party: customer,
-      logoUrl: pdfDesign.logoUrl,
-      stampUrl: pdfDesign.stampUrl,
-      signatureUrl: pdfDesign.signatureUrl,
-      footerText: pdfDesign.footerText,
-      templateLayout: frozenPdfDefinition
-        ? (Array.isArray(frozenPdfDefinition.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : null)
-        : design.layout,
-      termsText: pdfDesign.termsText,
-      bankText: pdfDesign.bankText,
-      documentMeta: [
-        [t('date'), note.note_date],
-        [t('refund_type'), refundType],
-        [t('reason'), note.reason ?? '—'],
-      ],
-      labels: {
-        title: isDebitNote ? t('debit_document_title') : t('document_title'),
-        titleSecondary: isDebitNote ? t('debit_document_subtitle') : t('document_subtitle'),
-        seller: tPrint('seller'),
-        billTo: counterpartLabel,
-        invoiceNumber: tPrint('document_number'),
-        vatNumber: tPrint('vat_number'),
-        crNumber: tPrint('cr_number'),
-        city: tPrint('city'),
-        date: t('date'),
-        paymentType: tPrint('document_data'),
-        cash: '',
-        credit: '',
-        product: tPrint('product'),
-        description: tPrint('description'),
-        quantity: tPrint('quantity'),
-        unitPrice: tPrint('unit_price'),
-        tax: tPrint('tax'),
-        total: tPrint('total'),
-        subtotal: tPrint('subtotal'),
-        vat: tPrint('vat'),
-        grandTotal: tPrint('grand_total'),
-        qrNote: '',
-        terms: tDoc('terms'),
-        bank: tDoc('bank'),
-        footer: tPrint('footer'),
-      },
-      locale,
-    });
-  }
-
   async function handleDownloadPdf() {
     if (!note) return;
     setBusy('pdf');
     try {
-      downloadLineDocumentPdf(await createPdf(), note.number);
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Credit note template is unavailable');
+      await documentExporter.download({ element, fileName: note.number, paper });
       success(tPrint('downloaded_ok'));
     } catch {
       errorToast(tPrint('export_failed'));
@@ -222,7 +154,14 @@ export default function CreditNoteDetailPage() {
     if (!note) return;
     setBusy('share');
     try {
-      const result = await shareLineDocumentPdf(await createPdf(), note.number, note.type === 'purchase' ? t('debit_document_title') : t('document_title'));
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Credit note template is unavailable');
+      const result = await documentExporter.share({
+        element,
+        fileName: note.number,
+        title: note.type === 'purchase' ? t('debit_document_title') : t('document_title'),
+        paper,
+      });
       success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
