@@ -33,6 +33,7 @@ import {
 import type {
   DocBlockAlignment,
   DocBlockFontSize,
+  DocBlockImageOpacity,
   DocBlockImageSize,
   DocItemsColumn,
   DocItemsColumnId,
@@ -217,7 +218,7 @@ export function BlockPropertiesEditor({
         </Select>
       </div>
 
-      {(allowed.includes('alignment') || allowed.includes('font_size') || allowed.includes('image_size')) && (
+      {(allowed.includes('alignment') || allowed.includes('font_size') || allowed.includes('image_size') || allowed.includes('image_opacity')) && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {allowed.includes('alignment') && (
             <div className="space-y-1.5">
@@ -249,6 +250,17 @@ export function BlockPropertiesEditor({
                 <option value="sm">{t('image_size_sm')}</option>
                 <option value="md">{t('image_size_md')}</option>
                 <option value="lg">{t('image_size_lg')}</option>
+              </Select>
+            </div>
+          )}
+          {allowed.includes('image_opacity') && (
+            <div className="space-y-1.5">
+              <Label htmlFor="template-block-image-opacity">{t('image_opacity')}</Label>
+              <Select id="template-block-image-opacity" value={properties.image_opacity ?? ''} disabled={disabled} onChange={(event) => update({ image_opacity: (event.target.value || undefined) as DocBlockImageOpacity | undefined })}>
+                <option value="">{t('inherit_default')}</option>
+                <option value="solid">{t('image_opacity_solid')}</option>
+                <option value="soft">{t('image_opacity_soft')}</option>
+                <option value="faint">{t('image_opacity_faint')}</option>
               </Select>
             </div>
           )}

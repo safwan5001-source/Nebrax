@@ -49,8 +49,8 @@ class PrintTemplateContract
         'notes' => ['alignment', 'font_size'],
         'terms' => ['alignment', 'font_size', 'static_content'],
         'bank' => ['alignment', 'font_size', 'static_content'],
-        'stamp' => ['alignment', 'image_size'],
-        'signature' => ['alignment', 'image_size'],
+        'stamp' => ['alignment', 'image_size', 'image_opacity'],
+        'signature' => ['alignment', 'image_size', 'image_opacity'],
         'footer' => ['alignment', 'font_size', 'static_content'],
     ];
 
@@ -69,6 +69,7 @@ class PrintTemplateContract
     private const ALIGNMENTS = ['start', 'center', 'end'];
     private const FONT_SIZES = ['sm', 'md', 'lg'];
     private const IMAGE_SIZES = ['sm', 'md', 'lg'];
+    private const IMAGE_OPACITIES = ['solid', 'soft', 'faint'];
 
     /** يرفض قائمة فارغة ومكررة أو نوعاً غير قابل للإخراج. */
     public static function assertDocumentTypes(array $documentTypes): array
@@ -191,6 +192,7 @@ class PrintTemplateContract
                 'alignment' => self::assertEnumProperty($block, $property, $value, self::ALIGNMENTS),
                 'font_size' => self::assertEnumProperty($block, $property, $value, self::FONT_SIZES),
                 'image_size' => self::assertEnumProperty($block, $property, $value, self::IMAGE_SIZES),
+                'image_opacity' => self::assertEnumProperty($block, $property, $value, self::IMAGE_OPACITIES),
                 'static_content' => self::assertStaticContent($block, $value),
                 'columns' => self::assertItemsColumns($value),
             };

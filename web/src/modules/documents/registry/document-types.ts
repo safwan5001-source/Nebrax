@@ -104,8 +104,8 @@ export const DOCUMENT_BLOCK_PROPERTY_CONTRACT: Readonly<Record<DocSectionKey, re
   notes: ['alignment', 'font_size'],
   terms: ['alignment', 'font_size', 'static_content'],
   bank: ['alignment', 'font_size', 'static_content'],
-  stamp: ['alignment', 'image_size'],
-  signature: ['alignment', 'image_size'],
+  stamp: ['alignment', 'image_size', 'image_opacity'],
+  signature: ['alignment', 'image_size', 'image_opacity'],
   footer: ['alignment', 'font_size', 'static_content'],
 };
 
@@ -122,6 +122,7 @@ const REQUIRED_ITEMS_COLUMNS = ['description', 'total'] as const satisfies reado
 const ALIGNMENTS = ['start', 'center', 'end'] as const;
 const FONT_SIZES = ['sm', 'md', 'lg'] as const;
 const IMAGE_SIZES = ['sm', 'md', 'lg'] as const;
+const IMAGE_OPACITIES = ['solid', 'soft', 'faint'] as const;
 
 const PAGE_PAPERS = ['a4', 'a4_landscape', 'letter', 'legal'] as const satisfies readonly PaperSizeId[];
 const THERMAL_PAPERS = ['thermal_58', 'thermal_80'] as const satisfies readonly PaperSizeId[];
@@ -297,11 +298,14 @@ export function validateDocumentBlockProperties(
       if (!allowed.includes(key)) errors.push(`unsupported_block_property:${item.key}:${key}`);
     }
 
-    const { alignment, font_size: fontSize, static_content: staticContent, columns } = item.properties;
+    const { alignment, font_size: fontSize, image_opacity: imageOpacity, static_content: staticContent, columns } = item.properties;
     if (alignment !== undefined && !ALIGNMENTS.includes(alignment)) errors.push(`invalid_block_alignment:${item.key}`);
     if (fontSize !== undefined && !FONT_SIZES.includes(fontSize)) errors.push(`invalid_block_font_size:${item.key}`);
     if (item.properties.image_size !== undefined && !IMAGE_SIZES.includes(item.properties.image_size)) {
       errors.push(`invalid_block_image_size:${item.key}`);
+    }
+    if (imageOpacity !== undefined && !IMAGE_OPACITIES.includes(imageOpacity)) {
+      errors.push(`invalid_block_image_opacity:${item.key}`);
     }
     if (staticContent !== undefined && (typeof staticContent !== 'string' || staticContent.length > 2000)) {
       errors.push(`invalid_static_content:${item.key}`);
