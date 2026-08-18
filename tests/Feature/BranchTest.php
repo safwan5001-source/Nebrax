@@ -82,9 +82,78 @@ class BranchTest extends TestCase
 
         $this->withToken($auth['token'])->deleteJson("/api/branches/{$main}")->assertStatus(422);
 
-        // فرع عادي يُحذف بلا مانع
+        // فرع عادي **بلا مستندات** يُحذف بلا مانع
         $other = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع مؤقّت'])['data']['id'];
         $this->withToken($auth['token'])->deleteJson("/api/branches/{$other}")->assertOk();
+    }
+
+    /**
+     * الفرع ذو المستندات لا يُحذف — والمنع ليس تنظيمياً.
+     *
+     * `branch_id` مُعرَّف `nullOnDelete`، فحذف الفرع ينقل مستنداته إلى سلسلة
+     * «بلا فرع» المحروسة بفهرس جزئي. وبما أن الترقيم مستقلّ لكل فرع، يحمل
+     * فرعان `INV-2026-00001` مشروعَين — فحذف الثاني بعد الأول كان يسقط
+     * بـ`23505` خاماً. هذا الاختبار يثبّت الرفض المفهوم مكانه.
+     *
+     * @test
+     */
+    public function a_branch_holding_documents_cannot_be_deleted(): void
+    {
+        $auth = $this->registerTenant();
+
+        $branch   = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])['data']['id'];
+        $customer = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $branch])
+            ->postJson('/api/invoices', [
+                'partner_id' => $customer, 'payment_type' => 'cash',
+                'items'      => [['description' => 'خدمة', 'quantity' => 1, 'unit_price' => 100000]],
+            ])->assertCreated();
+
+        $this->withToken($auth['token'])->deleteJson("/api/branches/{$branch}")
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'لا يمكن حذف فرع له مستندات — عطّله بدل حذفه حفاظاً على مستنداته وأرقامها.');
+
+        $this->assertDatabaseHas('branches', ['id' => $branch]);
+    }
+
+    /**
+     * السيناريو الذي كان يسقط: فرعان يحملان الرقم نفسه — وهو مشروع بالترقيم
+     * الفرعي. حذفهما تباعاً كان ينتهي بانتهاك الفهرس الجزئي؛ والآن يُرفض
+     * الاثنان بالرسالة نفسها ولا تصل قاعدة البيانات إلى حالة متعارضة.
+     *
+     * @test
+     */
+    public function two_branches_sharing_a_document_number_are_both_protected(): void
+    {
+        $auth = $this->registerTenant();
+
+        $customer = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+
+        $a = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'أ'])['data']['id'];
+        $b = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'ب'])['data']['id'];
+
+        $numbers = [];
+        foreach ([$a, $b] as $branchId) {
+            $numbers[] = $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $branchId])
+                ->postJson('/api/invoices', [
+                    'partner_id' => $customer, 'payment_type' => 'cash',
+                    'items'      => [['description' => 'خدمة', 'quantity' => 1, 'unit_price' => 100000]],
+                ])->assertCreated()['data']['number'];
+        }
+
+        // الرقم نفسه في فرعين — مشروع، وهو ما كان يجعل الحذف المتتابع ينفجر.
+        $this->assertSame($numbers[0], $numbers[1]);
+
+        $this->withToken($auth['token'])->deleteJson("/api/branches/{$a}")->assertStatus(422);
+        $this->withToken($auth['token'])->deleteJson("/api/branches/{$b}")->assertStatus(422);
+
+        $this->assertDatabaseHas('branches', ['id' => $a]);
+        $this->assertDatabaseHas('branches', ['id' => $b]);
     }
 
     /** @test */
