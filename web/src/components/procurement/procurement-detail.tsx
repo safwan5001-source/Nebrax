@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeftRight, ArrowRight, CopyPlus, Download, Eye, EyeOff, FileOutput, Printer, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,16 +18,10 @@ import {
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
-import { printDocument } from '@/modules/documents/services/export';
-import {
-  createLineDocumentPdf,
-  downloadLineDocumentPdf,
-  shareLineDocumentPdf,
-} from '@/modules/documents/services/line-document-pdf';
+import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
-import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
 import type { DocSectionLayoutItem, ThemeId } from '@/modules/documents/types';
 import {
   NEXT_STATUSES,
@@ -88,8 +82,6 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
   const t = useTranslations('procurement');
   const tc = useTranslations('common');
   const tPrint = useTranslations('documentPrint');
-  const tDoc = useTranslations('invoiceDoc');
-  const locale = useLocale();
   const { success, error: errorToast } = useToast();
 
   const [doc, setDoc] = useState<Doc | null>(null);
@@ -177,71 +169,13 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
     }
   }
 
-  function createPurchaseOrderPdf() {
-    if (!doc || doc.type !== 'order') throw new Error('Purchase order unavailable');
-    const frozenPdf = resolveFrozenOutputDefinition(
-      doc.pdf_template_revision,
-      doc.print_template_revision,
-    );
-
-    return createLineDocumentPdf({
-      document: {
-        number: doc.number,
-        date: doc.doc_date,
-        subtotal: doc.subtotal,
-        tax_amount: doc.tax_amount,
-        total: doc.total,
-        lines: doc.lines,
-      },
-      company,
-      party: supplier,
-      logoUrl: frozenPdf?.show_logo !== false ? frozenPdf?.logo ?? null : null,
-      stampUrl: frozenPdf?.stamp ?? null,
-      signatureUrl: frozenPdf?.signature ?? null,
-      footerText: frozenPdf?.footer_text ?? null,
-      templateLayout: Array.isArray(frozenPdf?.layout) && frozenPdf.layout.length ? frozenPdf.layout : null,
-      termsText: frozenPdf?.terms_text ?? null,
-      bankText: frozenPdf?.bank_text ?? null,
-      documentMeta: [
-        [t('date'), doc.doc_date],
-        [t('order.due_label'), doc.due_date ?? '—'],
-      ],
-      labels: {
-        title: t('order.document_title'),
-        titleSecondary: t('order.document_subtitle'),
-        seller: t('buyer'),
-        billTo: t('supplier'),
-        invoiceNumber: tPrint('document_number'),
-        vatNumber: tPrint('vat_number'),
-        crNumber: tPrint('cr_number'),
-        city: tPrint('city'),
-        date: t('date'),
-        paymentType: tPrint('document_data'),
-        cash: '',
-        credit: '',
-        product: tPrint('product'),
-        description: tPrint('description'),
-        quantity: tPrint('quantity'),
-        unitPrice: tPrint('unit_price'),
-        tax: tPrint('tax'),
-        total: tPrint('total'),
-        subtotal: tPrint('subtotal'),
-        vat: tPrint('vat'),
-        grandTotal: tPrint('grand_total'),
-        qrNote: '',
-        terms: tDoc('terms'),
-        bank: tDoc('bank'),
-        footer: tPrint('footer'),
-      },
-      locale,
-    });
-  }
-
   async function downloadPurchaseOrderPdf() {
     if (!doc || doc.type !== 'order') return;
     setOutputBusy('pdf');
     try {
-      downloadLineDocumentPdf(await createPurchaseOrderPdf(), doc.number);
+      const element = document.getElementById('purchase-order-print-root');
+      if (!element) throw new Error('Purchase order template is unavailable');
+      await documentExporter.download({ element, fileName: doc.number, paper });
       success(tPrint('downloaded_ok'));
     } catch {
       errorToast(tPrint('export_failed'));
@@ -254,11 +188,14 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
     if (!doc || doc.type !== 'order') return;
     setOutputBusy('share');
     try {
-      const result = await shareLineDocumentPdf(
-        await createPurchaseOrderPdf(),
-        doc.number,
-        t('order.document_title'),
-      );
+      const element = document.getElementById('purchase-order-print-root');
+      if (!element) throw new Error('Purchase order template is unavailable');
+      const result = await documentExporter.share({
+        element,
+        fileName: doc.number,
+        title: t('order.document_title'),
+        paper,
+      });
       success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));

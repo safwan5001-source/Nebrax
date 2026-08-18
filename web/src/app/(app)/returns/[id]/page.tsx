@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { ArrowRight, Printer, Download, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,8 +15,7 @@ import { formatRiyal } from '@/lib/money';
 import { useCompany } from '@/lib/company';
 import { useToast } from '@/components/ui/toast';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
-import { printDocument } from '@/modules/documents/services/export';
-import { createLineDocumentPdf, downloadLineDocumentPdf, shareLineDocumentPdf } from '@/modules/documents/services/line-document-pdf';
+import { documentExporter, printDocument } from '@/modules/documents/services/export';
 
 interface ReturnDoc {
   id: string;
@@ -41,8 +40,6 @@ export default function ReturnDetailPage() {
   const tr = useTranslations('returns');
   const ts = useTranslations('status');
   const tPrint = useTranslations('documentPrint');
-  const tDoc = useTranslations('invoiceDoc');
-  const locale = useLocale();
   const company = useCompany();
   const { success, error: errorToast } = useToast();
 
@@ -87,59 +84,13 @@ export default function ReturnDetailPage() {
     [tr('total'), <span key="t" className="num font-semibold">{formatRiyal(doc.total)}</span>],
   ];
 
-  async function createPdf() {
-    if (!doc) throw new Error('Return unavailable');
-    return createLineDocumentPdf({
-      document: {
-        number: doc.number,
-        date: doc.return_date,
-        subtotal: doc.subtotal,
-        tax_amount: doc.tax_amount,
-        total: doc.total,
-        lines: doc.lines,
-      },
-      company,
-      party,
-      documentMeta: [
-        [t('date'), doc.return_date],
-        [tr('type'), tr(doc.type)],
-      ],
-      labels: {
-        title: docTitle,
-        titleSecondary: docSubtitle,
-        seller: tPrint('seller'),
-        billTo: partyLabel,
-        invoiceNumber: tPrint('document_number'),
-        vatNumber: tPrint('vat_number'),
-        crNumber: tPrint('cr_number'),
-        city: tPrint('city'),
-        date: t('date'),
-        paymentType: tPrint('document_data'),
-        cash: '',
-        credit: '',
-        product: tPrint('product'),
-        description: tPrint('description'),
-        quantity: tPrint('quantity'),
-        unitPrice: tPrint('unit_price'),
-        tax: tPrint('tax'),
-        total: tPrint('total'),
-        subtotal: tPrint('subtotal'),
-        vat: tPrint('vat'),
-        grandTotal: tPrint('grand_total'),
-        qrNote: '',
-        terms: tDoc('terms'),
-        bank: tDoc('bank'),
-        footer: tPrint('footer'),
-      },
-      locale,
-    });
-  }
-
   async function handleDownloadPdf() {
     if (!doc) return;
     setBusy('pdf');
     try {
-      downloadLineDocumentPdf(await createPdf(), doc.number);
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Return template is unavailable');
+      await documentExporter.download({ element, fileName: doc.number, paper });
       success(tPrint('downloaded_ok'));
     } catch {
       errorToast(tPrint('export_failed'));
@@ -152,7 +103,9 @@ export default function ReturnDetailPage() {
     if (!doc) return;
     setBusy('share');
     try {
-      const result = await shareLineDocumentPdf(await createPdf(), doc.number, docTitle);
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Return template is unavailable');
+      const result = await documentExporter.share({ element, fileName: doc.number, title: docTitle, paper });
       success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));

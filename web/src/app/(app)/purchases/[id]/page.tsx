@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { ArrowRight, Printer, Eye, EyeOff, Pencil, Trash2, Download, Share2, FileSpreadsheet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
-import { TaxDocument, type Party, type DocLine, type DocAdjustment } from '@/components/documents/tax-document';
+import type { Party, DocLine } from '@/components/documents/tax-document';
 import { PurchaseDocument } from '@/components/purchases/purchase-document';
 import { Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
@@ -17,13 +17,12 @@ import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { useCompany } from '@/lib/company';
 import { exportXlsx } from '@/lib/xlsx';
-import { createPurchaseInvoicePdf, downloadPurchaseInvoicePdf, sharePurchaseInvoicePdf } from '@/modules/purchases/services/purchase-pdf';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
-import { printDocument } from '@/modules/documents/services/export';
-import { resolveFrozenOutputDefinition } from '@/modules/print-templates/services/frozen-output-template';
-import { getTemplate } from '@/modules/documents/registry/templates';
+import { documentExporter, printDocument } from '@/modules/documents/services/export';
+import { getTemplate, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
+import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
 
 interface FrozenPrintTemplateRevision {
   id: string;
@@ -46,6 +45,7 @@ interface FrozenPrintTemplateRevision {
 
 interface Purchase {
   id: string;
+  branch_id?: string | null;
   number: string;
   partner_id: string;
   payment_type: string;
@@ -89,14 +89,22 @@ export default function PurchaseDetailPage() {
   const tp = useTranslations('purchases');
   const tpf = useTranslations('purchaseForm');
   const tpp = useTranslations('purchasePdf');
-  const td = useTranslations('invoiceDoc');
   const ts = useTranslations('status');
   const tPrint = useTranslations('documentPrint');
-  const locale = useLocale();
   const company = useCompany();
 
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const [supplier, setSupplier] = useState<Party | null>(null);
+  const [templateId, setTemplateId] = useState(DEFAULT_TEMPLATE_ID);
+  const [themeId, setThemeId] = useState<ThemeId | null>(null);
+  const [footerText, setFooterText] = useState<string | null>(null);
+  const [showLogo, setShowLogo] = useState(true);
+  const [logoHeight, setLogoHeight] = useState<number | null>(null);
+  const [layout, setLayout] = useState<DocSectionLayoutItem[] | null>(null);
+  const [termsText, setTermsText] = useState<string | null>(null);
+  const [bankText, setBankText] = useState<string | null>(null);
+  const [stampUrl, setStampUrl] = useState<string | null>(null);
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // المعاينة تُظهر مستند A4 على الشاشة — هو نفسه المطبوع، فلا معاينةٌ تُخالف
   // ما يخرج من الطابعة.
@@ -125,8 +133,42 @@ export default function PurchaseDetailPage() {
     api<{ data: Purchase }>(`/purchases/${id}`)
       .then(async (r) => {
         setPurchase(r.data);
-        const p = await api<{ data: Party }>(`/partners/${r.data.partner_id}`).catch(() => null);
-        if (p) setSupplier(p.data);
+        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
+        const [partner, live] = await Promise.allSettled([
+          api<{ data: Party }>(`/partners/${r.data.partner_id}`),
+          api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=purchase_invoice&usage=print${branchQuery}`),
+        ]);
+        if (partner.status === 'fulfilled') setSupplier(partner.value.data);
+
+        const frozen = r.data.print_template_revision?.definition;
+        if (frozen) {
+          setTemplateId(frozen.template_id ?? DEFAULT_TEMPLATE_ID);
+          setThemeId(frozen.theme_id ?? null);
+          setFooterText(frozen.footer_text ?? null);
+          setShowLogo(frozen.show_logo !== false);
+          setLogoHeight(frozen.logo_height ?? null);
+          setLayout(Array.isArray(frozen.layout) && frozen.layout.length ? frozen.layout : null);
+          setTermsText(frozen.terms_text ?? null);
+          setBankText(frozen.bank_text ?? null);
+          setStampUrl(frozen.stamp ?? null);
+          setSignatureUrl(frozen.signature ?? null);
+          return;
+        }
+
+        const resolved = live.status === 'fulfilled'
+          ? resolveLiveTemplateDefinition(live.value.data, 'purchase_invoice')
+          : null;
+        if (!resolved) return;
+        setTemplateId(resolved.templateId);
+        setThemeId(resolved.themeId);
+        setFooterText(resolved.footerText);
+        setShowLogo(resolved.showLogo);
+        setLogoHeight(resolved.logoHeight);
+        setLayout(resolved.layout);
+        setTermsText(resolved.termsText);
+        setBankText(resolved.bankText);
+        setStampUrl(resolved.stampUrl);
+        setSignatureUrl(resolved.signatureUrl);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -145,12 +187,8 @@ export default function PurchaseDetailPage() {
   const isDraft = purchase.status === 'draft';
   const receivedStatusKey = receiptKey(purchase.received_status);
   const receivedStatusLabel = tpp(`received_${receivedStatusKey}`);
-  const frozenPrintFooter = purchase.print_template_revision?.definition.footer_text ?? null;
-  const frozenPdfDefinition = resolveFrozenOutputDefinition(
-    purchase.pdf_template_revision,
-    purchase.print_template_revision,
-  );
-  const frozenPdfFooter = frozenPdfDefinition?.footer_text ?? null;
+  const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
+  const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
   const frozenThermalDefinition = purchase.thermal_template_revision?.definition ?? null;
   const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
   const thermalPaperId = thermalTemplateId
@@ -160,53 +198,12 @@ export default function PurchaseDetailPage() {
     ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
     : null;
 
-  /**
-   * الخصم والشحن والتسوية كانت تُحذَف من المستند المطبوع، فيقرأ المورّد
-   * «المجموع + الضريبة ≠ الإجمالي» ويبدو المستندُ خاطئ الحساب. والقيمة تُرسَل
-   * **موجبة دائماً** و`negative` للعرض وحده — وإلا ضُوعفت إشارةُ السالب.
-   */
-  const adjustmentValue = Number(purchase.adjustment ?? 0);
-  const adjustments: DocAdjustment[] = [
-    ...(Number(purchase.discount) > 0
-      ? [{ label: tpf('discount'), amount: purchase.discount, negative: true }] : []),
-    ...(Number(purchase.shipping) > 0
-      ? [{ label: tpf('shipping'), amount: purchase.shipping }] : []),
-    ...(Number.isFinite(adjustmentValue) && adjustmentValue !== 0
-      ? [{
-          label: tpf('adjustment'),
-          amount: String(Math.abs(adjustmentValue)),
-          negative: adjustmentValue < 0,
-        }] : []),
-  ];
-
-  const buildPurchasePdf = async () => createPurchaseInvoicePdf({
-    purchase,
-    company,
-    supplier,
-    adjustments,
-    stampUrl: frozenPdfDefinition?.stamp ?? null,
-    signatureUrl: frozenPdfDefinition?.signature ?? null,
-    footerText: frozenPdfFooter,
-    templateLayout: Array.isArray(frozenPdfDefinition?.layout) && frozenPdfDefinition.layout.length ? frozenPdfDefinition.layout : null,
-    termsText: frozenPdfDefinition?.terms_text ?? null,
-    bankText: frozenPdfDefinition?.bank_text ?? null,
-    locale,
-    labels: {
-      title: tpp('title'), titleSecondary: tpp('title_secondary'), seller: tpp('buyer'), billTo: tpp('supplier'),
-      invoiceNumber: tp('number'), vatNumber: td('vat_number'), crNumber: td('cr_number'), city: td('city'),
-      date: td('date'), paymentType: td('payment_type'), cash: td('cash'), credit: td('credit'),
-      product: td('product'), description: td('description'), quantity: td('qty'), unitPrice: td('unit_price'), tax: td('tax'), total: tp('total'),
-      subtotal: tpf('subtotal'), vat: tpf('tax_amount'), grandTotal: tp('total'), qrNote: '',
-      terms: td('terms'), bank: td('bank'), footer: tpp('footer'),
-      supplierInvoiceNumber: tpp('supplier_invoice_number'), dueDate: tpp('due_date'), receiptStatus: tpp('receipt_status'),
-      receivedPending: tpp('received_pending'), receivedPartial: tpp('received_partial'), receivedFull: tpp('received_full'),
-    },
-  });
-
   const handleDownloadPdf = async () => {
     setBusy('pdf');
     try {
-      downloadPurchaseInvoicePdf(await buildPurchasePdf(), purchase.number);
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Purchase template is unavailable');
+      await documentExporter.download({ element, fileName: purchase.number, paper });
       success(t('downloaded_ok'));
     } catch {
       errorToast(t('export_failed'));
@@ -218,7 +215,9 @@ export default function PurchaseDetailPage() {
   const handleSharePdf = async () => {
     setBusy('share');
     try {
-      const result = await sharePurchaseInvoicePdf(await buildPurchasePdf(), purchase.number, purchase.number);
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Purchase template is unavailable');
+      const result = await documentExporter.share({ element, fileName: purchase.number, title: purchase.number, paper });
       success(result === 'shared' ? t('shared_ok') : t('downloaded_ok'));
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') errorToast(t('export_failed'));
@@ -304,7 +303,7 @@ export default function PurchaseDetailPage() {
             <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
             {tp('delete')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument({ widthMm: 210, heightMm: 297 }, 'print-root')} disabled={!!busy}>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'print-root')} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
@@ -369,28 +368,23 @@ export default function PurchaseDetailPage() {
         </CardContent>
       </Card>
 
-      {/* مستند فاتورة المشتريات A4 — للطباعة دائماً، وعلى الشاشة عند المعاينة */}
-      <div className={preview ? 'rounded border border-border bg-surface p-2 [&_.print-only]:block' : undefined}>
+      {/* القالب نفسه للشاشة والطباعة وPDF؛ يبقى في DOM عند إخفاء المعاينة لتلتقطه عملية التصدير. */}
+      <div className={preview ? 'rounded border border-border bg-surface p-2' : 'hidden print:block'}>
         <DocumentScaler>
-          <TaxDocument
-            title={tp('doc_title')}
+          <PurchaseDocument
+            purchase={purchase}
             company={company}
-            partyLabel={tp('supplier')}
-            party={supplier}
-            metaRows={[
-              [tp('number'), purchase.number],
-              [t('date'), purchase.purchase_date],
-              [t('payment_type'), purchase.payment_type === 'cash' ? t('cash') : t('credit')],
-              ...(purchase.due_date ? [[tpf('due_date'), purchase.due_date] as [string, string]] : []),
-              [tpf('received_status'), receivedStatusLabel],
-              ...(purchase.received_date ? [[tpf('received_date'), purchase.received_date] as [string, string]] : []),
-            ]}
-            lines={purchase.lines}
-            subtotal={purchase.subtotal}
-            adjustments={adjustments}
-            tax={purchase.tax_amount}
-            total={purchase.total}
-            footerText={frozenPrintFooter}
+            supplier={supplier}
+            templateId={templateId}
+            themeId={themeId}
+            footerText={footerText}
+            terms={termsText}
+            bank={bankText}
+            stampUrl={stampUrl}
+            signatureUrl={signatureUrl}
+            showLogo={showLogo}
+            logoHeight={logoHeight}
+            layout={layout}
           />
         </DocumentScaler>
       </div>
