@@ -136,7 +136,7 @@ class NumberingSettingsTest extends TestCase
 
         $this->assertSame('numeric', $res['meta']['format']);
         $this->assertSame(5, $res['meta']['padding']);
-        $this->assertSame(['invoice', 'purchase'], $res['meta']['editable_keys']);
+        $this->assertSame(['invoice', 'purchase', 'quote'], $res['meta']['editable_keys']);
     }
 
     /** السلاسل المتعدّدة في الجدول الواحد تُعرَض منفصلة. @test */
@@ -192,10 +192,57 @@ class NumberingSettingsTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'quote', 'prefix' => 'OFR'])
+            ->putJson('/api/numbering-settings', ['entity' => 'journal_entry', 'prefix' => 'QYD'])
             ->assertStatus(422)->assertJsonValidationErrors('entity');
 
-        $this->assertSame('QUO', $this->entity($auth['token'], 'quote')['series'][0]['prefix']);
+        $this->assertSame('JE', $this->entity($auth['token'], 'journal_entry')['series'][0]['prefix']);
+    }
+
+    /**
+     * بادئة عرض السعر صارت إعداداً كبادئة الفاتورة — والإثبات أن الرقم
+     * المولَّد يحملها، لا أن الإعداد حُفظ.
+     *
+     * @test
+     */
+    public function the_quote_prefix_is_configurable_and_reaches_the_generated_number(): void
+    {
+        $auth = $this->registerTenant();
+
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'quote', 'prefix' => 'OFR'])
+            ->assertOk()->assertJsonPath('data.prefix', 'OFR');
+
+        $customer = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل', 'type' => 'customer',
+        ])->assertCreated()['data'];
+
+        $number = $this->withToken($auth['token'])->postJson('/api/quotes', [
+            'partner_id' => $customer['id'],
+            'items'      => [['description' => 'خدمة', 'quantity' => 1, 'unit_price' => 100000]],
+        ])->assertCreated()['data']['number'];
+
+        $this->assertSame('OFR-' . now()->year . '-00001', $number);
+    }
+
+    /**
+     * وبادئتا العرض والفاتورة مستقلّتان: ضبط إحداهما لا يمسّ الأخرى، وإن
+     * كانتا في مجموعة الإعدادات نفسها.
+     *
+     * @test
+     */
+    public function the_quote_and_invoice_prefixes_stay_independent(): void
+    {
+        $auth = $this->registerTenant();
+
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'quote', 'prefix' => 'OFR'])->assertOk();
+
+        $this->assertSame('INV', $this->entity($auth['token'], 'invoice')['prefix']);
+
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'FTR'])->assertOk();
+
+        $this->assertSame('OFR', $this->entity($auth['token'], 'quote')['prefix']);
     }
 
     /** البادئة مُعرّف يُطبع ويُبحث به — لا نصّ حرّ. @test */
