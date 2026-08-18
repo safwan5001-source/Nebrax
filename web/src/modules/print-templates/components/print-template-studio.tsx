@@ -13,6 +13,7 @@ import { SectionDesigner } from '@/components/settings/section-designer';
 import { PrintTemplateAssignments } from './print-template-assignments';
 import { PrintTemplateCenter } from './print-template-center';
 import { PrintTemplateLibrary } from './print-template-library';
+import { PrintTemplateCreationWizard, type TemplateCreationSubmission } from './print-template-creation-wizard';
 import {
   canOpenTemplateCenterDocumentType,
   documentTypesForDraftSave,
@@ -114,7 +115,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   const [activeDocumentType, setActiveDocumentType] = useState<DocumentTypeId | null>(null);
   const [templateLoadState, setTemplateLoadState] = useState<TemplateCenterLoadState>('loading');
   const [saving, setSaving] = useState(false);
-  const [surface, setSurface] = useState<'center' | 'library' | 'studio'>('center');
+  const [surface, setSurface] = useState<'center' | 'library' | 'creation' | 'studio'>('center');
   const [templateDetails, setTemplateDetails] = useState<Record<string, PrintTemplate>>({});
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsFailed, setDetailsFailed] = useState(false);
@@ -170,32 +171,14 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
     }));
   };
 
-  function createLocalTemplate(documentType: DocumentTypeId) {
-    const now = Date.now();
-    const local: PrintTemplate = {
-      ...FALLBACK,
-      id: `new-${now}`,
-      name: t('new_template'),
-      document_types: [documentType],
-      draft_revision: {
-        ...FALLBACK.draft_revision!,
-        id: `new-r-${now}`,
-        document_types: [documentType],
-        definition: {
-          ...FALLBACK.draft_revision!.definition,
-          layout: getDefaultDocumentLayout(documentType),
-        },
-      },
-    };
-    setTemplates((current) => [local, ...current]);
-    setSelectedId(local.id);
+  function startTemplateCreation(documentType: DocumentTypeId = type) {
+    if (!canManage) return;
     setActiveDocumentType(documentType);
-    return local;
+    setSurface('creation');
   }
 
   function createTemplate() {
-    createLocalTemplate('tax_invoice');
-    setSurface('studio');
+    startTemplateCreation(type);
   }
 
   function openDocumentType(documentType: DocumentTypeId) {
@@ -216,8 +199,42 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   }
 
   function createTemplateFromLibrary(documentType: DocumentTypeId) {
-    createLocalTemplate(documentType);
-    setSurface('studio');
+    startTemplateCreation(documentType);
+  }
+
+  async function createTemplateFromWizard(submission: TemplateCreationSubmission) {
+    if (!canManage) return;
+    setSaving(true);
+    try {
+      const response = submission.source.kind === 'base'
+        ? await api<{ data: PrintTemplate }>('/print-templates', {
+          method: 'POST',
+          body: {
+            name: submission.name,
+            document_types: [submission.documentType],
+            definition: {
+              ...FALLBACK.draft_revision!.definition,
+              layout: getDefaultDocumentLayout(submission.documentType),
+            },
+          },
+        })
+        : await api<{ data: PrintTemplate }>(`/print-templates/${submission.source.templateId}/duplicate`, {
+          method: 'POST',
+          body: { name: submission.name },
+        });
+      setTemplates((current) => [response.data, ...current]);
+      setSelectedId(response.data.id);
+      setActiveDocumentType(submission.documentType);
+      setTemplateLoadState('ready');
+      setSurface('studio');
+      void loadTemplateDetails(response.data.id);
+      success(t('creation_draft_created'));
+    } catch (caught) {
+      error(caught instanceof ApiError ? caught.message : t('creation_failed'));
+      throw caught;
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function createDraftFromPublished(templateId: string, documentType: DocumentTypeId) {
@@ -361,6 +378,18 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
           onRetry={() => void loadTemplates()}
         />
       </div>
+    );
+  }
+
+  if (surface === 'creation') {
+    return (
+      <PrintTemplateCreationWizard
+        templates={templates}
+        initialDocumentType={activeDocumentType ?? type}
+        canManage={canManage}
+        onCancel={() => setSurface('library')}
+        onSubmit={createTemplateFromWizard}
+      />
     );
   }
 
