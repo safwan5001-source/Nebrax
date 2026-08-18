@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { SectionDesigner } from '@/components/settings/section-designer';
 import { PrintTemplateAssignments } from './print-template-assignments';
 import { PrintTemplateCenter } from './print-template-center';
+import { PrintTemplateLibrary } from './print-template-library';
 import {
   canOpenTemplateCenterDocumentType,
   documentTypesForDraftSave,
@@ -113,10 +114,11 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   const [activeDocumentType, setActiveDocumentType] = useState<DocumentTypeId | null>(null);
   const [templateLoadState, setTemplateLoadState] = useState<TemplateCenterLoadState>('loading');
   const [saving, setSaving] = useState(false);
-  const [surface, setSurface] = useState<'center' | 'studio'>('center');
+  const [surface, setSurface] = useState<'center' | 'library' | 'studio'>('center');
   const [templateDetails, setTemplateDetails] = useState<Record<string, PrintTemplate>>({});
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsFailed, setDetailsFailed] = useState(false);
+  const [studioFocus, setStudioFocus] = useState<'none' | 'history' | 'assignments'>('none');
 
   const loadTemplates = useCallback(async () => {
     setTemplateLoadState('loading');
@@ -151,6 +153,8 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
     const model = getDocumentPreviewModel(type);
     return definition.footer_text ? { ...model, footerText: definition.footer_text } : model;
   }, [definition.footer_text, type]);
+  const isPublishedOnly = selected.published_revision != null && selected.draft_revision == null;
+  const editorReadOnly = !canManage || isPublishedOnly;
 
   const patch = (changes: Partial<PrintTemplate>, definitionChanges?: Partial<TemplateDefinition>) => {
     setTemplates((current) => current.map((template) => {
@@ -196,15 +200,51 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
 
   function openDocumentType(documentType: DocumentTypeId) {
     if (!canOpenTemplateCenterDocumentType(templateLoadState)) return;
-
-    const matchingTemplate = templates.find((template) => template.document_types.includes(documentType));
     setActiveDocumentType(documentType);
-    if (matchingTemplate) {
-      setSelectedId(matchingTemplate.id);
-    } else {
-      createLocalTemplate(documentType);
-    }
+    setSurface('library');
+  }
+
+  function openTemplateFromLibrary(
+    templateId: string,
+    documentType: DocumentTypeId,
+    focus: 'none' | 'history' | 'assignments' = 'none',
+  ) {
+    setSelectedId(templateId);
+    setActiveDocumentType(documentType);
+    setStudioFocus(focus);
     setSurface('studio');
+  }
+
+  function createTemplateFromLibrary(documentType: DocumentTypeId) {
+    createLocalTemplate(documentType);
+    setSurface('studio');
+  }
+
+  async function createDraftFromPublished(templateId: string, documentType: DocumentTypeId) {
+    if (!canManage) return;
+    const template = templates.find((item) => item.id === templateId);
+    const revision = template?.published_revision;
+    if (!template || !revision) return;
+
+    setSaving(true);
+    try {
+      const documentTypes = documentTypesForDraftSave(revision.document_types, template.document_types);
+      const definition = normalizeDefinition(revision, documentType);
+      const response = await api<{ data: PrintTemplate }>(`/print-templates/${template.id}/draft`, {
+        method: 'PUT',
+        body: { name: template.name, document_types: documentTypes, definition },
+      });
+      setTemplates((current) => current.map((item) => item.id === template.id ? response.data : item));
+      setSelectedId(response.data.id);
+      setActiveDocumentType(documentType);
+      setSurface('studio');
+      void loadTemplateDetails(response.data.id);
+      success(t('library_draft_created'));
+    } catch (caught) {
+      error(caught instanceof ApiError ? caught.message : t('library_draft_create_failed'));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function saveDraft() {
@@ -296,6 +336,18 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
 
   useEffect(() => { void loadTemplateDetails(selected.id); }, [selected.id]);
 
+  useEffect(() => {
+    if (surface !== 'studio' || studioFocus === 'none') return;
+    const targetId = studioFocus === 'history' ? 'template-revision-history' : 'template-assignments';
+    const frame = requestAnimationFrame(() => {
+      const target = document.getElementById(targetId);
+      target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      target?.focus({ preventScroll: true });
+      setStudioFocus('none');
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selected.id, studioFocus, surface]);
+
   const templatesCatalog = listTemplates();
   const selectedName = selected.name || t('preview_template_name');
 
@@ -312,15 +364,32 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
     );
   }
 
+  if (surface === 'library') {
+    return (
+      <PrintTemplateLibrary
+        templates={templates}
+        loadState={templateLoadState}
+        initialDocumentType={activeDocumentType ?? 'tax_invoice'}
+        canManage={canManage}
+        onBack={() => setSurface('center')}
+        onOpenTemplate={openTemplateFromLibrary}
+        onReviewAssignments={(templateId, documentType) => openTemplateFromLibrary(templateId, documentType, 'assignments')}
+        onCompareRevisions={(templateId, documentType) => openTemplateFromLibrary(templateId, documentType, 'history')}
+        onCreateDraftFromPublished={(templateId, documentType) => void createDraftFromPublished(templateId, documentType)}
+        onCreateTemplate={createTemplateFromLibrary}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Button variant="ghost" size="sm" className="-ms-2 mb-2" onClick={() => setSurface('center')}>
+          <Button variant="ghost" size="sm" className="-ms-2 mb-2" onClick={() => setSurface('library')}>
             {locale === 'ar'
               ? <ChevronRight className="h-4 w-4" aria-hidden="true" />
               : <ChevronLeft className="h-4 w-4" aria-hidden="true" />}
-            {t('back_to_center')}
+            {t('back_to_library')}
           </Button>
           <p className="text-xs font-medium text-primary">{t('library_label')}</p>
           <h1 className="mt-1 text-2xl font-semibold text-text">{t('title')}</h1>
@@ -358,17 +427,17 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
           <Card className="h-fit">
             <CardHeader className="flex flex-row items-center justify-between border-b border-border py-3"><CardTitle className="text-sm">{t('draft_settings')}</CardTitle><Sparkles className="h-4 w-4 text-primary" aria-hidden="true" /></CardHeader>
             <CardContent className="space-y-4 p-4">
-              <div className="space-y-1.5"><Label htmlFor="template-name">{t('template_name')}</Label><Input id="template-name" value={selected.name} disabled={!canManage} onChange={(event) => patch({ name: event.target.value })} /></div>
-              <div className="space-y-1.5"><Label htmlFor="document-type">{t('document_type')}</Label><Select id="document-type" value={type} disabled={!canManage} onChange={(event) => setActiveDocumentType(event.target.value as DocumentTypeId)}>{documentTypes.map((id) => <option key={id} value={id}>{tTypes(id)}</option>)}</Select></div>
-              <div className="space-y-1.5"><Label htmlFor="template-style">{t('display_style')}</Label><Select id="template-style" value={definition.template_id} disabled={!canManage} onChange={(event) => patch({}, { template_id: event.target.value })}>{templatesCatalog.map((item) => <option key={item.id} value={item.id}>{tTemplates(item.nameKey)}</option>)}</Select></div>
-              <div className="space-y-1.5"><Label htmlFor="theme">{t('theme')}</Label><Select id="theme" value={definition.theme_id} disabled={!canManage} onChange={(event) => patch({}, { theme_id: event.target.value as ThemeId })}>{THEME_IDS.map((id) => <option key={id} value={id}>{id}</option>)}</Select></div>
-              <div className="space-y-1.5"><Label htmlFor="footer">{t('footer')}</Label><Input id="footer" value={definition.footer_text} disabled={!canManage} onChange={(event) => patch({}, { footer_text: event.target.value })} placeholder={t('footer_placeholder')} /></div>
+              <div className="space-y-1.5"><Label htmlFor="template-name">{t('template_name')}</Label><Input id="template-name" value={selected.name} disabled={editorReadOnly} onChange={(event) => patch({ name: event.target.value })} /></div>
+              <div className="space-y-1.5"><Label htmlFor="document-type">{t('document_type')}</Label><Select id="document-type" value={type} disabled={editorReadOnly} onChange={(event) => setActiveDocumentType(event.target.value as DocumentTypeId)}>{documentTypes.map((id) => <option key={id} value={id}>{tTypes(id)}</option>)}</Select></div>
+              <div className="space-y-1.5"><Label htmlFor="template-style">{t('display_style')}</Label><Select id="template-style" value={definition.template_id} disabled={editorReadOnly} onChange={(event) => patch({}, { template_id: event.target.value })}>{templatesCatalog.map((item) => <option key={item.id} value={item.id}>{tTemplates(item.nameKey)}</option>)}</Select></div>
+              <div className="space-y-1.5"><Label htmlFor="theme">{t('theme')}</Label><Select id="theme" value={definition.theme_id} disabled={editorReadOnly} onChange={(event) => patch({}, { theme_id: event.target.value as ThemeId })}>{THEME_IDS.map((id) => <option key={id} value={id}>{id}</option>)}</Select></div>
+              <div className="space-y-1.5"><Label htmlFor="footer">{t('footer')}</Label><Input id="footer" value={definition.footer_text} disabled={editorReadOnly} onChange={(event) => patch({}, { footer_text: event.target.value })} placeholder={t('footer_placeholder')} /></div>
               <div className="border-t border-border pt-4">
-                <div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-medium text-text">{t('layout_title')}</p>{!layoutValidation.valid && <Button variant="ghost" size="sm" onClick={() => patch({}, { layout: getDefaultDocumentLayout(type) })}>{t('restore_default_layout')}</Button>}</div>
-                {canManage ? <SectionDesigner value={definition.layout} onChange={(layout) => patch({}, { layout })} allowedBlocks={documentType.allowedBlocks} requiredBlocks={documentType.requiredBlocks} /> : <p className="text-xs text-muted">{t('read_only')}</p>}
+                <div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-medium text-text">{t('layout_title')}</p>{!editorReadOnly && !layoutValidation.valid && <Button variant="ghost" size="sm" onClick={() => patch({}, { layout: getDefaultDocumentLayout(type) })}>{t('restore_default_layout')}</Button>}</div>
+                {!editorReadOnly ? <SectionDesigner value={definition.layout} onChange={(layout) => patch({}, { layout })} allowedBlocks={documentType.allowedBlocks} requiredBlocks={documentType.requiredBlocks} /> : <p className="text-xs text-muted">{isPublishedOnly ? t('library_published_hint') : t('read_only')}</p>}
               </div>
-              {canManage && <BlockPropertiesEditor value={definition.layout} onChange={(layout) => patch({}, { layout })} documentType={type} disabled={saving} />}
-              {canManage && <div className="grid grid-cols-2 gap-2 border-t border-border pt-4"><Button variant="outline" onClick={() => void duplicate()} disabled={saving}><Copy className="h-4 w-4" aria-hidden="true" />{t('copy')}</Button><Button onClick={() => void saveDraft()} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}{t('save_draft')}</Button><Button className="col-span-2" variant="primary" onClick={() => void publish()} disabled={saving}><Send className="h-4 w-4" aria-hidden="true" />{t('publish_revision', { version: revision.version })}</Button></div>}
+              {!editorReadOnly && <BlockPropertiesEditor value={definition.layout} onChange={(layout) => patch({}, { layout })} documentType={type} disabled={saving} />}
+              {canManage && (isPublishedOnly ? <div className="border-t border-border pt-4"><Button className="w-full" onClick={() => void createDraftFromPublished(selected.id, type)} disabled={saving}><FilePlus2 className="h-4 w-4" aria-hidden="true" />{t('library_create_draft')}</Button></div> : <div className="grid grid-cols-2 gap-2 border-t border-border pt-4"><Button variant="outline" onClick={() => void duplicate()} disabled={saving}><Copy className="h-4 w-4" aria-hidden="true" />{t('copy')}</Button><Button onClick={() => void saveDraft()} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}{t('save_draft')}</Button><Button className="col-span-2" variant="primary" onClick={() => void publish()} disabled={saving}><Send className="h-4 w-4" aria-hidden="true" />{t('publish_revision', { version: revision.version })}</Button></div>)}
             </CardContent>
           </Card>
 
@@ -376,9 +445,13 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
         </div>
       </div>
 
-      <TemplateRevisionHistory revisions={detailedSelected.revisions} loading={detailsLoading} failed={detailsFailed} />
+      <section id="template-revision-history" tabIndex={-1} className="scroll-mt-4 focus:outline-none">
+        <TemplateRevisionHistory revisions={detailedSelected.revisions} loading={detailsLoading} failed={detailsFailed} />
+      </section>
 
-      <PrintTemplateAssignments template={selected} canManage={canManage} />
+      <section id="template-assignments" tabIndex={-1} className="scroll-mt-4 focus:outline-none">
+        <PrintTemplateAssignments template={selected} canManage={canManage} />
+      </section>
     </div>
   );
 }
