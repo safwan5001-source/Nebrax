@@ -36,6 +36,7 @@ class StocktakeController extends ApiController
     {
         $data = $request->validated();
         $this->assertTenantOwned(Warehouse::class, $data['warehouse_id'], 'المخزن');
+        $this->assertWarehouseAllowed($data['warehouse_id']);
         $this->assertTenantOwnedAll(Product::class, $data['product_ids'] ?? [], 'المنتج');
 
         $stocktake = $this->domain(

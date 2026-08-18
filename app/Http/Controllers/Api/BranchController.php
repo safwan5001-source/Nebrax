@@ -13,7 +13,12 @@ class BranchController extends ApiController
 {
     public function index(): JsonResponse
     {
-        return BranchResource::collection(Branch::orderBy('code')->get())
+        // المقيَّد لا يرى إلا فروعه — القائمة نفسها كشفٌ لبنية المؤسسة.
+        $allowed = request()->user()?->allowedBranchIds();
+
+        return BranchResource::collection(
+            Branch::when($allowed, fn ($q, $ids) => $q->whereIn('id', $ids))->orderBy('code')->get()
+        )
             ->additional(['main_branch_id' => BranchSettings::current()['main_branch_id']])
             ->response();
     }
