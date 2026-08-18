@@ -70,3 +70,32 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
   if (res.status === 204) return null as T;
   return res.json() as Promise<T>;
 }
+
+/** تنزيل ملف خاص من الـ API مع ترويسات المصادقة والفرع النشط. */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  if (isDemo()) return;
+
+  const token = getToken();
+  const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(branchId ? { 'X-Branch-Id': branchId } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, (body as { message?: string }).message ?? 'حدث خطأ', body);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fallbackName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}

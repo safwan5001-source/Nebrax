@@ -46,6 +46,12 @@ class Expense extends BaseModel
         return $this->referenceBelongsTo(Partner::class);
     }
 
+    /** مرجع تحليلي محفوظ في المستند، لا يختفي بعد تغيير سياق الفرع. */
+    public function costCenter(): BelongsTo
+    {
+        return $this->referenceBelongsTo(CostCenter::class);
+    }
+
     public function attachments(): HasMany
     {
         return $this->hasMany(ExpenseAttachment::class);
