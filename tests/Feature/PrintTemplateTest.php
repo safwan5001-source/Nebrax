@@ -308,8 +308,8 @@ class PrintTemplateTest extends TestCase
             ['key' => 'summary', 'visible' => true],
             ['key' => 'terms', 'visible' => true, 'properties' => ['alignment' => 'center', 'static_content' => 'الشروط الثابتة']],
             ['key' => 'bank', 'visible' => true, 'properties' => ['font_size' => 'sm', 'static_content' => 'IBAN: SA00']],
-            ['key' => 'stamp', 'visible' => true, 'properties' => ['image_size' => 'lg']],
-            ['key' => 'signature', 'visible' => true, 'properties' => ['image_size' => 'sm']],
+            ['key' => 'stamp', 'visible' => true, 'properties' => ['image_size' => 'lg', 'image_opacity' => 'soft']],
+            ['key' => 'signature', 'visible' => true, 'properties' => ['image_size' => 'sm', 'image_opacity' => 'solid']],
             ['key' => 'footer', 'visible' => true, 'properties' => ['alignment' => 'end', 'static_content' => 'نص تذييل ثابت']],
         ];
 
@@ -323,7 +323,9 @@ class PrintTemplateTest extends TestCase
             ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.3.id', 'barcode')
             ->assertJsonPath('data.draft_revision.definition.layout.2.properties.columns.5.id', 'price_before_tax')
             ->assertJsonPath('data.draft_revision.definition.layout.6.properties.image_size', 'lg')
+            ->assertJsonPath('data.draft_revision.definition.layout.6.properties.image_opacity', 'soft')
             ->assertJsonPath('data.draft_revision.definition.layout.7.properties.image_size', 'sm')
+            ->assertJsonPath('data.draft_revision.definition.layout.7.properties.image_opacity', 'solid')
             ->assertJsonPath('data.draft_revision.definition.layout.8.properties.static_content', 'نص تذييل ثابت');
 
         $templateId = $created['data']['id'];
@@ -341,7 +343,9 @@ class PrintTemplateTest extends TestCase
         $published = PrintTemplateRevision::findOrFail($revisionId);
         $this->assertSame('الشروط الثابتة', $published->definition['layout'][4]['properties']['static_content']);
         $this->assertSame('lg', $published->definition['layout'][6]['properties']['image_size']);
+        $this->assertSame('soft', $published->definition['layout'][6]['properties']['image_opacity']);
         $this->assertSame('sm', $published->definition['layout'][7]['properties']['image_size']);
+        $this->assertSame('solid', $published->definition['layout'][7]['properties']['image_opacity']);
 
         $this->withToken($token)->postJson('/api/print-templates', [
             'name' => 'خاصية غير مدعومة',
@@ -364,6 +368,19 @@ class PrintTemplateTest extends TestCase
                 ['key' => 'items', 'visible' => true],
                 ['key' => 'summary', 'visible' => true],
                 ['key' => 'stamp', 'visible' => true, 'properties' => ['image_size' => 'xl']],
+                ['key' => 'footer', 'visible' => true],
+            ]],
+        ])->assertUnprocessable();
+
+        $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'شفافية صورة غير صالحة',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['layout' => [
+                ['key' => 'header', 'visible' => true],
+                ['key' => 'parties', 'visible' => true],
+                ['key' => 'items', 'visible' => true],
+                ['key' => 'summary', 'visible' => true],
+                ['key' => 'signature', 'visible' => true, 'properties' => ['image_opacity' => 'transparent']],
                 ['key' => 'footer', 'visible' => true],
             ]],
         ])->assertUnprocessable();

@@ -1,7 +1,7 @@
 import type { Company, Customer, InvoiceDoc } from '@/components/invoices/invoice-document';
 
 import { DEFAULT_DOCUMENT_ITEMS_COLUMNS } from '@/modules/documents/registry/document-types';
-import { getDocumentImagePdfSize, getDocumentImagePdfX } from '@/modules/documents/utils/block-image-size';
+import { getDocumentImagePdfOpacity, getDocumentImagePdfSize, getDocumentImagePdfX, withDocumentImagePdfOpacity } from '@/modules/documents/utils/block-image-size';
 import type { DocBlockAlignment, DocBlockImageSize, DocItemsColumn, DocItemsColumnId, DocSectionLayoutItem, DocSectionProperties } from '@/modules/documents/types';
 
 const PAGE = { width: 210, height: 297, margin: 10, contentWidth: 190 };
@@ -493,9 +493,9 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
   drawContentBlock(input.labels.bank, bankContent, bankProperties);
 
   const assets = [
-    { image: stamp, visible: stampBlock?.visible === true, size: stampBlock?.properties?.image_size, alignment: stampBlock?.properties?.alignment },
-    { image: signature, visible: signatureBlock?.visible === true, size: signatureBlock?.properties?.image_size, alignment: signatureBlock?.properties?.alignment },
-  ].filter((asset): asset is { image: string; visible: true; size: DocBlockImageSize | undefined; alignment: DocBlockAlignment | undefined } => Boolean(asset.image) && asset.visible)
+    { block: 'stamp' as const, image: stamp, visible: stampBlock?.visible === true, size: stampBlock?.properties?.image_size, opacity: stampBlock?.properties?.image_opacity, alignment: stampBlock?.properties?.alignment },
+    { block: 'signature' as const, image: signature, visible: signatureBlock?.visible === true, size: signatureBlock?.properties?.image_size, opacity: signatureBlock?.properties?.image_opacity, alignment: signatureBlock?.properties?.alignment },
+  ].filter((asset): asset is { block: 'stamp' | 'signature'; image: string; visible: true; size: DocBlockImageSize | undefined; opacity: DocSectionProperties['image_opacity']; alignment: DocBlockAlignment | undefined } => Boolean(asset.image) && asset.visible)
     .map((asset) => ({ ...asset, ...getDocumentImagePdfSize(asset.size, 32, 24) }));
   if (assets.length) {
     const gap = 8;
@@ -506,14 +506,18 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
       const totalWidth = historicalAssets.reduce((sum, asset) => sum + asset.width, 0) + (historicalAssets.length - 1) * gap;
       let x = right - totalWidth;
       historicalAssets.forEach((asset) => {
-        drawLogo(pdf, asset.image, x, y, asset.width, asset.height);
+        withDocumentImagePdfOpacity(pdf, getDocumentImagePdfOpacity(asset.block, asset.opacity), () => {
+          drawLogo(pdf, asset.image, x, y, asset.width, asset.height);
+        });
         x += asset.width + gap;
       });
       y += maxHeight + 5;
     }
     assets.filter((asset) => asset.alignment !== undefined).forEach((asset) => {
       if (y + asset.height + 7 > contentBottom) { pdf.addPage(); drawHeader(true); }
-      drawLogo(pdf, asset.image, getDocumentImagePdfX(asset.alignment, PAGE.width, left, right, asset.width), y, asset.width, asset.height);
+      withDocumentImagePdfOpacity(pdf, getDocumentImagePdfOpacity(asset.block, asset.opacity), () => {
+        drawLogo(pdf, asset.image, getDocumentImagePdfX(asset.alignment, PAGE.width, left, right, asset.width), y, asset.width, asset.height);
+      });
       y += asset.height + 5;
     });
   }

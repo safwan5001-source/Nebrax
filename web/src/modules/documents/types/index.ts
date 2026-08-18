@@ -221,6 +221,8 @@ export type DocBlockAlignment = 'start' | 'center' | 'end';
 export type DocBlockFontSize = 'sm' | 'md' | 'lg';
 /** حجم نسبي آمن لكتل الصور؛ غيابه يبقي المراجعات التاريخية على مظهرها الأصلي. */
 export type DocBlockImageSize = 'sm' | 'md' | 'lg';
+/** شفافية مقيدة لكتل الصور؛ غيابها يحفظ المظهر التاريخي الخاص بكل كتلة. */
+export type DocBlockImageOpacity = 'solid' | 'soft' | 'faint';
 
 /** أعمدة جدول البنود التي يستطيع العارض رسمها بالفعل. */
 export type DocItemsColumnId =
@@ -244,6 +246,7 @@ export interface DocSectionProperties {
   alignment?: DocBlockAlignment;
   font_size?: DocBlockFontSize;
   image_size?: DocBlockImageSize;
+  image_opacity?: DocBlockImageOpacity;
   static_content?: string;
 }
 
