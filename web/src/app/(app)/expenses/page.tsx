@@ -70,7 +70,7 @@ export default function ExpensesPage() {
 
   const columns = useMemo<ColumnDef<Expense, unknown>[]>(
     () => [
-      { accessorKey: 'number', header: t('number'), cell: ({ row }) => <span className="num">{row.original.number}</span> },
+      { accessorKey: 'number', header: t('number'), cell: ({ row }) => <Link href={`/expenses/${row.original.id}`} className="num font-medium text-primary hover:underline">{row.original.number}</Link> },
       { id: 'account', header: t('account'), accessorFn: (r) => r.account_name ?? '—', cell: ({ row }) => row.original.account_name ?? '—' },
       { id: 'category', header: t('category'), accessorFn: (r) => r.category_name ?? '—', cell: ({ row }) => row.original.category_name ?? '—' },
       { id: 'vendor', header: t('vendor_name'), accessorFn: (r) => r.vendor_name ?? '—', cell: ({ row }) => row.original.vendor_name ?? '—' },

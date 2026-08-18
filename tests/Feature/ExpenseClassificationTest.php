@@ -130,6 +130,57 @@ class ExpenseClassificationTest extends TestCase
         $this->assertSame($expense['id'], $attachment->expense_id);
     }
 
+    /** تفاصيل المصروف تعرض التصنيف والبائع والقيد والمرفقات الوصفية بلا مسارات التخزين الخاصة. */
+    /** @test */
+    public function expense_detail_exposes_its_supported_operational_data(): void
+    {
+        $auth = $this->registerTenant();
+        $category = $this->category($auth['token'], 'مرافق');
+        $accountId = $this->expenseAccountId($auth['tenant_id']);
+
+        $expense = $this->withToken($auth['token'])->postJson('/api/expenses', [
+            'account_id' => $accountId,
+            'category_id' => $category['id'],
+            'vendor_name' => 'شركة الكهرباء',
+            'description' => 'فاتورة شهرية',
+            'amount' => 100000,
+        ])->assertCreated()['data'];
+
+        $detail = $this->withToken($auth['token'])->getJson("/api/expenses/{$expense['id']}")
+            ->assertOk()['data'];
+
+        $this->assertSame('مرافق', $detail['category_name']);
+        $this->assertSame('شركة الكهرباء', $detail['vendor_name']);
+        $this->assertSame('فاتورة شهرية', $detail['description']);
+        $this->assertArrayNotHasKey('path', $detail['attachments'] ?? []);
+    }
+
+    /** تنزيل المرفق يتحقق من انتمائه للمصروف المرئي ولا يقبل معرّف ملف عشوائياً. */
+    /** @test */
+    public function an_expense_attachment_can_be_downloaded_only_through_its_expense(): void
+    {
+        Storage::fake('local');
+        $auth = $this->registerTenant();
+        $accountId = $this->expenseAccountId($auth['tenant_id']);
+
+        $expense = $this->withToken($auth['token'])->post('/api/expenses', [
+            'account_id' => $accountId,
+            'amount' => 100000,
+            'attachments' => [UploadedFile::fake()->create('receipt.pdf', 120, 'application/pdf')],
+        ], ['Accept' => 'application/json'])->assertCreated()['data'];
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $attachment = ExpenseAttachment::where('expense_id', $expense['id'])->firstOrFail();
+
+        $this->withToken($auth['token'])
+            ->get("/api/expenses/{$expense['id']}/attachments/{$attachment->id}")
+            ->assertOk();
+
+        $this->withToken($auth['token'])
+            ->getJson("/api/expenses/{$expense['id']}/attachments/00000000-0000-0000-0000-000000000000")
+            ->assertNotFound();
+    }
+
     /** تصنيف مستأجر آخر لا يظهر ولا يمكن حقنه في سند مصروف. */
     /** @test */
     public function expense_categories_are_tenant_isolated(): void

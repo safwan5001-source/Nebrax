@@ -175,6 +175,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('expense-categories/{id}', [ExpenseCategoryController::class, 'destroy'])->middleware($perm('expenses.manage'));
         // المصروفات (مستند مالي؛ الترحيل يولّد قيداً متوازناً)
         Route::get('expenses', [ExpenseController::class, 'index'])->middleware($perm('expenses.view'));
+        Route::get('expenses/{id}/attachments/{attachmentId}', [ExpenseController::class, 'downloadAttachment'])->middleware($perm('expenses.view'));
         Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware($perm('expenses.view'));
         Route::post('expenses', [ExpenseController::class, 'store'])->middleware($perm('expenses.manage'));
         Route::post('expenses/{id}/post', [ExpenseController::class, 'post'])->middleware($perm('expenses.manage'));

@@ -12,6 +12,8 @@ use App\Models\Partner;
 use App\Services\Accounting\ExpenseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ExpenseController extends ApiController
 {
@@ -40,17 +42,41 @@ class ExpenseController extends ApiController
         return (new ExpenseResource($expense->load(['account', 'category', 'attachments'])))->response()->setStatusCode(201);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        return (new ExpenseResource(Expense::with(['account', 'category', 'attachments'])->findOrFail($id)))->response();
+        return (new ExpenseResource(
+            $this->visibleExpense($request, $id)->load(['account', 'category', 'partner', 'costCenter', 'attachments'])
+        ))->response();
     }
 
-    public function post(string $id): JsonResponse
+    public function post(Request $request, string $id): JsonResponse
     {
-        $expense = Expense::findOrFail($id);
+        $expense = $this->visibleExpense($request, $id);
         $posted = $this->domain(fn () => $this->expenses->post($expense));
 
-        return (new ExpenseResource($posted->load(['account', 'category', 'attachments'])))->response();
+        return (new ExpenseResource($posted->load(['account', 'category', 'partner', 'costCenter', 'attachments'])))->response();
+    }
+
+    /** تنزيل مرفق خاص بعد إثبات أنه يعود للمصروف المرئي في الفرع النشط. */
+    public function downloadAttachment(Request $request, string $id, string $attachmentId): BinaryFileResponse
+    {
+        $expense = $this->visibleExpense($request, $id);
+        $attachment = $expense->attachments()->whereKey($attachmentId)->firstOrFail();
+        $disk = Storage::disk($attachment->disk);
+
+        if (! $disk->exists($attachment->path)) {
+            abort(404, 'ملف المرفق غير موجود.');
+        }
+
+        return $disk->download($attachment->path, $attachment->original_name, [
+            'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
+        ]);
+    }
+
+    /** المصروفات محاسبية بلا Scope عالمي؛ عرضها وتنفيذ الإجراء عليها يُصفّيان صراحةً بالفرع. */
+    private function visibleExpense(Request $request, string $id): Expense
+    {
+        return $this->scopeToActiveBranch(Expense::query(), $request)->whereKey($id)->firstOrFail();
     }
 
     /** لا يقبل سند جديد تصنيفاً معطلاً أو مخفياً بعزل الفرع. */
