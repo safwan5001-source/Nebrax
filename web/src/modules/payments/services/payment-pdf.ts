@@ -1,6 +1,7 @@
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
 import type { SourcePayment } from '@/modules/documents/builder/from-payment';
-import type { DocBlockAlignment, DocSectionLayoutItem } from '@/modules/documents/types';
+import type { DocBlockAlignment, DocBlockImageSize, DocSectionLayoutItem } from '@/modules/documents/types';
+import { getDocumentImagePdfSize } from '@/modules/documents/utils/block-image-size';
 import { downloadInvoicePdf, shareInvoicePdf } from '@/modules/invoices/services/invoice-pdf';
 
 const PAGE = { width: 210, height: 297, margin: 10, contentWidth: 190 };
@@ -312,17 +313,24 @@ export async function createPaymentPdf(input: PaymentPdfInput): Promise<Blob> {
     y += height;
   }
 
+  const stampBlock = input.templateLayout?.find((block) => block.key === 'stamp');
+  const signatureBlock = input.templateLayout?.find((block) => block.key === 'signature');
   const assets = [
-    { image: stamp, visible: input.templateLayout?.some((block) => block.key === 'stamp' && block.visible) === true },
-    { image: signature, visible: input.templateLayout?.some((block) => block.key === 'signature' && block.visible) === true },
-  ].filter((asset): asset is { image: string; visible: true } => Boolean(asset.image) && asset.visible);
+    { image: stamp, visible: stampBlock?.visible === true, size: stampBlock?.properties?.image_size },
+    { image: signature, visible: signatureBlock?.visible === true, size: signatureBlock?.properties?.image_size },
+  ].filter((asset): asset is { image: string; visible: true; size: DocBlockImageSize | undefined } => Boolean(asset.image) && asset.visible)
+    .map((asset) => ({ ...asset, ...getDocumentImagePdfSize(asset.size, 32, 22) }));
   if (assets.length) {
-    y += 8;
-    if (y + 26 > 268) { pdf.addPage(); y = 25; }
-    const width = 32;
     const gap = 8;
-    const startX = right - assets.length * width - (assets.length - 1) * gap;
-    assets.forEach((asset, index) => drawLogo(pdf, asset.image, startX + index * (width + gap), y, width, 22));
+    const maxHeight = Math.max(...assets.map((asset) => asset.height));
+    y += 8;
+    if (y + maxHeight + 4 > 268) { pdf.addPage(); y = 25; }
+    const totalWidth = assets.reduce((sum, asset) => sum + asset.width, 0) + (assets.length - 1) * gap;
+    let x = right - totalWidth;
+    assets.forEach((asset) => {
+      drawLogo(pdf, asset.image, x, y, asset.width, asset.height);
+      x += asset.width + gap;
+    });
   }
 
   const pages = pdf.getNumberOfPages();

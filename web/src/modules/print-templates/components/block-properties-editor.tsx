@@ -33,6 +33,7 @@ import {
 import type {
   DocBlockAlignment,
   DocBlockFontSize,
+  DocBlockImageSize,
   DocItemsColumn,
   DocItemsColumnId,
   DocSectionKey,
@@ -216,7 +217,7 @@ export function BlockPropertiesEditor({
         </Select>
       </div>
 
-      {(allowed.includes('alignment') || allowed.includes('font_size')) && (
+      {(allowed.includes('alignment') || allowed.includes('font_size') || allowed.includes('image_size')) && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {allowed.includes('alignment') && (
             <div className="space-y-1.5">
@@ -237,6 +238,17 @@ export function BlockPropertiesEditor({
                 <option value="sm">{t('font_size_sm')}</option>
                 <option value="md">{t('font_size_md')}</option>
                 <option value="lg">{t('font_size_lg')}</option>
+              </Select>
+            </div>
+          )}
+          {allowed.includes('image_size') && (
+            <div className="space-y-1.5">
+              <Label htmlFor="template-block-image-size">{t('image_size')}</Label>
+              <Select id="template-block-image-size" value={properties.image_size ?? ''} disabled={disabled} onChange={(event) => update({ image_size: (event.target.value || undefined) as DocBlockImageSize | undefined })}>
+                <option value="">{t('inherit_default')}</option>
+                <option value="sm">{t('image_size_sm')}</option>
+                <option value="md">{t('image_size_md')}</option>
+                <option value="lg">{t('image_size_lg')}</option>
               </Select>
             </div>
           )}
