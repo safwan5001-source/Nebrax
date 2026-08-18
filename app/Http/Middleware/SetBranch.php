@@ -41,15 +41,39 @@ class SetBranch
         //  القيمة غير الصالحة تُتجاهَل بصمت كأنها لم تُرسَل — لا خطأ للمستخدم،
         //  لأنها ليست خطأه: تفضيلٌ قديمٌ في متصفّحه لا طلبٌ غير مشروع.
         //  (SQLite لا يتحقّق من النوع، ولذلك لم يكشفه أي اختبار قبل الإنتاج.)
+        $user = $request->user();
+
         $valid = $requested
             && Str::isUuid($requested)
             // التحقّق يمرّ عبر TenantScope، فلا يمكن تمرير فرع مستأجر آخر.
-            && Branch::whereKey($requested)->exists();
+            && Branch::whereKey($requested)->exists()
+            // ولا فرعاً خارج نطاق المستخدم: الترويسة طلبٌ لا إذن.
+            && (! $user || $user->canAccessBranch($requested));
 
-        $branchId = $valid ? $requested : BranchSettings::current()['main_branch_id'];
+        $branchId = $valid ? $requested : $this->defaultBranchFor($user);
 
         $this->branch->set($branchId ?: null);
 
         return $next($request);
+    }
+
+    /**
+     * الفرع الافتراضي للمستخدم.
+     *
+     * المقيَّد بفروع لا يُوضع في الفرع الرئيسي إن لم يكن منها — وإلا عمل خارج
+     * نطاقه بمجرّد ألّا يرسل ترويسة. فيُختار أوّل فروعه بترتيب الكود ليكون
+     * الافتراض ثابتاً لا عشوائياً. وغير المقيَّد يبقى على الفرع الرئيسي كما كان.
+     */
+    private function defaultBranchFor(?object $user): ?string
+    {
+        $main = BranchSettings::current()['main_branch_id'];
+
+        if (! $user || $user->canAccessBranch($main)) {
+            return $main;
+        }
+
+        return Branch::whereIn('id', $user->allowedBranchIds() ?? [])
+            ->orderBy('code')
+            ->value('id');
     }
 }

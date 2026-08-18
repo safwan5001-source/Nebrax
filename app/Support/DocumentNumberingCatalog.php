@@ -186,6 +186,22 @@ class DocumentNumberingCatalog
         ));
     }
 
+    /**
+     * أصناف النماذج المرقَّمة **بالفرع** — أي ما يحمل رقماً قد يتكرّر بين فرعين.
+     *
+     * يُشتقّ من التصنيف نفسه لا من قائمة مكتوبة، فيبقى مطابقاً للواقع متى
+     * تغيّر تصنيف نموذج. يستعمله حارس حذف الفرع لتحديد ما يمنع الحذف.
+     *
+     * @return array<int, class-string>
+     */
+    public static function branchNumberedModels(): array
+    {
+        return array_values(array_filter(
+            array_map(fn (array $entity) => $entity['model'], self::ENTITIES),
+            fn (string $model) => self::scopeOf($model) === 'branch'
+        ));
+    }
+
     /** وصف كيان واحد كاملاً: نطاقه وسلاسله وأرقامها التالية. */
     public static function describe(string $key): array
     {

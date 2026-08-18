@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\DocumentNumberingCatalog;
 use App\Support\GeneratesDocumentNumbers;
 use App\Support\Settings;
+use App\Tenancy\BranchScope;
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +76,39 @@ class Branch extends BaseModel implements CompanyWide
     public static function documentNumberColumn(): string
     {
         return 'code';
+    }
+
+    /**
+     * هل للفرع مستنداتٌ تمنع حذفه؟
+     *
+     * ═══ لماذا المنع، ولماذا هذه الجداول تحديداً ═══
+     *
+     * `branch_id` على المستندات مُعرَّف `nullOnDelete`، فحذف الفرع **ينقل
+     * مستنداته إلى سلسلة «بلا فرع»** — المحروسة بفهرس جزئي على
+     * `(tenant_id, number) WHERE branch_id IS NULL`. وبما أن الترقيم صار
+     * مستقلاً لكل فرع، يحمل فرعان `INV-2026-00001` مشروعَين؛ فحذف الثاني
+     * بعد الأول يصطدم بذلك الفهرس ويسقط بـ`23505` خاماً لا برسالة مفهومة.
+     *
+     * فالمنع هنا ليس تنظيماً بل تحويلُ عطلٍ صامتٍ إلى رفضٍ مفهوم — والتعطيل
+     * (`is_active`) هو البديل الذي يحفظ البيانات وأرقامها.
+     *
+     * القائمة تُشتقّ من `DocumentNumberingCatalog` لا تُكتب: فهي بالضبط
+     * الجداول التي يتكرّر رقمها بين الفروع، ولا تشمل ما هو `CompanyWide`
+     * (الموظف والمخزن وسمُهما بالفرع وصفيّ ولا يحمل رقماً فرعياً).
+     */
+    public function hasDocuments(): bool
+    {
+        foreach (DocumentNumberingCatalog::branchNumberedModels() as $model) {
+            $exists = $model::withoutGlobalScope(BranchScope::class)
+                ->where('branch_id', $this->id)
+                ->exists();
+
+            if ($exists) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

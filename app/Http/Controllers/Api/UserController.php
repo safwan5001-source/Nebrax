@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
+use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Support\PlanGate;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -28,6 +30,29 @@ class UserController extends ApiController
      * حراسة دور المالك: منح دور owner أو المساس بحساب owner قائم حكرٌ على owner.
      * يمنع تصعيد admin نفسه (أو غيره) إلى مالك، أو تعديل/حذف المالك من دونه.
      */
+    /**
+     * يزامن نطاق وصول المستخدم: فروعه ومستودعاته.
+     *
+     * **المفتاح الغائب يُترك ولا يُمحى** — تحديثٌ جزئيّ لا يجرّد مستخدماً من
+     * نطاقه بالسهو. والمصفوفة الفارغة إلغاءٌ صريح للتقييد (وصولٌ كامل)، وهي
+     * الحالة الافتراضية لكل مستخدم قائم.
+     *
+     * المعرّفات تمرّ بـ`TenantScope` عند التحقّق، فلا يُسنَد فرع أو مستودع
+     * لمستأجر آخر.
+     */
+    private function syncAccessScope(User $user, array $data): void
+    {
+        if (array_key_exists('branch_ids', $data)) {
+            $ids = Branch::whereKey($data['branch_ids'] ?? [])->pluck('id')->all();
+            $user->branches()->sync($ids);
+        }
+
+        if (array_key_exists('warehouse_ids', $data)) {
+            $ids = Warehouse::whereKey($data['warehouse_ids'] ?? [])->pluck('id')->all();
+            $user->warehouses()->sync($ids);
+        }
+    }
+
     private function guardOwnerRole(Request $request, ?User $target = null, ?string $newRole = null): void
     {
         $actorIsOwner = $request->user()->role === 'owner';
@@ -109,7 +134,10 @@ class UserController extends ApiController
             'is_active'   => $data['is_active'] ?? true,
         ]);
 
-        return (new UserResource($user->load('employee')))->response()->setStatusCode(201);
+        $this->syncAccessScope($user, $data);
+
+        return (new UserResource($user->load('employee', 'branches', 'warehouses')))
+            ->response()->setStatusCode(201);
     }
 
     public function update(UpdateUserRequest $request, string $id): JsonResponse
@@ -126,8 +154,9 @@ class UserController extends ApiController
         $this->assertLinkableEmployee($data['employee_id'] ?? null, $user->id);
 
         $user->update($data);
+        $this->syncAccessScope($user, $data);
 
-        return (new UserResource($user->load('employee')))->response();
+        return (new UserResource($user->load('employee', 'branches', 'warehouses')))->response();
     }
 
     public function destroy(Request $request, string $id): JsonResponse

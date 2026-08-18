@@ -770,10 +770,26 @@ class ReportService
     protected function branchIds(array $filters): ?array
     {
         $raw = $filters['branch_id'] ?? null;
-        if ($raw === null || $raw === '' || $raw === []) {
-            return null;
+        $ids = $raw === null || $raw === '' || $raw === []
+            ? []
+            : array_values(array_filter(is_array($raw) ? $raw : [$raw]));
+
+        // ═══════════════════════════════════════════════════════════
+        //  نطاق المستخدم يحدّ المطلوب — لا العكس
+        // ═══════════════════════════════════════════════════════════
+        //  التقرير المجمّع يكشف أرقام كل الفروع، فمستخدمٌ مقيَّد بفرعٍ لا يجوز
+        //  أن يراها بمجرّد إغفال المرشّح. فإن كان مقيَّداً: يُقاطَع المطلوب مع
+        //  فروعه، وإن لم يطلب شيئاً فُرِضت فروعه كلها.
+        //
+        //  والمقاطعة تُفرَّغ عمداً حين يطلب فرعاً ليس له: تُعاد فروعه هو، فلا
+        //  يتسرّب رقمٌ من خارج نطاقه ولا يُعاد تقريرٌ فارغٌ يُوهم بأن لا بيانات.
+        $allowed = auth()->user()?->allowedBranchIds();
+
+        if ($allowed !== null) {
+            $ids = $ids === [] ? $allowed : array_values(array_intersect($ids, $allowed));
+
+            return $ids === [] ? $allowed : $ids;
         }
-        $ids = array_values(array_filter(is_array($raw) ? $raw : [$raw]));
 
         return $ids === [] ? null : $ids;
     }
