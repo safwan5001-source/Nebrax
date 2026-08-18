@@ -956,7 +956,8 @@
       "system": "النظام",
       "pos": "نقطة البيع",
       "branches": "الفروع",
-      "purchases": "المشتريات"
+      "purchases": "المشتريات",
+      "finance": "المالية"
     },
     "invoices": "الفواتير وعروض الأسعار",
     "pos": "نقطة البيع",
@@ -1041,7 +1042,11 @@
       "finance": "المالية والموارد",
       "admin": "الإدارة"
     },
-    "numberingSettings": "إعدادات الترقيم المتسلسل"
+    "numberingSettings": "إعدادات الترقيم المتسلسل",
+    "receiptVouchers": "سندات القبض",
+    "cashAndBank": "خزائن وحسابات بنكية",
+    "employeeCustodies": "عُهَد الموظفين",
+    "financeSettings": "إعدادات المالية"
   },
   "partnerProfile": {
     "back": "رجوع",
