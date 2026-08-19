@@ -46,7 +46,7 @@ export default function CashBankTransferPage() {
     event.preventDefault();
     setSaving(true);
     try {
-      await api('/cash-bank-transfers', { method: 'POST', body: JSON.stringify({ source_cash_bank_account_id: form.source, destination_cash_bank_account_id: form.destination, amount: riyalToMinor(form.amount), transfer_date: form.date, reference: form.reference || null, notes: form.notes || null }) });
+      await api('/cash-bank-transfers', { method: 'POST', body: { source_cash_bank_account_id: form.source, destination_cash_bank_account_id: form.destination, amount: riyalToMinor(form.amount), transfer_date: form.date, reference: form.reference || null, notes: form.notes || null } });
       success(t('transfer_success'));
       router.push(`/cash-and-bank/${form.source}`);
     } catch (err) { toastError(err instanceof ApiError ? err.message : tc('saveFailed')); }
@@ -55,7 +55,7 @@ export default function CashBankTransferPage() {
 
   async function savePolicy(value: boolean) {
     setAllowNegative(value); setPolicySaving(true);
-    try { await api('/settings/finance', { method: 'PUT', body: JSON.stringify({ allow_negative_transfer_balance: value }) }); success(t('settings_saved')); }
+    try { await api('/settings/finance', { method: 'PUT', body: { allow_negative_transfer_balance: value } }); success(t('settings_saved')); }
     catch (err) { setAllowNegative(!value); toastError(err instanceof ApiError ? err.message : tc('saveFailed')); }
     finally { setPolicySaving(false); }
   }
