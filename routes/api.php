@@ -225,8 +225,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('invoices/{id}', [InvoiceController::class, 'show'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}/payments', [InvoiceController::class, 'payments'])->middleware($perm('payments.view'));
         Route::get('invoices/{id}/accounting', [InvoiceController::class, 'accounting'])->middleware($perm('reports.view'));
+        Route::get('invoices/{id}/notes', [InvoiceController::class, 'notes'])->middleware($perm('invoices.view'));
+        Route::get('invoices/{id}/notes/{noteId}/attachments/{attachmentId}/download', [InvoiceController::class, 'downloadNoteAttachment'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}/zatca', [InvoiceController::class, 'zatca'])->middleware($perm('zatca.view'));
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
+        Route::post('invoices/{id}/notes', [InvoiceController::class, 'storeNote'])->middleware($perm('invoices.manage'));
         Route::put('invoices/{id}', [InvoiceController::class, 'update'])->middleware($perm('invoices.manage')); // مسوّدة فقط
         Route::delete('invoices/{id}', [InvoiceController::class, 'destroy'])->middleware($perm('invoices.manage')); // مسوّدة فقط
         Route::post('invoices/{id}/post', [InvoiceController::class, 'post'])->middleware($perm('invoices.manage'));
