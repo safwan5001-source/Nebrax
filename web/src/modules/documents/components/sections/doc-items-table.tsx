@@ -10,6 +10,25 @@ import { blockTextClassName, useDocBlockProperties } from '../doc-block-properti
 
 const DEFAULT_COLUMNS: readonly DocItemsColumn[] = DEFAULT_DOCUMENT_ITEMS_COLUMNS.map((id) => ({ id }));
 
+/**
+ * الخط الأحادي مخصص للأرقام والأكواد القابلة للمقارنة فقط. لا يُطبّق على
+ * اسم المنتج أو وصفه؛ فقد يَسقط الخط الاحتياطي في تشكل عربي متباعد عند التصدير.
+ */
+const MONOSPACE_VALUE_COLUMNS = new Set<DocItemsColumnId>([
+  'number',
+  'product_code',
+  'barcode',
+  'quantity',
+  'price_before_tax',
+  'unit_price',
+  'tax',
+  'total',
+]);
+
+export function usesMonospaceValue(column: DocItemsColumnId): boolean {
+  return MONOSPACE_VALUE_COLUMNS.has(column);
+}
+
 /** خصائص صفّ رأس الجدول حسب نمط القالب. */
 function headRow(style: TemplateStyle): { className: string; style?: CSSProperties } {
   switch (style.tableHead) {
@@ -28,7 +47,7 @@ function textAlignmentClass(alignment: DocBlockAlignment): string {
 }
 
 function defaultAlignment(column: DocItemsColumnId): DocBlockAlignment {
-  return column === 'description' || column === 'product_code' || column === 'barcode' || column === 'number' ? 'start' : 'end';
+  return column === 'product' || column === 'description' || column === 'product_code' || column === 'barcode' || column === 'number' ? 'start' : 'end';
 }
 
 /** جدول البنود — أعمدة معتمدة قابلة للترتيب والإخفاء والتسمية والمحاذاة. */
@@ -46,7 +65,8 @@ export function DocItemsTable({
   const columns = properties.columns ?? DEFAULT_COLUMNS;
   const labels: Record<DocItemsColumnId, string> = {
     number: '#',
-    description: t('product'),
+    product: t('product'),
+    description: t('description'),
     product_code: t('product_code'),
     barcode: t('barcode'),
     quantity: t('qty'),
@@ -59,7 +79,8 @@ export function DocItemsTable({
   const valueFor = (column: DocItemsColumnId, line: DocumentModel['lines'][number], index: number): string | number => {
     switch (column) {
       case 'number': return index + 1;
-      case 'description': return line.productName || line.description || '—';
+      case 'product': return line.productName || '—';
+      case 'description': return line.description || '—';
       case 'product_code': return line.productCode || '—';
       case 'barcode': return line.barcode || '—';
       case 'quantity': return line.quantity;
@@ -91,7 +112,7 @@ export function DocItemsTable({
                   className={cn(
                     'border-b border-gray-200 p-2',
                     textAlignmentClass(alignment),
-                    column.id !== 'description' && 'num',
+                    usesMonospaceValue(column.id) && 'num',
                     column.id === 'number' && 'text-gray-500',
                     column.id === 'total' && 'font-medium',
                   )}

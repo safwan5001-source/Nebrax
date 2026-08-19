@@ -22,6 +22,12 @@ class StoreUserRequest extends FormRequest
             // ربط اختياري بسجلّ موظف قائم (المستخدم موظفٌ يدخل النظام).
             // ملكية المعرّف وعدم ارتباطه بمستخدم آخر يُتحقّقان في المتحكّم.
             'employee_id' => ['nullable', 'uuid'],
+            // نطاق الوصول: **الغياب لا يعني الحرمان**. مصفوفة فارغة تُلغي
+            // التقييد (وصولٌ كامل)، وعدم الإرسال يُبقي الإسناد كما هو.
+            'branch_ids'      => ['nullable', 'array'],
+            'branch_ids.*'    => ['uuid'],
+            'warehouse_ids'   => ['nullable', 'array'],
+            'warehouse_ids.*' => ['uuid'],
         ];
     }
 }

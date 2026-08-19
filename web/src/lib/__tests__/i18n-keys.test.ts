@@ -86,6 +86,39 @@ function staticCalls(): { file: string; key: string }[] {
   return found;
 }
 
+/**
+ * المفاتيح المكرَّرة **حرفياً** داخل الكائن الواحد.
+ *
+ * `JSON.parse` يوحّدها بصمت (الأخيرة تفوز)، فلا يراها أيُّ فحصٍ يعمل على
+ * الشجرة المحلَّلة — ومنها الفحوص الثلاثة أعلاه. ولذلك يُقرأ النصّ الخام هنا:
+ * مفتاحٌ مكرَّر يعني قيمةً ميتة لا يعرض شيئاً، وتعديلَ المترجم للنسخة الخطأ
+ * فلا يتغيّر شيء في الشاشة — وهو عطلٌ يصعب تفسيره.
+ */
+function duplicateKeys(lang: string): string[] {
+  const lines = readFileSync(join(MESSAGES, `${lang}.json`), 'utf8').split('\n');
+  const stack: string[] = [];
+  const seen = new Map<string, Set<string>>();
+  const dups: string[] = [];
+
+  for (const line of lines) {
+    const key = /^\s*"([^"]+)"\s*:/.exec(line);
+    if (key) {
+      const path = stack.join('.');
+      const keys = seen.get(path) ?? new Set<string>();
+      if (keys.has(key[1])) dups.push(`${lang}: ${path ? `${path}.` : ''}${key[1]}`);
+      keys.add(key[1]);
+      seen.set(path, keys);
+    }
+    if (/^\s*"[^"]+"\s*:\s*\{\s*$/.test(line)) stack.push(key![1]);
+    else if (/^\s*\},?\s*$/.test(line) && stack.length) {
+      seen.delete(stack.join('.'));
+      stack.pop();
+    }
+  }
+
+  return dups;
+}
+
 describe('مفاتيح الترجمة', () => {
   it('يفحص عدداً معتبراً من الاستدعاءات (حارسٌ للحارس)', () => {
     // لو انكسر التعرّف على الاستدعاءات لصار الحارس أخضرَ بلا فحص — وهو أسوأ
@@ -99,6 +132,10 @@ describe('مفاتيح الترجمة', () => {
       .map(({ file, key }) => `${key}  ←  ${file}`);
 
     expect([...new Set(broken)]).toEqual([]);
+  });
+
+  it('لا مفتاح مكرَّر داخل الكائن الواحد', () => {
+    expect([...duplicateKeys('ar'), ...duplicateKeys('en')]).toEqual([]);
   });
 
   it('شجرتا العربية والإنجليزية متطابقتان', () => {

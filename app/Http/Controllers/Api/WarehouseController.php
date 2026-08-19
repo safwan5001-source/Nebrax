@@ -14,7 +14,11 @@ class WarehouseController extends ApiController
 {
     public function index(): JsonResponse
     {
-        return WarehouseResource::collection(Warehouse::orderBy('code')->get())->response();
+        $allowed = request()->user()?->allowedWarehouseIds();
+
+        return WarehouseResource::collection(
+            Warehouse::when($allowed, fn ($q, $ids) => $q->whereIn('id', $ids))->orderBy('code')->get()
+        )->response();
     }
 
     public function show(string $id): JsonResponse

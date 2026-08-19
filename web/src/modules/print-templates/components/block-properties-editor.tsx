@@ -192,7 +192,8 @@ export function BlockPropertiesEditor({
 
   const columnLabels: Record<DocItemsColumnId, string> = {
     number: '#',
-    description: tInvoice('product'),
+    product: tInvoice('product'),
+    description: tInvoice('description'),
     product_code: tInvoice('product_code'),
     barcode: tInvoice('barcode'),
     quantity: tInvoice('qty'),
