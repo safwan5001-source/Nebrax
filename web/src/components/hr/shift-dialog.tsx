@@ -120,7 +120,7 @@ export function ShiftDialog({
           <div className="space-y-1.5">
             <Label htmlFor="shift_branch">{t('branch')}</Label>
             <Select id="shift_branch" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-              <option value="">{t('all_branches')}</option>
+              <option value="">{t('branch_current')}</option>
               {branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
             </Select>
           </div>

@@ -449,7 +449,7 @@
     "hours_short": "h",
     "minutes_short": "m",
     "branch": "Branch",
-    "all_branches": "All branches",
+    "branch_current": "Current branch (default)",
     "search_shifts": "Search shifts…",
     "no_shifts": "No shifts yet",
     "weekdays": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],

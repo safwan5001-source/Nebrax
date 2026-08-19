@@ -2,20 +2,20 @@
 
 namespace App\Models;
 
-use App\Tenancy\BelongsToBranch;
-use App\Tenancy\CompanyWide;
+use App\Tenancy\BranchScoped;
 
 /**
  * @see design-system/foundations/hr-users-architecture.md
  * وردية عمل — تعريف جدولٍ زمني تُسنَد إليه الموظفون لاحقاً.
  *
- * **مشترَكة على مستوى المؤسسة (`CompanyWide`)** كنمط `Employee`: تُسنَد لموظفين
- * مركزيين فلا تُعزل بالفرع. `branch_id` وسمٌ وصفي (الفرع الذي تخدمه) يوسمه
- * `BelongsToBranch` بلا Scope قراءة.
+ * **معزولة بالفرع (`BranchScoped`)** — وفق مرجع دفترة المعتمَد: خلافاً لسجلّ
+ * الموظف المركزي (`CompanyWide`)، وردية العمل **مرتبطة بفرعٍ تشغيلي فعلي**،
+ * فكل فرع يرى ويدير ورديّاته. `BranchScoped` يسم الفرع النشط عند الإنشاء
+ * ويعزل القراءة تلقائياً؛ ووردية `branch_id = null` مشترَكة تُرى من كل الفروع.
  */
-class Shift extends BaseModel implements CompanyWide
+class Shift extends BaseModel
 {
-    use BelongsToBranch;
+    use BranchScoped;
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'name',

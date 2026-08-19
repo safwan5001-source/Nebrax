@@ -118,6 +118,26 @@ class ShiftTest extends TestCase
     }
 
     /** @test */
+    public function shifts_are_isolated_by_active_branch(): void
+    {
+        $auth = $this->registerTenant();
+        $main   = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $khobar = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])
+            ->assertCreated()['data']['id'];
+
+        // وردية أُنشئت من فرع الخبر — تُوسَم بالفرع النشط (BranchScoped).
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $khobar])
+            ->postJson('/api/shifts', $this->payload())->assertCreated();
+
+        // الفرع الرئيسي لا يراها؛ وفرعُها يراها. هذا جوهر BranchScoped الذي
+        // يفرضه مرجع دفترة للورديات (خلافاً لسجلّ الموظف المركزي).
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $main])
+            ->getJson('/api/shifts')->assertOk()->assertJsonCount(0, 'data');
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $khobar])
+            ->getJson('/api/shifts')->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    /** @test */
     public function net_minutes_helper_matches_the_model(): void
     {
         $auth = $this->registerTenant();
