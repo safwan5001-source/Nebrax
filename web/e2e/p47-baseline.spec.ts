@@ -169,3 +169,28 @@ test.describe('P47 — خط الأساس المرئي والتفاعل الآم�
     }
   });
 });
+
+
+test('P47.3: لا يمر Tab عبر درج الجوال المخفي ويعود إلى زر القائمة عند الإغلاق', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await page.goto(`${baseUrl}/document-design`);
+  await expect(page.getByRole('heading', { name: 'مركز قوالب الطباعة' })).toBeVisible();
+
+  const sidebar = page.locator('aside');
+  const menuButton = page.getByRole('button', { name: 'القائمة' });
+  const closeButton = page.getByRole('button', { name: 'إغلاق القائمة' });
+
+  await expect.poll(() => sidebar.evaluate((element) => (element as HTMLElement).inert)).toBe(true);
+  await menuButton.focus();
+  await page.keyboard.press('Tab');
+  await expect.poll(() => sidebar.evaluate((element) => element.contains(document.activeElement))).toBe(false);
+
+  await menuButton.press('Enter');
+  await expect(closeButton).toBeFocused();
+  await expect.poll(() => sidebar.evaluate((element) => (element as HTMLElement).inert)).toBe(false);
+
+  await page.keyboard.press('Escape');
+  await expect(menuButton).toBeFocused();
+  await expect.poll(() => sidebar.evaluate((element) => (element as HTMLElement).inert)).toBe(true);
+});
