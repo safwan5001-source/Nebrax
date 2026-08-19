@@ -164,7 +164,7 @@ const GROUPS: NavGroup[] = [
       { href: '/expenses', icon: Receipt, key: 'expenses', built: true },
       { href: '/receipt-vouchers', icon: FileText, key: 'receiptVouchers', built: true },
       { href: '/cash-and-bank', icon: Building2, key: 'cashAndBank', built: true },
-      { href: '/employee-custodies', icon: Users, key: 'employeeCustodies' },
+      { href: '/employee-custodies', icon: Users, key: 'employeeCustodies', built: true },
       { href: '/finance-settings', icon: SlidersHorizontal, key: 'financeSettings' },
     ],
   },

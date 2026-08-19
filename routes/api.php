@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\EmployeeCustodyController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FinanceSettingsController;
@@ -277,6 +278,15 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('payments/{id}/duplicate', [PaymentController::class, 'duplicate'])->middleware($perm('payments.manage'));
         Route::delete('payments/{id}', [PaymentController::class, 'destroy'])->middleware($perm('payments.manage'));
         Route::post('payments/{id}/post', [PaymentController::class, 'post'])->middleware($perm('payments.manage'));
+
+        // عُهَد الموظفين — الإصدار الأول: مسودة ثم صرف مرحّل؛ التسويات تؤجّل لأنواع التسوية.
+        Route::get('employee-custodies', [EmployeeCustodyController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('employee-custodies/{id}', [EmployeeCustodyController::class, 'show'])->middleware($perm('payments.view'));
+        Route::post('employee-custodies', [EmployeeCustodyController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('employee-custodies/{id}', [EmployeeCustodyController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::post('employee-custodies/{id}/duplicate', [EmployeeCustodyController::class, 'duplicate'])->middleware($perm('payments.manage'));
+        Route::delete('employee-custodies/{id}', [EmployeeCustodyController::class, 'destroy'])->middleware($perm('payments.manage'));
+        Route::post('employee-custodies/{id}/post', [EmployeeCustodyController::class, 'post'])->middleware($perm('payments.manage'));
 
         // المشتريات
         Route::get('purchases', [PurchaseController::class, 'index'])->middleware($perm('purchases.view'));
