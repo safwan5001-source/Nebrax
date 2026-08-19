@@ -1445,7 +1445,33 @@ type MockPrintTemplate = {
   revisions: MockPrintTemplateRevision[];
 };
 
+type MockPrintTemplateAssignment = {
+  id: string;
+  branch_id: string | null;
+  document_type: string;
+  usage: 'print' | 'pdf' | 'thermal';
+  print_template_revision_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
 const mockPrintTemplates: MockPrintTemplate[] = [];
+const mockPrintTemplateAssignments: MockPrintTemplateAssignment[] = [];
+
+function mockRevisionForAssignment(revisionId: string): MockPrintTemplateRevision | null {
+  return mockPrintTemplates
+    .flatMap((template) => template.revisions)
+    .find((revision) => revision.id === revisionId) ?? null;
+}
+
+function mockAssignmentResource(assignment: MockPrintTemplateAssignment) {
+  const revision = mockRevisionForAssignment(assignment.print_template_revision_id);
+  return {
+    ...assignment,
+    scope: assignment.branch_id === null ? 'company' as const : 'branch' as const,
+    revision,
+  };
+}
 
 function createMockPrintTemplate(input: { name?: string; document_types?: unknown; definition?: unknown }): MockPrintTemplate {
   const documentTypes = Array.isArray(input.document_types) && input.document_types.length
@@ -1542,6 +1568,46 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       mockPrintTemplates[index] = template;
       return resolve({ data: template });
     }
+    if (clean === '/print-templates/assignments/default') {
+      const input = (body ?? {}) as {
+        branch_id?: string | null;
+        document_type?: string;
+        usage?: 'print' | 'pdf' | 'thermal';
+        print_template_revision_id?: string;
+      };
+      const revisionId = input.print_template_revision_id ?? '';
+      const revision = mockRevisionForAssignment(revisionId);
+      const documentType = input.document_type ?? '';
+      const usage = input.usage ?? 'print';
+      if (!revision || revision.status !== 'published' || !revision.document_types.includes(documentType)) {
+        return resolve({ data: null });
+      }
+      const branchId = input.branch_id ?? null;
+      const now = new Date().toISOString();
+      const index = mockPrintTemplateAssignments.findIndex((assignment) => (
+        assignment.branch_id === branchId
+        && assignment.document_type === documentType
+        && assignment.usage === usage
+      ));
+      const assignment: MockPrintTemplateAssignment = index >= 0
+        ? {
+          ...mockPrintTemplateAssignments[index],
+          print_template_revision_id: revisionId,
+          updated_at: now,
+        }
+        : {
+          id: `demo-assignment-${mockPrintTemplateAssignments.length + 1}`,
+          branch_id: branchId,
+          document_type: documentType,
+          usage,
+          print_template_revision_id: revisionId,
+          created_at: now,
+          updated_at: now,
+        };
+      if (index >= 0) mockPrintTemplateAssignments[index] = assignment;
+      else mockPrintTemplateAssignments.push(assignment);
+      return resolve({ data: mockAssignmentResource(assignment) });
+    }
     // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
     if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
     if (clean === '/pos/checkout') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body), payment_status: 'paid' } });
@@ -1569,6 +1635,22 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   }
 
   if (clean === '/print-templates') return resolve({ data: mockPrintTemplates });
+  if (clean === '/print-templates/assignments') {
+    return resolve({ data: mockPrintTemplateAssignments.map(mockAssignmentResource) });
+  }
+  if (clean === '/print-templates/resolve') {
+    const query = new URLSearchParams(path.split('?')[1] ?? '');
+    const documentType = query.get('document_type') ?? '';
+    const usage = query.get('usage') ?? 'print';
+    const branchId = query.get('branch_id');
+    const matches = mockPrintTemplateAssignments.filter((assignment) => (
+      assignment.document_type === documentType && assignment.usage === usage
+    ));
+    const resolved = (branchId ? matches.find((assignment) => assignment.branch_id === branchId) : null)
+      ?? matches.find((assignment) => assignment.branch_id === null)
+      ?? null;
+    return resolve({ data: resolved ? mockAssignmentResource(resolved) : null });
+  }
   const printTemplateMatch = clean.match(/^\/print-templates\/([^/]+)$/);
   if (printTemplateMatch) {
     const template = mockPrintTemplates.find((item) => item.id === printTemplateMatch[1]);

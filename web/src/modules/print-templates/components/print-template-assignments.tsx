@@ -18,6 +18,10 @@ import {
   type AssignmentScope,
   type AssignmentUsage,
 } from './print-template-assignment-contract';
+import {
+  resolveAssignmentContext,
+  type AssignmentResolutionItem,
+} from './print-template-assignment-resolution';
 
 interface PublishedRevision {
   id: string;
@@ -40,13 +44,8 @@ interface Branch {
   is_active: boolean;
 }
 
-interface Assignment {
-  id: string;
-  branch_id: string | null;
+interface Assignment extends AssignmentResolutionItem {
   scope: AssignmentScope;
-  document_type: DocumentTypeId;
-  usage: AssignmentUsage;
-  print_template_revision_id: string;
   revision?: {
     id: string;
     version: number;
@@ -78,7 +77,18 @@ export function PrintTemplateAssignments({
   const revision = template.published_revision ?? null;
   const supportedTypes = revision?.document_types ?? [];
   const activeBranches = useMemo(() => branches.filter((branch) => branch.is_active), [branches]);
+  const assignmentContext = useMemo(() => resolveAssignmentContext({
+    assignments: assignments ?? [],
+    scope,
+    branchId,
+    documentType,
+    usage,
+  }), [assignments, branchId, documentType, scope, usage]);
   const t = useTranslations('printTemplateAssignments');
+
+  const assignmentRevisionLabel = (assignment: Assignment | null) => assignment?.revision
+    ? t('revision', { version: assignment.revision.version })
+    : t('resolution_none');
 
   async function load() {
     const [assignmentResponse, branchResponse] = await Promise.all([
@@ -223,9 +233,44 @@ export function PrintTemplateAssignments({
                 </div>
               </div>
 
-              <div className="rounded bg-surface px-3 py-2 text-xs text-muted">
-                {t('revision_hint', { version: revision.version, name: template.name })}
-              </div>
+              <section aria-live="polite" className="space-y-3 rounded border border-border bg-surface p-3">
+                <div>
+                  <h4 className="text-sm font-medium text-text">{t('resolution_title')}</h4>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">{t('resolution_description')}</p>
+                </div>
+
+                {scope === 'branch' && !branchId ? (
+                  <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-relaxed text-text">{t('resolution_select_branch')}</p>
+                ) : (
+                  <dl className="grid gap-3 text-xs sm:grid-cols-2">
+                    <div className="space-y-1 rounded border border-border bg-background px-3 py-2">
+                      <dt className="text-muted">{t('resolution_effective')}</dt>
+                      <dd className="font-medium text-text">{assignmentRevisionLabel(assignmentContext.effective as Assignment | null)}</dd>
+                      <dd className="text-muted">{assignmentContext.effective ? (assignmentContext.effective.branch_id === null ? t('scope_company') : t('resolution_branch_override')) : t('resolution_default_output')}</dd>
+                    </div>
+                    <div className="space-y-1 rounded border border-border bg-background px-3 py-2">
+                      <dt className="text-muted">{t('resolution_save_effect')}</dt>
+                      <dd className="font-medium text-text">
+                        {assignmentContext.target
+                          ? assignmentContext.target.print_template_revision_id === revision.id
+                            ? t('resolution_already_selected')
+                            : t('resolution_replace', { revision: assignmentRevisionLabel(assignmentContext.target as Assignment) })
+                          : scope === 'company'
+                            ? t('resolution_create_company')
+                            : t('resolution_create_branch')}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
+
+                {scope === 'branch' && branchId && assignmentContext.target === null && assignmentContext.companyFallback ? (
+                  <p className="text-xs leading-relaxed text-muted">{t('resolution_fallback', { revision: assignmentRevisionLabel(assignmentContext.companyFallback as Assignment) })}</p>
+                ) : null}
+
+                <p className="rounded bg-background px-3 py-2 text-xs text-muted">
+                  {t('revision_hint', { version: revision.version, name: template.name })}
+                </p>
+              </section>
 
               <div className="flex justify-end">
                 <Button type="submit" disabled={!canManage || saving || (scope === 'branch' && !branchId)}>
