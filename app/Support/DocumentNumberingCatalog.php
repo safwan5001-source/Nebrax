@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Asset;
 use App\Models\Branch;
+use App\Models\CashBankTransfer;
 use App\Models\CreditNote;
 use App\Models\Employee;
 use App\Models\Expense;
@@ -93,6 +94,11 @@ class DocumentNumberingCatalog
                 ['key' => 'received', 'prefix' => 'REC'],
                 ['key' => 'paid', 'prefix' => 'PAY'],
             ],
+        ],
+        'cash_bank_transfer' => [
+            'model'  => CashBankTransfer::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'CBT']],
         ],
         'credit_note' => [
             'model'  => CreditNote::class,

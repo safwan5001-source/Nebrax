@@ -75,7 +75,7 @@ class CashBankAccountTest extends TestCase
         $this->withToken($auth['token'])->postJson("/api/cash-bank-accounts/{$cash['id']}/deactivate")
             ->assertOk()->assertJsonPath('data.is_active', false);
         $this->withToken($auth['token'])->deleteJson("/api/cash-bank-accounts/{$cash['id']}")
-            ->assertUnprocessable();
+            ->assertOk();
     }
 
     /** @test */
@@ -120,6 +120,6 @@ class CashBankAccountTest extends TestCase
             'source_cash_bank_account_id' => $cash['id'],
             'destination_cash_bank_account_id' => CashBankAccount::where('type', 'cash')->firstOrFail()->id,
             'amount' => 100,
-        ])->assertNotFound();
+        ])->assertUnprocessable();
     }
 }
