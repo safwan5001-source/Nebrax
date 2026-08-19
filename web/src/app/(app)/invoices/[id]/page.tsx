@@ -1,17 +1,27 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
-import { ArrowRight, Printer, Download, Share2, FileSpreadsheet, LayoutTemplate, ChevronDown } from 'lucide-react';
+import {
+  ArrowRight, Banknote, BookOpen, CheckCircle2, ChevronDown, Download,
+  FileSpreadsheet, LayoutTemplate, MoreVertical, Pencil, Printer,
+  RotateCcw, Share2, Trash2,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog } from '@/components/ui/dialog';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
+import { Tabs, TabPanel } from '@/components/ui/tabs';
+import { Accordion, AccordionItem } from '@/components/ui/accordion';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
+import { PaymentDialog } from '@/components/payments/payment-dialog';
+import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
@@ -62,12 +72,17 @@ interface Invoice {
   status: string;
   payment_status: string;
   invoice_date: string;
+  due_date: string | null;
   subtotal: string;
+  discount: string;
+  shipping: string;
+  adjustment: string;
   tax_amount: string;
   total: string;
   paid_amount: string;
   remaining: string;
   notes: string | null;
+  cost_center?: { id: string; code: string; name: string } | null;
   lines: Line[];
   print_template_revision_id?: string | null;
   print_template_revision?: FrozenPrintTemplateRevision | null;
@@ -76,12 +91,35 @@ interface Invoice {
   thermal_template_revision_id?: string | null;
   thermal_template_revision?: FrozenPrintTemplateRevision | null;
 }
+interface InvoicePayment {
+  id: string;
+  number: string;
+  payment_date: string | null;
+  method: 'cash' | 'bank';
+  status: string;
+  amount: string;
+  allocated_amount: string;
+}
+interface AccountingEntry {
+  id: string;
+  number: string;
+  date: string | null;
+  status: string;
+  description: string | null;
+  lines: { account_id: string; account_code: string | null; account_name: string | null; description: string | null; debit: string; credit: string }[];
+}
+interface AccountingLinks {
+  sales_entry: AccountingEntry | null;
+  cost_entry: AccountingEntry | null;
+}
 interface Zatca {
   qr: string | null;
   hash: string | null;
   uuid: string | null;
   icv: number | null;
 }
+type PendingAction = 'post' | 'delete' | null;
+type ExportBusy = 'pdf' | 'share' | 'excel' | null;
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = {
   posted: 'positive',
@@ -99,7 +137,6 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const t = useTranslations('invoiceDetail');
   const ti = useTranslations('invoices');
-  const td = useTranslations('invoiceDoc');
   const ts = useTranslations('status');
   const tPrint = useTranslations('documentPrint');
   const locale = useLocale();
@@ -111,7 +148,16 @@ export default function InvoiceDetailPage() {
   const [zatca, setZatca] = useState<Zatca | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [busy, setBusy] = useState<null | 'pdf' | 'share' | 'excel'>(null);
+  const [busy, setBusy] = useState<ExportBusy>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [actioning, setActioning] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [payments, setPayments] = useState<InvoicePayment[]>([]);
+  const [accounting, setAccounting] = useState<AccountingLinks | null>(null);
+  const [relationsLoading, setRelationsLoading] = useState(true);
+  const [relationsUnavailable, setRelationsUnavailable] = useState(false);
+  const [relationSection, setRelationSection] = useState<'payments' | 'accounting'>('payments');
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
@@ -126,23 +172,35 @@ export default function InvoiceDetailPage() {
   const tt = useTranslations('invoiceTemplates');
 
   const partnerName = customer?.name ?? '—';
+  const isDraft = invoice?.status === 'draft';
+  const isPosted = invoice?.status === 'posted';
+  const canCollect = isPosted && invoice?.payment_status !== 'paid';
 
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
+    setRelationsLoading(true);
+    setRelationsUnavailable(false);
     api<{ data: Invoice }>(`/invoices/${id}`)
       .then(async (r) => {
         setInvoice(r.data);
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, z, m, live] = await Promise.allSettled([
+        const [p, z, m, live, paymentRelations, accountingRelations] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
           api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=tax_invoice&usage=print${branchQuery}`),
+          api<{ data: InvoicePayment[] }>(`/invoices/${id}/payments`),
+          api<{ data: AccountingLinks }>(`/invoices/${id}/accounting`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
         if (m.status === 'fulfilled') setCompany(m.value.company);
+        if (paymentRelations.status === 'fulfilled') setPayments(paymentRelations.value.data);
+        if (accountingRelations.status === 'fulfilled') setAccounting(accountingRelations.value.data);
+        setRelationsUnavailable(paymentRelations.status === 'rejected' || accountingRelations.status === 'rejected');
+        setRelationsLoading(false);
+
         // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
         // إعدادات الهوية تفسير مستند تاريخي. المسودات والبيانات القديمة تستخدم
         // إعدادات التوافق الحية إلى أن تصدر.
@@ -153,7 +211,12 @@ export default function InvoiceDetailPage() {
           setFooterText(frozen.footer_text ?? null);
           setShowLogo(frozen.show_logo !== false);
           setLayout(Array.isArray(frozen.layout) && frozen.layout.length ? frozen.layout : null);
-          setLogoUrl(null); setLogoHeight(null); setTermsText(frozen.terms_text ?? null); setBankText(frozen.bank_text ?? null); setStampUrl(null); setSignatureUrl(null);
+          setLogoUrl(null);
+          setLogoHeight(null);
+          setTermsText(frozen.terms_text ?? null);
+          setBankText(frozen.bank_text ?? null);
+          setStampUrl(null);
+          setSignatureUrl(null);
         } else {
           const resolved = live.status === 'fulfilled'
             ? resolveLiveTemplateDefinition(live.value.data, 'tax_invoice')
@@ -163,9 +226,13 @@ export default function InvoiceDetailPage() {
             setThemeId(resolved.themeId);
             setFooterText(resolved.footerText);
             setShowLogo(resolved.showLogo);
-            setLogoUrl(null); setLogoHeight(resolved.logoHeight);
+            setLogoUrl(null);
+            setLogoHeight(resolved.logoHeight);
             setLayout(resolved.layout);
-            setTermsText(resolved.termsText); setBankText(resolved.bankText); setStampUrl(resolved.stampUrl); setSignatureUrl(resolved.signatureUrl);
+            setTermsText(resolved.termsText);
+            setBankText(resolved.bankText);
+            setStampUrl(resolved.stampUrl);
+            setSignatureUrl(resolved.signatureUrl);
           }
         }
       })
@@ -193,21 +260,61 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  if (!invoice) {
-    return <div className="text-muted">{t('not_found')}</div>;
-  }
+  if (!invoice) return <div className="text-muted">{t('not_found')}</div>;
 
   const info: [string, React.ReactNode][] = [
-    [t('partner'), partnerName],
-    [t('date'), <span key="d" className="num">{invoice.invoice_date}</span>],
+    [t('partner'), customer ? <Link href={`/partners/${invoice.partner_id}`} className="text-primary hover:underline">{partnerName}</Link> : partnerName],
+    [t('date'), <span key="date" className="num">{invoice.invoice_date}</span>],
+    [t('due_date'), <span key="due" className="num">{invoice.due_date ?? '—'}</span>],
     [t('payment_type'), invoice.payment_type === 'cash' ? t('cash') : t('credit')],
-    [ti('total'), <span key="t" className="num font-semibold">{formatRiyal(invoice.total)}</span>],
-    [t('paid'), <span key="p" className="num">{formatRiyal(invoice.paid_amount)}</span>],
-    [t('remaining'), <span key="r" className="num">{formatRiyal(invoice.remaining)}</span>],
+    [t('paid'), <span key="paid" className="num font-medium">{formatRiyal(invoice.paid_amount)}</span>],
+    [t('remaining'), <span key="remaining" className="num font-semibold">{formatRiyal(invoice.remaining)}</span>],
+    [t('cost_center'), invoice.cost_center ? <span key="cost-center" className="text-primary">{invoice.cost_center.code} · {invoice.cost_center.name}</span> : t('not_assigned')],
+  ];
+  const financialSummary: [string, string, boolean][] = [
+    [t('subtotal'), invoice.subtotal, false],
+    [t('discount'), invoice.discount, false],
+    [t('shipping'), invoice.shipping, false],
+    [t('adjustment'), invoice.adjustment, false],
+    [t('tax_amount'), invoice.tax_amount, false],
+    [t('grand_total'), invoice.total, true],
   ];
 
+  const relationTabs = [
+    { id: 'payments', label: t('payments'), count: relationsLoading ? undefined : payments.length },
+    { id: 'accounting', label: t('accounting') },
+  ];
+  const paymentMethod = (method: InvoicePayment['method']) => method === 'bank' ? t('bank') : t('cash');
+  const paymentsContent = relationsLoading ? (
+    <div className="space-y-3 p-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+  ) : payments.length === 0 ? (
+    <p className="p-5 text-center text-sm text-muted">{t('no_payments')}</p>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[40rem] text-sm">
+        <thead className="border-b border-border bg-muted/40 text-start text-xs text-muted">
+          <tr><th className="px-4 py-3 font-medium">{t('payment_number')}</th><th className="px-4 py-3 font-medium">{t('payment_date')}</th><th className="px-4 py-3 font-medium">{t('payment_method')}</th><th className="px-4 py-3 font-medium">{t('voucher_amount')}</th><th className="px-4 py-3 font-medium">{t('allocated_amount')}</th><th className="px-4 py-3 font-medium">{t('status')}</th></tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {payments.map((payment) => <tr key={payment.id} className="hover:bg-muted/30"><td className="num px-4 py-3 font-medium text-primary"><Link href={`/payments/${payment.id}`} className="hover:underline">{payment.number}</Link></td><td className="num px-4 py-3 text-text">{payment.payment_date ?? '—'}</td><td className="px-4 py-3 text-text">{paymentMethod(payment.method)}</td><td className="num px-4 py-3 text-text">{formatRiyal(payment.amount)}</td><td className="num px-4 py-3 font-semibold text-text">{formatRiyal(payment.allocated_amount)}</td><td className="px-4 py-3"><Badge tone={statusTone[payment.status] ?? 'muted'}>{ts(payment.status)}</Badge></td></tr>)}
+        </tbody>
+      </table>
+    </div>
+  );
+  const entryContent = (entry: AccountingEntry | null, label: string, empty: string) => (
+    <section className="space-y-3 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-semibold text-text"><BookOpen className="h-4 w-4 text-primary" strokeWidth={1.8} />{label}</h3>{entry && <Badge tone={statusTone[entry.status] ?? 'muted'}>{ts(entry.status)}</Badge>}</div>
+      {entry ? <><dl className="grid grid-cols-2 gap-3 rounded border border-border bg-background p-3 text-sm sm:grid-cols-3"><div><dt className="text-xs text-muted">{t('entry_number')}</dt><dd className="num mt-1 text-text">{entry.number}</dd></div><div><dt className="text-xs text-muted">{t('entry_date')}</dt><dd className="num mt-1 text-text">{entry.date ?? '—'}</dd></div>{entry.description && <div><dt className="text-xs text-muted">{t('description')}</dt><dd className="mt-1 text-text">{entry.description}</dd></div>}</dl><div className="overflow-x-auto"><table className="w-full min-w-[34rem] text-sm"><thead className="border-b border-border bg-muted/40 text-start text-xs text-muted"><tr><th className="px-3 py-2.5 font-medium">{t('account')}</th><th className="px-3 py-2.5 font-medium">{t('description')}</th><th className="px-3 py-2.5 font-medium">{t('debit')}</th><th className="px-3 py-2.5 font-medium">{t('credit_amount')}</th></tr></thead><tbody className="divide-y divide-border">{entry.lines.map((line) => <tr key={`${entry.id}-${line.account_id}-${line.description ?? ''}`}><td className="px-3 py-2.5 text-text"><span className="num text-muted">{line.account_code}</span>{line.account_name && <span> · {line.account_name}</span>}</td><td className="px-3 py-2.5 text-muted">{line.description ?? '—'}</td><td className="num px-3 py-2.5 text-text">{formatRiyal(line.debit)}</td><td className="num px-3 py-2.5 text-text">{formatRiyal(line.credit)}</td></tr>)}</tbody></table></div></> : <p className="rounded border border-dashed border-border bg-background px-3 py-4 text-sm leading-6 text-muted">{empty}</p>}
+    </section>
+  );
+  const accountingContent = relationsLoading ? (
+    <div className="space-y-3 p-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>
+  ) : (
+    <div className="divide-y divide-border">{entryContent(accounting?.sales_entry ?? null, t('sales_entry'), t('no_sales_entry'))}{entryContent(accounting?.cost_entry ?? null, t('cost_entry'), t('no_cost_entry'))}</div>
+  );
+  const relationContent = relationSection === 'payments' ? paymentsContent : accountingContent;
+
   const doc = () => document.getElementById('print-root');
-  // حجم ورق القالب المختار (A4 افتراضياً، أو الحراري) — يوجّه الـ PDF والطباعة.
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
   const frozenThermalDefinition = invoice.thermal_template_revision?.definition ?? null;
@@ -262,12 +369,12 @@ export default function InvoiceDetailPage() {
           [t('remaining'), Number(invoice.remaining)],
         ],
         columns: [t('description'), t('qty'), t('unit_price'), t('tax'), ti('total')],
-        rows: invoice.lines.map((l) => [
-          l.description ?? '—',
-          l.quantity,
-          Number(l.unit_price),
-          Number(l.line_tax),
-          Number(l.line_total),
+        rows: invoice.lines.map((line) => [
+          line.description ?? '—',
+          line.quantity,
+          Number(line.unit_price),
+          Number(line.line_tax),
+          Number(line.line_total),
         ]),
         sheetName: 'Invoice',
       });
@@ -279,89 +386,210 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  async function confirmAction() {
+    if (!pendingAction || !invoice) return;
+    setActioning(true);
+    try {
+      if (pendingAction === 'post') {
+        await api(`/invoices/${invoice.id}/post`, { method: 'POST' });
+        success(t('post_success'));
+        setPendingAction(null);
+        load();
+      } else {
+        await api(`/invoices/${invoice.id}`, { method: 'DELETE' });
+        success(t('delete_success'));
+        router.push('/invoices');
+      }
+    } catch {
+      errorToast(t('action_failed'));
+    } finally {
+      setActioning(false);
+    }
+  }
+
+  const documentControls = (
+    <>
+      <Button variant="outline" size="sm" onClick={handleExcel} disabled={!!busy}>
+        <FileSpreadsheet className="h-4 w-4" strokeWidth={1.7} />
+        {t('excel')}
+      </Button>
+      <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={!!busy}>
+        <Download className="h-4 w-4" strokeWidth={1.7} />
+        {busy === 'pdf' ? t('generating') : t('download_pdf')}
+      </Button>
+      <Button variant="outline" size="sm" onClick={handleShare} disabled={!!busy}>
+        <Share2 className="h-4 w-4" strokeWidth={1.7} />
+        {busy === 'share' ? t('generating') : t('share')}
+      </Button>
+      <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'print-root')} disabled={!!busy}>
+        <Printer className="h-4 w-4" strokeWidth={1.7} />
+        {t('print')}
+      </Button>
+    </>
+  );
+
+  const workControls = (
+    <>
+      {isDraft && (
+        <Link href={`/invoices/${invoice.id}/edit`}>
+          <Button variant="outline" size="sm"><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Button>
+        </Link>
+      )}
+      {isDraft && (
+        <Button size="sm" onClick={() => setPendingAction('post')} disabled={actioning}>
+          <CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />
+          {t('post')}
+        </Button>
+      )}
+      {canCollect && (
+        <Button size="sm" onClick={() => setPaymentOpen(true)}>
+          <Banknote className="h-4 w-4" strokeWidth={1.7} />
+          {t('add_payment')}
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/invoices')} aria-label={t('back')}>
-          <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
-        <h1 className="num text-xl font-semibold text-text">{invoice.number}</h1>
-        <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
-        <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
-        <div className="no-print ms-auto flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExcel} disabled={!!busy}>
-            <FileSpreadsheet className="h-4 w-4" strokeWidth={1.7} />
-            {t('excel')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={!!busy}>
-            <Download className="h-4 w-4" strokeWidth={1.7} />
-            {busy === 'pdf' ? t('generating') : t('download_pdf')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleShare} disabled={!!busy}>
-            <Share2 className="h-4 w-4" strokeWidth={1.7} />
-            {busy === 'share' ? t('generating') : t('share')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'print-root')} disabled={!!busy}>
-            <Printer className="h-4 w-4" strokeWidth={1.7} />
-            {t('print')}
-          </Button>
-          {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
-            <Button variant="outline" size="sm" onClick={() => printDocument(thermalPaper, 'thermal-print-root')} disabled={!!busy}>
-              <Printer className="h-4 w-4" strokeWidth={1.7} />
-              {tPrint('thermal_print')}
+      <header className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2">
+            <Button variant="ghost" size="icon" className="no-print shrink-0" onClick={() => router.push('/invoices')} aria-label={t('back')}>
+              <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
             </Button>
-          )}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="num text-xl font-semibold text-text">{invoice.number}</h1>
+                <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
+                <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
+              </div>
+              <p className="mt-1 text-sm text-muted">{isDraft ? t('post_confirm') : t('payment_section_note')}</p>
+            </div>
+          </div>
+          <div className="no-print hidden flex-wrap items-center justify-end gap-2 lg:flex">
+            {workControls}
+            {documentControls}
+            <Dropdown
+              align="end"
+              menuLabel={t('actions')}
+              triggerLabel={t('actions')}
+              triggerClassName="h-8 border border-border px-2 text-text hover:bg-primary-soft"
+              trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}
+            >
+              {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
+              {customer && <DropdownItem icon={ArrowRight} href={`/partners/${invoice.partner_id}`}>{t('open_customer')}</DropdownItem>}
+              {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+                <DropdownItem icon={Printer} onClick={() => printDocument(thermalPaper, 'thermal-print-root')}>{tPrint('thermal_print')}</DropdownItem>
+              )}
+              {isDraft && <DropdownItem icon={Trash2} tone="danger" onClick={() => setPendingAction('delete')}>{t('delete')}</DropdownItem>}
+            </Dropdown>
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
+        <div className="no-print -mx-4 overflow-x-auto px-4 lg:hidden">
+          <div className="flex w-max gap-2">
+            {workControls}
+            <Dropdown
+              align="end"
+              menuLabel={t('actions')}
+              triggerLabel={t('actions')}
+              triggerClassName="h-8 border border-border bg-surface px-2 text-text hover:bg-primary-soft"
+              trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}
+            >
+              {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
+              {customer && <DropdownItem icon={ArrowRight} href={`/partners/${invoice.partner_id}`}>{t('open_customer')}</DropdownItem>}
+              <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
+              <DropdownItem icon={Download} onClick={handleDownloadPdf}>{t('download_pdf')}</DropdownItem>
+              <DropdownItem icon={FileSpreadsheet} onClick={handleExcel}>{t('excel')}</DropdownItem>
+              {isDraft && <DropdownItem icon={Trash2} tone="danger" onClick={() => setPendingAction('delete')}>{t('delete')}</DropdownItem>}
+            </Dropdown>
+          </div>
+        </div>
+      </header>
+
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Card className="xl:col-span-2">
+          <CardHeader className="flex-row items-center justify-between gap-3">
             <CardTitle>{t('details')}</CardTitle>
+            {customer && <Link href={`/partners/${invoice.partner_id}`} className="text-sm text-primary hover:underline">{t('open_customer')}</Link>}
           </CardHeader>
           <CardContent>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-              {info.map(([k, v]) => (
-                <div key={k}>
-                  <dt className="text-xs text-muted">{k}</dt>
-                  <dd className="text-text">{v}</dd>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
+              {info.map(([key, value]) => (
+                <div key={key}>
+                  <dt className="text-xs text-muted">{key}</dt>
+                  <dd className="mt-1 text-text">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="mt-5 border-t border-border pt-4">
+              <p className="text-xs text-muted">{t('notes')}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-text">{invoice.notes || t('no_notes')}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>{t('vat_status')}</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge tone={zatca?.qr ? 'positive' : 'muted'}>{zatca?.qr ? t('vat_generated') : t('vat_not_generated')}</Badge>
+            </div>
+            {zatca?.qr ? (
+              <div className="flex items-center gap-3">
+                <div className="rounded bg-white p-2"><QRCodeSVG value={zatca.qr} size={76} level="M" /></div>
+                <dl className="min-w-0 space-y-1 text-xs text-muted">
+                  <div className="flex justify-between gap-3"><dt>ICV</dt><dd className="num text-text">{zatca.icv}</dd></div>
+                  <div className="truncate" title={zatca.uuid ?? ''}>UUID: <span className="num text-text">{zatca.uuid}</span></div>
+                </dl>
+              </div>
+            ) : <p className="text-sm text-muted">{t('zatca_pending')}</p>}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <Card>
+          <CardHeader><CardTitle>{t('financial_summary')}</CardTitle></CardHeader>
+          <CardContent>
+            <dl className="divide-y divide-border">
+              {financialSummary.map(([label, value, strong]) => (
+                <div key={label} className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+                  <dt className={strong ? 'font-medium text-text' : 'text-sm text-muted'}>{label}</dt>
+                  <dd className={`num ${strong ? 'text-base font-semibold text-text' : 'text-sm text-text'}`}>{formatRiyal(value)}</dd>
                 </div>
               ))}
             </dl>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('zatca')}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-3">
-            {zatca?.qr ? (
-              <>
-                <div className="rounded bg-white p-3">
-                  <QRCodeSVG value={zatca.qr} size={140} level="M" />
-                </div>
-                <div className="w-full space-y-1 text-xs text-muted">
-                  <div className="flex justify-between gap-2">
-                    <span>ICV</span>
-                    <span className="num text-text">{zatca.icv}</span>
-                  </div>
-                  <div className="truncate" title={zatca.uuid ?? ''}>
-                    UUID: <span className="num text-text">{zatca.uuid}</span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="py-6 text-xs text-muted">{t('zatca_pending')}</p>
-            )}
+        <Card className="h-fit">
+          <CardHeader><CardTitle>{t('add_payment')}</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm leading-6 text-muted">{canCollect ? t('collect_available') : t('fully_paid')}</p>
+            <div className="flex items-center justify-between gap-3 rounded border border-border bg-background px-3 py-2.5">
+              <span className="text-sm text-muted">{t('remaining')}</span>
+              <span className="num text-sm font-semibold text-text">{formatRiyal(invoice.remaining)}</span>
+            </div>
+            {canCollect && <Button className="w-full" onClick={() => setPaymentOpen(true)}><Banknote className="h-4 w-4" strokeWidth={1.7} />{t('add_payment')}</Button>}
           </CardContent>
         </Card>
-      </div>
+      </section>
 
-      {/* معاينة قالب الفاتورة الضريبية A4 (مرئية على الشاشة + مصدر الطباعة/الـ PDF) */}
+      <section aria-label={t('relations')}>
+        {relationsUnavailable && <p className="mb-3 rounded border border-border bg-muted/40 px-3 py-2 text-sm text-text">{t('relations_unavailable')}</p>}
+        <Card className="hidden lg:block">
+          <CardHeader><CardTitle>{t('relations')}</CardTitle></CardHeader>
+          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as 'payments' | 'accounting')} />
+          <CardContent className="p-0"><TabPanel id={relationSection}>{relationContent}</TabPanel></CardContent>
+        </Card>
+        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => setRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => setRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
+      </section>
+
       <Card>
         <CardHeader className="no-print flex flex-row items-center justify-between gap-3">
-          <CardTitle>{t('preview')}</CardTitle>
+          <CardTitle>{t('document')}</CardTitle>
           <Dropdown
             align="end"
             menuLabel={t('template')}
@@ -374,15 +602,13 @@ export default function InvoiceDetailPage() {
               </>
             }
           >
-            {listTemplates().map((d) => (
-              <DropdownItem key={d.id} onClick={() => setTemplateId(d.id)}>
-                {tt(d.nameKey)}
-              </DropdownItem>
+            {listTemplates().map((definition) => (
+              <DropdownItem key={definition.id} onClick={() => setTemplateId(definition.id)}>{tt(definition.nameKey)}</DropdownItem>
             ))}
           </Dropdown>
         </CardHeader>
         <CardContent className="print:p-0">
-          <div className="rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
+          <div className="rounded border border-border bg-background p-3 print:border-0 print:bg-transparent print:p-0">
             <DocumentScaler>
               <InvoiceDocument
                 invoice={invoice}
@@ -421,8 +647,38 @@ export default function InvoiceDetailPage() {
         />
       )}
 
-      {/* سجلّ التغييرات — لا يُطبع مع المستند. */}
-      <RevisionLog type="invoice" id={id} />
+      <section aria-label={t('activity')}><RevisionLog type="invoice" id={id} /></section>
+
+      <PaymentDialog
+        open={paymentOpen}
+        onClose={() => setPaymentOpen(false)}
+        onSaved={load}
+        fixedDirection="received"
+        initialInvoice={{ id: invoice.id, partnerId: invoice.partner_id, remaining: invoice.remaining }}
+      />
+      <CreateReturnDialog
+        open={returnOpen}
+        onClose={() => setReturnOpen(false)}
+        onCreated={load}
+        fixedType="sales"
+        initialSalesInvoice={{ id: invoice.id, partnerId: invoice.partner_id }}
+      />
+
+      <Dialog
+        open={pendingAction !== null}
+        onClose={() => (actioning ? null : setPendingAction(null))}
+        title={pendingAction === 'post' ? t('post') : t('delete_title')}
+      >
+        <p className="text-sm leading-6 text-text">
+          {pendingAction === 'post' ? t('post_confirm') : <>{t('delete_confirm')} <span className="num font-medium">{invoice.number}</span>؟</>}
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="outline" disabled={actioning} onClick={() => setPendingAction(null)}>{t('retry')}</Button>
+          <Button variant={pendingAction === 'delete' ? 'danger' : 'primary'} disabled={actioning} onClick={confirmAction}>
+            {pendingAction === 'post' ? t('post') : t('delete')}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

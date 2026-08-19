@@ -29,6 +29,11 @@ class InvoiceResource extends JsonResource
             'due_date'       => optional($this->due_date)->toDateString(),
             'notes'          => $this->notes,
             'cost_center_id' => $this->cost_center_id,
+            'cost_center' => $this->whenLoaded('costCenter', fn () => $this->costCenter ? [
+                'id'   => $this->costCenter->id,
+                'code' => $this->costCenter->code,
+                'name' => $this->costCenter->name,
+            ] : null),
             'salesperson_id' => $this->salesperson_id,
             // لقطة مرجع الطباعة عند الترحيل؛ null للمسوّدات والبيانات التاريخية.
             'print_template_revision_id' => $this->print_template_revision_id,
