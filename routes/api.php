@@ -48,6 +48,7 @@ use App\Http\Controllers\Api\ReturnSourcesController;
 use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesReportController;
 use App\Http\Controllers\Api\SalesSettingsController;
+use App\Http\Controllers\Api\SettlementTypeController;
 use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
@@ -258,6 +259,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.
         Route::get('settings/finance', [FinanceSettingsController::class, 'show'])->middleware($perm('payments.view'));
         Route::put('settings/finance', [FinanceSettingsController::class, 'update'])->middleware($perm('payments.manage'));
+
+        // أنواع التسوية: بيانات رئيسية مشتركة؛ لا تنشئ قيداً حتى تُبنى تسويات العُهَد.
+        Route::get('settlement-types', [SettlementTypeController::class, 'index'])->middleware($perm('payments.view'));
+        Route::post('settlement-types', [SettlementTypeController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('settlement-types/{id}', [SettlementTypeController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::delete('settlement-types/{id}', [SettlementTypeController::class, 'destroy'])->middleware($perm('payments.manage'));
 
         // الخزائن والحسابات البنكية والتحويلات الداخلية
         Route::get('cash-bank-accounts', [CashBankAccountController::class, 'index'])->middleware($perm('payments.view'));
