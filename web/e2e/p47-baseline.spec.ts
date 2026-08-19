@@ -439,3 +439,26 @@ test('P47.2: يوثق تنقل لوحة المفاتيح وتكشف تبويبا
   await saveEvidence('p47-2-mobile-360-tabs-keyboard', endState);
   await page.screenshot({ path: 'test-results/p47-baseline/p47-2-mobile-360-tabs-keyboard.png', fullPage: true });
 });
+
+
+test('P47.2: تحقق إجراءات رأس الاستوديو وأدوات البنية هدف لمس 44px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await openStudioForP472(page, 'touch-targets-mobile-360');
+
+  for (const name of ['العودة إلى المكتبة', 'قالب جديد', 'نسخ', 'حفظ المسودة', 'نشر المراجعة 1']) {
+    const action = page.getByRole('button', { name });
+    await action.scrollIntoViewIfNeeded();
+    await expectTargetsAtLeast44(action);
+  }
+
+  const structureTab = page.getByRole('tab', { name: 'البنية' });
+  await structureTab.click();
+  await expect(structureTab).toHaveAttribute('aria-selected', 'true');
+
+  const structurePanel = page.locator('#template-structure-panel');
+  await structurePanel.scrollIntoViewIfNeeded();
+  await expectTargetsAtLeast44(structurePanel.getByRole('button'));
+  expect(await page.evaluate(() => window.innerWidth)).toBe(360);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
+});

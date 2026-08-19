@@ -475,7 +475,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
       <header className="rounded-xl border border-border bg-surface p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <Button variant="ghost" size="sm" className="-ms-2 mb-2" onClick={() => setSurface('library')}>
+            <Button variant="ghost" size="sm" className="-ms-2 mb-2 h-11" onClick={() => setSurface('library')}>
               {locale === 'ar' ? <ChevronRight className="h-4 w-4" aria-hidden="true" /> : <ChevronLeft className="h-4 w-4" aria-hidden="true" />}
               {t('back_to_library')}
             </Button>
@@ -487,19 +487,19 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
             <p className="mt-1 text-sm text-muted">{t('workspace_last_saved', { date: lastSaveLabel })}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {canManage && <Button variant="outline" onClick={createTemplate}><FilePlus2 className="h-4 w-4" aria-hidden="true" />{t('new_template')}</Button>}
+            {canManage && <Button variant="outline" className="h-11" onClick={createTemplate}><FilePlus2 className="h-4 w-4" aria-hidden="true" />{t('new_template')}</Button>}
             {canManage && (isPublishedOnly ? (
-              <Button onClick={() => void createDraftFromPublished(selected.id, type)} disabled={saving}><FilePlus2 className="h-4 w-4" aria-hidden="true" />{t('library_create_draft')}</Button>
+              <Button className="h-11" onClick={() => void createDraftFromPublished(selected.id, type)} disabled={saving}><FilePlus2 className="h-4 w-4" aria-hidden="true" />{t('library_create_draft')}</Button>
             ) : (
               <>
-                <Button variant="outline" onClick={() => void duplicate()} disabled={saving}><Copy className="h-4 w-4" aria-hidden="true" />{t('copy')}</Button>
-                <Button onClick={() => void saveDraft()} disabled={saving || !layoutValidation.valid} aria-describedby={!layoutValidation.valid ? 'template-validation-action-hint' : undefined}>{saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}{t('save_draft')}</Button>
-                <Button variant="primary" onClick={() => void publish()} disabled={saving || !layoutValidation.valid} aria-describedby={!layoutValidation.valid ? 'template-validation-action-hint' : undefined}><Send className="h-4 w-4" aria-hidden="true" />{t('publish_revision', { version: revision.version })}</Button>
+                <Button variant="outline" className="h-11" onClick={() => void duplicate()} disabled={saving}><Copy className="h-4 w-4" aria-hidden="true" />{t('copy')}</Button>
+                <Button className="h-11" onClick={() => void saveDraft()} disabled={saving || !layoutValidation.valid} aria-describedby={!layoutValidation.valid ? 'template-validation-action-hint' : undefined}>{saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}{t('save_draft')}</Button>
+                <Button variant="primary" className="h-11" onClick={() => void publish()} disabled={saving || !layoutValidation.valid} aria-describedby={!layoutValidation.valid ? 'template-validation-action-hint' : undefined}><Send className="h-4 w-4" aria-hidden="true" />{t('publish_revision', { version: revision.version })}</Button>
               </>
             ))}
           </div>
         </div>
-        {!layoutValidation.valid && <div id="template-validation-action-hint" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text"><span>{t('workspace_publish_blocked')}</span><Button size="sm" variant="ghost" onClick={() => revealValidation()}>{t('workspace_review_issues')}</Button></div>}
+        {!layoutValidation.valid && <div id="template-validation-action-hint" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text"><span>{t('workspace_publish_blocked')}</span><Button size="sm" variant="ghost" className="h-11" onClick={() => revealValidation()}>{t('workspace_review_issues')}</Button></div>}
       </header>
 
       {validationRequested && validationIssues.length > 0 && <section id="template-validation-summary" tabIndex={-1} role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-4 focus:outline-none"><h2 className="text-sm font-semibold text-text">{t('validation_summary_title')}</h2><p className="mt-1 text-sm text-muted">{t('validation_summary_hint')}</p><div className="mt-3 flex flex-wrap gap-2">{validationIssues.map((issue, index) => <Button key={`${issue.code}-${index}`} size="sm" variant="outline" onClick={() => revealValidation(issue.target)}>{validationLabel(issue)}</Button>)}</div></section>}
