@@ -244,3 +244,16 @@ test('P47: تحقق أدوات غلاف الجوال وقوائمه هدف لم�
   await page.setViewportSize({ width: 1280, height: 900 });
   await expectTargetsAtLeast44(page.locator('header input:visible'));
 });
+
+
+test('P47.1: تحقق عناصر مركز القوالب الظاهرة هدف لمس 44px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await page.goto(`${baseUrl}/document-design`);
+  await expect(page.getByRole('heading', { name: 'مركز قوالب الطباعة' })).toBeVisible();
+
+  await expectTargetsAtLeast44(page.locator('#template-center-search'));
+  const documentTypeButtons = page.locator('section[aria-labelledby="template-center-families-title"] button');
+  await documentTypeButtons.first().scrollIntoViewIfNeeded();
+  await expectTargetsAtLeast44(documentTypeButtons);
+});

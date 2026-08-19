@@ -86,7 +86,7 @@ export function PrintTemplateCenter({ templates, loadState, onOpenDocumentType, 
                 <p className="mt-1 text-sm text-muted">{t('center_load_failed_hint')}</p>
               </div>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+            <Button type="button" variant="outline" size="sm" className="h-11" onClick={onRetry}>
               <RotateCcw className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('center_retry')}
             </Button>
@@ -103,7 +103,7 @@ export function PrintTemplateCenter({ templates, loadState, onOpenDocumentType, 
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="ps-9"
+            className="h-11 ps-9"
             placeholder={t('center_search_placeholder')}
           />
         </div>
