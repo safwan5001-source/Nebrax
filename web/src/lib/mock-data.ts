@@ -1450,6 +1450,33 @@ export const mockAttendance = [
   att('at5', { id: 'em-5', name: 'فهد المطيري' }, '2026-08-18', null, null, 'absent'),
 ];
 
+// كتالوج الصلاحيات القابلة للإسناد — نظير App\Support\Rbac::PERMISSIONS.
+export const mockPermissionCatalogue = [
+  'partners.view', 'partners.manage', 'products.view', 'products.manage',
+  'invoices.view', 'invoices.manage', 'payments.view', 'payments.manage',
+  'purchases.view', 'purchases.manage', 'returns.view', 'returns.manage',
+  'hr.view', 'hr.manage', 'expenses.view', 'expenses.manage',
+  'assets.view', 'assets.manage', 'cost_centers.view', 'cost_centers.manage',
+  'accounts.view', 'accounts.manage', 'branches.view', 'branches.manage',
+  'company.manage', 'users.view', 'users.manage', 'roles.view', 'roles.manage',
+  'reports.view', 'zatca.view',
+];
+
+export const mockRoles = [
+  { id: 'ro-owner', slug: 'owner', name: 'المالك', permissions: ['*'], is_system: true, is_owner: true, users_count: 1 },
+  { id: 'ro-admin', slug: 'admin', name: 'مدير', permissions: ['*'], is_system: true, is_owner: false, users_count: 1 },
+  { id: 'ro-acc', slug: 'accountant', name: 'محاسب', permissions: [
+    'partners.view', 'partners.manage', 'invoices.view', 'invoices.manage',
+    'payments.view', 'payments.manage', 'reports.view', 'accounts.view',
+  ], is_system: true, is_owner: false, users_count: 2 },
+  { id: 'ro-staff', slug: 'staff', name: 'موظف', permissions: [
+    'partners.view', 'products.view', 'invoices.view', 'reports.view',
+  ], is_system: true, is_owner: false, users_count: 3 },
+  { id: 'ro-cashier', slug: 'role-cashier', name: 'كاشير الفرع', permissions: [
+    'invoices.view', 'invoices.manage', 'payments.view', 'payments.manage',
+  ], is_system: false, is_owner: false, users_count: 1 },
+];
+
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
@@ -1777,6 +1804,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: list });
   }
   if (clean === '/payroll-runs') return resolve({ data: mockPayrollRuns });
+  if (clean === '/roles') return resolve({ data: mockRoles, meta: { permissions: mockPermissionCatalogue } });
 
   if (clean === '/inventory') return resolve(mockInventory());
   const movementsMatch = clean.match(/^\/inventory\/([^/]+)\/movements$/);
