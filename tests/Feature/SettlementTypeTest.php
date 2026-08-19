@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 /**
  * أنواع التسوية إعدادات مؤسسة لا تولد قيوداً. الاستخدام المالي الفعلي يُختبر
