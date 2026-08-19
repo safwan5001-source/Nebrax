@@ -14,6 +14,7 @@ import { InvoiceDocument } from '@/components/invoices/invoice-document';
 import { SectionDesigner } from '@/components/settings/section-designer';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { api } from '@/lib/api';
+import { notifyCompanyUpdated } from '@/lib/company';
 import { fileToResizedDataUrl } from '@/lib/image';
 import { listTemplates } from '@/modules/documents/registry/templates';
 import { THEME_IDS, themeSwatch } from '@/modules/documents/themes';
@@ -105,6 +106,8 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
     setSaving(true);
     try {
       await api('/sales-config/designs', { method: 'PUT', body: { data: cfg } });
+      // يحدّث /me الشعار من إعدادات المؤسسة؛ تُعيد القشرة قراءته فور الحفظ.
+      notifyCompanyUpdated();
       success(t('saved'));
     } catch {
       errorToast(t('save_failed'));

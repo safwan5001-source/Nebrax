@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from './api';
 
 export interface Company {
@@ -13,15 +13,27 @@ export interface Company {
   logo?: string | null;
 }
 
-/** يجلب بيانات الشركة (البائع) من /me لاستخدامها في رؤوس المستندات. */
+const COMPANY_UPDATED_EVENT = 'nebrax:company-updated';
+
+/** تخبر قشرة التطبيق بأن بيانات الشركة، ومنها شعارها، حُفّظت في الإعدادات. */
+export function notifyCompanyUpdated(): void {
+  window.dispatchEvent(new Event(COMPANY_UPDATED_EVENT));
+}
+
+/** يجلب بيانات الشركة (البائع) من /me لاستخدامها في رؤوس المستندات والقشرة. */
 export function useCompany(): Company | null {
   const [company, setCompany] = useState<Company | null>(null);
-
-  useEffect(() => {
+  const loadCompany = useCallback(() => {
     api<{ company: Company }>('/me')
       .then((r) => setCompany(r.company))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadCompany();
+    window.addEventListener(COMPANY_UPDATED_EVENT, loadCompany);
+    return () => window.removeEventListener(COMPANY_UPDATED_EVENT, loadCompany);
+  }, [loadCompany]);
 
   return company;
 }
