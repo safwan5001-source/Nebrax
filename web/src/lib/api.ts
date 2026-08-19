@@ -39,9 +39,10 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
   const token = getToken();
   // الفرع النشط — يوسم به الخادمُ المستنداتِ وسطورَ قيدها (بلا ترويسة: الفرع الرئيسي).
   const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
+  const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(branchId ? { 'X-Branch-Id': branchId } : {}),
     ...(options.headers as Record<string, string> | undefined),
@@ -50,7 +51,7 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: options.body !== undefined ? (isFormData ? options.body as FormData : JSON.stringify(options.body)) : undefined,
   });
 
   if (res.status === 401 && typeof window !== 'undefined') {
@@ -68,4 +69,33 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
 
   if (res.status === 204) return null as T;
   return res.json() as Promise<T>;
+}
+
+/** تنزيل ملف خاص من الـ API مع ترويسات المصادقة والفرع النشط. */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  if (isDemo()) return;
+
+  const token = getToken();
+  const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(branchId ? { 'X-Branch-Id': branchId } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, (body as { message?: string }).message ?? 'حدث خطأ', body);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fallbackName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }

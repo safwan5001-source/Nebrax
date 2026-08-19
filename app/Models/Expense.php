@@ -6,6 +6,7 @@ use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Expense extends BaseModel
 {
@@ -15,9 +16,9 @@ class Expense extends BaseModel
 
     protected $fillable = [
         'branch_id',
-        'tenant_id', 'number', 'account_id', 'partner_id', 'cost_center_id', 'expense_date',
-        'payment_method', 'description', 'amount', 'tax_rate', 'tax_amount',
-        'total', 'status', 'journal_entry_id', 'created_by',
+        'tenant_id', 'number', 'account_id', 'category_id', 'partner_id', 'vendor_name',
+        'cost_center_id', 'expense_date', 'payment_method', 'description', 'amount',
+        'tax_rate', 'tax_amount', 'total', 'status', 'journal_entry_id', 'created_by',
     ];
 
     protected $casts = [
@@ -34,9 +35,26 @@ class Expense extends BaseModel
     }
 
     /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
+    public function category(): BelongsTo
+    {
+        return $this->referenceBelongsTo(ExpenseCategory::class);
+    }
+
+    /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
+    }
+
+    /** مرجع تحليلي محفوظ في المستند، لا يختفي بعد تغيير سياق الفرع. */
+    public function costCenter(): BelongsTo
+    {
+        return $this->referenceBelongsTo(CostCenter::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(ExpenseAttachment::class);
     }
 
     public function journalEntry(): BelongsTo

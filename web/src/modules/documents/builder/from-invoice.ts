@@ -7,9 +7,13 @@ import type { DocumentModel } from '../types';
  */
 export interface SourceInvoiceLine {
   id: string;
+  product_name?: string | null;
+  product_code?: string | null;
+  barcode?: string | null;
   description: string | null;
   quantity: number;
   unit_price: string;
+  unit_price_before_tax?: string | null;
   tax_rate: number;
   line_tax: string;
   line_total: string;
@@ -28,6 +32,8 @@ export interface SourceCompany {
   name: string;
   vat_number?: string | null;
   cr_number?: string | null;
+  /** شعار هوية المنشأة كما يعيده /me؛ يُستخدم عند غياب شعار مخصص لتصميم الفاتورة. */
+  logo?: string | null;
 }
 export interface SourceCustomer {
   name: string;
@@ -68,7 +74,9 @@ export function buildInvoiceDocumentModel(input: {
       crNumber: company?.cr_number ?? null,
       tagline: null,
       logoText: null,
-      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : null,
+      // أولوية الشعار: تصميم الفاتورة المخصص ثم شعار هوية المؤسسة. لا تُظهر علامة
+      // احتياطية ما دام الشعار المرفوع للشركة متوفراً عبر /me.
+      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : (company?.logo ?? null),
       logoHeight: logoHeight ?? null,
     },
     buyer: {
@@ -83,9 +91,15 @@ export function buildInvoiceDocumentModel(input: {
     },
     lines: invoice.lines.map((l) => ({
       id: l.id,
+      productName: l.product_name ?? l.description ?? null,
+      productCode: l.product_code ?? null,
+      barcode: l.barcode ?? null,
       description: l.description ?? '',
       quantity: l.quantity,
       unitPrice: riyalToMinor(l.unit_price),
+      priceBeforeTax: l.unit_price_before_tax === null || l.unit_price_before_tax === undefined
+        ? null
+        : riyalToMinor(l.unit_price_before_tax),
       tax: riyalToMinor(l.line_tax),
       total: riyalToMinor(l.line_total),
     })),

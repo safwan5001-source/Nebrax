@@ -390,6 +390,8 @@ export const mockPurchases: MockPurchase[] = [
   purchase('pu-41', 'PUR-2026-0041', 'p5', '2026-06-15', 'posted', 'partial', 'S-8842', [line('l1', 'خدمة شحن حاويات', 1, 4000)]),
   purchase('pu-40', 'PUR-2026-0040', 'p4', '2026-05-30', 'posted', 'unpaid', 'S-8810', [line('l1', 'قطع غيار معدّات', 20, 150)]),
   purchase('pu-39', 'PUR-2026-0039', 'p2', '2026-06-22', 'draft', 'unpaid', null, [line('l1', 'أدوات مكتبية', 1, 1200)]),
+  // بيانات مورد حقيقية في وضع المعاينة: فاتورة آجلة + إشعار مدين + سند صرف.
+  purchase('pu-43', 'PUR-2026-0043', 'p7', '2026-06-15', 'posted', 'partial', 'JZ-4412', [line('l1', 'مضخات صناعية', 10, 1200)]),
 ];
 
 // ── المرتجعات ──────────────────────────────────────────────────────────────
@@ -1042,6 +1044,63 @@ export const mockCostCenterProfit = {
   total_profit: '150950.00',
 };
 
+// تقارير الحسابات العامة في وضع العرض: تطابق عقود Laravel الحقيقية كي يبقى
+// اختبار الواجهة التجريبية كاشفاً لانحراف العقد لا سبباً لانهيار وقت التشغيل.
+export const mockCashFlow = {
+  operating: {
+    inflows: '38250.00', outflows: '14400.00', net: '23850.00',
+    entries: [
+      { date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', inflow: '5750.00', outflow: '0.00', net: '5750.00' },
+      { date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', inflow: '0.00', outflow: '6900.00', net: '-6900.00' },
+    ],
+  },
+  investing: {
+    inflows: '0.00', outflows: '45000.00', net: '-45000.00',
+    entries: [{ date: '2026-06-15', number: 'JRN-2026-0042', description: 'شراء معدات', inflow: '0.00', outflow: '45000.00', net: '-45000.00' }],
+  },
+  financing: {
+    inflows: '60000.00', outflows: '0.00', net: '60000.00',
+    entries: [{ date: '2026-06-01', number: 'JRN-2026-0038', description: 'ضخ رأس مال', inflow: '60000.00', outflow: '0.00', net: '60000.00' }],
+  },
+  net_cash_flow: '38850.00',
+};
+
+export const mockTaxReport = {
+  input_vat: '12150.00',
+  output_vat: '21300.00',
+  net_vat: '9150.00',
+  status: 'payable',
+};
+
+export const mockJournalEntries = {
+  rows: [
+    {
+      entry_id: 'jrn-51', date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', debit: '5750.00', credit: '5750.00',
+      lines: [
+        { account_id: 'a1120', account_code: '1120', account_name: 'البنك', description: null, debit: '5750.00', credit: '0.00' },
+        { account_id: 'a1130', account_code: '1130', account_name: 'العملاء (المدينون)', description: null, debit: '0.00', credit: '5750.00' },
+      ],
+    },
+    {
+      entry_id: 'jrn-49', date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', debit: '6900.00', credit: '6900.00',
+      lines: [
+        { account_id: 'a2110', account_code: '2110', account_name: 'الموردون (الدائنون)', description: null, debit: '6900.00', credit: '0.00' },
+        { account_id: 'a1110', account_code: '1110', account_name: 'الصندوق', description: null, debit: '0.00', credit: '6900.00' },
+      ],
+    },
+  ],
+  total_debit: '12650.00',
+  total_credit: '12650.00',
+};
+
+function accountLedgerFor(accountId: string) {
+  const account = mockAccounts.find((candidate) => candidate.id === accountId) ?? mockAccounts.find((candidate) => candidate.code === '1110')!;
+  const rows = account.code === '1120'
+    ? [{ date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', debit: '5750.00', credit: '0.00', balance: '163520.00' }]
+    : [{ date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', debit: '0.00', credit: '6900.00', balance: '54320.00' }];
+  return { account: { id: account.id, code: account.code, name: account.name }, opening_balance: account.code === '1120' ? '157770.00' : '61220.00', rows, closing_balance: rows[rows.length - 1].balance };
+}
+
 function agingFor(type: string) {
   if (type === 'payable') {
     return {
@@ -1066,14 +1125,298 @@ function agingFor(type: string) {
 
 function partnerStatement(id: string) {
   const p = mockPartners.find((x) => x.id === id) ?? mockPartners[0];
+  const base = { partner: { id: p.id, name: p.name, type: p.type }, opening_balance: '0.00' };
+
+  // عند فتح التقرير عبر المورد، لا نعيد إطلاقاً مستندات مبيعات أو سندات قبض.
+  // المورد p7 لديه دورة متكاملة: شراء آجل، إشعار مدين، ثم سند صرف.
+  if (p.type === 'supplier' || p.type === 'both') {
+    if (p.id !== 'p7') return { ...base, rows: [], closing_balance: '0.00' };
+    return {
+      ...base,
+      rows: [
+        {
+          date: '2026-06-15', number: 'JRN-2026-0043', description: 'فاتورة شراء PUR-2026-0043',
+          debit: '0.00', credit: '13800.00', balance: '-13800.00',
+          source: { kind: 'purchase', id: 'pu-43', label: 'فاتورة شراء PUR-2026-0043', allocations: [] },
+        },
+        {
+          date: '2026-06-19', number: 'JRN-2026-0044', description: 'إشعار مدين DN-2026-0002',
+          debit: '1200.00', credit: '0.00', balance: '-12600.00',
+          source: { kind: 'credit_note', id: 'dn-2', label: 'إشعار مدين DN-2026-0002', allocations: [] },
+        },
+        {
+          date: '2026-06-20', number: 'JRN-2026-0049', description: 'سند صرف PMT-2026-0049',
+          debit: '6900.00', credit: '0.00', balance: '-5700.00',
+          source: {
+            kind: 'payment', id: 'pm-49', label: 'سند صرف PMT-2026-0049',
+            allocations: [{ kind: 'purchase', id: 'pu-43', number: 'PUR-2026-0043', amount: '6900.00' }],
+          },
+        },
+      ],
+      closing_balance: '-5700.00',
+    };
+  }
+
   return {
-    partner: { id: p.id, name: p.name, type: p.type },
-    opening_balance: '0.00',
+    ...base,
     rows: [
-      { date: '2026-06-01', number: 'INV-2026-0117', description: 'فاتورة مبيعات', debit: '12650.00', credit: '0.00', balance: '12650.00' },
-      { date: '2026-06-22', number: 'PMT-2026-0050', description: 'دفعة مستلمة', debit: '0.00', credit: '6325.00', balance: '6325.00' },
+      {
+        date: '2026-06-01', number: 'JRN-2026-0117', description: 'فاتورة مبيعات INV-2026-0117',
+        debit: '12650.00', credit: '0.00', balance: '12650.00',
+        source: { kind: 'invoice', id: 'inv-0117', label: 'فاتورة INV-2026-0117', allocations: [] },
+      },
+      {
+        date: '2026-06-22', number: 'JRN-2026-0050', description: 'دفعة مستلمة PMT-2026-0050',
+        debit: '0.00', credit: '6325.00', balance: '6325.00',
+        source: {
+          kind: 'payment', id: 'pmt-0050', label: 'دفعة PMT-2026-0050',
+          allocations: [{ kind: 'invoice', id: 'inv-0117', number: 'INV-2026-0117', amount: '6325.00' }],
+        },
+      },
     ],
     closing_balance: '6325.00',
+  };
+}
+
+// ── تقرير المبيعات في وضع العرض التجريبي ───────────────────────────────────
+// يبقى هذا المسار محصوراً في `isDemo()`؛ الواجهة الحقيقية تقرأ عقد Laravel نفسه.
+function salesReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'period';
+  const from = query.get('from') ?? '';
+  const to = query.get('to') ?? '';
+  const customerId = query.get('customer_id') ?? '';
+  const paymentStatus = query.get('payment_status') ?? '';
+  const receiptMethod = query.get('receipt_method') ?? '';
+  const money = (value: number) => value.toFixed(2);
+  const inRange = (date: string) => (!from || date >= from) && (!to || date <= to);
+  const invoices = mockInvoices.filter((invoice) => invoice.status === 'posted'
+    && inRange(invoice.invoice_date)
+    && (!customerId || invoice.partner_id === customerId)
+    && (!paymentStatus || invoice.payment_status === paymentStatus));
+  const amount = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const netSales = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.subtotal), 0);
+  const tax = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.tax_amount), 0);
+  const invoiceTotals = { invoices: invoices.length, amount: money(amount(invoices)), net_sales: money(netSales(invoices)), tax: money(tax(invoices)) };
+  const group = <T extends { key: string; label: string }>(items: T[], value: (item: T) => number, countKey: 'invoices' | 'quantity' | 'receipts') => {
+    const buckets = new Map<string, { key: string; label: string; count: number; amount: number }>();
+    items.forEach((item) => {
+      const bucket = buckets.get(item.key) ?? { key: item.key, label: item.label, count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += value(item);
+      buckets.set(item.key, bucket);
+    });
+    return [...buckets.values()].sort((a, b) => b.amount - a.amount).map((bucket) => ({ key: bucket.key, label: bucket.label, [countKey]: bucket.count, amount: money(bucket.amount) }));
+  };
+
+  if (view === 'payments') {
+    const receipts = mockPayments.filter((payment) => payment.direction === 'received' && inRange(payment.payment_date) && (!receiptMethod || payment.method === receiptMethod));
+    const rows = group(receipts.map((payment) => ({ key: payment.payment_date.slice(0, 7), label: payment.payment_date.slice(0, 7), amount: Number(payment.amount) })), (row) => row.amount, 'receipts');
+    return { view, data: rows, totals: { receipts: receipts.length, amount: money(receipts.reduce((sum, receipt) => sum + Number(receipt.amount), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_receipts' } };
+  }
+
+  if (view === 'product') {
+    const rows = group(invoices.flatMap((invoice) => invoice.lines.map((line) => ({ key: line.description ?? 'manual', label: line.description ?? 'بند وصفي', amount: Number(line.line_total), quantity: line.quantity }))), (row) => row.amount, 'quantity');
+    const quantityByProduct = new Map(invoices.flatMap((invoice) => invoice.lines).map((line) => [line.description ?? 'manual', line.quantity]));
+    return { view, data: rows.map((row) => ({ ...row, quantity: quantityByProduct.get(row.key) ?? row.quantity })), totals: { invoices: invoices.length, amount: money(invoices.flatMap((invoice) => invoice.lines).reduce((sum, line) => sum + Number(line.line_total), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+
+  if (view === 'customer') {
+    const rows = group(invoices.map((invoice) => ({ key: invoice.partner_id, label: mockPartners.find((partner) => partner.id === invoice.partner_id)?.name ?? 'غير مسند', amount: Number(invoice.total) })), (row) => row.amount, 'invoices');
+    return { view, data: rows, totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+
+  const periods = group(invoices.map((invoice) => ({ key: invoice.invoice_date.slice(0, 7), label: invoice.invoice_date.slice(0, 7), amount: Number(invoice.total) })), (row) => row.amount, 'invoices');
+  if (view === 'profit') {
+    const rows = periods.map((row) => ({ ...row, revenue: row.amount, cost: '0.00', profit: row.amount, margin_bp: 10000 }));
+    const revenue = netSales(invoices);
+    return { view, data: rows, totals: { revenue: money(revenue), cost: '0.00', profit: money(revenue), margin_bp: 10000 }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+  if (view === 'salesperson') {
+    return { view, data: [{ key: 'unassigned', label: 'غير مسند', invoices: invoices.length, amount: money(amount(invoices)) }], totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+  return { view, data: periods, totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+}
+
+// ── تقرير المشتريات في وضع العرض التجريبي ───────────────────────────────────
+// هذا الموجّه لا يُستدعى إلا مع `isDemo()`؛ وهو يسهّل مراجعة واجهة التقارير
+// المتجاوبة من دون طلب أي بيانات حقيقية أو تغيير منطق تقارير Laravel.
+function purchasesReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'period';
+  const from = query.get('from') ?? '';
+  const to = query.get('to') ?? '';
+  const supplierId = query.get('supplier_id') ?? '';
+  const paymentStatus = query.get('payment_status') ?? '';
+  const paymentMethod = query.get('payment_method') ?? '';
+  const money = (value: number) => value.toFixed(2);
+  const inRange = (date: string) => (!from || date >= from) && (!to || date <= to);
+  const purchases = mockPurchases.filter((purchase) => purchase.status === 'posted'
+    && inRange(purchase.purchase_date)
+    && (!supplierId || purchase.partner_id === supplierId)
+    && (!paymentStatus || purchase.payment_status === paymentStatus));
+  const amount = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.total), 0);
+  const net = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.subtotal), 0);
+  const tax = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.tax_amount), 0);
+  const balance = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.remaining), 0);
+  const totals = {
+    purchases: purchases.length,
+    amount: money(amount(purchases)),
+    net_purchases: money(net(purchases)),
+    tax: money(tax(purchases)),
+    balance: money(balance(purchases)),
+  };
+  const group = <T extends { key: string; label: string }>(items: T[], value: (item: T) => number, countKey: 'purchases' | 'payments') => {
+    const buckets = new Map<string, { key: string; label: string; count: number; amount: number }>();
+    items.forEach((item) => {
+      const bucket = buckets.get(item.key) ?? { key: item.key, label: item.label, count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += value(item);
+      buckets.set(item.key, bucket);
+    });
+    return [...buckets.values()].sort((a, b) => b.amount - a.amount).map((bucket) => ({ key: bucket.key, label: bucket.label, [countKey]: bucket.count, amount: money(bucket.amount) }));
+  };
+
+  if (view === 'payments') {
+    const payments = mockPayments.filter((payment) => payment.direction === 'paid'
+      && inRange(payment.payment_date)
+      && (!paymentMethod || payment.method === paymentMethod));
+    const rows = group(payments.map((payment) => ({ key: payment.payment_date.slice(0, 7), label: payment.payment_date.slice(0, 7), amount: Number(payment.amount) })), (row) => row.amount, 'payments');
+    return { view, data: rows, totals: { payments: payments.length, amount: money(payments.reduce((sum, payment) => sum + Number(payment.amount), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_supplier_payments' } };
+  }
+
+  if (view === 'product') {
+    const rows = group(purchases.flatMap((purchase) => purchase.lines.map((line) => ({ key: line.description ?? 'manual', label: line.description ?? 'بند وصفي', amount: Number(line.line_total), quantity: line.quantity }))), (row) => row.amount, 'purchases');
+    const quantityByProduct = new Map(purchases.flatMap((purchase) => purchase.lines).map((line) => [line.description ?? 'manual', line.quantity]));
+    return { view, data: rows.map((row) => ({ ...row, quantity: quantityByProduct.get(row.key) ?? row.purchases })), totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  if (view === 'supplier' || view === 'balances') {
+    const rows = group(purchases.map((purchase) => ({ key: purchase.partner_id, label: mockPartners.find((partner) => partner.id === purchase.partner_id)?.name ?? 'غير مسند', amount: Number(purchase.total), balance: Number(purchase.remaining) })), (row) => row.amount, 'purchases');
+    if (view === 'balances') {
+      const balances = new Map<string, number>();
+      purchases.forEach((purchase) => balances.set(purchase.partner_id, (balances.get(purchase.partner_id) ?? 0) + Number(purchase.remaining)));
+      return { view, data: rows.map((row) => ({ ...row, balance: money(balances.get(row.key) ?? 0) })), totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+    }
+    return { view, data: rows, totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  if (view === 'employee') {
+    return { view, data: [{ key: 'unassigned', label: 'غير مسند', purchases: purchases.length, amount: money(amount(purchases)) }], totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  const periods = group(purchases.map((purchase) => ({ key: purchase.purchase_date.slice(0, 7), label: purchase.purchase_date.slice(0, 7), amount: Number(purchase.total) })), (row) => row.amount, 'purchases');
+  return { view, data: periods, totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+}
+
+// تقارير العملاء في وضع العرض: عقود مطابقة للـ API، لا استجابة افتراضية فارغة.
+function customersReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'sales';
+  const customer = query.get('customer_id') ?? 'p-customer-1';
+  const customers = [
+    { key: customer, label: 'شركة الروّاد', invoices: 7, amount: '38250.00', balance: '9450.00' },
+    { key: 'p-customer-2', label: 'مؤسسة المدى', invoices: 4, amount: '17400.00', balance: '2200.00' },
+  ];
+
+  if (view === 'balances') {
+    return {
+      view,
+      data: customers,
+      totals: { invoices: 11, amount: '55650.00', balance: '11650.00' },
+      scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_invoices' },
+    };
+  }
+  if (view === 'payments') {
+    return {
+      view,
+      data: [
+        { key: '2026-05', label: '2026-05', receipts: 5, amount: '14800.00' },
+        { key: '2026-06', label: '2026-06', receipts: 8, amount: '21400.00' },
+      ],
+      totals: { receipts: 13, amount: '36200.00' },
+      scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_receipts' },
+    };
+  }
+  if (view === 'appointments') {
+    return {
+      view,
+      data: [
+        { key: customer, label: 'شركة الروّاد', appointments: 4, scheduled: 2, done: 1, cancelled: 1 },
+        { key: 'p-customer-2', label: 'مؤسسة المدى', appointments: 3, scheduled: 1, done: 2, cancelled: 0 },
+      ],
+      totals: { appointments: 7, scheduled: 3, done: 3, cancelled: 1 },
+      scope: { interval: query.get('interval') ?? 'month', source: 'customer_appointments' },
+    };
+  }
+
+  return {
+    view: 'sales',
+    data: customers,
+    totals: { invoices: 11, amount: '55650.00', net_sales: '48391.30', tax: '7258.70' },
+    scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_invoices' },
+  };
+}
+
+// تقارير المخزون في وضع العرض: نفس العقود الصادقة لمسارات API الحية.
+function inventoryReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'value';
+  const snapshot = (source: string) => ({ source, snapshot: true });
+  const history = (source: string) => ({ source, snapshot: false });
+
+  if (view === 'warehouses') {
+    return {
+      view,
+      data: [
+        { key: 'pr2', warehouse_id: 'wh1', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', quantity: 22 },
+        { key: 'pr3', warehouse_id: 'wh2', warehouse: 'مخزن الخبر', branch: 'فرع الخبر', sku: 'SKU-003', label: 'كرتون ورق A4', unit: 'carton', quantity: 130 },
+      ],
+      totals: { items: 2, warehouses: 2, quantity: 152 },
+      scope: snapshot('warehouse_stock_quantities'),
+    };
+  }
+  if (view === 'movements') {
+    return {
+      view,
+      data: [
+        { key: 'mv2', date: '2026-06-24', type: 'out', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', quantity: 3, unit_cost: '760.00', total_cost: '2280.00', balance_quantity: 22, notes: 'بيع عبر فاتورة INV-2026-0118' },
+        { key: 'mv1', date: '2026-06-20', type: 'in', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', quantity: 25, unit_cost: '760.00', total_cost: '19000.00', balance_quantity: 25, notes: 'استلام مخزون مرحّل' },
+      ],
+      totals: { movements: 2, in_quantity: 25, out_quantity: 3, in_cost: '19000.00', out_cost: '2280.00', total_cost: '21280.00' },
+      scope: history('posted_stock_movements'),
+    };
+  }
+  if (view === 'operations') {
+    return {
+      view,
+      data: [
+        { key: 'op2', number: 'ST-2026-00012', date: '2026-06-24', type: 'transfer', warehouse: 'المخزن الرئيسي', target_warehouse: 'مخزن الخبر', branch: 'الفرع الرئيسي', target_branch: 'فرع الخبر', lines: 1, quantity: 3, total_cost: '2280.00' },
+        { key: 'op1', number: 'SR-2026-00008', date: '2026-06-20', type: 'receipt', warehouse: 'المخزن الرئيسي', target_warehouse: null, branch: 'الفرع الرئيسي', target_branch: null, lines: 2, quantity: 31, total_cost: '21850.00' },
+      ],
+      totals: { operations: 2, lines: 3, quantity: 34, total_cost: '24130.00' },
+      scope: history('posted_stock_permits'),
+    };
+  }
+  if (view === 'stocktakes') {
+    return {
+      view,
+      data: [
+        { key: 'stk1', number: 'STK-2026-00004', date: '2026-06-18', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', counted_lines: 4, quantity_difference: -2, difference_value: '-1520.00' },
+      ],
+      totals: { stocktakes: 1, counted_lines: 4, quantity_difference: -2, difference_value: '-1520.00' },
+      scope: history('posted_stocktakes'),
+    };
+  }
+
+  return {
+    view: 'value',
+    data: [
+      { key: 'pr2', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', quantity: 22, reorder_level: 10, avg_cost: '760.00', stock_value: '16720.00' },
+      { key: 'pr3', sku: 'SKU-003', label: 'كرتون ورق A4', unit: 'carton', quantity: 130, reorder_level: 10, avg_cost: '58.00', stock_value: '7540.00' },
+    ],
+    totals: { products: 2, quantity: 152, stock_value: '24260.00' },
+    scope: snapshot('current_tracked_products'),
   };
 }
 
@@ -1086,6 +1429,54 @@ export const mockShifts = [
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
+
+type MockPrintTemplateRevision = {
+  id: string;
+  version: number;
+  status: 'draft' | 'published' | 'superseded';
+  document_types: string[];
+  definition: Record<string, unknown>;
+  created_at: string;
+  published_at?: string | null;
+};
+
+type MockPrintTemplate = {
+  id: string;
+  name: string;
+  status: 'draft' | 'published' | 'archived';
+  source: 'custom';
+  document_types: string[];
+  draft_revision: MockPrintTemplateRevision | null;
+  published_revision: MockPrintTemplateRevision | null;
+  revisions: MockPrintTemplateRevision[];
+};
+
+const mockPrintTemplates: MockPrintTemplate[] = [];
+
+function createMockPrintTemplate(input: { name?: string; document_types?: unknown; definition?: unknown }): MockPrintTemplate {
+  const documentTypes = Array.isArray(input.document_types) && input.document_types.length
+    ? input.document_types.map(String)
+    : ['tax_invoice'];
+  const revision = {
+    id: `demo-template-r${mockPrintTemplates.length + 1}`,
+    version: 1,
+    status: 'draft' as const,
+    document_types: documentTypes,
+    definition: (input.definition && typeof input.definition === 'object' ? input.definition : {}) as Record<string, unknown>,
+    created_at: new Date().toISOString(),
+  };
+  return {
+    id: `demo-template-${mockPrintTemplates.length + 1}`,
+    name: input.name?.trim() || 'قالب معاينة جديد',
+    status: 'draft',
+    source: 'custom',
+    document_types: documentTypes,
+    draft_revision: revision,
+    published_revision: null,
+    revisions: [revision],
+  };
+}
+
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const clean = path.split('?')[0];
   const m = method.toUpperCase();
@@ -1093,6 +1484,70 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   // الطفرات (إنشاء/تعديل/حذف/ترحيل) — نجاح صوري دون أي أثر فعلي.
   if (m !== 'GET') {
     if (clean === '/logout') return resolve(null);
+    if (clean === '/print-templates') {
+      const template = createMockPrintTemplate((body ?? {}) as { name?: string; document_types?: unknown; definition?: unknown });
+      mockPrintTemplates.unshift(template);
+      return resolve({ data: template });
+    }
+    const duplicateTemplate = clean.match(/^\/print-templates\/([^/]+)\/duplicate$/);
+    if (duplicateTemplate) {
+      const source = mockPrintTemplates.find((template) => template.id === duplicateTemplate[1]);
+      const template = createMockPrintTemplate({
+        name: ((body ?? {}) as { name?: string }).name,
+        document_types: source?.document_types,
+        definition: source?.draft_revision?.definition ?? source?.published_revision?.definition,
+      });
+      mockPrintTemplates.unshift(template);
+      return resolve({ data: template });
+    }
+    const draftTemplate = clean.match(/^\/print-templates\/([^/]+)\/draft$/);
+    if (draftTemplate) {
+      const index = mockPrintTemplates.findIndex((template) => template.id === draftTemplate[1]);
+      if (index < 0) return resolve({ data: null });
+      const current = mockPrintTemplates[index];
+      const input = (body ?? {}) as { name?: string; document_types?: unknown; definition?: unknown };
+      const revision: MockPrintTemplateRevision = {
+        id: `${current.id}-r${current.revisions.length + 1}`,
+        version: current.revisions.length + 1,
+        status: 'draft',
+        document_types: Array.isArray(input.document_types) && input.document_types.length
+          ? input.document_types.map(String)
+          : current.document_types,
+        definition: (input.definition && typeof input.definition === 'object'
+          ? input.definition
+          : current.draft_revision?.definition ?? current.published_revision?.definition ?? {}) as Record<string, unknown>,
+        created_at: new Date().toISOString(),
+      };
+      const template: MockPrintTemplate = {
+        ...current,
+        name: input.name?.trim() || current.name,
+        status: 'draft',
+        document_types: revision.document_types,
+        draft_revision: revision,
+        revisions: [...current.revisions, revision],
+      };
+      mockPrintTemplates[index] = template;
+      return resolve({ data: template });
+    }
+    const publishTemplate = clean.match(/^\/print-templates\/([^/]+)\/publish$/);
+    if (publishTemplate) {
+      const index = mockPrintTemplates.findIndex((template) => template.id === publishTemplate[1]);
+      if (index < 0) return resolve({ data: null });
+      const current = mockPrintTemplates[index];
+      const draft = current.draft_revision ?? current.published_revision;
+      if (!draft) return resolve({ data: current });
+      const now = new Date().toISOString();
+      const revision: MockPrintTemplateRevision = { ...draft, status: 'published', published_at: now };
+      const template: MockPrintTemplate = {
+        ...current,
+        status: 'published',
+        draft_revision: null,
+        published_revision: revision,
+        revisions: current.revisions.map((item) => item.id === revision.id ? revision : item),
+      };
+      mockPrintTemplates[index] = template;
+      return resolve({ data: template });
+    }
     // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
     if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
     if (clean === '/pos/checkout') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body), payment_status: 'paid' } });
@@ -1119,6 +1574,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: { id: 'demo-new' } });
   }
 
+  if (clean === '/print-templates') return resolve({ data: mockPrintTemplates });
+  const printTemplateMatch = clean.match(/^\/print-templates\/([^/]+)$/);
+  if (printTemplateMatch) {
+    const template = mockPrintTemplates.find((item) => item.id === printTemplateMatch[1]);
+    return resolve({ data: template ?? null });
+  }
   if (clean === '/me') return resolve({ user: DEMO_USER, company: mockCompany });
   if (clean === '/subscription') return resolve(mockSubscription);
   if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
@@ -1206,10 +1667,19 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const movementsMatch = clean.match(/^\/inventory\/([^/]+)\/movements$/);
   if (movementsMatch) return resolve(mockMovements(movementsMatch[1]));
 
+  if (clean === '/reports/sales') return resolve(salesReportFor(path));
+  if (clean === '/reports/purchases') return resolve(purchasesReportFor(path));
+  if (clean === '/reports/customers') return resolve(customersReportFor(path));
+  if (clean === '/reports/inventory') return resolve(inventoryReportFor(path));
   if (clean === '/reports/income-statement') return resolve(incomeStatementFor(path));
   if (clean === '/reports/balance-sheet') return resolve(mockBalanceSheet);
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);
   if (clean === '/reports/cost-center-profitability') return resolve(mockCostCenterProfit);
+  if (clean === '/reports/cash-flow') return resolve(mockCashFlow);
+  if (clean === '/reports/tax-report') return resolve(mockTaxReport);
+  if (clean === '/reports/journal-entries') return resolve(mockJournalEntries);
+  const ledgerMatch = clean.match(/^\/reports\/account-ledger\/([^/]+)$/);
+  if (ledgerMatch) return resolve(accountLedgerFor(ledgerMatch[1]));
   const agingMatch = clean.match(/^\/reports\/aging\/([^/]+)$/);
   if (agingMatch) return resolve(agingFor(agingMatch[1]));
   const stmtMatch = clean.match(/^\/reports\/partner-statement\/([^/]+)$/);
@@ -1275,6 +1745,27 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (returnMatch) {
     const found = mockReturns.find((r) => r.id === returnMatch[1]) ?? mockReturns[0];
     return resolve({ data: found });
+  }
+
+  // تفاصيل سند القبض/الصرف: القوائم تشير إلى هذا المسار، لذلك نعيد عقداً كاملاً
+  // يطابق API الإنتاج ويمنع ظهور سند فارغ في المعاينة أو التصدير.
+  const paymentMatch = clean.match(/^\/payments\/([^/]+)$/);
+  if (paymentMatch) {
+    const found = mockPayments.find((p) => p.id === paymentMatch[1]) ?? mockPayments[0];
+    const allocations = found.id === 'pm-49'
+      ? [{ label: 'فاتورة شراء PUR-2026-0043', amount: '6900.00' }]
+      : found.id === 'pm-50'
+        ? [{ label: 'فاتورة مبيعات INV-2026-0117', amount: found.amount }]
+        : [];
+    return resolve({
+      data: {
+        ...found,
+        status: 'posted',
+        reference: found.method === 'bank' ? `BNK-${found.number.slice(-4)}` : null,
+        notes: found.direction === 'paid' ? 'سداد مستحق للمورد' : 'تحصيل من العميل',
+        allocations,
+      },
+    });
   }
 
   const runMatch = clean.match(/^\/payroll-runs\/([^/]+)$/);

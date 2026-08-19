@@ -9,6 +9,7 @@ use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Support\Settings;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -45,7 +46,8 @@ class InvoiceService
         protected InventoryService $inventory,
         protected ZatcaService $zatca,
         protected UnitConversion $units,
-        protected PaymentService $payments
+        protected PaymentService $payments,
+        protected PrintTemplateService $printTemplates
     ) {}
 
     /**
@@ -220,6 +222,11 @@ class InvoiceService
                 throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
             }
 
+            // لقطة سعر الوحدة الصافي تُحسب من سعر الوحدة نفسه قبل خصم السطر،
+            // فتظل مستقلة عن كمية السطر ولا تُشتق في طبقة العرض.
+            $unitPriceBeforeTax = $inclusive
+                ? $unitPrice - $this->extractTax($unitPrice, $rate)
+                : $unitPrice;
             $lineGross = $qty * $unitPrice;                    // إجمالي السطر قبل خصمه (متضمِّن أو غير متضمِّن حسب الوضع)
             if ($lineDisc < 0 || $lineDisc > $lineGross) {
                 throw new RuntimeException('خصم السطر لا يمكن أن يتجاوز إجمالي السطر.');
@@ -246,14 +253,18 @@ class InvoiceService
             }
 
             InvoiceLine::create([
-                'invoice_id'    => $invoice->id,
-                'product_id'    => $item['product_id'] ?? null,
-                'description'   => $description,
-                'quantity'      => $qty,
-                'unit_name'     => $unitName,
-                'unit_factor'   => $unitFactor,
-                'unit_price'    => $unitPrice,
-                'tax_rate'      => $rate,
+                'invoice_id'               => $invoice->id,
+                'product_id'               => $item['product_id'] ?? null,
+                'product_name_snapshot'    => $product?->name ?? $description,
+                'product_sku_snapshot'     => $product?->sku,
+                'product_barcode_snapshot' => $product?->barcode,
+                'description'              => $description,
+                'quantity'                 => $qty,
+                'unit_name'                => $unitName,
+                'unit_factor'              => $unitFactor,
+                'unit_price'               => $unitPrice,
+                'unit_price_before_tax'    => $unitPriceBeforeTax,
+                'tax_rate'                 => $rate,
                 'line_subtotal' => $storedSubtotal,
                 'line_discount' => $storedDiscount,
                 'line_tax'      => $lineTax,
@@ -425,8 +436,17 @@ class InvoiceService
             $invoice->total      = $total;
             $zatca = $this->zatca->buildFor($invoice);
 
+            // تُحل المراجعة داخل معاملة الترحيل وتُخزَّن لقطةً؛ لا تغيّر
+            // تعيينات الفرع أو القالب لاحقاً إعادة طباعة فاتورة صدرت بالفعل.
+            $printAssignment = $this->printTemplates->resolve('tax_invoice', 'print', $invoice->branch_id);
+            $pdfAssignment = $this->printTemplates->resolve('tax_invoice', 'pdf', $invoice->branch_id);
+            $thermalAssignment = $this->printTemplates->resolve('tax_invoice', 'thermal', $invoice->branch_id);
+
             $invoice->update([
                 'status'              => 'posted',
+                'print_template_revision_id' => $printAssignment?->print_template_revision_id,
+                'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
+                'thermal_template_revision_id' => $thermalAssignment?->print_template_revision_id,
                 'subtotal'            => $subtotal,
                 'discount'            => $discount,
                 'shipping'            => $shipping,

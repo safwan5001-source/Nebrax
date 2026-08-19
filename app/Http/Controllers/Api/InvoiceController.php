@@ -20,7 +20,7 @@ class InvoiceController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        return InvoiceResource::collection($this->scopeToActiveBranch(Invoice::with('lines')->latest(), $request)->get())->response();
+        return InvoiceResource::collection($this->scopeToActiveBranch(Invoice::with('lines.product')->latest(), $request)->get())->response();
     }
 
     public function store(StoreInvoiceRequest $request): JsonResponse
@@ -36,12 +36,12 @@ class InvoiceController extends ApiController
 
         $invoice = $this->domain(fn () => $this->invoices->create($data, $data['items']));
 
-        return (new InvoiceResource($invoice->load('lines')))->response()->setStatusCode(201);
+        return (new InvoiceResource($invoice->load('lines.product')))->response()->setStatusCode(201);
     }
 
     public function show(string $id): JsonResponse
     {
-        return (new InvoiceResource(Invoice::with('lines')->findOrFail($id)))->response();
+        return (new InvoiceResource(Invoice::with(['lines.product', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])->findOrFail($id)))->response();
     }
 
     /**
@@ -80,7 +80,7 @@ class InvoiceController extends ApiController
         $invoice = Invoice::findOrFail($id);
         $posted = $this->domain(fn () => $this->invoices->post($invoice));
 
-        return (new InvoiceResource($posted->load('lines')))->response();
+        return (new InvoiceResource($posted->load(['lines.product', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
     }
 
     public function zatca(string $id): JsonResponse

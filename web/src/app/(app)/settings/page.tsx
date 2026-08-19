@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { Plus, Trash2, Pencil, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { UserDialog } from '@/components/users/user-dialog';
+import { UserScopeDialog } from '@/components/users/user-scope-dialog';
 import { CompanyDialog } from '@/components/settings/company-dialog';
 import { TaxSettingsCard } from '@/components/settings/tax-settings-card';
 import { useToast } from '@/components/ui/toast';
@@ -16,7 +17,11 @@ import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import type { Company } from '@/lib/company';
 
-interface TeamUser { id: string; name: string; email: string; role: string; is_active: boolean }
+interface TeamUser {
+  id: string; name: string; email: string; role: string; is_active: boolean;
+  // نطاق الوصول — يصل مع القائمة. **الفارغ يعني الكلّ** لا الحرمان.
+  branch_ids?: string[]; warehouse_ids?: string[];
+}
 
 interface Subscription {
   plan: string;
@@ -60,6 +65,7 @@ export default function SettingsPage() {
 
   const [team, setTeam] = useState<TeamUser[]>([]);
   const [userDialog, setUserDialog] = useState(false);
+  const [scopeUser, setScopeUser] = useState<TeamUser | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [companyDialog, setCompanyDialog] = useState(false);
 
@@ -213,6 +219,12 @@ export default function SettingsPage() {
                     <TD className="num text-muted">{u.email}</TD>
                     <TD><Badge tone="muted">{tu(`roles.${u.role}`)}</Badge></TD>
                     <TD className="text-end">
+                      <Button
+                        variant="ghost" size="icon" aria-label={tu('scope_title')}
+                        onClick={() => setScopeUser(u)}
+                      >
+                        <MapPin className="h-4 w-4 text-muted" strokeWidth={1.7} />
+                      </Button>
                       {u.id !== user?.id && (
                         <Button variant="ghost" size="icon" aria-label={tu('remove')} onClick={() => removeUser(u.id)}>
                           <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
@@ -228,6 +240,9 @@ export default function SettingsPage() {
       )}
 
       <UserDialog open={userDialog} onClose={() => setUserDialog(false)} onSaved={loadTeam} />
+      {scopeUser && (
+        <UserScopeDialog user={scopeUser} onClose={() => setScopeUser(null)} onSaved={loadTeam} />
+      )}
       {companyDialog && (
         <CompanyDialog open onClose={() => setCompanyDialog(false)} onSaved={loadCompany} company={company} />
       )}

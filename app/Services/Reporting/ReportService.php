@@ -3,11 +3,15 @@
 namespace App\Services\Reporting;
 
 use App\Models\Account;
+use App\Models\Asset;
 use App\Models\CostCenter;
+use App\Models\CreditNote;
 use App\Models\Invoice;
 use App\Models\JournalLine;
 use App\Models\Partner;
+use App\Models\Payment;
 use App\Models\Purchase;
+use App\Models\ReturnDocument;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -359,6 +363,183 @@ class ReportService
     }
 
     /**
+     * القيود اليومية المرحّلة: كل قيد يُعرض مع سطوره المتوازنة ومصدره المحاسبي.
+     * لا تُستبدل القيود المعكوسة ولا تُخفى: الأصل والعاكس معاً مصدر الحقيقة.
+     *
+     * @param  array  $filters  ['from'=>'Y-m-d'?, 'to'=>'Y-m-d'?, 'branch_id'=>array?, 'account_id'=>uuid?]
+     */
+    public function journalEntries(array $filters = []): array
+    {
+        // نحمّل سطور القيد كاملةً أولاً. مرشح الحساب يختار القيد الذي يظهر، لكنه
+        // لا يبتّر سطوره الأخرى؛ وإلا بدا القيد غير متوازن في التقرير.
+        $from = $filters['from'] ?? null;
+        $to = $filters['to'] ?? null;
+        $allLines = $this->postedLines(fn ($query) => $query, $this->branchIds($filters))
+            ->filter(function (JournalLine $line) use ($from, $to) {
+                $date = $line->entry->entry_date->toDateString();
+                return (! $from || $date >= $from) && (! $to || $date <= $to);
+            })
+            ->values();
+        $entries = $allLines->groupBy('journal_entry_id');
+
+        if (! empty($filters['account_id'])) {
+            $entries = $entries->filter(fn (Collection $lines) => $lines->contains('account_id', $filters['account_id']));
+        }
+        if ($entries->isEmpty()) {
+            return ['rows' => [], 'total_debit' => 0, 'total_credit' => 0];
+        }
+
+        $accountIds = $entries->flatten(1)->pluck('account_id')->unique();
+        $accounts = Account::whereIn('id', $accountIds)->get()->keyBy('id');
+        $rows = [];
+        $totalDebit = $totalCredit = 0;
+
+        foreach ($entries as $lines) {
+            $entry = $lines->first()->entry;
+            $debit = $credit = 0;
+            $mappedLines = [];
+            foreach ($lines as $line) {
+                $lineDebit = (int) $line->debit;
+                $lineCredit = (int) $line->credit;
+                $debit += $lineDebit;
+                $credit += $lineCredit;
+                $account = $accounts->get($line->account_id);
+                $mappedLines[] = [
+                    'account_id'   => $line->account_id,
+                    'account_code' => $account?->code,
+                    'account_name' => $account?->name,
+                    'description'  => $line->description,
+                    'debit'        => $lineDebit,
+                    'credit'       => $lineCredit,
+                ];
+            }
+
+            $rows[] = [
+                'entry_id'     => $entry->id,
+                'date'         => $entry->entry_date->toDateString(),
+                'number'       => $entry->number,
+                'description'  => $entry->description,
+                'source_type'  => $entry->source_type,
+                'source_id'    => $entry->source_id,
+                'debit'        => $debit,
+                'credit'       => $credit,
+                'lines'        => $mappedLines,
+            ];
+            $totalDebit += $debit;
+            $totalCredit += $credit;
+        }
+
+        return ['rows' => $rows, 'total_debit' => $totalDebit, 'total_credit' => $totalCredit];
+    }
+
+    /**
+     * تقرير الضريبة من الحسابين النظاميين فقط: 1150 ضريبة المدخلات و2120 ضريبة
+     * المخرجات. صافي موجب = مستحق للهيئة، وسالب = رصيد قابل للاسترداد/الترحيل.
+     */
+    public function taxReport(array $filters = []): array
+    {
+        $movements = $this->movementsByAccount($filters)->keyBy(fn ($m) => $m['account']->code);
+        $input = (int) ($movements->get('1150')['net'] ?? 0);       // مدين − دائن
+        $output = -(int) ($movements->get('2120')['net'] ?? 0);    // دائن − مدين
+
+        return [
+            'input_vat'  => $input,
+            'output_vat' => $output,
+            'net_vat'    => $output - $input,
+            'status'     => $output - $input >= 0 ? 'payable' : 'recoverable',
+        ];
+    }
+
+    /**
+     * تدفقات نقدية بالطريقة المباشرة: يُجمع أثر النقد والبنك الفعلي لكل قيد
+     * مرحّل، فتُلغى التحويلات الداخلية بين الصندوق والبنك تلقائياً لأن صافيها صفر.
+     * التصنيف شفاف ومحدود: أصل ثابت = استثماري، مقابل حقوق ملكية = تمويلي، وما
+     * عداه تشغيلي. لا تُشتق حركة نقدية من تغيّر الذمم أو اللقطات.
+     */
+    public function cashFlow(array $filters = []): array
+    {
+        $cashAccounts = Account::whereIn('code', ['1110', '1120'])->pluck('id');
+        if ($cashAccounts->isEmpty()) {
+            return $this->emptyCashFlow();
+        }
+
+        $cashLines = $this->postedLines(
+            fn ($query) => $query->whereIn('journal_lines.account_id', $cashAccounts),
+            $this->branchIds($filters),
+        );
+        // نحمل السطور المقابلة دفعة واحدة: التصنيف لا يقرأ وصفاً حراً ولا ينفذ N+1.
+        $cashLines->load('entry.lines');
+        $equityAccountIds = Account::where('type', 'equity')->pluck('id')->all();
+
+        $from = $filters['from'] ?? null;
+        $to = $filters['to'] ?? null;
+        $cashLines = $cashLines->filter(function (JournalLine $line) use ($from, $to) {
+            $date = $line->entry->entry_date->toDateString();
+            return (! $from || $date >= $from) && (! $to || $date <= $to);
+        })->groupBy('journal_entry_id');
+
+        $results = [
+            'operating'  => ['inflows' => 0, 'outflows' => 0, 'net' => 0, 'entries' => []],
+            'investing'  => ['inflows' => 0, 'outflows' => 0, 'net' => 0, 'entries' => []],
+            'financing'  => ['inflows' => 0, 'outflows' => 0, 'net' => 0, 'entries' => []],
+        ];
+
+        foreach ($cashLines as $lines) {
+            $entry = $lines->first()->entry;
+            $net = $lines->sum(fn (JournalLine $line) => (int) $line->debit - (int) $line->credit);
+            if ($net === 0) {
+                continue; // تحويل داخلي بين نقد وبنك، لا تدفق للمنشأة.
+            }
+
+            $category = $this->cashFlowCategory($entry, $cashAccounts->all(), $equityAccountIds);
+            $inflow = $net > 0 ? $net : 0;
+            $outflow = $net < 0 ? -$net : 0;
+            $results[$category]['inflows'] += $inflow;
+            $results[$category]['outflows'] += $outflow;
+            $results[$category]['net'] += $net;
+            $results[$category]['entries'][] = [
+                'date'        => $entry->entry_date->toDateString(),
+                'number'      => $entry->number,
+                'description' => $entry->description,
+                'inflow'      => $inflow,
+                'outflow'     => $outflow,
+                'net'         => $net,
+            ];
+        }
+
+        $netCashFlow = array_sum(array_column($results, 'net'));
+        return [
+            ...$results,
+            'net_cash_flow' => $netCashFlow,
+        ];
+    }
+
+    /** @return array{operating:array, investing:array, financing:array, net_cash_flow:int} */
+    protected function emptyCashFlow(): array
+    {
+        $empty = ['inflows' => 0, 'outflows' => 0, 'net' => 0, 'entries' => []];
+        return ['operating' => $empty, 'investing' => $empty, 'financing' => $empty, 'net_cash_flow' => 0];
+    }
+
+    /**
+     * التصنيف لا يعتمد على نصّ الوصف: الأصل الثابت مصدر استثماري صريح، وتمويل
+     * رأس المال يُعرَف من الطرف المقابل في حقوق الملكية. الباقي نشاط يومي.
+     */
+    protected function cashFlowCategory($entry, array $cashAccountIds, array $equityAccountIds): string
+    {
+        if ($entry->source_type === Asset::class) {
+            return 'investing';
+        }
+
+        $counterpartIds = $entry->lines
+            ->whereNotIn('account_id', $cashAccountIds)
+            ->pluck('account_id');
+        $hasEquity = $counterpartIds->intersect($equityAccountIds)->isNotEmpty();
+
+        return $hasEquity ? 'financing' : 'operating';
+    }
+
+    /**
      * كشف حساب طرف (عميل/مورد): حركاته برصيد جارٍ (موجب = الطرف مدين لنا).
      *
      * @param  array  $filters  ['from'=>'Y-m-d'?, 'to'=>'Y-m-d'?]
@@ -374,6 +555,19 @@ class ReportService
             ->where('journal_lines.partner_type', Partner::class)
             ->where('journal_lines.partner_id', $partnerId), $this->branchIds($filters));
 
+        $role = $filters['partner_role'] ?? null;
+        if (in_array($role, ['customer', 'supplier'], true)) {
+            $sourceRoles = $this->partnerStatementSourceRoles($lines);
+            $lines = $lines->filter(function (JournalLine $line) use ($sourceRoles, $role) {
+                $key = ($line->entry->source_type ?? '') . '#' . ($line->entry->source_id ?? '');
+                // الرصيد الافتتاحي للطرف يُفصل بطبيعة السطر: مدين للعميل، دائن للمورد.
+                if ($line->entry->source_type === Partner::class) {
+                    return $role === 'supplier' ? $line->credit > $line->debit : $line->debit >= $line->credit;
+                }
+                return ($sourceRoles[$key] ?? null) === $role;
+            })->values();
+        }
+
         $opening = 0;
         $rows = [];
         foreach ($lines as $line) {
@@ -388,6 +582,18 @@ class ReportService
             $rows[] = $line;
         }
 
+        // التخصيصات هي مصدر الحقيقة لعلاقة سند القبض/الصرف بالمستندات التي سُدّدت.
+        // نحمّلها دفعة واحدة لتبقى شاشة حركة الحساب بلا N+1 عند كثرة الحركات.
+        $paymentIds = collect($rows)
+            ->filter(fn (JournalLine $line) => $line->entry->source_type === Payment::class)
+            ->map(fn (JournalLine $line) => $line->entry->source_id)
+            ->filter()
+            ->unique()
+            ->values();
+        $payments = $paymentIds->isEmpty()
+            ? collect()
+            : Payment::with('allocations.allocatable')->whereIn('id', $paymentIds)->get()->keyBy('id');
+
         $running = $opening;
         $mapped = [];
         foreach ($rows as $line) {
@@ -399,6 +605,7 @@ class ReportService
                 'debit'       => (int) $line->debit,
                 'credit'      => (int) $line->credit,
                 'balance'     => $running,
+                'source'      => $this->partnerStatementSource($line, $payments),
             ];
         }
 
@@ -407,6 +614,84 @@ class ReportService
             'opening_balance' => $opening,
             'rows'            => $mapped,
             'closing_balance' => $running,
+        ];
+    }
+
+    /**
+     * يعين كل مستند محاسبي إلى دور طرف واحد. لا تُستخدم الخريطة إلا عندما تطلب
+     * الشاشة كشف المورد أو العميل صراحةً لطرف ذي صفتين؛ التقرير العام لا يتغيّر.
+     *
+     * @return array<string, 'customer'|'supplier'>
+     */
+    protected function partnerStatementSourceRoles(Collection $lines): array
+    {
+        $idsFor = fn (string $type) => $lines
+            ->filter(fn (JournalLine $line) => $line->entry->source_type === $type)
+            ->map(fn (JournalLine $line) => $line->entry->source_id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $roles = [];
+        foreach ($idsFor(Invoice::class) as $id) {
+            $roles[Invoice::class . '#' . $id] = 'customer';
+        }
+        foreach ($idsFor(Purchase::class) as $id) {
+            $roles[Purchase::class . '#' . $id] = 'supplier';
+        }
+        foreach (Payment::whereIn('id', $idsFor(Payment::class))->get(['id', 'direction']) as $payment) {
+            $roles[Payment::class . '#' . $payment->id] = $payment->direction === 'paid' ? 'supplier' : 'customer';
+        }
+        foreach (CreditNote::whereIn('id', $idsFor(CreditNote::class))->get(['id', 'type']) as $note) {
+            $roles[CreditNote::class . '#' . $note->id] = $note->type === 'purchase' ? 'supplier' : 'customer';
+        }
+        foreach (ReturnDocument::whereIn('id', $idsFor(ReturnDocument::class))->get(['id', 'type']) as $return) {
+            $roles[ReturnDocument::class . '#' . $return->id] = $return->type === 'purchase' ? 'supplier' : 'customer';
+        }
+
+        return $roles;
+    }
+
+    /**
+     * يطبع مصدر السطر إلى نوع واجهة ثابت، ويعرض تسويات سندات الدفع بلا افتراضات
+     * عن وجود فاتورة واحدة فقط لكل سند.
+     */
+    protected function partnerStatementSource(JournalLine $line, Collection $payments): ?array
+    {
+        $entry = $line->entry;
+        if (!$entry->source_type || !$entry->source_id) {
+            return null;
+        }
+
+        $kind = match ($entry->source_type) {
+            Invoice::class => 'invoice',
+            Payment::class => 'payment',
+            Purchase::class => 'purchase',
+            Partner::class => 'opening',
+            \App\Models\CreditNote::class => 'credit_note',
+            \App\Models\ReturnDocument::class => 'return',
+            default => 'journal',
+        };
+
+        $allocations = [];
+        if ($kind === 'payment' && ($payment = $payments->get($entry->source_id))) {
+            $allocations = $payment->allocations->map(fn ($allocation) => [
+                'kind'   => match ($allocation->allocatable_type) {
+                    Invoice::class => 'invoice',
+                    Purchase::class => 'purchase',
+                    default => 'document',
+                },
+                'id'     => (string) $allocation->allocatable_id,
+                'number' => $allocation->allocatable?->number,
+                'amount' => (int) $allocation->amount,
+            ])->values()->all();
+        }
+
+        return [
+            'kind'        => $kind,
+            'id'          => (string) $entry->source_id,
+            'label'       => $entry->description,
+            'allocations' => $allocations,
         ];
     }
 
@@ -485,10 +770,26 @@ class ReportService
     protected function branchIds(array $filters): ?array
     {
         $raw = $filters['branch_id'] ?? null;
-        if ($raw === null || $raw === '' || $raw === []) {
-            return null;
+        $ids = $raw === null || $raw === '' || $raw === []
+            ? []
+            : array_values(array_filter(is_array($raw) ? $raw : [$raw]));
+
+        // ═══════════════════════════════════════════════════════════
+        //  نطاق المستخدم يحدّ المطلوب — لا العكس
+        // ═══════════════════════════════════════════════════════════
+        //  التقرير المجمّع يكشف أرقام كل الفروع، فمستخدمٌ مقيَّد بفرعٍ لا يجوز
+        //  أن يراها بمجرّد إغفال المرشّح. فإن كان مقيَّداً: يُقاطَع المطلوب مع
+        //  فروعه، وإن لم يطلب شيئاً فُرِضت فروعه كلها.
+        //
+        //  والمقاطعة تُفرَّغ عمداً حين يطلب فرعاً ليس له: تُعاد فروعه هو، فلا
+        //  يتسرّب رقمٌ من خارج نطاقه ولا يُعاد تقريرٌ فارغٌ يُوهم بأن لا بيانات.
+        $allowed = auth()->user()?->allowedBranchIds();
+
+        if ($allowed !== null) {
+            $ids = $ids === [] ? $allowed : array_values(array_intersect($ids, $allowed));
+
+            return $ids === [] ? $allowed : $ids;
         }
-        $ids = array_values(array_filter(is_array($raw) ? $raw : [$raw]));
 
         return $ids === [] ? null : $ids;
     }

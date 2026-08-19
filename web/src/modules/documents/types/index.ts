@@ -19,6 +19,7 @@ export type DocumentTypeId =
   | 'proforma_invoice'
   | 'sales_order'
   | 'purchase_order'
+  | 'purchase_invoice'
   | 'delivery_note'
   | 'packing_list'
   | 'receipt_voucher'
@@ -56,9 +57,15 @@ export interface DocumentSeller extends DocumentParty {
 /** سطر بند — كل المبالغ بالوحدات الصغرى. */
 export interface DocumentLine {
   id: string;
+  /** لقطة هوية المنتج؛ تبقى اختيارية لمستندات لا تملك كتالوج منتجات. */
+  productName?: string | null;
+  productCode?: string | null;
+  barcode?: string | null;
   description: string;
   quantity: number;
   unitPrice: number; // minor units
+  /** سعر الوحدة قبل الضريبة؛ تجهزه طبقة المصدر ولا يُشتق في العارض. */
+  priceBeforeTax?: number | null;
   tax: number;       // minor units
   total: number;     // minor units (شامل الضريبة للسطر)
 }
@@ -68,6 +75,8 @@ export interface DocumentTotals {
   subtotal: number;
   discount?: number;
   shipping?: number;
+  /** فرق تسوية موجب أو سالب؛ يستخدمه الشراء للحفاظ على تطابق الإجمالي المطبوع. */
+  adjustment?: number;
   tax: number;
   total: number;
 }
@@ -205,10 +214,50 @@ export type DocSectionKey =
   | 'header' | 'barcode' | 'parties' | 'items' | 'summary' | 'voucher'
   | 'amountWords' | 'notes' | 'terms' | 'bank' | 'stamp' | 'signature' | 'footer';
 
-/** عنصر تخطيط: قسم + ظهوره. ترتيب المصفوفة = ترتيب العرض. */
+/** محاذاة منطقية متوافقة مع RTL/LTR؛ لا تستعمل `left` أو `right`. */
+export type DocBlockAlignment = 'start' | 'center' | 'end';
+
+/** درجات حجم النص المتاحة للكتل؛ تبقى عائلة الخط من قالب المستند نفسه. */
+export type DocBlockFontSize = 'sm' | 'md' | 'lg';
+/** حجم نسبي آمن لكتل الصور؛ غيابه يبقي المراجعات التاريخية على مظهرها الأصلي. */
+export type DocBlockImageSize = 'sm' | 'md' | 'lg';
+/** شفافية مقيدة لكتل الصور؛ غيابها يحفظ المظهر التاريخي الخاص بكل كتلة. */
+export type DocBlockImageOpacity = 'solid' | 'soft' | 'faint';
+
+/** أعمدة جدول البنود التي يستطيع العارض رسمها بالفعل. */
+export type DocItemsColumnId =
+  | 'number' | 'product_code' | 'barcode' | 'product' | 'description'
+  | 'quantity' | 'price_before_tax' | 'unit_price' | 'tax' | 'total';
+
+/** تخصيص عمود واحد: عنوان ثابت اختياري ومحاذاة منطقية. */
+export interface DocItemsColumn {
+  id: DocItemsColumnId;
+  label?: string;
+  alignment?: DocBlockAlignment;
+}
+
+/**
+ * خصائص اختيارية ملازمة للكتلة في تخطيطها. العقد الخلفي وسجل أنواع المستندات
+ * يحددان المفاتيح المسموحة لكل كتلة؛ يظل هذا النوع واسعاً لتفادي تمثيل منفصل
+ * لكل عنصر تخطيط قبل التحقق وقت الحفظ.
+ */
+export interface DocSectionProperties {
+  columns?: DocItemsColumn[];
+  alignment?: DocBlockAlignment;
+  font_size?: DocBlockFontSize;
+  image_size?: DocBlockImageSize;
+  image_opacity?: DocBlockImageOpacity;
+  static_content?: string;
+}
+
+/** خصائص مفهرسة بمفتاح الكتلة، تلحق بتعريف القالب والمراجعة المثبتة. */
+export type DocBlockPropertiesMap = Partial<Record<DocSectionKey, DocSectionProperties>>;
+
+/** عنصر تخطيط: قسم + ظهوره وخصائصه المصرح بها. ترتيب المصفوفة = ترتيب العرض. */
 export interface DocSectionLayoutItem {
   key: DocSectionKey;
   visible: boolean;
+  properties?: DocSectionProperties;
 }
 
 /** الترتيب الافتراضي للأقسام (يطابق التركيب الأصلي). */
@@ -226,6 +275,8 @@ export interface DocumentTemplateProps {
   sections?: Partial<TemplateSectionsConfig>;
   /** تخطيط مخصّص (ترتيب/إظهار الأقسام) من مصمّم المستند؛ يتجاوز الترتيب الافتراضي. */
   layout?: DocSectionLayoutItem[] | null;
+  /** خصائص الكتل المعتمدة من المراجعة؛ لا يعاد حل إعداد حي عند وجودها. */
+  blockProperties?: DocBlockPropertiesMap | null;
   /**
    * معرّف عنصر الجذر: 'print-root' (افتراضي) لمصدر الطباعة/التصدير،
    * أو `null` لمعاينة لا تخطف الطباعة (كمعاينة الإعدادات).

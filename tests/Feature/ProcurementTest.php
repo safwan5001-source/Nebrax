@@ -11,6 +11,7 @@ use App\Models\StockMovement;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\ProcurementService;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
@@ -201,6 +202,16 @@ class ProcurementTest extends TestCase
         $this->assertSame($purchase->id, $order->converted_purchase_id);
     }
 
+    /** @test */
+    public function an_unapproved_order_cannot_be_issued(): void
+    {
+        $request = $this->approvedRequest();
+        $order = $this->procurement->convert($request, 'order', ['partner_id' => $this->supplier->id]);
+
+        $this->expectException(RuntimeException::class);
+        $this->procurement->issueForPrint($order);
+    }
+
     /** التحويل يلزمه اعتماد — لا يُلتزَم بمسوّدة لم يراجعها أحد. */
     /** @test */
     public function a_draft_document_cannot_be_converted(): void
@@ -212,6 +223,68 @@ class ProcurementTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->procurement->convert($doc, 'order', ['partner_id' => $this->supplier->id]);
+    }
+
+    /** @test */
+    public function an_issued_order_freezes_templates_and_requires_a_working_revision_for_changes(): void
+    {
+        $request = $this->approvedRequest();
+        $order = $this->procurement->convert($request, 'order', ['partner_id' => $this->supplier->id]);
+        $this->procurement->transition($order, 'submitted');
+        $order = $this->procurement->transition($order->fresh(), 'approved');
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'قالب أمر شراء ثابت',
+            'document_types' => ['purchase_order'],
+            'definition' => ['template_id' => 'tax-invoice-classic', 'footer_text' => 'أمر صادر'],
+        ], null));
+        $pdf = $templates->publish($templates->create([
+            'name' => 'قالب PDF لأمر ثابت',
+            'document_types' => ['purchase_order'],
+            'definition' => ['template_id' => 'tax-invoice-minimal', 'footer_text' => 'أرشيف أمر'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'purchase_order',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+        $templates->assign([
+            'document_type' => 'purchase_order',
+            'usage' => 'pdf',
+            'print_template_revision_id' => $pdf->published_revision_id,
+        ], null);
+
+        $issued = $this->procurement->issueForPrint($order);
+        $this->assertNotNull($issued->print_issued_at);
+        $this->assertSame($print->published_revision_id, $issued->print_template_revision_id);
+        $this->assertSame($pdf->published_revision_id, $issued->pdf_template_revision_id);
+
+        try {
+            $this->procurement->update($issued, ['notes' => 'تعديل غير مسموح'], null);
+            $this->fail('يجب أن يرفض المصدر الصادر أي تعديل مباشر.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('لا يمكن تعديل أمر شراء صادر للطباعة. أنشئ نسخة عمل أولاً.', $exception->getMessage());
+        }
+
+        try {
+            $this->procurement->transition($issued, 'cancelled');
+            $this->fail('يجب أن يرفض المصدر الصادر أي انتقال حالة مباشر.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('لا يمكن تغيير حالة أمر شراء صادر للطباعة. أنشئ نسخة عمل أولاً.', $exception->getMessage());
+        }
+
+        $revision = $this->procurement->createPrintRevision($issued);
+        $this->assertSame('draft', $revision->status);
+        $this->assertSame($issued->id, $revision->revised_from_id);
+        $this->assertNull($revision->print_issued_at);
+        $this->assertSame($issued->total, $revision->total);
+        $this->assertCount(1, $revision->lines);
+
+        $purchase = $this->procurement->convertToPurchase($issued->fresh());
+        $this->assertSame('draft', $purchase->status);
+        $this->assertSame(0, JournalEntry::count());
+        $this->assertSame(0, StockMovement::count());
     }
 
     /** السلسلة اتجاهها واحد: أمر الشراء لا يعود طلباً. */

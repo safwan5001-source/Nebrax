@@ -12,6 +12,7 @@ class CreditNoteResource extends JsonResource
     {
         return [
             'id'                  => $this->id,
+            'branch_id'           => $this->branch_id,
             'number'              => $this->number,
             'type'                => $this->type,
             'partner_id'          => $this->partner_id,
@@ -23,6 +24,12 @@ class CreditNoteResource extends JsonResource
             'total'               => Money::toRiyal($this->total),
             'reason'              => $this->reason,
             'original_invoice_id' => $this->original_invoice_id,
+            'print_template_revision_id' => $this->print_template_revision_id,
+            'print_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('printTemplateRevision')),
+            'pdf_template_revision_id' => $this->pdf_template_revision_id,
+            'pdf_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('pdfTemplateRevision')),
+            'thermal_template_revision_id' => $this->thermal_template_revision_id,
+            'thermal_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('thermalTemplateRevision')),
             'lines'               => CreditNoteLineResource::collection($this->whenLoaded('lines')),
         ];
     }

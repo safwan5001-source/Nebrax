@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Invoice;
+use App\Models\Product;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Tenancy\TenantContext;
@@ -61,6 +62,40 @@ class ApiInvoiceTest extends TestCase
         $this->assertEquals(115000, $this->line($entry, '1110')->debit);  // الصندوق
         $this->assertEquals(100000, $this->line($entry, '4110')->credit); // المبيعات
         $this->assertEquals(15000,  $this->line($entry, '2120')->credit); // ضريبة المخرجات
+    }
+
+    /** @test */
+    public function invoice_line_product_snapshots_stay_stable_in_the_api_response(): void
+    {
+        $auth = $this->registerTenant();
+        $token = $auth['token'];
+        $partnerId = $this->withToken($token)->postJson('/api/partners', [
+            'name' => 'عميل اللقطة', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+        $productId = $this->withToken($token)->postJson('/api/products', [
+            'name' => 'منتج الإصدار الأول', 'sku' => 'SKU-ORIGINAL', 'barcode' => '6281234567890',
+            'type' => 'good', 'sale_price' => 115000, 'tax_rate' => 15,
+        ])->assertCreated()['data']['id'];
+
+        $created = $this->withToken($token)->postJson('/api/invoices', [
+            'partner_id' => $partnerId, 'payment_type' => 'cash', 'tax_inclusive' => true,
+            'items' => [['product_id' => $productId, 'quantity' => 1, 'unit_price' => 115000, 'tax_rate' => 15]],
+        ])->assertCreated()
+            ->assertJsonPath('data.lines.0.product_name', 'منتج الإصدار الأول')
+            ->assertJsonPath('data.lines.0.product_code', 'SKU-ORIGINAL')
+            ->assertJsonPath('data.lines.0.barcode', '6281234567890')
+            ->assertJsonPath('data.lines.0.unit_price_before_tax', '1000.00');
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        Product::findOrFail($productId)->update([
+            'name' => 'منتج بعد التعديل', 'sku' => 'SKU-CHANGED', 'barcode' => '6280000000000',
+        ]);
+
+        $this->withToken($token)->getJson('/api/invoices/'.$created['data']['id'])->assertOk()
+            ->assertJsonPath('data.lines.0.product_name', 'منتج الإصدار الأول')
+            ->assertJsonPath('data.lines.0.product_code', 'SKU-ORIGINAL')
+            ->assertJsonPath('data.lines.0.barcode', '6281234567890')
+            ->assertJsonPath('data.lines.0.unit_price_before_tax', '1000.00');
     }
 
     /** @test */

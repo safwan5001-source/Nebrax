@@ -8,6 +8,7 @@ use App\Models\Account;
 use App\Models\Partner;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Purchase;
 use App\Services\Accounting\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ class PaymentController extends ApiController
         }
 
         return PaymentResource::collection(
-            $this->scopeToActiveBranch($query, $request)->get()
+            $this->scopeToActiveBranch($query->with('partner'), $request)->get()
         )->response();
     }
 
@@ -39,9 +40,7 @@ class PaymentController extends ApiController
     {
         $data = $request->validated();
 
-        Partner::findOrFail($data['partner_id']); // عزل الطرف
-        $this->assertTenantOwned(Invoice::class, $data['invoice_id'] ?? null, 'الفاتورة');
-        $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
+        $this->assertReferences($data);
 
         $payment = $this->domain(
             fn () => $this->payments->create($data, $data['allocations'] ?? [])
@@ -50,16 +49,72 @@ class PaymentController extends ApiController
         return (new PaymentResource($payment))->response()->setStatusCode(201);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        return (new PaymentResource(Payment::with('allocations.allocatable')->findOrFail($id)))->response();
+        return (new PaymentResource(
+            $this->visiblePayment($request, $id)->load(['partner', 'cashAccount', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])
+        ))->response();
     }
 
-    public function post(string $id): JsonResponse
+    public function update(StorePaymentRequest $request, string $id): JsonResponse
     {
-        $payment = Payment::findOrFail($id);
+        $payment = $this->visiblePayment($request, $id);
+        $data = $request->validated();
+        if ($data['direction'] !== $payment->direction) {
+            abort(422, 'لا يمكن تغيير اتجاه سند قائم.');
+        }
+        $this->assertReferences($data);
+
+        $updated = $this->domain(fn () => $this->payments->update($payment, $data, $data['allocations'] ?? []));
+        return (new PaymentResource($updated->load(['partner', 'cashAccount', 'allocations.allocatable'])))->response();
+    }
+
+    /** النسخة الجديدة مسودة بلا تخصيصات حتى لا تؤثر في فواتير السند الأصل. */
+    public function duplicate(Request $request, string $id): JsonResponse
+    {
+        $payment = $this->visiblePayment($request, $id);
+        $copy = $this->domain(fn () => $this->payments->duplicate($payment, $request->user()?->id));
+        return (new PaymentResource($copy->load(['partner', 'cashAccount', 'allocations.allocatable'])))->response()->setStatusCode(201);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $payment = $this->visiblePayment($request, $id);
+        if (! $payment->isDraft()) {
+            abort(422, 'لا يمكن حذف سند مرحّل أو ملغى.');
+        }
+
+        $this->domain(function () use ($payment) {
+            $payment->allocations()->delete();
+            $payment->delete();
+        });
+
+        return response()->json(['message' => 'deleted']);
+    }
+
+    public function post(Request $request, string $id): JsonResponse
+    {
+        $payment = $this->visiblePayment($request, $id);
         $posted = $this->domain(fn () => $this->payments->post($payment));
 
-        return (new PaymentResource($posted))->response();
+        return (new PaymentResource($posted->load(['partner', 'cashAccount', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
+    }
+
+    /** سندات القبض مستندات مالية بلا Scope فرع عالمي، فتقيّد كل عملية بالفرع النشط. */
+    private function visiblePayment(Request $request, string $id): Payment
+    {
+        return $this->scopeToActiveBranch(Payment::query(), $request)->whereKey($id)->firstOrFail();
+    }
+
+    private function assertReferences(array $data): void
+    {
+        Partner::findOrFail($data['partner_id']);
+        $this->assertTenantOwned(Invoice::class, $data['invoice_id'] ?? null, 'الفاتورة');
+        $this->assertTenantOwned(Purchase::class, $data['purchase_id'] ?? null, 'فاتورة المشتريات');
+        $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
+        foreach ($data['allocations'] ?? [] as $allocation) {
+            $this->assertTenantOwned(Invoice::class, $allocation['invoice_id'] ?? null, 'الفاتورة');
+            $this->assertTenantOwned(Purchase::class, $allocation['purchase_id'] ?? null, 'فاتورة المشتريات');
+        }
     }
 }

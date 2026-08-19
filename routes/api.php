@@ -12,14 +12,16 @@ use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CostCenterController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\CrmActivityController;
+use App\Http\Controllers\Api\CustomerReportController;
 use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
-use App\Http\Controllers\Api\ShiftController;
+use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\InventoryReportController;
 use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
@@ -29,9 +31,11 @@ use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\PosSessionController;
+use App\Http\Controllers\Api\PrintTemplateController;
 use App\Http\Controllers\Api\ProcurementController;
 use App\Http\Controllers\Api\PurchaseSettingsController;
 use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\PurchaseReportController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RecurringInvoiceController;
 use App\Http\Controllers\Api\ReportController;
@@ -39,7 +43,9 @@ use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\ReturnableController;
 use App\Http\Controllers\Api\ReturnSourcesController;
 use App\Http\Controllers\Api\SalesConfigController;
+use App\Http\Controllers\Api\SalesReportController;
 use App\Http\Controllers\Api\SalesSettingsController;
+use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
@@ -157,14 +163,25 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('inventory-settings', [InventorySettingsController::class, 'show'])->middleware($perm('products.view'));
         Route::put('inventory-settings', [InventorySettingsController::class, 'update'])->middleware($perm('company.manage'));
 
-        // دليل الحسابات (قراءة)
+        // دليل الحسابات: إدارة شجرية بلا حذف؛ التعطيل يمنع الترحيل الجديد ويحفظ الأثر التاريخي.
         Route::get('accounts', [AccountController::class, 'index'])->middleware($perm('accounts.view'));
         Route::get('accounts/{id}', [AccountController::class, 'show'])->middleware($perm('accounts.view'));
+        Route::post('accounts', [AccountController::class, 'store'])->middleware($perm('accounts.manage'));
+        Route::put('accounts/{id}', [AccountController::class, 'update'])->middleware($perm('accounts.manage'));
 
+        // تصنيفات المصروفات: بيانات تحليلية بلا أثر محاسبي، تتحكم بها صلاحيات المصروفات.
+        Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->middleware($perm('expenses.view'));
+        Route::post('expense-categories', [ExpenseCategoryController::class, 'store'])->middleware($perm('expenses.manage'));
+        Route::put('expense-categories/{id}', [ExpenseCategoryController::class, 'update'])->middleware($perm('expenses.manage'));
+        Route::delete('expense-categories/{id}', [ExpenseCategoryController::class, 'destroy'])->middleware($perm('expenses.manage'));
         // المصروفات (مستند مالي؛ الترحيل يولّد قيداً متوازناً)
         Route::get('expenses', [ExpenseController::class, 'index'])->middleware($perm('expenses.view'));
+        Route::get('expenses/{id}/attachments/{attachmentId}', [ExpenseController::class, 'downloadAttachment'])->middleware($perm('expenses.view'));
         Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware($perm('expenses.view'));
         Route::post('expenses', [ExpenseController::class, 'store'])->middleware($perm('expenses.manage'));
+        Route::put('expenses/{id}', [ExpenseController::class, 'update'])->middleware($perm('expenses.manage'));
+        Route::post('expenses/{id}/duplicate', [ExpenseController::class, 'duplicate'])->middleware($perm('expenses.manage'));
+        Route::delete('expenses/{id}', [ExpenseController::class, 'destroy'])->middleware($perm('expenses.manage'));
         Route::post('expenses/{id}/post', [ExpenseController::class, 'post'])->middleware($perm('expenses.manage'));
 
         // الأصول الثابتة (اقتناء + إهلاك؛ كلاهما يولّد قيداً متوازناً)
@@ -212,6 +229,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('quotes', [QuoteController::class, 'store'])->middleware($perm('invoices.manage'));
         Route::put('quotes/{id}', [QuoteController::class, 'update'])->middleware($perm('invoices.manage'));
         Route::delete('quotes/{id}', [QuoteController::class, 'destroy'])->middleware($perm('invoices.manage'));
+        Route::post('quotes/{id}/issue', [QuoteController::class, 'issue'])->middleware($perm('invoices.manage'));
+        Route::post('quotes/{id}/revise', [QuoteController::class, 'revise'])->middleware($perm('invoices.manage'));
         Route::post('quotes/{id}/convert', [QuoteController::class, 'convert'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
 
         // الإشعارات الدائنة (مستند مالي؛ الترحيل يولّد قيداً عكسياً)
@@ -238,6 +257,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payments/{id}', [PaymentController::class, 'show'])->middleware($perm('payments.view'));
         Route::post('payments', [PaymentController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('payments/{id}', [PaymentController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::post('payments/{id}/duplicate', [PaymentController::class, 'duplicate'])->middleware($perm('payments.manage'));
+        Route::delete('payments/{id}', [PaymentController::class, 'destroy'])->middleware($perm('payments.manage'));
         Route::post('payments/{id}/post', [PaymentController::class, 'post'])->middleware($perm('payments.manage'));
 
         // المشتريات
@@ -254,6 +276,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('procurement', [ProcurementController::class, 'store'])->middleware($perm('purchases.manage'));
         Route::put('procurement/{id}', [ProcurementController::class, 'update'])->middleware($perm('purchases.manage'));
         Route::delete('procurement/{id}', [ProcurementController::class, 'destroy'])->middleware($perm('purchases.manage'));
+        Route::post('procurement/{id}/issue', [ProcurementController::class, 'issue'])->middleware($perm('purchases.manage'));
+        Route::post('procurement/{id}/revise', [ProcurementController::class, 'revise'])->middleware($perm('purchases.manage'));
         Route::post('procurement/{id}/transition', [ProcurementController::class, 'transition'])->middleware($perm('purchases.manage'));
         Route::post('procurement/{id}/convert', [ProcurementController::class, 'convert'])->middleware($perm('purchases.manage'));
 
@@ -278,6 +302,15 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // لوحة التحكم: تفصيل المبيعات ببُعد (يوم/منتج/فئة/فرع/بائع) — قراءة فقط
         Route::get('dashboard/sales-breakdown', [DashboardController::class, 'salesBreakdown'])->middleware($perm('reports.view'));
+        // تقارير المبيعات: تجميعات قراءة فقط مع نطاق تاريخ/فرع/عميل/صنف/مندوب وسداد.
+        Route::get('reports/sales', [SalesReportController::class, 'show'])->middleware($perm('reports.view'));
+        // تقارير المشتريات: فواتير شراء وسندات صرف مرحّلة فقط؛ لا أثر محاسبي جديد.
+        Route::get('reports/purchases', [PurchaseReportController::class, 'show'])->middleware($perm('reports.view'));
+        Route::get('reports/purchases/creators', [PurchaseReportController::class, 'creators'])->middleware($perm('reports.view'));
+        // تقارير العملاء: قراءة من الفواتير وسندات القبض والمواعيد، بلا أثر محاسبي جديد.
+        Route::get('reports/customers', [CustomerReportController::class, 'show'])->middleware($perm('reports.view'));
+        // تقارير المخزون: قراءة من الأرصدة والحركات والأذون والجرد المرحّل فقط.
+        Route::get('reports/inventory', [InventoryReportController::class, 'show'])->middleware($perm('reports.view'));
 
         // المرتجعات
         // سطور مستندٍ مصدر بكمياتها المتبقية للردّ — تسبق `returns/{id}` في
@@ -335,6 +368,17 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('sales-config/{section}', [SalesConfigController::class, 'show'])->middleware($perm('invoices.view'));
         Route::put('sales-config/{section}', [SalesConfigController::class, 'update'])->middleware($perm('company.manage'));
 
+        // مكتبة قوالب الطباعة: القراءة لمن يطبع مستندات، والإدارة لمالك/مدير الشركة.
+        Route::get('print-templates', [PrintTemplateController::class, 'index'])->middleware($perm('invoices.view'));
+        Route::get('print-templates/assignments', [PrintTemplateController::class, 'assignments'])->middleware($perm('invoices.view'));
+        Route::get('print-templates/resolve', [PrintTemplateController::class, 'resolve'])->middleware($perm('invoices.view'));
+        Route::get('print-templates/{id}', [PrintTemplateController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::post('print-templates', [PrintTemplateController::class, 'store'])->middleware($perm('company.manage'));
+        Route::put('print-templates/{id}/draft', [PrintTemplateController::class, 'updateDraft'])->middleware($perm('company.manage'));
+        Route::post('print-templates/{id}/publish', [PrintTemplateController::class, 'publish'])->middleware($perm('company.manage'));
+        Route::post('print-templates/{id}/duplicate', [PrintTemplateController::class, 'duplicate'])->middleware($perm('company.manage'));
+        Route::put('print-templates/assignments/default', [PrintTemplateController::class, 'assign'])->middleware($perm('company.manage'));
+
         // إعدادات العميل (تفضيلات غير محاسبية)
         Route::get('customer-settings', [CustomerSettingsController::class, 'show'])->middleware($perm('partners.view'));
         Route::put('customer-settings', [CustomerSettingsController::class, 'update'])->middleware($perm('company.manage'));
@@ -350,6 +394,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('reports/income-statement', [ReportController::class, 'incomeStatement'])->middleware($perm('reports.view'));
         Route::get('reports/balance-sheet', [ReportController::class, 'balanceSheet'])->middleware($perm('reports.view'));
         Route::get('reports/account-ledger/{accountId}', [ReportController::class, 'accountLedger'])->middleware($perm('reports.view'));
+        Route::get('reports/journal-entries', [ReportController::class, 'journalEntries'])->middleware($perm('reports.view'));
+        Route::get('reports/cash-flow', [ReportController::class, 'cashFlow'])->middleware($perm('reports.view'));
+        Route::get('reports/tax-report', [ReportController::class, 'taxReport'])->middleware($perm('reports.view'));
         Route::get('reports/partner-statement/{partnerId}', [ReportController::class, 'partnerStatement'])->middleware($perm('reports.view'));
         Route::get('reports/aging/{type}', [ReportController::class, 'aging'])->middleware($perm('reports.view'));
         Route::get('reports/cost-center-profitability', [ReportController::class, 'costCenterProfitability'])->middleware($perm('reports.view'));

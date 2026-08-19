@@ -37,9 +37,18 @@ export function filtersToQuery(f: ReportFilterState): string {
 export function ReportFilters({
   value,
   onChange,
+  onClear,
+  showDateRange = true,
+  showBranches = true,
 }: {
   value: ReportFilterState;
   onChange: (next: ReportFilterState) => void;
+  /** يسمح لتقرير متخصص بمسح مرشحاته الإضافية مع المرشحات المشتركة. */
+  onClear?: () => void;
+  /** تقارير اللقطة الحالية لا تدّعي أنها قابلة للرجوع إلى فترة تاريخية. */
+  showDateRange?: boolean;
+  /** تقارير القيمة العالمية لا تتظاهر بأن لها فلتر فرع مستقل. */
+  showBranches?: boolean;
 }) {
   const t = useTranslations('reports');
   const tb = useTranslations('branches');
@@ -80,8 +89,9 @@ export function ReportFilters({
     return t('branches_selected', { n: value.branchIds.length });
   }, [value.branchIds, branches, t]);
 
-  const dirty = !!value.from || !!value.to || value.branchIds.length > 0;
-  const dateSet = !!value.from || !!value.to;
+  const clear = () => onClear ? onClear() : onChange(EMPTY_FILTERS);
+  const dateSet = showDateRange && (!!value.from || !!value.to);
+  const dirty = dateSet || (showBranches && value.branchIds.length > 0);
 
   /**
    * نصّ chip التاريخ. **لا يُترك فارغاً**: الحالة الافتراضية تُسمّى «كل الفترات»
@@ -117,24 +127,28 @@ export function ReportFilters({
           ثلاثة حقول كاملة العرض كانت تدفع أول بيانٍ حقيقي أسفل الطيّة —
           فيُمرّر المستخدم ليرى ما جاء من أجله. الصفّ الواحد يردّه إلى مكانه. */}
       <div className="no-print -mx-1 flex w-full gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden">
-        <button type="button" onClick={() => setDateSheet(true)} className={chip(dateSet)}>
-          <CalendarDays className="h-4 w-4 shrink-0" strokeWidth={1.8} />
-          <span className={cn(dateSet && 'num')}>{dateLabel}</span>
-        </button>
+        {showDateRange && (
+          <button type="button" onClick={() => setDateSheet(true)} className={chip(dateSet)}>
+            <CalendarDays className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+            <span className={cn(dateSet && 'num')}>{dateLabel}</span>
+          </button>
+        )}
 
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          className={chip(value.branchIds.length > 0)}
-        >
-          <MapPin className="h-4 w-4 shrink-0" strokeWidth={1.8} />
-          <span>{label}</span>
-        </button>
+        {showBranches && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            className={chip(value.branchIds.length > 0)}
+          >
+            <MapPin className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+            <span>{label}</span>
+          </button>
+        )}
 
         {dirty && (
-          <button type="button" onClick={() => onChange(EMPTY_FILTERS)} className={chip(false)}>
+          <button type="button" onClick={clear} className={chip(false)}>
             <X className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
             {t('clear_filters')}
           </button>
@@ -142,7 +156,7 @@ export function ReportFilters({
       </div>
 
       {/* نافذة اختيار المدى — على الجوال وحده؛ الديسكتوب يعرض الحقلين مباشرةً. */}
-      <Dialog open={dateSheet} onClose={() => setDateSheet(false)} title={t('date_range')}>
+      {showDateRange && <Dialog open={dateSheet} onClose={() => setDateSheet(false)} title={t('date_range')}>
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="rf-from-m">{t('from')}</Label>
@@ -163,22 +177,24 @@ export function ReportFilters({
             <Button onClick={() => setDateSheet(false)}>{t('apply')}</Button>
           </div>
         </div>
-      </Dialog>
+      </Dialog>}
 
     <div className="no-print hidden flex-wrap items-end gap-3 rounded border border-border bg-surface p-3 sm:flex">
-      <div className="space-y-1.5">
-        <Label htmlFor="rf-from">{t('from')}</Label>
-        <Input id="rf-from" type="date" dir="ltr" className="w-40 text-start [unicode-bidi:isolate]" value={value.from}
-          onChange={(e) => onChange({ ...value, from: e.target.value })} />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="rf-to">{t('to')}</Label>
-        <Input id="rf-to" type="date" dir="ltr" className="w-40 text-start [unicode-bidi:isolate]" value={value.to}
-          onChange={(e) => onChange({ ...value, to: e.target.value })} />
-      </div>
+      {showDateRange && <>
+        <div className="space-y-1.5">
+          <Label htmlFor="rf-from">{t('from')}</Label>
+          <Input id="rf-from" type="date" dir="ltr" className="w-40 text-start [unicode-bidi:isolate]" value={value.from}
+            onChange={(e) => onChange({ ...value, from: e.target.value })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="rf-to">{t('to')}</Label>
+          <Input id="rf-to" type="date" dir="ltr" className="w-40 text-start [unicode-bidi:isolate]" value={value.to}
+            onChange={(e) => onChange({ ...value, to: e.target.value })} />
+        </div>
+      </>}
 
       {/* منتقي فروع متعدّد الاختيار */}
-      <div className="space-y-1.5">
+      {showBranches && <div className="space-y-1.5">
         <Label htmlFor="rf-branches">{tb('title')}</Label>
         <div ref={rootRef} className="relative">
           <button
@@ -225,10 +241,10 @@ export function ReportFilters({
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {dirty && (
-        <Button variant="ghost" size="sm" onClick={() => onChange(EMPTY_FILTERS)}>
+        <Button variant="ghost" size="sm" onClick={clear}>
           <X className="h-3.5 w-3.5" strokeWidth={1.8} />
           {t('clear_filters')}
         </Button>

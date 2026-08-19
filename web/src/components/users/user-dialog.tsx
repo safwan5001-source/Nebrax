@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { AccessScopeFields, type AccessScope } from './access-scope-fields';
 
 export function UserDialog({
   open,
@@ -23,6 +24,7 @@ export function UserDialog({
   const tc = useTranslations('common');
   const { success } = useToast();
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'staff' });
+  const [scope, setScope] = useState<AccessScope>({ branch_ids: [], warehouse_ids: [] });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -33,9 +35,10 @@ export function UserDialog({
     setSaving(true);
     setError(null);
     try {
-      await api('/users', { method: 'POST', body: form });
+      await api('/users', { method: 'POST', body: { ...form, ...scope } });
       success(tc('created'));
       setForm({ name: '', email: '', password: '', role: 'staff' });
+      setScope({ branch_ids: [], warehouse_ids: [] });
       onSaved();
       onClose();
     } catch (err) {
@@ -68,6 +71,8 @@ export function UserDialog({
             <option value="staff">{t('roles.staff')}</option>
           </Select>
         </div>
+
+        <AccessScopeFields value={scope} onChange={setScope} />
 
         {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 

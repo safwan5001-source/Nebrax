@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Printer, Download, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Printer, Download, CheckCircle2, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,12 +16,30 @@ import { documentExporter, printDocument } from '@/modules/documents/services/ex
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
-import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
+import {
+  resolveCreditNoteTemplateDesign,
+  resolveLiveCreditNoteTemplateDesign,
+  type CreditNoteTemplateDefinition,
+} from '@/modules/credit-notes/services/credit-note-template-design';
+import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
+interface FrozenPrintTemplateRevision {
+  id: string;
+  version: number;
+  definition: CreditNoteTemplateDefinition;
+  document_types: string[];
+}
+
 interface CreditNote {
-  id: string; number: string; partner_id: string; refund_type: string; status: string;
+  id: string; branch_id: string | null; number: string; partner_id: string; type?: 'sales' | 'purchase'; refund_type: string; status: string;
   note_date: string; subtotal: string; tax_amount: string; total: string; reason: string | null; lines: Line[];
+  print_template_revision_id?: string | null;
+  print_template_revision?: FrozenPrintTemplateRevision | null;
+  pdf_template_revision_id?: string | null;
+  pdf_template_revision?: FrozenPrintTemplateRevision | null;
+  thermal_template_revision_id?: string | null;
+  thermal_template_revision?: FrozenPrintTemplateRevision | null;
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
@@ -31,6 +49,7 @@ export default function CreditNoteDetailPage() {
   const router = useRouter();
   const t = useTranslations('creditNotes');
   const td = useTranslations('invoiceDetail');
+  const tPrint = useTranslations('documentPrint');
   const tc = useTranslations('common');
   const { success, error: errorToast } = useToast();
 
@@ -39,45 +58,36 @@ export default function CreditNoteDetailPage() {
   const [company, setCompany] = useState<CreditNoteCompany | null>(null);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [templateId, setTemplateId] = useState<string>('tax-invoice-classic');
-  const [themeId, setThemeId] = useState<ThemeId | null>(null);
-  const [footerText, setFooterText] = useState<string | null>(null);
-  const [showLogo, setShowLogo] = useState(true);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [logoHeight, setLogoHeight] = useState<number | null>(null);
-  const [layout, setLayout] = useState<DocSectionLayoutItem[] | null>(null);
-  const [termsText, setTermsText] = useState<string | null>(null);
-  const [bankText, setBankText] = useState<string | null>(null);
-  const [stampUrl, setStampUrl] = useState<string | null>(null);
-  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
+  const [design, setDesign] = useState(() => resolveCreditNoteTemplateDesign(null, null));
 
   function load() {
     setLoading(true);
     api<{ data: CreditNote }>(`/credit-notes/${id}`)
       .then(async (r) => {
         setNote(r.data);
-        const [p, m, d] = await Promise.allSettled([
+        const documentType = r.data.type === 'purchase' ? 'debit_note' : 'credit_note';
+        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
+        const [p, m, live] = await Promise.allSettled([
           api<{ data: CreditNoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: CreditNoteCompany }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
+          api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=${documentType}&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
-        if (d.status === 'fulfilled') {
-          const dg = d.value.data ?? {};
-          setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
-          if (dg.theme) setThemeId(dg.theme as ThemeId);
-          setFooterText(dg.footer_text ?? null);
-          setShowLogo(dg.show_logo !== false);
-          setLogoUrl(dg.logo ?? null);
-          setLogoHeight(dg.logo_height ?? null);
-          setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
-          setTermsText(dg.terms_text ?? null);
-          setBankText(dg.bank_text ?? null);
-          setStampUrl(dg.stamp ?? null);
-          setSignatureUrl(dg.signature ?? null);
-        }
+
+        // المراجعة المثبتة حد تاريخي: لا تخلط خصائصها بإعداد حي تغيّر بعد ترحيل الإشعار.
+        const frozen = r.data.print_template_revision?.definition ?? null;
+        const liveDesign = frozen || live.status !== 'fulfilled'
+          ? null
+          : resolveLiveCreditNoteTemplateDesign(
+            resolveLiveTemplateDefinition(live.value.data, documentType),
+          );
+        setDesign(
+          frozen
+            ? resolveCreditNoteTemplateDesign(frozen, null)
+            : liveDesign ?? resolveCreditNoteTemplateDesign(null, null),
+        );
       })
       .finally(() => setLoading(false));
   }
@@ -102,27 +112,61 @@ export default function CreditNoteDetailPage() {
   }
   if (!note) return <div className="text-muted">{t('not_found')}</div>;
 
+  const isDebitNote = note.type === 'purchase';
+  const counterpartLabel = isDebitNote ? t('supplier') : t('partner');
+  const treatmentLabel = isDebitNote
+    ? t('debit_document_subtitle')
+    : (note.refund_type === 'cash' ? t('refund_cash') : t('refund_credit'));
   const info: [string, React.ReactNode][] = [
-    [t('partner'), customer?.name ?? '—'],
-    [t('refund_type'), note.refund_type === 'cash' ? t('refund_cash') : t('refund_credit')],
+    [counterpartLabel, customer?.name ?? '—'],
+    [t('refund_type'), treatmentLabel],
     [t('date'), <span key="d" className="num">{note.note_date}</span>],
     [t('total'), <span key="t" className="num font-semibold">{formatRiyal(note.total)}</span>],
   ];
 
-  const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
+  const paperId = getTemplate(design.templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+  const frozenThermalDefinition = note.thermal_template_revision?.definition ?? null;
+  const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
+  const thermalPaperId = thermalTemplateId
+    ? getTemplate(thermalTemplateId).supportedPaper.find((candidate) => candidate.startsWith('thermal_'))
+    : null;
+  const thermalPaper = thermalPaperId
+    ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
+    : null;
 
   async function handleDownloadPdf() {
-    const el = document.getElementById('print-root');
-    if (!el || !note) return;
-    setBusy(true);
+    if (!note) return;
+    setBusy('pdf');
     try {
-      await documentExporter.download({ element: el, fileName: note.number, paper });
-      success(td('downloaded_ok'));
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Credit note template is unavailable');
+      await documentExporter.download({ element, fileName: note.number, paper });
+      success(tPrint('downloaded_ok'));
     } catch {
-      errorToast(td('export_failed'));
+      errorToast(tPrint('export_failed'));
     } finally {
-      setBusy(false);
+      setBusy(null);
+    }
+  }
+
+  async function handleShare() {
+    if (!note) return;
+    setBusy('share');
+    try {
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Credit note template is unavailable');
+      const result = await documentExporter.share({
+        element,
+        fileName: note.number,
+        title: note.type === 'purchase' ? t('debit_document_title') : t('document_title'),
+        paper,
+      });
+      success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -141,14 +185,24 @@ export default function CreditNoteDetailPage() {
               {t('post')}
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={busy}>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={!!busy}>
             <Download className="h-4 w-4" strokeWidth={1.7} />
-            {busy ? td('generating') : td('download_pdf')}
+            {busy === 'pdf' ? tPrint('generating') : tPrint('download_pdf')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={busy}>
+          <Button variant="outline" size="sm" onClick={handleShare} disabled={!!busy}>
+            <Share2 className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'share' ? tPrint('generating') : tPrint('share_pdf')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'print-root')} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
+          {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+            <Button variant="outline" size="sm" onClick={() => printDocument(thermalPaper, 'thermal-print-root')} disabled={!!busy}>
+              <Printer className="h-4 w-4" strokeWidth={1.7} />
+              {tPrint('thermal_print')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -166,7 +220,7 @@ export default function CreditNoteDetailPage() {
 
       {/* معاينة مستند الإشعار الدائن (مرئية + مصدر الطباعة/الـ PDF) عبر محرّك المستندات. */}
       <Card>
-        <CardHeader className="no-print"><CardTitle>{td('preview')}</CardTitle></CardHeader>
+        <CardHeader className="no-print"><CardTitle>{tPrint('preview')}</CardTitle></CardHeader>
         <CardContent className="print:p-0">
           <div className="rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0">
             <DocumentScaler>
@@ -174,22 +228,42 @@ export default function CreditNoteDetailPage() {
                 note={note}
                 company={company}
                 customer={customer}
-                templateId={templateId}
-                themeId={themeId}
-                footerText={footerText}
-                terms={termsText}
-                bank={bankText}
-                stampUrl={stampUrl}
-                signatureUrl={signatureUrl}
-                showLogo={showLogo}
-                logoUrl={logoUrl}
-                logoHeight={logoHeight}
-                layout={layout}
+                templateId={design.templateId}
+                themeId={design.themeId}
+                footerText={design.footerText}
+                terms={design.termsText}
+                bank={design.bankText}
+                stampUrl={design.stampUrl}
+                signatureUrl={design.signatureUrl}
+                showLogo={design.showLogo}
+                logoUrl={design.logoUrl}
+                logoHeight={design.logoHeight}
+                layout={design.layout}
               />
             </DocumentScaler>
           </div>
         </CardContent>
       </Card>
+
+      {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+        <CreditNoteDocument
+          note={note}
+          company={company}
+          customer={customer}
+          templateId={thermalTemplateId}
+          themeId={frozenThermalDefinition.theme_id ?? null}
+          footerText={frozenThermalDefinition.footer_text ?? null}
+          terms={frozenThermalDefinition.terms_text ?? null}
+          bank={frozenThermalDefinition.bank_text ?? null}
+          stampUrl={frozenThermalDefinition.stamp ?? null}
+          signatureUrl={frozenThermalDefinition.signature ?? null}
+          showLogo={frozenThermalDefinition.show_logo !== false}
+          logoUrl={frozenThermalDefinition.logo ?? null}
+          logoHeight={frozenThermalDefinition.logo_height ?? null}
+          layout={Array.isArray(frozenThermalDefinition.layout) && frozenThermalDefinition.layout.length ? frozenThermalDefinition.layout : null}
+          rootId="thermal-print-root"
+        />
+      )}
     </div>
   );
 }

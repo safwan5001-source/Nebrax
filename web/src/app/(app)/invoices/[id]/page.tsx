@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
 import { ArrowRight, Printer, Download, Share2, FileSpreadsheet, LayoutTemplate, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,19 +21,41 @@ import { RevisionLog } from '@/components/documents/revision-log';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { exportXlsx } from '@/lib/xlsx';
+import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
 
 interface Line {
   id: string;
+  product_name: string | null;
+  product_code: string | null;
+  barcode: string | null;
   description: string | null;
   quantity: number;
   unit_price: string;
+  unit_price_before_tax: string;
   tax_rate: number;
   line_subtotal: string;
   line_tax: string;
   line_total: string;
 }
+interface FrozenPrintTemplateRevision {
+  id: string;
+  version: number;
+  definition: {
+    template_id?: string;
+    theme_id?: ThemeId;
+    footer_text?: string;
+    show_logo?: boolean;
+    layout?: DocSectionLayoutItem[];
+    terms_text?: string;
+    bank_text?: string;
+    stamp?: string;
+    signature?: string;
+  };
+  document_types: string[];
+}
 interface Invoice {
   id: string;
+  branch_id: string | null;
   number: string;
   partner_id: string;
   payment_type: string;
@@ -47,6 +69,12 @@ interface Invoice {
   remaining: string;
   notes: string | null;
   lines: Line[];
+  print_template_revision_id?: string | null;
+  print_template_revision?: FrozenPrintTemplateRevision | null;
+  pdf_template_revision_id?: string | null;
+  pdf_template_revision?: FrozenPrintTemplateRevision | null;
+  thermal_template_revision_id?: string | null;
+  thermal_template_revision?: FrozenPrintTemplateRevision | null;
 }
 interface Zatca {
   qr: string | null;
@@ -71,7 +99,10 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const t = useTranslations('invoiceDetail');
   const ti = useTranslations('invoices');
+  const td = useTranslations('invoiceDoc');
   const ts = useTranslations('status');
+  const tPrint = useTranslations('documentPrint');
+  const locale = useLocale();
   const { success, error: errorToast } = useToast();
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -102,29 +133,40 @@ export default function InvoiceDetailPage() {
     api<{ data: Invoice }>(`/invoices/${id}`)
       .then(async (r) => {
         setInvoice(r.data);
-        const [p, z, m, d] = await Promise.allSettled([
+        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
+        const [p, z, m, live] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
-          api<{ data: { template?: string; theme?: string; footer_text?: string; show_logo?: boolean; logo?: string; logo_height?: number; sections?: DocSectionLayoutItem[]; terms_text?: string; bank_text?: string; stamp?: string; signature?: string } }>(`/sales-config/designs`),
+          api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=tax_invoice&usage=print${branchQuery}`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
         if (m.status === 'fulfilled') setCompany(m.value.company);
-        // القالب والهوية الافتراضية من إعدادات التصاميم (تتراجع للافتراضي إن غابت).
-        if (d.status === 'fulfilled') {
-          const dg = d.value.data ?? {};
-          setTemplateId(getTemplate(`tax-invoice-${dg.template ?? ''}`).id);
-          if (dg.theme) setThemeId(dg.theme as ThemeId);
-          setFooterText(dg.footer_text ?? null);
-          setShowLogo(dg.show_logo !== false);
-          setLogoUrl(dg.logo ?? null);
-          setLogoHeight(dg.logo_height ?? null);
-          setLayout(Array.isArray(dg.sections) && dg.sections.length ? dg.sections : null);
-          setTermsText(dg.terms_text ?? null);
-          setBankText(dg.bank_text ?? null);
-          setStampUrl(dg.stamp ?? null);
-          setSignatureUrl(dg.signature ?? null);
+        // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
+        // إعدادات الهوية تفسير مستند تاريخي. المسودات والبيانات القديمة تستخدم
+        // إعدادات التوافق الحية إلى أن تصدر.
+        const frozen = r.data.print_template_revision?.definition;
+        if (frozen) {
+          setTemplateId(frozen.template_id ?? DEFAULT_TEMPLATE_ID);
+          setThemeId(frozen.theme_id ?? null);
+          setFooterText(frozen.footer_text ?? null);
+          setShowLogo(frozen.show_logo !== false);
+          setLayout(Array.isArray(frozen.layout) && frozen.layout.length ? frozen.layout : null);
+          setLogoUrl(null); setLogoHeight(null); setTermsText(frozen.terms_text ?? null); setBankText(frozen.bank_text ?? null); setStampUrl(null); setSignatureUrl(null);
+        } else {
+          const resolved = live.status === 'fulfilled'
+            ? resolveLiveTemplateDefinition(live.value.data, 'tax_invoice')
+            : null;
+          if (resolved) {
+            setTemplateId(resolved.templateId);
+            setThemeId(resolved.themeId);
+            setFooterText(resolved.footerText);
+            setShowLogo(resolved.showLogo);
+            setLogoUrl(null); setLogoHeight(resolved.logoHeight);
+            setLayout(resolved.layout);
+            setTermsText(resolved.termsText); setBankText(resolved.bankText); setStampUrl(resolved.stampUrl); setSignatureUrl(resolved.signatureUrl);
+          }
         }
       })
       .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
@@ -168,13 +210,22 @@ export default function InvoiceDetailPage() {
   // حجم ورق القالب المختار (A4 افتراضياً، أو الحراري) — يوجّه الـ PDF والطباعة.
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+  const frozenThermalDefinition = invoice.thermal_template_revision?.definition ?? null;
+  const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
+  const thermalPaperId = thermalTemplateId
+    ? getTemplate(thermalTemplateId).supportedPaper.find((candidate) => candidate.startsWith('thermal_'))
+    : null;
+  const thermalPaper = thermalPaperId
+    ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
+    : null;
 
   async function handleDownloadPdf() {
-    const el = doc();
-    if (!el || !invoice) return;
+    if (!invoice) return;
     setBusy('pdf');
     try {
-      await documentExporter.download({ element: el, fileName: invoice.number, paper });
+      const element = doc();
+      if (!element) throw new Error('Invoice template is unavailable');
+      await documentExporter.download({ element, fileName: invoice.number, paper });
       success(t('downloaded_ok'));
     } catch {
       errorToast(t('export_failed'));
@@ -184,14 +235,15 @@ export default function InvoiceDetailPage() {
   }
 
   async function handleShare() {
-    const el = doc();
-    if (!el || !invoice) return;
+    if (!invoice) return;
     setBusy('share');
     try {
-      const r = await documentExporter.share({ element: el, fileName: invoice.number, title: invoice.number, paper });
-      success(r === 'shared' ? t('shared_ok') : t('downloaded_ok'));
-    } catch (e) {
-      if ((e as Error)?.name !== 'AbortError') errorToast(t('export_failed')); // إلغاء المستخدم لا يُعدّ خطأ
+      const element = doc();
+      if (!element) throw new Error('Invoice template is unavailable');
+      const result = await documentExporter.share({ element, fileName: invoice.number, title: invoice.number, paper });
+      success(result === 'shared' ? t('shared_ok') : t('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(t('export_failed'));
     } finally {
       setBusy(null);
     }
@@ -249,10 +301,16 @@ export default function InvoiceDetailPage() {
             <Share2 className="h-4 w-4" strokeWidth={1.7} />
             {busy === 'share' ? t('generating') : t('share')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={!!busy}>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'print-root')} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
+          {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+            <Button variant="outline" size="sm" onClick={() => printDocument(thermalPaper, 'thermal-print-root')} disabled={!!busy}>
+              <Printer className="h-4 w-4" strokeWidth={1.7} />
+              {tPrint('thermal_print')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -347,6 +405,21 @@ export default function InvoiceDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+        <InvoiceDocument
+          invoice={invoice}
+          company={company}
+          customer={customer}
+          qr={zatca?.qr ?? null}
+          templateId={thermalTemplateId}
+          themeId={frozenThermalDefinition.theme_id ?? null}
+          footerText={frozenThermalDefinition.footer_text ?? null}
+          showLogo={frozenThermalDefinition.show_logo !== false}
+          layout={Array.isArray(frozenThermalDefinition.layout) && frozenThermalDefinition.layout.length ? frozenThermalDefinition.layout : null}
+          rootId="thermal-print-root"
+        />
+      )}
 
       {/* سجلّ التغييرات — لا يُطبع مع المستند. */}
       <RevisionLog type="invoice" id={id} />

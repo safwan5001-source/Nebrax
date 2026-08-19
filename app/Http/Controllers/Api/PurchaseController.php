@@ -24,6 +24,8 @@ class PurchaseController extends ApiController
     public function store(StorePurchaseRequest $request): JsonResponse
     {
         $data = $request->validated();
+        // مصدر التقرير هو المستخدم الموثق، لا قيمة يرسلها العميل ويستطيع انتحالها.
+        $data['created_by'] = $request->user()?->id;
 
         Partner::findOrFail($data['partner_id']); // عزل المورد
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
@@ -36,7 +38,7 @@ class PurchaseController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        return (new PurchaseResource(Purchase::with('lines')->findOrFail($id)))->response();
+        return (new PurchaseResource(Purchase::with(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])->findOrFail($id)))->response();
     }
 
     /**
@@ -71,6 +73,6 @@ class PurchaseController extends ApiController
         $purchase = Purchase::findOrFail($id);
         $posted = $this->domain(fn () => $this->purchases->post($purchase));
 
-        return (new PurchaseResource($posted->load('lines')))->response();
+        return (new PurchaseResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
     }
 }

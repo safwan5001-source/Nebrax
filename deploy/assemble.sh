@@ -24,7 +24,7 @@ php artisan install:api --no-interaction --without-migration-prompt || true
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
 
 echo "▶ 3/4  دمج ملفات النواة وطبقة الـ API..."
-mkdir -p app/Services/Accounting app/Services/Reporting app/Support \
+mkdir -p app/Services/Accounting app/Services/Reporting app/Services/PrintTemplates app/Support \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
          app/Http/Requests app/Http/Resources app/Console/Commands \
          app/Models/Concerns tests/Feature routes
@@ -33,6 +33,7 @@ cp -r "$CORE_DIR/app/Models/"*.php               app/Models/
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php      app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
 cp -r "$CORE_DIR/app/Services/Reporting/"*.php   app/Services/Reporting/
+cp -r "$CORE_DIR/app/Services/PrintTemplates/"*.php app/Services/PrintTemplates/
 cp -r "$CORE_DIR/app/Support/"*.php              app/Support/
 cp -r "$CORE_DIR/app/Tenancy/"*.php              app/Tenancy/
 cp -r "$CORE_DIR/app/Http/Middleware/"*.php      app/Http/Middleware/

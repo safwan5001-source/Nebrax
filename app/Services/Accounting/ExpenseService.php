@@ -21,7 +21,8 @@ use RuntimeException;
  *    دائن  1110 الصندوق            115000
  *  (طريقة الدفع تحدّد الحساب الدائن: نقد 1110 / بنك 1120 / آجل 2110 الموردون)
  *
- *  لا كتابة مباشرة في journal_lines — المرور إجباري عبر المحرك.
+ *  التصنيف والبائع والمرفقات بيانات إثبات وتحليل؛ لا تغيّر الحساب المدين ولا
+ *  القيد. لا كتابة مباشرة في journal_lines — المرور إجباري عبر المحرك.
  */
 class ExpenseService
 {
@@ -33,7 +34,8 @@ class ExpenseService
     public function __construct(protected LedgerService $ledger) {}
 
     /**
-     * @param  array  $data  ['account_id'=>uuid, 'amount'=>int(هللات), 'tax_rate'=>?int,
+     * @param  array  $data  ['account_id'=>uuid, 'category_id'=>?uuid, 'vendor_name'=>?string,
+     *                         'amount'=>int(هللات), 'tax_rate'=>?int,
      *                         'payment_method'=>'cash|bank|credit', 'partner_id'=>?uuid,
      *                         'expense_date'=>?, 'description'=>?, 'number'=>?, 'created_by'=>?]
      */
@@ -54,7 +56,9 @@ class ExpenseService
             return Expense::create([
                 'number'         => $data['number'] ?? $this->nextNumber($date),
                 'account_id'     => $data['account_id'],
+                'category_id'    => $data['category_id'] ?? null,
                 'partner_id'     => $data['partner_id'] ?? null,
+                'vendor_name'    => $data['vendor_name'] ?? null,
                 'cost_center_id' => $data['cost_center_id'] ?? null,
                 'expense_date'   => $date,
                 'payment_method' => $data['payment_method'] ?? 'cash',
@@ -70,8 +74,67 @@ class ExpenseService
     }
 
     /**
-     * ترحيل المصروف: توليد القيد المتوازن عبر LedgerService.
+     * تعديل مسودة المصروف فقط. إعادة اشتقاق الضريبة والإجمالي تمنع تعارض شاشة
+     * قديمة مع القيم المخزّنة، والمصروف المرحّل لا يُفتح للتعديل أبداً.
      */
+    public function update(Expense $expense, array $data): Expense
+    {
+        if (! $expense->isDraft()) {
+            throw new RuntimeException('لا يمكن تعديل مصروف مرحّل أو ملغى.');
+        }
+
+        $amount = (int) ($data['amount'] ?? 0);
+        if ($amount <= 0) {
+            throw new RuntimeException('مبلغ المصروف يجب أن يكون موجباً.');
+        }
+
+        $this->assertExpenseAccount($data['account_id']);
+
+        return DB::transaction(function () use ($expense, $data, $amount) {
+            $rate = (int) ($data['tax_rate'] ?? 15);
+            $tax = $this->calcTax($amount, $rate);
+
+            $expense->update([
+                'account_id'     => $data['account_id'],
+                'category_id'    => $data['category_id'] ?? null,
+                'partner_id'     => $data['partner_id'] ?? null,
+                'vendor_name'    => $data['vendor_name'] ?? null,
+                'cost_center_id' => $data['cost_center_id'] ?? null,
+                'expense_date'   => $data['expense_date'] ?? $expense->expense_date->toDateString(),
+                'payment_method' => $data['payment_method'] ?? 'cash',
+                'description'    => $data['description'] ?? null,
+                'amount'         => $amount,
+                'tax_rate'       => $rate,
+                'tax_amount'     => $tax,
+                'total'          => $amount + $tax,
+            ]);
+
+            return $expense->fresh();
+        });
+    }
+
+    /**
+     * النسخة الجديدة مسودة مستقلة برقم وتاريخ جديدين. لا تُنسخ المرفقات لأنها
+     * إثبات للمستند المصدر لا للمستند الجديد.
+     */
+    public function duplicate(Expense $expense, ?string $createdBy = null): Expense
+    {
+        return $this->create([
+            'account_id'     => $expense->account_id,
+            'category_id'    => $expense->category_id,
+            'partner_id'     => $expense->partner_id,
+            'vendor_name'    => $expense->vendor_name,
+            'cost_center_id' => $expense->cost_center_id,
+            'expense_date'   => now()->toDateString(),
+            'payment_method' => $expense->payment_method,
+            'description'    => $expense->description,
+            'amount'         => $expense->amount,
+            'tax_rate'       => $expense->tax_rate,
+            'created_by'     => $createdBy,
+        ]);
+    }
+
+    /** ترحيل المصروف: توليد القيد المتوازن عبر LedgerService. */
     public function post(Expense $expense): Expense
     {
         if (! $expense->isDraft()) {

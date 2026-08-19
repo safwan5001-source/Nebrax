@@ -20,6 +20,12 @@ class UpdateUserRequest extends FormRequest
             'is_active' => ['boolean'],
             // ربط/فكّ الربط بموظف. الغياب يُبقي الحالي؛ `null` صريحة تفكّ الربط.
             'employee_id' => ['nullable', 'uuid'],
+            // نطاق الوصول: **الغياب لا يعني الحرمان**. مصفوفة فارغة تُلغي
+            // التقييد (وصولٌ كامل)، وعدم الإرسال يُبقي الإسناد كما هو.
+            'branch_ids'      => ['nullable', 'array'],
+            'branch_ids.*'    => ['uuid'],
+            'warehouse_ids'   => ['nullable', 'array'],
+            'warehouse_ids.*' => ['uuid'],
         ];
     }
 }

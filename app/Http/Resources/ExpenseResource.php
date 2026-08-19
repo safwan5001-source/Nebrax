@@ -16,8 +16,15 @@ class ExpenseResource extends JsonResource
             'account_id'     => $this->account_id,
             'account_code'   => $this->whenLoaded('account', fn () => $this->account->code),
             'account_name'   => $this->whenLoaded('account', fn () => $this->account->name),
+            'category_id'    => $this->category_id,
+            'category_name'  => $this->whenLoaded('category', fn () => $this->category?->name),
             'partner_id'     => $this->partner_id,
+            'partner_name'   => $this->whenLoaded('partner', fn () => $this->partner?->name),
+            'vendor_name'    => $this->vendor_name,
             'cost_center_id' => $this->cost_center_id,
+            'cost_center_name' => $this->whenLoaded('costCenter', fn () => $this->costCenter?->name),
+            'cost_center_code' => $this->whenLoaded('costCenter', fn () => $this->costCenter?->code),
+            'journal_entry_id' => $this->journal_entry_id,
             'expense_date'   => optional($this->expense_date)->toDateString(),
             'payment_method' => $this->payment_method,
             'description'    => $this->description,
@@ -26,6 +33,12 @@ class ExpenseResource extends JsonResource
             'tax_amount'     => Money::toRiyal($this->tax_amount),
             'total'          => Money::toRiyal($this->total),
             'status'         => $this->status,
+            'attachments'    => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn ($attachment) => [
+                'id'            => $attachment->id,
+                'original_name' => $attachment->original_name,
+                'mime_type'     => $attachment->mime_type,
+                'size'          => $attachment->size,
+            ])->values()),
         ];
     }
 }

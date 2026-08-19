@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Printer } from 'lucide-react';
+import { ArrowRight, Printer, Download, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,9 @@ import { TaxDocument, type Party, type DocLine } from '@/components/documents/ta
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { useCompany } from '@/lib/company';
+import { useToast } from '@/components/ui/toast';
+import { DocumentScaler } from '@/modules/documents/components/document-scaler';
+import { documentExporter, printDocument } from '@/modules/documents/services/export';
 
 interface ReturnDoc {
   id: string;
@@ -36,11 +39,14 @@ export default function ReturnDetailPage() {
   const t = useTranslations('invoiceDetail');
   const tr = useTranslations('returns');
   const ts = useTranslations('status');
+  const tPrint = useTranslations('documentPrint');
   const company = useCompany();
+  const { success, error: errorToast } = useToast();
 
   const [doc, setDoc] = useState<ReturnDoc | null>(null);
   const [party, setParty] = useState<Party | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -64,8 +70,12 @@ export default function ReturnDetailPage() {
 
   if (!doc) return <div className="text-muted">{t('not_found')}</div>;
 
-  // مرتجع مبيعات = إشعار دائن، مرتجع مشتريات = إشعار مدين.
-  const docTitle = doc.type === 'sales' ? tr('doc_title_credit') : tr('doc_title_debit');
+  // مرتجع مبيعات = إشعار دائن للعميل، ومرتجع مشتريات = إشعار مدين للمورد.
+  const isPurchaseReturn = doc.type === 'purchase';
+  const docTitle = isPurchaseReturn ? tr('doc_title_debit') : tr('doc_title_credit');
+  const docSubtitle = isPurchaseReturn ? tr('document_subtitle_debit') : tr('document_subtitle_credit');
+  const partyLabel = isPurchaseReturn ? tr('supplier') : tr('customer');
+  const paper = { widthMm: 210, heightMm: 297 };
 
   const info: [string, React.ReactNode][] = [
     [tr('partner'), party?.name ?? '—'],
@@ -74,24 +84,64 @@ export default function ReturnDetailPage() {
     [tr('total'), <span key="t" className="num font-semibold">{formatRiyal(doc.total)}</span>],
   ];
 
+  async function handleDownloadPdf() {
+    if (!doc) return;
+    setBusy('pdf');
+    try {
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Return template is unavailable');
+      await documentExporter.download({ element, fileName: doc.number, paper });
+      success(tPrint('downloaded_ok'));
+    } catch {
+      errorToast(tPrint('export_failed'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleShare() {
+    if (!doc) return;
+    setBusy('share');
+    try {
+      const element = document.getElementById('print-root');
+      if (!element) throw new Error('Return template is unavailable');
+      const result = await documentExporter.share({ element, fileName: doc.number, title: docTitle, paper });
+      success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/returns')} aria-label={t('back')}>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
         </Button>
         <h1 className="num text-xl font-semibold text-text">{doc.number}</h1>
         <Badge tone={doc.type === 'sales' ? 'neutral' : 'warning'}>{tr(doc.type)}</Badge>
         <Badge tone={statusTone[doc.status] ?? 'muted'}>{ts(doc.status)}</Badge>
-        <Button variant="outline" size="sm" className="no-print ms-auto" onClick={() => window.print()}>
-          <Printer className="h-4 w-4" strokeWidth={1.7} />
-          {t('print')}
-        </Button>
+        <div className="no-print ms-auto flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={!!busy}>
+            <Download className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'pdf' ? tPrint('generating') : tPrint('download_pdf')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleShare} disabled={!!busy}>
+            <Share2 className="h-4 w-4" strokeWidth={1.7} />
+            {busy === 'share' ? tPrint('generating') : tPrint('share_pdf')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={!!busy}>
+            <Printer className="h-4 w-4" strokeWidth={1.7} />
+            {t('print')}
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('details')}</CardTitle>
+          <CardTitle>{tr('details')}</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
@@ -107,7 +157,7 @@ export default function ReturnDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('lines')}</CardTitle>
+          <CardTitle>{tr('lines')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -135,22 +185,31 @@ export default function ReturnDetailPage() {
         </CardContent>
       </Card>
 
-      {/* إشعار دائن/مدين A4 — يظهر عند الطباعة / حفظ PDF فقط */}
-      <TaxDocument
-        title={docTitle}
-        company={company}
-        partyLabel={tr('partner')}
-        party={party}
-        metaRows={[
-          [tr('number'), doc.number],
-          [t('date'), doc.return_date],
-          [tr('type'), tr(doc.type)],
-        ]}
-        lines={doc.lines}
-        subtotal={doc.subtotal}
-        tax={doc.tax_amount}
-        total={doc.total}
-      />
+      <Card>
+        <CardHeader className="no-print"><CardTitle>{tr('preview')}</CardTitle></CardHeader>
+        <CardContent className="print:p-0">
+          <div className="rounded-lg bg-gray-100 p-3 dark:bg-black/30 print:bg-transparent print:p-0 [&_.print-only]:block">
+            <DocumentScaler>
+              <TaxDocument
+                title={docTitle}
+                subtitle={docSubtitle}
+                company={company}
+                partyLabel={partyLabel}
+                party={party}
+                metaRows={[
+                  [tr('number'), doc.number],
+                  [t('date'), doc.return_date],
+                  [tr('type'), tr(doc.type)],
+                ]}
+                lines={doc.lines}
+                subtotal={doc.subtotal}
+                tax={doc.tax_amount}
+                total={doc.total}
+              />
+            </DocumentScaler>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

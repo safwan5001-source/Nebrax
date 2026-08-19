@@ -45,6 +45,9 @@ class StockPermitController extends ApiController
         $data = $request->validated();
         $this->assertTenantOwned(Warehouse::class, $data['warehouse_id'], 'المخزن');
         $this->assertTenantOwned(Warehouse::class, $data['target_warehouse_id'] ?? null, 'مخزن الوجهة');
+        // ونطاق المستخدم يشمل طرفَي التحويل معاً — وإلا نقل بضاعةً إلى حيث لا يملك.
+        $this->assertWarehouseAllowed($data['warehouse_id']);
+        $this->assertWarehouseAllowed($data['target_warehouse_id'] ?? null);
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $permit = $this->domain(fn () => $this->permits->create($data, $data['items']));

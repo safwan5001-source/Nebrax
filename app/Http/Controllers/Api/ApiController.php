@@ -44,21 +44,50 @@ abstract class ApiController extends Controller
      */
     protected function scopeToActiveBranch(Builder $query, Request $request): Builder
     {
+        $table   = $query->getModel()->getTable();
+        $allowed = $request->user()?->allowedBranchIds();
+
+        // «كل الفروع» تعني كلَّ **ما يملكه المستخدم** لا كلَّ ما في المؤسسة:
+        // القيد على المستخدم لا يُرفَع بمعاملٍ في الرابط.
         if ($request->query('branch') === 'all') {
-            return $query;
+            return $allowed === null ? $query : $this->whereBranchIn($query, $table, $allowed);
         }
 
         $branchId = app(BranchContext::class)->id();
+
         if ($branchId === null) {
-            return $query;
+            return $allowed === null ? $query : $this->whereBranchIn($query, $table, $allowed);
         }
 
-        $table = $query->getModel()->getTable();
+        return $this->whereBranchIn($query, $table, [$branchId]);
+    }
 
-        return $query->where(function (Builder $q) use ($table, $branchId) {
-            $q->where($table . '.branch_id', $branchId)
+    /**
+     * تصفية بفروع محدَّدة **مع إبقاء الصفوف بلا فرع مرئية**.
+     *
+     * `branch_id` الفارغ يعني «ما قبل الفروع» أو ما أُنشئ بلا سياق (أوامر
+     * artisan، مهامّ مجدولة) — وهو مشترك بطبيعته. إخفاؤه كان سيُخفي بيانات
+     * قائمة عن كل مستخدم بمجرّد تفعيل التقييد، وهو ضررٌ أكبر من الذي يدفعه.
+     */
+    private function whereBranchIn(Builder $query, string $table, array $branchIds): Builder
+    {
+        return $query->where(function (Builder $q) use ($table, $branchIds) {
+            $q->whereIn($table . '.branch_id', $branchIds)
               ->orWhereNull($table . '.branch_id');
         });
+    }
+
+    /**
+     * يمنع التعامل مع مستودع خارج نطاق المستخدم.
+     *
+     * القائمة المصفّاة تُخفي المستودع من الشاشة لا من الـAPI — والطلب المباشر
+     * يبقى ممكناً بلا هذا الحارس. `null` يمرّ: غياب المعرّف يعالجه التحقّق.
+     */
+    protected function assertWarehouseAllowed(?string $warehouseId): void
+    {
+        if ($warehouseId !== null && ! request()->user()?->canAccessWarehouse($warehouseId)) {
+            abort(422, 'هذا المستودع خارج نطاق صلاحياتك.');
+        }
     }
 
     /**
