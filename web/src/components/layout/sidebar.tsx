@@ -388,7 +388,7 @@ export function Sidebar({
             onClick={onDismiss}
             aria-label={t('close')}
             ref={closeButtonRef}
-            className="ms-auto rounded p-1 text-muted hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:hidden"
+            className="ms-auto flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:hidden"
           >
             <X className="h-5 w-5" strokeWidth={1.7} />
           </button>
@@ -401,7 +401,7 @@ export function Sidebar({
               aria-expanded={!mini}
               title={mini ? t('expand') : t('collapse')}
               className={cn(
-                'hidden shrink-0 rounded p-1 text-muted hover:bg-primary-soft hover:text-primary lg:block',
+                'hidden h-11 w-11 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary lg:flex',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                 mini ? '' : 'ms-auto'
               )}
@@ -420,7 +420,7 @@ export function Sidebar({
             onClick={onClose}
             title={mini ? t('dashboard') : undefined}
             className={cn(
-              'relative mb-3 flex h-9 items-center rounded text-sm text-muted hover:bg-primary-soft hover:text-primary',
+              'relative mb-3 flex h-11 items-center rounded text-sm text-muted hover:bg-primary-soft hover:text-primary',
               mini ? 'justify-center px-0' : 'gap-2 px-2',
               isActive('/dashboard') && 'bg-primary-soft font-medium text-primary'
             )}
@@ -463,7 +463,7 @@ export function Sidebar({
                   aria-haspopup={mini ? 'menu' : undefined}
                   title={mini ? t(`groups.${group.title}`) : undefined}
                   className={cn(
-                    'relative flex h-9 w-full items-center rounded text-[14.5px] font-medium transition-colors',
+                    'relative flex h-11 w-full items-center rounded text-[14.5px] font-medium transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                     mini ? 'justify-center px-0' : 'gap-2 px-2',
                     groupActive || (mini && flyout?.title === group.title)
@@ -511,7 +511,7 @@ export function Sidebar({
                             // الفرع أصغر وأخفت من أبيه — والنشِط يتميّز باللون
                             // والوزن **بلا خلفية**: `primary-soft` للرئيسي وحده،
                             // ولو أخذها الفرع لتساويا في الوزن البصري.
-                            'flex h-8 items-center gap-2 rounded pe-2 ps-2 text-[13px] text-muted transition-colors hover:text-primary',
+                            'flex h-11 items-center gap-2 rounded pe-2 ps-2 text-[13px] text-muted transition-colors hover:text-primary',
                             active && 'font-semibold text-primary'
                           )}
                         >
