@@ -12,14 +12,14 @@ export function DemoBanner() {
   if (hidden || !isDemo()) return null;
 
   return (
-    <div className="no-print flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm text-warning">
+    <div className="no-print flex min-h-12 items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-0.5 text-sm text-warning">
       <AlertTriangle className="h-4 w-4 shrink-0" strokeWidth={1.8} />
       <span className="font-medium">{t('banner')}</span>
       <button
         type="button"
         onClick={() => setHidden(true)}
         aria-label={t('close')}
-        className="ms-auto shrink-0 text-warning/70 transition-colors hover:text-warning"
+        className="ms-auto flex h-11 w-11 shrink-0 items-center justify-center rounded text-warning/70 transition-colors hover:text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         <X className="h-4 w-4" strokeWidth={1.8} />
       </button>

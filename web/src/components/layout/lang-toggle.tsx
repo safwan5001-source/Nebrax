@@ -16,7 +16,7 @@ export function LangToggle() {
   }
 
   return (
-    <Button variant="ghost" size="icon" aria-label="تبديل اللغة" onClick={toggle}>
+    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="تبديل اللغة" onClick={toggle}>
       <span className="text-xs font-semibold">{locale === 'ar' ? 'EN' : 'ع'}</span>
       <Languages className="sr-only h-4 w-4" />
     </Button>

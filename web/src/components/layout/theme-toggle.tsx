@@ -14,6 +14,7 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
+      className="h-11 w-11"
       aria-label="تبديل الوضع"
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
     >

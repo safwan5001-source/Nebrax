@@ -39,7 +39,7 @@ export function Topbar({
       <Button
         variant="ghost"
         size="icon"
-        className="lg:hidden"
+        className="h-11 w-11 lg:hidden"
         aria-label={t('menu')}
         onClick={onMenuClick}
         ref={menuButtonRef}
@@ -51,11 +51,11 @@ export function Topbar({
           الشريط الجانبي، وتكرارها في الشريطين ضجيجٌ بلا فائدة. */}
       <CompanyLogoMark logo={company?.logo} name={company?.name} size="sm" className="lg:hidden" />
 
-      <div className="hidden h-9 items-center gap-2 rounded border border-border px-3 focus-within:ring-2 focus-within:ring-primary/40 sm:flex">
+      <div className="hidden h-12 items-center gap-2 rounded border border-border px-3 focus-within:ring-2 focus-within:ring-primary/40 sm:flex">
         <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.6} />
         <input
           placeholder={t('search')}
-          className="w-40 bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
+          className="h-full w-40 bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
         />
       </div>
 
@@ -64,7 +64,8 @@ export function Topbar({
         <Dropdown
           align="end"
           menuLabel={t('create')}
-          triggerClassName="h-9 w-9 justify-center text-text hover:bg-primary-soft hover:text-primary"
+          triggerLabel={t('create')}
+          triggerClassName="h-11 w-11 justify-center text-text hover:bg-primary-soft hover:text-primary"
           trigger={<Plus className="h-4 w-4" strokeWidth={1.8} />}
         >
           <DropdownItem icon={FilePlus} href="/invoices/new">{t('new_invoice')}</DropdownItem>
@@ -79,7 +80,8 @@ export function Topbar({
         <Dropdown
           align="end"
           menuLabel={t('account')}
-          triggerClassName="gap-2 px-1.5 py-1 hover:bg-primary-soft"
+          triggerLabel={t('account')}
+          triggerClassName="h-11 min-w-11 justify-center gap-2 px-2 hover:bg-primary-soft sm:min-w-0 sm:justify-start sm:px-1.5"
           trigger={
             <>
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary">

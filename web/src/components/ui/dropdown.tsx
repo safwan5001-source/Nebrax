@@ -19,6 +19,7 @@ export function Dropdown({
   children,
   align = 'end',
   menuLabel,
+  triggerLabel,
   triggerClassName,
   menuClassName,
 }: {
@@ -26,6 +27,7 @@ export function Dropdown({
   children: React.ReactNode;
   align?: 'start' | 'end';
   menuLabel?: string;
+  triggerLabel?: string;
   triggerClassName?: string;
   menuClassName?: string;
 }) {
@@ -76,6 +78,7 @@ export function Dropdown({
         type="button"
         onClick={toggle}
         aria-haspopup="menu"
+        aria-label={triggerLabel}
         aria-expanded={open}
         className={cn(
           'inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
@@ -122,7 +125,7 @@ export function DropdownItem({
   const { open, close } = useContext(DropdownCtx);
   const tabIndex = open ? 0 : -1; // خارج ترتيب التنقّل عند الإغلاق
   const className = cn(
-    'flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-sm',
+    'flex min-h-11 w-full items-center gap-2 rounded px-2.5 py-1.5 text-sm',
     tone === 'danger'
       ? 'text-negative hover:bg-negative/10'
       : 'text-text hover:bg-primary-soft hover:text-primary',

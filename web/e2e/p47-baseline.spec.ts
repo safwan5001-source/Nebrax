@@ -194,3 +194,53 @@ test('P47.3: لا يمر Tab عبر درج الجوال المخفي ويعود 
   await expect(menuButton).toBeFocused();
   await expect.poll(() => sidebar.evaluate((element) => (element as HTMLElement).inert)).toBe(true);
 });
+
+
+async function expectTargetsAtLeast44(locator: ReturnType<Page['locator']>) {
+  const dimensions = await locator.evaluateAll((elements) => elements
+    .filter((element) => {
+      const rect = (element as HTMLElement).getBoundingClientRect();
+      return rect.width > 0
+        && rect.height > 0
+        && rect.bottom > 0
+        && rect.right > 0
+        && rect.top < window.innerHeight
+        && rect.left < window.innerWidth;
+    })
+    .map((element) => {
+      const rect = (element as HTMLElement).getBoundingClientRect();
+      return {
+        label: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? null,
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+    }));
+
+  expect(dimensions).not.toHaveLength(0);
+  expect(dimensions.every((target) => target.width >= 44 && target.height >= 44), JSON.stringify(dimensions, null, 2)).toBe(true);
+}
+
+test('P47: تحقق أدوات غلاف الجوال وقوائمه هدف لمس 44px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await page.goto(`${baseUrl}/document-design`);
+  await expect(page.getByRole('heading', { name: 'مركز قوالب الطباعة' })).toBeVisible();
+
+  await expectTargetsAtLeast44(page.locator('header button:visible'));
+  await expectTargetsAtLeast44(page.getByRole('button', { name: 'إغلاق' }));
+
+  await page.getByRole('button', { name: 'القائمة' }).click();
+  await expect(page.getByRole('button', { name: 'إغلاق القائمة' })).toBeVisible();
+  await expectTargetsAtLeast44(page.locator('aside button:visible, aside a[href]:visible'));
+  await page.getByRole('button', { name: 'إغلاق القائمة' }).click();
+
+  await page.getByRole('button', { name: 'إنشاء سريع' }).click();
+  await expectTargetsAtLeast44(page.getByRole('menu', { name: 'إنشاء سريع' }).getByRole('menuitem'));
+  await page.getByRole('button', { name: 'إنشاء سريع' }).click();
+
+  await page.getByRole('button', { name: 'الحساب' }).click();
+  await expectTargetsAtLeast44(page.getByRole('menu', { name: 'الحساب' }).getByRole('menuitem'));
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expectTargetsAtLeast44(page.locator('header input:visible'));
+});
