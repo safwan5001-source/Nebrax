@@ -238,7 +238,7 @@ class PaymentService
             throw new RuntimeException('لا يمكن ترحيل سند غير مسوّد (draft).');
         }
 
-        return DB::transaction(function () use ($payment) {
+        return DB::transaction(function () use ($payment, $actor) {
             // قفل الصف وإعادة فحص الحالة — يمنع الترحيل المزدوج المتزامن.
             $payment = Payment::lockForUpdate()->findOrFail($payment->id);
             if (! $payment->isDraft()) {
