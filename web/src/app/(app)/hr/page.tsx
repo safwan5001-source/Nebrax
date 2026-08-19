@@ -8,13 +8,14 @@ import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmployeeDialog, type Employee } from '@/components/hr/employee-dialog';
+import { ShiftDialog, type Shift } from '@/components/hr/shift-dialog';
 import { CreateRunDialog } from '@/components/hr/create-run-dialog';
 import { RunDetailDialog, type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
-type Tab = 'employees' | 'runs';
+type Tab = 'employees' | 'shifts' | 'runs';
 const statusTone: Record<string, 'positive' | 'warning' | 'muted'> = { paid: 'positive', posted: 'warning', draft: 'muted' };
 
 export default function HrPage() {
@@ -23,19 +24,27 @@ export default function HrPage() {
   const [tab, setTab] = useState<Tab>('employees');
 
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [empDialog, setEmpDialog] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [shiftDialog, setShiftDialog] = useState(false);
+  const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [runDialog, setRunDialog] = useState(false);
   const [activeRun, setActiveRun] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([api<{ data: Employee[] }>('/employees'), api<{ data: PayrollRun[] }>('/payroll-runs')])
-      .then(([e, r]) => {
+    Promise.all([
+      api<{ data: Employee[] }>('/employees'),
+      api<{ data: Shift[] }>('/shifts'),
+      api<{ data: PayrollRun[] }>('/payroll-runs'),
+    ])
+      .then(([e, sh, r]) => {
         setEmployees(e.data);
+        setShifts(sh.data);
         setRuns(r.data);
       })
       .finally(() => setLoading(false));
@@ -97,25 +106,57 @@ export default function HrPage() {
     [t, ts]
   );
 
+  const weekdays = t.raw('weekdays') as string[];
+  const fmtHours = (m: number) => `${Math.floor(m / 60)} ${t('hours_short')} ${m % 60} ${t('minutes_short')}`;
+
+  const shiftColumns = useMemo<ColumnDef<Shift, unknown>[]>(
+    () => [
+      { accessorKey: 'name', header: t('shift_name') },
+      {
+        id: 'time',
+        header: t('start_time'),
+        cell: ({ row }) => <span className="num text-muted" dir="ltr">{row.original.start_time} — {row.original.end_time}</span>,
+      },
+      { id: 'net', header: t('net_hours'), cell: ({ row }) => <span className="num">{fmtHours(row.original.net_minutes)}</span> },
+      {
+        id: 'days',
+        header: t('work_days'),
+        cell: ({ row }) => <span className="text-muted">{row.original.work_days.map((d) => weekdays[d]).join('، ')}</span>,
+      },
+      {
+        accessorKey: 'is_active',
+        header: t('status_label'),
+        cell: ({ row }) => <Badge tone={row.original.is_active ? 'positive' : 'muted'}>{row.original.is_active ? t('active') : t('inactive')}</Badge>,
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <Button variant="ghost" size="icon" aria-label={t('edit')} onClick={() => { setEditingShift(row.original); setShiftDialog(true); }}>
+            <Pencil className="h-4 w-4" strokeWidth={1.7} />
+          </Button>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t]
+  );
+
+  const addButton = {
+    employees: () => (<Button onClick={() => { setEditing(null); setEmpDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_employee')}</Button>),
+    shifts: () => (<Button onClick={() => { setEditingShift(null); setShiftDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_shift')}</Button>),
+    runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
+  }[tab];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        {tab === 'employees' ? (
-          <Button onClick={() => { setEditing(null); setEmpDialog(true); }}>
-            <Plus className="h-4 w-4" strokeWidth={1.8} />
-            {t('add_employee')}
-          </Button>
-        ) : (
-          <Button onClick={() => setRunDialog(true)}>
-            <Plus className="h-4 w-4" strokeWidth={1.8} />
-            {t('create_run')}
-          </Button>
-        )}
+        {addButton()}
       </div>
 
       <div className="flex gap-1 border-b border-border">
-        {(['employees', 'runs'] as Tab[]).map((key) => (
+        {(['employees', 'shifts', 'runs'] as Tab[]).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -129,13 +170,18 @@ export default function HrPage() {
         ))}
       </div>
 
-      {tab === 'employees' ? (
+      {tab === 'employees' && (
         <DataTable columns={empColumns} data={employees} loading={loading} searchPlaceholder={t('search_employees')} emptyLabel={t('no_employees')} exportName="employees" />
-      ) : (
+      )}
+      {tab === 'shifts' && (
+        <DataTable columns={shiftColumns} data={shifts} loading={loading} searchPlaceholder={t('search_shifts')} emptyLabel={t('no_shifts')} exportName="shifts" />
+      )}
+      {tab === 'runs' && (
         <DataTable columns={runColumns} data={runs} loading={loading} searchPlaceholder={t('search_runs')} emptyLabel={t('no_runs')} exportName="payroll-runs" />
       )}
 
       <EmployeeDialog open={empDialog} onClose={() => setEmpDialog(false)} onSaved={load} employee={editing} />
+      <ShiftDialog open={shiftDialog} onClose={() => setShiftDialog(false)} onSaved={load} shift={editingShift} />
       <CreateRunDialog open={runDialog} onClose={() => setRunDialog(false)} onCreated={() => { load(); setTab('runs'); }} />
       <RunDetailDialog runId={activeRun} onClose={() => setActiveRun(null)} onChanged={load} />
     </div>
