@@ -131,11 +131,11 @@ function SortableItemsColumnEditor({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_140px]">
         <div className="space-y-1">
           <Label htmlFor={`template-column-label-${column.id}`} className="text-xs text-muted">{t('column_label', { column: label })}</Label>
-          <Input id={`template-column-label-${column.id}`} value={column.label ?? ''} disabled={disabled} maxLength={80} placeholder={label} onChange={(event) => onChange({ label: event.target.value || undefined })} />
+          <Input id={`template-column-label-${column.id}`} className="h-11" value={column.label ?? ''} disabled={disabled} maxLength={80} placeholder={label} onChange={(event) => onChange({ label: event.target.value || undefined })} />
         </div>
         <div className="space-y-1">
           <Label htmlFor={`template-column-alignment-${column.id}`} className="text-xs text-muted">{t('alignment')}</Label>
-          <Select id={`template-column-alignment-${column.id}`} value={column.alignment ?? ''} disabled={disabled} onChange={(event) => onChange({ alignment: (event.target.value || undefined) as DocBlockAlignment | undefined })}>
+          <Select id={`template-column-alignment-${column.id}`} className="h-11" value={column.alignment ?? ''} disabled={disabled} onChange={(event) => onChange({ alignment: (event.target.value || undefined) as DocBlockAlignment | undefined })}>
             <option value="">{t('inherit_default')}</option>
             <option value="start">{t('alignment_start')}</option>
             <option value="center">{t('alignment_center')}</option>
@@ -241,7 +241,7 @@ export function BlockPropertiesEditor({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="template-property-block">{t('property_block')}</Label>
-        <Select id="template-property-block" value={selected.key} disabled={disabled} onChange={(event) => setSelectedKey(event.target.value as DocSectionKey)}>
+        <Select id="template-property-block" className="h-11" value={selected.key} disabled={disabled} onChange={(event) => setSelectedKey(event.target.value as DocSectionKey)}>
           {editableBlocks.map((item) => <option key={item.key} value={item.key}>{tSections(item.key)}</option>)}
         </Select>
       </div>
@@ -251,7 +251,7 @@ export function BlockPropertiesEditor({
           {allowed.includes('alignment') && !isImageBlock && (
             <div className="space-y-1.5">
               <Label htmlFor="template-block-alignment">{t('alignment')}</Label>
-              <Select id="template-block-alignment" value={properties.alignment ?? ''} disabled={disabled} onChange={(event) => update({ alignment: (event.target.value || undefined) as DocBlockAlignment | undefined })}>
+              <Select id="template-block-alignment" className="h-11" value={properties.alignment ?? ''} disabled={disabled} onChange={(event) => update({ alignment: (event.target.value || undefined) as DocBlockAlignment | undefined })}>
                 <option value="">{t('inherit_default')}</option>
                 <option value="start">{t('alignment_start')}</option>
                 <option value="center">{t('alignment_center')}</option>
@@ -295,7 +295,7 @@ export function BlockPropertiesEditor({
           {allowed.includes('font_size') && (
             <div className="space-y-1.5">
               <Label htmlFor="template-block-font-size">{t('font_size')}</Label>
-              <Select id="template-block-font-size" value={properties.font_size ?? ''} disabled={disabled} onChange={(event) => update({ font_size: (event.target.value || undefined) as DocBlockFontSize | undefined })}>
+              <Select id="template-block-font-size" className="h-11" value={properties.font_size ?? ''} disabled={disabled} onChange={(event) => update({ font_size: (event.target.value || undefined) as DocBlockFontSize | undefined })}>
                 <option value="">{t('inherit_default')}</option>
                 <option value="sm">{t('font_size_sm')}</option>
                 <option value="md">{t('font_size_md')}</option>
@@ -306,7 +306,7 @@ export function BlockPropertiesEditor({
           {allowed.includes('image_size') && (
             <div className="space-y-1.5">
               <Label htmlFor="template-block-image-size">{t('image_size')}</Label>
-              <Select id="template-block-image-size" value={properties.image_size ?? ''} disabled={disabled} onChange={(event) => update({ image_size: (event.target.value || undefined) as DocBlockImageSize | undefined })}>
+              <Select id="template-block-image-size" className="h-11" value={properties.image_size ?? ''} disabled={disabled} onChange={(event) => update({ image_size: (event.target.value || undefined) as DocBlockImageSize | undefined })}>
                 <option value="">{t('inherit_default')}</option>
                 <option value="sm">{t('image_size_sm')}</option>
                 <option value="md">{t('image_size_md')}</option>
@@ -317,7 +317,7 @@ export function BlockPropertiesEditor({
           {allowed.includes('image_opacity') && (
             <div className="space-y-1.5">
               <Label htmlFor="template-block-image-opacity">{t('image_opacity')}</Label>
-              <Select id="template-block-image-opacity" value={properties.image_opacity ?? ''} disabled={disabled} onChange={(event) => update({ image_opacity: (event.target.value || undefined) as DocBlockImageOpacity | undefined })}>
+              <Select id="template-block-image-opacity" className="h-11" value={properties.image_opacity ?? ''} disabled={disabled} onChange={(event) => update({ image_opacity: (event.target.value || undefined) as DocBlockImageOpacity | undefined })}>
                 <option value="">{t('inherit_default')}</option>
                 <option value="solid">{t('image_opacity_solid')}</option>
                 <option value="soft">{t('image_opacity_soft')}</option>

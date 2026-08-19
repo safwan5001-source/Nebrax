@@ -462,3 +462,27 @@ test('P47.2: تحقق إجراءات رأس الاستوديو وأدوات ال
   expect(await page.evaluate(() => window.innerWidth)).toBe(360);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 });
+
+
+test('P47.2-B: تحقق حقول خصائص الاستوديو هدف لمس 44px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await openStudioForP472(page, 'property-touch-targets-mobile-360');
+
+  const propertiesTab = page.getByRole('tab', { name: 'الخصائص' });
+  await propertiesTab.click();
+  await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
+
+  const propertiesPanel = page.locator('#template-properties-panel');
+  const propertyFields = propertiesPanel.locator('input:not([type="radio"]), select');
+  expect(await propertyFields.count()).toBeGreaterThanOrEqual(6);
+
+  for (let index = 0; index < await propertyFields.count(); index += 1) {
+    const field = propertyFields.nth(index);
+    await field.scrollIntoViewIfNeeded();
+    await expectTargetsAtLeast44(field);
+  }
+
+  expect(await page.evaluate(() => window.innerWidth)).toBe(360);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
+});
