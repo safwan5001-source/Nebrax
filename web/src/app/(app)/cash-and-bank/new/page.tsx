@@ -62,7 +62,7 @@ export default function CashBankFormPage() {
     };
     try {
       const response = await api<{ data: CashBankAccount }>(editId ? `/cash-bank-accounts/${editId}` : '/cash-bank-accounts', {
-        method: editId ? 'PUT' : 'POST', body: JSON.stringify(payload),
+        method: editId ? 'PUT' : 'POST', body: payload,
       });
       success(editId ? t('updated') : t('saved'));
       router.push(`/cash-and-bank/${response.data.id}`);
