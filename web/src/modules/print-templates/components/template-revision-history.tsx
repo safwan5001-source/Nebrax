@@ -54,6 +54,9 @@ export function TemplateRevisionHistory({ revisions, loading, failed }: Template
 
   const status = (revision: TemplateRevisionHistoryItem) => t(`revision_status_${revision.status}`);
   const optionLabel = (revision: TemplateRevisionHistoryItem) => `${t('revision', { version: revision.version })} · ${status(revision)}`;
+  const published = sorted.find((revision) => revision.status === 'published') ?? null;
+  const draft = sorted.find((revision) => revision.status === 'draft') ?? null;
+  const supersededCount = sorted.filter((revision) => revision.status === 'superseded').length;
 
   return (
     <Card>
@@ -69,59 +72,81 @@ export function TemplateRevisionHistory({ revisions, loading, failed }: Template
           <p className="text-sm text-muted">{t('revision_history_loading')}</p>
         ) : failed ? (
           <p className="text-sm text-negative">{t('revision_history_failed')}</p>
-        ) : sorted.length < 2 ? (
-          <p className="text-sm text-muted">{t('revision_history_single')}</p>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="revision-before">{t('revision_before')}</Label>
-                <Select id="revision-before" value={beforeId ?? ''} onChange={(event) => setBeforeId(event.target.value)}>
-                  {sorted.map((revision) => <option key={revision.id} value={revision.id}>{optionLabel(revision)}</option>)}
-                </Select>
+            <section aria-label={t('revision_lifecycle')} className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded border border-border bg-surface px-3 py-2">
+                <p className="text-xs text-muted">{t('revision_lifecycle_published')}</p>
+                <p className="mt-1 text-sm font-medium text-text">{published ? t('revision', { version: published.version }) : t('revision_lifecycle_none')}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{t('revision_lifecycle_published_hint')}</p>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="revision-after">{t('revision_after')}</Label>
-                <Select id="revision-after" value={afterId ?? ''} onChange={(event) => setAfterId(event.target.value)}>
-                  {sorted.map((revision) => <option key={revision.id} value={revision.id}>{optionLabel(revision)}</option>)}
-                </Select>
+              <div className="rounded border border-border bg-surface px-3 py-2">
+                <p className="text-xs text-muted">{t('revision_lifecycle_draft')}</p>
+                <p className="mt-1 text-sm font-medium text-text">{draft ? t('revision', { version: draft.version }) : t('revision_lifecycle_none')}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{t('revision_lifecycle_draft_hint')}</p>
               </div>
-            </div>
+              <div className="rounded border border-border bg-surface px-3 py-2">
+                <p className="text-xs text-muted">{t('revision_lifecycle_superseded')}</p>
+                <p className="mt-1 text-sm font-medium text-text">{t('revision_lifecycle_superseded_count', { count: supersededCount })}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{t('revision_lifecycle_superseded_hint')}</p>
+              </div>
+            </section>
 
-            {before && after && before.id === after.id ? (
-              <p className="text-sm text-muted">{t('revision_select_distinct')}</p>
-            ) : changes.length ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-medium text-text">
-                  <GitCompareArrows className="h-4 w-4 text-primary" aria-hidden="true" />
-                  <span>{t('revision_change_count', { count: changes.length })}</span>
-                </div>
-                <div className="overflow-x-auto rounded border border-border">
-                  <table className="min-w-full text-start text-xs">
-                    <thead className="bg-surface text-muted">
-                      <tr>
-                        <th scope="col" className="px-3 py-2 text-start font-medium">{t('revision_field')}</th>
-                        <th scope="col" className="px-3 py-2 text-start font-medium">{t('revision_before')}</th>
-                        <th scope="col" className="px-3 py-2 text-start font-medium">{t('revision_after')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {changes.map((change) => (
-                        <tr key={change.path}>
-                          <th scope="row" className="whitespace-nowrap px-3 py-2 text-start font-medium text-text">{t(getRevisionPathLabelKey(change.path), { path: change.path.replace(/^definition\./, '') })}</th>
-                          <td className="max-w-72 px-3 py-2 align-top text-muted"><code className="break-words">{formatRevisionValue(change.before, t('revision_empty_value'))}</code></td>
-                          <td className="max-w-72 px-3 py-2 align-top text-text"><code className="break-words">{formatRevisionValue(change.after, t('revision_empty_value'))}</code></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+            {sorted.length < 2 ? (
+              <p className="text-sm text-muted">{t('revision_history_single')}</p>
             ) : (
-              <p className="text-sm text-muted">{t('revision_no_changes')}</p>
-            )}
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="revision-before">{t('revision_before')}</Label>
+                    <Select id="revision-before" value={beforeId ?? ''} onChange={(event) => setBeforeId(event.target.value)}>
+                      {sorted.map((revision) => <option key={revision.id} value={revision.id}>{optionLabel(revision)}</option>)}
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="revision-after">{t('revision_after')}</Label>
+                    <Select id="revision-after" value={afterId ?? ''} onChange={(event) => setAfterId(event.target.value)}>
+                      {sorted.map((revision) => <option key={revision.id} value={revision.id}>{optionLabel(revision)}</option>)}
+                    </Select>
+                  </div>
+                </div>
 
-            {before && after && before.id !== after.id && <TemplateRevisionVisualComparison before={before} after={after} />}
+                {before && after && before.id === after.id ? (
+                  <p className="text-sm text-muted">{t('revision_select_distinct')}</p>
+                ) : changes.length ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-medium text-text">
+                      <GitCompareArrows className="h-4 w-4 text-primary" aria-hidden="true" />
+                      <span>{t('revision_change_count', { count: changes.length })}</span>
+                    </div>
+                    <div className="overflow-x-auto rounded border border-border">
+                      <table className="min-w-full text-start text-xs">
+                        <thead className="bg-surface text-muted">
+                          <tr>
+                            <th scope="col" className="px-3 py-2 text-start font-medium">{t('revision_field')}</th>
+                            <th scope="col" className="px-3 py-2 text-start font-medium">{t('revision_before')}</th>
+                            <th scope="col" className="px-3 py-2 text-start font-medium">{t('revision_after')}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {changes.map((change) => (
+                            <tr key={change.path}>
+                              <th scope="row" className="whitespace-nowrap px-3 py-2 text-start font-medium text-text">{t(getRevisionPathLabelKey(change.path), { path: change.path.replace(/^definition\./, '') })}</th>
+                              <td className="max-w-72 px-3 py-2 align-top text-muted"><code className="break-words">{formatRevisionValue(change.before, t('revision_empty_value'))}</code></td>
+                              <td className="max-w-72 px-3 py-2 align-top text-text"><code className="break-words">{formatRevisionValue(change.after, t('revision_empty_value'))}</code></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">{t('revision_no_changes')}</p>
+                )}
+
+                {before && after && before.id !== after.id && <TemplateRevisionVisualComparison before={before} after={after} />}
+              </>
+            )}
           </>
         )}
       </CardContent>
