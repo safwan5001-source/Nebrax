@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Tenancy\CompanyWide;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * نوع تسوية عهدة موظف: قائمة إعداد على مستوى المؤسسة.
@@ -18,4 +19,10 @@ class SettlementType extends BaseModel implements CompanyWide
     protected $casts = ['is_active' => 'boolean'];
 
     protected $attributes = ['is_active' => true];
+
+    /** تسويات العُهَد المرتبطة بالنوع؛ وجودها يجعل الحذف غير آمن. */
+    public function custodySettlements(): HasMany
+    {
+        return $this->hasMany(EmployeeCustodySettlement::class, 'settlement_type_id');
+    }
 }

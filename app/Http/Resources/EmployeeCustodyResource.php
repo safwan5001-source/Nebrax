@@ -10,6 +10,9 @@ class EmployeeCustodyResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $settledAmount = $this->settledAmount();
+        $remainingAmount = max(0, (int) $this->amount - $settledAmount);
+
         return [
             'id' => $this->id,
             'branch_id' => $this->branch_id,
@@ -27,9 +30,26 @@ class EmployeeCustodyResource extends JsonResource
             'custody_date' => optional($this->custody_date)->toDateString(),
             'due_date' => optional($this->due_date)->toDateString(),
             'amount' => Money::toRiyal($this->amount),
+            'settled_amount' => Money::toRiyal($settledAmount),
+            'remaining_amount' => Money::toRiyal($remainingAmount),
+            'is_settled' => $this->status === 'posted' && $remainingAmount === 0,
+            'settlements_count' => $this->whenCounted('settlements'),
+            'settlements' => $this->whenLoaded('settlements', fn () => EmployeeCustodySettlementResource::collection($this->settlements)),
             'status' => $this->status,
             'notes' => $this->notes,
             'journal_entry_id' => $this->journal_entry_id,
         ];
+    }
+
+    /** مجموع محفوظ بوحدة الهللة، من aggregate المحمّل أو من علاقة التفاصيل. */
+    private function settledAmount(): int
+    {
+        if (array_key_exists('settlements_sum_amount', $this->resource->getAttributes())) {
+            return (int) ($this->settlements_sum_amount ?? 0);
+        }
+
+        return $this->resource->relationLoaded('settlements')
+            ? (int) $this->settlements->sum('amount')
+            : 0;
     }
 }

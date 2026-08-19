@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StoreEmployeeCustodyRequest;
+use App\Http\Requests\StoreEmployeeCustodySettlementRequest;
 use App\Http\Resources\EmployeeCustodyResource;
+use App\Http\Resources\EmployeeCustodySettlementResource;
 use App\Models\Account;
 use App\Models\Employee;
 use App\Models\EmployeeCustody;
+use App\Models\SettlementType;
 use App\Services\Accounting\EmployeeCustodyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +20,10 @@ class EmployeeCustodyController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        $query = EmployeeCustody::query()->with('employee');
+        $query = EmployeeCustody::query()
+            ->with('employee')
+            ->withCount('settlements')
+            ->withSum('settlements', 'amount');
 
         if (in_array($request->query('status'), ['draft', 'posted'], true)) {
             $query->where('status', $request->query('status'));
@@ -98,6 +104,36 @@ class EmployeeCustodyController extends ApiController
         return (new EmployeeCustodyResource($this->loadRelations($posted)))->response();
     }
 
+    /** تسوية مرحّلة فوراً؛ السجل والقيد يُنشآن في EmployeeCustodyService ومعاملة واحدة. */
+    public function storeSettlement(StoreEmployeeCustodySettlementRequest $request, string $id): JsonResponse
+    {
+        $custody = $this->visibleCustody($request, $id);
+        $data = $request->validated();
+        $this->assertTenantOwned(SettlementType::class, $data['settlement_type_id'], 'نوع التسوية');
+        $this->assertTenantOwned(Account::class, $data['debit_account_id'], 'الحساب المدين');
+        $data['created_by'] = $request->user()?->id;
+
+        $settlement = $this->domain(fn () => $this->custodies->settle($custody, $data));
+
+        return (new EmployeeCustodySettlementResource($settlement))
+            ->response()
+            ->setStatusCode(201);
+    }
+
+    /** سجل تسويات العهدة، مقيد بالعهدة الظاهرة ضمن فرع العرض الفعّال. */
+    public function indexSettlements(Request $request, string $id): JsonResponse
+    {
+        $custody = $this->visibleCustody($request, $id);
+
+        return EmployeeCustodySettlementResource::collection(
+            $custody->settlements()
+                ->with(['settlementType', 'debitAccount'])
+                ->latest('settlement_date')
+                ->latest('created_at')
+                ->get()
+        )->response();
+    }
+
     /** العُهَد مستندات مالية موسومة بالفرع؛ كل عملية تلتزم بفرع العرض الفعّال. */
     private function visibleCustody(Request $request, string $id): EmployeeCustody
     {
@@ -106,7 +142,13 @@ class EmployeeCustodyController extends ApiController
 
     private function loadRelations(EmployeeCustody $custody): EmployeeCustody
     {
-        return $custody->load(['employee', 'custodyAccount', 'cashAccount', 'journalEntry']);
+        return $custody->load([
+            'employee', 'custodyAccount', 'cashAccount', 'journalEntry',
+            'settlements' => fn ($query) => $query
+                ->with(['settlementType', 'debitAccount'])
+                ->latest('settlement_date')
+                ->latest('created_at'),
+        ])->loadCount('settlements')->loadSum('settlements', 'amount');
     }
 
     private function assertReferences(array $data): void

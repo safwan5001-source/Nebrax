@@ -9,14 +9,17 @@ use Illuminate\Http\JsonResponse;
 
 /**
  * أنواع التسوية بيانات رئيسية مشتركة للمؤسسة. لا تُنشئ قيوداً ولا تتحكم في
- * الحسابات المدينة؛ استخدامها المالي الفعلي سيُربط فقط مع تسويات العُهَد.
+ * الحسابات المدينة؛ يستخدمها الآن مسار تسويات العُهَد دون أن يفرض حساباً بعينه.
  */
 class SettlementTypeController extends ApiController
 {
     public function index(): JsonResponse
     {
         return SettlementTypeResource::collection(
-            SettlementType::query()->orderBy('name')->get()
+            SettlementType::query()
+                ->withCount('custodySettlements as settlements_count')
+                ->orderBy('name')
+                ->get()
         )->response();
     }
 
@@ -51,14 +54,15 @@ class SettlementTypeController extends ApiController
         return (new SettlementTypeResource($type))->response();
     }
 
-    /**
-     * لا توجد تسويات عهدة قابلة للتسجيل قبل بناء دورة التسوية ذاتها، لذلك لا
-     * يمكن أن يكون النوع مرتبطاً في هذا الإصدار. عند إضافة جدول التسويات، يجب
-     * أن يُستبدل الحذف بفحص ارتباط صريح ثم توجيه المستخدم إلى التعطيل.
-     */
+    /** لا يحذف النوع المستخدم في سجلات تسوية؛ التعطيل يبقي الأثر التدقيقي قابلاً للقراءة. */
     public function destroy(string $id): JsonResponse
     {
-        SettlementType::findOrFail($id)->delete();
+        $type = SettlementType::findOrFail($id);
+        if ($type->custodySettlements()->exists()) {
+            abort(422, 'لا يمكن حذف نوع تسوية مرتبط بسجلات. عطّله بدلاً من ذلك.');
+        }
+
+        $type->delete();
 
         return response()->json(['message' => 'deleted']);
     }

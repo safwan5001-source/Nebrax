@@ -1,6 +1,23 @@
 export type EmployeeCustodyStatus = 'draft' | 'posted';
 export type EmployeeCustodyMethod = 'cash' | 'bank';
 
+export interface CustodySettlement {
+  id: string;
+  branch_id?: string | null;
+  number: string;
+  employee_custody_id: string;
+  settlement_type_id: string;
+  settlement_type_name?: string | null;
+  debit_account_id: string;
+  debit_account_code?: string | null;
+  debit_account_name?: string | null;
+  settlement_date: string;
+  amount: string;
+  notes?: string | null;
+  journal_entry_id: string;
+  created_at?: string | null;
+}
+
 export interface EmployeeCustody {
   id: string;
   branch_id?: string | null;
@@ -18,6 +35,11 @@ export interface EmployeeCustody {
   custody_date: string;
   due_date?: string | null;
   amount: string;
+  settled_amount?: string;
+  remaining_amount?: string;
+  is_settled?: boolean;
+  settlements_count?: number;
+  settlements?: CustodySettlement[];
   status: EmployeeCustodyStatus;
   notes?: string | null;
   journal_entry_id?: string | null;

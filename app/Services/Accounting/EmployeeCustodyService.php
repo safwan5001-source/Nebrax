@@ -5,6 +5,8 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\Employee;
 use App\Models\EmployeeCustody;
+use App\Models\EmployeeCustodySettlement;
+use App\Models\SettlementType;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -14,7 +16,8 @@ use RuntimeException;
  * - create/update/duplicate: مسودة بلا أثر محاسبي.
  * - post: مدين حساب عهدة الموظف │ دائن الخزينة/البنك، عبر LedgerService.
  *
- * التسويات وإرجاع النقد والإغلاق مؤجلة حتى بناء إعدادات المالية وأنواع التسوية.
+ * التسوية: مدين الحساب المختار │ دائن حساب العُهَد، بسجل وقيد مترابطين ذرياً.
+ * إرجاع النقد والإغلاق الرسمي والدين المعدوم خارج نطاق هذه الدورة.
  */
 class EmployeeCustodyService
 {
@@ -163,6 +166,85 @@ class EmployeeCustodyService
         });
     }
 
+    /**
+     * تسوية أحادية السطر لعهدة مرحّلة. تنشأ التسوية أولاً داخل المعاملة لتكون
+     * مصدر القيد، ثم تمر سطور القيد عبر LedgerService حصراً، وبعدها يُحفظ الرابط.
+     */
+    public function settle(EmployeeCustody $custody, array $data): EmployeeCustodySettlement
+    {
+        $amount = $this->assertSettlementAmount($data['amount'] ?? 0);
+
+        return DB::transaction(function () use ($custody, $data, $amount) {
+            // قفل أصل العهدة هو حاجز التزامن: يمنع عمليتي تسوية من تجاوز الرصيد معاً.
+            $custody = EmployeeCustody::lockForUpdate()->findOrFail($custody->id);
+            if ($custody->status !== 'posted') {
+                throw new RuntimeException('لا يمكن تسوية عهدة غير مرحّلة.');
+            }
+
+            $settledAmount = (int) EmployeeCustodySettlement::query()
+                ->where('employee_custody_id', $custody->id)
+                ->sum('amount');
+            $remainingAmount = $custody->amount - $settledAmount;
+            if ($amount > $remainingAmount) {
+                throw new RuntimeException('مبلغ التسوية يتجاوز الرصيد المتبقي للعهدة.');
+            }
+
+            $settlementType = SettlementType::findOrFail($data['settlement_type_id']);
+            if (! $settlementType->is_active) {
+                throw new RuntimeException('لا يمكن استخدام نوع تسوية غير نشط.');
+            }
+
+            $custodyAccountId = $this->resolveCustodyAccount($custody->custody_account_id);
+            $debitAccount = $this->resolveSettlementDebitAccount($data['debit_account_id']);
+            if ($debitAccount->id === $custodyAccountId) {
+                throw new RuntimeException('يجب أن يختلف الحساب المدين للتسوية عن حساب عُهَد الموظفين.');
+            }
+
+            $settlementDate = $data['settlement_date'] ?? now()->toDateString();
+            $settlement = EmployeeCustodySettlement::create([
+                'branch_id' => $custody->branch_id,
+                'number' => EmployeeCustodySettlement::nextDocumentNumber('CSTL', $settlementDate, $custody->branch_id),
+                'employee_custody_id' => $custody->id,
+                'settlement_type_id' => $settlementType->id,
+                'debit_account_id' => $debitAccount->id,
+                'settlement_date' => $settlementDate,
+                'amount' => $amount,
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $data['created_by'] ?? null,
+            ]);
+
+            $entry = $this->ledger->post([
+                [
+                    'account_id' => $debitAccount->id,
+                    'debit' => $amount,
+                    'description' => "تسوية عهدة {$custody->number}",
+                    'partner_type' => Employee::class,
+                    'partner_id' => $custody->employee_id,
+                    'branch_id' => $custody->branch_id,
+                ],
+                [
+                    'account_id' => $custodyAccountId,
+                    'credit' => $amount,
+                    'description' => "تسوية عهدة {$custody->number}",
+                    'partner_type' => Employee::class,
+                    'partner_id' => $custody->employee_id,
+                    'branch_id' => $custody->branch_id,
+                ],
+            ], [
+                'entry_date' => $settlementDate,
+                'description' => "تسوية عهدة موظف {$custody->number} ({$settlement->number})",
+                'source_type' => EmployeeCustodySettlement::class,
+                'source_id' => $settlement->id,
+                'created_by' => $data['created_by'] ?? null,
+                'branch_id' => $custody->branch_id,
+            ]);
+
+            $settlement->update(['journal_entry_id' => $entry->id]);
+
+            return $settlement->fresh(['settlementType', 'debitAccount']);
+        });
+    }
+
     private function assertAmount(mixed $amount): int
     {
         $value = (int) $amount;
@@ -171,6 +253,26 @@ class EmployeeCustodyService
         }
 
         return $value;
+    }
+
+    private function assertSettlementAmount(mixed $amount): int
+    {
+        $value = (int) $amount;
+        if ($value <= 0) {
+            throw new RuntimeException('مبلغ التسوية يجب أن يكون موجباً.');
+        }
+
+        return $value;
+    }
+
+    private function resolveSettlementDebitAccount(?string $accountId): Account
+    {
+        $account = Account::findOrFail($accountId);
+        if ($account->is_group || ! $account->is_active) {
+            throw new RuntimeException('الحساب المدين للتسوية غير صالح أو غير نشط.');
+        }
+
+        return $account;
     }
 
     private function resolveEmployee(?string $employeeId): Employee

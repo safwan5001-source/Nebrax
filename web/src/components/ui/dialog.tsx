@@ -35,7 +35,7 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-base font-semibold text-text">{title}</h2>
-          <button onClick={onClose} className="text-muted hover:text-text" aria-label="إغلاق">
+          <button type="button" onClick={onClose} className="rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="إغلاق">
             <X className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
