@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesReportController;
 use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\SettlementTypeController;
+use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
@@ -366,6 +367,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('employees', [EmployeeController::class, 'store'])->middleware($perm('hr.manage'));
         Route::put('employees/{id}', [EmployeeController::class, 'update'])->middleware($perm('hr.manage'));
         Route::delete('employees/{id}', [EmployeeController::class, 'destroy'])->middleware($perm('hr.manage'));
+
+        // الورديات (الوحدة الثانية من معمار الموارد البشرية)
+        Route::get('shifts', [ShiftController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('shifts', [ShiftController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::put('shifts/{id}', [ShiftController::class, 'update'])->middleware($perm('hr.manage'));
+        Route::delete('shifts/{id}', [ShiftController::class, 'destroy'])->middleware($perm('hr.manage'));
 
         // مسيّرات الرواتب
         Route::get('payroll-runs', [PayrollController::class, 'index'])->middleware($perm('hr.view'));

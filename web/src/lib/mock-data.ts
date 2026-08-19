@@ -1420,6 +1420,12 @@ function inventoryReportFor(path: string) {
   };
 }
 
+export const mockShifts = [
+  { id: 'sh1', branch_id: null, name: 'الوردية الصباحية', start_time: '08:00', end_time: '16:00', break_minutes: 30, work_days: [0, 1, 2, 3, 4], net_minutes: 450, is_active: true },
+  { id: 'sh2', branch_id: null, name: 'الوردية المسائية', start_time: '14:00', end_time: '22:00', break_minutes: 30, work_days: [0, 1, 2, 3], net_minutes: 450, is_active: true },
+  { id: 'sh3', branch_id: null, name: 'وردية المستودع', start_time: '07:00', end_time: '15:00', break_minutes: 0, work_days: [1, 2, 3, 4, 5], net_minutes: 480, is_active: true },
+];
+
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
@@ -1736,6 +1742,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: list });
   }
   if (clean === '/employees') return resolve({ data: mockEmployees });
+  if (clean === '/shifts') return resolve({ data: mockShifts });
   if (clean === '/payroll-runs') return resolve({ data: mockPayrollRuns });
 
   if (clean === '/inventory') return resolve(mockInventory());
