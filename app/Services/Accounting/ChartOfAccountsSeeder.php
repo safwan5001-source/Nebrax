@@ -17,8 +17,12 @@ class ChartOfAccountsSeeder
     protected array $tree = [
         ['1', 'الأصول', 'Assets', 'asset', true, [
             ['11', 'الأصول المتداولة', 'Current Assets', 'asset', true, [
+                // الحسابان النظاميان القائمان يظلان قابلين للترحيل لتوافق المستندات التاريخية.
                 ['1110', 'الصندوق', 'Cash', 'asset', false, []],
                 ['1120', 'البنك', 'Bank', 'asset', false, []],
+                // الحسابات المسماة في وحدة الخزائن والبنوك تُنشأ فرعية تحت هاتين المجموعتين.
+                ['111', 'الخزائن', 'Cash Treasuries', 'asset', true, []],
+                ['112', 'الحسابات البنكية', 'Bank Accounts', 'asset', true, []],
                 ['1130', 'العملاء (المدينون)', 'Accounts Receivable', 'asset', false, []],
                 ['1140', 'المخزون', 'Inventory', 'asset', false, []],
                 ['1150', 'ضريبة القيمة المضافة - مدخلات', 'VAT Input', 'asset', false, []],

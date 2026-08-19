@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
+use App\Models\User;
 use App\Models\PaymentAllocation;
 use App\Models\Purchase;
 use App\Services\PrintTemplates\PrintTemplateService;
@@ -29,21 +30,13 @@ use RuntimeException;
  */
 class PaymentService
 {
-    private const ACC_CASH        = '1110'; // الصندوق
-    private const ACC_BANK        = '1120'; // البنك
     private const ACC_RECEIVABLE  = '1130'; // العملاء
     private const ACC_PAYABLE     = '2110'; // الموردون
 
-    /**
-     * عائلة النقد والبنوك في دليل الحسابات — المدى المقبول لـ«الخزينة».
-     * خزينةٌ ثانية أو حسابٌ بنكي إضافي يُرمَّز داخل 111x/112x، وما دونه
-     * (1130 العملاء، 1140 المخزون…) يجعل قيد السند متوازناً وكاذباً معاً.
-     */
-    private const CASH_CODE_PREFIXES = ['111', '112'];
-
     public function __construct(
         protected LedgerService $ledger,
-        protected PrintTemplateService $printTemplates
+        protected PrintTemplateService $printTemplates,
+        protected CashBankAccountService $cashBankAccounts,
     ) {}
 
     /**
@@ -92,7 +85,9 @@ class PaymentService
 
         // الخزينة تُتحقَّق **قبل** الإنشاء: سندٌ يحمل حساباً مرفوضاً كان سيُرفض
         // عند الترحيل وحده، فيبقى في القاعدة مسوّدةً لا تُرحَّل أبداً.
-        $cashAccountId = $this->validCashAccountId($data['cash_account_id'] ?? null);
+        $cashAccountId = $this->cashBankAccounts
+            ->resolveForPayment($data['cash_account_id'] ?? null, $data['method'] ?? 'cash')
+            ->account_id;
 
         return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $cashAccountId) {
             // النسخ قد يكون لمستند تاريخي بلا فرع. نحفظ نطاق المصدر صراحةً،
@@ -175,7 +170,9 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        $cashAccountId = $this->validCashAccountId($data['cash_account_id'] ?? null);
+        $cashAccountId = $this->cashBankAccounts
+            ->resolveForPayment($data['cash_account_id'] ?? null, $data['method'] ?? 'cash')
+            ->account_id;
 
         return DB::transaction(function () use ($payment, $data, $amount, $normalized, $cashAccountId) {
             $payment->update([
@@ -235,13 +232,13 @@ class PaymentService
     /**
      * ترحيل السند: توليد القيد المتوازن عبر LedgerService + تحديث سداد الفواتير.
      */
-    public function post(Payment $payment): Payment
+    public function post(Payment $payment, ?User $actor = null): Payment
     {
         if (! $payment->isDraft()) {
             throw new RuntimeException('لا يمكن ترحيل سند غير مسوّد (draft).');
         }
 
-        return DB::transaction(function () use ($payment) {
+        return DB::transaction(function () use ($payment, $actor) {
             // قفل الصف وإعادة فحص الحالة — يمنع الترحيل المزدوج المتزامن.
             $payment = Payment::lockForUpdate()->findOrFail($payment->id);
             if (! $payment->isDraft()) {
@@ -281,9 +278,14 @@ class PaymentService
                 $targets[$alloc->id] = $target;
             }
 
-            // الخزينة المختارة تعلو على الاشتقاق من الطريقة؛ وغيابها = سلوك ما قبل الحقل.
-            $cashCode      = $payment->method === 'bank' ? self::ACC_BANK : self::ACC_CASH;
-            $cashAccountId = $payment->cash_account_id ?: $this->accountId($cashCode);
+            // الحساب المختار كيان خزينة/بنك فعلي؛ تُفحص صلاحية الإيداع أو السحب عند الأثر المالي لا عند إنشاء المسودة فقط.
+            $cashEntity = $this->cashBankAccounts->resolveForPayment($payment->cash_account_id, $payment->method);
+            $this->cashBankAccounts->assertAllowed(
+                $cashEntity,
+                $payment->direction === 'received' ? 'deposit' : 'withdraw',
+                $actor
+            );
+            $cashAccountId = $cashEntity->account_id;
 
             if ($payment->direction === 'received') {
                 // قبض من عميل: مدين الصندوق/البنك، دائن العملاء
@@ -358,39 +360,6 @@ class PaymentService
         }
 
         return $paid >= $total ? 'paid' : 'partial';
-    }
-
-    /**
-     * تحقّق «الخزينة» المختارة وإعادتها (أو null إن لم تُختَر).
-     *
-     * ثلاثة شروط لا رابع: موجودة في مستأجر السند، **فرعية لا تجميعية**
-     * (قاعدة معمارية: `is_group` لا يقبل قيوداً)، ومن عائلة النقد والبنوك.
-     */
-    protected function validCashAccountId(?string $accountId): ?string
-    {
-        if (empty($accountId)) {
-            return null;
-        }
-
-        $account = Account::find($accountId); // TenantScope يتكفّل بالعزل
-
-        if (! $account) {
-            throw new RuntimeException('الخزينة المختارة غير موجودة.');
-        }
-        if ($account->is_group) {
-            throw new RuntimeException('الحساب التجميعي لا يقبل قيوداً مباشرة، فلا يصلح خزينةً.');
-        }
-
-        $inCashFamily = $account->type === 'asset' && count(array_filter(
-            self::CASH_CODE_PREFIXES,
-            fn (string $prefix) => str_starts_with((string) $account->code, $prefix)
-        )) > 0;
-
-        if (! $inCashFamily) {
-            throw new RuntimeException('الخزينة يجب أن تكون حساب نقد أو بنك (111x/112x).');
-        }
-
-        return $account->id;
     }
 
     /**
