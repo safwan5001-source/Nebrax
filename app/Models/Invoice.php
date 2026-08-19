@@ -75,6 +75,12 @@ class Invoice extends BaseModel
         return $this->hasMany(Appointment::class)->orderByDesc('appointment_at');
     }
 
+    /** سجل الملاحظات الداخلي ومرفقاته؛ يظل خارج حقول الفاتورة المحاسبية. */
+    public function notesLog(): HasMany
+    {
+        return $this->hasMany(InvoiceNote::class)->orderByDesc('recorded_at');
+    }
+
     /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {

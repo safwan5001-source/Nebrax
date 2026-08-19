@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\StoreInvoiceNoteRequest;
 use App\Http\Requests\StoreInvoiceRequest;
+use App\Http\Resources\InvoiceNoteResource;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Account;
 use App\Models\CostCenter;
 use App\Models\Employee;
 use App\Models\Invoice;
+use App\Models\InvoiceNote;
 use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Product;
@@ -15,6 +18,8 @@ use App\Services\Accounting\InvoiceRelationsService;
 use App\Services\Accounting\InvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends ApiController
 {
@@ -54,7 +59,7 @@ class InvoiceController extends ApiController
     /** مدفوعات الفاتورة للقراءة: مبلغ التخصيص لا مبلغ سند قد يغطي فواتير أخرى. */
     public function payments(Request $request, string $id): JsonResponse
     {
-        $invoice = $this->scopeToActiveBranch(Invoice::query(), $request)->findOrFail($id);
+        $invoice = $this->visibleInvoice($request, $id);
 
         return response()->json([
             'data' => $this->relations->payments(
@@ -67,9 +72,60 @@ class InvoiceController extends ApiController
     /** روابط القيد وقيد التكلفة للقراءة، محمية بصلاحية التقارير في المسار. */
     public function accounting(Request $request, string $id): JsonResponse
     {
-        $invoice = $this->scopeToActiveBranch(Invoice::query(), $request)->findOrFail($id);
+        $invoice = $this->visibleInvoice($request, $id);
 
         return response()->json(['data' => $this->relations->accountingLinks($invoice)]);
+    }
+
+    /** سجل الملاحظات الداخلي للفواتير؛ قراءة فقط ولا يعيد تفسير الفاتورة المحاسبية. */
+    public function notes(Request $request, string $id): JsonResponse
+    {
+        $invoice = $this->visibleInvoice($request, $id);
+
+        return InvoiceNoteResource::collection($invoice->notesLog()->with('attachments')->get())->response();
+    }
+
+    /** ينشئ ملاحظة داخلية وملفات خاصة مرتبطة بها، من دون تعديل حالة الفاتورة أو قيدها. */
+    public function storeNote(StoreInvoiceNoteRequest $request, string $id): JsonResponse
+    {
+        $invoice = $this->visibleInvoice($request, $id);
+        $data = $request->validated();
+        $note = $invoice->notesLog()->create([
+            'recorded_at' => $data['recorded_at'] ?? now(),
+            'body'        => $data['body'] ?? null,
+            'created_by'  => $request->user()?->id,
+        ]);
+
+        foreach ($request->file('attachments', []) as $file) {
+            $path = $file->store("invoices/{$invoice->id}/notes/{$note->id}", 'local');
+            $note->attachments()->create([
+                'disk'          => 'local',
+                'path'          => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type'     => $file->getMimeType(),
+                'size'          => $file->getSize(),
+                'uploaded_by'   => $request->user()?->id,
+            ]);
+        }
+
+        return (new InvoiceNoteResource($note->load('attachments')))->response()->setStatusCode(201);
+    }
+
+    /** تنزيل ملف خاص بعد إثبات أنه ينتمي لملاحظة فاتورة مرئية في الفرع النشط. */
+    public function downloadNoteAttachment(Request $request, string $id, string $noteId, string $attachmentId): StreamedResponse
+    {
+        $invoice = $this->visibleInvoice($request, $id);
+        $note = $invoice->notesLog()->whereKey($noteId)->firstOrFail();
+        $attachment = $note->attachments()->whereKey($attachmentId)->firstOrFail();
+        $disk = Storage::disk($attachment->disk);
+
+        if (! $disk->exists($attachment->path)) {
+            abort(404, 'ملف المرفق غير موجود.');
+        }
+
+        return $disk->download($attachment->path, $attachment->original_name, [
+            'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
+        ]);
     }
 
     /**
@@ -123,5 +179,11 @@ class InvoiceController extends ApiController
             'previous_hash' => $invoice->zatca_previous_hash,
             'xml'           => $invoice->zatca_xml,
         ]);
+    }
+
+    /** الفاتورة وملحقاتها المقروءة تحترم الفرع النشط، لا مجرد عزل المستأجر. */
+    private function visibleInvoice(Request $request, string $id): Invoice
+    {
+        return $this->scopeToActiveBranch(Invoice::query(), $request)->findOrFail($id);
     }
 }

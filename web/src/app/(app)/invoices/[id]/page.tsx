@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  ArrowRight, Banknote, BookOpen, CalendarPlus, CheckCircle2, ChevronDown, Download,
+  ArrowRight, Banknote, BookOpen, CalendarPlus, CheckCircle2, ChevronDown, Download, Paperclip,
   FileSpreadsheet, LayoutTemplate, MoreVertical, Pencil, Printer,
   RotateCcw, Share2, Trash2,
 } from 'lucide-react';
@@ -23,7 +23,8 @@ import { InvoiceDocument, type Company, type Customer } from '@/components/invoi
 import { PaymentDialog } from '@/components/payments/payment-dialog';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
 import { AppointmentDialog, type Appointment } from '@/components/appointments/appointment-dialog';
-import { api } from '@/lib/api';
+import { InvoiceNoteDialog } from '@/components/invoices/invoice-note-dialog';
+import { api, downloadFile } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
@@ -113,6 +114,12 @@ interface AccountingLinks {
   sales_entry: AccountingEntry | null;
   cost_entry: AccountingEntry | null;
 }
+interface InvoiceNote {
+  id: string;
+  recorded_at: string | null;
+  body: string | null;
+  attachments: { id: string; original_name: string; mime_type: string | null; size: number }[];
+}
 interface Zatca {
   qr: string | null;
   hash: string | null;
@@ -155,12 +162,14 @@ export default function InvoiceDetailPage() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [notesLog, setNotesLog] = useState<InvoiceNote[]>([]);
   const [payments, setPayments] = useState<InvoicePayment[]>([]);
   const [accounting, setAccounting] = useState<AccountingLinks | null>(null);
   const [relationsLoading, setRelationsLoading] = useState(true);
   const [relationsUnavailable, setRelationsUnavailable] = useState(false);
-  const [relationSection, setRelationSection] = useState<'payments' | 'appointments' | 'accounting'>('payments');
+  const [relationSection, setRelationSection] = useState<'payments' | 'appointments' | 'notes' | 'accounting'>('payments');
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
@@ -188,13 +197,14 @@ export default function InvoiceDetailPage() {
       .then(async (r) => {
         setInvoice(r.data);
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, z, m, live, paymentRelations, appointmentRelations, accountingRelations] = await Promise.allSettled([
+        const [p, z, m, live, paymentRelations, appointmentRelations, noteRelations, accountingRelations] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
           api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=tax_invoice&usage=print${branchQuery}`),
           api<{ data: InvoicePayment[] }>(`/invoices/${id}/payments`),
           api<{ data: Appointment[] }>(`/invoices/${id}/appointments`),
+          api<{ data: InvoiceNote[] }>(`/invoices/${id}/notes`),
           api<{ data: AccountingLinks }>(`/invoices/${id}/accounting`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
@@ -202,8 +212,9 @@ export default function InvoiceDetailPage() {
         if (m.status === 'fulfilled') setCompany(m.value.company);
         if (paymentRelations.status === 'fulfilled') setPayments(paymentRelations.value.data);
         if (appointmentRelations.status === 'fulfilled') setAppointments(appointmentRelations.value.data);
+        if (noteRelations.status === 'fulfilled') setNotesLog(noteRelations.value.data);
         if (accountingRelations.status === 'fulfilled') setAccounting(accountingRelations.value.data);
-        setRelationsUnavailable(paymentRelations.status === 'rejected' || appointmentRelations.status === 'rejected' || accountingRelations.status === 'rejected');
+        setRelationsUnavailable(paymentRelations.status === 'rejected' || appointmentRelations.status === 'rejected' || noteRelations.status === 'rejected' || accountingRelations.status === 'rejected');
         setRelationsLoading(false);
 
         // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
@@ -288,6 +299,7 @@ export default function InvoiceDetailPage() {
   const relationTabs = [
     { id: 'payments', label: t('payments'), count: relationsLoading ? undefined : payments.length },
     { id: 'appointments', label: t('appointments'), count: relationsLoading ? undefined : appointments.length },
+    { id: 'notes', label: t('notes_attachments'), count: relationsLoading ? undefined : notesLog.length },
     { id: 'accounting', label: t('accounting') },
   ];
   const paymentMethod = (method: InvoicePayment['method']) => method === 'bank' ? t('bank') : t('cash');
@@ -322,12 +334,27 @@ export default function InvoiceDetailPage() {
       {appointments.length > 0 && <div className="divide-y divide-border rounded border border-border">{appointments.map((appointment) => <div key={appointment.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3"><div><p className="text-sm font-medium text-text">{appointment.title}</p><p className="mt-1 text-xs text-muted">{formatAppointmentAt(appointment.appointment_at)}{appointment.location ? ` · ${appointment.location}` : ''}</p></div><Badge tone={appointment.status === 'done' ? 'positive' : appointment.status === 'cancelled' ? 'negative' : 'muted'}>{appointment.status === 'scheduled' ? t('appointment_scheduled') : appointment.status === 'done' ? t('appointment_done') : t('appointment_cancelled')}</Badge></div>)}</div>}
     </div>
   );
+  const downloadAttachment = async (note: InvoiceNote, attachment: InvoiceNote['attachments'][number]) => {
+    try {
+      await downloadFile(`/invoices/${invoice.id}/notes/${note.id}/attachments/${attachment.id}/download`, attachment.original_name);
+    } catch {
+      errorToast(t('action_failed'));
+    }
+  };
+  const notesContent = relationsLoading ? (
+    <div className="space-y-3 p-4"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
+  ) : (
+    <div className="p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted">{notesLog.length ? t('notes_attachments') : t('no_notes_attachments')}</p><Button size="sm" variant="outline" onClick={() => setNoteOpen(true)}><Paperclip className="h-4 w-4" strokeWidth={1.7} />{t('add_note_attachment')}</Button></div>
+      {notesLog.length > 0 && <div className="space-y-3">{notesLog.map((note) => <article key={note.id} className="rounded border border-border bg-background p-3"><p className="num text-xs text-muted">{formatAppointmentAt(note.recorded_at)}</p>{note.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{note.body}</p>}{note.attachments.length > 0 && <ul className="mt-3 divide-y divide-border rounded border border-border">{note.attachments.map((attachment) => <li key={attachment.id} className="flex items-center justify-between gap-3 px-3 py-2"><span className="min-w-0 truncate text-sm text-text">{attachment.original_name}</span><Button size="sm" variant="ghost" onClick={() => downloadAttachment(note, attachment)}><Download className="h-4 w-4" strokeWidth={1.7} />{t('download_attachment')}</Button></li>)}</ul>}</article>)}</div>}
+    </div>
+  );
   const accountingContent = relationsLoading ? (
     <div className="space-y-3 p-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>
   ) : (
     <div className="divide-y divide-border">{entryContent(accounting?.sales_entry ?? null, t('sales_entry'), t('no_sales_entry'))}{entryContent(accounting?.cost_entry ?? null, t('cost_entry'), t('no_cost_entry'))}</div>
   );
-  const relationContent = relationSection === 'payments' ? paymentsContent : relationSection === 'appointments' ? appointmentsContent : accountingContent;
+  const relationContent = relationSection === 'payments' ? paymentsContent : relationSection === 'appointments' ? appointmentsContent : relationSection === 'notes' ? notesContent : accountingContent;
 
   const doc = () => document.getElementById('print-root');
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
@@ -494,6 +521,7 @@ export default function InvoiceDetailPage() {
             >
               {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
               <DropdownItem icon={CalendarPlus} onClick={() => setAppointmentOpen(true)}>{t('schedule_appointment')}</DropdownItem>
+              <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
               {customer && <DropdownItem icon={ArrowRight} href={`/partners/${invoice.partner_id}`}>{t('open_customer')}</DropdownItem>}
               {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
                 <DropdownItem icon={Printer} onClick={() => printDocument(thermalPaper, 'thermal-print-root')}>{tPrint('thermal_print')}</DropdownItem>
@@ -515,6 +543,7 @@ export default function InvoiceDetailPage() {
             >
               {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
               <DropdownItem icon={CalendarPlus} onClick={() => setAppointmentOpen(true)}>{t('schedule_appointment')}</DropdownItem>
+              <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
               {customer && <DropdownItem icon={ArrowRight} href={`/partners/${invoice.partner_id}`}>{t('open_customer')}</DropdownItem>}
               <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
               <DropdownItem icon={Download} onClick={handleDownloadPdf}>{t('download_pdf')}</DropdownItem>
@@ -598,10 +627,10 @@ export default function InvoiceDetailPage() {
         {relationsUnavailable && <p className="mb-3 rounded border border-border bg-muted/40 px-3 py-2 text-sm text-text">{t('relations_unavailable')}</p>}
         <Card className="hidden lg:block">
           <CardHeader><CardTitle>{t('relations')}</CardTitle></CardHeader>
-          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as 'payments' | 'appointments' | 'accounting')} />
+          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as 'payments' | 'appointments' | 'notes' | 'accounting')} />
           <CardContent className="p-0"><TabPanel id={relationSection}>{relationContent}</TabPanel></CardContent>
         </Card>
-        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => setRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="appointments" title={t('appointments')} count={relationsLoading ? undefined : appointments.length} open={relationSection === 'appointments'} onToggle={() => setRelationSection('appointments')}>{appointmentsContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => setRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
+        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => setRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="appointments" title={t('appointments')} count={relationsLoading ? undefined : appointments.length} open={relationSection === 'appointments'} onToggle={() => setRelationSection('appointments')}>{appointmentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => setRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => setRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
 
       <Card>
@@ -685,6 +714,12 @@ export default function InvoiceDetailPage() {
         onClose={() => setAppointmentOpen(false)}
         onSaved={load}
         initialInvoice={{ id: invoice.id, partnerId: invoice.partner_id, number: invoice.number }}
+      />
+      <InvoiceNoteDialog
+        open={noteOpen}
+        onClose={() => setNoteOpen(false)}
+        onSaved={load}
+        invoiceId={invoice.id}
       />
 
       <Dialog
