@@ -9,14 +9,19 @@ use App\Models\CostCenter;
 use App\Models\Employee;
 use App\Models\Invoice;
 use App\Models\Partner;
+use App\Models\Payment;
 use App\Models\Product;
+use App\Services\Accounting\InvoiceRelationsService;
 use App\Services\Accounting\InvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class InvoiceController extends ApiController
 {
-    public function __construct(protected InvoiceService $invoices) {}
+    public function __construct(
+        protected InvoiceService $invoices,
+        protected InvoiceRelationsService $relations,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -41,7 +46,30 @@ class InvoiceController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        return (new InvoiceResource(Invoice::with(['lines.product', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])->findOrFail($id)))->response();
+        return (new InvoiceResource(Invoice::with([
+            'lines.product', 'costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
+        ])->findOrFail($id)))->response();
+    }
+
+    /** مدفوعات الفاتورة للقراءة: مبلغ التخصيص لا مبلغ سند قد يغطي فواتير أخرى. */
+    public function payments(Request $request, string $id): JsonResponse
+    {
+        $invoice = $this->scopeToActiveBranch(Invoice::query(), $request)->findOrFail($id);
+
+        return response()->json([
+            'data' => $this->relations->payments(
+                $invoice,
+                $this->scopeToActiveBranch(Payment::query(), $request),
+            ),
+        ]);
+    }
+
+    /** روابط القيد وقيد التكلفة للقراءة، محمية بصلاحية التقارير في المسار. */
+    public function accounting(Request $request, string $id): JsonResponse
+    {
+        $invoice = $this->scopeToActiveBranch(Invoice::query(), $request)->findOrFail($id);
+
+        return response()->json(['data' => $this->relations->accountingLinks($invoice)]);
     }
 
     /**

@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  ArrowRight, Banknote, CheckCircle2, ChevronDown, Download,
+  ArrowRight, Banknote, BookOpen, CheckCircle2, ChevronDown, Download,
   FileSpreadsheet, LayoutTemplate, MoreVertical, Pencil, Printer,
   RotateCcw, Share2, Trash2,
 } from 'lucide-react';
@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog } from '@/components/ui/dialog';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
+import { Tabs, TabPanel } from '@/components/ui/tabs';
+import { Accordion, AccordionItem } from '@/components/ui/accordion';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { PaymentDialog } from '@/components/payments/payment-dialog';
@@ -80,6 +82,7 @@ interface Invoice {
   paid_amount: string;
   remaining: string;
   notes: string | null;
+  cost_center?: { id: string; code: string; name: string } | null;
   lines: Line[];
   print_template_revision_id?: string | null;
   print_template_revision?: FrozenPrintTemplateRevision | null;
@@ -87,6 +90,27 @@ interface Invoice {
   pdf_template_revision?: FrozenPrintTemplateRevision | null;
   thermal_template_revision_id?: string | null;
   thermal_template_revision?: FrozenPrintTemplateRevision | null;
+}
+interface InvoicePayment {
+  id: string;
+  number: string;
+  payment_date: string | null;
+  method: 'cash' | 'bank';
+  status: string;
+  amount: string;
+  allocated_amount: string;
+}
+interface AccountingEntry {
+  id: string;
+  number: string;
+  date: string | null;
+  status: string;
+  description: string | null;
+  lines: { account_id: string; account_code: string | null; account_name: string | null; description: string | null; debit: string; credit: string }[];
+}
+interface AccountingLinks {
+  sales_entry: AccountingEntry | null;
+  cost_entry: AccountingEntry | null;
 }
 interface Zatca {
   qr: string | null;
@@ -129,6 +153,11 @@ export default function InvoiceDetailPage() {
   const [actioning, setActioning] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
+  const [payments, setPayments] = useState<InvoicePayment[]>([]);
+  const [accounting, setAccounting] = useState<AccountingLinks | null>(null);
+  const [relationsLoading, setRelationsLoading] = useState(true);
+  const [relationsUnavailable, setRelationsUnavailable] = useState(false);
+  const [relationSection, setRelationSection] = useState<'payments' | 'accounting'>('payments');
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
@@ -150,19 +179,27 @@ export default function InvoiceDetailPage() {
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
+    setRelationsLoading(true);
+    setRelationsUnavailable(false);
     api<{ data: Invoice }>(`/invoices/${id}`)
       .then(async (r) => {
         setInvoice(r.data);
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, z, m, live] = await Promise.allSettled([
+        const [p, z, m, live, paymentRelations, accountingRelations] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
           api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=tax_invoice&usage=print${branchQuery}`),
+          api<{ data: InvoicePayment[] }>(`/invoices/${id}/payments`),
+          api<{ data: AccountingLinks }>(`/invoices/${id}/accounting`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
         if (m.status === 'fulfilled') setCompany(m.value.company);
+        if (paymentRelations.status === 'fulfilled') setPayments(paymentRelations.value.data);
+        if (accountingRelations.status === 'fulfilled') setAccounting(accountingRelations.value.data);
+        setRelationsUnavailable(paymentRelations.status === 'rejected' || accountingRelations.status === 'rejected');
+        setRelationsLoading(false);
 
         // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
         // إعدادات الهوية تفسير مستند تاريخي. المسودات والبيانات القديمة تستخدم
@@ -232,6 +269,7 @@ export default function InvoiceDetailPage() {
     [t('payment_type'), invoice.payment_type === 'cash' ? t('cash') : t('credit')],
     [t('paid'), <span key="paid" className="num font-medium">{formatRiyal(invoice.paid_amount)}</span>],
     [t('remaining'), <span key="remaining" className="num font-semibold">{formatRiyal(invoice.remaining)}</span>],
+    [t('cost_center'), invoice.cost_center ? <span key="cost-center" className="text-primary">{invoice.cost_center.code} · {invoice.cost_center.name}</span> : t('not_assigned')],
   ];
   const financialSummary: [string, string, boolean][] = [
     [t('subtotal'), invoice.subtotal, false],
@@ -241,6 +279,40 @@ export default function InvoiceDetailPage() {
     [t('tax_amount'), invoice.tax_amount, false],
     [t('grand_total'), invoice.total, true],
   ];
+
+  const relationTabs = [
+    { id: 'payments', label: t('payments'), count: relationsLoading ? undefined : payments.length },
+    { id: 'accounting', label: t('accounting') },
+  ];
+  const paymentMethod = (method: InvoicePayment['method']) => method === 'bank' ? t('bank') : t('cash');
+  const paymentsContent = relationsLoading ? (
+    <div className="space-y-3 p-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+  ) : payments.length === 0 ? (
+    <p className="p-5 text-center text-sm text-muted">{t('no_payments')}</p>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[40rem] text-sm">
+        <thead className="border-b border-border bg-muted/40 text-start text-xs text-muted">
+          <tr><th className="px-4 py-3 font-medium">{t('payment_number')}</th><th className="px-4 py-3 font-medium">{t('payment_date')}</th><th className="px-4 py-3 font-medium">{t('payment_method')}</th><th className="px-4 py-3 font-medium">{t('voucher_amount')}</th><th className="px-4 py-3 font-medium">{t('allocated_amount')}</th><th className="px-4 py-3 font-medium">{t('status')}</th></tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {payments.map((payment) => <tr key={payment.id} className="hover:bg-muted/30"><td className="num px-4 py-3 font-medium text-primary"><Link href={`/payments/${payment.id}`} className="hover:underline">{payment.number}</Link></td><td className="num px-4 py-3 text-text">{payment.payment_date ?? '—'}</td><td className="px-4 py-3 text-text">{paymentMethod(payment.method)}</td><td className="num px-4 py-3 text-text">{formatRiyal(payment.amount)}</td><td className="num px-4 py-3 font-semibold text-text">{formatRiyal(payment.allocated_amount)}</td><td className="px-4 py-3"><Badge tone={statusTone[payment.status] ?? 'muted'}>{ts(payment.status)}</Badge></td></tr>)}
+        </tbody>
+      </table>
+    </div>
+  );
+  const entryContent = (entry: AccountingEntry | null, label: string, empty: string) => (
+    <section className="space-y-3 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-semibold text-text"><BookOpen className="h-4 w-4 text-primary" strokeWidth={1.8} />{label}</h3>{entry && <Badge tone={statusTone[entry.status] ?? 'muted'}>{ts(entry.status)}</Badge>}</div>
+      {entry ? <><dl className="grid grid-cols-2 gap-3 rounded border border-border bg-background p-3 text-sm sm:grid-cols-3"><div><dt className="text-xs text-muted">{t('entry_number')}</dt><dd className="num mt-1 text-text">{entry.number}</dd></div><div><dt className="text-xs text-muted">{t('entry_date')}</dt><dd className="num mt-1 text-text">{entry.date ?? '—'}</dd></div>{entry.description && <div><dt className="text-xs text-muted">{t('description')}</dt><dd className="mt-1 text-text">{entry.description}</dd></div>}</dl><div className="overflow-x-auto"><table className="w-full min-w-[34rem] text-sm"><thead className="border-b border-border bg-muted/40 text-start text-xs text-muted"><tr><th className="px-3 py-2.5 font-medium">{t('account')}</th><th className="px-3 py-2.5 font-medium">{t('description')}</th><th className="px-3 py-2.5 font-medium">{t('debit')}</th><th className="px-3 py-2.5 font-medium">{t('credit_amount')}</th></tr></thead><tbody className="divide-y divide-border">{entry.lines.map((line) => <tr key={`${entry.id}-${line.account_id}-${line.description ?? ''}`}><td className="px-3 py-2.5 text-text"><span className="num text-muted">{line.account_code}</span>{line.account_name && <span> · {line.account_name}</span>}</td><td className="px-3 py-2.5 text-muted">{line.description ?? '—'}</td><td className="num px-3 py-2.5 text-text">{formatRiyal(line.debit)}</td><td className="num px-3 py-2.5 text-text">{formatRiyal(line.credit)}</td></tr>)}</tbody></table></div></> : <p className="rounded border border-dashed border-border bg-background px-3 py-4 text-sm leading-6 text-muted">{empty}</p>}
+    </section>
+  );
+  const accountingContent = relationsLoading ? (
+    <div className="space-y-3 p-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>
+  ) : (
+    <div className="divide-y divide-border">{entryContent(accounting?.sales_entry ?? null, t('sales_entry'), t('no_sales_entry'))}{entryContent(accounting?.cost_entry ?? null, t('cost_entry'), t('no_cost_entry'))}</div>
+  );
+  const relationContent = relationSection === 'payments' ? paymentsContent : accountingContent;
 
   const doc = () => document.getElementById('print-root');
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
@@ -503,6 +575,16 @@ export default function InvoiceDetailPage() {
             {canCollect && <Button className="w-full" onClick={() => setPaymentOpen(true)}><Banknote className="h-4 w-4" strokeWidth={1.7} />{t('add_payment')}</Button>}
           </CardContent>
         </Card>
+      </section>
+
+      <section aria-label={t('relations')}>
+        {relationsUnavailable && <p className="mb-3 rounded border border-border bg-muted/40 px-3 py-2 text-sm text-text">{t('relations_unavailable')}</p>}
+        <Card className="hidden lg:block">
+          <CardHeader><CardTitle>{t('relations')}</CardTitle></CardHeader>
+          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as 'payments' | 'accounting')} />
+          <CardContent className="p-0"><TabPanel id={relationSection}>{relationContent}</TabPanel></CardContent>
+        </Card>
+        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => setRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => setRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
 
       <Card>

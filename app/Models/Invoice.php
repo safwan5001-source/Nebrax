@@ -80,6 +80,12 @@ class Invoice extends BaseModel
         return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
     }
 
+    /** مركز تكلفة مرجعي محفوظ على الفاتورة؛ لا يختفي عند تبديل نطاق الفرع. */
+    public function costCenter(): BelongsTo
+    {
+        return $this->referenceBelongsTo(CostCenter::class, 'cost_center_id');
+    }
+
     public function cogsEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'cogs_entry_id');

@@ -220,6 +220,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // الفواتير
         Route::get('invoices', [InvoiceController::class, 'index'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}', [InvoiceController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::get('invoices/{id}/payments', [InvoiceController::class, 'payments'])->middleware($perm('payments.view'));
+        Route::get('invoices/{id}/accounting', [InvoiceController::class, 'accounting'])->middleware($perm('reports.view'));
         Route::get('invoices/{id}/zatca', [InvoiceController::class, 'zatca'])->middleware($perm('zatca.view'));
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
         Route::put('invoices/{id}', [InvoiceController::class, 'update'])->middleware($perm('invoices.manage')); // مسوّدة فقط
