@@ -257,3 +257,185 @@ test('P47.1: تحقق عناصر مركز القوالب الظاهرة هدف �
   await documentTypeButtons.first().scrollIntoViewIfNeeded();
   await expectTargetsAtLeast44(documentTypeButtons);
 });
+
+
+type StudioBaselineMetrics = {
+  viewport: { width: number; height: number };
+  documentWidth: number;
+  horizontalOverflow: boolean;
+  tabList: { clientWidth: number; scrollWidth: number; scrollLeft: number; horizontalOverflow: boolean } | null;
+  tabs: Array<{ label: string | null; selected: boolean; width: number; height: number; visible: boolean }>;
+  targetsBelow44: Array<{ tag: string; label: string | null; width: number; height: number }>;
+  activePanel: { id: string | null; width: number; height: number; visible: boolean } | null;
+  preview: { width: number; height: number; visible: boolean } | null;
+  governanceSections: Array<{ id: string; width: number; height: number; visible: boolean }>;
+};
+
+async function captureStudioBaseline(page: Page, name: string) {
+  const metrics = await page.evaluate<StudioBaselineMetrics>(() => {
+    const inViewport = (element: HTMLElement) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0
+        && rect.height > 0
+        && rect.bottom > 0
+        && rect.right > 0
+        && rect.top < window.innerHeight
+        && rect.left < window.innerWidth;
+    };
+    const tabList = document.querySelector<HTMLElement>('[role="tablist"]');
+    const panel = document.querySelector<HTMLElement>('[role="tabpanel"]');
+    const preview = document.getElementById('print-template-preview');
+    const targetsBelow44 = Array.from(document.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea'))
+      .filter((target) => inViewport(target))
+      .map((target) => {
+        const rect = target.getBoundingClientRect();
+        return {
+          tag: target.tagName.toLowerCase(),
+          label: target.getAttribute('aria-label') ?? target.textContent?.trim() ?? target.getAttribute('placeholder') ?? null,
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        };
+      })
+      .filter((target) => target.width < 44 || target.height < 44);
+
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      documentWidth: document.documentElement.scrollWidth,
+      horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+      tabList: tabList ? {
+        clientWidth: Math.round(tabList.clientWidth),
+        scrollWidth: Math.round(tabList.scrollWidth),
+        scrollLeft: Math.round(tabList.scrollLeft),
+        horizontalOverflow: tabList.scrollWidth > tabList.clientWidth,
+      } : null,
+      targetsBelow44,
+      tabs: Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]')).map((tab) => {
+        const rect = tab.getBoundingClientRect();
+        return {
+          label: tab.textContent?.trim() ?? null,
+          selected: tab.getAttribute('aria-selected') === 'true',
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          visible: inViewport(tab),
+        };
+      }),
+      activePanel: panel ? {
+        id: panel.id || null,
+        width: Math.round(panel.getBoundingClientRect().width),
+        height: Math.round(panel.getBoundingClientRect().height),
+        visible: inViewport(panel),
+      } : null,
+      preview: preview ? {
+        width: Math.round(preview.getBoundingClientRect().width),
+        height: Math.round(preview.getBoundingClientRect().height),
+        visible: inViewport(preview),
+      } : null,
+      governanceSections: ['template-revision-history', 'template-assignments'].flatMap((id) => {
+        const section = document.getElementById(id);
+        if (!section) return [];
+        const rect = section.getBoundingClientRect();
+        return [{
+          id,
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          visible: inViewport(section),
+        }];
+      }),
+    };
+  });
+
+  await test.info().attach(`${name}-metrics.json`, {
+    body: JSON.stringify(metrics, null, 2),
+    contentType: 'application/json',
+  });
+  await saveEvidence(`${name}-metrics`, metrics);
+  await page.screenshot({ path: `test-results/p47-baseline/${name}.png`, fullPage: true });
+  return metrics;
+}
+
+async function openStudioForP472(page: Page, name: string) {
+  await page.goto(`${baseUrl}/document-design`);
+  await expect(page.getByRole('heading', { name: 'مركز قوالب الطباعة' })).toBeVisible();
+  await page.getByRole('button', { name: /^فاتورة ضريبية/ }).first().click();
+  await expect(page.getByRole('heading', { name: 'مكتبة قوالب الطباعة' })).toBeVisible();
+  await page.getByRole('button', { name: 'ابدأ قالباً أساسياً' }).click();
+  await page.getByRole('button', { name: 'التالي' }).click();
+  await page.getByRole('button', { name: 'التالي' }).click();
+  await page.getByLabel('اسم القالب').fill(`خط أساس P47.2 ${name}`);
+  await page.getByRole('button', { name: 'إنشاء المسودة' }).click();
+  await expect(page.getByRole('tab', { name: 'المعاينة' })).toBeVisible();
+}
+
+test('P47.2: يوثق الاستوديو والمعاينة والحوكمة عبر العروض المرجعية', async ({ page }) => {
+  const viewports = [
+    { name: 'p47-2-mobile-360', width: 360, height: 800 },
+    { name: 'p47-2-mobile-390', width: 390, height: 844 },
+    { name: 'p47-2-tablet-768', width: 768, height: 1024 },
+    { name: 'p47-2-desktop-1280', width: 1280, height: 900 },
+  ];
+  const workspaces = [
+    { id: 'structure', label: 'البنية' },
+    { id: 'properties', label: 'الخصائص' },
+    { id: 'preview', label: 'المعاينة' },
+    { id: 'governance', label: 'المراجعات والتعيينات' },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await enterDemo(page);
+    await openStudioForP472(page, viewport.name);
+
+    for (const workspace of workspaces) {
+      const tab = page.getByRole('tab', { name: workspace.label });
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await captureStudioBaseline(page, `${viewport.name}-${workspace.id}`);
+    }
+  }
+});
+
+
+test('P47.2: يوثق تنقل لوحة المفاتيح وتكشف تبويبات الاستوديو على الجوال', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await openStudioForP472(page, 'keyboard-mobile-360');
+
+  const previewTab = page.getByRole('tab', { name: 'المعاينة' });
+  const governanceTab = page.getByRole('tab', { name: 'المراجعات والتعيينات' });
+  const structureTab = page.getByRole('tab', { name: 'البنية' });
+
+  await previewTab.focus();
+  await page.keyboard.press('End');
+  await expect(governanceTab).toHaveAttribute('aria-selected', 'true');
+  await expect(governanceTab).toBeFocused();
+
+  const endState = await page.evaluate(() => {
+    const list = document.querySelector<HTMLElement>('[role="tablist"]');
+    const active = document.activeElement as HTMLElement | null;
+    const activeRect = active?.getBoundingClientRect();
+    return {
+      activeLabel: active?.textContent?.trim() ?? null,
+      activeVisible: Boolean(activeRect
+        && activeRect.width > 0
+        && activeRect.height > 0
+        && activeRect.bottom > 0
+        && activeRect.right > 0
+        && activeRect.top < window.innerHeight
+        && activeRect.left < window.innerWidth),
+      scrollLeft: list?.scrollLeft ?? null,
+      scrollWidth: list?.scrollWidth ?? null,
+      clientWidth: list?.clientWidth ?? null,
+    };
+  });
+
+  await page.keyboard.press('Home');
+  await expect(structureTab).toHaveAttribute('aria-selected', 'true');
+  await expect(structureTab).toBeFocused();
+
+  await test.info().attach('p47-2-mobile-360-tabs-keyboard.json', {
+    body: JSON.stringify(endState, null, 2),
+    contentType: 'application/json',
+  });
+  await saveEvidence('p47-2-mobile-360-tabs-keyboard', endState);
+  await page.screenshot({ path: 'test-results/p47-baseline/p47-2-mobile-360-tabs-keyboard.png', fullPage: true });
+});
