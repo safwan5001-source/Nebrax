@@ -8,10 +8,12 @@ use App\Models\Branch;
 use App\Models\Warehouse;
 use App\Models\Tenant;
 use App\Support\Settings;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Support\PlanGate;
+use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,6 +49,18 @@ class AuthController extends ApiController
             app(TenantContext::class)->set($tenant->id);
             app(ChartOfAccountsSeeder::class)->seed($tenant->id);
             app(CashBankAccountService::class)->bootstrapDefaults();
+
+            // الأدوار النظامية الأربعة — نسخةً طبق الأصل من المصفوفة الثابتة،
+            // فيصبح جدول الأدوار مصدر الحقيقة من أول يوم دون تغيير سلوك.
+            foreach (Rbac::systemRoles() as $slug => $role) {
+                Role::create([
+                    'tenant_id'   => $tenant->id,
+                    'slug'        => $slug,
+                    'name'        => $role['name'],
+                    'permissions' => $role['permissions'],
+                    'is_system'   => true,
+                ]);
+            }
 
             // فرع رئيسي افتراضي لكل مؤسسة (كدليل الحسابات) — يبقى النظام أحادي
             // الفرع سلوكياً حتى يضيف المستخدم فروعاً ويعطّل المشاركة.

@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\ReturnableController;
 use App\Http\Controllers\Api\ReturnSourcesController;
+use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesReportController;
 use App\Http\Controllers\Api\SalesSettingsController;
@@ -438,6 +439,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('users', [UserController::class, 'store'])->middleware($perm('users.manage'));
         Route::put('users/{id}', [UserController::class, 'update'])->middleware($perm('users.manage'));
         Route::delete('users/{id}', [UserController::class, 'destroy'])->middleware($perm('users.manage'));
+
+        // أدوار الصلاحيات القابلة للضبط (owner/admin) — مشروع أمني حسّاس
+        Route::get('roles', [RoleController::class, 'index'])->middleware($perm('roles.view'));
+        Route::post('roles', [RoleController::class, 'store'])->middleware($perm('roles.manage'));
+        Route::put('roles/{id}', [RoleController::class, 'update'])->middleware($perm('roles.manage'));
+        Route::delete('roles/{id}', [RoleController::class, 'destroy'])->middleware($perm('roles.manage'));
 
         // التقارير
         Route::get('reports/trial-balance', [ReportController::class, 'trialBalance'])->middleware($perm('reports.view'));
