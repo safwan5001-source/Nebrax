@@ -69,6 +69,12 @@ class Invoice extends BaseModel
         return $this->hasMany(InvoiceLine::class);
     }
 
+    /** مواعيد تشغيلية مرتبطة بالمستند؛ لا تغيّر مالاً أو قيداً. */
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class)->orderByDesc('appointment_at');
+    }
+
     /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {

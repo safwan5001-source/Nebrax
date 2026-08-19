@@ -16,7 +16,7 @@ class Appointment extends BaseModel
     use BranchScoped;
 
     protected $fillable = [
-        'tenant_id', 'branch_id', 'partner_id', 'title', 'appointment_at',
+        'tenant_id', 'branch_id', 'partner_id', 'invoice_id', 'title', 'appointment_at',
         'duration_minutes', 'status', 'location', 'notes', 'created_by',
     ];
 
@@ -33,5 +33,11 @@ class Appointment extends BaseModel
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
+    }
+
+    /** فاتورة مصدر اختيارية؛ توثق سبب الموعد ولا تُنشئ أثراً مالياً. */
+    public function invoice(): BelongsTo
+    {
+        return $this->referenceBelongsTo(Invoice::class, 'invoice_id');
     }
 }

@@ -114,6 +114,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('partners/{id}', [PartnerController::class, 'update'])->middleware($perm('partners.manage'));
         // مواعيد العملاء (غير محاسبية)
         Route::get('appointments', [AppointmentController::class, 'index'])->middleware($perm('partners.view'));
+        Route::get('invoices/{id}/appointments', [AppointmentController::class, 'forInvoice'])->middleware($perm('partners.view'));
         Route::get('appointments/{id}', [AppointmentController::class, 'show'])->middleware($perm('partners.view'));
         Route::post('appointments', [AppointmentController::class, 'store'])->middleware($perm('partners.manage'));
         Route::put('appointments/{id}', [AppointmentController::class, 'update'])->middleware($perm('partners.manage'));
