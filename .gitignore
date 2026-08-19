@@ -10,3 +10,4 @@ Thumbs.db
 /.vscode
 composer.lock
 package-lock.json
+/.claude/settings.local.json
