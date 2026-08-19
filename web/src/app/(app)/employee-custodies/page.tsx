@@ -122,6 +122,9 @@ export default function EmployeeCustodiesPage() {
               <Button size="icon" variant="ghost" disabled title={t('draftActionOnly')} aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button>
             )}
             <Button size="icon" variant="ghost" disabled={busy} onClick={() => duplicate(custody.id)} aria-label={t('duplicate')}><Copy className="h-4 w-4" strokeWidth={1.7} /></Button>
+            <span title={t('settlementsUnavailableReason')}>
+              <Button size="sm" variant="outline" disabled aria-label={t('settlementsUnavailable')}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('settlementsUnavailable')}</Button>
+            </span>
             <Button size="icon" variant="ghost" disabled={!draft || busy} title={!draft ? t('draftActionOnly') : undefined} onClick={() => remove(custody.id)} aria-label={t('delete')}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} /></Button>
             {draft && <Button size="sm" variant="outline" disabled={busy} onClick={() => post(custody.id)}>{t('post')}</Button>}
           </div>
