@@ -284,7 +284,7 @@ class CashBankAccountService
         if ($scope !== 'all' && empty($subject)) {
             throw new RuntimeException('نطاق الصلاحية المحدد يحتاج دوراً أو مستخدماً أو فرعاً.');
         }
-        if ($scope === 'role' && ! array_key_exists((string) $subject, Rbac::MATRIX)) {
+        if ($scope === 'role' && ! Rbac::roleExists((string) $subject)) {
             throw new RuntimeException('الدور المحدد للصلاحية غير موجود.');
         }
         if ($scope === 'user' && ! User::whereKey($subject)->exists()) {
