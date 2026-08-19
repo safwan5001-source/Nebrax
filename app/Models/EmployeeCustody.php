@@ -6,6 +6,7 @@ use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * عهدة موظف: مسودة ثم ترحيل صرف واحد عبر EmployeeCustodyService.
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *   مدين 1160 عُهَد الموظفين
  *   دائن الخزينة أو الحساب البنكي المختار
  *
- * لا تسويات في الإصدار الأول؛ يبقى الرصيد مفتوحاً حتى تنفيذ أنواع التسوية.
+ * تسويات العهدة تُسجل كحركات مستقلة متوازنة وترتبط بقيدها؛ الرصيد يشتق من سجلها.
  */
 class EmployeeCustody extends BaseModel
 {
@@ -64,6 +65,12 @@ class EmployeeCustody extends BaseModel
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** سجل التسويات المرحّلة؛ الرصيد المتبقي يشتق من مجموعها ولا يخزّن كقيمة مستقلة. */
+    public function settlements(): HasMany
+    {
+        return $this->hasMany(EmployeeCustodySettlement::class, 'employee_custody_id');
     }
 
     public function isDraft(): bool

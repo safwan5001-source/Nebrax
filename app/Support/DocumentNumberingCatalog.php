@@ -8,6 +8,7 @@ use App\Models\CashBankTransfer;
 use App\Models\CreditNote;
 use App\Models\Employee;
 use App\Models\EmployeeCustody;
+use App\Models\EmployeeCustodySettlement;
 use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
@@ -26,7 +27,7 @@ use App\Models\Warehouse;
  * ═══════════════════════════════════════════════════════════════
  *  فهرس الترقيم — وصفٌ للعرض، لا محرّكُ توليد
  * ═══════════════════════════════════════════════════════════════
- *  يصف الكيانات التسعة عشر التي تُرقَّم عبر `GeneratesDocumentNumbers`:
+ *  يصف الكيانات المرقّمة عبر `GeneratesDocumentNumbers`:
  *  سلاسلها وبادئاتها ونطاقها، ليعرضها المستخدمُ في مكانٍ واحد.
  *
  *  **لا يولّد رقماً ولا ينسخ منطقاً.** الرقم التالي يُقرأ باستدعاء الطبقة
@@ -61,7 +62,7 @@ class DocumentNumberingCatalog
     public const PADDING = 5;
 
     /**
-     * الكيانات التسعة عشر.
+     * الكيانات المرقّمة.
      *
      *  - `series`  سلسلة أو أكثر لكل كيان: الجدول الواحد قد يحمل سلاسل
      *              مستقلّة يفصلها اختلاف البادئة (مبيعات/مشتريات، قبض/صرف…).
@@ -170,11 +171,17 @@ class DocumentNumberingCatalog
             'yearly' => false,
             'series' => [['key' => 'default', 'prefix' => 'EMP']],
         ],
-        'employee_custody' => [
+                'employee_custody' => [
             'model'  => EmployeeCustody::class,
             'yearly' => true,
-            'series' => [['key' => 'default', 'prefix' => 'CST']],
+            'series'  => [['key' => 'default', 'prefix' => 'CST']],
         ],
+        'employee_custody_settlement' => [
+            'model'  => EmployeeCustodySettlement::class,
+            'yearly' => true,
+            'series'  => [['key' => 'default', 'prefix' => 'CSTL']],
+        ],
+
         'branch' => [
             'model'   => Branch::class,
             'yearly'  => false,

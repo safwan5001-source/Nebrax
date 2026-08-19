@@ -101,7 +101,8 @@ export default function EmployeeCustodiesPage() {
     { accessorKey: 'custody_date', header: t('date'), cell: ({ row }) => <span className="num text-muted">{row.original.custody_date}</span> },
     { accessorKey: 'due_date', header: t('dueDate'), cell: ({ row }) => <span className="num text-muted">{row.original.due_date || '—'}</span> },
     { accessorKey: 'amount', header: t('amount'), cell: ({ row }) => <span className="num font-medium">{formatRiyal(row.original.amount)}</span> },
-    { accessorKey: 'status', header: t('status'), cell: ({ row }) => <Badge tone={tone[row.original.status]}>{t(row.original.status)}</Badge> },
+    { accessorKey: 'remaining_amount', header: t('remaining'), cell: ({ row }) => <span className="num font-medium text-text">{row.original.status === 'posted' ? formatRiyal(row.original.remaining_amount ?? row.original.amount) : '—'}</span> },
+    { accessorKey: 'status', header: t('status'), cell: ({ row }) => <div className="flex flex-wrap gap-1"><Badge tone={tone[row.original.status]}>{t(row.original.status)}</Badge>{row.original.is_settled && <Badge tone="positive">{t('settled')}</Badge>}</div> },
     {
       id: 'actions',
       header: t('actions'),
@@ -122,8 +123,8 @@ export default function EmployeeCustodiesPage() {
               <Button size="icon" variant="ghost" disabled title={t('draftActionOnly')} aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button>
             )}
             <Button size="icon" variant="ghost" disabled={busy} onClick={() => duplicate(custody.id)} aria-label={t('duplicate')}><Copy className="h-4 w-4" strokeWidth={1.7} /></Button>
-            <span title={t('settlementsUnavailableReason')}>
-              <Button size="sm" variant="outline" disabled aria-label={t('settlementsUnavailable')}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('settlementsUnavailable')}</Button>
+            <span title={draft ? t('settlementDraftOnly') : custody.is_settled ? t('settlementNoRemaining') : undefined}>
+              <Button size="sm" variant="outline" disabled={draft || custody.is_settled || busy} onClick={() => router.push(`/employee-custodies/${custody.id}?settlement=1`)} aria-label={t('addSettlement')}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('addSettlement')}</Button>
             </span>
             <Button size="icon" variant="ghost" disabled={!draft || busy} title={!draft ? t('draftActionOnly') : undefined} onClick={() => remove(custody.id)} aria-label={t('delete')}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} /></Button>
             {draft && <Button size="sm" variant="outline" disabled={busy} onClick={() => post(custody.id)}>{t('post')}</Button>}
@@ -131,7 +132,7 @@ export default function EmployeeCustodiesPage() {
         );
       },
     },
-  ], [acting, duplicate, post, remove, t]);
+  ], [acting, duplicate, post, remove, router, t]);
 
   return (
     <div className="space-y-4">

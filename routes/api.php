@@ -286,10 +286,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('payments/{id}', [PaymentController::class, 'destroy'])->middleware($perm('payments.manage'));
         Route::post('payments/{id}/post', [PaymentController::class, 'post'])->middleware($perm('payments.manage'));
 
-        // عُهَد الموظفين — الإصدار الأول: مسودة ثم صرف مرحّل؛ التسويات تؤجّل لأنواع التسوية.
+        // عُهَد الموظفين — مسودة ثم صرف مرحّل، وتسوية أحادية السطر بنوع نشط وقيد مستقل.
         Route::get('employee-custodies', [EmployeeCustodyController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('employee-custodies/{id}', [EmployeeCustodyController::class, 'show'])->middleware($perm('payments.view'));
+        Route::get('employee-custodies/{id}/settlements', [EmployeeCustodyController::class, 'indexSettlements'])->middleware($perm('payments.view'));
         Route::post('employee-custodies', [EmployeeCustodyController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::post('employee-custodies/{id}/settlements', [EmployeeCustodyController::class, 'storeSettlement'])->middleware($perm('payments.manage'));
         Route::put('employee-custodies/{id}', [EmployeeCustodyController::class, 'update'])->middleware($perm('payments.manage'));
         Route::post('employee-custodies/{id}/duplicate', [EmployeeCustodyController::class, 'duplicate'])->middleware($perm('payments.manage'));
         Route::delete('employee-custodies/{id}', [EmployeeCustodyController::class, 'destroy'])->middleware($perm('payments.manage'));

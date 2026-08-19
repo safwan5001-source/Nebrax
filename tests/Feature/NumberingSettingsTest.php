@@ -69,7 +69,7 @@ class NumberingSettingsTest extends TestCase
             'وكل مدخل هناك يجب أن يقابل نموذجاً يستعمل الطبقة فعلاً.',
         ]));
 
-        $this->assertCount(19, $catalogued);
+        $this->assertCount(20, $catalogued);
     }
 
     /** عدّاد ZATCA ليس رقم مستند — فلا يظهر في هذه الشاشة إطلاقاً. @test */
