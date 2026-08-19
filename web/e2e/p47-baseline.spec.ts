@@ -508,3 +508,16 @@ test('P47.2-C: تحقق حقل بحث البنية هدف لمس 44px', async ({
   expect(await page.evaluate(() => window.innerWidth)).toBe(360);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 });
+
+
+test('P47: يحقق زر إغلاق الإشعار هدف لمس 44px ويغلق الرسالة', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await openStudioForP472(page, 'toast-dismiss-touch-target-mobile-360');
+
+  const dismissToast = page.getByRole('status').getByRole('button', { name: 'إغلاق' });
+  await expect(dismissToast).toBeVisible();
+  await expectTargetsAtLeast44(dismissToast);
+  await dismissToast.click({ force: true });
+  await expect(dismissToast).toBeHidden();
+});

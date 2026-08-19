@@ -92,7 +92,7 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
         type="button"
         onClick={onDismiss}
         aria-label="إغلاق"
-        className="shrink-0 text-muted transition-colors hover:text-text"
+        className="flex h-11 w-11 shrink-0 items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         <X className="h-3.5 w-3.5" strokeWidth={1.8} />
       </button>
