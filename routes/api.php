@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BranchSettingsController;
+use App\Http\Controllers\Api\CashBankAccountController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CostCenterController;
@@ -17,8 +18,10 @@ use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\EmployeeCustodyController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryReportController;
@@ -45,6 +48,7 @@ use App\Http\Controllers\Api\ReturnSourcesController;
 use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesReportController;
 use App\Http\Controllers\Api\SalesSettingsController;
+use App\Http\Controllers\Api\SettlementTypeController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\StocktakeController;
@@ -253,6 +257,27 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('pos-sessions/open', [PosSessionController::class, 'open'])->middleware($perm('invoices.manage'));
         Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware($perm('invoices.manage'));
 
+        // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.
+        Route::get('settings/finance', [FinanceSettingsController::class, 'show'])->middleware($perm('payments.view'));
+        Route::put('settings/finance', [FinanceSettingsController::class, 'update'])->middleware($perm('payments.manage'));
+
+        // أنواع التسوية: بيانات رئيسية مشتركة؛ لا تنشئ قيداً حتى تُبنى تسويات العُهَد.
+        Route::get('settlement-types', [SettlementTypeController::class, 'index'])->middleware($perm('payments.view'));
+        Route::post('settlement-types', [SettlementTypeController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('settlement-types/{id}', [SettlementTypeController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::delete('settlement-types/{id}', [SettlementTypeController::class, 'destroy'])->middleware($perm('payments.manage'));
+
+        // الخزائن والحسابات البنكية والتحويلات الداخلية
+        Route::get('cash-bank-accounts', [CashBankAccountController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('cash-bank-accounts/{id}', [CashBankAccountController::class, 'show'])->middleware($perm('payments.view'));
+        Route::post('cash-bank-accounts', [CashBankAccountController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('cash-bank-accounts/{id}', [CashBankAccountController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::post('cash-bank-accounts/{id}/deactivate', [CashBankAccountController::class, 'deactivate'])->middleware($perm('payments.manage'));
+        Route::post('cash-bank-accounts/{id}/make-main', [CashBankAccountController::class, 'makeMain'])->middleware($perm('payments.manage'));
+        Route::delete('cash-bank-accounts/{id}', [CashBankAccountController::class, 'destroy'])->middleware($perm('payments.manage'));
+        Route::get('cash-bank-transfers', [CashBankAccountController::class, 'transfers'])->middleware($perm('payments.view'));
+        Route::post('cash-bank-transfers', [CashBankAccountController::class, 'transfer'])->middleware($perm('payments.manage'));
+
         // المدفوعات
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payments/{id}', [PaymentController::class, 'show'])->middleware($perm('payments.view'));
@@ -261,6 +286,17 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('payments/{id}/duplicate', [PaymentController::class, 'duplicate'])->middleware($perm('payments.manage'));
         Route::delete('payments/{id}', [PaymentController::class, 'destroy'])->middleware($perm('payments.manage'));
         Route::post('payments/{id}/post', [PaymentController::class, 'post'])->middleware($perm('payments.manage'));
+
+        // عُهَد الموظفين — مسودة ثم صرف مرحّل، وتسوية أحادية السطر بنوع نشط وقيد مستقل.
+        Route::get('employee-custodies', [EmployeeCustodyController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('employee-custodies/{id}', [EmployeeCustodyController::class, 'show'])->middleware($perm('payments.view'));
+        Route::get('employee-custodies/{id}/settlements', [EmployeeCustodyController::class, 'indexSettlements'])->middleware($perm('payments.view'));
+        Route::post('employee-custodies', [EmployeeCustodyController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::post('employee-custodies/{id}/settlements', [EmployeeCustodyController::class, 'storeSettlement'])->middleware($perm('payments.manage'));
+        Route::put('employee-custodies/{id}', [EmployeeCustodyController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::post('employee-custodies/{id}/duplicate', [EmployeeCustodyController::class, 'duplicate'])->middleware($perm('payments.manage'));
+        Route::delete('employee-custodies/{id}', [EmployeeCustodyController::class, 'destroy'])->middleware($perm('payments.manage'));
+        Route::post('employee-custodies/{id}/post', [EmployeeCustodyController::class, 'post'])->middleware($perm('payments.manage'));
 
         // المشتريات
         Route::get('purchases', [PurchaseController::class, 'index'])->middleware($perm('purchases.view'));

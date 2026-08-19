@@ -95,7 +95,7 @@ class PaymentController extends ApiController
     public function post(Request $request, string $id): JsonResponse
     {
         $payment = $this->visiblePayment($request, $id);
-        $posted = $this->domain(fn () => $this->payments->post($payment));
+        $posted = $this->domain(fn () => $this->payments->post($payment, $request->user()));
 
         return (new PaymentResource($posted->load(['partner', 'cashAccount', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
     }

@@ -163,9 +163,9 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/expenses', icon: Receipt, key: 'expenses', built: true },
       { href: '/receipt-vouchers', icon: FileText, key: 'receiptVouchers', built: true },
-      { href: '/cash-and-bank', icon: Building2, key: 'cashAndBank' },
-      { href: '/employee-custodies', icon: Users, key: 'employeeCustodies' },
-      { href: '/finance-settings', icon: SlidersHorizontal, key: 'financeSettings' },
+      { href: '/cash-and-bank', icon: Building2, key: 'cashAndBank', built: true },
+      { href: '/employee-custodies', icon: Users, key: 'employeeCustodies', built: true },
+      { href: '/finance-settings', icon: SlidersHorizontal, key: 'financeSettings', built: true },
     ],
   },
   {
@@ -242,21 +242,27 @@ const SUPER_GROUPS: { label: string; titles: string[] }[] = [
 export function Sidebar({
   open,
   onClose,
+  onDismiss,
   collapsed = false,
   onToggleCollapse,
 }: {
   open: boolean;
   onClose: () => void;
+  /** يغلق درج الجوال ويعيد التركيز إلى زر القائمة الذي فتحه. */
+  onDismiss: () => void;
   /** مطويّ: أيقونات فقط بعرض ضيّق. لا يُطبَّق إلا على الشاشات الواسعة. */
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
   const pathname = usePathname();
   const t = useTranslations('nav');
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // الدرج على الجوال يعرض القائمة كاملة دائماً — الطيّ ميزة شاشات واسعة.
   // فحين يكون الدرج مفتوحاً يسقط الطيّ، ولا يبقى المستخدم أمام أيقونات صمّاء.
   const mini = collapsed && !open;
+  const drawerHiddenOnMobile = isMobileViewport && !open;
 
   // بيانات الشركة للعلامة في الترويسة — من `/me` القائم بلا طلب إضافي.
   const company = useCompany();
@@ -265,10 +271,36 @@ export function Sidebar({
   const [flyout, setFlyout] = useState<{ title: string; top: number } | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // يتابع شرط `lg` نفسه الذي يحوّل الدرج إلى شريط ثابت؛ فلا يُعزل شريط سطح المكتب.
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 1023px)');
+    const syncViewport = () => setIsMobileViewport(mediaQuery.matches);
+    syncViewport();
+    mediaQuery.addEventListener('change', syncViewport);
+    return () => mediaQuery.removeEventListener('change', syncViewport);
+  }, []);
+
   // الطيّ يُلغي أي قائمة منبثقة معلّقة — وإلا بقيت طافية بلا مرساة.
   useEffect(() => {
     if (!mini) setFlyout(null);
   }, [mini]);
+
+  // عند فتح الدرج على الجوال يبدأ مسار لوحة المفاتيح بزر الإغلاق الظاهر.
+  useEffect(() => {
+    if (open && isMobileViewport) {
+      requestAnimationFrame(() => closeButtonRef.current?.focus());
+    }
+  }, [open, isMobileViewport]);
+
+  // Escape يعامل كإغلاق صريح ويعيد التركيز إلى الزر الذي فتح الدرج.
+  useEffect(() => {
+    if (!open || !isMobileViewport) return;
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onDismiss();
+    };
+    document.addEventListener('keydown', dismissOnEscape);
+    return () => document.removeEventListener('keydown', dismissOnEscape);
+  }, [isMobileViewport, onDismiss, open]);
 
   useEffect(() => {
     if (!flyout) return;
@@ -330,9 +362,11 @@ export function Sidebar({
   return (
     <>
       {/* خلفية معتمة على الجوال عند فتح الدرج */}
-      {open && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={onClose} aria-hidden />}
+      {open && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={onDismiss} aria-hidden />}
 
       <aside
+        aria-hidden={drawerHiddenOnMobile || undefined}
+        inert={drawerHiddenOnMobile}
         className={cn(
           'no-print fixed inset-y-0 start-0 z-50 flex w-64 flex-col border-e border-border bg-surface',
           'transition-[transform,width] duration-200 ease-out',
@@ -351,9 +385,10 @@ export function Sidebar({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={onDismiss}
             aria-label={t('close')}
-            className="ms-auto rounded p-1 text-muted hover:bg-primary-soft hover:text-primary lg:hidden"
+            ref={closeButtonRef}
+            className="ms-auto flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:hidden"
           >
             <X className="h-5 w-5" strokeWidth={1.7} />
           </button>
@@ -366,7 +401,7 @@ export function Sidebar({
               aria-expanded={!mini}
               title={mini ? t('expand') : t('collapse')}
               className={cn(
-                'hidden shrink-0 rounded p-1 text-muted hover:bg-primary-soft hover:text-primary lg:block',
+                'hidden h-11 w-11 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary lg:flex',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                 mini ? '' : 'ms-auto'
               )}
@@ -385,7 +420,7 @@ export function Sidebar({
             onClick={onClose}
             title={mini ? t('dashboard') : undefined}
             className={cn(
-              'relative mb-3 flex h-9 items-center rounded text-sm text-muted hover:bg-primary-soft hover:text-primary',
+              'relative mb-3 flex h-11 items-center rounded text-sm text-muted hover:bg-primary-soft hover:text-primary',
               mini ? 'justify-center px-0' : 'gap-2 px-2',
               isActive('/dashboard') && 'bg-primary-soft font-medium text-primary'
             )}
@@ -428,7 +463,7 @@ export function Sidebar({
                   aria-haspopup={mini ? 'menu' : undefined}
                   title={mini ? t(`groups.${group.title}`) : undefined}
                   className={cn(
-                    'relative flex h-9 w-full items-center rounded text-[14.5px] font-medium transition-colors',
+                    'relative flex h-11 w-full items-center rounded text-[14.5px] font-medium transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                     mini ? 'justify-center px-0' : 'gap-2 px-2',
                     groupActive || (mini && flyout?.title === group.title)
@@ -476,7 +511,7 @@ export function Sidebar({
                             // الفرع أصغر وأخفت من أبيه — والنشِط يتميّز باللون
                             // والوزن **بلا خلفية**: `primary-soft` للرئيسي وحده،
                             // ولو أخذها الفرع لتساويا في الوزن البصري.
-                            'flex h-8 items-center gap-2 rounded pe-2 ps-2 text-[13px] text-muted transition-colors hover:text-primary',
+                            'flex h-11 items-center gap-2 rounded pe-2 ps-2 text-[13px] text-muted transition-colors hover:text-primary',
                             active && 'font-semibold text-primary'
                           )}
                         >

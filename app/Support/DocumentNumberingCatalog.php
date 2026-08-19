@@ -4,8 +4,11 @@ namespace App\Support;
 
 use App\Models\Asset;
 use App\Models\Branch;
+use App\Models\CashBankTransfer;
 use App\Models\CreditNote;
 use App\Models\Employee;
+use App\Models\EmployeeCustody;
+use App\Models\EmployeeCustodySettlement;
 use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
@@ -24,7 +27,7 @@ use App\Models\Warehouse;
  * ═══════════════════════════════════════════════════════════════
  *  فهرس الترقيم — وصفٌ للعرض، لا محرّكُ توليد
  * ═══════════════════════════════════════════════════════════════
- *  يصف الكيانات السبعة عشر التي تُرقَّم عبر `GeneratesDocumentNumbers`:
+ *  يصف الكيانات المرقّمة عبر `GeneratesDocumentNumbers`:
  *  سلاسلها وبادئاتها ونطاقها، ليعرضها المستخدمُ في مكانٍ واحد.
  *
  *  **لا يولّد رقماً ولا ينسخ منطقاً.** الرقم التالي يُقرأ باستدعاء الطبقة
@@ -35,7 +38,7 @@ use App\Models\Warehouse;
  *
  *  الطبقة تستقبل البادئة من مستدعيها، وتُصفّر الرقم بخمس خانات عشرية دائماً.
  *  فالتنسيق وعدد الأرقام **ثابتان في الطبقة** لا إعدادان — تُعرَض قيمتاهما
- *  للاطّلاع لا للتحرير. ومن السبع عشرة، **خمس** تقرأ بادئتها من الإعدادات
+ *  للاطّلاع لا للتحرير. ومن الثمانية عشر، **خمس** تقرأ بادئتها من الإعدادات
  *  (الفاتورة · فاتورة الشراء · عرض السعر · الفرع · المخزن)؛ والبقية تمرّر
  *  ثوابت مكتوبة في خدماتها. لذلك حقل البادئة قابلٌ للتحرير في هذه الخمس
  *  وحدها، ومعطَّلٌ فيما عداها — الشاشة تعرض الواقع ولا تَعِد بما لا تملك تنفيذه.
@@ -59,7 +62,7 @@ class DocumentNumberingCatalog
     public const PADDING = 5;
 
     /**
-     * الكيانات السبعة عشر.
+     * الكيانات المرقّمة.
      *
      *  - `series`  سلسلة أو أكثر لكل كيان: الجدول الواحد قد يحمل سلاسل
      *              مستقلّة يفصلها اختلاف البادئة (مبيعات/مشتريات، قبض/صرف…).
@@ -100,6 +103,11 @@ class DocumentNumberingCatalog
                 ['key' => 'received', 'prefix' => 'REC'],
                 ['key' => 'paid', 'prefix' => 'PAY'],
             ],
+        ],
+        'cash_bank_transfer' => [
+            'model'  => CashBankTransfer::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'CBT']],
         ],
         'credit_note' => [
             'model'  => CreditNote::class,
@@ -163,6 +171,17 @@ class DocumentNumberingCatalog
             'yearly' => false,
             'series' => [['key' => 'default', 'prefix' => 'EMP']],
         ],
+                'employee_custody' => [
+            'model'  => EmployeeCustody::class,
+            'yearly' => true,
+            'series'  => [['key' => 'default', 'prefix' => 'CST']],
+        ],
+        'employee_custody_settlement' => [
+            'model'  => EmployeeCustodySettlement::class,
+            'yearly' => true,
+            'series'  => [['key' => 'default', 'prefix' => 'CSTL']],
+        ],
+
         'branch' => [
             'model'   => Branch::class,
             'yearly'  => false,

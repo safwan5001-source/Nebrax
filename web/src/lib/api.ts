@@ -51,7 +51,9 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers,
-    body: options.body !== undefined ? (isFormData ? options.body as FormData : JSON.stringify(options.body)) : undefined,
+    body: options.body !== undefined
+      ? (isFormData || typeof options.body === 'string' ? options.body as BodyInit : JSON.stringify(options.body))
+      : undefined,
   });
 
   if (res.status === 401 && typeof window !== 'undefined') {

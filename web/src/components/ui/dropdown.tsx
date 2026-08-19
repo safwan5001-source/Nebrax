@@ -19,6 +19,7 @@ export function Dropdown({
   children,
   align = 'end',
   menuLabel,
+  triggerLabel,
   triggerClassName,
   menuClassName,
 }: {
@@ -26,6 +27,7 @@ export function Dropdown({
   children: React.ReactNode;
   align?: 'start' | 'end';
   menuLabel?: string;
+  triggerLabel?: string;
   triggerClassName?: string;
   menuClassName?: string;
 }) {
@@ -76,6 +78,7 @@ export function Dropdown({
         type="button"
         onClick={toggle}
         aria-haspopup="menu"
+        aria-label={triggerLabel}
         aria-expanded={open}
         className={cn(
           'inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
@@ -110,20 +113,23 @@ export function DropdownItem({
   href,
   onClick,
   tone = 'default',
+  disabled = false,
 }: {
   children: React.ReactNode;
   icon?: LucideIcon;
   href?: string;
   onClick?: () => void;
   tone?: 'default' | 'danger';
+  disabled?: boolean;
 }) {
   const { open, close } = useContext(DropdownCtx);
   const tabIndex = open ? 0 : -1; // خارج ترتيب التنقّل عند الإغلاق
   const className = cn(
-    'flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-sm',
+    'flex min-h-11 w-full items-center gap-2 rounded px-2.5 py-1.5 text-sm',
     tone === 'danger'
       ? 'text-negative hover:bg-negative/10'
-      : 'text-text hover:bg-primary-soft hover:text-primary'
+      : 'text-text hover:bg-primary-soft hover:text-primary',
+    disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-inherit'
   );
   const inner = (
     <>
@@ -144,11 +150,14 @@ export function DropdownItem({
       type="button"
       role="menuitem"
       tabIndex={tabIndex}
-      onClick={() => {
-        onClick?.();
-        close();
-      }}
-      className={className}
+              disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          onClick?.();
+          close();
+        }}
+        className={className}
+
     >
       {inner}
     </button>

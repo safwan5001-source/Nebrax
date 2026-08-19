@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\CashBankAccount;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
@@ -756,6 +757,17 @@ class InvoiceTest extends TestCase
         $showroom = Account::create([
             'code' => '1111', 'name' => 'خزينة المعرض', 'type' => 'asset',
             'normal_balance' => 'debit', 'is_group' => false,
+        ]);
+
+        CashBankAccount::create([
+            'account_id' => $showroom->id,
+            'type' => 'cash',
+            'name' => 'خزينة المعرض',
+            'currency' => 'SAR',
+            'is_active' => true,
+            'is_main' => false,
+            'deposit_scope' => 'all',
+            'withdraw_scope' => 'all',
         ]);
 
         $posted = $this->invoices->post($this->invoices->create([

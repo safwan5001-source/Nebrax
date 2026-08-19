@@ -51,13 +51,13 @@ function Row({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn('flex items-center gap-2 rounded border border-border bg-surface px-2 py-1.5', isDragging && 'opacity-60 shadow-md')}
     >
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
           disabled={disabled || index === 0}
           onClick={() => onMove(item.key, 'up')}
           aria-label={t('move_up', { section: t(item.key) })}
-          className="rounded p-1 text-muted hover:bg-primary-soft hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
         </button>
@@ -66,7 +66,7 @@ function Row({
           disabled={disabled || index === count - 1}
           onClick={() => onMove(item.key, 'down')}
           aria-label={t('move_down', { section: t(item.key) })}
-          className="rounded p-1 text-muted hover:bg-primary-soft hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
         </button>
@@ -75,7 +75,7 @@ function Row({
         type="button"
         disabled={disabled}
         aria-label={t('drag')}
-        className="cursor-grab touch-none rounded p-1 text-muted focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-default disabled:opacity-40"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-default disabled:opacity-40"
         {...attributes}
         {...listeners}
       >
@@ -89,7 +89,7 @@ function Row({
         onClick={() => onToggle(item.key)}
         aria-pressed={item.visible}
         aria-label={item.visible ? t('hide', { section: t(item.key) }) : t('show', { section: t(item.key) })}
-        className="rounded p-1 text-muted hover:bg-primary-soft hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {item.visible ? <Eye className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /> : <EyeOff className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
       </button>

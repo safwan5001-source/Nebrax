@@ -1,26 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { NebraxLogo } from '@/components/layout/nebrax-logo';
 import { cn } from '@/lib/utils';
 
 /**
- * ═══════════════════════════════════════════════════════════════
- *  CompanyLogoMark — علامة الشركة المربّعة في قشرة التطبيق
- * ═══════════════════════════════════════════════════════════════
- *  الشعار الكامل (الأفقي) يبقى للمستندات وشاشة الدخول؛ وهنا تُعرض **علامة
- *  مربّعة** بمقاس ثابت، فلا يمطّ شعارٌ عريض ترويسةَ الشريط.
+ * علامة المؤسسة في قشرة لوحة التحكم.
  *
- *  ثلاثة قرارات عرض تستحقّ التثبيت:
- *
- *   • **`object-contain` لا `cover`.** الشعار الأفقي داخل مربّع يترك فراغاً
- *     على الجانبين — وهو أقلّ ضرراً من `cover` الذي كان يقصّ اسم الشركة نفسه.
- *
- *   • **خلفية بيضاء ثابتة في الوضعين.** أغلب الشعارات مصمَّمة على أبيض
- *     وكثيرٌ منها بنصّ داكن؛ فوضعُها على خلفية داكنة يُخفي الشعار. الأبيض
- *     الثابت يضمن ظهوره في الثيمين، ولذلك لا يُشتقّ من رموز الثيم.
- *
- *   • **`onError` يرجع إلى الحرف.** رابطٌ تالف أو صورة محذوفة كانا يتركان
- *     مربّعاً فارغاً في ترويسة كل صفحة — والحرف أوضح من الفراغ.
+ * يحظى الشعار الذي ترفعه المؤسسة من الإعدادات بالأولوية المطلقة. وعندما لا
+ * يوجد شعار مرفوع — كما في الحسابات الجديدة — يظهر شعار نبراكس المتكيف مع
+ * اللغة والوضع النشط بدلاً من حرف ثابت، ويعود تلقائياً إلى شعار المؤسسة عند
+ * حفظه في الإعدادات.
  */
 export function CompanyLogoMark({
   logo,
@@ -30,28 +20,23 @@ export function CompanyLogoMark({
 }: {
   /** data URL أو فارغ. */
   logo?: string | null;
-  /** اسم الشركة — يُشتقّ منه الحرف الاحتياطي. */
+  /** اسم الشركة، لنص بديل ذي معنى عند وجود شعار مرفوع. */
   name?: string | null;
   size?: 'sm' | 'md';
   className?: string;
 }) {
   const [broken, setBroken] = useState(false);
+  const logoClass = size === 'md' ? 'h-9 w-auto' : 'h-7 w-auto';
 
-  // شعارٌ جديد بعد رفعه يستحقّ محاولة جديدة — وإلا بقي «مكسوراً» إلى التحديث.
+  // شعار جديد بعد رفعه يستحقّ محاولة جديدة — وإلا بقيت القشرة على البديل.
   useEffect(() => setBroken(false), [logo]);
-
-  const box = size === 'md' ? 'h-9 w-9' : 'h-7 w-7';
-  const letter = size === 'md' ? 'text-sm' : 'text-xs';
-
-  // الحرف الأول من اسم الشركة، و«ن» احتياطاً قبل وصول البيانات.
-  const initial = (name ?? '').trim().charAt(0) || 'ن';
 
   if (logo && !broken) {
     return (
       <div
         className={cn(
           'flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5',
-          box,
+          size === 'md' ? 'h-9 w-9' : 'h-7 w-7',
           className
         )}
       >
@@ -65,16 +50,5 @@ export function CompanyLogoMark({
     );
   }
 
-  return (
-    <div
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-lg bg-primary font-bold text-white',
-        box,
-        letter,
-        className
-      )}
-    >
-      {initial}
-    </div>
-  );
+  return <NebraxLogo alt="" className={cn('shrink-0', logoClass, className)} />;
 }

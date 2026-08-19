@@ -1,12 +1,29 @@
-import Image from 'next/image';
+'use client';
+
+import type { CSSProperties } from 'react';
+import { useLocale } from 'next-intl';
 import { cn } from '@/lib/utils';
 
+const LOGO_ASSETS = {
+  ar: {
+    src: '/brand/nebrax-logo.png',
+    width: 1026,
+    height: 680,
+  },
+  en: {
+    src: '/brand/nebrax-logo-en.png',
+    width: 1466,
+    height: 959,
+  },
+} as const;
+
 /**
- * شعار نبراكس الرسمي بدرجتين معتمدتين من الهوية.
+ * شعار نبراكس المتكيف مع اللغة ووضع العرض.
  *
- * يظهر الأزرق العميق (#1E40AF) في الوضع الفاتح، والأزرق الفاتح (#4F8CFF)
- * في الوضع الداكن. تعتمد كل نسخة على شفافية الأصل نفسه بلا خلفية أو إطار،
- * ولا تُغيّر رموز ألوان الواجهة أو متغيرات الثيم.
+ * يستخدم الأصل الشفاف بوصفه قناعاً، لا لوناً مضمّناً في الصورة. لذلك يأخذ
+ * الشعار العربي وNEBRAX اللون `--primary` ذاته تلقائياً: #1E40AF في الوضع
+ * الفاتح و#4F8CFF في الوضع الداكن، وأي تغيير مستقبلي في رمز الهوية ينعكس
+ * على النسختين في الوقت نفسه.
  */
 export function NebraxLogo({
   alt = '',
@@ -15,28 +32,33 @@ export function NebraxLogo({
 }: {
   alt?: string;
   className?: string;
+  /** محفوظ لتوافق مواضع الاستخدام السابقة؛ أصل القناع لا يطلب تحميلاً مسبقاً. */
   priority?: boolean;
 }) {
+  const locale = useLocale();
+  const asset = locale === 'en' ? LOGO_ASSETS.en : LOGO_ASSETS.ar;
+  void priority;
+
+  const maskStyle: CSSProperties = {
+    aspectRatio: `${asset.width} / ${asset.height}`,
+    backgroundColor: 'var(--primary)',
+    maskImage: `url(${asset.src})`,
+    maskPosition: 'center',
+    maskRepeat: 'no-repeat',
+    maskSize: 'contain',
+    WebkitMaskImage: `url(${asset.src})`,
+    WebkitMaskPosition: 'center',
+    WebkitMaskRepeat: 'no-repeat',
+    WebkitMaskSize: 'contain',
+  };
+
   return (
-    <>
-      <Image
-        src="/brand/nebrax-logo.png"
-        alt={alt}
-        width={1026}
-        height={680}
-        priority={priority}
-        sizes="(max-width: 640px) 72px, 96px"
-        className={cn('h-auto w-auto object-contain dark:hidden', className)}
-      />
-      <Image
-        src="/brand/nebrax-logo-dark.png"
-        alt={alt}
-        width={1026}
-        height={680}
-        priority={priority}
-        sizes="(max-width: 640px) 72px, 96px"
-        className={cn('hidden h-auto w-auto object-contain dark:block', className)}
-      />
-    </>
+    <span
+      role={alt ? 'img' : undefined}
+      aria-label={alt || undefined}
+      aria-hidden={alt ? undefined : true}
+      style={maskStyle}
+      className={cn('inline-block shrink-0 bg-primary', className)}
+    />
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BranchScope, useBranchVersion } from '@/components/layout/branch-scope';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -13,6 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const branchVersion = useBranchVersion();
 
   useEffect(() => {
@@ -29,6 +30,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (branchVersion > 0) setCollapsed(false);
   }, [branchVersion]);
 
+  const dismissSidebar = () => {
+    // إعادة التركيز قبل إخفاء الدرج تمنع بقاء المؤشر داخل سطح غير مرئي.
+    menuButtonRef.current?.focus();
+    setSidebarOpen(false);
+  };
+
   if (!ready) {
     return <div className="flex min-h-screen items-center justify-center bg-background text-muted">…</div>;
   }
@@ -40,11 +47,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          onDismiss={dismissSidebar}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((c) => !c)}
         />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar onMenuClick={() => setSidebarOpen(true)} />
+          <Topbar onMenuClick={() => setSidebarOpen(true)} menuButtonRef={menuButtonRef} />
           <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6">
             {/* تبديل الفرع يُعيد جلب بيانات الصفحة فوراً — بلا إعادة تحميل. */}
             <BranchScope>{children}</BranchScope>
