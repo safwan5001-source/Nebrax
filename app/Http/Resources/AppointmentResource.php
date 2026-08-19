@@ -12,6 +12,11 @@ class AppointmentResource extends JsonResource
         return [
             'id'               => $this->id,
             'partner_id'       => $this->partner_id,
+            'invoice_id'       => $this->invoice_id,
+            'invoice'          => $this->whenLoaded('invoice', fn () => $this->invoice ? [
+                'id'     => $this->invoice->id,
+                'number' => $this->invoice->number,
+            ] : null),
             'title'            => $this->title,
             'appointment_at'   => optional($this->appointment_at)->toIso8601String(),
             'duration_minutes' => $this->duration_minutes,

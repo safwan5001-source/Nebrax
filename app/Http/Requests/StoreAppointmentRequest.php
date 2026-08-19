@@ -15,6 +15,7 @@ class StoreAppointmentRequest extends FormRequest
     {
         return [
             'partner_id'       => ['nullable', 'uuid'],
+            'invoice_id'       => ['nullable', 'uuid'],
             'title'            => ['required', 'string', 'max:255'],
             'appointment_at'   => ['required', 'date'],
             'duration_minutes' => ['nullable', 'integer', 'min:0', 'max:1440'],

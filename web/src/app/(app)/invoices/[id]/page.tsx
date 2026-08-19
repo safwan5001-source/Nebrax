@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  ArrowRight, Banknote, BookOpen, CheckCircle2, ChevronDown, Download,
+  ArrowRight, Banknote, BookOpen, CalendarPlus, CheckCircle2, ChevronDown, Download,
   FileSpreadsheet, LayoutTemplate, MoreVertical, Pencil, Printer,
   RotateCcw, Share2, Trash2,
 } from 'lucide-react';
@@ -22,6 +22,7 @@ import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { PaymentDialog } from '@/components/payments/payment-dialog';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
+import { AppointmentDialog, type Appointment } from '@/components/appointments/appointment-dialog';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
@@ -153,11 +154,13 @@ export default function InvoiceDetailPage() {
   const [actioning, setActioning] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
+  const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [payments, setPayments] = useState<InvoicePayment[]>([]);
   const [accounting, setAccounting] = useState<AccountingLinks | null>(null);
   const [relationsLoading, setRelationsLoading] = useState(true);
   const [relationsUnavailable, setRelationsUnavailable] = useState(false);
-  const [relationSection, setRelationSection] = useState<'payments' | 'accounting'>('payments');
+  const [relationSection, setRelationSection] = useState<'payments' | 'appointments' | 'accounting'>('payments');
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
@@ -185,20 +188,22 @@ export default function InvoiceDetailPage() {
       .then(async (r) => {
         setInvoice(r.data);
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, z, m, live, paymentRelations, accountingRelations] = await Promise.allSettled([
+        const [p, z, m, live, paymentRelations, appointmentRelations, accountingRelations] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
           api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=tax_invoice&usage=print${branchQuery}`),
           api<{ data: InvoicePayment[] }>(`/invoices/${id}/payments`),
+          api<{ data: Appointment[] }>(`/invoices/${id}/appointments`),
           api<{ data: AccountingLinks }>(`/invoices/${id}/accounting`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (z.status === 'fulfilled') setZatca(z.value);
         if (m.status === 'fulfilled') setCompany(m.value.company);
         if (paymentRelations.status === 'fulfilled') setPayments(paymentRelations.value.data);
+        if (appointmentRelations.status === 'fulfilled') setAppointments(appointmentRelations.value.data);
         if (accountingRelations.status === 'fulfilled') setAccounting(accountingRelations.value.data);
-        setRelationsUnavailable(paymentRelations.status === 'rejected' || accountingRelations.status === 'rejected');
+        setRelationsUnavailable(paymentRelations.status === 'rejected' || appointmentRelations.status === 'rejected' || accountingRelations.status === 'rejected');
         setRelationsLoading(false);
 
         // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
@@ -282,6 +287,7 @@ export default function InvoiceDetailPage() {
 
   const relationTabs = [
     { id: 'payments', label: t('payments'), count: relationsLoading ? undefined : payments.length },
+    { id: 'appointments', label: t('appointments'), count: relationsLoading ? undefined : appointments.length },
     { id: 'accounting', label: t('accounting') },
   ];
   const paymentMethod = (method: InvoicePayment['method']) => method === 'bank' ? t('bank') : t('cash');
@@ -307,12 +313,21 @@ export default function InvoiceDetailPage() {
       {entry ? <><dl className="grid grid-cols-2 gap-3 rounded border border-border bg-background p-3 text-sm sm:grid-cols-3"><div><dt className="text-xs text-muted">{t('entry_number')}</dt><dd className="num mt-1 text-text">{entry.number}</dd></div><div><dt className="text-xs text-muted">{t('entry_date')}</dt><dd className="num mt-1 text-text">{entry.date ?? '—'}</dd></div>{entry.description && <div><dt className="text-xs text-muted">{t('description')}</dt><dd className="mt-1 text-text">{entry.description}</dd></div>}</dl><div className="overflow-x-auto"><table className="w-full min-w-[34rem] text-sm"><thead className="border-b border-border bg-muted/40 text-start text-xs text-muted"><tr><th className="px-3 py-2.5 font-medium">{t('account')}</th><th className="px-3 py-2.5 font-medium">{t('description')}</th><th className="px-3 py-2.5 font-medium">{t('debit')}</th><th className="px-3 py-2.5 font-medium">{t('credit_amount')}</th></tr></thead><tbody className="divide-y divide-border">{entry.lines.map((line) => <tr key={`${entry.id}-${line.account_id}-${line.description ?? ''}`}><td className="px-3 py-2.5 text-text"><span className="num text-muted">{line.account_code}</span>{line.account_name && <span> · {line.account_name}</span>}</td><td className="px-3 py-2.5 text-muted">{line.description ?? '—'}</td><td className="num px-3 py-2.5 text-text">{formatRiyal(line.debit)}</td><td className="num px-3 py-2.5 text-text">{formatRiyal(line.credit)}</td></tr>)}</tbody></table></div></> : <p className="rounded border border-dashed border-border bg-background px-3 py-4 text-sm leading-6 text-muted">{empty}</p>}
     </section>
   );
+  const formatAppointmentAt = (value: string | null) => value ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
+  const appointmentsContent = relationsLoading ? (
+    <div className="space-y-3 p-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
+  ) : (
+    <div className="p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted">{appointments.length ? t('appointments_note') : t('no_appointments')}</p><Button size="sm" variant="outline" onClick={() => setAppointmentOpen(true)}><CalendarPlus className="h-4 w-4" strokeWidth={1.7} />{t('schedule_appointment')}</Button></div>
+      {appointments.length > 0 && <div className="divide-y divide-border rounded border border-border">{appointments.map((appointment) => <div key={appointment.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3"><div><p className="text-sm font-medium text-text">{appointment.title}</p><p className="mt-1 text-xs text-muted">{formatAppointmentAt(appointment.appointment_at)}{appointment.location ? ` · ${appointment.location}` : ''}</p></div><Badge tone={appointment.status === 'done' ? 'positive' : appointment.status === 'cancelled' ? 'negative' : 'muted'}>{appointment.status === 'scheduled' ? t('appointment_scheduled') : appointment.status === 'done' ? t('appointment_done') : t('appointment_cancelled')}</Badge></div>)}</div>}
+    </div>
+  );
   const accountingContent = relationsLoading ? (
     <div className="space-y-3 p-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>
   ) : (
     <div className="divide-y divide-border">{entryContent(accounting?.sales_entry ?? null, t('sales_entry'), t('no_sales_entry'))}{entryContent(accounting?.cost_entry ?? null, t('cost_entry'), t('no_cost_entry'))}</div>
   );
-  const relationContent = relationSection === 'payments' ? paymentsContent : accountingContent;
+  const relationContent = relationSection === 'payments' ? paymentsContent : relationSection === 'appointments' ? appointmentsContent : accountingContent;
 
   const doc = () => document.getElementById('print-root');
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
@@ -478,6 +493,7 @@ export default function InvoiceDetailPage() {
               trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}
             >
               {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
+              <DropdownItem icon={CalendarPlus} onClick={() => setAppointmentOpen(true)}>{t('schedule_appointment')}</DropdownItem>
               {customer && <DropdownItem icon={ArrowRight} href={`/partners/${invoice.partner_id}`}>{t('open_customer')}</DropdownItem>}
               {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
                 <DropdownItem icon={Printer} onClick={() => printDocument(thermalPaper, 'thermal-print-root')}>{tPrint('thermal_print')}</DropdownItem>
@@ -498,6 +514,7 @@ export default function InvoiceDetailPage() {
               trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}
             >
               {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
+              <DropdownItem icon={CalendarPlus} onClick={() => setAppointmentOpen(true)}>{t('schedule_appointment')}</DropdownItem>
               {customer && <DropdownItem icon={ArrowRight} href={`/partners/${invoice.partner_id}`}>{t('open_customer')}</DropdownItem>}
               <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
               <DropdownItem icon={Download} onClick={handleDownloadPdf}>{t('download_pdf')}</DropdownItem>
@@ -581,10 +598,10 @@ export default function InvoiceDetailPage() {
         {relationsUnavailable && <p className="mb-3 rounded border border-border bg-muted/40 px-3 py-2 text-sm text-text">{t('relations_unavailable')}</p>}
         <Card className="hidden lg:block">
           <CardHeader><CardTitle>{t('relations')}</CardTitle></CardHeader>
-          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as 'payments' | 'accounting')} />
+          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as 'payments' | 'appointments' | 'accounting')} />
           <CardContent className="p-0"><TabPanel id={relationSection}>{relationContent}</TabPanel></CardContent>
         </Card>
-        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => setRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => setRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
+        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => setRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="appointments" title={t('appointments')} count={relationsLoading ? undefined : appointments.length} open={relationSection === 'appointments'} onToggle={() => setRelationSection('appointments')}>{appointmentsContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => setRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
 
       <Card>
@@ -662,6 +679,12 @@ export default function InvoiceDetailPage() {
         onCreated={load}
         fixedType="sales"
         initialSalesInvoice={{ id: invoice.id, partnerId: invoice.partner_id }}
+      />
+      <AppointmentDialog
+        open={appointmentOpen}
+        onClose={() => setAppointmentOpen(false)}
+        onSaved={load}
+        initialInvoice={{ id: invoice.id, partnerId: invoice.partner_id, number: invoice.number }}
       />
 
       <Dialog
