@@ -157,7 +157,7 @@ export function SectionDesigner({
     <div className="space-y-3">
       <div className="space-y-1.5">
         <label htmlFor="document-section-search" className="text-xs font-medium text-muted">{t('search')}</label>
-        <Input id="document-section-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('search_placeholder')} disabled={disabled} />
+        <Input id="document-section-search" className="h-11" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('search_placeholder')} disabled={disabled} />
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={visibleItems.map((v) => v.key)} strategy={verticalListSortingStrategy}>

@@ -486,3 +486,25 @@ test('P47.2-B: تحقق حقول خصائص الاستوديو هدف لمس 44p
   expect(await page.evaluate(() => window.innerWidth)).toBe(360);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 });
+
+
+test('P47.2-C: تحقق حقل بحث البنية هدف لمس 44px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await openStudioForP472(page, 'structure-search-touch-target-mobile-360');
+
+  const structureTab = page.getByRole('tab', { name: 'البنية' });
+  await structureTab.click();
+  await expect(structureTab).toHaveAttribute('aria-selected', 'true');
+
+  const structureSearch = page.locator('#document-section-search');
+  await structureSearch.scrollIntoViewIfNeeded();
+  await expectTargetsAtLeast44(structureSearch);
+  await structureSearch.fill('الرئيسية');
+  await expect(structureSearch).toHaveValue('الرئيسية');
+  await structureSearch.fill('');
+  await expect(structureSearch).toHaveValue('');
+
+  expect(await page.evaluate(() => window.innerWidth)).toBe(360);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
+});
