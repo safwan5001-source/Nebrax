@@ -47,12 +47,15 @@ export function CreateReturnDialog({
   onClose,
   onCreated,
   fixedType,
+  initialSalesInvoice,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
   /** يثبّت نوع المرتجع ويُخفي منتقيه — لشاشتَي مرتجعات المبيعات/المشتريات. */
   fixedType?: 'sales' | 'purchase';
+  /** فاتورة مبيعات مصدر اختيارية؛ تسحب السطور القابلة للرد من الخادم. */
+  initialSalesInvoice?: { id: string; partnerId: string };
 }) {
   const t = useTranslations('returnForm');
   const tc = useTranslations('common');
@@ -72,7 +75,7 @@ export function CreateReturnDialog({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+    useEffect(() => {
     if (!open) return;
     api<{ data: Partner[] }>('/partners').then((r) => setPartners(r.data)).catch(() => {});
     api<{ data: Product[] }>('/products')
@@ -80,7 +83,18 @@ export function CreateReturnDialog({
       .catch(() => {});
   }, [open]);
 
+  // الدخول من فاتورة يثبت النوع والعميل والمصدر؛ اختيار المصدر نفسه يمر عبر
+  // `pickSource` لكي تبقى السطور والسقوف محسوبة من الخادم.
+  useEffect(() => {
+    if (!open || !initialSalesInvoice) return;
+    setType('sales');
+    setPartnerId(initialSalesInvoice.partnerId);
+    setSourceId('');
+    setLines([emptyLine()]);
+  }, [open, initialSalesInvoice?.id, initialSalesInvoice?.partnerId]);
+
   // سياسة إلزام المصدر — تتبع نوع المرتجع، فتُعاد عند تبديله.
+
   useEffect(() => {
     if (!open) return;
     api<{ data: Record<string, unknown> }>(type === 'sales' ? '/sales-settings' : '/purchase-settings')
@@ -151,6 +165,11 @@ export function CreateReturnDialog({
    * السطور المردودة بالكامل تُستبعَد — عرضُها بصفرٍ يدعو لكتابة كميةٍ تُرفض.
    * والسعر يُملأ سقفاً لا قيداً: للمستخدم أن ينقصه (استرداد جزئي) لا أن يزيده.
    */
+  useEffect(() => {
+    if (!open || !initialSalesInvoice || type !== 'sales' || partnerId !== initialSalesInvoice.partnerId) return;
+    void pickSource(initialSalesInvoice.id);
+  }, [open, type, partnerId, initialSalesInvoice?.id, initialSalesInvoice?.partnerId]);
+
   async function pickSource(id: string) {
     setSourceId(id);
     if (!id) { setLines([emptyLine()]); return; }

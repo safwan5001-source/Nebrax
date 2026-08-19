@@ -19,12 +19,15 @@ export function PaymentDialog({
   onClose,
   onSaved,
   fixedDirection,
+  initialInvoice,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
   /** يثبّت اتجاه الدفعة ويُخفي منتقيه — لشاشتَي مدفوعات العملاء/الموردين. */
   fixedDirection?: 'received' | 'paid';
+  /** فاتورة مصدر اختيارية؛ تهيّئ سند قبض ولا تتجاوز تحقق الخادم أو الترحيل. */
+  initialInvoice?: { id: string; partnerId: string; remaining: string };
 }) {
   const t = useTranslations('paymentForm');
   const tc = useTranslations('common');
@@ -45,6 +48,15 @@ export function PaymentDialog({
     api<{ data: Partner[] }>('/partners').then((r) => setPartners(r.data));
   }, [open]);
 
+  // الدخول من فاتورة لا ينشئ دفعة بنفسه؛ يهيئ فقط العميل والمستند والمبلغ المتبقي.
+  useEffect(() => {
+    if (!open || !initialInvoice) return;
+    setDirection('received');
+    setPartnerId(initialInvoice.partnerId);
+    setDocId(initialInvoice.id);
+    setAmount(initialInvoice.remaining);
+  }, [open, initialInvoice?.id, initialInvoice?.partnerId, initialInvoice?.remaining]);
+
   // أطراف مناسبة للاتجاه
   const eligiblePartners = useMemo(
     () =>
@@ -54,20 +66,28 @@ export function PaymentDialog({
     [partners, direction]
   );
 
-  // جلب المستندات المفتوحة للطرف عند اختياره
+  // جلب المستندات المفتوحة للطرف عند اختياره. التهيئة من الفاتورة تُطابق
+  // المستند مع القائمة المعادة من الخادم، فلا تُقبل فاتورة غير مؤهلة بالواجهة فقط.
   useEffect(() => {
-    setDocId('');
     setDocs([]);
     if (!open || !partnerId) return;
     const path = direction === 'received' ? '/invoices' : '/purchases';
     api<{ data: Doc[] }>(path).then((r) => {
-      setDocs(
-        r.data.filter(
-          (d) => d.partner_id === partnerId && d.status === 'posted' && d.payment_status !== 'paid'
-        )
+      const openDocs = r.data.filter(
+        (d) => d.partner_id === partnerId && d.status === 'posted' && d.payment_status !== 'paid'
       );
+      setDocs(openDocs);
+      const prefilled = direction === 'received' && initialInvoice
+        ? openDocs.find((d) => d.id === initialInvoice.id)
+        : undefined;
+      if (prefilled) {
+        setDocId(prefilled.id);
+        setAmount(String(prefilled.remaining));
+      } else {
+        setDocId('');
+      }
     });
-  }, [open, partnerId, direction]);
+  }, [open, partnerId, direction, initialInvoice?.id]);
 
   function selectDoc(id: string) {
     setDocId(id);
