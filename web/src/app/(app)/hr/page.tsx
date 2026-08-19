@@ -9,14 +9,18 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmployeeDialog, type Employee } from '@/components/hr/employee-dialog';
 import { ShiftDialog, type Shift } from '@/components/hr/shift-dialog';
+import { AttendanceDialog, type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { CreateRunDialog } from '@/components/hr/create-run-dialog';
 import { RunDetailDialog, type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
-type Tab = 'employees' | 'shifts' | 'runs';
+type Tab = 'employees' | 'shifts' | 'attendance' | 'runs';
 const statusTone: Record<string, 'positive' | 'warning' | 'muted'> = { paid: 'positive', posted: 'warning', draft: 'muted' };
+const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' | 'negative'> = {
+  present: 'positive', late: 'warning', leave: 'muted', absent: 'negative',
+};
 
 export default function HrPage() {
   const t = useTranslations('hr');
@@ -25,6 +29,7 @@ export default function HrPage() {
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +37,8 @@ export default function HrPage() {
   const [editing, setEditing] = useState<Employee | null>(null);
   const [shiftDialog, setShiftDialog] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [attDialog, setAttDialog] = useState(false);
+  const [editingAtt, setEditingAtt] = useState<Attendance | null>(null);
   const [runDialog, setRunDialog] = useState(false);
   const [activeRun, setActiveRun] = useState<string | null>(null);
 
@@ -40,11 +47,13 @@ export default function HrPage() {
     Promise.all([
       api<{ data: Employee[] }>('/employees'),
       api<{ data: Shift[] }>('/shifts'),
+      api<{ data: Attendance[] }>('/attendances'),
       api<{ data: PayrollRun[] }>('/payroll-runs'),
     ])
-      .then(([e, sh, r]) => {
+      .then(([e, sh, at, r]) => {
         setEmployees(e.data);
         setShifts(sh.data);
+        setAttendance(at.data);
         setRuns(r.data);
       })
       .finally(() => setLoading(false));
@@ -142,9 +151,41 @@ export default function HrPage() {
     [t]
   );
 
+  const attColumns = useMemo<ColumnDef<Attendance, unknown>[]>(
+    () => [
+      { accessorKey: 'attendance_date', header: t('attendance_date'), cell: ({ row }) => <span className="num text-muted" dir="ltr">{row.original.attendance_date}</span> },
+      { id: 'employee', header: t('employee'), accessorFn: (r) => r.employee?.name ?? '', cell: ({ row }) => row.original.employee?.name ?? '—' },
+      { id: 'shift', header: t('shifts'), cell: ({ row }) => <span className="text-muted">{row.original.shift?.name ?? '—'}</span> },
+      {
+        id: 'time',
+        header: t('check_in'),
+        cell: ({ row }) =>
+          row.original.check_in ? <span className="num text-muted" dir="ltr">{row.original.check_in} — {row.original.check_out ?? '—'}</span> : <span className="text-muted">—</span>,
+      },
+      { id: 'worked', header: t('worked_hours'), cell: ({ row }) => <span className="num">{row.original.worked_minutes ? fmtHours(row.original.worked_minutes) : '—'}</span> },
+      {
+        accessorKey: 'status',
+        header: t('status_label'),
+        cell: ({ row }) => <Badge tone={attStatusTone[row.original.status] ?? 'muted'}>{t(`att_${row.original.status}`)}</Badge>,
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <Button variant="ghost" size="icon" aria-label={t('edit')} onClick={() => { setEditingAtt(row.original); setAttDialog(true); }}>
+            <Pencil className="h-4 w-4" strokeWidth={1.7} />
+          </Button>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t]
+  );
+
   const addButton = {
     employees: () => (<Button onClick={() => { setEditing(null); setEmpDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_employee')}</Button>),
     shifts: () => (<Button onClick={() => { setEditingShift(null); setShiftDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_shift')}</Button>),
+    attendance: () => (<Button onClick={() => { setEditingAtt(null); setAttDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_attendance')}</Button>),
     runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
   }[tab];
 
@@ -156,7 +197,7 @@ export default function HrPage() {
       </div>
 
       <div className="flex gap-1 border-b border-border">
-        {(['employees', 'shifts', 'runs'] as Tab[]).map((key) => (
+        {(['employees', 'shifts', 'attendance', 'runs'] as Tab[]).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -176,12 +217,16 @@ export default function HrPage() {
       {tab === 'shifts' && (
         <DataTable columns={shiftColumns} data={shifts} loading={loading} searchPlaceholder={t('search_shifts')} emptyLabel={t('no_shifts')} exportName="shifts" />
       )}
+      {tab === 'attendance' && (
+        <DataTable columns={attColumns} data={attendance} loading={loading} searchPlaceholder={t('search_attendance')} emptyLabel={t('no_attendance')} exportName="attendance" />
+      )}
       {tab === 'runs' && (
         <DataTable columns={runColumns} data={runs} loading={loading} searchPlaceholder={t('search_runs')} emptyLabel={t('no_runs')} exportName="payroll-runs" />
       )}
 
       <EmployeeDialog open={empDialog} onClose={() => setEmpDialog(false)} onSaved={load} employee={editing} />
       <ShiftDialog open={shiftDialog} onClose={() => setShiftDialog(false)} onSaved={load} shift={editingShift} />
+      <AttendanceDialog open={attDialog} onClose={() => setAttDialog(false)} onSaved={load} attendance={editingAtt} />
       <CreateRunDialog open={runDialog} onClose={() => setRunDialog(false)} onCreated={() => { load(); setTab('runs'); }} />
       <RunDetailDialog runId={activeRun} onClose={() => setActiveRun(null)} onChanged={load} />
     </div>

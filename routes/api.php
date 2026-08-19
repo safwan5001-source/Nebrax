@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AssetController;
+use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
@@ -373,6 +374,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('shifts', [ShiftController::class, 'store'])->middleware($perm('hr.manage'));
         Route::put('shifts/{id}', [ShiftController::class, 'update'])->middleware($perm('hr.manage'));
         Route::delete('shifts/{id}', [ShiftController::class, 'destroy'])->middleware($perm('hr.manage'));
+
+        // الحضور والانصراف (تمام الوحدة الثانية)
+        Route::get('attendances', [AttendanceController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('attendances', [AttendanceController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::put('attendances/{id}', [AttendanceController::class, 'update'])->middleware($perm('hr.manage'));
+        Route::delete('attendances/{id}', [AttendanceController::class, 'destroy'])->middleware($perm('hr.manage'));
 
         // مسيّرات الرواتب
         Route::get('payroll-runs', [PayrollController::class, 'index'])->middleware($perm('hr.view'));

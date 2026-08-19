@@ -1426,6 +1426,30 @@ export const mockShifts = [
   { id: 'sh3', branch_id: null, name: 'وردية المستودع', start_time: '07:00', end_time: '15:00', break_minutes: 0, work_days: [1, 2, 3, 4, 5], net_minutes: 480, is_active: true },
 ];
 
+const att = (
+  id: string, emp: { id: string; name: string }, date: string,
+  checkIn: string | null, checkOut: string | null,
+  status: 'present' | 'absent' | 'late' | 'leave',
+  shift: { id: string; name: string } | null = null, notes: string | null = null,
+) => {
+  const toMin = (v: string) => { const [h, m] = v.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+  let worked = 0;
+  if (checkIn && checkOut) { worked = toMin(checkOut) - toMin(checkIn); if (worked < 0) worked += 24 * 60; }
+  return {
+    id, employee_id: emp.id, employee: emp, shift_id: shift?.id ?? null, shift,
+    attendance_date: date, check_in: checkIn, check_out: checkOut, status, worked_minutes: worked, notes,
+  };
+};
+
+const morning = { id: 'sh1', name: 'الوردية الصباحية' };
+export const mockAttendance = [
+  att('at1', { id: 'em-1', name: 'أحمد العتيبي' }, '2026-08-18', '08:00', '16:30', 'present', morning),
+  att('at2', { id: 'em-2', name: 'سارة القحطاني' }, '2026-08-18', '08:45', '16:30', 'late', morning, 'تأخّر ٤٥ دقيقة'),
+  att('at3', { id: 'em-3', name: 'خالد الدوسري' }, '2026-08-18', '07:00', '15:00', 'present', { id: 'sh3', name: 'وردية المستودع' }),
+  att('at4', { id: 'em-4', name: 'منى الشمري' }, '2026-08-18', null, null, 'leave', null, 'إجازة سنوية'),
+  att('at5', { id: 'em-5', name: 'فهد المطيري' }, '2026-08-18', null, null, 'absent'),
+];
+
 // ── موجّه الطلبات الوهمي ───────────────────────────────────────────────────
 // يحاكي عقد الـ REST API: يعيد نفس الأشكال التي تتوقّعها الشاشات. المسارات غير
 // المعرّفة تُعيد قائمة فارغة { data: [] } لتظهر الشاشة حالة فارغة نظيفة.
@@ -1743,6 +1767,15 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   }
   if (clean === '/employees') return resolve({ data: mockEmployees });
   if (clean === '/shifts') return resolve({ data: mockShifts });
+  if (clean === '/attendances') {
+    const params = new URLSearchParams(path.split('?')[1] ?? '');
+    const date = params.get('date');
+    const employeeId = params.get('employee_id');
+    let list = mockAttendance;
+    if (date) list = list.filter((a) => a.attendance_date === date);
+    if (employeeId) list = list.filter((a) => a.employee_id === employeeId);
+    return resolve({ data: list });
+  }
   if (clean === '/payroll-runs') return resolve({ data: mockPayrollRuns });
 
   if (clean === '/inventory') return resolve(mockInventory());
