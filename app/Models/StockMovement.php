@@ -42,4 +42,10 @@ class StockMovement extends BaseModel
     {
         return $this->referenceBelongsTo(Product::class);
     }
+
+    /** المخزن المرجعي للحركة؛ يوضح مكان الصرف من دون تغيير الرصيد. */
+    public function warehouse(): BelongsTo
+    {
+        return $this->referenceBelongsTo(Warehouse::class);
+    }
 }

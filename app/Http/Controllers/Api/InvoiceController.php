@@ -14,6 +14,8 @@ use App\Models\InvoiceNote;
 use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Models\StockMovement;
+use App\Support\Money;
 use App\Services\Accounting\InvoiceRelationsService;
 use App\Services\Accounting\InvoiceService;
 use Illuminate\Http\JsonResponse;
@@ -75,6 +77,44 @@ class InvoiceController extends ApiController
         $invoice = $this->visibleInvoice($request, $id);
 
         return response()->json(['data' => $this->relations->accountingLinks($invoice)]);
+    }
+
+    /**
+     * حركات مخزون ولّدها ترحيل الفاتورة فعلياً. لا نستنتج حركة من سطور الفاتورة
+     * ولا نعرض إذناً منفصلاً غير موجود في نبراكس؛ المصدر المحفوظ هو الحقيقة.
+     */
+    public function inventory(Request $request, string $id): JsonResponse
+    {
+        $invoice = $this->visibleInvoice($request, $id);
+        $rows = StockMovement::with(['product', 'warehouse'])
+            ->where('source_type', Invoice::class)
+            ->where('source_id', $invoice->id)
+            ->orderByDesc('movement_date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (StockMovement $movement) => [
+                'id'               => $movement->id,
+                'type'             => $movement->type,
+                'movement_date'    => optional($movement->movement_date)->toDateString(),
+                'quantity'         => $movement->quantity,
+                'unit_cost'        => Money::toRiyal($movement->unit_cost),
+                'total_cost'       => Money::toRiyal($movement->total_cost),
+                'balance_quantity' => $movement->balance_quantity,
+                'notes'            => $movement->notes,
+                'product'          => $movement->product ? [
+                    'id'   => $movement->product->id,
+                    'sku'  => $movement->product->sku,
+                    'name' => $movement->product->name,
+                    'unit' => $movement->product->unit,
+                ] : null,
+                'warehouse'        => $movement->warehouse ? [
+                    'id'   => $movement->warehouse->id,
+                    'code' => $movement->warehouse->code,
+                    'name' => $movement->warehouse->name,
+                ] : null,
+            ])->values();
+
+        return response()->json(['data' => $rows]);
     }
 
     /** سجل الملاحظات الداخلي للفواتير؛ قراءة فقط ولا يعيد تفسير الفاتورة المحاسبية. */

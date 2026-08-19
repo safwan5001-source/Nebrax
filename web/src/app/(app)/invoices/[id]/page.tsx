@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  ArrowRight, Banknote, BookOpen, CalendarPlus, CheckCircle2, ChevronDown, Download, Paperclip,
+  ArrowRight, Banknote, BookOpen, Boxes, CalendarPlus, CheckCircle2, ChevronDown, Download, Paperclip,
   FileSpreadsheet, LayoutTemplate, MoreVertical, Pencil, Printer,
   RotateCcw, Share2, Trash2,
 } from 'lucide-react';
@@ -120,6 +120,18 @@ interface InvoiceNote {
   body: string | null;
   attachments: { id: string; original_name: string; mime_type: string | null; size: number }[];
 }
+interface InvoiceInventoryMovement {
+  id: string;
+  type: 'in' | 'out' | 'adjustment';
+  movement_date: string | null;
+  quantity: number;
+  unit_cost: string;
+  total_cost: string;
+  balance_quantity: number;
+  notes: string | null;
+  product: { id: string; sku: string | null; name: string; unit: string | null } | null;
+  warehouse: { id: string; code: string; name: string } | null;
+}
 interface Zatca {
   qr: string | null;
   hash: string | null;
@@ -165,11 +177,12 @@ export default function InvoiceDetailPage() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [notesLog, setNotesLog] = useState<InvoiceNote[]>([]);
+  const [inventoryMovements, setInventoryMovements] = useState<InvoiceInventoryMovement[]>([]);
   const [payments, setPayments] = useState<InvoicePayment[]>([]);
   const [accounting, setAccounting] = useState<AccountingLinks | null>(null);
   const [relationsLoading, setRelationsLoading] = useState(true);
   const [relationsUnavailable, setRelationsUnavailable] = useState(false);
-  const [relationSection, setRelationSection] = useState<'payments' | 'appointments' | 'notes' | 'accounting'>('payments');
+  const [relationSection, setRelationSection] = useState<'payments' | 'appointments' | 'notes' | 'inventory' | 'accounting'>('payments');
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
@@ -197,7 +210,7 @@ export default function InvoiceDetailPage() {
       .then(async (r) => {
         setInvoice(r.data);
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, z, m, live, paymentRelations, appointmentRelations, noteRelations, accountingRelations] = await Promise.allSettled([
+        const [p, z, m, live, paymentRelations, appointmentRelations, noteRelations, inventoryRelations, accountingRelations] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
@@ -205,6 +218,7 @@ export default function InvoiceDetailPage() {
           api<{ data: InvoicePayment[] }>(`/invoices/${id}/payments`),
           api<{ data: Appointment[] }>(`/invoices/${id}/appointments`),
           api<{ data: InvoiceNote[] }>(`/invoices/${id}/notes`),
+          api<{ data: InvoiceInventoryMovement[] }>(`/invoices/${id}/inventory`),
           api<{ data: AccountingLinks }>(`/invoices/${id}/accounting`),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
@@ -213,8 +227,9 @@ export default function InvoiceDetailPage() {
         if (paymentRelations.status === 'fulfilled') setPayments(paymentRelations.value.data);
         if (appointmentRelations.status === 'fulfilled') setAppointments(appointmentRelations.value.data);
         if (noteRelations.status === 'fulfilled') setNotesLog(noteRelations.value.data);
+        if (inventoryRelations.status === 'fulfilled') setInventoryMovements(inventoryRelations.value.data);
         if (accountingRelations.status === 'fulfilled') setAccounting(accountingRelations.value.data);
-        setRelationsUnavailable(paymentRelations.status === 'rejected' || appointmentRelations.status === 'rejected' || noteRelations.status === 'rejected' || accountingRelations.status === 'rejected');
+        setRelationsUnavailable(paymentRelations.status === 'rejected' || appointmentRelations.status === 'rejected' || noteRelations.status === 'rejected' || inventoryRelations.status === 'rejected' || accountingRelations.status === 'rejected');
         setRelationsLoading(false);
 
         // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
@@ -300,6 +315,7 @@ export default function InvoiceDetailPage() {
     { id: 'payments', label: t('payments'), count: relationsLoading ? undefined : payments.length },
     { id: 'appointments', label: t('appointments'), count: relationsLoading ? undefined : appointments.length },
     { id: 'notes', label: t('notes_attachments'), count: relationsLoading ? undefined : notesLog.length },
+    { id: 'inventory', label: t('inventory_movements'), count: relationsLoading ? undefined : inventoryMovements.length },
     { id: 'accounting', label: t('accounting') },
   ];
   const paymentMethod = (method: InvoicePayment['method']) => method === 'bank' ? t('bank') : t('cash');
@@ -349,12 +365,21 @@ export default function InvoiceDetailPage() {
       {notesLog.length > 0 && <div className="space-y-3">{notesLog.map((note) => <article key={note.id} className="rounded border border-border bg-background p-3"><p className="num text-xs text-muted">{formatAppointmentAt(note.recorded_at)}</p>{note.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{note.body}</p>}{note.attachments.length > 0 && <ul className="mt-3 divide-y divide-border rounded border border-border">{note.attachments.map((attachment) => <li key={attachment.id} className="flex items-center justify-between gap-3 px-3 py-2"><span className="min-w-0 truncate text-sm text-text">{attachment.original_name}</span><Button size="sm" variant="ghost" onClick={() => downloadAttachment(note, attachment)}><Download className="h-4 w-4" strokeWidth={1.7} />{t('download_attachment')}</Button></li>)}</ul>}</article>)}</div>}
     </div>
   );
+  const inventoryContent = relationsLoading ? (
+    <div className="space-y-3 p-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
+  ) : inventoryMovements.length === 0 ? (
+    <div className="p-5 text-center"><Boxes className="mx-auto h-6 w-6 text-muted" strokeWidth={1.5} /><p className="mt-2 text-sm text-muted">{t('no_inventory_movements')}</p></div>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[48rem] text-sm"><thead className="border-b border-border bg-muted/40 text-start text-xs text-muted"><tr><th className="px-4 py-3 font-medium">{t('inventory_product')}</th><th className="px-4 py-3 font-medium">{t('inventory_warehouse')}</th><th className="px-4 py-3 font-medium">{t('inventory_date')}</th><th className="px-4 py-3 font-medium">{t('inventory_direction')}</th><th className="px-4 py-3 font-medium">{t('qty')}</th><th className="px-4 py-3 font-medium">{t('inventory_unit_cost')}</th><th className="px-4 py-3 font-medium">{t('inventory_total_cost')}</th><th className="px-4 py-3 font-medium">{t('inventory_balance')}</th></tr></thead><tbody className="divide-y divide-border">{inventoryMovements.map((movement) => <tr key={movement.id} className="hover:bg-muted/30"><td className="px-4 py-3 text-text"><span className="font-medium">{movement.product?.name ?? '—'}</span>{movement.product?.sku && <span className="num ms-2 text-xs text-muted">{movement.product.sku}</span>}</td><td className="px-4 py-3 text-text">{movement.warehouse ? `${movement.warehouse.code} · ${movement.warehouse.name}` : '—'}</td><td className="num px-4 py-3 text-text">{movement.movement_date ?? '—'}</td><td className="px-4 py-3"><Badge tone={movement.type === 'out' ? 'warning' : movement.type === 'in' ? 'positive' : 'muted'}>{movement.type === 'out' ? t('inventory_out') : movement.type === 'in' ? t('inventory_in') : t('inventory_adjustment')}</Badge></td><td className="num px-4 py-3 text-text">{movement.quantity}</td><td className="num px-4 py-3 text-text">{formatRiyal(movement.unit_cost)}</td><td className="num px-4 py-3 text-text">{formatRiyal(movement.total_cost)}</td><td className="num px-4 py-3 font-medium text-text">{movement.balance_quantity}</td></tr>)}</tbody></table>
+    </div>
+  );
   const accountingContent = relationsLoading ? (
     <div className="space-y-3 p-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>
   ) : (
     <div className="divide-y divide-border">{entryContent(accounting?.sales_entry ?? null, t('sales_entry'), t('no_sales_entry'))}{entryContent(accounting?.cost_entry ?? null, t('cost_entry'), t('no_cost_entry'))}</div>
   );
-  const relationContent = relationSection === 'payments' ? paymentsContent : relationSection === 'appointments' ? appointmentsContent : relationSection === 'notes' ? notesContent : accountingContent;
+  const relationContent = relationSection === 'payments' ? paymentsContent : relationSection === 'appointments' ? appointmentsContent : relationSection === 'notes' ? notesContent : relationSection === 'inventory' ? inventoryContent : accountingContent;
 
   const doc = () => document.getElementById('print-root');
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
@@ -627,10 +652,10 @@ export default function InvoiceDetailPage() {
         {relationsUnavailable && <p className="mb-3 rounded border border-border bg-muted/40 px-3 py-2 text-sm text-text">{t('relations_unavailable')}</p>}
         <Card className="hidden lg:block">
           <CardHeader><CardTitle>{t('relations')}</CardTitle></CardHeader>
-          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as 'payments' | 'appointments' | 'notes' | 'accounting')} />
+          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as 'payments' | 'appointments' | 'notes' | 'inventory' | 'accounting')} />
           <CardContent className="p-0"><TabPanel id={relationSection}>{relationContent}</TabPanel></CardContent>
         </Card>
-        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => setRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="appointments" title={t('appointments')} count={relationsLoading ? undefined : appointments.length} open={relationSection === 'appointments'} onToggle={() => setRelationSection('appointments')}>{appointmentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => setRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => setRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
+        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => setRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="appointments" title={t('appointments')} count={relationsLoading ? undefined : appointments.length} open={relationSection === 'appointments'} onToggle={() => setRelationSection('appointments')}>{appointmentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => setRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => setRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => setRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
 
       <Card>

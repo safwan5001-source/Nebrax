@@ -225,6 +225,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('invoices/{id}', [InvoiceController::class, 'show'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}/payments', [InvoiceController::class, 'payments'])->middleware($perm('payments.view'));
         Route::get('invoices/{id}/accounting', [InvoiceController::class, 'accounting'])->middleware($perm('reports.view'));
+        Route::get('invoices/{id}/inventory', [InvoiceController::class, 'inventory'])->middleware($perm('products.view'));
         Route::get('invoices/{id}/notes', [InvoiceController::class, 'notes'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}/notes/{noteId}/attachments/{attachmentId}/download', [InvoiceController::class, 'downloadNoteAttachment'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}/zatca', [InvoiceController::class, 'zatca'])->middleware($perm('zatca.view'));
