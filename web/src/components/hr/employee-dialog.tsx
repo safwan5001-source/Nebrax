@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { currentUser } from '@/lib/auth';
 import { riyalToMinor } from '@/lib/money';
 
 export interface Employee {
@@ -36,11 +37,24 @@ export function EmployeeDialog({
   employee?: Employee | null;
 }) {
   const t = useTranslations('hr');
+  const tu = useTranslations('users');
   const tc = useTranslations('common');
-  const { success } = useToast();
+  const { success, error: toastError } = useToast();
   const [form, setForm] = useState<Employee>(
     employee ?? { id: '', name: '', national_id: '', job_title: '', basic_salary: '', allowances: '', gosi: '', other_deductions: '', is_active: true }
   );
+  // ═══ منح الدخول (المستخدم موظفٌ يدخل النظام: User ⊃ Employee) ═══
+  // قسمٌ اختياري يظهر عند **الإنشاء** فقط، ولمن يملك إدارة المستخدمين
+  // (المالك/المدير). تفعيله ينشئ — بعد الموظف — حساب دخولٍ مرتبطاً به عبر
+  // `users.employee_id`. تحرير دخول موظفٍ قائم مسارُه إدارة المستخدمين.
+  const canGrantLogin = !employee?.id && (() => {
+    const role = currentUser()?.role;
+    return role === 'owner' || role === 'admin';
+  })();
+  const [grantLogin, setGrantLogin] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginRole, setLoginRole] = useState('staff');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -64,10 +78,38 @@ export function EmployeeDialog({
       if (employee?.id) {
         await api(`/employees/${employee.id}`, { method: 'PUT', body });
         success(tc('updated'));
-      } else {
-        await api('/employees', { method: 'POST', body });
-        success(tc('created'));
+        onSaved();
+        onClose();
+        return;
       }
+
+      // إنشاء: الموظف أولاً (مصدر الحقيقة)، ثم — اختيارياً — حساب دخوله.
+      const created = await api<{ data: { id: string } }>('/employees', { method: 'POST', body });
+
+      if (canGrantLogin && grantLogin) {
+        try {
+          await api('/users', {
+            method: 'POST',
+            body: {
+              name: form.name,
+              email: loginEmail,
+              password: loginPassword,
+              role: loginRole,
+              employee_id: created.data.id, // الربط: هذا المستخدم = هذا الموظف
+              is_active: true,
+            },
+          });
+        } catch (userErr) {
+          // الموظف أُنشئ (حالةٌ صحيحة قائمة بذاتها — الموظف بلا دخول هو الغالب).
+          // نُبلغ بفشل الدخول ونُبقي الموظف؛ يُمنح الدخول لاحقاً من إدارة المستخدمين.
+          onSaved();
+          onClose();
+          toastError(t('login_failed_saved'), userErr instanceof ApiError ? userErr.message : undefined);
+          return;
+        }
+      }
+
+      success(tc('created'));
       onSaved();
       onClose();
     } catch (err) {
@@ -121,6 +163,45 @@ export function EmployeeDialog({
             <option value="0">{t('inactive')}</option>
           </Select>
         </div>
+
+        {/* ═══ منح الدخول للنظام (اختياري، عند الإنشاء ولمن يديرون المستخدمين) ═══ */}
+        {canGrantLogin && (
+          <div className="rounded border border-border bg-background p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-text">
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0 accent-primary"
+                checked={grantLogin}
+                onChange={(e) => setGrantLogin(e.target.checked)}
+              />
+              {t('grant_login')}
+            </label>
+            <p className="mt-1 text-[11px] leading-5 text-muted">{t('grant_login_hint')}</p>
+
+            {grantLogin && (
+              <div className="mt-3 space-y-3 border-t border-border pt-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="login_email">{tu('email')}</Label>
+                  <Input id="login_email" type="email" dir="ltr" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required={grantLogin} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="login_password">{tu('password')}</Label>
+                    <Input id="login_password" type="password" dir="ltr" minLength={8} value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required={grantLogin} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="login_role">{tu('role')}</Label>
+                    <Select id="login_role" value={loginRole} onChange={(e) => setLoginRole(e.target.value)}>
+                      <option value="admin">{tu('roles.admin')}</option>
+                      <option value="accountant">{tu('roles.accountant')}</option>
+                      <option value="staff">{tu('roles.staff')}</option>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 
