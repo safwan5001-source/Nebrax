@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import type { RefObject } from 'react';
 import { useTranslations } from 'next-intl';
 import { LogOut, Search, Menu, Plus, Settings, ChevronDown, FilePlus, FilePlus2, UserPlus, Building2, Check } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -12,7 +13,13 @@ import { useCompany } from '@/lib/company';
 import { currentUser, logout } from '@/lib/auth';
 import { useBranches } from '@/lib/branch';
 
-export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
+export function Topbar({
+  onMenuClick,
+  menuButtonRef,
+}: {
+  onMenuClick: () => void;
+  menuButtonRef: RefObject<HTMLButtonElement>;
+}) {
   const t = useTranslations('topbar');
   const tb = useTranslations('branches');
   const router = useRouter();
@@ -35,6 +42,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         className="lg:hidden"
         aria-label={t('menu')}
         onClick={onMenuClick}
+        ref={menuButtonRef}
       >
         <Menu className="h-5 w-5" strokeWidth={1.7} />
       </Button>
