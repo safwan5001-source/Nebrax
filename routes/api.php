@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BranchSettingsController;
+use App\Http\Controllers\Api\CashBankAccountController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CostCenterController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryReportController;
@@ -251,6 +253,21 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('pos-sessions/{id}/report', [PosSessionController::class, 'report'])->middleware($perm('invoices.view'));
         Route::post('pos-sessions/open', [PosSessionController::class, 'open'])->middleware($perm('invoices.manage'));
         Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware($perm('invoices.manage'));
+
+        // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.
+        Route::get('settings/finance', [FinanceSettingsController::class, 'show'])->middleware($perm('payments.view'));
+        Route::put('settings/finance', [FinanceSettingsController::class, 'update'])->middleware($perm('payments.manage'));
+
+        // الخزائن والحسابات البنكية والتحويلات الداخلية
+        Route::get('cash-bank-accounts', [CashBankAccountController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('cash-bank-accounts/{id}', [CashBankAccountController::class, 'show'])->middleware($perm('payments.view'));
+        Route::post('cash-bank-accounts', [CashBankAccountController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('cash-bank-accounts/{id}', [CashBankAccountController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::post('cash-bank-accounts/{id}/deactivate', [CashBankAccountController::class, 'deactivate'])->middleware($perm('payments.manage'));
+        Route::post('cash-bank-accounts/{id}/make-main', [CashBankAccountController::class, 'makeMain'])->middleware($perm('payments.manage'));
+        Route::delete('cash-bank-accounts/{id}', [CashBankAccountController::class, 'destroy'])->middleware($perm('payments.manage'));
+        Route::get('cash-bank-transfers', [CashBankAccountController::class, 'transfers'])->middleware($perm('payments.view'));
+        Route::post('cash-bank-transfers', [CashBankAccountController::class, 'transfer'])->middleware($perm('payments.manage'));
 
         // المدفوعات
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));

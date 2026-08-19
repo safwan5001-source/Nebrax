@@ -9,6 +9,7 @@ use App\Models\Warehouse;
 use App\Models\Tenant;
 use App\Support\Settings;
 use App\Models\User;
+use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Support\PlanGate;
 use App\Tenancy\TenantContext;
@@ -45,6 +46,7 @@ class AuthController extends ApiController
 
             app(TenantContext::class)->set($tenant->id);
             app(ChartOfAccountsSeeder::class)->seed($tenant->id);
+            app(CashBankAccountService::class)->bootstrapDefaults();
 
             // فرع رئيسي افتراضي لكل مؤسسة (كدليل الحسابات) — يبقى النظام أحادي
             // الفرع سلوكياً حتى يضيف المستخدم فروعاً ويعطّل المشاركة.
