@@ -26,6 +26,7 @@ class ChartOfAccountsSeeder
                 ['1130', 'العملاء (المدينون)', 'Accounts Receivable', 'asset', false, []],
                 ['1140', 'المخزون', 'Inventory', 'asset', false, []],
                 ['1150', 'ضريبة القيمة المضافة - مدخلات', 'VAT Input', 'asset', false, []],
+                ['1160', 'عُهَد الموظفين', 'Employee Custodies', 'asset', false, []],
             ]],
             ['12', 'الأصول الثابتة', 'Fixed Assets', 'asset', true, [
                 ['1210', 'المعدات والآليات', 'Equipment', 'asset', false, []],
