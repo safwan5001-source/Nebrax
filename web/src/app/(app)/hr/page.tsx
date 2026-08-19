@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,11 +12,14 @@ import { ShiftDialog, type Shift } from '@/components/hr/shift-dialog';
 import { AttendanceDialog, type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { CreateRunDialog } from '@/components/hr/create-run-dialog';
 import { RunDetailDialog, type PayrollRun } from '@/components/hr/run-detail-dialog';
-import { api } from '@/lib/api';
+import { RoleDialog, type Role } from '@/components/hr/role-dialog';
+import { useToast } from '@/components/ui/toast';
+import { api, ApiError } from '@/lib/api';
+import { currentUser } from '@/lib/auth';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
-type Tab = 'employees' | 'shifts' | 'attendance' | 'runs';
+type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'roles';
 const statusTone: Record<string, 'positive' | 'warning' | 'muted'> = { paid: 'positive', posted: 'warning', draft: 'muted' };
 const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' | 'negative'> = {
   present: 'positive', late: 'warning', leave: 'muted', absent: 'negative',
@@ -25,6 +28,8 @@ const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' |
 export default function HrPage() {
   const t = useTranslations('hr');
   const ts = useTranslations('status');
+  const tc = useTranslations('common');
+  const { success, error } = useToast();
   const [tab, setTab] = useState<Tab>('employees');
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -41,6 +46,25 @@ export default function HrPage() {
   const [editingAtt, setEditingAtt] = useState<Attendance | null>(null);
   const [runDialog, setRunDialog] = useState(false);
   const [activeRun, setActiveRun] = useState<string | null>(null);
+
+  // الأدوار: تبويبٌ حسّاس يظهر لأصحاب الإدارة فقط (owner/admin). الدور يُقرأ بعد
+  // التركيب لتفادي اختلاف الترطيب (localStorage غائب أثناء العرض على الخادم).
+  const [role, setRole] = useState<string | null>(null);
+  useEffect(() => setRole(currentUser()?.role ?? null), []);
+  const canManageRoles = role === 'owner' || role === 'admin';
+
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [permCatalog, setPermCatalog] = useState<string[]>([]);
+  const [roleDialog, setRoleDialog] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+
+  const reloadRoles = useCallback(() => {
+    api<{ data: Role[]; meta: { permissions: string[] } }>('/roles')
+      .then((r) => { setRoles(r.data); setPermCatalog(r.meta?.permissions ?? []); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { if (canManageRoles) reloadRoles(); }, [canManageRoles, reloadRoles]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -182,11 +206,58 @@ export default function HrPage() {
     [t]
   );
 
+  const deleteRole = useCallback((r: Role) => {
+    if (!window.confirm(t('confirm_delete_role'))) return;
+    api(`/roles/${r.id}`, { method: 'DELETE' })
+      .then(() => { success(tc('deleted')); reloadRoles(); })
+      .catch((e) => error(e instanceof ApiError ? e.message : tc('saveFailed')));
+  }, [t, tc, success, error, reloadRoles]);
+
+  const roleColumns = useMemo<ColumnDef<Role, unknown>[]>(
+    () => [
+      { accessorKey: 'name', header: t('role_name'), cell: ({ row }) => <span className="font-medium text-text">{row.original.name}</span> },
+      {
+        id: 'perms',
+        header: t('role_perms_count'),
+        cell: ({ row }) =>
+          row.original.permissions.includes('*')
+            ? <Badge tone="neutral">{t('full_access')}</Badge>
+            : <span className="num text-muted">{row.original.permissions.length}</span>,
+      },
+      { accessorKey: 'users_count', header: t('role_users_count'), cell: ({ row }) => <span className="num text-muted">{row.original.users_count}</span> },
+      {
+        id: 'kind',
+        header: '',
+        cell: ({ row }) => <Badge tone="muted">{row.original.is_system ? t('role_system') : t('role_custom')}</Badge>,
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="icon" aria-label={row.original.is_owner ? t('view_role') : t('edit')} onClick={() => { setEditingRole(row.original); setRoleDialog(true); }}>
+              <Pencil className="h-4 w-4" strokeWidth={1.7} />
+            </Button>
+            {/* النظامي والمالك لا يُحذفان — نُخفي الزر بدل أن يصطدم بـ422. */}
+            {!row.original.is_system && (
+              <Button variant="ghost" size="icon" aria-label={t('delete')} onClick={() => deleteRole(row.original)}>
+                <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+              </Button>
+            )}
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, deleteRole]
+  );
+
   const addButton = {
     employees: () => (<Button onClick={() => { setEditing(null); setEmpDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_employee')}</Button>),
     shifts: () => (<Button onClick={() => { setEditingShift(null); setShiftDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_shift')}</Button>),
     attendance: () => (<Button onClick={() => { setEditingAtt(null); setAttDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_attendance')}</Button>),
     runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
+    roles: () => (<Button onClick={() => { setEditingRole(null); setRoleDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_role')}</Button>),
   }[tab];
 
   return (
@@ -197,7 +268,7 @@ export default function HrPage() {
       </div>
 
       <div className="flex gap-1 border-b border-border">
-        {(['employees', 'shifts', 'attendance', 'runs'] as Tab[]).map((key) => (
+        {(['employees', 'shifts', 'attendance', 'runs', ...(canManageRoles ? ['roles'] : [])] as Tab[]).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -223,12 +294,16 @@ export default function HrPage() {
       {tab === 'runs' && (
         <DataTable columns={runColumns} data={runs} loading={loading} searchPlaceholder={t('search_runs')} emptyLabel={t('no_runs')} exportName="payroll-runs" />
       )}
+      {tab === 'roles' && canManageRoles && (
+        <DataTable columns={roleColumns} data={roles} loading={loading} searchPlaceholder={t('search_roles')} emptyLabel={t('no_roles')} exportName="roles" />
+      )}
 
       <EmployeeDialog open={empDialog} onClose={() => setEmpDialog(false)} onSaved={load} employee={editing} />
       <ShiftDialog open={shiftDialog} onClose={() => setShiftDialog(false)} onSaved={load} shift={editingShift} />
       <AttendanceDialog open={attDialog} onClose={() => setAttDialog(false)} onSaved={load} attendance={editingAtt} />
       <CreateRunDialog open={runDialog} onClose={() => setRunDialog(false)} onCreated={() => { load(); setTab('runs'); }} />
       <RunDetailDialog runId={activeRun} onClose={() => setActiveRun(null)} onChanged={load} />
+      <RoleDialog open={roleDialog} onClose={() => setRoleDialog(false)} onSaved={reloadRoles} role={editingRole} catalog={permCatalog} />
     </div>
   );
 }
