@@ -182,10 +182,10 @@ class InventoryService
 
     public function recordSaleCogs(Invoice $invoice): ?\App\Models\JournalEntry
     {
-        $invoice->loadMissing('lines.product');
+        $invoice->loadMissing('lines.product', 'lines.costCenterAllocations');
 
         $totalCogs = 0;
-        $cogsByAccount = []; // account_id => amount (تجاوز حساب التكلفة لكل منتج)
+        $cogsByAccountAndCenter = []; // account_id|cost_center_id => amount
         $defaultCogs = $this->accountId(self::ACC_COGS);
 
         // مخزن الإخراج: مخزن فرع الفاتورة إن وُجد، وإلا المخزن الافتراضي.
@@ -230,7 +230,19 @@ class InventoryService
             $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity);
             $totalCogs += $cost;
             $cogsAcct = $product->cogs_account_id ?: $defaultCogs;
-            $cogsByAccount[$cogsAcct] = ($cogsByAccount[$cogsAcct] ?? 0) + $cost;
+            foreach ($this->splitAllocatedAmount($cost, $line->costCenterAllocations, $invoice->cost_center_id) as $allocation) {
+                $costCenterId = $allocation['cost_center_id'];
+                $amount = $allocation['amount'];
+                if ($amount === 0) {
+                    continue;
+                }
+                $key = $cogsAcct.'|'.($costCenterId ?? 'none');
+                $cogsByAccountAndCenter[$key] = [
+                    'account_id' => $cogsAcct,
+                    'cost_center_id' => $costCenterId,
+                    'amount' => ($cogsByAccountAndCenter[$key]['amount'] ?? 0) + $amount,
+                ];
+            }
         }
 
         if ($totalCogs <= 0) {
@@ -239,8 +251,12 @@ class InventoryService
 
         // قيد: مدين تكلفة البضاعة المباعة (لكل حساب منتج) / دائن المخزون
         $lines = [];
-        foreach ($cogsByAccount as $acct => $amount) {
-            $lines[] = ['account_id' => $acct, 'debit' => $amount];
+        foreach ($cogsByAccountAndCenter as $row) {
+            $lines[] = [
+                'account_id' => $row['account_id'],
+                'debit' => $row['amount'],
+                'cost_center_id' => $row['cost_center_id'],
+            ];
         }
         $lines[] = ['account_id' => $this->accountId(self::ACC_INVENTORY), 'credit' => $totalCogs];
 
@@ -250,6 +266,34 @@ class InventoryService
             'source_type' => Invoice::class,
             'source_id'   => $invoice->id,
         ]);
+    }
+
+    /**
+     * يوزع تكلفة السطر من لقطة تخصيصاته. غيابها يحافظ على وسم الرأس التاريخي.
+     * آخر تخصيص يأخذ بواقي القسمة الصحيحة؛ لذلك مجموع المدين يساوي التكلفة دائماً.
+     *
+     * @return array<int, array{cost_center_id: ?string, amount: int}>
+     */
+    private function splitAllocatedAmount(int $amount, $allocations, ?string $fallbackCostCenterId): array
+    {
+        if ($allocations->isEmpty()) {
+            return [['cost_center_id' => $fallbackCostCenterId, 'amount' => $amount]];
+        }
+        $allocationTotal = (int) $allocations->sum('amount');
+        if ($allocationTotal <= 0) {
+            throw new RuntimeException('تخصيصات مركز التكلفة يجب أن تملك مبلغاً موجباً.');
+        }
+        $result = [];
+        $allocated = 0;
+        foreach ($allocations->sortBy('position')->values() as $position => $allocation) {
+            $part = $position === $allocations->count() - 1
+                ? $amount - $allocated
+                : intdiv($amount * (int) $allocation->amount, $allocationTotal);
+            $result[] = ['cost_center_id' => $allocation->cost_center_id, 'amount' => $part];
+            $allocated += $part;
+        }
+
+        return $result;
     }
 
     /**

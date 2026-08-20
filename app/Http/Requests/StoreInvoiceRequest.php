@@ -45,6 +45,12 @@ class StoreInvoiceRequest extends FormRequest
             'items.*.unit'        => ['nullable', 'string', 'max:255'],
             'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'], // هللات
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
+            // تخصيصات صافي السطر: النسبة بنقاط أساس (10000 = 100%) والمبلغ بالهللات.
+            // يتحقق جمع النسب/المبالغ وتطابق المركز في الخدمة بعد احتساب السطر فعلياً.
+            'items.*.cost_center_allocations'                      => ['nullable', 'array', 'min:1', 'max:20'],
+            'items.*.cost_center_allocations.*.cost_center_id'     => ['required', 'uuid'],
+            'items.*.cost_center_allocations.*.mode'               => ['required', 'in:percent,amount'],
+            'items.*.cost_center_allocations.*.value'              => ['required', 'integer', 'min:1', 'max:100000000000'],
         ];
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Concerns\HasUnitConversion;
 use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * سطر فاتورة. المبالغ بالـ minor units (هللات) كـ bigint.
@@ -45,5 +46,11 @@ class InvoiceLine extends BaseModel implements CompanyWide
     public function product(): BelongsTo
     {
         return $this->referenceBelongsTo(Product::class);
+    }
+
+    /** تخصيصات صافي السطر بين مراكز التكلفة؛ تحذف مع المسودة عند إعادة بناء السطور. */
+    public function costCenterAllocations(): HasMany
+    {
+        return $this->hasMany(InvoiceLineCostCenterAllocation::class);
     }
 }

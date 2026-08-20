@@ -3,8 +3,10 @@
 namespace App\Services\Accounting;
 
 use App\Models\Account;
+use App\Models\CostCenter;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
+use App\Models\InvoiceLineCostCenterAllocation;
 use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Product;
@@ -92,7 +94,7 @@ class InvoiceService
 
             $this->applyItemsAndTotals($invoice, $items, $data);
 
-            return $invoice->load('lines');
+            return $invoice->fresh('lines.costCenterAllocations.costCenter');
         });
     }
 
@@ -150,7 +152,7 @@ class InvoiceService
 
             $this->applyItemsAndTotals($invoice, $items, $data);
 
-            return $invoice->fresh('lines');
+            return $invoice->fresh('lines.costCenterAllocations.costCenter');
         });
     }
 
@@ -252,7 +254,7 @@ class InvoiceService
                 $lineTotal = $lineNet + $lineTax;
             }
 
-            InvoiceLine::create([
+            $line = InvoiceLine::create([
                 'invoice_id'               => $invoice->id,
                 'product_id'               => $item['product_id'] ?? null,
                 'product_name_snapshot'    => $product?->name ?? $description,
@@ -270,6 +272,12 @@ class InvoiceService
                 'line_tax'      => $lineTax,
                 'line_total'    => $lineTotal,
             ]);
+            $this->storeLineCostCenterAllocations(
+                $invoice,
+                $line,
+                $item['cost_center_allocations'] ?? [],
+                $lineNet
+            );
 
             $subtotal += $lineNet;                             // إجمالي الفاتورة = مجموع صافي السطور
             $taxTotal += $lineTax;
@@ -309,6 +317,84 @@ class InvoiceService
     }
 
     /**
+     * يحوّل إدخال النسبة أو المبلغ إلى لقطة موحّدة: هللات + نقاط أساس.
+     * لا يترك أي جزء من سطر «موزع» خارج المراكز، ولا يقبل خلط طريقتي الإدخال.
+     */
+    private function storeLineCostCenterAllocations(Invoice $invoice, InvoiceLine $line, array $raw, int $lineNet): void
+    {
+        if ($raw === []) {
+            return;
+        }
+        if ($lineNet <= 0) {
+            throw new RuntimeException('لا يمكن توزيع مركز تكلفة على سطر صافيّه صفر.');
+        }
+
+        $modes = array_values(array_unique(array_map(fn (array $row) => $row['mode'] ?? null, $raw)));
+        if (count($modes) !== 1 || ! in_array($modes[0], ['percent', 'amount'], true)) {
+            throw new RuntimeException('يجب اختيار طريقة توزيع واحدة: نسبة أو مبلغ.');
+        }
+        $mode = $modes[0];
+        $centerIds = array_map(fn (array $row) => (string) $row['cost_center_id'], $raw);
+        if (count($centerIds) !== count(array_unique($centerIds))) {
+            throw new RuntimeException('لا يمكن تكرار مركز تكلفة داخل السطر نفسه.');
+        }
+
+        $centers = CostCenter::query()
+            ->whereIn('id', $centerIds)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('id');
+        if ($centers->count() !== count($centerIds)) {
+            throw new RuntimeException('يجب أن تكون مراكز التكلفة نشطة ومرئية في الفرع الحالي.');
+        }
+
+        $values = array_map(fn (array $row) => (int) $row['value'], $raw);
+        $sum = array_sum($values);
+        if (($mode === 'percent' && $sum !== 10000) || ($mode === 'amount' && $sum !== $lineNet)) {
+            throw new RuntimeException($mode === 'percent'
+                ? 'يجب أن يساوي مجموع نسب مراكز التكلفة 100.00%. '
+                : 'يجب أن يساوي مجموع مبالغ مراكز التكلفة صافي السطر بعد الخصم.');
+        }
+
+        $amounts = [];
+        $basisPoints = [];
+        if ($mode === 'percent') {
+            $allocated = 0;
+            foreach ($values as $position => $basis) {
+                $amount = $position === array_key_last($values)
+                    ? $lineNet - $allocated
+                    : intdiv($lineNet * $basis, 10000);
+                $amounts[$position] = $amount;
+                $basisPoints[$position] = $basis;
+                $allocated += $amount;
+            }
+        } else {
+            $allocatedBasis = 0;
+            foreach ($values as $position => $amount) {
+                $basis = $position === array_key_last($values)
+                    ? 10000 - $allocatedBasis
+                    : intdiv($amount * 10000, $lineNet);
+                $amounts[$position] = $amount;
+                $basisPoints[$position] = $basis;
+                $allocatedBasis += $basis;
+            }
+        }
+
+        foreach ($raw as $position => $allocation) {
+            InvoiceLineCostCenterAllocation::create([
+                'tenant_id'       => $invoice->tenant_id,
+                'branch_id'       => $invoice->branch_id,
+                'invoice_line_id' => $line->id,
+                'cost_center_id'  => $centers[(string) $allocation['cost_center_id']]->id,
+                'mode'            => $mode,
+                'position'        => $position,
+                'basis_points'    => $basisPoints[$position],
+                'amount'          => $amounts[$position],
+            ]);
+        }
+    }
+
+    /**
      * ترحيل الفاتورة: توليد القيد المحاسبي المتوازن عبر LedgerService.
      *
      * فاتورة مبيعات نقدية 1150 (1000 + 15%):
@@ -334,7 +420,7 @@ class InvoiceService
             // إعادة احتساب الإجماليات من السطور (مصدر الحقيقة) قبل توليد القيد.
             // يضمن أن القيد = السطور دائماً، ويوفّق رأس الفاتورة معها،
             // فلا يمكن أن يتعارض total مع subtotal + tax_amount مهما عُبث بالرأس.
-            $invoice->loadMissing('lines.product');
+            $invoice->loadMissing('lines.product', 'lines.costCenterAllocations');
             // إجمالي الفاتورة = مجموع صافي السطور (بعد خصم كل سطر).
             $subtotal  = (int) $invoice->lines->sum(fn ($l) => (int) $l->line_subtotal - (int) $l->line_discount);
             $taxGross  = (int) $invoice->lines->sum('line_tax');
@@ -369,29 +455,37 @@ class InvoiceService
                 'partner_id'   => $invoice->partner_id,
             ]];
 
-            // تقسيم الإيراد الصافي حسب حساب مبيعات كل منتج (افتراضياً 4110)، مع بقايا التقريب على الافتراضي.
+            // كل بند يحسب حصته من خصم الفاتورة أولاً، ثم يوزعها بين مراكزه المخزنة.
+            // آخر بند يحمل بقايا التقريب، فلا يظهر هلل «مفقود» في تقرير الربحية أو القيد.
             $defaultSales = $this->accountId(self::ACC_SALES);
-            $revByAccount = [];
-            $allocated    = 0;
-            foreach ($invoice->lines as $line) {
+            $revByAccountAndCenter = [];
+            $lineRevenueAllocated = 0;
+            foreach ($invoice->lines->values() as $position => $line) {
                 $lineNet = (int) $line->line_subtotal - (int) $line->line_discount;
-                $rev     = $subtotal > 0 ? intdiv($lineNet * $netSales, $subtotal) : 0;
-                $acct    = $line->product?->sales_account_id ?: $defaultSales;
-                $revByAccount[$acct] = ($revByAccount[$acct] ?? 0) + $rev;
-                $allocated += $rev;
-            }
-            $remainder = $netSales - $allocated; // ≥ 0 (intdiv يقرّب لأسفل) — يُسنَد للحساب الافتراضي
-            if ($remainder !== 0) {
-                $revByAccount[$defaultSales] = ($revByAccount[$defaultSales] ?? 0) + $remainder;
-            }
-            foreach ($revByAccount as $acct => $amount) {
-                if ($amount === 0) {
-                    continue;
+                $revenue = $position === $invoice->lines->count() - 1
+                    ? $netSales - $lineRevenueAllocated
+                    : ($subtotal > 0 ? intdiv($lineNet * $netSales, $subtotal) : 0);
+                $lineRevenueAllocated += $revenue;
+                $acct = $line->product?->sales_account_id ?: $defaultSales;
+                foreach ($this->splitAllocatedAmount($revenue, $line->costCenterAllocations, $invoice->cost_center_id) as $allocation) {
+                    $costCenterId = $allocation['cost_center_id'];
+                    $amount = $allocation['amount'];
+                    if ($amount === 0) {
+                        continue;
+                    }
+                    $key = $acct.'|'.($costCenterId ?? 'none');
+                    $revByAccountAndCenter[$key] = [
+                        'account_id' => $acct,
+                        'cost_center_id' => $costCenterId,
+                        'amount' => ($revByAccountAndCenter[$key]['amount'] ?? 0) + $amount,
+                    ];
                 }
+            }
+            foreach ($revByAccountAndCenter as $row) {
                 $lines[] = [
-                    'account_id'     => $acct,
-                    'credit'         => $amount,
-                    'cost_center_id' => $invoice->cost_center_id, // وسم الإيراد بمركز التكلفة
+                    'account_id'     => $row['account_id'],
+                    'credit'         => $row['amount'],
+                    'cost_center_id' => $row['cost_center_id'],
                 ];
             }
 
@@ -465,8 +559,36 @@ class InvoiceService
 
             $this->settle($invoice, $total);
 
-            return $invoice->fresh('lines');
+            return $invoice->fresh('lines.costCenterAllocations.costCenter');
         });
+    }
+
+    /**
+     * يفرع مبلغاً نهائياً على تخصيصات السطر المحفوظة. غياب التوزيع يبقي توافق
+     * وسم الرأس القديم، ولا يوسم شيئاً إن لم يكن هناك مركز مفرد أصلاً.
+     *
+     * @return array<int, array{cost_center_id: ?string, amount: int}>
+     */
+    public function splitAllocatedAmount(int $amount, $allocations, ?string $fallbackCostCenterId): array
+    {
+        if ($allocations->isEmpty()) {
+            return [['cost_center_id' => $fallbackCostCenterId, 'amount' => $amount]];
+        }
+        $allocationTotal = (int) $allocations->sum('amount');
+        if ($allocationTotal <= 0) {
+            throw new RuntimeException('تخصيصات مركز التكلفة يجب أن تملك مبلغاً موجباً.');
+        }
+        $result = [];
+        $allocated = 0;
+        foreach ($allocations->sortBy('position')->values() as $position => $allocation) {
+            $part = $position === $allocations->count() - 1
+                ? $amount - $allocated
+                : intdiv($amount * (int) $allocation->amount, $allocationTotal);
+            $result[] = ['cost_center_id' => $allocation->cost_center_id, 'amount' => $part];
+            $allocated += $part;
+        }
+
+        return $result;
     }
 
     /**
