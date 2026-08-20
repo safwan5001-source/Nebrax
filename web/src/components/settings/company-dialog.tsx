@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import type { Company } from '@/lib/company';
+import { notifyCompanyUpdated, type Company } from '@/lib/company';
 
 export function CompanyDialog({
   open,
@@ -52,6 +52,7 @@ export function CompanyDialog({
         },
       });
       success(tc('updated'));
+      notifyCompanyUpdated();
       onSaved();
       onClose();
     } catch (err) {
