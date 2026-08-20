@@ -48,9 +48,14 @@ class PayrollUnallocatedTest extends TestCase
         $main   = $this->mainBranch($auth['token']);
         $khobar = $this->branch($auth['token'], 'فرع الخبر');
 
-        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $khobar])
-            ->postJson('/api/employees', ['name' => 'موظف', 'basic_salary' => 500000])
-            ->assertCreated();
+        $employeeId = $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $khobar])
+            ->postJson('/api/employees', ['name' => 'موظف'])
+            ->assertCreated()['data']['id'];
+
+        // الراتب يتبع العقد لا حقول الموظف — عقدٌ دائم نشط منذ 2020-01-01.
+        $this->withToken($auth['token'])->postJson("/api/employees/{$employeeId}/contracts", [
+            'type' => 'permanent', 'start_date' => '2020-01-01', 'basic_salary' => 500000,
+        ])->assertCreated();
 
         return [$auth, $main, $khobar];
     }
