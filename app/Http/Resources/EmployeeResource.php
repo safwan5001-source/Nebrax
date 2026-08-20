@@ -23,9 +23,22 @@ class EmployeeResource extends JsonResource
             'residency_expiry_date' => optional($this->residency_expiry_date)->toDateString(),
             'phone'          => $this->phone,
             'personal_email' => $this->personal_email,
-            'job_title'      => $this->job_title,
-            'department'     => $this->department,
-            'employment_type' => $this->employment_type,
+            'job_title_id'      => $this->job_title_id,
+            'job_title'         => $this->whenLoaded('jobTitle', fn () => $this->jobTitle ? [
+                'id' => $this->jobTitle->id, 'name' => $this->jobTitle->name,
+            ] : null),
+            'department_id'     => $this->department_id,
+            'department'        => $this->whenLoaded('department', fn () => $this->department ? [
+                'id' => $this->department->id, 'name' => $this->department->name,
+            ] : null),
+            'job_level_id'      => $this->job_level_id,
+            'job_level'         => $this->whenLoaded('jobLevel', fn () => $this->jobLevel ? [
+                'id' => $this->jobLevel->id, 'name' => $this->jobLevel->name,
+            ] : null),
+            'employment_type_id' => $this->employment_type_id,
+            'employment_type'    => $this->whenLoaded('employmentType', fn () => $this->employmentType ? [
+                'id' => $this->employmentType->id, 'name' => $this->employmentType->name,
+            ] : null),
             'manager_id'     => $this->manager_id,
             'manager'        => $this->whenLoaded('manager', fn () => $this->manager ? [
                 'id' => $this->manager->id, 'name' => $this->manager->name,

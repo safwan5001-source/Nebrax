@@ -18,7 +18,7 @@ interface Partner { id: string; name: string; type: string }
 interface OpenDocument { id: string; number: string; remaining: string; payment_status: string; status: string; partner_id: string }
 interface PaymentMethod { id: string; name: string; settlement_type: 'cash' | 'bank'; cash_bank_account_id: string | null; is_active: boolean; is_default: boolean }
 interface CashBankAccount { id: string; account_id: string; name: string; type: 'cash' | 'bank'; is_active: boolean; is_main: boolean }
-interface Collector { id: string; name: string; employee_no: string; job_title: string | null }
+interface Collector { id: string; name: string; employee_no: string }
 
 type Direction = 'received' | 'paid';
 type SubmitMode = 'draft' | 'post';

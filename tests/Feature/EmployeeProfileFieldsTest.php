@@ -31,12 +31,17 @@ class EmployeeProfileFieldsTest extends TestCase
     {
         $auth = $this->registerTenant();
 
+        $department = $this->withToken($auth['token'])->postJson('/api/departments', ['name' => 'قسم المبيعات'])
+            ->assertCreated()['data']['id'];
+        $employmentType = $this->withToken($auth['token'])->postJson('/api/employment-types', ['name' => 'دوام كامل'])
+            ->assertCreated()['data']['id'];
+
         $emp = $this->makeEmployee($auth['token'], [
             'name' => 'أكرم المهدي',
             'first_name' => 'أكرم', 'middle_name' => 'محمد', 'last_name' => 'المهدي',
             'nationality' => 'اليمن', 'residency_expiry_date' => '2027-01-15',
             'phone' => '0558477233', 'personal_email' => 'akram@example.com',
-            'department' => 'قسم المبيعات', 'employment_type' => 'full_time',
+            'department_id' => $department, 'employment_type_id' => $employmentType,
         ]);
 
         $this->assertSame('أكرم', $emp['first_name']);
@@ -46,17 +51,21 @@ class EmployeeProfileFieldsTest extends TestCase
         $this->assertSame('2027-01-15', $emp['residency_expiry_date']);
         $this->assertSame('0558477233', $emp['phone']);
         $this->assertSame('akram@example.com', $emp['personal_email']);
-        $this->assertSame('قسم المبيعات', $emp['department']);
-        $this->assertSame('full_time', $emp['employment_type']);
+        $this->assertSame('قسم المبيعات', $emp['department']['name']);
+        $this->assertSame('دوام كامل', $emp['employment_type']['name']);
     }
 
     /** @test */
-    public function an_unknown_employment_type_is_rejected(): void
+    public function an_employment_type_belonging_to_another_tenant_is_rejected(): void
     {
-        $auth = $this->registerTenant();
+        $a = $this->registerTenant('alpha', 'a@alpha.test');
+        $b = $this->registerTenant('beta', 'b@beta.test');
 
-        $this->withToken($auth['token'])->postJson('/api/employees', [
-            'name' => 'موظف', 'basic_salary' => 500000, 'employment_type' => 'ceo',
+        $employmentType = $this->withToken($b['token'])->postJson('/api/employment-types', ['name' => 'دوام كامل'])
+            ->assertCreated()['data']['id'];
+
+        $this->withToken($a['token'])->postJson('/api/employees', [
+            'name' => 'موظف', 'basic_salary' => 500000, 'employment_type_id' => $employmentType,
         ])->assertStatus(422);
     }
 

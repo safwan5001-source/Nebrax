@@ -43,7 +43,7 @@ interface CashBankAccount {
   is_main: boolean;
 }
 
-interface Collector { id: string; name: string; employee_no: string; job_title: string | null }
+interface Collector { id: string; name: string; employee_no: string }
 
 type SubmitMode = 'draft' | 'post';
 export type PaymentDocumentKind = 'invoice' | 'purchase';

@@ -9,7 +9,11 @@ use App\Http\Requests\UploadEmployeePhotoRequest;
 use App\Http\Resources\EmployeeAttachmentResource;
 use App\Http\Resources\EmployeeResource;
 use App\Models\Branch;
+use App\Models\Department;
 use App\Models\Employee;
+use App\Models\EmploymentType;
+use App\Models\JobLevel;
+use App\Models\JobTitle;
 use App\Models\Shift;
 use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
@@ -19,9 +23,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployeeController extends ApiController
 {
+    private const WITH = ['manager', 'jobTitle', 'department', 'jobLevel', 'employmentType'];
+
     public function index(): JsonResponse
     {
-        return EmployeeResource::collection(Employee::with('manager')->latest()->get())->response();
+        return EmployeeResource::collection(Employee::with(self::WITH)->latest()->get())->response();
     }
 
     public function store(StoreEmployeeRequest $request): JsonResponse
@@ -30,6 +36,7 @@ class EmployeeController extends ApiController
         $this->assertTenantOwned(Branch::class, $data['branch_id'] ?? null, 'الفرع');
         $this->assertTenantOwned(Employee::class, $data['manager_id'] ?? null, 'المدير المباشر');
         $this->assertOwnedShift($data['shift_id'] ?? null);
+        $this->assertOrgStructureOwned($data);
         // الترقيم داخل معاملة: قفل المِرساة في طبقة الترقيم لا يُسلسِل شيئاً بدونها.
         $employee = DB::transaction(function () use ($data) {
             $data['employee_no'] ??= Employee::nextDocumentNumber('EMP');
@@ -37,12 +44,12 @@ class EmployeeController extends ApiController
             return Employee::create($data);
         });
 
-        return (new EmployeeResource($employee->load('manager')))->response()->setStatusCode(201);
+        return (new EmployeeResource($employee->load(self::WITH)))->response()->setStatusCode(201);
     }
 
     public function show(string $id): JsonResponse
     {
-        return (new EmployeeResource(Employee::with('manager')->findOrFail($id)))->response();
+        return (new EmployeeResource(Employee::with(self::WITH)->findOrFail($id)))->response();
     }
 
     public function update(UpdateEmployeeRequest $request, string $id): JsonResponse
@@ -57,9 +64,19 @@ class EmployeeController extends ApiController
         $this->assertTenantOwned(Branch::class, $data['branch_id'] ?? null, 'الفرع');
         $this->assertTenantOwned(Employee::class, $data['manager_id'] ?? null, 'المدير المباشر');
         $this->assertOwnedShift($data['shift_id'] ?? null);
+        $this->assertOrgStructureOwned($data);
         $employee->update($data);
 
-        return (new EmployeeResource($employee->load('manager')))->response();
+        return (new EmployeeResource($employee->load(self::WITH)))->response();
+    }
+
+    /** الهيكل التنظيمي كيانات مُدارة CompanyWide — لا حاجة لتحقّق مرجعي عابر للفرع كالوردية. */
+    private function assertOrgStructureOwned(array $data): void
+    {
+        $this->assertTenantOwned(JobTitle::class, $data['job_title_id'] ?? null, 'المسمى الوظيفي');
+        $this->assertTenantOwned(Department::class, $data['department_id'] ?? null, 'القسم');
+        $this->assertTenantOwned(JobLevel::class, $data['job_level_id'] ?? null, 'المستوى الوظيفي');
+        $this->assertTenantOwned(EmploymentType::class, $data['employment_type_id'] ?? null, 'نوع التوظيف');
     }
 
     /**
@@ -102,7 +119,7 @@ class EmployeeController extends ApiController
         $employee->photo_path = $request->file('photo')->store("employees/{$employee->id}", 'local');
         $employee->save();
 
-        return (new EmployeeResource($employee->load('manager')))->response();
+        return (new EmployeeResource($employee->load(self::WITH)))->response();
     }
 
     public function removePhoto(string $id): JsonResponse
@@ -115,7 +132,7 @@ class EmployeeController extends ApiController
             $employee->save();
         }
 
-        return (new EmployeeResource($employee->load('manager')))->response();
+        return (new EmployeeResource($employee->load(self::WITH)))->response();
     }
 
     /** بث الصورة للعرض المباشر (لا تنزيل قسري) — يمرّ بعزل المستأجر عبر findOrFail العادي. */

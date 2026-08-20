@@ -65,7 +65,7 @@ class PaymentController extends ApiController
             'data' => Employee::query()
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'employee_no', 'name', 'job_title']),
+                ->get(['id', 'employee_no', 'name']),
         ]);
     }
 

@@ -172,12 +172,10 @@ export default function EmployeeProfilePage() {
               <div>
                 <SubHead>{t('job_data')}</SubHead>
                 <KeyValue label={t('employee_no')} value={employee.employee_no || '—'} mono />
-                <KeyValue label={t('job_title')} value={employee.job_title || '—'} />
-                <KeyValue label={t('department')} value={employee.department || '—'} />
-                <KeyValue
-                  label={t('employment_type')}
-                  value={employee.employment_type ? t(`employment_type_${employee.employment_type}`) : '—'}
-                />
+                <KeyValue label={t('job_title')} value={employee.job_title?.name ?? '—'} />
+                <KeyValue label={t('department')} value={employee.department?.name ?? '—'} />
+                <KeyValue label={t('job_level')} value={employee.job_level?.name ?? '—'} />
+                <KeyValue label={t('employment_type')} value={employee.employment_type?.name ?? '—'} />
                 <KeyValue
                   label={t('manager')}
                   value={employee.manager?.name ?? '—'}
