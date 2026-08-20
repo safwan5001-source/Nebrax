@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use App\Support\Plans;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 
 /**
  * يسجل عقد اشتراك للمنصة من مسار تشغيلي داخلي فقط.
@@ -31,8 +32,11 @@ class RecordPlatformSubscriptionCommand extends Command
     {
         $tenantKey = (string) $this->argument('tenant');
         $tenant = Tenant::query()
-            ->where('id', $tenantKey)
-            ->orWhere('slug', $tenantKey)
+            ->when(
+                Str::isUuid($tenantKey),
+                fn ($query) => $query->where('id', $tenantKey)->orWhere('slug', $tenantKey),
+                fn ($query) => $query->where('slug', $tenantKey),
+            )
             ->first();
 
         if (! $tenant) {
