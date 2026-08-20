@@ -6,10 +6,12 @@ use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Models\User;
 use App\Models\PaymentAllocation;
 use App\Models\Purchase;
 use App\Services\PrintTemplates\PrintTemplateService;
+use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -32,6 +34,7 @@ class PaymentService
 {
     private const ACC_RECEIVABLE  = '1130'; // العملاء
     private const ACC_PAYABLE     = '2110'; // الموردون
+    private const ACC_INPUT_VAT   = '1150'; // ضريبة قيمة مضافة - مدخلات
 
     public function __construct(
         protected LedgerService $ledger,
@@ -57,6 +60,7 @@ class PaymentService
 
         $direction = $data['direction'] ?? 'received';
         $date      = $data['payment_date'] ?? now()->toDateString();
+        [$method, $cashAccountId, $fee] = $this->resolvePaymentSetup($data, $amount, $direction);
 
         // المستند المستهدَف حسب الاتجاه: قبض→فاتورة مبيعات، صرف→فاتورة مشتريات.
         [$targetClass, $key] = $direction === 'received'
@@ -83,13 +87,7 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        // الخزينة تُتحقَّق **قبل** الإنشاء: سندٌ يحمل حساباً مرفوضاً كان سيُرفض
-        // عند الترحيل وحده، فيبقى في القاعدة مسوّدةً لا تُرحَّل أبداً.
-        $cashAccountId = $this->cashBankAccounts
-            ->resolveForPayment($data['cash_account_id'] ?? null, $data['method'] ?? 'cash')
-            ->account_id;
-
-        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $cashAccountId) {
+        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $method, $cashAccountId, $fee) {
             // النسخ قد يكون لمستند تاريخي بلا فرع. نحفظ نطاق المصدر صراحةً،
             // فلا تنتقل النسخة إلى الفرع الرئيسي للطلب ثم تصطدم برقمه القديم.
             $hasExplicitBranch = array_key_exists('branch_id', $data);
@@ -104,11 +102,16 @@ class PaymentService
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null, // مرجع اختياري للقبض
                 'direction'       => $direction,
-                'method'          => $data['method'] ?? 'cash',
+                'method'          => $method,
+                'payment_method_id' => $fee['payment_method_id'],
+                'payment_method_name' => $fee['payment_method_name'],
                 'reference'       => $data['reference'] ?? null,
                 'cash_account_id' => $cashAccountId,
                 'payment_date'    => $date,
                 'amount'          => $amount,
+                'fee_amount'      => $fee['amount'],
+                'fee_tax_amount'  => $fee['tax_amount'],
+                'fee_expense_account_id' => $fee['expense_account_id'],
                 'status'          => 'draft',
                 'notes'           => $data['notes'] ?? null,
                 'created_by'      => $data['created_by'] ?? null,
@@ -149,6 +152,7 @@ class PaymentService
         }
 
         $direction = $payment->direction;
+        [$method, $cashAccountId, $fee] = $this->resolvePaymentSetup($data, $amount, $direction);
         [$targetClass, $key] = $direction === 'received'
             ? [Invoice::class, 'invoice_id']
             : [Purchase::class, 'purchase_id'];
@@ -170,19 +174,20 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        $cashAccountId = $this->cashBankAccounts
-            ->resolveForPayment($data['cash_account_id'] ?? null, $data['method'] ?? 'cash')
-            ->account_id;
-
-        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $cashAccountId) {
+        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $method, $cashAccountId, $fee) {
             $payment->update([
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null,
-                'method'          => $data['method'] ?? 'cash',
+                'method'          => $method,
+                'payment_method_id' => $fee['payment_method_id'],
+                'payment_method_name' => $fee['payment_method_name'],
                 'reference'       => $data['reference'] ?? null,
                 'cash_account_id' => $cashAccountId,
                 'payment_date'    => $data['payment_date'] ?? $payment->payment_date->toDateString(),
                 'amount'          => $amount,
+                'fee_amount'      => $fee['amount'],
+                'fee_tax_amount'  => $fee['tax_amount'],
+                'fee_expense_account_id' => $fee['expense_account_id'],
                 'notes'           => $data['notes'] ?? null,
             ]);
 
@@ -208,6 +213,7 @@ class PaymentService
             'partner_id'      => $payment->partner_id,
             'direction'       => $payment->direction,
             'method'          => $payment->method,
+            'payment_method_id' => $payment->payment_method_id,
             'reference'       => $payment->reference,
             'cash_account_id' => $payment->cash_account_id,
             'payment_date'    => $date,
@@ -287,27 +293,34 @@ class PaymentService
             );
             $cashAccountId = $cashEntity->account_id;
 
+            $feeTotal = $payment->fee_amount + $payment->fee_tax_amount;
+            $feeLines = $this->feeLines($payment);
+
             if ($payment->direction === 'received') {
-                // قبض من عميل: مدين الصندوق/البنك، دائن العملاء
+                // قبض: العميل يسدد كامل الذمة، والمنشأة تتحمل العمولة فينخفض صافي الإيداع.
+                $netDeposit = $payment->amount - $feeTotal;
+                if ($netDeposit <= 0) {
+                    throw new RuntimeException('رسوم الدفع وضريبتها يجب أن تكون أقل من مبلغ سند القبض.');
+                }
                 $lines = [[
                     'account_id' => $cashAccountId,
-                    'debit'      => $payment->amount,
-                ], [
+                    'debit'      => $netDeposit,
+                ], ...$feeLines, [
                     'account_id'   => $this->accountId(self::ACC_RECEIVABLE),
                     'credit'       => $payment->amount,
                     'partner_type' => Partner::class,
                     'partner_id'   => $payment->partner_id,
                 ]];
             } else {
-                // صرف لمورد: مدين الموردون، دائن الصندوق/البنك
+                // صرف: ذمة المورد تسدد بكاملها وتزداد حركة الخزينة بعمولة المنشأة وضريبتها.
                 $lines = [[
                     'account_id'   => $this->accountId(self::ACC_PAYABLE),
                     'debit'        => $payment->amount,
                     'partner_type' => Partner::class,
                     'partner_id'   => $payment->partner_id,
-                ], [
+                ], ...$feeLines, [
                     'account_id' => $cashAccountId,
-                    'credit'     => $payment->amount,
+                    'credit'     => $payment->amount + $feeTotal,
                 ]];
             }
 
@@ -348,6 +361,103 @@ class PaymentService
 
             return $payment->fresh();
         });
+    }
+
+    /**
+     * يطابق الطريقة الجديدة بخزينتها/حسابها ويحسب لقطة رسومها قبل إنشاء أو تعديل المسودة.
+     * تبقى المدفوعات القديمة التي لا تحمل payment_method_id على عقد cash|bank السابق.
+     *
+     * @return array{0:string,1:string,2:array{payment_method_id:?string,payment_method_name:?string,amount:int,tax_amount:int,expense_account_id:?string}}
+     */
+    private function resolvePaymentSetup(array $data, int $amount, string $direction): array
+    {
+        $paymentMethodId = $data['payment_method_id'] ?? null;
+        if (! $paymentMethodId) {
+            $method = $data['method'] ?? 'cash';
+            $cashAccount = $this->cashBankAccounts->resolveForPayment($data['cash_account_id'] ?? null, $method);
+
+            return [$method, $cashAccount->account_id, [
+                'payment_method_id' => null,
+                'payment_method_name' => null,
+                'amount' => 0,
+                'tax_amount' => 0,
+                'expense_account_id' => null,
+            ]];
+        }
+
+        $paymentMethod = PaymentMethod::with('cashBankAccount')->find($paymentMethodId);
+        if (! $paymentMethod || ! $paymentMethod->is_active) {
+            throw new RuntimeException('طريقة الدفع المختارة غير موجودة أو معطلة.');
+        }
+
+        $method = $paymentMethod->settlement_type;
+        $accountId = $data['cash_account_id'] ?? $paymentMethod->cashBankAccount?->account_id;
+        $cashAccount = $this->cashBankAccounts->resolveForPayment($accountId, $method);
+        $fee = $this->calculateFee($paymentMethod, $amount, $direction);
+
+        return [$method, $cashAccount->account_id, [
+            'payment_method_id' => $paymentMethod->id,
+            'payment_method_name' => $paymentMethod->name,
+            'amount' => $fee['amount'],
+            'tax_amount' => $fee['tax_amount'],
+            'expense_account_id' => $fee['expense_account_id'],
+        ]];
+    }
+
+    /**
+     * تحسب رسوم المنشأة بالهللات. النسبة نقاط أساس (10000 = 100%)، والناتج يقرب
+     * نصفاً إلى أعلى. الحد الأدنى يقارن بالجزء النسبي ثم يضاف الرسم الثابت.
+     */
+    private function calculateFee(PaymentMethod $method, int $amount, string $direction): array
+    {
+        $application = Settings::get('finance', 'payment_fee_application');
+        $applies = match ($application) {
+            'received' => $direction === 'received',
+            'paid' => $direction === 'paid',
+            'both' => true,
+            default => false,
+        };
+
+        if (! $applies || ! $method->fees_enabled) {
+            return ['amount' => 0, 'tax_amount' => 0, 'expense_account_id' => null];
+        }
+        if (! $method->fee_expense_account_id) {
+            throw new RuntimeException('طريقة الدفع ذات الرسوم تحتاج حساب مصروف رسوم نشطاً.');
+        }
+
+        $percentage = intdiv($amount * $method->fee_rate_bps + 5000, 10000);
+        $fee = max($percentage, $method->fee_min_amount) + $method->fee_fixed_amount;
+        $tax = intdiv($fee * $method->fee_tax_rate + 50, 100);
+
+        return [
+            'amount' => $fee,
+            'tax_amount' => $tax,
+            'expense_account_id' => $method->fee_expense_account_id,
+        ];
+    }
+
+    /** سطور مصروف الرسوم وضريبة المدخلات؛ تبقى فارغة للطرق بلا رسوم أو خارج النطاق. */
+    private function feeLines(Payment $payment): array
+    {
+        if ($payment->fee_amount <= 0) {
+            return [];
+        }
+        if (! $payment->fee_expense_account_id) {
+            throw new RuntimeException('سند الرسوم لا يحمل حساب مصروف صالحاً.');
+        }
+
+        $lines = [[
+            'account_id' => $payment->fee_expense_account_id,
+            'debit' => $payment->fee_amount,
+        ]];
+        if ($payment->fee_tax_amount > 0) {
+            $lines[] = [
+                'account_id' => $this->accountId(self::ACC_INPUT_VAT),
+                'debit' => $payment->fee_tax_amount,
+            ];
+        }
+
+        return $lines;
     }
 
     /**

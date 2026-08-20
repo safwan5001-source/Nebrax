@@ -24,13 +24,16 @@ class Payment extends BaseModel
     protected $fillable = [
         'branch_id',
         'tenant_id', 'number', 'partner_id', 'invoice_id',
-        'direction', 'method', 'reference', 'cash_account_id', 'payment_date', 'amount',
+        'direction', 'method', 'payment_method_id', 'payment_method_name', 'reference', 'cash_account_id', 'payment_date', 'amount',
+        'fee_amount', 'fee_tax_amount', 'fee_expense_account_id',
         'status', 'notes', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by',
     ];
 
     protected $casts = [
         'payment_date' => 'date',
         'amount'       => 'integer',
+        'fee_amount'   => 'integer',
+        'fee_tax_amount' => 'integer',
     ];
 
     protected $attributes = [
@@ -55,6 +58,18 @@ class Payment extends BaseModel
     public function cashAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'cash_account_id');
+    }
+
+    /** الطريقة المختارة؛ تبقى لقطة الاسم والرسوم على السند حتى بعد تعديل الإعداد. */
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class);
+    }
+
+    /** حساب مصروف الرسوم الملتقط وقت إنشاء السند، لا حساب الطريقة الحالي. */
+    public function feeExpenseAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'fee_expense_account_id');
     }
 
     public function journalEntry(): BelongsTo

@@ -13,6 +13,7 @@ import { formatRiyal, riyalToMinor } from '@/lib/money';
 
 interface Partner { id: string; name: string; type: string }
 interface Doc { id: string; number: string; remaining: string; payment_status: string; status: string; partner_id: string }
+interface PaymentMethod { id: string; name: string; settlement_type: 'cash' | 'bank'; is_active: boolean; is_default: boolean }
 
 export function PaymentDialog({
   open,
@@ -34,10 +35,12 @@ export function PaymentDialog({
   const { success } = useToast();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   const [direction, setDirection] = useState<'received' | 'paid'>(fixedDirection ?? 'received');
   const [partnerId, setPartnerId] = useState('');
   const [method, setMethod] = useState('cash');
+  const [paymentMethodId, setPaymentMethodId] = useState('');
   const [docId, setDocId] = useState(''); // المستند المخصَّص (اختياري)
   const [amount, setAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +48,15 @@ export function PaymentDialog({
 
   useEffect(() => {
     if (!open) return;
-    api<{ data: Partner[] }>('/partners').then((r) => setPartners(r.data));
+    Promise.all([
+      api<{ data: Partner[] }>('/partners'),
+      api<{ data: PaymentMethod[] }>('/payment-methods'),
+    ]).then(([partnerResponse, paymentMethodResponse]) => {
+      setPartners(partnerResponse.data);
+      const active = paymentMethodResponse.data.filter((paymentMethod) => paymentMethod.is_active);
+      setPaymentMethods(active);
+      setPaymentMethodId((current) => current || active.find((paymentMethod) => paymentMethod.is_default)?.id || active[0]?.id || '');
+    });
   }, [open]);
 
   // الدخول من فاتورة لا ينشئ دفعة بنفسه؛ يهيئ فقط العميل والمستند والمبلغ المتبقي.
@@ -102,7 +113,7 @@ export function PaymentDialog({
     const body: Record<string, unknown> = {
       partner_id: partnerId,
       direction,
-      method,
+      ...(paymentMethodId ? { payment_method_id: paymentMethodId } : { method }),
       amount: riyalToMinor(amount),
     };
     if (docId) {
@@ -114,6 +125,7 @@ export function PaymentDialog({
       success(tc('created'));
       setPartnerId('');
       setAmount('');
+      setPaymentMethodId(paymentMethods.find((paymentMethod) => paymentMethod.is_default)?.id ?? paymentMethods[0]?.id ?? '');
       setDocId('');
       onSaved();
       onClose();
@@ -147,10 +159,18 @@ export function PaymentDialog({
           )}
           <div className="space-y-1.5">
             <Label htmlFor="method">{t('method')}</Label>
-            <Select id="method" value={method} onChange={(e) => setMethod(e.target.value)}>
-              <option value="cash">{t('cash')}</option>
-              <option value="bank">{t('bank')}</option>
-            </Select>
+            {paymentMethods.length > 0 ? (
+              <Select id="method" value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)}>
+                {paymentMethods.map((paymentMethod) => (
+                  <option key={paymentMethod.id} value={paymentMethod.id}>{paymentMethod.name}</option>
+                ))}
+              </Select>
+            ) : (
+              <Select id="method" value={method} onChange={(e) => setMethod(e.target.value)}>
+                <option value="cash">{t('cash')}</option>
+                <option value="bank">{t('bank')}</option>
+              </Select>
+            )}
           </div>
         </div>
 

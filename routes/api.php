@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PaymentMethodController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -286,6 +287,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('cash-bank-accounts/{id}', [CashBankAccountController::class, 'destroy'])->middleware($perm('payments.manage'));
         Route::get('cash-bank-transfers', [CashBankAccountController::class, 'transfers'])->middleware($perm('payments.view'));
         Route::post('cash-bank-transfers', [CashBankAccountController::class, 'transfer'])->middleware($perm('payments.manage'));
+
+        // طرق الدفع: بيان مالي مشترك يحدد وجهة السند ورسومه.
+        Route::get('payment-methods', [PaymentMethodController::class, 'index'])->middleware($perm('payments.view'));
+        Route::post('payment-methods', [PaymentMethodController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('payment-methods/{id}', [PaymentMethodController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::post('payment-methods/{id}/make-default', [PaymentMethodController::class, 'makeDefault'])->middleware($perm('payments.manage'));
+        Route::delete('payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->middleware($perm('payments.manage'));
 
         // المدفوعات
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));
