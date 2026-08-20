@@ -81,6 +81,63 @@ class UserManagementTest extends TestCase
     }
 
     /** @test */
+    public function a_custom_role_can_be_assigned_to_a_new_user(): void
+    {
+        $auth = $this->registerTenant();
+
+        // قبل هذا الاختبار: `role` كان مقيَّداً بقائمة ثابتة (owner/admin/accountant/staff)
+        // في StoreUserRequest، فأي دور مخصَّص كان يُرفض بـ٤٢٢ رغم إنشائه بنجاح عبر /api/roles.
+        $role = $this->withToken($auth['token'])->postJson('/api/roles', [
+            'name' => 'مطّلع', 'permissions' => ['invoices.view'],
+        ])->assertCreated()['data'];
+
+        $this->withToken($auth['token'])->postJson('/api/users', [
+            'name' => 'مطّلع واحد', 'email' => 'viewer@acme.test', 'password' => 'password123', 'role' => $role['slug'],
+        ])->assertCreated()->assertJsonPath('data.role', $role['slug']);
+    }
+
+    /** @test */
+    public function updating_a_user_to_a_custom_role_works(): void
+    {
+        $auth = $this->registerTenant();
+        $role = $this->withToken($auth['token'])->postJson('/api/roles', [
+            'name' => 'مطّلع', 'permissions' => ['invoices.view'],
+        ])->assertCreated()['data'];
+
+        $user = $this->withToken($auth['token'])->postJson('/api/users', [
+            'name' => 'م', 'email' => 'u@acme.test', 'password' => 'password123', 'role' => 'staff',
+        ])->assertCreated()['data'];
+
+        $this->withToken($auth['token'])->putJson("/api/users/{$user['id']}", ['role' => $role['slug']])
+            ->assertOk()->assertJsonPath('data.role', $role['slug']);
+    }
+
+    /** @test */
+    public function an_unknown_role_slug_is_rejected(): void
+    {
+        $auth = $this->registerTenant();
+
+        $this->withToken($auth['token'])->postJson('/api/users', [
+            'name' => 'x', 'email' => 'unknown@acme.test', 'password' => 'password123', 'role' => 'does-not-exist',
+        ])->assertStatus(422);
+    }
+
+    /** @test */
+    public function a_role_belonging_to_another_tenant_cannot_be_assigned(): void
+    {
+        $a = $this->registerTenant('alpha', 'a@alpha.test');
+        $b = $this->registerTenant('beta', 'b@beta.test');
+
+        $roleB = $this->withToken($b['token'])->postJson('/api/roles', [
+            'name' => 'دور بيتا', 'permissions' => ['invoices.view'],
+        ])->assertCreated()['data'];
+
+        $this->withToken($a['token'])->postJson('/api/users', [
+            'name' => 'x', 'email' => 'cross@alpha.test', 'password' => 'password123', 'role' => $roleB['slug'],
+        ])->assertStatus(422);
+    }
+
+    /** @test */
     public function a_tenant_cannot_see_or_edit_another_tenants_user(): void
     {
         $a = $this->registerTenant('alpha', 'a@alpha.test');

@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreUserRequest extends FormRequest
 {
@@ -13,11 +15,19 @@ class StoreUserRequest extends FormRequest
 
     public function rules(): array
     {
+        $tenantId = app(TenantContext::class)->id();
+
         return [
             'name'      => ['required', 'string', 'max:255'],
             'email'     => ['required', 'email', 'max:255'],
             'password'  => ['required', 'string', 'min:8'],
-            'role'      => ['required', 'in:owner,admin,accountant,staff'],
+            // يشمل النظامية (owner/admin/accountant/staff — مزروعة لكل مستأجر
+            // عند التسجيل) والمخصَّصة معاً؛ لا قائمة ثابتة بعد اليوم.
+            'role' => [
+                'required',
+                Rule::exists('roles', 'slug')
+                    ->where(fn ($q) => $q->where('tenant_id', $tenantId)->whereNull('deleted_at')),
+            ],
             'is_active' => ['boolean'],
             // ربط اختياري بسجلّ موظف قائم (المستخدم موظفٌ يدخل النظام).
             // ملكية المعرّف وعدم ارتباطه بمستخدم آخر يُتحقّقان في المتحكّم.

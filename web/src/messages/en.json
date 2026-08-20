@@ -3354,7 +3354,10 @@
     "scope_warehouses": "Allowed warehouses",
     "scope_warehouses_hint": "Leave empty to give access to all warehouses. When set, dealing with any other is refused and they are hidden from lists.",
     "scope_loading": "Loading…",
-    "scope_none": "No items available."
+    "scope_none": "No items available.",
+    "link_employee": "Link to employee",
+    "no_employee_link": "— No link —",
+    "link_employee_hint": "Optional. Links the login account to an existing employee record; one link per employee."
   },
   "voucherDoc": {
     "received_from": "Received from",
