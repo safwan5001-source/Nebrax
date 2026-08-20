@@ -14,7 +14,7 @@ class StoreEmployeeRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        return array_merge([
             'branch_id'    => ['nullable', 'uuid'], // مكان العمل (وصفي — لا يعزل)
             'employee_no'  => ['nullable', 'string', 'max:255'],
             'name'         => ['required', 'string', 'max:255'],
@@ -39,6 +39,19 @@ class StoreEmployeeRequest extends FormRequest
             'hire_date'    => ['nullable', 'date'],
             'is_active'    => ['boolean'],
             'notes'        => ['nullable', 'string'],
-        ];
+        ], self::addressRules());
+    }
+
+    /** العنوانان (حالي/دائم) — نمط عنوان `partners` نفسه مكرَّراً بادئتين. */
+    public static function addressRules(): array
+    {
+        $rules = [];
+        foreach (['current', 'permanent'] as $prefix) {
+            foreach (['address', 'city', 'building_no', 'street', 'district', 'postal_code', 'country'] as $field) {
+                $rules["{$prefix}_{$field}"] = ['nullable', 'string', 'max:255'];
+            }
+        }
+
+        return $rules;
     }
 }

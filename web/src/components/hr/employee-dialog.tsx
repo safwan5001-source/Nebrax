@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { ImagePlus, Trash2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { riyalToMinor } from '@/lib/money';
 import type { Shift } from './shift-dialog';
 
@@ -29,6 +30,21 @@ export interface Employee {
   employment_type?: string | null;
   manager_id?: string | null;
   shift_id?: string | null;
+  has_photo?: boolean;
+  current_address?: string | null;
+  current_city?: string | null;
+  current_building_no?: string | null;
+  current_street?: string | null;
+  current_district?: string | null;
+  current_postal_code?: string | null;
+  current_country?: string | null;
+  permanent_address?: string | null;
+  permanent_city?: string | null;
+  permanent_building_no?: string | null;
+  permanent_street?: string | null;
+  permanent_district?: string | null;
+  permanent_postal_code?: string | null;
+  permanent_country?: string | null;
   basic_salary: string;     // ريال (نص)
   allowances: string;       // ريال (نص)
   gosi: string;             // ريال (نص)
@@ -40,11 +56,52 @@ const EMPTY_EMPLOYEE: Employee = {
   id: '', name: '', first_name: '', middle_name: '', last_name: '',
   national_id: '', nationality: '', residency_expiry_date: '',
   phone: '', personal_email: '', job_title: '', department: '', employment_type: '',
-  manager_id: '', shift_id: '',
+  manager_id: '', shift_id: '', has_photo: false,
+  current_address: '', current_city: '', current_building_no: '', current_street: '',
+  current_district: '', current_postal_code: '', current_country: '',
+  permanent_address: '', permanent_city: '', permanent_building_no: '', permanent_street: '',
+  permanent_district: '', permanent_postal_code: '', permanent_country: '',
   basic_salary: '', allowances: '', gosi: '', other_deductions: '', is_active: true,
 };
 
 const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract', 'temporary'] as const;
+const ADDRESS_FIELDS = ['address', 'city', 'building_no', 'street', 'district', 'postal_code', 'country'] as const;
+
+/** نمط عنوانٍ وطنيٍّ واحد — يتكرّر بادئتين (حالي/دائم) بلا نسخ الحقول يدوياً. */
+function AddressGroup({
+  prefix, title, form, set, t,
+}: {
+  prefix: 'current' | 'permanent';
+  title: string;
+  form: Employee;
+  set: (k: keyof Employee, v: string) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <fieldset className="space-y-3 rounded border border-border p-3">
+      <legend className="px-1 text-xs font-medium text-muted">{title}</legend>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${prefix}_address`}>{t('address')}</Label>
+        <Input
+          id={`${prefix}_address`}
+          value={(form[`${prefix}_address` as keyof Employee] as string) ?? ''}
+          onChange={(e) => set(`${prefix}_address` as keyof Employee, e.target.value)}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {ADDRESS_FIELDS.slice(1).map((field) => {
+          const key = `${prefix}_${field}` as keyof Employee;
+          return (
+            <div key={key} className="space-y-1.5">
+              <Label htmlFor={key}>{t(field)}</Label>
+              <Input id={key} value={(form[key] as string) ?? ''} onChange={(e) => set(key, e.target.value)} />
+            </div>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
 
 export function EmployeeDialog({
   open,
@@ -59,12 +116,16 @@ export function EmployeeDialog({
 }) {
   const t = useTranslations('hr');
   const tc = useTranslations('common');
-  const { success } = useToast();
+  const { success, error: toastError } = useToast();
   const [form, setForm] = useState<Employee>(employee ?? EMPTY_EMPLOYEE);
   const [colleagues, setColleagues] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const set = (k: keyof Employee, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -75,13 +136,77 @@ export function EmployeeDialog({
     api<{ data: Shift[] }>('/shifts').then((r) => setShifts(r.data)).catch(() => {});
   }, [open]);
 
+  // معاينة الصورة الحالية — رابط كائنٍ محلّي يُفكّ عند تبديل الموظف أو إغلاق الحوار.
+  useEffect(() => {
+    if (!open || !employee?.id || !employee.has_photo) {
+      setPhotoUrl(null);
+      return;
+    }
+    let cancelled = false;
+    fetchImageUrl(`/employees/${employee.id}/photo`).then((url) => {
+      if (!cancelled) setPhotoUrl(url);
+    });
+    return () => {
+      cancelled = true;
+      setPhotoUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [open, employee?.id, employee?.has_photo]);
+
+  async function uploadPhoto(file: File) {
+    if (!employee?.id) return;
+    setPhotoBusy(true);
+    try {
+      const res = await api<{ data: Employee }>(`/employees/${employee.id}/photo`, {
+        method: 'POST',
+        body: (() => { const f = new FormData(); f.append('photo', file); return f; })(),
+      });
+      setPhotoUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+      fetchImageUrl(`/employees/${employee.id}/photo`).then(setPhotoUrl);
+      setForm((f) => ({ ...f, has_photo: res.data.has_photo }));
+      success(tc('updated'));
+      onSaved();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto() {
+    if (!employee?.id) return;
+    setPhotoBusy(true);
+    try {
+      await api(`/employees/${employee.id}/photo`, { method: 'DELETE' });
+      setPhotoUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+      setForm((f) => ({ ...f, has_photo: false }));
+      success(tc('deleted'));
+      onSaved();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   const managerOptions = colleagues.filter((c) => c.id !== employee?.id);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const addressBody = Object.fromEntries(
+      (['current', 'permanent'] as const).flatMap((prefix) =>
+        ADDRESS_FIELDS.map((field) => {
+          const key = `${prefix}_${field}` as keyof Employee;
+          return [key, (form[key] as string) || null];
+        })
+      )
+    );
     const body = {
+      ...addressBody,
       name: form.name,
       first_name: form.first_name || null,
       middle_name: form.middle_name || null,
@@ -126,6 +251,40 @@ export function EmployeeDialog({
           <Label htmlFor="name">{t('emp_name')}</Label>
           <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} required />
         </div>
+
+        <div className="space-y-1.5">
+          <Label>{t('photo')}</Label>
+          {employee?.id ? (
+            <div className="flex items-center gap-3">
+              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-border bg-background">
+                {photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- صورة مرفوعة (blob:) لا تخضع لتحسين next/image
+                  <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <ImagePlus className="h-6 w-6 text-muted" strokeWidth={1.5} />
+                )}
+              </div>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadPhoto(file); e.target.value = ''; }}
+              />
+              <Button type="button" variant="outline" size="sm" disabled={photoBusy} onClick={() => photoInputRef.current?.click()}>
+                {t('choose_photo')}
+              </Button>
+              {form.has_photo && (
+                <Button type="button" variant="ghost" size="icon" aria-label={t('remove_photo')} disabled={photoBusy} onClick={removePhoto}>
+                  <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                </Button>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted">{t('save_first_for_photo')}</p>
+          )}
+        </div>
+
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="first_name">{t('first_name')}</Label>
@@ -185,6 +344,10 @@ export function EmployeeDialog({
             <Input id="personal_email" type="email" dir="ltr" value={form.personal_email ?? ''} onChange={(e) => set('personal_email', e.target.value)} />
           </div>
         </div>
+
+        <AddressGroup prefix="current" title={t('current_address_title')} form={form} set={set} t={t} />
+        <AddressGroup prefix="permanent" title={t('permanent_address_title')} form={form} set={set} t={t} />
+
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="manager_id">{t('manager')}</Label>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
+use App\Http\Requests\UploadEmployeePhotoRequest;
 use App\Http\Resources\EmployeeResource;
 use App\Models\Branch;
 use App\Models\Employee;
@@ -11,6 +12,8 @@ use App\Models\Shift;
 use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployeeController extends ApiController
 {
@@ -72,8 +75,53 @@ class EmployeeController extends ApiController
 
     public function destroy(string $id): JsonResponse
     {
-        Employee::findOrFail($id)->delete();
+        $employee = Employee::findOrFail($id);
+        if ($employee->photo_path) {
+            Storage::disk('local')->delete($employee->photo_path);
+        }
+        $employee->delete();
 
         return response()->json(['message' => 'تم الحذف.']);
+    }
+
+    /** يستبدل صورة الموظف (إن وُجدت سابقاً تُحذف) — لا يمرّ عبر update العادي عمداً. */
+    public function uploadPhoto(UploadEmployeePhotoRequest $request, string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+
+        if ($employee->photo_path) {
+            Storage::disk('local')->delete($employee->photo_path);
+        }
+
+        $employee->photo_path = $request->file('photo')->store("employees/{$employee->id}", 'local');
+        $employee->save();
+
+        return (new EmployeeResource($employee->load('manager')))->response();
+    }
+
+    public function removePhoto(string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+
+        if ($employee->photo_path) {
+            Storage::disk('local')->delete($employee->photo_path);
+            $employee->photo_path = null;
+            $employee->save();
+        }
+
+        return (new EmployeeResource($employee->load('manager')))->response();
+    }
+
+    /** بث الصورة للعرض المباشر (لا تنزيل قسري) — يمرّ بعزل المستأجر عبر findOrFail العادي. */
+    public function showPhoto(string $id): StreamedResponse
+    {
+        $employee = Employee::findOrFail($id);
+        $disk = Storage::disk('local');
+
+        if (! $employee->photo_path || ! $disk->exists($employee->photo_path)) {
+            abort(404, 'لا صورة لهذا الموظف.');
+        }
+
+        return $disk->response($employee->photo_path);
     }
 }
