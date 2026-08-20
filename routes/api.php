@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\PlatformAuthController;
+use App\Http\Controllers\Api\PlatformDashboardController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BranchSettingsController;
@@ -67,6 +69,7 @@ use App\Http\Controllers\Api\ZatcaSettingsController;
 use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsurePermission;
+use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\SetBranch;
 use App\Http\Middleware\SetTenant;
@@ -100,6 +103,14 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
     // عام (بلا مصادقة)
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+
+    // منصة التشغيل الداخلية: مصادقة مستقلة تماماً عن المستأجرين، ولا تمر عبر SetTenant.
+    Route::post('platform/login', [PlatformAuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::middleware(['auth:sanctum', EnsurePlatformAdministrator::class])->prefix('platform')->group(function () {
+        Route::post('logout', [PlatformAuthController::class, 'logout']);
+        Route::get('me', [PlatformAuthController::class, 'me']);
+        Route::get('overview', [PlatformDashboardController::class, 'overview']);
+    });
 
     // محمي: مصادقة Sanctum + ضبط المستأجر (العزل التلقائي)
     Route::middleware(['auth:sanctum', SetTenant::class, SetBranch::class])->group(function () {
