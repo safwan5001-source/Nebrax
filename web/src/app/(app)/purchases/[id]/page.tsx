@@ -20,7 +20,6 @@ import { useToast } from '@/components/ui/toast';
 import type { Party, DocLine } from '@/components/documents/tax-document';
 import { PurchaseDocument } from '@/components/purchases/purchase-document';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
-import { PaymentDialog } from '@/components/payments/payment-dialog';
 import { RevisionLog } from '@/components/documents/revision-log';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
@@ -149,7 +148,6 @@ export default function PurchaseDetailPage() {
   const [busy, setBusy] = useState<ExportBusy>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [actioning, setActioning] = useState(false);
-  const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [payments, setPayments] = useState<PurchasePayment[]>([]);
   const [inventoryMovements, setInventoryMovements] = useState<PurchaseInventoryMovement[]>([]);
@@ -381,7 +379,7 @@ export default function PurchaseDetailPage() {
   const workControls = isDraft ? <Button size="sm" onClick={() => setPendingAction('post')} disabled={actioning}><CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />{t('post')}</Button> : null;
   const purchaseActions = <>
     {isDraft && <DropdownItem icon={Pencil} href={`/purchases/${purchase.id}/edit`}>{tp('edit')}</DropdownItem>}
-    {canPay && <DropdownItem icon={RotateCcw} onClick={() => setPaymentOpen(true)}>{t('add_payment')}</DropdownItem>}
+    {canPay && <DropdownItem icon={RotateCcw} href={`/purchases/${purchase.id}/payments/new`}>{t('add_payment')}</DropdownItem>}
     {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
     <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
     <DropdownItem icon={Download} onClick={handleDownloadPdf}>{busy === 'pdf' ? t('generating') : t('download_pdf')}</DropdownItem>
@@ -415,7 +413,6 @@ export default function PurchaseDetailPage() {
 
     <section aria-label={t('activity')}><RevisionLog type="purchase" id={id} collapsible defaultOpen={false} /></section>
 
-    <PaymentDialog open={paymentOpen} onClose={() => setPaymentOpen(false)} onSaved={load} fixedDirection="paid" initialPurchase={{ id: purchase.id, partnerId: purchase.partner_id, remaining: purchase.remaining }} />
     <CreateReturnDialog open={returnOpen} onClose={() => setReturnOpen(false)} onCreated={() => { setReturnOpen(false); load(); }} fixedType="purchase" initialPurchase={{ id: purchase.id, partnerId: purchase.partner_id }} />
     <Dialog open={pendingAction !== null} onClose={() => (actioning ? null : setPendingAction(null))} title={pendingAction === 'post' ? t('post') : tp('delete_title')}><p className="text-sm text-text">{pendingAction === 'post' ? t('post_confirm') : <>{tp('delete_confirm')} <span className="num font-medium">{purchase.number}</span>؟</>}</p><div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setPendingAction(null)} disabled={actioning}>{tp('cancel')}</Button><Button variant={pendingAction === 'delete' ? 'danger' : 'primary'} onClick={confirmAction} disabled={actioning}>{pendingAction === 'post' ? t('post') : tp('delete')}</Button></div></Dialog>
   </div>;
