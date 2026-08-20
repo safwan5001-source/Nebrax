@@ -596,3 +596,66 @@ test('P47.3: يكمل مسار القالب بلوحة المفاتيح مع ب�
     structureOrderAfter: await moveDownButtons.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
   });
 });
+
+
+test('P47.4: تحقق رموز الحالات النصية تباين 4.5:1 في الوضعين', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await page.goto(`${baseUrl}/document-design`);
+  await expect(page.getByRole('heading', { name: 'مركز قوالب الطباعة' })).toBeVisible();
+
+  const samples = [];
+  for (const theme of ['light', 'dark'] as const) {
+    await page.evaluate((selectedTheme) => {
+      document.documentElement.classList.toggle('dark', selectedTheme === 'dark');
+    }, theme);
+
+    const measurements = await page.evaluate(() => {
+      const tokens = getComputedStyle(document.documentElement);
+      const parseHex = (value: string) => {
+        const normalized = value.trim();
+        return [
+          Number.parseInt(normalized.slice(1, 3), 16),
+          Number.parseInt(normalized.slice(3, 5), 16),
+          Number.parseInt(normalized.slice(5, 7), 16),
+        ];
+      };
+      const linearize = (channel: number) => {
+        const value = channel / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      };
+      const luminance = (value: string) => {
+        const [red, green, blue] = parseHex(value);
+        return (0.2126 * linearize(red)) + (0.7152 * linearize(green)) + (0.0722 * linearize(blue));
+      };
+      const ratio = (foreground: string, background: string) => {
+        const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+        return Number(((lighter + 0.05) / (darker + 0.05)).toFixed(2));
+      };
+      const blend = (foreground: string, background: string) => {
+        const front = parseHex(foreground);
+        const back = parseHex(background);
+        return `#${front.map((channel, index) => Math.round((channel * 0.1) + (back[index] * 0.9)).toString(16).padStart(2, '0')).join('')}`;
+      };
+      const surface = tokens.getPropertyValue('--surface').trim();
+      return ['positive', 'negative', 'warning'].flatMap((tone) => {
+        const foreground = tokens.getPropertyValue(`--${tone}`).trim();
+        const badgeBackground = blend(foreground, surface);
+        return [
+          { tone, context: 'surface', foreground, background: surface, ratio: ratio(foreground, surface) },
+          { tone, context: 'badge-10', foreground, background: badgeBackground, ratio: ratio(foreground, badgeBackground) },
+        ];
+      });
+    });
+
+    expect(measurements.every((sample) => sample.ratio >= 4.5), JSON.stringify({ theme, measurements }, null, 2)).toBe(true);
+    samples.push({ theme, measurements });
+    await page.screenshot({ path: `test-results/p47-baseline/p47-4-${theme}-contrast.png`, fullPage: true });
+  }
+
+  await test.info().attach('p47-4-theme-contrast.json', {
+    body: JSON.stringify(samples, null, 2),
+    contentType: 'application/json',
+  });
+  await saveEvidence('p47-4-theme-contrast', samples);
+});

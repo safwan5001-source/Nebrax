@@ -11,9 +11,9 @@
   --primary: #1e40af;
   --primary-hover: #1e3a8a;
   --primary-soft: #eef2ff;
-  --positive: #16a34a;
-  --negative: #dc2626;
-  --warning: #d97706;
+  --positive: #166534;
+  --negative: #b91c1c;
+  --warning: #92400e;
   --flag-saudi: #006c35;
   --flag-mark: #ffffff;
   --font-sans: var(--font-ibm-sans), 'IBM Plex Sans Arabic', system-ui, sans-serif;
@@ -30,7 +30,7 @@
   --primary-hover: #6ba0ff;
   --primary-soft: #1b2740;
   --positive: #16a34a;
-  --negative: #dc2626;
+  --negative: #f87171;
   --warning: #d97706;
   --flag-saudi: #006c35;
   --flag-mark: #ffffff;
