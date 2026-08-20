@@ -1,0 +1,82 @@
+import { expect, test, type Page } from '@playwright/test';
+
+const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
+
+async function enterDemo(page: Page) {
+  await page.context().addCookies([{ name: 'locale', value: 'ar', url: baseUrl }]);
+  await page.goto(`${baseUrl}/login`);
+  await page.getByRole('button', { name: 'دخول تجريبي' }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.waitForLoadState('domcontentloaded');
+}
+
+async function expectActionMenuWithinViewport(page: Page, expectedItems: RegExp[]) {
+  const actions = page.getByRole('button', { name: /^(Purchase invoice actions|إجراءات فاتورة الشراء)$/ });
+  await actions.click();
+  const menu = page.getByRole('menu', { name: /^(Purchase invoice actions|إجراءات فاتورة الشراء)$/ });
+  await expect(menu).toBeVisible();
+  for (const name of expectedItems) await expect(menu.getByRole('menuitem', { name })).toBeVisible();
+  const menuBox = await menu.boundingBox();
+  expect(menuBox).not.toBeNull();
+  expect(menuBox!.x).toBeGreaterThanOrEqual(12);
+  expect(menuBox!.width).toBeLessThanOrEqual(352);
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(378);
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(832);
+  await actions.click();
+  await expect(menu).toBeHidden();
+}
+
+test('تفاصيل فاتورة الشراء على الجوال: قائمة إجراءات وأقسام قابلة للإغلاق', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enterDemo(page);
+  await page.goto(`${baseUrl}/purchases/pu-40`, { waitUntil: 'commit' }).catch((error: Error) => {
+    if (!error.message.includes('ERR_ABORTED')) throw error;
+  });
+  await expect(page.getByRole('heading', { name: /^(PUR-2026-0040|PUR-٢٠٢٦-٠٠٤٠)$/ })).toBeVisible();
+
+  await expectActionMenuWithinViewport(page, [/^(Add payment|إضافة عملية دفع)$/, /^(Create return|إنشاء مرتجع)$/, /^(Print|طباعة)$/]);
+
+  const documentBeforeDetails = await page.evaluate(() => {
+    const headings = Array.from(document.querySelectorAll('h3'));
+    const documentTitle = headings.find((node) => /^(Document|المستند)$/.test(node.textContent?.trim() ?? ''));
+    const detailsTitle = headings.find((node) => /^(Invoice details|تفاصيل الفاتورة)$/.test(node.textContent?.trim() ?? ''));
+    return Boolean(documentTitle && detailsTitle && (documentTitle.compareDocumentPosition(detailsTitle) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(documentBeforeDetails).toBe(true);
+
+  await expect(page.locator('#purchase-document-content')).toBeVisible();
+  const details = page.getByRole('button', { name: /^(Invoice details|تفاصيل الفاتورة)$/ });
+  await expect(page.locator('#purchase-details-content')).toHaveCount(0);
+  await details.click();
+  await expect(page.locator('#purchase-details-content')).toBeVisible();
+  await details.click();
+  await expect(page.locator('#purchase-details-content')).toHaveCount(0);
+
+  const financial = page.getByRole('button', { name: /^(Financial summary|الملخص المالي)$/ });
+  await expect(page.locator('#purchase-financial-content')).toHaveCount(0);
+  await financial.click();
+  await expect(page.locator('#purchase-financial-content')).toBeVisible();
+
+  const payments = page.getByRole('button', { name: /^(Payments|المدفوعات)/ });
+  await payments.scrollIntoViewIfNeeded();
+  await expect(page.locator('#acc-payments')).toHaveCount(0);
+  await payments.click();
+  await expect(page.locator('#acc-payments')).toBeVisible();
+  await payments.click();
+  await expect(page.locator('#acc-payments')).toHaveCount(0);
+
+  const revisions = page.getByRole('button', { name: /^(Change log|سجلّ التغييرات)$/ });
+  await revisions.scrollIntoViewIfNeeded();
+  await expect(page.locator('#revision-log-purchase-pu-40')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'تبديل اللغة' }).click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  await expectActionMenuWithinViewport(page, [/^Add payment$/, /^Create return$/]);
+
+  await page.goto(`${baseUrl}/purchases/pu-39`, { waitUntil: 'commit' }).catch((error: Error) => {
+    if (!error.message.includes('ERR_ABORTED')) throw error;
+  });
+  await expect(page.getByRole('heading', { name: 'PUR-2026-0039' })).toBeVisible();
+  await expectActionMenuWithinViewport(page, [/^Edit$/, /^Delete$/]);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});

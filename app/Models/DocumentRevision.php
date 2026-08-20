@@ -37,6 +37,7 @@ class DocumentRevision extends BaseModel implements CompanyWide
      */
     public const TYPES = [
         'invoice'      => \App\Models\Invoice::class,
+        'purchase'     => \App\Models\Purchase::class,
         'quote'        => \App\Models\Quote::class,
         'procurement'  => \App\Models\ProcurementDocument::class,
         'stocktake'    => \App\Models\Stocktake::class,

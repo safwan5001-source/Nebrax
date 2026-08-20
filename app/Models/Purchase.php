@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\GeneratesDocumentNumbers;
+use App\Support\RecordsRevisions;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Purchase extends BaseModel
 {
     use ResolvesBranchReferences;
+    use RecordsRevisions;
     use BelongsToBranch;
     use GeneratesDocumentNumbers;
 

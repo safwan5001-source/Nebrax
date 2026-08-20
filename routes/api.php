@@ -337,6 +337,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // المشتريات
         Route::get('purchases', [PurchaseController::class, 'index'])->middleware($perm('purchases.view'));
         Route::get('purchases/{id}', [PurchaseController::class, 'show'])->middleware($perm('purchases.view'));
+        Route::get('purchases/{id}/payments', [PurchaseController::class, 'payments'])->middleware($perm('payments.view'));
+        Route::get('purchases/{id}/accounting', [PurchaseController::class, 'accounting'])->middleware($perm('reports.view'));
+        Route::get('purchases/{id}/inventory', [PurchaseController::class, 'inventory'])->middleware($perm('products.view'));
         Route::post('purchases', [PurchaseController::class, 'store'])->middleware($perm('purchases.manage'));
         Route::put('purchases/{id}', [PurchaseController::class, 'update'])->middleware($perm('purchases.manage'));    // مسوّدة فقط
         Route::delete('purchases/{id}', [PurchaseController::class, 'destroy'])->middleware($perm('purchases.manage')); // مسوّدة فقط

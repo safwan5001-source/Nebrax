@@ -48,6 +48,7 @@ export function CreateReturnDialog({
   onCreated,
   fixedType,
   initialSalesInvoice,
+  initialPurchase,
 }: {
   open: boolean;
   onClose: () => void;
@@ -56,6 +57,8 @@ export function CreateReturnDialog({
   fixedType?: 'sales' | 'purchase';
   /** فاتورة مبيعات مصدر اختيارية؛ تسحب السطور القابلة للرد من الخادم. */
   initialSalesInvoice?: { id: string; partnerId: string };
+  /** فاتورة شراء مصدر اختيارية؛ تسحب السطور القابلة للرد من الخادم. */
+  initialPurchase?: { id: string; partnerId: string };
 }) {
   const t = useTranslations('returnForm');
   const tc = useTranslations('common');
@@ -92,6 +95,14 @@ export function CreateReturnDialog({
     setSourceId('');
     setLines([emptyLine()]);
   }, [open, initialSalesInvoice?.id, initialSalesInvoice?.partnerId]);
+
+  useEffect(() => {
+    if (!open || !initialPurchase) return;
+    setType('purchase');
+    setPartnerId(initialPurchase.partnerId);
+    setSourceId('');
+    setLines([emptyLine()]);
+  }, [open, initialPurchase?.id, initialPurchase?.partnerId]);
 
   // سياسة إلزام المصدر — تتبع نوع المرتجع، فتُعاد عند تبديله.
 
@@ -169,6 +180,11 @@ export function CreateReturnDialog({
     if (!open || !initialSalesInvoice || type !== 'sales' || partnerId !== initialSalesInvoice.partnerId) return;
     void pickSource(initialSalesInvoice.id);
   }, [open, type, partnerId, initialSalesInvoice?.id, initialSalesInvoice?.partnerId]);
+
+  useEffect(() => {
+    if (!open || !initialPurchase || type !== 'purchase' || partnerId !== initialPurchase.partnerId) return;
+    void pickSource(initialPurchase.id);
+  }, [open, type, partnerId, initialPurchase?.id, initialPurchase?.partnerId]);
 
   async function pickSource(id: string) {
     setSourceId(id);
