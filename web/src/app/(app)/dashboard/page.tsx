@@ -40,7 +40,7 @@ interface InventoryRow { total_value?: string; value?: string }
 const QUICK_ACTIONS: { href: string; key: string; icon: LucideIcon }[] = [
   { href: '/invoices/new', key: 'qa_invoice', icon: FilePlus },
   { href: '/partners/new', key: 'qa_partner', icon: UserPlus },
-  { href: '/payments', key: 'qa_payment', icon: CreditCard },
+  { href: '/payments/new', key: 'qa_payment', icon: CreditCard },
   { href: '/reports', key: 'qa_reports', icon: BarChart3 },
 ];
 

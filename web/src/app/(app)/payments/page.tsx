@@ -8,7 +8,6 @@ import { Plus } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PaymentDialog } from '@/components/payments/payment-dialog';
 import { api } from '@/lib/api';
 import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
 import { branchViewQuery, type BranchView } from '@/lib/branch-view';
@@ -30,7 +29,6 @@ export default function PaymentsPage() {
   const [data, setData] = useState<Payment[]>([]);
   const [partners, setPartners] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
 
   // نطاق العرض: الفرع النشط افتراضياً؛ لا يُحفظ فيبدأ كل فتح من الافتراضي.
   const [view, setView] = useState<BranchView>('current');
@@ -85,15 +83,11 @@ export default function PaymentsPage() {
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
         {/* نطاق العرض ظاهر في الشاشة نفسها — لا مخفيّاً في الإعدادات. */}
         <BranchViewToggle value={view} onChange={setView} />
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" strokeWidth={1.8} />
-          {t('create')}
-        </Button>
+        <Link href="/payments/new"><Button><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create')}</Button></Link>
       </div>
 
       <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="payments" />
 
-      <PaymentDialog open={open} onClose={() => setOpen(false)} onSaved={load} fixedDirection="received" />
     </div>
   );
 }

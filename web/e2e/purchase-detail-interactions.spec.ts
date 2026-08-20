@@ -35,6 +35,17 @@ test('تفاصيل فاتورة الشراء على الجوال: قائمة إ�
   await expect(page.getByRole('heading', { name: /^(PUR-2026-0040|PUR-٢٠٢٦-٠٠٤٠)$/ })).toBeVisible();
 
   await expectActionMenuWithinViewport(page, [/^(Add payment|إضافة عملية دفع)$/, /^(Create return|إنشاء مرتجع)$/, /^(Print|طباعة)$/]);
+  await page.getByRole('button', { name: /^(Purchase invoice actions|إجراءات فاتورة الشراء)$/ }).click();
+  await page.getByRole('menuitem', { name: /^(Add payment|إضافة عملية دفع)$/ }).click();
+  await expect(page).toHaveURL(/\/purchases\/pu-40\/payments\/new$/);
+  await expect(page.getByRole('heading', { name: /^(Add payment|إضافة عملية دفع)$/ })).toBeVisible();
+  await expect(page.locator('#document-payment-amount')).toHaveValue('3450.00');
+  await expect(page.locator('#document-payment-collector')).toBeVisible();
+
+  await page.goto(`${baseUrl}/purchases/pu-40`, { waitUntil: 'commit' }).catch((error: Error) => {
+    if (!error.message.includes('ERR_ABORTED')) throw error;
+  });
+  await expect(page.getByRole('heading', { name: /^(PUR-2026-0040|PUR-٢٠٢٦-٠٠٤٠)$/ })).toBeVisible();
 
   const documentBeforeDetails = await page.evaluate(() => {
     const headings = Array.from(document.querySelectorAll('h3'));
@@ -78,5 +89,18 @@ test('تفاصيل فاتورة الشراء على الجوال: قائمة إ�
   });
   await expect(page.getByRole('heading', { name: 'PUR-2026-0039' })).toBeVisible();
   await expectActionMenuWithinViewport(page, [/^Edit$/, /^Delete$/]);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+
+test('الإجراء السريع في لوحة التحكم يفتح شاشة تسجيل دفعة الموحدة', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enterDemo(page);
+  await page.getByRole('link', { name: /^(Record payment|تسجيل دفعة)$/ }).click();
+  await expect(page).toHaveURL(/\/payments\/new$/);
+  await expect(page.getByRole('heading', { name: /^(Record payment|تسجيل دفعة)$/ })).toBeVisible();
+  await expect(page.locator('#general-payment-direction')).toBeVisible();
+  await expect(page.locator('#general-payment-partner')).toBeVisible();
+  await expect(page.locator('#general-payment-attachments')).toBeAttached();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
