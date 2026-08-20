@@ -17,6 +17,7 @@ import {
   Receipt,
   Scale,
   ShoppingCart,
+  SlidersHorizontal,
   type LucideIcon,
   Users,
   WalletCards,
@@ -58,6 +59,7 @@ const REPORT_CATEGORIES: ReportCategoryDefinition[] = [
       { key: 'salesByPeriod', href: '/reports/sales/by-period', icon: CalendarDays, status: 'ready' },
       { key: 'salesByCustomer', href: '/reports/sales/by-customer', icon: Users, status: 'ready' },
       { key: 'salesByProduct', href: '/reports/sales/by-product', icon: Package, status: 'ready' },
+      { key: 'salesByClassification', href: '/reports/sales/by-classification', icon: ClipboardList, status: 'ready' },
       { key: 'salesByRepresentative', href: '/reports/sales/by-salesperson', icon: Contact, status: 'ready' },
       { key: 'salesProfitability', href: '/reports/sales/profitability', icon: Scale, status: 'ready' },
       { key: 'salesPaymentsByPeriod', href: '/reports/sales/payments', icon: WalletCards, status: 'ready' },
@@ -72,6 +74,7 @@ const REPORT_CATEGORIES: ReportCategoryDefinition[] = [
       { key: 'purchasesByPeriod', href: '/reports/purchases/by-period', icon: BarChart3, status: 'ready' },
       { key: 'purchasesBySupplier', href: '/reports/purchases/by-supplier', icon: Users, status: 'ready' },
       { key: 'purchasesByProduct', href: '/reports/purchases/by-product', icon: Package, status: 'ready' },
+      { key: 'purchasesByClassification', href: '/reports/purchases/by-classification', icon: ClipboardList, status: 'ready' },
       { key: 'purchasesByEmployee', href: '/reports/purchases/by-employee', icon: Contact, status: 'ready' },
       { key: 'supplierBalances', href: '/reports/purchases/balances', icon: WalletCards, status: 'ready' },
       { key: 'supplierPaymentsByPeriod', href: '/reports/purchases/payments', icon: CalendarDays, status: 'ready' },
@@ -177,12 +180,19 @@ function ReportCard({ report }: { report: ReportDefinition }) {
 
 export function ReportsCatalog() {
   const t = useTranslations('reports.catalog');
+  const tPolicy = useTranslations('classificationPolicy');
 
   return (
     <div className="space-y-6">
-      <header className="max-w-3xl">
-        <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <p className="mt-1 text-sm leading-6 text-muted">{t('description')}</p>
+      <header className="flex max-w-3xl flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+          <p className="mt-1 text-sm leading-6 text-muted">{t('description')}</p>
+        </div>
+        <Link href="/reports/settings/classifications" className="inline-flex items-center gap-2 rounded border border-border px-3 py-2 text-sm font-medium text-text transition-colors hover:border-primary/40 hover:bg-primary-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <SlidersHorizontal className="h-4 w-4 text-primary" strokeWidth={1.7} aria-hidden="true" />
+          {tPolicy('title')}
+        </Link>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

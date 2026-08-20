@@ -26,7 +26,7 @@ import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
 import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
 
-export type PurchaseReportView = 'period' | 'supplier' | 'product' | 'employee' | 'balances' | 'payments';
+export type PurchaseReportView = 'period' | 'supplier' | 'product' | 'classification' | 'employee' | 'balances' | 'payments';
 
 type Money = string;
 interface PurchaseRow {
@@ -66,7 +66,10 @@ function filtersToQuery(view: PurchaseReportView, filters: PurchaseReportFilterS
   if (filters.to) params.set('to', filters.to);
   filters.branchIds.forEach((id) => params.append('branch_id[]', id));
   if (filters.supplierId) params.set('supplier_id', filters.supplierId);
+  if (filters.supplierClassificationId) params.set('supplier_classification_id', filters.supplierClassificationId);
   if (filters.productId) params.set('product_id', filters.productId);
+  if (filters.productCategoryId) params.set('product_category_id', filters.productCategoryId);
+  if (filters.classificationId) params.set('classification_id', filters.classificationId);
   if (filters.creatorId) params.set('creator_id', filters.creatorId);
   if (filters.paymentStatus) params.set('payment_status', filters.paymentStatus);
   if (filters.receivedStatus) params.set('received_status', filters.receivedStatus);

@@ -12,6 +12,7 @@ use App\Models\Partner;
 use App\Models\Product;
 use App\Support\Settings;
 use App\Services\PrintTemplates\PrintTemplateService;
+use App\Services\ClassificationService;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -49,7 +50,8 @@ class InvoiceService
         protected ZatcaService $zatca,
         protected UnitConversion $units,
         protected PaymentService $payments,
-        protected PrintTemplateService $printTemplates
+        protected PrintTemplateService $printTemplates,
+        protected ClassificationService $classifications
     ) {}
 
     /**
@@ -93,6 +95,9 @@ class InvoiceService
             ]);
 
             $this->applyItemsAndTotals($invoice, $items, $data);
+            if (array_key_exists('classification_id', $data)) {
+                $this->classifications->updateDocumentClassification($invoice, $data['classification_id'], 'sales_invoice');
+            }
 
             return $invoice->fresh('lines.costCenterAllocations.costCenter');
         });
@@ -151,6 +156,9 @@ class InvoiceService
             ]);
 
             $this->applyItemsAndTotals($invoice, $items, $data);
+            if (array_key_exists('classification_id', $data) && $data['classification_id'] !== $invoice->classification_id) {
+                $this->classifications->updateDocumentClassification($invoice, $data['classification_id'], 'sales_invoice');
+            }
 
             return $invoice->fresh('lines.costCenterAllocations.costCenter');
         });
@@ -177,6 +185,7 @@ class InvoiceService
             'invoice_date'    => $date,
             'due_date'        => $invoice->due_date?->toDateString(),
             'cost_center_id'  => $invoice->cost_center_id,
+            'classification_id' => $invoice->classification_id,
             'salesperson_id'  => $invoice->salesperson_id,
             'discount'        => $invoice->discount,
             'shipping'        => $invoice->shipping,

@@ -16,11 +16,16 @@ import type { PurchaseReportView } from '@/components/reports/purchases-reports-
 interface Partner { id: string; name: string; phone?: string | null; vat_number?: string | null }
 interface Product { id: string; name: string; sku?: string | null; barcode?: string | null; is_active: boolean }
 interface Creator { id: string; name: string; hint?: string | null }
+interface Category { id: string; name: string; is_active: boolean }
+interface Classification { id: string; name: string; is_active: boolean }
 
 export interface PurchaseReportFilterState extends ReportFilterState {
   interval: 'day' | 'week' | 'month' | 'year';
   supplierId: string;
+  supplierClassificationId: string;
   productId: string;
+  productCategoryId: string;
+  classificationId: string;
   creatorId: string;
   paymentStatus: '' | 'paid' | 'partial' | 'unpaid';
   receivedStatus: '' | 'pending' | 'partial' | 'received';
@@ -31,7 +36,10 @@ export const EMPTY_PURCHASE_REPORT_FILTERS: PurchaseReportFilterState = {
   ...EMPTY_FILTERS,
   interval: 'month',
   supplierId: '',
+  supplierClassificationId: '',
   productId: '',
+  productCategoryId: '',
+  classificationId: '',
   creatorId: '',
   paymentStatus: '',
   receivedStatus: '',
@@ -52,11 +60,17 @@ export function PurchaseReportFilters({
   const [suppliers, setSuppliers] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [creators, setCreators] = useState<Creator[]>([]);
+  const [productCategories, setProductCategories] = useState<Category[]>([]);
+  const [supplierClassifications, setSupplierClassifications] = useState<Classification[]>([]);
+  const [invoiceClassifications, setInvoiceClassifications] = useState<Classification[]>([]);
 
   useEffect(() => {
     api<{ data: Partner[] }>('/partners?type=supplier').then((r) => setSuppliers(r.data)).catch(() => {});
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
     api<{ data: Creator[] }>('/reports/purchases/creators').then((r) => setCreators(r.data)).catch(() => {});
+    api<{ data: Category[] }>('/product-categories').then((r) => setProductCategories(r.data.filter((c) => c.is_active))).catch(() => {});
+    api<{ data: Classification[] }>('/classifications?scope=supplier').then((r) => setSupplierClassifications(r.data.filter((c) => c.is_active))).catch(() => {});
+    api<{ data: Classification[] }>('/classifications?scope=purchase_invoice').then((r) => setInvoiceClassifications(r.data.filter((c) => c.is_active))).catch(() => {});
   }, []);
 
   const supplierOptions = useMemo<ComboOption[]>(() => suppliers.map((p) => ({
@@ -75,11 +89,15 @@ export function PurchaseReportFilters({
     label: creator.name,
     hint: creator.hint ?? undefined,
   })), [creators]);
+  const productCategoryOptions = useMemo<ComboOption[]>(() => productCategories.map((c) => ({ value: c.id, label: c.name })), [productCategories]);
+  const supplierClassificationOptions = useMemo<ComboOption[]>(() => supplierClassifications.map((c) => ({ value: c.id, label: c.name })), [supplierClassifications]);
+  const invoiceClassificationOptions = useMemo<ComboOption[]>(() => invoiceClassifications.map((c) => ({ value: c.id, label: c.name })), [invoiceClassifications]);
 
   const isPaymentReport = view === 'payments';
   const hasInterval = view === 'period' || view === 'payments';
   const hasProduct = !isPaymentReport;
-  const dirty = value.supplierId !== '' || value.productId !== '' || value.creatorId !== ''
+  const dirty = value.supplierId !== '' || value.supplierClassificationId !== '' || value.productId !== ''
+    || value.productCategoryId !== '' || value.classificationId !== '' || value.creatorId !== ''
     || value.paymentStatus !== '' || value.receivedStatus !== '' || value.paymentMethod !== '' || value.interval !== 'month';
   const scopeDirty = !!value.from || !!value.to || value.branchIds.length > 0;
 
@@ -148,6 +166,21 @@ export function PurchaseReportFilters({
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <Label htmlFor="purchase-supplier-classification">{t('supplierClassification')}</Label>
+                <Combobox
+                  id="purchase-supplier-classification"
+                  value={value.supplierClassificationId}
+                  onChange={(supplierClassificationId) => patch({ supplierClassificationId })}
+                  options={supplierClassificationOptions}
+                  placeholder={t('allSupplierClassifications')}
+                  clearLabel={t('allSupplierClassifications')}
+                  searchPlaceholder={t('supplierClassification')}
+                  emptyText={t('allSupplierClassifications')}
+                  aria-label={t('supplierClassification')}
+                />
+              </div>
+
               {!isPaymentReport && (
                 <div className="space-y-1.5">
                   <Label htmlFor="purchase-creator">{t('creator')}</Label>
@@ -166,7 +199,22 @@ export function PurchaseReportFilters({
               )}
 
               {hasProduct && (
-                <div className="space-y-1.5">
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="purchase-product-category">{t('productCategory')}</Label>
+                    <Combobox
+                      id="purchase-product-category"
+                      value={value.productCategoryId}
+                      onChange={(productCategoryId) => patch({ productCategoryId })}
+                      options={productCategoryOptions}
+                      placeholder={t('allProductCategories')}
+                      clearLabel={t('allProductCategories')}
+                      searchPlaceholder={t('productCategory')}
+                      emptyText={t('allProductCategories')}
+                      aria-label={t('productCategory')}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
                   <Label htmlFor="purchase-product">{t('product')}</Label>
                   <Combobox
                     id="purchase-product"
@@ -180,6 +228,24 @@ export function PurchaseReportFilters({
                     aria-label={t('product')}
                   />
                   {view !== 'product' && value.productId && <p className="text-[11px] leading-4 text-muted">{t('productInvoiceScope')}</p>}
+                  </div>
+                </>
+              )}
+
+              {!isPaymentReport && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="purchase-invoice-classification">{t('invoiceClassification')}</Label>
+                  <Combobox
+                    id="purchase-invoice-classification"
+                    value={value.classificationId}
+                    onChange={(classificationId) => patch({ classificationId })}
+                    options={invoiceClassificationOptions}
+                    placeholder={t('allInvoiceClassifications')}
+                    clearLabel={t('allInvoiceClassifications')}
+                    searchPlaceholder={t('invoiceClassification')}
+                    emptyText={t('allInvoiceClassifications')}
+                    aria-label={t('invoiceClassification')}
+                  />
                 </div>
               )}
 

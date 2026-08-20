@@ -29,6 +29,12 @@ class InvoiceResource extends JsonResource
             'due_date'       => optional($this->due_date)->toDateString(),
             'notes'          => $this->notes,
             'cost_center_id' => $this->cost_center_id,
+            'classification_id' => $this->classification_id,
+            'classification' => $this->whenLoaded('classification', fn () => $this->classification ? [
+                'id' => $this->classification->id,
+                'name' => $this->classification->name,
+                'scope' => $this->classification->scope,
+            ] : null),
             'cost_center' => $this->whenLoaded('costCenter', fn () => $this->costCenter ? [
                 'id'   => $this->costCenter->id,
                 'code' => $this->costCenter->code,

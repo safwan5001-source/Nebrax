@@ -24,7 +24,7 @@ class Invoice extends BaseModel
     protected $fillable = [
         'branch_id',
         'tenant_id', 'number', 'partner_id', 'type', 'payment_type',
-        'invoice_date', 'due_date', 'cost_center_id', 'salesperson_id', 'status',
+        'invoice_date', 'due_date', 'cost_center_id', 'classification_id', 'salesperson_id', 'status',
         'subtotal', 'discount', 'shipping', 'adjustment', 'tax_amount', 'total',
         'tax_inclusive', 'paid_amount', 'payment_status',
         'is_paid', 'payment_method', 'payment_reference', 'cash_account_id',
@@ -85,6 +85,12 @@ class Invoice extends BaseModel
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
+    }
+
+    /** تصنيف تحليلي محفوظ على الفاتورة؛ لا يغيّر القيد أو الإجماليات. */
+    public function classification(): BelongsTo
+    {
+        return $this->referenceBelongsTo(Classification::class);
     }
 
     public function journalEntry(): BelongsTo

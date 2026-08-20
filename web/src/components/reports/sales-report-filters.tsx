@@ -16,11 +16,16 @@ import type { SalesReportView } from '@/components/reports/sales-reports-workspa
 interface Partner { id: string; name: string; phone?: string | null; vat_number?: string | null }
 interface Product { id: string; name: string; sku?: string | null; barcode?: string | null; is_active: boolean }
 interface Employee { id: string; name: string }
+interface Category { id: string; name: string; is_active: boolean }
+interface Classification { id: string; name: string; is_active: boolean }
 
 export interface SalesReportFilterState extends ReportFilterState {
   interval: 'day' | 'week' | 'month' | 'year';
   customerId: string;
+  customerClassificationId: string;
   productId: string;
+  productCategoryId: string;
+  classificationId: string;
   salespersonId: string;
   paymentStatus: '' | 'paid' | 'partial' | 'unpaid';
   receiptMethod: '' | 'cash' | 'bank';
@@ -30,7 +35,10 @@ export const EMPTY_SALES_REPORT_FILTERS: SalesReportFilterState = {
   ...EMPTY_FILTERS,
   interval: 'month',
   customerId: '',
+  customerClassificationId: '',
   productId: '',
+  productCategoryId: '',
+  classificationId: '',
   salespersonId: '',
   paymentStatus: '',
   receiptMethod: '',
@@ -50,11 +58,17 @@ export function SalesReportFilters({
   const [partners, setPartners] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [productCategories, setProductCategories] = useState<Category[]>([]);
+  const [customerClassifications, setCustomerClassifications] = useState<Classification[]>([]);
+  const [invoiceClassifications, setInvoiceClassifications] = useState<Classification[]>([]);
 
   useEffect(() => {
     api<{ data: Partner[] }>('/partners?type=customer').then((r) => setPartners(r.data)).catch(() => {});
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
     api<{ data: Employee[] }>('/employees').then((r) => setEmployees(r.data)).catch(() => {});
+    api<{ data: Category[] }>('/product-categories').then((r) => setProductCategories(r.data.filter((c) => c.is_active))).catch(() => {});
+    api<{ data: Classification[] }>('/classifications?scope=customer').then((r) => setCustomerClassifications(r.data.filter((c) => c.is_active))).catch(() => {});
+    api<{ data: Classification[] }>('/classifications?scope=sales_invoice').then((r) => setInvoiceClassifications(r.data.filter((c) => c.is_active))).catch(() => {});
   }, []);
 
   const customerOptions = useMemo<ComboOption[]>(() => partners.map((p) => ({
@@ -69,12 +83,16 @@ export function SalesReportFilters({
     sub: [p.sku, p.barcode].filter(Boolean).join(' · ') || undefined,
   })), [products]);
   const salespersonOptions = useMemo<ComboOption[]>(() => employees.map((e) => ({ value: e.id, label: e.name })), [employees]);
+  const productCategoryOptions = useMemo<ComboOption[]>(() => productCategories.map((c) => ({ value: c.id, label: c.name })), [productCategories]);
+  const customerClassificationOptions = useMemo<ComboOption[]>(() => customerClassifications.map((c) => ({ value: c.id, label: c.name })), [customerClassifications]);
+  const invoiceClassificationOptions = useMemo<ComboOption[]>(() => invoiceClassifications.map((c) => ({ value: c.id, label: c.name })), [invoiceClassifications]);
 
   const isReceiptReport = view === 'payments';
   const isProfitReport = view === 'profit';
   const hasInterval = view === 'period' || view === 'profit' || view === 'payments';
   const hasProduct = !isReceiptReport && !isProfitReport;
-  const dirty = value.customerId !== '' || value.productId !== '' || value.salespersonId !== ''
+  const dirty = value.customerId !== '' || value.customerClassificationId !== '' || value.productId !== ''
+    || value.productCategoryId !== '' || value.classificationId !== '' || value.salespersonId !== ''
     || value.paymentStatus !== '' || value.receiptMethod !== '' || value.interval !== 'month';
   const scopeDirty = !!value.from || !!value.to || value.branchIds.length > 0;
 
@@ -147,6 +165,21 @@ export function SalesReportFilters({
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <Label htmlFor="sales-customer-classification">{t('customerClassification')}</Label>
+                <Combobox
+                  id="sales-customer-classification"
+                  value={value.customerClassificationId}
+                  onChange={(customerClassificationId) => patch({ customerClassificationId })}
+                  options={customerClassificationOptions}
+                  placeholder={t('allCustomerClassifications')}
+                  clearLabel={t('allCustomerClassifications')}
+                  searchPlaceholder={t('customerClassification')}
+                  emptyText={t('allCustomerClassifications')}
+                  aria-label={t('customerClassification')}
+                />
+              </div>
+
               {!isReceiptReport && (
                 <div className="space-y-1.5">
                   <Label htmlFor="salesperson">{t('salesperson')}</Label>
@@ -165,7 +198,22 @@ export function SalesReportFilters({
               )}
 
               {hasProduct && (
-                <div className="space-y-1.5">
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sales-product-category">{t('productCategory')}</Label>
+                    <Combobox
+                      id="sales-product-category"
+                      value={value.productCategoryId}
+                      onChange={(productCategoryId) => patch({ productCategoryId })}
+                      options={productCategoryOptions}
+                      placeholder={t('allProductCategories')}
+                      clearLabel={t('allProductCategories')}
+                      searchPlaceholder={t('productCategory')}
+                      emptyText={t('allProductCategories')}
+                      aria-label={t('productCategory')}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
                   <Label htmlFor="sales-product">{t('product')}</Label>
                   <Combobox
                     id="sales-product"
@@ -179,6 +227,24 @@ export function SalesReportFilters({
                     aria-label={t('product')}
                   />
                   {view !== 'product' && value.productId && <p className="text-[11px] leading-4 text-muted">{t('productInvoiceScope')}</p>}
+                  </div>
+                </>
+              )}
+
+              {!isReceiptReport && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="sales-invoice-classification">{t('invoiceClassification')}</Label>
+                  <Combobox
+                    id="sales-invoice-classification"
+                    value={value.classificationId}
+                    onChange={(classificationId) => patch({ classificationId })}
+                    options={invoiceClassificationOptions}
+                    placeholder={t('allInvoiceClassifications')}
+                    clearLabel={t('allInvoiceClassifications')}
+                    searchPlaceholder={t('invoiceClassification')}
+                    emptyText={t('allInvoiceClassifications')}
+                    aria-label={t('invoiceClassification')}
+                  />
                 </div>
               )}
 

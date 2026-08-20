@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StorePurchaseRequest;
+use App\Http\Requests\UpdateDocumentClassificationRequest;
 use App\Http\Resources\PurchaseResource;
 use App\Models\CostCenter;
 use App\Models\Partner;
@@ -12,6 +13,7 @@ use App\Models\Purchase;
 use App\Models\StockMovement;
 use App\Services\Accounting\PurchaseRelationsService;
 use App\Services\Accounting\PurchaseService;
+use App\Services\ClassificationService;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +23,7 @@ class PurchaseController extends ApiController
     public function __construct(
         protected PurchaseService $purchases,
         protected PurchaseRelationsService $relations,
+        protected ClassificationService $classifications,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -118,6 +121,19 @@ class PurchaseController extends ApiController
         $updated = $this->domain(fn () => $this->purchases->update($purchase, $data, $data['items']));
 
         return (new PurchaseResource($updated->load('lines')))->response();
+    }
+
+    /** تعديل تحليلي محدود؛ لا يفتح تعديل مبلغ أو بنود أو قيد شراء مرحّل. */
+    public function updateClassification(UpdateDocumentClassificationRequest $request, string $id): JsonResponse
+    {
+        $purchase = Purchase::findOrFail($id);
+        $updated = $this->domain(fn () => $this->classifications->updateDocumentClassification(
+            $purchase,
+            $request->validated('classification_id'),
+            'purchase_invoice',
+        ));
+
+        return (new PurchaseResource($updated->load(['classification', 'lines'])))->response();
     }
 
     /** حذف مسوّدة. المرحّلة لا تُحذف — سلامة الأثر المحاسبي. */

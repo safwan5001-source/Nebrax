@@ -19,7 +19,7 @@ use RuntimeException;
  */
 class PurchaseReportService
 {
-    public const VIEWS = ['period', 'supplier', 'product', 'employee', 'balances', 'payments'];
+    public const VIEWS = ['period', 'supplier', 'product', 'classification', 'employee', 'balances', 'payments'];
 
     public const INTERVALS = ['day', 'week', 'month', 'year'];
 
@@ -40,6 +40,7 @@ class PurchaseReportService
             'period'   => $this->byPeriod($filters, $interval),
             'supplier' => $this->bySupplier($filters),
             'product'  => $this->byProduct($filters),
+            'classification' => $this->byClassification($filters),
             'employee' => $this->byEmployee($filters),
             'balances' => $this->supplierBalances($filters),
             'payments' => $this->paymentsByPeriod($filters, $interval),
@@ -85,6 +86,12 @@ class PurchaseReportService
         if (! empty($filters['supplier_id'])) {
             $query->where('purchases.partner_id', $filters['supplier_id']);
         }
+        if (! empty($filters['supplier_classification_id'])) {
+            $query->whereHas('partner', fn (Builder $partner) => $partner->where('supplier_classification_id', $filters['supplier_classification_id']));
+        }
+        if (! empty($filters['classification_id'])) {
+            $query->where('purchases.classification_id', $filters['classification_id']);
+        }
         if (! empty($filters['creator_id'])) {
             $query->where('purchases.created_by', $filters['creator_id']);
         }
@@ -99,6 +106,9 @@ class PurchaseReportService
         // الإجمالي. تقرير المنتج نفسه ينتقل إلى purchase_lines ويجمع السطور فقط.
         if (! empty($filters['product_id'])) {
             $query->whereHas('lines', fn (Builder $lines) => $lines->where('product_id', $filters['product_id']));
+        }
+        if (! empty($filters['product_category_id'])) {
+            $query->whereHas('lines.product', fn (Builder $product) => $product->where('category_id', $filters['product_category_id']));
         }
     }
 
@@ -144,7 +154,7 @@ class PurchaseReportService
     private function byProduct(array $filters): array
     {
         $purchaseFilters = $filters;
-        unset($purchaseFilters['product_id']);
+        unset($purchaseFilters['product_id'], $purchaseFilters['product_category_id']);
         $purchaseIds = $this->purchases($purchaseFilters)->select('purchases.id');
 
         $query = PurchaseLine::query()
@@ -153,6 +163,9 @@ class PurchaseReportService
 
         if (! empty($filters['product_id'])) {
             $query->where('purchase_lines.product_id', $filters['product_id']);
+        }
+        if (! empty($filters['product_category_id'])) {
+            $query->where('products.category_id', $filters['product_category_id']);
         }
 
         $rows = $query
@@ -176,6 +189,25 @@ class PurchaseReportService
                 'amount'    => array_sum(array_column($rows, 'amount')),
             ],
         ];
+    }
+
+    /** تجميع رؤوس فواتير الشراء حسب تصنيف المستند؛ لا JOIN على السطور كي لا يتكرر الإجمالي. */
+    private function byClassification(array $filters): array
+    {
+        $rows = $this->purchases($filters)
+            ->leftJoin('classifications', 'classifications.id', '=', 'purchases.classification_id')
+            ->selectRaw('purchases.classification_id as bucket_key, classifications.name as bucket_label, COUNT(purchases.id) as purchases_count, SUM(purchases.total) as amount')
+            ->groupBy('purchases.classification_id', 'classifications.name')
+            ->orderByDesc('amount')
+            ->get()
+            ->map(fn ($row) => [
+                'key' => $row->bucket_key === null ? null : (string) $row->bucket_key,
+                'label' => $row->bucket_label === null || $row->bucket_label === '' ? 'غير مصنف' : (string) $row->bucket_label,
+                'purchases' => (int) $row->purchases_count,
+                'amount' => (int) $row->amount,
+            ])->all();
+
+        return ['rows' => $rows, 'totals' => $this->purchaseTotals($filters)];
     }
 
     /** @return array{rows:array<int,array<string,mixed>>, totals:array<string,int>} */

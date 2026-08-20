@@ -19,7 +19,7 @@ use RuntimeException;
  */
 class SalesReportService
 {
-    public const VIEWS = ['period', 'customer', 'product', 'salesperson', 'profit', 'payments'];
+    public const VIEWS = ['period', 'customer', 'product', 'classification', 'salesperson', 'profit', 'payments'];
     public const INTERVALS = ['day', 'week', 'month', 'year'];
 
     /**
@@ -39,6 +39,7 @@ class SalesReportService
             'period'      => $this->byPeriod($filters, $interval),
             'customer'    => $this->byCustomer($filters),
             'product'     => $this->byProduct($filters),
+            'classification' => $this->byClassification($filters),
             'salesperson' => $this->bySalesperson($filters),
             'profit'      => $this->profitByPeriod($filters, $interval),
             'payments'    => $this->paymentsByPeriod($filters, $interval),
@@ -83,6 +84,12 @@ class SalesReportService
         if (! empty($filters['customer_id'])) {
             $query->where('invoices.partner_id', $filters['customer_id']);
         }
+        if (! empty($filters['customer_classification_id'])) {
+            $query->whereHas('partner', fn (Builder $partner) => $partner->where('customer_classification_id', $filters['customer_classification_id']));
+        }
+        if (! empty($filters['classification_id'])) {
+            $query->where('invoices.classification_id', $filters['classification_id']);
+        }
         if (! empty($filters['salesperson_id'])) {
             $query->where('invoices.salesperson_id', $filters['salesperson_id']);
         }
@@ -94,6 +101,9 @@ class SalesReportService
         // الإجمالي. تقرير المنتج نفسه ينتقل إلى invoice_lines ويجمع السطور فقط.
         if (! empty($filters['product_id'])) {
             $query->whereHas('lines', fn (Builder $lines) => $lines->where('product_id', $filters['product_id']));
+        }
+        if (! empty($filters['product_category_id'])) {
+            $query->whereHas('lines.product', fn (Builder $product) => $product->where('category_id', $filters['product_category_id']));
         }
     }
 
@@ -139,7 +149,7 @@ class SalesReportService
     private function byProduct(array $filters): array
     {
         $invoiceFilters = $filters;
-        unset($invoiceFilters['product_id']);
+        unset($invoiceFilters['product_id'], $invoiceFilters['product_category_id']);
         $invoiceIds = $this->invoices($invoiceFilters)->select('invoices.id');
 
         $query = InvoiceLine::query()
@@ -148,6 +158,9 @@ class SalesReportService
 
         if (! empty($filters['product_id'])) {
             $query->where('invoice_lines.product_id', $filters['product_id']);
+        }
+        if (! empty($filters['product_category_id'])) {
+            $query->where('products.category_id', $filters['product_category_id']);
         }
 
         $rows = $query
@@ -171,6 +184,25 @@ class SalesReportService
                 'amount'   => array_sum(array_column($rows, 'amount')),
             ],
         ];
+    }
+
+    /** تجميع رؤوس الفواتير حسب تصنيف المستند: لا JOIN على السطور كي لا يتكرر الإجمالي. */
+    private function byClassification(array $filters): array
+    {
+        $rows = $this->invoices($filters)
+            ->leftJoin('classifications', 'classifications.id', '=', 'invoices.classification_id')
+            ->selectRaw('invoices.classification_id as bucket_key, classifications.name as bucket_label, COUNT(invoices.id) as invoices_count, SUM(invoices.total) as amount')
+            ->groupBy('invoices.classification_id', 'classifications.name')
+            ->orderByDesc('amount')
+            ->get()
+            ->map(fn ($row) => [
+                'key' => $row->bucket_key === null ? null : (string) $row->bucket_key,
+                'label' => $row->bucket_label === null || $row->bucket_label === '' ? 'غير مصنف' : (string) $row->bucket_label,
+                'invoices' => (int) $row->invoices_count,
+                'amount' => (int) $row->amount,
+            ])->all();
+
+        return ['rows' => $rows, 'totals' => $this->invoiceTotals($filters)];
     }
 
     /** @return array{rows:array<int,array<string,mixed>>, totals:array<string,int>} */

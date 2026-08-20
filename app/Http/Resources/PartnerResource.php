@@ -29,7 +29,17 @@ class PartnerResource extends JsonResource
             'district'     => $this->district,
             'postal_code'  => $this->postal_code,
             'country'      => $this->country,
-            'classification' => $this->classification,
+            'classification' => $this->classification, // حقل انتقالي للتوافق الرجعي
+            'customer_classification_id' => $this->customer_classification_id,
+            'supplier_classification_id' => $this->supplier_classification_id,
+            'customer_classification' => $this->whenLoaded('customerClassification', fn () => [
+                'id' => $this->customerClassification?->id,
+                'name' => $this->customerClassification?->name,
+            ]),
+            'supplier_classification' => $this->whenLoaded('supplierClassification', fn () => [
+                'id' => $this->supplierClassification?->id,
+                'name' => $this->supplierClassification?->name,
+            ]),
             'credit_limit'  => $this->credit_limit !== null ? Money::toRiyal($this->credit_limit) : null,
             'credit_period' => $this->credit_period,
             'is_active'  => $this->is_active,

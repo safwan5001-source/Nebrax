@@ -23,7 +23,7 @@ class Payment extends BaseModel
 
     protected $fillable = [
         'branch_id',
-        'tenant_id', 'number', 'partner_id', 'invoice_id',
+        'tenant_id', 'number', 'partner_id', 'invoice_id', 'classification_id',
         'direction', 'method', 'payment_method_id', 'payment_method_name', 'reference', 'payment_details', 'cash_account_id', 'payment_date', 'amount',
         'status', 'notes', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by', 'collector_employee_id',
     ];
@@ -44,6 +44,12 @@ class Payment extends BaseModel
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
+    }
+
+    /** تصنيف تحليلي لسند القبض أو الصرف؛ نطاقه يتحقق منه في الخدمة. */
+    public function classification(): BelongsTo
+    {
+        return $this->referenceBelongsTo(Classification::class);
     }
 
     public function invoice(): BelongsTo

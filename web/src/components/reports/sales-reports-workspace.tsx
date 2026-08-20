@@ -26,7 +26,7 @@ import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
 import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader, type ReportMetric } from '@/components/reports/report-workspace-ui';
 
-export type SalesReportView = 'period' | 'customer' | 'product' | 'salesperson' | 'profit' | 'payments';
+export type SalesReportView = 'period' | 'customer' | 'product' | 'classification' | 'salesperson' | 'profit' | 'payments';
 
 type Money = string;
 interface SalesRow {
@@ -72,7 +72,10 @@ function filtersToQuery(view: SalesReportView, f: SalesReportFilterState): strin
   if (f.to) p.set('to', f.to);
   f.branchIds.forEach((id) => p.append('branch_id[]', id));
   if (f.customerId) p.set('customer_id', f.customerId);
+  if (f.customerClassificationId) p.set('customer_classification_id', f.customerClassificationId);
   if (f.productId) p.set('product_id', f.productId);
+  if (f.productCategoryId) p.set('product_category_id', f.productCategoryId);
+  if (f.classificationId) p.set('classification_id', f.classificationId);
   if (f.salespersonId) p.set('salesperson_id', f.salespersonId);
   if (f.paymentStatus) p.set('payment_status', f.paymentStatus);
   if (f.receiptMethod) p.set('receipt_method', f.receiptMethod);

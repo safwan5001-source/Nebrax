@@ -8,6 +8,7 @@ use App\Tenancy\BranchSharing;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * طرف تجاري: عميل أو مورد (أو كلاهما).
@@ -27,7 +28,7 @@ class Partner extends BaseModel implements BranchShareable
         'tenant_id', 'branch_id', 'code', 'type', 'entity_type', 'name', 'name_en',
         'vat_number', 'cr_number', 'email', 'phone', 'mobile', 'address', 'city',
         'building_no', 'street', 'district', 'postal_code', 'country',
-        'classification', 'credit_limit', 'credit_period', 'is_active',
+        'classification', 'customer_classification_id', 'supplier_classification_id', 'credit_limit', 'credit_period', 'is_active',
     ];
 
     protected $casts = [
@@ -41,6 +42,18 @@ class Partner extends BaseModel implements BranchShareable
         'entity_type' => 'commercial',
         'is_active'   => true,
     ];
+
+    /** مرجع تحليلي محفوظ؛ لا يختفي عند تبديل سياق الفرع. */
+    public function customerClassification(): BelongsTo
+    {
+        return $this->referenceBelongsTo(Classification::class, 'customer_classification_id');
+    }
+
+    /** مرجع تحليلي محفوظ؛ لا يختفي عند تبديل سياق الفرع. */
+    public function supplierClassification(): BelongsTo
+    {
+        return $this->referenceBelongsTo(Classification::class, 'supplier_classification_id');
+    }
 
     public function isCustomer(): bool
     {

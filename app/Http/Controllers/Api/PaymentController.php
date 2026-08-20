@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StorePaymentRequest;
+use App\Http\Requests\UpdateDocumentClassificationRequest;
 use App\Http\Resources\PaymentResource;
 use App\Models\Account;
 use App\Models\Employee;
@@ -12,6 +13,7 @@ use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Purchase;
 use App\Services\Accounting\PaymentService;
+use App\Services\ClassificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +21,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaymentController extends ApiController
 {
-    public function __construct(protected PaymentService $payments) {}
+    public function __construct(
+        protected PaymentService $payments,
+        protected ClassificationService $classifications,
+    ) {}
 
     /**
      * قائمة المدفوعات، مع تصفية اختيارية بالاتجاه (`?direction=received|paid`)
@@ -90,6 +95,20 @@ class PaymentController extends ApiController
         $this->storeAttachments($request, $updated);
 
         return (new PaymentResource($updated->load(['partner', 'cashAccount', 'paymentMethod', 'collectorEmployee', 'attachments', 'allocations.allocatable'])))->response();
+    }
+
+    /** تعديل تحليلي محدود لسند قبض أو صرف؛ لا يفتح التخصيص أو القيد بعد الترحيل. */
+    public function updateClassification(UpdateDocumentClassificationRequest $request, string $id): JsonResponse
+    {
+        $payment = $this->visiblePayment($request, $id);
+        $scope = $payment->direction === 'received' ? 'receipt' : 'payment';
+        $updated = $this->domain(fn () => $this->classifications->updateDocumentClassification(
+            $payment,
+            $request->validated('classification_id'),
+            $scope,
+        ));
+
+        return (new PaymentResource($updated->load(['classification', 'partner', 'cashAccount', 'paymentMethod', 'collectorEmployee', 'attachments'])))->response();
     }
 
     /** النسخة الجديدة مسودة بلا تخصيصات ولا مرفقات كي لا تكرر حجوزات أو إثباتات المصدر. */
