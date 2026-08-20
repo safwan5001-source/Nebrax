@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\AccountBalance;
 use App\Models\Branch;
 use App\Models\CashBankAccount;
+use App\Models\PaymentMethod;
 use App\Models\User;
 use App\Support\Rbac;
 use App\Tenancy\BranchContext;
@@ -43,6 +44,35 @@ class CashBankAccountService
                     'is_main' => ! CashBankAccount::where('type', $default['type'])->where('is_main', true)->exists(),
                     'deposit_scope' => 'all',
                     'withdraw_scope' => 'all',
+                ]);
+            }
+
+            // تُنشأ القائمة مرة واحدة للمؤسسة الفارغة؛ لا تعيد التهيئة طرقاً حذفها
+            // المستخدم أو غيّرها لاحقاً، وتبقى بلا رسوم أو آثار محاسبية مستقلة.
+            if (PaymentMethod::query()->exists()) {
+                return;
+            }
+
+            $cash = CashBankAccount::where('type', 'cash')->where('is_main', true)->first();
+            $bank = CashBankAccount::where('type', 'bank')->where('is_main', true)->first();
+            if (! $cash || ! $bank) {
+                return;
+            }
+
+            foreach ([
+                ['name' => 'تحويل بنكي', 'name_en' => 'Bank Transfer', 'type' => 'bank', 'account_id' => $bank->id],
+                ['name' => 'نقدي', 'name_en' => 'Cash', 'type' => 'cash', 'account_id' => $cash->id],
+                ['name' => 'شيك', 'name_en' => 'Cheque', 'type' => 'bank', 'account_id' => $bank->id],
+                ['name' => 'بطاقة ائتمان', 'name_en' => 'Credit Card', 'type' => 'bank', 'account_id' => $bank->id],
+            ] as $method) {
+                PaymentMethod::create([
+                    'name' => $method['name'],
+                    'name_en' => $method['name_en'],
+                    'settlement_type' => $method['type'],
+                    'cash_bank_account_id' => $method['account_id'],
+                    'available_online' => false,
+                    'is_active' => true,
+                    'is_default' => false,
                 ]);
             }
         });
