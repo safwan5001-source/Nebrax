@@ -28,6 +28,21 @@ class InvoiceLineResource extends JsonResource
             'line_discount' => Money::toRiyal($this->line_discount),
             'line_tax'      => Money::toRiyal($this->line_tax),
             'line_total'    => Money::toRiyal($this->line_total),
+            'cost_center_allocations' => $this->whenLoaded('costCenterAllocations', fn () => $this->costCenterAllocations
+                ->sortBy('position')
+                ->map(fn ($allocation) => [
+                    'id'             => $allocation->id,
+                    'cost_center_id' => $allocation->cost_center_id,
+                    'mode'           => $allocation->mode,
+                    'position'       => $allocation->position,
+                    'basis_points'   => $allocation->basis_points,
+                    'amount'         => Money::toRiyal($allocation->amount),
+                    'cost_center'    => $allocation->relationLoaded('costCenter') && $allocation->costCenter ? [
+                        'id'   => $allocation->costCenter->id,
+                        'code' => $allocation->costCenter->code,
+                        'name' => $allocation->costCenter->name,
+                    ] : null,
+                ])->values()),
         ];
     }
 }

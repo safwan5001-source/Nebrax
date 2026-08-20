@@ -27,8 +27,18 @@ interface Product {
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
 interface Employee { id: string; name: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
-interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string; disc: string; unit: string }
-interface ApiLine { product_id: string | null; description: string | null; quantity: number; unit_name: string | null; unit_price: string; tax_rate: number; line_discount: string }
+type AllocationKind = 'none' | 'single' | 'multiple';
+type AllocationInputMode = 'percent' | 'amount';
+interface LineAllocation { costCenterId: string; value: string }
+interface Line {
+  key: string; productId: string | null; description: string; qty: string; price: string; tax: string; disc: string; unit: string;
+  allocationKind: AllocationKind; allocationInputMode: AllocationInputMode; allocations: LineAllocation[];
+}
+interface ApiLineAllocation { cost_center_id: string; mode: AllocationInputMode; basis_points: number; amount: string }
+interface ApiLine {
+  product_id: string | null; description: string | null; quantity: number; unit_name: string | null; unit_price: string; tax_rate: number; line_discount: string;
+  cost_center_allocations?: ApiLineAllocation[];
+}
 interface ApiInvoice {
   status: string; partner_id: string; payment_type: string; invoice_date: string; due_date: string | null;
   cost_center_id: string | null; salesperson_id: string | null; discount: string; shipping: string;
@@ -38,7 +48,28 @@ interface ApiInvoice {
 interface TaxDef { name: string; rate: number; inclusive: boolean }
 
 let lineSeq = 0;
-const newLine = (): Line => ({ key: `l${++lineSeq}`, productId: null, description: '', qty: '1', price: '', tax: '15', disc: '', unit: '' });
+const newLine = (): Line => ({
+  key: `l${++lineSeq}`, productId: null, description: '', qty: '1', price: '', tax: '15', disc: '', unit: '',
+  allocationKind: 'none', allocationInputMode: 'percent', allocations: [],
+});
+
+/** تحويل واجهة النسبة إلى نقاط أساس بلا تعويم: «60.25» ← 6025. */
+function percentToBasisPoints(value: string): number | null {
+  const normalized = value.trim()
+    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    .replace(/[٫]/g, '.')
+    .replace(/[,٬\s]/g, '');
+  if (!/^\d+(?:\.\d{0,2})?$/.test(normalized)) return null;
+  const [whole, fraction = ''] = normalized.split('.');
+  const basisPoints = Number(whole) * 100 + Number((fraction + '00').slice(0, 2));
+  return Number.isSafeInteger(basisPoints) ? basisPoints : null;
+}
+
+function basisPointsToPercent(value: number): string {
+  const whole = Math.floor(value / 100);
+  const fraction = String(value % 100).padStart(2, '0');
+  return fraction === '00' ? String(whole) : `${whole}.${fraction}`;
+}
 
 /** يضيف عدداً من الأيام إلى تاريخ YYYY-MM-DD ويعيد YYYY-MM-DD (بلا مناطق زمنية). */
 function addDays(date: string, days: number): string {
@@ -165,6 +196,16 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                 price: l.unit_price,
                 tax: String(l.tax_rate),
                 disc: Number(l.line_discount) > 0 ? l.line_discount : '',
+                allocationKind: !l.cost_center_allocations?.length
+                  ? 'none'
+                  : l.cost_center_allocations.length === 1 ? 'single' : 'multiple',
+                allocationInputMode: l.cost_center_allocations?.[0]?.mode ?? 'percent',
+                allocations: (l.cost_center_allocations ?? []).map((allocation) => ({
+                  costCenterId: allocation.cost_center_id,
+                  value: allocation.mode === 'percent'
+                    ? basisPointsToPercent(allocation.basis_points)
+                    : allocation.amount,
+                })),
               }))
             : [newLine()]
         );
@@ -187,6 +228,42 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, newLine()]);
   const removeLine = (key: string) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
+  const setAllocationKind = (key: string, allocationKind: AllocationKind) => setLines((ls) => ls.map((line) => {
+    if (line.key !== key) return line;
+    if (allocationKind === 'none') return { ...line, allocationKind, allocations: [] };
+    if (allocationKind === 'single') {
+      const first = line.allocations[0];
+      return {
+        ...line,
+        allocationKind,
+        allocations: [{
+          costCenterId: first?.costCenterId ?? '',
+          value: line.allocationInputMode === 'percent' ? '100' : minorToInput(lineNetTax(line)[0]),
+        }],
+      };
+    }
+    if (line.allocations.length > 0) return { ...line, allocationKind };
+    return {
+      ...line,
+      allocationKind,
+      allocations: [{ costCenterId: '', value: line.allocationInputMode === 'percent' ? '100' : '' }],
+    };
+  }));
+  const addAllocation = (key: string) => setLines((ls) => ls.map((line) =>
+    line.key === key ? { ...line, allocationKind: 'multiple', allocations: [...line.allocations, { costCenterId: '', value: '' }] } : line
+  ));
+  const removeAllocation = (key: string, allocationIndex: number) => setLines((ls) => ls.map((line) => {
+    if (line.key !== key) return line;
+    const allocations = line.allocations.filter((_, index) => index !== allocationIndex);
+    return allocations.length === 0
+      ? { ...line, allocationKind: 'none', allocations }
+      : { ...line, allocationKind: allocations.length === 1 ? 'single' : 'multiple', allocations };
+  }));
+  const patchAllocation = (key: string, allocationIndex: number, patch: Partial<LineAllocation>) => setLines((ls) => ls.map((line) =>
+    line.key === key
+      ? { ...line, allocations: line.allocations.map((allocation, index) => index === allocationIndex ? { ...allocation, ...patch } : allocation) }
+      : line
+  ));
 
   // البحث يشمل الاسم والهاتف والرقم الضريبي للطرف، والاسم والرمز والباركود
   // للمنتج — يُدخل المستخدم ما بين يديه لا ما نفترض أنه يحفظه.
@@ -245,11 +322,71 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const adjustmentMinor = riyalToMinor(adjustmentInput);
   const totalMinor = netMinor + shippingMinor + taxMinor + adjustmentMinor;
 
-  const canSave = useMemo(() => !!partnerId && !saving && !loadingDoc, [partnerId, saving, loadingDoc]);
+  const minorToInput = (minor: number): string => `${Math.floor(minor / 100)}.${String(Math.abs(minor % 100)).padStart(2, '0')}`;
+  const allocationMinorTotal = (line: Line): number | null => {
+    if (line.allocationKind === 'none') return 0;
+    if (line.allocationInputMode === 'percent') {
+      const values = line.allocations.map((allocation) => percentToBasisPoints(allocation.value));
+      if (values.some((value) => value === null)) return null;
+      return values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+    }
+    const values = line.allocations.map((allocation) => riyalToMinor(allocation.value));
+    if (values.some((value) => !Number.isFinite(value))) return null;
+    return values.reduce((sum, value) => sum + value, 0);
+  };
+  const allocationError = (line: Line): string | null => {
+    if (line.allocationKind === 'none') return null;
+    if (line.allocations.length === 0 || line.allocations.some((allocation) => !allocation.costCenterId)) return t('allocation_need_center');
+    const ids = line.allocations.map((allocation) => allocation.costCenterId);
+    if (new Set(ids).size !== ids.length) return t('allocation_duplicate_center');
+    const total = allocationMinorTotal(line);
+    if (total === null || line.allocations.some((allocation) => !allocation.value.trim())) return t('allocation_invalid_value');
+    return line.allocationInputMode === 'percent'
+      ? (total === 10000 ? null : t('allocation_percent_invalid'))
+      : (total === lineNetTax(line)[0] ? null : t('allocation_amount_invalid'));
+  };
+  const changeAllocationInputMode = (key: string, allocationInputMode: AllocationInputMode) => setLines((ls) => ls.map((line) => {
+    if (line.key !== key || line.allocationInputMode === allocationInputMode) return line;
+    const lineNet = lineNetTax(line)[0];
+    if (lineNet <= 0) return { ...line, allocationInputMode };
+    const converted = line.allocations.map((allocation, index) => {
+      if (allocationInputMode === 'amount') {
+        const basisPoints = percentToBasisPoints(allocation.value) ?? 0;
+        const previousAmount = line.allocations.slice(0, index).reduce(
+          (sum, item) => sum + Math.floor(lineNet * (percentToBasisPoints(item.value) ?? 0) / 10000),
+          0
+        );
+        const minor = index === line.allocations.length - 1
+          ? lineNet - previousAmount
+          : Math.floor(lineNet * basisPoints / 10000);
+        return { ...allocation, value: minorToInput(minor) };
+      }
+      const minor = riyalToMinor(allocation.value);
+      const previousBasis = line.allocations.slice(0, index).reduce((sum, item) => {
+        const previousMinor = riyalToMinor(item.value);
+        return sum + Math.floor((Number.isFinite(previousMinor) ? previousMinor : 0) * 10000 / lineNet);
+      }, 0);
+      const basisPoints = index === line.allocations.length - 1
+        ? 10000 - previousBasis
+        : Math.floor((Number.isFinite(minor) ? minor : 0) * 10000 / lineNet);
+      return { ...allocation, value: basisPointsToPercent(basisPoints) };
+    });
+    return { ...line, allocationInputMode, allocations: converted };
+  }));
+
+  const canSave = useMemo(
+    () => !!partnerId && !saving && !loadingDoc && !lines.some((line) => allocationError(line)),
+    [partnerId, saving, loadingDoc, lines, taxInclusive, t]
+  );
 
   async function submit(post: boolean) {
     if (lines.some((l) => l.price !== '' && !Number.isFinite(riyalToMinor(l.price)))) {
       setError(tc('saveFailed'));
+      return;
+    }
+    const invalidAllocation = lines.map(allocationError).find(Boolean);
+    if (invalidAllocation) {
+      setError(invalidAllocation);
       return;
     }
     const items = lines
@@ -257,6 +394,13 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       .map((l) => {
         const qty = Math.floor(Number(l.qty));
         const gross = qty * riyalToMinor(l.price);
+        const allocations = l.allocationKind === 'none' ? undefined : l.allocations.map((allocation) => ({
+          cost_center_id: allocation.costCenterId,
+          mode: l.allocationInputMode,
+          value: l.allocationInputMode === 'percent'
+            ? percentToBasisPoints(allocation.value) ?? 0
+            : riyalToMinor(allocation.value),
+        }));
         return {
           product_id: l.productId,
           description: l.description || null,
@@ -265,6 +409,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
           unit_price: riyalToMinor(l.price),
           tax_rate: Number(l.tax) || 0,
           discount: Math.min(Number.isFinite(riyalToMinor(l.disc)) ? riyalToMinor(l.disc) : 0, gross),
+          ...(allocations ? { cost_center_allocations: allocations } : {}),
         };
       });
     if (items.length === 0) { setError(t('need_line')); return; }
@@ -489,6 +634,123 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                     <Button type="button" variant="ghost" size="icon" className="col-span-1 ms-auto md:col-span-1" aria-label={t('remove_line')} onClick={() => removeLine(l.key)}>
                       <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
                     </Button>
+
+                    {centers.length > 0 && (() => {
+                      const allocationTotal = allocationMinorTotal(l);
+                      const allocationIssue = allocationError(l);
+                      const lineNet = net;
+                      const remaining = allocationTotal === null
+                        ? null
+                        : l.allocationInputMode === 'percent' ? 10000 - allocationTotal : lineNet - allocationTotal;
+                      return (
+                        <div className="col-span-2 rounded-md border border-border bg-surface/60 p-3 md:col-span-12">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <div className="space-y-1.5">
+                              <Label htmlFor={`line-center-kind-${l.key}`}>{t('line_cost_center')}</Label>
+                              <Select
+                                id={`line-center-kind-${l.key}`}
+                                value={l.allocationKind}
+                                onChange={(event) => setAllocationKind(l.key, event.target.value as AllocationKind)}
+                              >
+                                <option value="none">{t('line_cost_center_none')}</option>
+                                <option value="single">{t('line_cost_center_single')}</option>
+                                <option value="multiple">{t('line_cost_center_multiple')}</option>
+                              </Select>
+                            </div>
+                            {l.allocationKind !== 'none' && (
+                              <div className="space-y-1.5">
+                                <Label htmlFor={`line-center-mode-${l.key}`}>{t('allocation_mode')}</Label>
+                                <Select
+                                  id={`line-center-mode-${l.key}`}
+                                  value={l.allocationInputMode}
+                                  onChange={(event) => changeAllocationInputMode(l.key, event.target.value as AllocationInputMode)}
+                                >
+                                  <option value="percent">{t('allocation_percent')}</option>
+                                  <option value="amount">{t('allocation_amount')}</option>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+
+                          {l.allocationKind !== 'none' && (
+                            <div className="mt-3 space-y-2">
+                              {l.allocations.map((allocation, allocationIndex) => (
+                                <div key={`${l.key}-allocation-${allocationIndex}`} className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,180px)_auto]">
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor={`line-center-${l.key}-${allocationIndex}`}>{t('allocation_center')}</Label>
+                                    <Select
+                                      id={`line-center-${l.key}-${allocationIndex}`}
+                                      value={allocation.costCenterId}
+                                      onChange={(event) => patchAllocation(l.key, allocationIndex, { costCenterId: event.target.value })}
+                                    >
+                                      <option value="">{t('no_center')}</option>
+                                      {centers.map((center) => (
+                                        <option
+                                          key={center.id}
+                                          value={center.id}
+                                          disabled={center.id !== allocation.costCenterId && l.allocations.some((item) => item.costCenterId === center.id)}
+                                        >
+                                          {center.code} — {center.name}
+                                        </option>
+                                      ))}
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor={`line-center-value-${l.key}-${allocationIndex}`}>
+                                      {l.allocationInputMode === 'percent' ? t('allocation_value_percent') : t('allocation_value_amount')}
+                                    </Label>
+                                    <Input
+                                      id={`line-center-value-${l.key}-${allocationIndex}`}
+                                      className="num text-end"
+                                      inputMode="decimal"
+                                      placeholder="0"
+                                      value={allocation.value}
+                                      onChange={(event) => patchAllocation(l.key, allocationIndex, { value: event.target.value })}
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="mb-0.5"
+                                    aria-label={t('allocation_remove')}
+                                    onClick={() => removeAllocation(l.key, allocationIndex)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                                  </Button>
+                                </div>
+                              ))}
+
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2">
+                                <Button type="button" variant="outline" size="sm" onClick={() => addAllocation(l.key)}>
+                                  <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />{t('allocation_add')}
+                                </Button>
+                                <div className="text-end text-xs" aria-live="polite">
+                                  <p className="text-muted">
+                                    {t('allocation_total')}: <span className="num text-text">
+                                      {allocationTotal === null
+                                        ? '—'
+                                        : l.allocationInputMode === 'percent'
+                                          ? `${basisPointsToPercent(allocationTotal)}%`
+                                          : formatRiyal(allocationTotal / 100)}
+                                    </span> {t('allocation_of_line')}
+                                  </p>
+                                  {remaining !== null && (
+                                    <p className={cn('num', remaining === 0 ? 'text-positive' : 'text-negative')}>
+                                      {remaining === 0
+                                        ? t('allocation_complete')
+                                        : `${t('allocation_remaining')}: ${l.allocationInputMode === 'percent' ? `${basisPointsToPercent(Math.abs(remaining))}%` : formatRiyal(Math.abs(remaining) / 100)}`}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-[11px] leading-relaxed text-muted">{t('allocation_hint')}</p>
+                              {allocationIssue && <p className="text-xs text-negative" role="alert">{allocationIssue}</p>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
