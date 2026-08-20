@@ -41,6 +41,7 @@ class InvoiceController extends ApiController
 
         // عزل: كل المراجع يجب أن تخص المستأجر الحالي (تصدّ حقن معرّفات مستأجرين آخرين)
         Partner::findOrFail($data['partner_id']);
+        $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $this->activeBranchId(), false);
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertTenantOwned(Employee::class, $data['salesperson_id'] ?? null, 'مسؤول المبيعات');
         $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
@@ -178,6 +179,7 @@ class InvoiceController extends ApiController
         $data = $request->validated();
 
         Partner::findOrFail($data['partner_id']);
+        $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $invoice->branch_id, false);
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertTenantOwned(Employee::class, $data['salesperson_id'] ?? null, 'مسؤول المبيعات');
         $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
@@ -210,9 +212,10 @@ class InvoiceController extends ApiController
         return response()->json(['message' => 'تم الحذف.']);
     }
 
-    public function post(string $id): JsonResponse
+    public function post(Request $request, string $id): JsonResponse
     {
         $invoice = Invoice::findOrFail($id);
+        $this->assertWarehouseAllowed($invoice->warehouse_id, $invoice->branch_id);
         $posted = $this->domain(fn () => $this->invoices->post($invoice));
 
         return (new InvoiceResource($posted->load(['lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();

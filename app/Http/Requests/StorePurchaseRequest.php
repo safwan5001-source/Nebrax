@@ -15,6 +15,8 @@ class StorePurchaseRequest extends FormRequest
     {
         return [
             'partner_id'          => ['required', 'uuid'],
+            // اختياري للتوافق مع المستندات والمسارات القديمة؛ يثبّت موقع الاستلام عند إرساله.
+            'warehouse_id'        => ['nullable', 'uuid'],
             // اختياري لا مطلوب: الغياب يعني «استخدم تفضيل المستأجر»
             // (`purchases.default_payment_type`). كونه مطلوباً كان يجعل
             // التفضيل حبراً على ورق — لا طلبَ يصل بلا قيمة فيُقرأ.

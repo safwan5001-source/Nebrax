@@ -12,6 +12,7 @@ use App\Models\Partner;
 use App\Models\Product;
 use App\Support\Settings;
 use App\Services\PrintTemplates\PrintTemplateService;
+use App\Tenancy\BranchContext;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -69,11 +70,16 @@ class InvoiceService
             $date   = $data['invoice_date'] ?? now()->toDateString();
             $isPaid = (bool) ($data['is_paid'] ?? false);
 
+            // يجب تثبيت الفرع قبل الترقيم: BelongsToBranch يحقنه عند creating،
+            // لكن توليد الرقم يسبق ذلك. وإلا وُلّد رقم السلسلة بلا فرع ثم حُفظ
+            // في فرع نشط، فيتصادم أول رقم بين فرعين رغم أن نطاق الترقيم فرعي.
+            $branchId = $data['branch_id'] ?? app(BranchContext::class)->id();
+
             $invoice = Invoice::create([
-                'number'            => $data['number'] ?? $this->nextNumber($date),
+                'number'            => $data['number'] ?? $this->nextNumber($date, $branchId),
                 'partner_id'        => $data['partner_id'],
-                // فرع صريح (كالتوليد من فاتورة دورية)؛ وإن غاب يوسمه BelongsToBranch بالفرع النشط.
-                'branch_id'         => $data['branch_id'] ?? null,
+                'branch_id'         => $branchId,
+                'warehouse_id'      => $data['warehouse_id'] ?? null,
                 'type'              => 'sale',
                 'payment_type'      => $this->paymentType($data['payment_type'] ?? Settings::get('sales', 'default_payment_type'), $isPaid),
                 'is_paid'           => $isPaid,
@@ -137,6 +143,7 @@ class InvoiceService
 
             $invoice->update([
                 'partner_id'        => $data['partner_id'],
+                'warehouse_id'      => $keep('warehouse_id', $invoice->warehouse_id),
                 'payment_type'      => $this->paymentType($keep('payment_type', $invoice->payment_type) ?? $invoice->payment_type, $isPaid),
                 'is_paid'           => $isPaid,
                 'payment_method'    => $this->paymentMethod($keep('payment_method', $invoice->payment_method)),
@@ -170,6 +177,7 @@ class InvoiceService
 
         $data = [
             'partner_id'      => $invoice->partner_id,
+            'warehouse_id'    => $invoice->warehouse_id,
             'payment_type'    => $invoice->payment_type,
             'is_paid'         => false,
             'payment_method'  => $invoice->payment_method,

@@ -137,6 +137,12 @@ class InventoryService
         $newQty      = $product->quantity_on_hand - $quantity;
         $warehouseId = $this->resolveWarehouseId($meta);
 
+        // يمرّ المسار التشغيلي الصريح بهذا المفتاح؛ أما الجرد والتصحيح فيظلان
+        // قادرين على تسجيل فرق فعلي من دون أن يحظره حارس البيع.
+        if (($meta['enforce_stock'] ?? false) === true) {
+            $this->assertStockAvailable($product, $quantity, $warehouseId);
+        }
+
         $movement = StockMovement::create([
             'product_id'       => $product->id,
             'warehouse_id'     => $warehouseId,
@@ -188,8 +194,12 @@ class InventoryService
         $cogsByAccountAndCenter = []; // account_id|cost_center_id => amount
         $defaultCogs = $this->accountId(self::ACC_COGS);
 
-        // مخزن الإخراج: مخزن فرع الفاتورة إن وُجد، وإلا المخزن الافتراضي.
-        $warehouseId = $this->warehouseForBranch($invoice->branch_id);
+        // مخزن الإخراج المثبت على الفاتورة يعلو على بديل الفرع؛ المستند القديم
+        // بلا مخزن يستمر عبر مخزن فرعه ثم الافتراضي لتبقى البيانات التاريخية قابلة للترحيل.
+        $warehouseId = $this->resolveWarehouseId([
+            'warehouse_id' => $invoice->warehouse_id,
+            'branch_id' => $invoice->branch_id,
+        ]);
 
         foreach ($invoice->lines as $line) {
             $product = $line->product;
@@ -205,7 +215,7 @@ class InventoryService
             // الحارس قبل أي حركة: الرفض هنا يُبطل المعاملة كلها، فلا فاتورة
             // نصفها مرحَّل ونصفها لا. ويقارن بوحدة المخزون لا بوحدة السطر —
             // «طبليتان» و«رصيد ٦٠ كيساً» لا يُقارَنان قبل التحويل.
-            $this->assertStockAvailable($product, $quantity);
+            $this->assertStockAvailable($product, $quantity, $warehouseId);
 
             $unitCost = $product->avg_cost;
             $cost     = $quantity * $unitCost;
@@ -313,36 +323,52 @@ class InventoryService
      *  عجز، وحظرٌ أعمى في البدائية كان سيمنع **مسار التصحيح نفسه**. الحارس
      *  يُستدعى صراحةً من مسارات البيع والمرتجع، ويبقى التصحيح حرّاً.
      */
-    public function assertStockAvailable(Product $product, int $quantity): void
+    public function assertStockAvailable(Product $product, int $quantity, ?string $warehouseId = null): void
     {
         if (Settings::get('inventory', 'allow_negative_stock')) {
             return;
         }
 
-        if ($product->quantity_on_hand >= $quantity) {
+        // إن عُرف المخزن فالرصيد المطلوب هو رصيده هو، لا إجمالي المنشأة.
+        // أما المستندات السابقة على المخازن فتستمر بفحص الإجمالي كي لا تعيد
+        // الترقية تفسير حركة تاريخية بلا موقع كمية.
+        $available = $warehouseId === null
+            ? (int) $product->quantity_on_hand
+            : (int) (ProductWarehouseStock::where('product_id', $product->id)
+                ->where('warehouse_id', $warehouseId)
+                ->value('quantity') ?? 0);
+
+        if ($available >= $quantity) {
             return;
         }
 
+        $location = $warehouseId === null ? 'من المنتج' : 'من المخزن المحدد';
         throw new RuntimeException(sprintf(
-            'الكمية المتاحة من «%s» (%d) أقل من المطلوب (%d). لا يمكن البيع بأكثر من الرصيد — '
+            'الكمية المتاحة %s لـ«%s» (%d) أقل من المطلوب (%d). لا يمكن البيع أو الإرجاع بأكثر من الرصيد — '
             . 'يمكن تغيير ذلك من إعدادات المخزون.',
+            $location,
             $product->name,
-            $product->quantity_on_hand,
+            $available,
             $quantity
         ));
     }
 
     /**
-     * يحلّ المخزن المستهدَف للحركة: الصريح في meta، وإلا المخزن الافتراضي.
+     * يحلّ المخزن المستهدَف للحركة: الصريح في meta، ثم مخزن الفرع، ثم الافتراضي.
      * `null` = لا مخازن معرّفة بعد ⇒ تُسجَّل الحركة بلا مخزن (سلوك ما قبل B4).
      */
     protected function resolveWarehouseId(array $meta): ?string
     {
-        if (! empty($meta['warehouse_id'])) {
-            return Warehouse::whereKey($meta['warehouse_id'])->exists() ? $meta['warehouse_id'] : null;
+        if (($meta['warehouse_id'] ?? null) !== null) {
+            $warehouse = Warehouse::whereKey($meta['warehouse_id'])->where('is_active', true)->first();
+            if (! $warehouse) {
+                throw new RuntimeException('المستودع المحدد غير موجود أو غير نشط.');
+            }
+
+            return $warehouse->id;
         }
 
-        return Warehouse::default()?->id;
+        return $this->warehouseForBranch($meta['branch_id'] ?? null);
     }
 
     /**

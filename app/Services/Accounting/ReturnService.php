@@ -95,6 +95,8 @@ class ReturnService
                 'number'        => $data['number'] ?? $this->nextNumber($type, $date),
                 'type'          => $type,
                 'partner_id'    => $data['partner_id'],
+                // المصدر يحدد موقع البضاعة افتراضياً؛ الاختيار الصريح يعلو عليه.
+                'warehouse_id'  => $data['warehouse_id'] ?? $source?->warehouse_id,
                 'payment_type'  => $data['payment_type'] ?? 'credit',
                 // null = «اتبع سياسة المستأجر» — تُحسَم عند الترحيل لا الآن،
                 // فتبقى المسوّدة تابعةً للسياسة ولو تغيّرت قبل ترحيلها.
@@ -405,10 +407,12 @@ class ReturnService
 
             if ($restock) {
                 $this->inventory->applyReceipt($product, $line->quantity, $unitCost, [
-                    'source_type' => ReturnDocument::class,
-                    'source_id'   => $return->id,
-                    'date'        => $return->return_date->toDateString(),
-                    'notes'       => "إرجاع عبر المرتجع {$return->number}",
+                    'source_type'  => ReturnDocument::class,
+                    'source_id'    => $return->id,
+                    'warehouse_id' => $return->warehouse_id,
+                    'branch_id'    => $return->branch_id,
+                    'date'         => $return->return_date->toDateString(),
+                    'notes'        => "إرجاع عبر المرتجع {$return->number}",
                 ]);
             }
             // بلا إرجاع: **لا حركة مخزون إطلاقاً**. إدخالُ بضاعةٍ تالفة بكميةٍ
@@ -511,15 +515,16 @@ class ReturnService
         foreach ($return->lines as $line) {
             $product = $line->product;
             if ($product && $product->track_inventory && $line->quantity > 0) {
-                // إرجاع للمورّد إخراجٌ من المخزون كالبيع — فيخضع لسياسة
-                // «البيع بلا رصيد» نفسها: لا يُرَدّ ما ليس موجوداً.
-                $this->inventory->assertStockAvailable($product, $line->quantity);
-
+                // إرجاع للمورّد إخراجٌ من المخزون كالبيع، لكن الرصيد المقارن
+                // هو رصيد المخزن المثبت على المرتجع لا إجمالي كل المستودعات.
                 $this->inventory->applyIssue($product, $line->quantity, $line->unit_price, [
-                    'source_type' => ReturnDocument::class,
-                    'source_id'   => $return->id,
-                    'date'        => $return->return_date->toDateString(),
-                    'notes'       => "إرجاع للمورد عبر المرتجع {$return->number}",
+                    'source_type'   => ReturnDocument::class,
+                    'source_id'     => $return->id,
+                    'warehouse_id'  => $return->warehouse_id,
+                    'branch_id'     => $return->branch_id,
+                    'enforce_stock' => true,
+                    'date'          => $return->return_date->toDateString(),
+                    'notes'         => "إرجاع للمورد عبر المرتجع {$return->number}",
                 ]);
             }
         }

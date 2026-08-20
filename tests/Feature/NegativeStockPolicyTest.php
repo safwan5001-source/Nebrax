@@ -87,8 +87,8 @@ class NegativeStockPolicyTest extends TestCase
 
         $this->sell($product['id'], 10)
             ->assertStatus(422)
-            ->assertJsonFragment(['message' => 'الكمية المتاحة من «إسمنت» (3) أقل من المطلوب (10). '
-                . 'لا يمكن البيع بأكثر من الرصيد — يمكن تغيير ذلك من إعدادات المخزون.']);
+            ->assertJsonFragment(['message' => 'الكمية المتاحة من المخزن المحدد لـ«إسمنت» (3) أقل من المطلوب (10). '
+                . 'لا يمكن البيع أو الإرجاع بأكثر من الرصيد — يمكن تغيير ذلك من إعدادات المخزون.']);
 
         $stored = Product::findOrFail($product['id']);
         $this->assertSame(3, $stored->quantity_on_hand, 'الكمية لم تُمسّ.');

@@ -74,6 +74,7 @@ class PurchaseService
             $purchase = Purchase::create([
                 'number'              => $data['number'] ?? $this->nextNumber($date),
                 'partner_id'          => $data['partner_id'],
+                'warehouse_id'        => $data['warehouse_id'] ?? null,
                 'cost_center_id'      => $data['cost_center_id'] ?? null,
                 'payment_type'        => $data['payment_type'] ?? Settings::get('purchases', 'default_payment_type'),
                 'purchase_date'       => $date,
@@ -224,6 +225,7 @@ class PurchaseService
 
             $purchase->update([
                 'partner_id'          => $data['partner_id'],
+                'warehouse_id'        => $keep('warehouse_id', $purchase->warehouse_id),
                 'cost_center_id'      => $keep('cost_center_id', $purchase->cost_center_id),
                 'payment_type'        => $keep('payment_type', $purchase->payment_type) ?? $purchase->payment_type,
                 'purchase_date'       => $keep('purchase_date', $purchase->purchase_date) ?? $purchase->purchase_date,
@@ -436,6 +438,8 @@ class PurchaseService
                     [
                         'source_type' => Purchase::class,
                         'source_id'   => $purchase->id,
+                        'warehouse_id' => $purchase->warehouse_id,
+                        'branch_id'   => $purchase->branch_id,
                         'date'        => $purchase->purchase_date->toDateString(),
                         'notes'       => "شراء عبر الفاتورة {$purchase->number}",
                     ],
