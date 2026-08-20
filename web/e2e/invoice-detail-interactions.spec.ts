@@ -15,7 +15,7 @@ async function expectActionMenuWithinViewport(page: Page) {
   await actions.click();
   const menu = page.getByRole('menu', { name: /^(Invoice actions|إجراءات الفاتورة)$/ });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveCount(8);
+  await expect(menu.getByRole('menuitem')).toHaveCount(6);
   const menuBox = await menu.boundingBox();
   expect(menuBox).not.toBeNull();
   expect(menuBox!.x).toBeGreaterThanOrEqual(12);

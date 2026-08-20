@@ -129,8 +129,8 @@ export function Dropdown({
         style={mobilePopover ? (mobilePopoverPosition ?? { top: 12, left: 12 }) : undefined}
         className={cn(
           mobilePopover
-            ? 'fixed z-50 w-[min(22rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded border border-border bg-surface p-1 shadow-lg lg:absolute lg:w-auto lg:!left-auto lg:!top-auto lg:mt-1 lg:max-h-none lg:min-w-44 lg:shadow-md'
-            : 'absolute top-full z-50 mt-1 min-w-44 rounded border border-border bg-surface p-1 shadow-md',
+            ? 'fixed z-50 w-[min(18rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded border border-border bg-surface p-1 shadow-lg lg:absolute lg:w-auto lg:!left-auto lg:!top-auto lg:mt-1 lg:max-h-none lg:min-w-36 lg:shadow-md'
+            : 'absolute top-full z-50 mt-1 min-w-36 rounded border border-border bg-surface p-1 shadow-md',
           'transition duration-150 ease-out',
           mobilePopover
             ? (align === 'end' ? 'lg:end-0' : 'lg:start-0')
