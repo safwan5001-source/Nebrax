@@ -170,7 +170,12 @@ export default function HrPage() {
         ),
       },
       { accessorKey: 'job_title', header: t('job_title'), cell: ({ row }) => row.original.job_title?.name ?? '—' },
-      { accessorKey: 'basic_salary', header: t('basic_salary'), cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.basic_salary)}</div> },
+      {
+        id: 'basic_salary',
+        header: t('basic_salary'),
+        accessorFn: (r) => (r as Employee & { basic_salary?: string }).basic_salary ?? '0',
+        cell: ({ row }) => <div className="num text-end">{formatRiyal((row.original as Employee & { basic_salary?: string }).basic_salary)}</div>,
+      },
       {
         id: 'gross',
         header: t('gross'),

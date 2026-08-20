@@ -11,7 +11,6 @@ import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
-import { riyalToMinor } from '@/lib/money';
 import { AccessScopeFields, type AccessScope } from '@/components/users/access-scope-fields';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-dialog';
 import type { Shift } from './shift-dialog';
@@ -70,10 +69,6 @@ export interface Employee {
   permanent_district?: string | null;
   permanent_postal_code?: string | null;
   permanent_country?: string | null;
-  basic_salary: string;     // ريال (نص)
-  allowances: string;       // ريال (نص)
-  gosi: string;             // ريال (نص)
-  other_deductions: string; // ريال (نص)
   is_active: boolean;
   notes?: string | null;
 }
@@ -88,7 +83,7 @@ const EMPTY_EMPLOYEE: Employee = {
   current_district: '', current_postal_code: '', current_country: '',
   permanent_address: '', permanent_city: '', permanent_building_no: '', permanent_street: '',
   permanent_district: '', permanent_postal_code: '', permanent_country: '',
-  basic_salary: '', allowances: '', gosi: '', other_deductions: '', is_active: true, notes: '',
+  is_active: true, notes: '',
 };
 
 const ADDRESS_FIELDS = ['address', 'city', 'building_no', 'street', 'district', 'postal_code', 'country'] as const;
@@ -302,10 +297,6 @@ export function EmployeeDialog({
       employment_type_id: form.employment_type_id || null,
       manager_id: form.manager_id || null,
       shift_id: form.shift_id || null,
-      basic_salary: riyalToMinor(form.basic_salary), // ريال → هللات
-      allowances: riyalToMinor(form.allowances || '0'),
-      gosi: riyalToMinor(form.gosi || '0'),
-      other_deductions: riyalToMinor(form.other_deductions || '0'),
       is_active: form.is_active,
       notes: form.notes || null,
     };
@@ -549,26 +540,6 @@ export function EmployeeDialog({
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </Select>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="basic_salary">{t('basic_salary')}</Label>
-            <Input id="basic_salary" inputMode="decimal" className="num text-end" value={form.basic_salary} onChange={(e) => set('basic_salary', e.target.value)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="allowances">{t('allowances')}</Label>
-            <Input id="allowances" inputMode="decimal" className="num text-end" value={form.allowances} onChange={(e) => set('allowances', e.target.value)} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="gosi">{t('gosi')}</Label>
-            <Input id="gosi" inputMode="decimal" className="num text-end" value={form.gosi} onChange={(e) => set('gosi', e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="other_deductions">{t('other_deductions')}</Label>
-            <Input id="other_deductions" inputMode="decimal" className="num text-end" value={form.other_deductions} onChange={(e) => set('other_deductions', e.target.value)} />
           </div>
         </div>
         <div className="space-y-1.5">

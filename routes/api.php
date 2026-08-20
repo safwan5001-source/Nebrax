@@ -439,6 +439,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('employees/{id}/attachments/{attachmentId}/download', [EmployeeController::class, 'downloadAttachment'])->middleware($perm('hr.view'));
         Route::delete('employees/{id}/attachments/{attachmentId}', [EmployeeController::class, 'destroyAttachment'])->middleware($perm('hr.manage'));
 
+        // عقود العمل — مصدر الراتب الفعلي، انظر design-system/foundations/hr-users-architecture.md
+        Route::get('employees/{id}/contracts', [EmployeeController::class, 'indexContracts'])->middleware($perm('hr.view'));
+        Route::post('employees/{id}/contracts', [EmployeeController::class, 'storeContracts'])->middleware($perm('hr.manage'));
+        Route::put('employees/{id}/contracts/{contractId}', [EmployeeController::class, 'updateContract'])->middleware($perm('hr.manage'));
+        Route::delete('employees/{id}/contracts/{contractId}', [EmployeeController::class, 'destroyContract'])->middleware($perm('hr.manage'));
+
         // الهيكل التنظيمي — مسمى وظيفي/قسم/مستوى وظيفي/نوع وظيفة ككيانات مُدارة.
         Route::get('job-titles', [JobTitleController::class, 'index'])->middleware($perm('hr.view'));
         Route::post('job-titles', [JobTitleController::class, 'store'])->middleware($perm('hr.manage'));

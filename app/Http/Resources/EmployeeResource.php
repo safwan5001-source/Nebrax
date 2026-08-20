@@ -10,6 +10,10 @@ class EmployeeResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // الراتب يتبع العقد النشط اليوم، لا حقول الموظف الثابتة القديمة
+        // (design-system/foundations/hr-users-architecture.md «الراتب يتبع العقد»).
+        $contract = $this->activeContract();
+
         return [
             'id'           => $this->id,
             'branch_id'    => $this->branch_id,   // مكان العمل (وصفي)
@@ -59,12 +63,13 @@ class EmployeeResource extends JsonResource
             'permanent_district'     => $this->permanent_district,
             'permanent_postal_code'  => $this->permanent_postal_code,
             'permanent_country'      => $this->permanent_country,
-            'basic_salary'     => Money::toRiyal($this->basic_salary),
-            'allowances'       => Money::toRiyal($this->allowances),
-            'gosi'             => Money::toRiyal($this->gosi),
-            'other_deductions' => Money::toRiyal($this->other_deductions),
-            'gross'            => Money::toRiyal($this->gross()),
-            'net'              => Money::toRiyal($this->net()),
+            'active_contract_id' => $contract?->id,
+            'basic_salary'       => Money::toRiyal($contract?->basic_salary ?? 0),
+            'allowances'         => Money::toRiyal($contract?->allowances ?? 0),
+            'gosi'               => Money::toRiyal($contract?->gosi ?? 0),
+            'other_deductions'   => Money::toRiyal($contract?->other_deductions ?? 0),
+            'gross'              => Money::toRiyal($contract?->gross() ?? 0),
+            'net'                => Money::toRiyal($contract?->net() ?? 0),
             'hire_date'    => optional($this->hire_date)->toDateString(),
             'is_active'    => $this->is_active,
             'notes'        => $this->notes,

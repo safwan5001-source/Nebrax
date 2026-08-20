@@ -102,6 +102,18 @@ class Employee extends BaseModel implements CompanyWide
         return $this->hasMany(EmployeeAttachment::class);
     }
 
+    /** عقود العمل عبر الزمن — مصدر الحقيقة الفعلي للراتب، انظر Contract::activeFor(). */
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(Contract::class);
+    }
+
+    /** العقد النشط لهذا الموظف بتاريخ مرجعي معيّن (افتراضياً اليوم). */
+    public function activeContract(?string $referenceDate = null): ?Contract
+    {
+        return Contract::activeFor($this->id, $referenceDate);
+    }
+
     /** المسمى الوظيفي — جزءٌ من الهيكل التنظيمي (كيانٌ مُدار لكل مؤسسة). */
     public function jobTitle(): BelongsTo
     {
@@ -137,21 +149,24 @@ class Employee extends BaseModel implements CompanyWide
         return $this->belongsTo(Shift::class);
     }
 
-    /** إجمالي استحقاق الموظف الشهري (الأساسي + البدلات) بالهللات. */
+    /**
+     * إجمالي استحقاق الموظف الشهري (الأساسي + البدلات) بالهللات، من عقده
+     * النشط اليوم — لا حقوله الثابتة القديمة. صفر بلا عقدٍ نشط.
+     */
     public function gross(): int
     {
-        return (int) $this->basic_salary + (int) $this->allowances;
+        return $this->activeContract()?->gross() ?? 0;
     }
 
-    /** إجمالي الاستقطاعات الشهرية (GOSI + استقطاعات أخرى) بالهللات. */
+    /** إجمالي الاستقطاعات الشهرية (GOSI + استقطاعات أخرى) بالهللات، من العقد النشط. */
     public function deductions(): int
     {
-        return (int) $this->gosi + (int) $this->other_deductions;
+        return $this->activeContract()?->deductions() ?? 0;
     }
 
-    /** صافي استحقاق الموظف (الإجمالي − الاستقطاعات) بالهللات. */
+    /** صافي استحقاق الموظف (الإجمالي − الاستقطاعات) بالهللات، من العقد النشط. */
     public function net(): int
     {
-        return $this->gross() - $this->deductions();
+        return $this->activeContract()?->net() ?? 0;
     }
 }
