@@ -17,6 +17,7 @@ import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { useBranches } from '@/lib/branch';
+import type { Warehouse } from '@/lib/warehouse';
 import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
@@ -53,7 +54,7 @@ const FAV_KEY = 'nibras_pos_favs';
 const HELD_KEY = 'nibras_pos_held';
 
 /** بيع معلّق (محلّي): سلة + عميل، لاستئنافه لاحقاً. */
-interface HeldSale { id: string; at: string; cart: CartLine[]; customer: PosCustomer | null }
+interface HeldSale { id: string; at: string; cart: CartLine[]; customer: PosCustomer | null; warehouseId?: string }
 
 function stockTone(qty: number) {
   if (qty <= 20) return { w: Math.max(8, (qty / 20) * 40), c: 'var(--negative)' };
@@ -70,6 +71,8 @@ export default function PosPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [warehouseId, setWarehouseId] = useState('');
   const [cashier, setCashier] = useState('—');
   const [companyName, setCompanyName] = useState('—');
   // الفرع المعروض: الفرع النشط (افتراضه الرئيسي)، وإلا اسم الشركة.
@@ -111,6 +114,11 @@ export default function PosPage() {
 
   useEffect(() => {
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
+    api<{ data: Warehouse[] }>('/warehouses').then((r) => {
+      const active = r.data.filter((warehouse) => warehouse.is_active);
+      setWarehouses(active);
+      setWarehouseId((current) => current || active.find((warehouse) => warehouse.is_default)?.id || active[0]?.id || '');
+    }).catch(() => {});
     api<{ user?: { name?: string }; company?: { name?: string; vat_number?: string | null; cr_number?: string | null } }>('/me')
       .then((r) => {
         setCashier(r.user?.name ?? t('cashier'));
@@ -181,7 +189,7 @@ export default function PosPage() {
   // تعليق البيع الحالي (سلة + عميل) وتفريغ الشاشة لبيع جديد.
   function holdSale() {
     if (cart.length === 0) return;
-    const entry: HeldSale = { id: `h${Date.now()}`, at: new Date().toISOString(), cart, customer: selectedCustomer };
+    const entry: HeldSale = { id: `h${Date.now()}`, at: new Date().toISOString(), cart, customer: selectedCustomer, warehouseId };
     persistHeld([entry, ...heldSales]);
     setCart([]);
     setSelectedCustomer(null);
@@ -193,6 +201,7 @@ export default function PosPage() {
     if (!entry) return;
     setCart(entry.cart);
     setSelectedCustomer(entry.customer);
+    if (entry.warehouseId) setWarehouseId(entry.warehouseId);
     persistHeld(heldSales.filter((h) => h.id !== id));
     setRetrieveOpen(false);
     setMobileTab('cart');
@@ -346,7 +355,7 @@ export default function PosPage() {
         // إتمام ذرّي: فاتورة آجلة مرحّلة + سندات قبض حسب الوسائل (نقد→1110، بطاقة/تحويل→1120).
         const created = await api<{ data: { id: string; number: string; total: string } }>('/pos/checkout', {
           method: 'POST',
-          body: { partner_id: partnerId, tax_inclusive: taxInclusive, items, tenders },
+          body: { partner_id: partnerId, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, items, tenders },
         });
         const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
         success(t('sale_done'));
@@ -389,7 +398,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive, company],
+    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive, company, warehouseId],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -645,6 +654,10 @@ export default function PosPage() {
         cashier={cashier}
         branch={branch}
         session={session}
+        warehouses={warehouses}
+        warehouseId={warehouseId}
+        warehouseDisabled={step === 'payment' || paying}
+        onWarehouseChange={setWarehouseId}
         onEndSession={() => (session ? (setCountedBal(''), setSessionError(null), setCloseOpen(true)) : router.push('/dashboard'))}
       />
 

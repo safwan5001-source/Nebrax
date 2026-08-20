@@ -23,6 +23,7 @@ class PosController extends ApiController
 
         // عزل: المراجع تخصّ المستأجر الحالي.
         Partner::findOrFail($data['partner_id']);
+        $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $this->activeBranchId());
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $invoice = $this->domain(fn () => $this->pos->checkout($data));

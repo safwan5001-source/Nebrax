@@ -22,7 +22,7 @@ class Purchase extends BaseModel
     use GeneratesDocumentNumbers;
 
     protected $fillable = [
-        'branch_id',
+        'branch_id', 'warehouse_id',
         'tenant_id', 'number', 'partner_id', 'cost_center_id', 'payment_type',
         'purchase_date', 'due_date', 'supplier_invoice_no', 'status',
         'subtotal', 'tax_amount', 'total', 'tax_inclusive',
@@ -66,6 +66,12 @@ class Purchase extends BaseModel
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
+    }
+
+    /** مخزن مثبت على فاتورة الشراء، يحدد موقع الاستلام لا قيمة التقييم. */
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     public function journalEntry(): BelongsTo

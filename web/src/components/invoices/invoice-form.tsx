@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
+import type { Warehouse } from '@/lib/warehouse';
 
 interface Partner { id: string; name: string; type?: string; phone?: string | null; vat_number?: string | null }
 interface ProductUnit { name: string; factor: number }
@@ -40,7 +41,7 @@ interface ApiLine {
   cost_center_allocations?: ApiLineAllocation[];
 }
 interface ApiInvoice {
-  status: string; partner_id: string; payment_type: string; invoice_date: string; due_date: string | null;
+  status: string; partner_id: string; warehouse_id: string | null; payment_type: string; invoice_date: string; due_date: string | null;
   cost_center_id: string | null; salesperson_id: string | null; discount: string; shipping: string;
   adjustment: string; tax_inclusive: boolean; notes: string | null; lines: ApiLine[];
   is_paid?: boolean; payment_method?: string | null; payment_reference?: string | null; cash_account_id?: string | null;
@@ -93,9 +94,11 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [centers, setCenters] = useState<CostCenter[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [cashAccounts, setCashAccounts] = useState<Account[]>([]);
   const [partnerId, setPartnerId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
   const [centerId, setCenterId] = useState('');
   const [salespersonId, setSalespersonId] = useState('');
   const [date, setDate] = useState('');
@@ -145,6 +148,11 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     loadPartners(!editId); // الافتراضي للإنشاء فقط
     loadProducts();
     api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
+    api<{ data: Warehouse[] }>('/warehouses').then((r) => {
+      const active = r.data.filter((warehouse) => warehouse.is_active);
+      setWarehouses(active);
+      if (!editId) setWarehouseId((current) => current || active.find((warehouse) => warehouse.is_default)?.id || active[0]?.id || '');
+    }).catch(() => {});
     api<{ data: Employee[] }>('/employees').then((r) => setEmployees(r.data)).catch(() => {});
     // خزائن التحصيل: حسابات النقد والبنوك الفرعية وحدها (111x/112x) — وهو
     // المدى نفسه الذي يقبله `PaymentService`، فلا تُعرَض خزينة يرفضها الخادم.
@@ -171,6 +179,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         const inv = r.data;
         if (inv.status !== 'draft') { router.replace(`/invoices/${editId}`); return; } // المرحّلة لا تُعدَّل
         setPartnerId(inv.partner_id);
+        setWarehouseId(inv.warehouse_id ?? '');
         setIsPaid(!!inv.is_paid);
         setPayMethod(inv.payment_method ?? 'cash');
         setPayReference(inv.payment_reference ?? '');
@@ -421,7 +430,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     // وتفاصيل الدفع **مشروطة بالخانة**: بلا تأشير لا تُرسَل، فلا تُسجَّل
     // خزينةٌ ولا مرجعٌ لفاتورة لم يُعلَن تحصيلها.
     const body = {
-      partner_id: partnerId, invoice_date: date || null, due_date: dueDate || null,
+      partner_id: partnerId, warehouse_id: warehouseId || null, invoice_date: date || null, due_date: dueDate || null,
       cost_center_id: centerId || null, salesperson_id: salespersonId || null,
       discount: discountMinor, shipping: shippingMinor, adjustment: adjustmentMinor,
       tax_inclusive: taxInclusive, notes: notes || null, items,
@@ -550,6 +559,18 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                   <Label htmlFor="due">{t('due_date')}</Label>
                   <Input id="due" type="date" dir="ltr" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 </div>
+                {warehouses.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="warehouse">{t('warehouse')}</Label>
+                    <Select id="warehouse" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                      <option value="">{t('warehouse_auto')}</option>
+                      {warehouses.map((warehouse) => (
+                        <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>
+                      ))}
+                    </Select>
+                    <p className="text-xs text-muted">{t('warehouse_hint')}</p>
+                  </div>
+                )}
                 {centers.length > 0 && (
                   <div className="space-y-1.5">
                     <Label htmlFor="center">{t('cost_center')}</Label>

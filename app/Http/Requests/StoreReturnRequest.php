@@ -16,6 +16,8 @@ class StoreReturnRequest extends FormRequest
         return [
             'type'                => ['required', 'in:sales,purchase'],
             'partner_id'          => ['required', 'uuid'],
+            // المخزن فعلي؛ وفي المرتجع المرتبط يمكن للخدمة توريث مخزن المصدر عند غيابه.
+            'warehouse_id'        => ['nullable', 'uuid'],
             'payment_type'        => ['required', 'in:cash,credit'],
             'return_date'         => ['nullable', 'date'],
             // المستند المصدر (اختياري ما لم يُلزِم به الإعداد). النوع يُستنتَج

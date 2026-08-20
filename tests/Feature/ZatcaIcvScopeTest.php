@@ -90,6 +90,11 @@ class ZatcaIcvScopeTest extends TestCase
         app(BranchContext::class)->set($riyadh->id);
         $third  = $this->postInvoice();
 
+        // رقم المستند مستقل لكل فرع، ولو تشابه الرقم المعروض بين فرعين.
+        $this->assertSame(
+            ['INV-2026-00001', 'INV-2026-00001', 'INV-2026-00002'],
+            [$first->number, $second->number, $third->number]
+        );
         $this->assertSame([1, 2, 3], [$first->zatca_icv, $second->zatca_icv, $third->zatca_icv]);
 
         // السلسلة متّصلة عبر الفروع: هاش كلٍّ هو سابقُ تاليه.

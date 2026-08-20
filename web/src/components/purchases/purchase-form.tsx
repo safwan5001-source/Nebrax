@@ -16,6 +16,7 @@ import { ProductDialog } from '@/components/products/product-dialog';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
+import type { Warehouse } from '@/lib/warehouse';
 
 interface Partner { id: string; name: string; type: string; phone?: string | null; vat_number?: string | null }
 interface ProductUnit { name: string; factor: number }
@@ -30,7 +31,7 @@ interface ApiLine {
   unit_name: string | null; unit_price: string; tax_rate: number; line_discount?: string;
 }
 interface ApiPurchase {
-  partner_id: string; cost_center_id: string | null; payment_type: string;
+  partner_id: string; warehouse_id: string | null; cost_center_id: string | null; payment_type: string;
   purchase_date: string | null; supplier_invoice_no: string | null;
   tax_inclusive: boolean; notes?: string | null; lines: ApiLine[];
   discount?: string; shipping?: string; adjustment?: string;
@@ -78,8 +79,10 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [centers, setCenters] = useState<CostCenter[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
   const [partnerId, setPartnerId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
   const [centerId, setCenterId] = useState('');
   const [paymentType, setPaymentType] = useState('credit');
   const [date, setDate] = useState('');
@@ -122,8 +125,13 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
     loadPartners();
     loadProducts();
     api<{ data: CostCenter[] }>('/cost-centers').then((r) => setCenters(r.data.filter((c) => c.is_active))).catch(() => {});
+    api<{ data: Warehouse[] }>('/warehouses').then((r) => {
+      const active = r.data.filter((warehouse) => warehouse.is_active);
+      setWarehouses(active);
+      if (!editId) setWarehouseId((current) => current || active.find((warehouse) => warehouse.is_default)?.id || active[0]?.id || '');
+    }).catch(() => {});
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
-  }, [loadPartners, loadProducts]);
+  }, [editId, loadPartners, loadProducts]);
 
   // تحميل المسوّدة للتعديل وملء الحقول. المرحّلة يرفضها الخادم، وزرّ التعديل
   // معطّل عليها في الشاشتين — فلا يصل المستخدم إلى هنا بمرحّلة إلا بالمسار.
@@ -134,6 +142,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
       .then((r) => {
         const d = r.data;
         setPartnerId(d.partner_id);
+        setWarehouseId(d.warehouse_id ?? '');
         setCenterId(d.cost_center_id ?? '');
         setPaymentType(d.payment_type);
         setDate(d.purchase_date ?? '');
@@ -279,6 +288,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
     try {
       const body = {
           partner_id: partnerId,
+          warehouse_id: warehouseId || null,
           cost_center_id: centerId || null,
           payment_type: paymentType,
           purchase_date: date || null,
@@ -363,6 +373,19 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                     <option value="cash">{t('cash')}</option>
                   </Select>
                 </div>
+
+                {warehouses.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="warehouse">{t('warehouse')}</Label>
+                    <Select id="warehouse" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                      <option value="">{t('warehouse_auto')}</option>
+                      {warehouses.map((warehouse) => (
+                        <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>
+                      ))}
+                    </Select>
+                    <p className="text-xs text-muted">{t('warehouse_hint')}</p>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <Label htmlFor="date">{t('date')}</Label>

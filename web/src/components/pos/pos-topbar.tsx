@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Printer, Barcode, Wifi, Building2, Power, Clock } from 'lucide-react';
+import type { Warehouse } from '@/lib/warehouse';
 
 /** نقطة حالة ملوّنة (متصل/غير متصل) على زر أداة. */
 function StatusDot({ ok }: { ok: boolean }) {
@@ -19,11 +20,19 @@ export function PosTopbar({
   cashier,
   branch,
   session,
+  warehouses = [],
+  warehouseId = '',
+  warehouseDisabled = false,
+  onWarehouseChange,
   onEndSession,
 }: {
   cashier: string;
   branch: string;
   session?: { number: string } | null;
+  warehouses?: Warehouse[];
+  warehouseId?: string;
+  warehouseDisabled?: boolean;
+  onWarehouseChange?: (warehouseId: string) => void;
   onEndSession?: () => void;
 }) {
   const t = useTranslations('pos');
@@ -81,6 +90,23 @@ export function PosTopbar({
           <Clock className="h-3.5 w-3.5 text-positive" strokeWidth={1.7} />
           <span className="num">{session.number}</span>
         </div>
+      )}
+      {warehouses.length > 0 && (
+        <label className="flex min-w-0 items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-xs">
+          <Building2 className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.7} />
+          <span className="sr-only">{t('warehouse')}</span>
+          <select
+            className="max-w-32 truncate bg-transparent text-xs text-text outline-none disabled:cursor-not-allowed disabled:text-muted"
+            value={warehouseId}
+            disabled={warehouseDisabled}
+            onChange={(event) => onWarehouseChange?.(event.target.value)}
+            aria-label={t('warehouse')}
+          >
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>
+            ))}
+          </select>
+        </label>
       )}
       <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs">
         <Building2 className="h-3.5 w-3.5 text-muted" strokeWidth={1.7} />

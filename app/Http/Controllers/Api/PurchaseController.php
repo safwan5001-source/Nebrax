@@ -35,6 +35,7 @@ class PurchaseController extends ApiController
         $data['created_by'] = $request->user()?->id;
 
         Partner::findOrFail($data['partner_id']); // عزل المورد
+        $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $this->activeBranchId());
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
@@ -112,6 +113,7 @@ class PurchaseController extends ApiController
         $data = $request->validated();
 
         Partner::findOrFail($data['partner_id']);
+        $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $purchase->branch_id);
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
@@ -129,9 +131,10 @@ class PurchaseController extends ApiController
         return response()->json(['message' => 'تم الحذف.']);
     }
 
-    public function post(string $id): JsonResponse
+    public function post(Request $request, string $id): JsonResponse
     {
         $purchase = Purchase::findOrFail($id);
+        $this->assertWarehouseAllowed($purchase->warehouse_id, $purchase->branch_id);
         $posted = $this->domain(fn () => $this->purchases->post($purchase));
 
         return (new PurchaseResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();

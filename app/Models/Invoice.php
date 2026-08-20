@@ -22,7 +22,7 @@ class Invoice extends BaseModel
     use GeneratesDocumentNumbers;
 
     protected $fillable = [
-        'branch_id',
+        'branch_id', 'warehouse_id',
         'tenant_id', 'number', 'partner_id', 'type', 'payment_type',
         'invoice_date', 'due_date', 'cost_center_id', 'salesperson_id', 'status',
         'subtotal', 'discount', 'shipping', 'adjustment', 'tax_amount', 'total',
@@ -85,6 +85,12 @@ class Invoice extends BaseModel
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
+    }
+
+    /** مخزن مثبت على رأس الفاتورة؛ لا يعاد حله من سياق الفرع عند الترحيل. */
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     public function journalEntry(): BelongsTo
