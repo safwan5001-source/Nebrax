@@ -13,9 +13,18 @@ class PayrollController extends ApiController
 {
     public function __construct(protected PayrollService $payroll) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return PayrollRunResource::collection(PayrollRun::latest()->get())->response();
+        $query = PayrollRun::latest();
+
+        // تصفية اختيارية بموظفٍ واحد — لعرض سجلّ رواتبه في صفحة ملفّه، بلا
+        // جلب كل السطور (`items`) لبقية الموظفين في كل مسيّر.
+        if ($employeeId = $request->query('employee_id')) {
+            $query->whereHas('items', fn ($q) => $q->where('employee_id', $employeeId))
+                ->with(['items' => fn ($q) => $q->where('employee_id', $employeeId)->with('employee')]);
+        }
+
+        return PayrollRunResource::collection($query->get())->response();
     }
 
     public function store(StorePayrollRunRequest $request): JsonResponse
