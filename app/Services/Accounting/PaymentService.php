@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Models\User;
 use App\Models\PaymentAllocation;
 use App\Models\Purchase;
@@ -57,6 +58,7 @@ class PaymentService
 
         $direction = $data['direction'] ?? 'received';
         $date      = $data['payment_date'] ?? now()->toDateString();
+        [$method, $cashAccountId, $paymentMethod] = $this->resolvePaymentSetup($data);
 
         // المستند المستهدَف حسب الاتجاه: قبض→فاتورة مبيعات، صرف→فاتورة مشتريات.
         [$targetClass, $key] = $direction === 'received'
@@ -83,13 +85,7 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        // الخزينة تُتحقَّق **قبل** الإنشاء: سندٌ يحمل حساباً مرفوضاً كان سيُرفض
-        // عند الترحيل وحده، فيبقى في القاعدة مسوّدةً لا تُرحَّل أبداً.
-        $cashAccountId = $this->cashBankAccounts
-            ->resolveForPayment($data['cash_account_id'] ?? null, $data['method'] ?? 'cash')
-            ->account_id;
-
-        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $cashAccountId) {
+        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $method, $cashAccountId, $paymentMethod) {
             // النسخ قد يكون لمستند تاريخي بلا فرع. نحفظ نطاق المصدر صراحةً،
             // فلا تنتقل النسخة إلى الفرع الرئيسي للطلب ثم تصطدم برقمه القديم.
             $hasExplicitBranch = array_key_exists('branch_id', $data);
@@ -104,7 +100,9 @@ class PaymentService
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null, // مرجع اختياري للقبض
                 'direction'       => $direction,
-                'method'          => $data['method'] ?? 'cash',
+                'method'          => $method,
+                'payment_method_id' => $paymentMethod['id'],
+                'payment_method_name' => $paymentMethod['name'],
                 'reference'       => $data['reference'] ?? null,
                 'cash_account_id' => $cashAccountId,
                 'payment_date'    => $date,
@@ -149,6 +147,7 @@ class PaymentService
         }
 
         $direction = $payment->direction;
+        [$method, $cashAccountId, $paymentMethod] = $this->resolvePaymentSetup($data);
         [$targetClass, $key] = $direction === 'received'
             ? [Invoice::class, 'invoice_id']
             : [Purchase::class, 'purchase_id'];
@@ -170,15 +169,13 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        $cashAccountId = $this->cashBankAccounts
-            ->resolveForPayment($data['cash_account_id'] ?? null, $data['method'] ?? 'cash')
-            ->account_id;
-
-        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $cashAccountId) {
+        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $method, $cashAccountId, $paymentMethod) {
             $payment->update([
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null,
-                'method'          => $data['method'] ?? 'cash',
+                'method'          => $method,
+                'payment_method_id' => $paymentMethod['id'],
+                'payment_method_name' => $paymentMethod['name'],
                 'reference'       => $data['reference'] ?? null,
                 'cash_account_id' => $cashAccountId,
                 'payment_date'    => $data['payment_date'] ?? $payment->payment_date->toDateString(),
@@ -208,6 +205,7 @@ class PaymentService
             'partner_id'      => $payment->partner_id,
             'direction'       => $payment->direction,
             'method'          => $payment->method,
+            'payment_method_id' => $payment->payment_method_id,
             'reference'       => $payment->reference,
             'cash_account_id' => $payment->cash_account_id,
             'payment_date'    => $date,
@@ -288,7 +286,6 @@ class PaymentService
             $cashAccountId = $cashEntity->account_id;
 
             if ($payment->direction === 'received') {
-                // قبض من عميل: مدين الصندوق/البنك، دائن العملاء
                 $lines = [[
                     'account_id' => $cashAccountId,
                     'debit'      => $payment->amount,
@@ -299,7 +296,6 @@ class PaymentService
                     'partner_id'   => $payment->partner_id,
                 ]];
             } else {
-                // صرف لمورد: مدين الموردون، دائن الصندوق/البنك
                 $lines = [[
                     'account_id'   => $this->accountId(self::ACC_PAYABLE),
                     'debit'        => $payment->amount,
@@ -348,6 +344,34 @@ class PaymentService
 
             return $payment->fresh();
         });
+    }
+
+    /**
+     * يطابق الطريقة النشطة بخزينتها أو حسابها البنكي ويلتقط اسمها على السند.
+     * تبقى المدفوعات القديمة التي لا تحمل payment_method_id على عقد cash|bank السابق.
+     *
+     * @return array{0:string,1:string,2:array{id:?string,name:?string}}
+     */
+    private function resolvePaymentSetup(array $data): array
+    {
+        $paymentMethodId = $data['payment_method_id'] ?? null;
+        if (! $paymentMethodId) {
+            $method = $data['method'] ?? 'cash';
+            $cashAccount = $this->cashBankAccounts->resolveForPayment($data['cash_account_id'] ?? null, $method);
+
+            return [$method, $cashAccount->account_id, ['id' => null, 'name' => null]];
+        }
+
+        $paymentMethod = PaymentMethod::with('cashBankAccount')->find($paymentMethodId);
+        if (! $paymentMethod || ! $paymentMethod->is_active) {
+            throw new RuntimeException('طريقة الدفع المختارة غير موجودة أو معطلة.');
+        }
+
+        $method = $paymentMethod->settlement_type;
+        $accountId = $data['cash_account_id'] ?? $paymentMethod->cashBankAccount?->account_id;
+        $cashAccount = $this->cashBankAccounts->resolveForPayment($accountId, $method);
+
+        return [$method, $cashAccount->account_id, ['id' => $paymentMethod->id, 'name' => $paymentMethod->name]];
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Models\Account;
 use App\Models\Partner;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Models\Purchase;
 use App\Services\Accounting\PaymentService;
 use Illuminate\Http\JsonResponse;
@@ -32,7 +33,7 @@ class PaymentController extends ApiController
         }
 
         return PaymentResource::collection(
-            $this->scopeToActiveBranch($query->with('partner'), $request)->get()
+            $this->scopeToActiveBranch($query->with(['partner', 'cashAccount', 'paymentMethod']), $request)->get()
         )->response();
     }
 
@@ -52,7 +53,7 @@ class PaymentController extends ApiController
     public function show(Request $request, string $id): JsonResponse
     {
         return (new PaymentResource(
-            $this->visiblePayment($request, $id)->load(['partner', 'cashAccount', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])
+            $this->visiblePayment($request, $id)->load(['partner', 'cashAccount', 'paymentMethod', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])
         ))->response();
     }
 
@@ -66,7 +67,7 @@ class PaymentController extends ApiController
         $this->assertReferences($data);
 
         $updated = $this->domain(fn () => $this->payments->update($payment, $data, $data['allocations'] ?? []));
-        return (new PaymentResource($updated->load(['partner', 'cashAccount', 'allocations.allocatable'])))->response();
+        return (new PaymentResource($updated->load(['partner', 'cashAccount', 'paymentMethod', 'allocations.allocatable'])))->response();
     }
 
     /** النسخة الجديدة مسودة بلا تخصيصات حتى لا تؤثر في فواتير السند الأصل. */
@@ -74,7 +75,7 @@ class PaymentController extends ApiController
     {
         $payment = $this->visiblePayment($request, $id);
         $copy = $this->domain(fn () => $this->payments->duplicate($payment, $request->user()?->id));
-        return (new PaymentResource($copy->load(['partner', 'cashAccount', 'allocations.allocatable'])))->response()->setStatusCode(201);
+        return (new PaymentResource($copy->load(['partner', 'cashAccount', 'paymentMethod', 'allocations.allocatable'])))->response()->setStatusCode(201);
     }
 
     public function destroy(Request $request, string $id): JsonResponse
@@ -97,7 +98,7 @@ class PaymentController extends ApiController
         $payment = $this->visiblePayment($request, $id);
         $posted = $this->domain(fn () => $this->payments->post($payment, $request->user()));
 
-        return (new PaymentResource($posted->load(['partner', 'cashAccount', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
+        return (new PaymentResource($posted->load(['partner', 'cashAccount', 'paymentMethod', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
     }
 
     /** سندات القبض مستندات مالية بلا Scope فرع عالمي، فتقيّد كل عملية بالفرع النشط. */
@@ -112,6 +113,7 @@ class PaymentController extends ApiController
         $this->assertTenantOwned(Invoice::class, $data['invoice_id'] ?? null, 'الفاتورة');
         $this->assertTenantOwned(Purchase::class, $data['purchase_id'] ?? null, 'فاتورة المشتريات');
         $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
+        $this->assertTenantOwned(PaymentMethod::class, $data['payment_method_id'] ?? null, 'طريقة الدفع');
         foreach ($data['allocations'] ?? [] as $allocation) {
             $this->assertTenantOwned(Invoice::class, $allocation['invoice_id'] ?? null, 'الفاتورة');
             $this->assertTenantOwned(Purchase::class, $allocation['purchase_id'] ?? null, 'فاتورة المشتريات');

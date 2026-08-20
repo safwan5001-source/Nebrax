@@ -24,7 +24,7 @@ class Payment extends BaseModel
     protected $fillable = [
         'branch_id',
         'tenant_id', 'number', 'partner_id', 'invoice_id',
-        'direction', 'method', 'reference', 'cash_account_id', 'payment_date', 'amount',
+        'direction', 'method', 'payment_method_id', 'payment_method_name', 'reference', 'cash_account_id', 'payment_date', 'amount',
         'status', 'notes', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by',
     ];
 
@@ -55,6 +55,12 @@ class Payment extends BaseModel
     public function cashAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'cash_account_id');
+    }
+
+    /** الطريقة المختارة؛ تبقى لقطة الاسم على السند حتى بعد تعديل الإعداد. */
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class);
     }
 
     public function journalEntry(): BelongsTo

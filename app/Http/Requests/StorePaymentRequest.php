@@ -17,7 +17,8 @@ class StorePaymentRequest extends FormRequest
             'partner_id'             => ['required', 'uuid'],
             'amount'                 => ['required', 'integer', 'min:1', 'max:100000000000'], // هللات
             'direction'              => ['required', 'in:received,paid'],
-            'method'                 => ['required', 'in:cash,bank'],
+            'method'                 => ['nullable', 'required_without:payment_method_id', 'in:cash,bank'],
+            'payment_method_id'      => ['nullable', 'uuid', 'required_without:method'],
             'reference'              => ['nullable', 'string', 'max:255'], // رقم الحوالة/الشبكة
             'cash_account_id'        => ['nullable', 'uuid'],              // الخزينة — يتحقق نوعها PaymentService
             'payment_date'           => ['nullable', 'date'],

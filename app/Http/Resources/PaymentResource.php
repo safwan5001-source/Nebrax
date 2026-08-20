@@ -18,6 +18,8 @@ class PaymentResource extends JsonResource
             'partner_name' => $this->whenLoaded('partner', fn () => $this->partner?->name),
             'direction'    => $this->direction,
             'method'       => $this->method,
+            'payment_method_id' => $this->payment_method_id,
+            'payment_method_name' => $this->payment_method_name,
             'reference'    => $this->reference,
             'cash_account_id' => $this->cash_account_id,
             'cash_account_code' => $this->whenLoaded('cashAccount', fn () => $this->cashAccount?->code),
