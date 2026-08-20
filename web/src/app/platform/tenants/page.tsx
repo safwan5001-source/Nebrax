@@ -9,9 +9,12 @@ import { DataTable } from '@/components/data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select } from '@/components/ui/select';
 import { ApiError } from '@/lib/api';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
+
+const PLAN_OPTIONS = ['free', 'basic', 'pro', 'enterprise'] as const;
 
 interface TenantRow {
   id: string;
@@ -21,7 +24,7 @@ interface TenantRow {
   is_active: boolean;
   trial_ends_at: string | null;
   users_count: number;
-  contact: { name: string; email: string } | null;
+  contact: { name: string; email: string; phone: string | null } | null;
 }
 
 interface TenantsResponse {
@@ -35,6 +38,8 @@ export default function PlatformTenantsPage() {
   const [rows, setRows] = useState<TenantRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [planFilter, setPlanFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,10 +79,22 @@ export default function PlatformTenantsPage() {
         ),
       },
       {
-        id: 'contact',
+        id: 'contactName',
+        accessorFn: (row) => row.contact?.name ?? '',
+        header: t('contactName'),
+        cell: ({ row }) => row.original.contact?.name ?? '—',
+      },
+      {
+        id: 'contactEmail',
         accessorFn: (row) => row.contact?.email ?? '',
         header: t('contact'),
         cell: ({ row }) => <span className="num text-muted">{row.original.contact?.email ?? '—'}</span>,
+      },
+      {
+        id: 'contactPhone',
+        accessorFn: (row) => row.contact?.phone ?? '',
+        header: t('phone'),
+        cell: ({ row }) => <span className="num text-muted">{row.original.contact?.phone ?? '—'}</span>,
       },
       {
         accessorKey: 'plan',
@@ -105,6 +122,16 @@ export default function PlatformTenantsPage() {
       },
     ],
     [t, router]
+  );
+
+  const filteredRows = useMemo(
+    () =>
+      rows.filter((row) => {
+        if (planFilter !== 'all' && row.plan !== planFilter) return false;
+        if (statusFilter !== 'all' && String(row.is_active) !== statusFilter) return false;
+        return true;
+      }),
+    [rows, planFilter, statusFilter]
   );
 
   return (
@@ -139,14 +166,39 @@ export default function PlatformTenantsPage() {
             </CardContent>
           </Card>
         ) : (
-          <DataTable
-            columns={columns}
-            data={rows}
-            loading={loading}
-            searchPlaceholder={t('search')}
-            emptyLabel={t('empty')}
-            exportName="tenants"
-          />
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={planFilter}
+                onChange={(e) => setPlanFilter(e.target.value)}
+                aria-label={t('filterByPlan')}
+                className="w-40"
+              >
+                <option value="all">{t('allPlans')}</option>
+                {PLAN_OPTIONS.map((plan) => (
+                  <option key={plan} value={plan}>{plan}</option>
+                ))}
+              </Select>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                aria-label={t('filterByStatus')}
+                className="w-40"
+              >
+                <option value="all">{t('allStatuses')}</option>
+                <option value="true">{t('active')}</option>
+                <option value="false">{t('inactive')}</option>
+              </Select>
+            </div>
+            <DataTable
+              columns={columns}
+              data={filteredRows}
+              loading={loading}
+              searchPlaceholder={t('search')}
+              emptyLabel={t('empty')}
+              exportName="tenants"
+            />
+          </div>
         )}
       </div>
     </main>

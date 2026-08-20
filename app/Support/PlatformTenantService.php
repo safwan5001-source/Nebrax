@@ -142,7 +142,7 @@ class PlatformTenantService
             'subscription_ends_at'  => $tenant->subscription_ends_at?->toDateString(),
             'created_at'            => $tenant->created_at?->toDateString(),
             'users_count'           => $tenant->users_count,
-            'contact'               => $owner ? ['name' => $owner->name, 'email' => $owner->email] : null,
+            'contact'               => $owner ? ['name' => $owner->name, 'email' => $owner->email, 'phone' => $owner->phone] : null,
         ];
     }
 }

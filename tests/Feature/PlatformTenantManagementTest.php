@@ -44,6 +44,26 @@ class PlatformTenantManagementTest extends TestCase
     }
 
     /** @test */
+    public function it_exposes_the_owner_phone_number_for_contact_purposes(): void
+    {
+        $this->postJson('/api/register', [
+            'company_name' => 'شركة جوال',
+            'slug'         => 'phoney',
+            'vat_number'   => '300000000000003',
+            'name'         => 'مالك الجوال',
+            'email'        => 'owner@phoney.test',
+            'phone'        => '0500000000',
+            'password'     => 'password123',
+        ])->assertCreated();
+        $token = $this->administratorToken();
+
+        $response = $this->withToken($token)->getJson('/api/platform/tenants')->assertOk();
+        $tenant = collect($response->json('data'))->firstWhere('slug', 'phoney');
+        $this->assertSame('0500000000', $tenant['contact']['phone']);
+        $this->assertSame('مالك الجوال', $tenant['contact']['name']);
+    }
+
+    /** @test */
     public function it_searches_tenants_by_owner_email(): void
     {
         $this->registerTenant('alpha', 'owner@alpha.test');

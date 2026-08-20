@@ -38,7 +38,7 @@ interface TenantDetail {
   created_at: string | null;
   users_count: number;
   active_users_count: number;
-  contact: { name: string; email: string } | null;
+  contact: { name: string; email: string; phone: string | null } | null;
   subscriptions: Subscription[];
 }
 
@@ -182,7 +182,9 @@ export default function PlatformTenantDetailPage() {
                 <CardTitle>{t('detailTitle')}</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+                <Info label={t('contactName')} value={tenant.contact?.name ?? '—'} />
                 <Info label={t('contact')} value={tenant.contact?.email ?? '—'} />
+                <Info label={t('phone')} value={tenant.contact?.phone ?? '—'} />
                 <Info label={t('status')}>
                   <Badge tone={tenant.is_active ? 'positive' : 'negative'}>
                     {tenant.is_active ? t('active') : t('inactive')}
