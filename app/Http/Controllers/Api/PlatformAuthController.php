@@ -57,7 +57,7 @@ class PlatformAuthController extends ApiController
     private function issueToken(PlatformAdministrator $administrator): string
     {
         return $administrator
-            ->createToken('platform-console', ['platform:read'], now()->addDays(self::TOKEN_TTL_DAYS))
+            ->createToken('platform-console', ['platform:read', 'platform:manage'], now()->addDays(self::TOKEN_TTL_DAYS))
             ->plainTextToken;
     }
 

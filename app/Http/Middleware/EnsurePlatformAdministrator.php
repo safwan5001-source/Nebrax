@@ -11,11 +11,12 @@ use Symfony\Component\HttpFoundation\Response;
  * يحمي مسارات تشغيل المنصة من حسابات المستأجرين.
  *
  * لا يكفي `auth:sanctum` هنا، إذ يمكن لتوكن مستخدم مستأجر أن ينجح في المصادقة.
- * هذا الوسيط يطلب نموذج مدير المنصة صراحةً وتوكناً ذا قدرة محددة.
+ * هذا الوسيط يطلب نموذج مدير المنصة صراحةً وتوكناً ذا قدرة محددة، تُمرَّر
+ * اسماً عبر المسار (افتراضها `platform:read`): `EnsurePlatformAdministrator::class . ':platform:manage'`.
  */
 class EnsurePlatformAdministrator
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $ability = 'platform:read'): Response
     {
         $administrator = $request->user();
 
@@ -23,8 +24,8 @@ class EnsurePlatformAdministrator
             abort(403, 'هذه المساحة مخصصة لمديري المنصة فقط.');
         }
 
-        if (! $administrator->tokenCan('platform:read')) {
-            abort(403, 'لا يحمل هذا التوكن صلاحية قراءة مؤشرات المنصة.');
+        if (! $administrator->tokenCan($ability)) {
+            abort(403, 'لا يحمل هذا التوكن الصلاحية المطلوبة.');
         }
 
         return $next($request);

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Building2, LogOut, RefreshCw, ShieldCheck, UsersRound } from 'lucide-react';
+import { Building2, LogOut, RefreshCw, ShieldCheck, Users2, UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -111,6 +111,10 @@ export default function PlatformDashboardPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="max-w-48 truncate text-xs text-muted">{t('signedInAs', { name: administrator.name })}</span>
+            <Button variant="outline" size="sm" onClick={() => router.push('/platform/tenants')}>
+              <Users2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              {t('manageTenants')}
+            </Button>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
               {t('refresh')}

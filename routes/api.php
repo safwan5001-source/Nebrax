@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PlatformAuthController;
 use App\Http\Controllers\Api\PlatformDashboardController;
+use App\Http\Controllers\Api\PlatformTenantController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BranchSettingsController;
@@ -114,7 +115,14 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('logout', [PlatformAuthController::class, 'logout']);
         Route::get('me', [PlatformAuthController::class, 'me']);
         Route::get('overview', [PlatformDashboardController::class, 'overview']);
+        Route::get('tenants', [PlatformTenantController::class, 'index']);
+        Route::get('tenants/{tenant}', [PlatformTenantController::class, 'show']);
     });
+    Route::middleware(['auth:sanctum', EnsurePlatformAdministrator::class . ':platform:manage'])
+        ->prefix('platform')
+        ->group(function () {
+            Route::patch('tenants/{tenant}', [PlatformTenantController::class, 'update']);
+        });
 
     // محمي: مصادقة Sanctum + ضبط المستأجر (العزل التلقائي)
     Route::middleware(['auth:sanctum', SetTenant::class, SetBranch::class])->group(function () {
