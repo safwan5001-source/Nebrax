@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { QRCodeSVG } from 'qrcode.react';
 import {
   ArrowRight, Banknote, BookOpen, Boxes, CalendarPlus, CheckCircle2, ChevronDown, Download, Paperclip,
   FileSpreadsheet, LayoutTemplate, MoreVertical, Pencil, Printer,
@@ -140,6 +139,7 @@ interface Zatca {
 }
 type PendingAction = 'post' | 'delete' | null;
 type ExportBusy = 'pdf' | 'share' | 'excel' | null;
+type RelationSection = 'payments' | 'appointments' | 'notes' | 'inventory' | 'accounting';
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = {
   posted: 'positive',
@@ -182,7 +182,9 @@ export default function InvoiceDetailPage() {
   const [accounting, setAccounting] = useState<AccountingLinks | null>(null);
   const [relationsLoading, setRelationsLoading] = useState(true);
   const [relationsUnavailable, setRelationsUnavailable] = useState(false);
-  const [relationSection, setRelationSection] = useState<'payments' | 'appointments' | 'notes' | 'inventory' | 'accounting'>('payments');
+  const [relationSection, setRelationSection] = useState<RelationSection | null>('payments');
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [financialOpen, setFinancialOpen] = useState(true);
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
@@ -379,7 +381,16 @@ export default function InvoiceDetailPage() {
   ) : (
     <div className="divide-y divide-border">{entryContent(accounting?.sales_entry ?? null, t('sales_entry'), t('no_sales_entry'))}{entryContent(accounting?.cost_entry ?? null, t('cost_entry'), t('no_cost_entry'))}</div>
   );
-  const relationContent = relationSection === 'payments' ? paymentsContent : relationSection === 'appointments' ? appointmentsContent : relationSection === 'notes' ? notesContent : relationSection === 'inventory' ? inventoryContent : accountingContent;
+  const relationContent = relationSection === 'payments'
+    ? paymentsContent
+    : relationSection === 'appointments'
+      ? appointmentsContent
+      : relationSection === 'notes'
+        ? notesContent
+        : relationSection === 'inventory'
+          ? inventoryContent
+          : relationSection === 'accounting' ? accountingContent : null;
+  const toggleRelationSection = (section: RelationSection) => setRelationSection((current) => current === section ? null : section);
 
   const doc = () => document.getElementById('print-root');
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
@@ -474,27 +485,6 @@ export default function InvoiceDetailPage() {
     }
   }
 
-  const documentControls = (
-    <>
-      <Button variant="outline" size="sm" onClick={handleExcel} disabled={!!busy}>
-        <FileSpreadsheet className="h-4 w-4" strokeWidth={1.7} />
-        {t('excel')}
-      </Button>
-      <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={!!busy}>
-        <Download className="h-4 w-4" strokeWidth={1.7} />
-        {busy === 'pdf' ? t('generating') : t('download_pdf')}
-      </Button>
-      <Button variant="outline" size="sm" onClick={handleShare} disabled={!!busy}>
-        <Share2 className="h-4 w-4" strokeWidth={1.7} />
-        {busy === 'share' ? t('generating') : t('share')}
-      </Button>
-      <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'print-root')} disabled={!!busy}>
-        <Printer className="h-4 w-4" strokeWidth={1.7} />
-        {t('print')}
-      </Button>
-    </>
-  );
-
   const workControls = (
     <>
       {isDraft && (
@@ -536,7 +526,6 @@ export default function InvoiceDetailPage() {
           </div>
           <div className="no-print hidden flex-wrap items-center justify-end gap-2 lg:flex">
             {workControls}
-            {documentControls}
             <Dropdown
               align="end"
               menuLabel={t('actions')}
@@ -548,6 +537,10 @@ export default function InvoiceDetailPage() {
               <DropdownItem icon={CalendarPlus} onClick={() => setAppointmentOpen(true)}>{t('schedule_appointment')}</DropdownItem>
               <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
               {customer && <DropdownItem icon={ArrowRight} href={`/partners/${invoice.partner_id}`}>{t('open_customer')}</DropdownItem>}
+              <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
+              <DropdownItem icon={Download} onClick={handleDownloadPdf}>{busy === 'pdf' ? t('generating') : t('download_pdf')}</DropdownItem>
+              <DropdownItem icon={Share2} onClick={handleShare}>{t('share')}</DropdownItem>
+              <DropdownItem icon={FileSpreadsheet} onClick={handleExcel}>{t('excel')}</DropdownItem>
               {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
                 <DropdownItem icon={Printer} onClick={() => printDocument(thermalPaper, 'thermal-print-root')}>{tPrint('thermal_print')}</DropdownItem>
               )}
@@ -556,8 +549,8 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
 
-        <div className="no-print -mx-4 overflow-x-auto px-4 lg:hidden">
-          <div className="flex w-max gap-2">
+        <div className="no-print lg:hidden">
+          <div className="flex flex-wrap items-center gap-2">
             {workControls}
             <Dropdown
               align="end"
@@ -573,19 +566,44 @@ export default function InvoiceDetailPage() {
               <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
               <DropdownItem icon={Download} onClick={handleDownloadPdf}>{t('download_pdf')}</DropdownItem>
               <DropdownItem icon={FileSpreadsheet} onClick={handleExcel}>{t('excel')}</DropdownItem>
+              <DropdownItem icon={Share2} onClick={handleShare}>{t('share')}</DropdownItem>
               {isDraft && <DropdownItem icon={Trash2} tone="danger" onClick={() => setPendingAction('delete')}>{t('delete')}</DropdownItem>}
             </Dropdown>
           </div>
         </div>
+
+        <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-surface px-3 py-2.5">
+          <span className="text-sm font-medium text-text">{t('template')}</span>
+          <Dropdown
+            align="end"
+            menuLabel={t('template')}
+            triggerLabel={t('template')}
+            triggerClassName="h-8 gap-2 border border-border px-3 text-sm text-text hover:bg-primary-soft"
+            trigger={
+              <>
+                <LayoutTemplate className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
+                <span>{tt(getTemplate(templateId).nameKey)}</span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.8} />
+              </>
+            }
+          >
+            {listTemplates().map((definition) => (
+              <DropdownItem key={definition.id} onClick={() => setTemplateId(definition.id)}>{tt(definition.nameKey)}</DropdownItem>
+            ))}
+          </Dropdown>
+        </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle>{t('details')}</CardTitle>
-            {customer && <Link href={`/partners/${invoice.partner_id}`} className="text-sm text-primary hover:underline">{t('open_customer')}</Link>}
+      <section className="grid grid-cols-1 gap-4">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-3 p-0">
+            <button type="button" onClick={() => setDetailsOpen((value) => !value)} aria-expanded={detailsOpen} aria-controls="invoice-details-content" className="flex min-w-0 flex-1 items-center justify-between gap-3 px-5 py-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40">
+              <CardTitle>{t('details')}</CardTitle>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${detailsOpen ? 'rotate-180 text-primary' : ''}`} strokeWidth={2} />
+            </button>
+            {customer && <Link href={`/partners/${invoice.partner_id}`} className="me-5 shrink-0 text-sm text-primary hover:underline">{t('open_customer')}</Link>}
           </CardHeader>
-          <CardContent>
+          {detailsOpen && <CardContent id="invoice-details-content">
             <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
               {info.map(([key, value]) => (
                 <div key={key}>
@@ -598,32 +616,19 @@ export default function InvoiceDetailPage() {
               <p className="text-xs text-muted">{t('notes')}</p>
               <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-text">{invoice.notes || t('no_notes')}</p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>{t('vat_status')}</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Badge tone={zatca?.qr ? 'positive' : 'muted'}>{zatca?.qr ? t('vat_generated') : t('vat_not_generated')}</Badge>
-            </div>
-            {zatca?.qr ? (
-              <div className="flex items-center gap-3">
-                <div className="rounded bg-white p-2"><QRCodeSVG value={zatca.qr} size={76} level="M" /></div>
-                <dl className="min-w-0 space-y-1 text-xs text-muted">
-                  <div className="flex justify-between gap-3"><dt>ICV</dt><dd className="num text-text">{zatca.icv}</dd></div>
-                  <div className="truncate" title={zatca.uuid ?? ''}>UUID: <span className="num text-text">{zatca.uuid}</span></div>
-                </dl>
-              </div>
-            ) : <p className="text-sm text-muted">{t('zatca_pending')}</p>}
-          </CardContent>
+          </CardContent>}
         </Card>
       </section>
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <Card>
-          <CardHeader><CardTitle>{t('financial_summary')}</CardTitle></CardHeader>
-          <CardContent>
+          <CardHeader className="p-0">
+            <button type="button" onClick={() => setFinancialOpen((value) => !value)} aria-expanded={financialOpen} aria-controls="invoice-financial-content" className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40">
+              <CardTitle>{t('financial_summary')}</CardTitle>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${financialOpen ? 'rotate-180 text-primary' : ''}`} strokeWidth={2} />
+            </button>
+          </CardHeader>
+          {financialOpen && <CardContent id="invoice-financial-content">
             <dl className="divide-y divide-border">
               {financialSummary.map(([label, value, strong]) => (
                 <div key={label} className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
@@ -632,7 +637,7 @@ export default function InvoiceDetailPage() {
                 </div>
               ))}
             </dl>
-          </CardContent>
+          </CardContent>}
         </Card>
 
         <Card className="h-fit">
@@ -652,32 +657,14 @@ export default function InvoiceDetailPage() {
         {relationsUnavailable && <p className="mb-3 rounded border border-border bg-muted/40 px-3 py-2 text-sm text-text">{t('relations_unavailable')}</p>}
         <Card className="hidden lg:block">
           <CardHeader><CardTitle>{t('relations')}</CardTitle></CardHeader>
-          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as 'payments' | 'appointments' | 'notes' | 'inventory' | 'accounting')} />
-          <CardContent className="p-0"><TabPanel id={relationSection}>{relationContent}</TabPanel></CardContent>
+          <Tabs tabs={relationTabs} value={relationSection ?? 'payments'} onChange={(value) => setRelationSection(value as RelationSection)} />
+          <CardContent className="p-0"><TabPanel id={relationSection ?? 'payments'}>{relationSection ? relationContent : paymentsContent}</TabPanel></CardContent>
         </Card>
-        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => setRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="appointments" title={t('appointments')} count={relationsLoading ? undefined : appointments.length} open={relationSection === 'appointments'} onToggle={() => setRelationSection('appointments')}>{appointmentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => setRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => setRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => setRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
+        <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => toggleRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="appointments" title={t('appointments')} count={relationsLoading ? undefined : appointments.length} open={relationSection === 'appointments'} onToggle={() => toggleRelationSection('appointments')}>{appointmentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => toggleRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => toggleRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => toggleRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
 
       <Card>
-        <CardHeader className="no-print flex flex-row items-center justify-between gap-3">
-          <CardTitle>{t('document')}</CardTitle>
-          <Dropdown
-            align="end"
-            menuLabel={t('template')}
-            triggerClassName="h-8 gap-2 border border-border px-3 text-sm text-text hover:bg-primary-soft"
-            trigger={
-              <>
-                <LayoutTemplate className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
-                <span>{tt(getTemplate(templateId).nameKey)}</span>
-                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.8} />
-              </>
-            }
-          >
-            {listTemplates().map((definition) => (
-              <DropdownItem key={definition.id} onClick={() => setTemplateId(definition.id)}>{tt(definition.nameKey)}</DropdownItem>
-            ))}
-          </Dropdown>
-        </CardHeader>
+        <CardHeader className="no-print"><CardTitle>{t('document')}</CardTitle></CardHeader>
         <CardContent className="print:p-0">
           <div className="rounded border border-border bg-background p-3 print:border-0 print:bg-transparent print:p-0">
             <DocumentScaler>
@@ -718,7 +705,7 @@ export default function InvoiceDetailPage() {
         />
       )}
 
-      <section aria-label={t('activity')}><RevisionLog type="invoice" id={id} /></section>
+      <section aria-label={t('activity')}><RevisionLog type="invoice" id={id} collapsible /></section>
 
       <PaymentDialog
         open={paymentOpen}
