@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\StoreEmployeeAttachmentsRequest;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Http\Requests\UploadEmployeePhotoRequest;
+use App\Http\Resources\EmployeeAttachmentResource;
 use App\Http\Resources\EmployeeResource;
 use App\Models\Branch;
 use App\Models\Employee;
@@ -79,7 +81,11 @@ class EmployeeController extends ApiController
         if ($employee->photo_path) {
             Storage::disk('local')->delete($employee->photo_path);
         }
+        $attachments = $employee->attachments()->get();
         $employee->delete();
+        foreach ($attachments as $attachment) {
+            Storage::disk($attachment->disk)->delete($attachment->path);
+        }
 
         return response()->json(['message' => 'تم الحذف.']);
     }
@@ -123,5 +129,66 @@ class EmployeeController extends ApiController
         }
 
         return $disk->response($employee->photo_path);
+    }
+
+    /** مسوّغات التعيين لهذا الموظف. */
+    public function indexAttachments(string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+
+        return EmployeeAttachmentResource::collection($employee->attachments()->latest()->get())->response();
+    }
+
+    /**
+     * تُحفَظ الملفات على قرص خاص وتُربط بالموظف. لا يُقبل من العميل مسار
+     * جاهز، فلا يستطيع ربط مستند بملف يخصّ مستأجراً أو موظفاً آخر.
+     */
+    public function storeAttachments(StoreEmployeeAttachmentsRequest $request, string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+
+        foreach ($request->file('attachments', []) as $file) {
+            $path = $file->store("employees/{$employee->id}/attachments", 'local');
+
+            $employee->attachments()->create([
+                'disk'          => 'local',
+                'path'          => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type'     => $file->getMimeType(),
+                'size'          => $file->getSize(),
+                'uploaded_by'   => $request->user()?->id,
+            ]);
+        }
+
+        return EmployeeAttachmentResource::collection($employee->attachments()->latest()->get())
+            ->response()->setStatusCode(201);
+    }
+
+    /** تنزيل مرفقٍ خاص بعد إثبات أنه يعود لهذا الموظف. */
+    public function downloadAttachment(string $id, string $attachmentId): StreamedResponse
+    {
+        $employee = Employee::findOrFail($id);
+        $attachment = $employee->attachments()->whereKey($attachmentId)->firstOrFail();
+        $disk = Storage::disk($attachment->disk);
+
+        if (! $disk->exists($attachment->path)) {
+            abort(404, 'ملف المرفق غير موجود.');
+        }
+
+        return $disk->download($attachment->path, $attachment->original_name, [
+            'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
+        ]);
+    }
+
+    public function destroyAttachment(string $id, string $attachmentId): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+        $attachment = $employee->attachments()->whereKey($attachmentId)->firstOrFail();
+        $disk = $attachment->disk;
+        $path = $attachment->path;
+        $attachment->delete();
+        Storage::disk($disk)->delete($path);
+
+        return response()->json(['message' => 'تم الحذف.']);
     }
 }
