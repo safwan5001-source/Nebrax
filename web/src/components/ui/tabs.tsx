@@ -22,7 +22,7 @@ export function Tabs({
   className,
 }: {
   tabs: TabDef[];
-  value: string;
+  value: string | null;
   onChange: (id: string) => void;
   className?: string;
 }) {
@@ -30,7 +30,22 @@ export function Tabs({
 
   function onKeyDown(e: React.KeyboardEvent) {
     const i = tabs.findIndex((t) => t.id === value);
-    if (i < 0) return;
+
+    // في الحالة المغلقة لا توجد لوحة نشطة؛ أول سهم أو Home يفعّل أول تبويب،
+    // وEnd يفعّل الأخير. بذلك يبقى الانتقال بلوحة المفاتيح قابلاً للتوقع.
+    if (i < 0) {
+      if (e.key === 'Home' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        onChange(tabs[0].id);
+        listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[0]?.focus();
+      }
+      if (e.key === 'End') {
+        e.preventDefault();
+        onChange(tabs[tabs.length - 1].id);
+        listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[tabs.length - 1]?.focus();
+      }
+      return;
+    }
 
     // في RTL يعكس المتصفّح معنى السهمين بصرياً — نتبع الترتيب المنطقي للقائمة.
     const rtl = document.documentElement.dir === 'rtl';
@@ -63,7 +78,7 @@ export function Tabs({
             id={`tab-${t.id}`}
             aria-selected={on}
             aria-controls={`panel-${t.id}`}
-            tabIndex={on ? 0 : -1}
+            tabIndex={on || (!value && tabs[0]?.id === t.id) ? 0 : -1}
             onClick={() => onChange(t.id)}
             className={cn(
               'whitespace-nowrap border-b-2 px-3.5 py-3 text-sm font-medium transition-colors',
