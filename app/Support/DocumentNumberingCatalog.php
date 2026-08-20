@@ -12,6 +12,7 @@ use App\Models\EmployeeCustodySettlement;
 use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
+use App\Models\ManualJournal;
 use App\Models\Payment;
 use App\Models\PayrollRun;
 use App\Models\PosSession;
@@ -160,6 +161,11 @@ class DocumentNumberingCatalog
             'model'  => JournalEntry::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'JE']],
+        ],
+        'manual_journal' => [
+            'model'  => ManualJournal::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'MJE']],
         ],
         'payroll_run' => [
             'model'  => PayrollRun::class,
