@@ -16,6 +16,7 @@ import { CreateRunDialog } from '@/components/hr/create-run-dialog';
 import { RunDetailDialog, type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { RoleDialog, type Role } from '@/components/hr/role-dialog';
 import { OrgStructureManager } from '@/components/hr/org-structure-manager';
+import { LeaveManager } from '@/components/hr/leave-manager';
 import { UserDialog } from '@/components/users/user-dialog';
 import { UserScopeDialog } from '@/components/users/user-scope-dialog';
 import { useToast } from '@/components/ui/toast';
@@ -24,7 +25,7 @@ import { currentUser } from '@/lib/auth';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
-type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'roles' | 'users' | 'org_structure';
+type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'leave' | 'roles' | 'users' | 'org_structure';
 
 interface TeamUser {
   id: string; name: string; email: string; role: string; is_active: boolean;
@@ -406,8 +407,9 @@ export default function HrPage() {
     runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
     roles: () => (<Button onClick={() => { setEditingRole(null); setRoleDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_role')}</Button>),
     users: () => (<Button onClick={() => { setEditing(null); setEmpLinkedUser(null); setEmpInitialAccess(true); setEmpDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{tu('add')}</Button>),
-    // زرّ الإضافة الخاص بهذا القسم داخلي في OrgStructureManager نفسه (يتبدّل حسب القسم الفرعي النشط).
+    // زرّا الإضافة الخاصّان بهذين القسمين داخليان في مكوّنيهما (كلٌّ يتبدّل حسب القسم الفرعي/النوع النشط).
     org_structure: () => null,
+    leave: () => null,
   }[tab];
 
   return (
@@ -418,7 +420,7 @@ export default function HrPage() {
       </div>
 
       <div className="flex gap-1 border-b border-border">
-        {(['employees', 'shifts', 'attendance', 'runs', ...(canManageRoles ? ['roles', 'users', 'org_structure'] : [])] as Tab[]).map((key) => (
+        {(['employees', 'shifts', 'attendance', 'runs', 'leave', ...(canManageRoles ? ['roles', 'users', 'org_structure'] : [])] as Tab[]).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -444,6 +446,7 @@ export default function HrPage() {
       {tab === 'runs' && (
         <DataTable columns={runColumns} data={runs} loading={loading} searchPlaceholder={t('search_runs')} emptyLabel={t('no_runs')} exportName="payroll-runs" />
       )}
+      {tab === 'leave' && <LeaveManager />}
       {tab === 'roles' && canManageRoles && (
         <DataTable columns={roleColumns} data={roles} loading={loading} searchPlaceholder={t('search_roles')} emptyLabel={t('no_roles')} exportName="roles" />
       )}

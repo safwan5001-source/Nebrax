@@ -901,6 +901,22 @@ export const mockEmploymentTypes = [
   { id: 'et-3', name: 'عقد', is_active: true },
 ];
 
+// الإجازات — نطاق البناء الأول (نوعٌ فقط + رصيدٌ مباشر).
+export const mockLeaveTypes = [
+  { id: 'lt-1', name: 'سنوية', is_paid: true, annual_days: 21, requires_approval: true, is_active: true, leave_requests_count: 1 },
+  { id: 'lt-2', name: 'مرضية', is_paid: true, annual_days: 30, requires_approval: true, is_active: true, leave_requests_count: 0 },
+  { id: 'lt-3', name: 'بلا راتب', is_paid: false, annual_days: 0, requires_approval: true, is_active: true, leave_requests_count: 0 },
+];
+export const mockLeaveRequests = [
+  {
+    id: 'lr-1', employee_id: 'em-1', employee: { id: 'em-1', name: 'أحمد العتيبي' },
+    leave_type_id: 'lt-1', leave_type: { id: 'lt-1', name: 'سنوية', is_paid: true },
+    start_date: '2026-09-01', end_date: '2026-09-05', days_count: 5, status: 'pending',
+    reason: 'سفر عائلي', rejection_reason: null, approver: null, approved_at: null,
+    created_at: '2026-08-15T09:00:00Z',
+  },
+];
+
 export interface MockRun {
   id: string;
   number: string;
@@ -1858,6 +1874,35 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/departments') return resolve({ data: mockDepartments });
   if (clean === '/job-levels') return resolve({ data: mockJobLevels });
   if (clean === '/employment-types') return resolve({ data: mockEmploymentTypes });
+  if (clean === '/leave-types') return resolve({ data: mockLeaveTypes });
+  if (clean === '/leave-requests') {
+    const params = new URLSearchParams(path.split('?')[1] ?? '');
+    const status = params.get('status');
+    const employeeId = params.get('employee_id');
+    let list = mockLeaveRequests;
+    if (status) list = list.filter((r) => r.status === status);
+    if (employeeId) list = list.filter((r) => r.employee_id === employeeId);
+    return resolve({ data: list });
+  }
+  const leaveRequestsMatch = clean.match(/^\/employees\/([^/]+)\/leave-requests$/);
+  if (leaveRequestsMatch) {
+    return resolve({ data: mockLeaveRequests.filter((r) => r.employee_id === leaveRequestsMatch[1]) });
+  }
+  const leaveBalancesMatch = clean.match(/^\/employees\/([^/]+)\/leave-balances$/);
+  if (leaveBalancesMatch) {
+    const employeeId = leaveBalancesMatch[1];
+    return resolve({
+      data: mockLeaveTypes.filter((lt) => lt.is_active).map((lt) => {
+        const used = mockLeaveRequests
+          .filter((r) => r.employee_id === employeeId && r.leave_type_id === lt.id && r.status === 'approved')
+          .reduce((sum, r) => sum + r.days_count, 0);
+        return {
+          leave_type_id: lt.id, leave_type_name: lt.name, is_paid: lt.is_paid,
+          entitled: lt.annual_days, used, remaining: Math.max(0, lt.annual_days - used),
+        };
+      }),
+    });
+  }
   if (clean === '/attendances') {
     const params = new URLSearchParams(path.split('?')[1] ?? '');
     const date = params.get('date');
