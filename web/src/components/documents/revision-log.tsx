@@ -52,7 +52,7 @@ export function RevisionLog({
   collapsible = false,
   defaultOpen = true,
 }: {
-  type: 'invoice' | 'quote' | 'procurement';
+  type: 'invoice' | 'purchase' | 'quote' | 'procurement';
   id: string;
   collapsible?: boolean;
   defaultOpen?: boolean;

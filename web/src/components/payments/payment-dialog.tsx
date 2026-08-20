@@ -21,14 +21,17 @@ export function PaymentDialog({
   onSaved,
   fixedDirection,
   initialInvoice,
+  initialPurchase,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
   /** يثبّت اتجاه الدفعة ويُخفي منتقيه — لشاشتَي مدفوعات العملاء/الموردين. */
   fixedDirection?: 'received' | 'paid';
-  /** فاتورة مصدر اختيارية؛ تهيّئ سند قبض ولا تتجاوز تحقق الخادم أو الترحيل. */
+  /** فاتورة مبيعات مصدر اختيارية؛ تهيّئ سند قبض ولا تتجاوز تحقق الخادم أو الترحيل. */
   initialInvoice?: { id: string; partnerId: string; remaining: string };
+  /** فاتورة شراء مصدر اختيارية؛ تهيّئ سند صرف ولا تتجاوز تحقق الخادم أو الترحيل. */
+  initialPurchase?: { id: string; partnerId: string; remaining: string };
 }) {
   const t = useTranslations('paymentForm');
   const tc = useTranslations('common');
@@ -59,7 +62,7 @@ export function PaymentDialog({
     });
   }, [open]);
 
-  // الدخول من فاتورة لا ينشئ دفعة بنفسه؛ يهيئ فقط العميل والمستند والمبلغ المتبقي.
+  // الدخول من مستند لا ينشئ دفعة بنفسه؛ يهيئ فقط الطرف والمستند والمبلغ المتبقي.
   useEffect(() => {
     if (!open || !initialInvoice) return;
     setDirection('received');
@@ -67,6 +70,14 @@ export function PaymentDialog({
     setDocId(initialInvoice.id);
     setAmount(initialInvoice.remaining);
   }, [open, initialInvoice?.id, initialInvoice?.partnerId, initialInvoice?.remaining]);
+
+  useEffect(() => {
+    if (!open || !initialPurchase) return;
+    setDirection('paid');
+    setPartnerId(initialPurchase.partnerId);
+    setDocId(initialPurchase.id);
+    setAmount(initialPurchase.remaining);
+  }, [open, initialPurchase?.id, initialPurchase?.partnerId, initialPurchase?.remaining]);
 
   // أطراف مناسبة للاتجاه
   const eligiblePartners = useMemo(
@@ -88,8 +99,9 @@ export function PaymentDialog({
         (d) => d.partner_id === partnerId && d.status === 'posted' && d.payment_status !== 'paid'
       );
       setDocs(openDocs);
-      const prefilled = direction === 'received' && initialInvoice
-        ? openDocs.find((d) => d.id === initialInvoice.id)
+      const initialDocument = direction === 'received' ? initialInvoice : initialPurchase;
+      const prefilled = initialDocument
+        ? openDocs.find((d) => d.id === initialDocument.id)
         : undefined;
       if (prefilled) {
         setDocId(prefilled.id);
@@ -98,7 +110,7 @@ export function PaymentDialog({
         setDocId('');
       }
     });
-  }, [open, partnerId, direction, initialInvoice?.id]);
+  }, [open, partnerId, direction, initialInvoice?.id, initialPurchase?.id]);
 
   function selectDoc(id: string) {
     setDocId(id);
