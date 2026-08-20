@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Download, FileText, Pencil, Trash2, Upload } from 'lucide-react';
+import { ArrowRight, Check, Download, FileText, Pencil, Trash2, Upload, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,7 @@ import { KeyValue, SubHead, EmptyPanel } from '@/components/partners/partner-pan
 import { useToast } from '@/components/ui/toast';
 import { EmployeeDialog, type Employee, type LinkedUser } from '@/components/hr/employee-dialog';
 import { ContractDialog, type Contract } from '@/components/hr/contract-dialog';
+import { LeaveRequestDialog, type LeaveRequest } from '@/components/hr/leave-request-dialog';
 import { type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-dialog';
@@ -43,7 +44,16 @@ interface EmployeeAttachment {
   size: number;
 }
 
-const SECTIONS = ['details', 'contracts', 'attachments', 'attendance', 'payroll'] as const;
+interface LeaveBalance {
+  leave_type_id: string;
+  leave_type_name: string;
+  is_paid: boolean;
+  entitled: number;
+  used: number;
+  remaining: number;
+}
+
+const SECTIONS = ['details', 'contracts', 'leave', 'attachments', 'attendance', 'payroll'] as const;
 type SectionId = (typeof SECTIONS)[number];
 
 const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' | 'negative'> = {
@@ -52,6 +62,9 @@ const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' |
 const runStatusTone: Record<string, 'positive' | 'warning' | 'muted'> = { paid: 'positive', posted: 'warning', draft: 'muted' };
 const contractStatusTone: Record<Contract['status'], 'positive' | 'warning' | 'muted'> = {
   active: 'positive', ended: 'muted', terminated: 'warning',
+};
+const leaveStatusTone: Record<LeaveRequest['status'], 'positive' | 'warning' | 'muted' | 'negative'> = {
+  approved: 'positive', pending: 'warning', rejected: 'negative', cancelled: 'muted',
 };
 
 const ADDRESS_FIELDS = ['address', 'building_no', 'street', 'district', 'city', 'postal_code', 'country'] as const;
@@ -76,6 +89,8 @@ export default function EmployeeProfilePage() {
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [attachments, setAttachments] = useState<EmployeeAttachment[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
   const [linkedUser, setLinkedUser] = useState<LinkedUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<SectionId>('details');
@@ -83,6 +98,8 @@ export default function EmployeeProfilePage() {
   const [contractDialogOpen, setContractDialogOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [busyContractId, setBusyContractId] = useState<string | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [busyLeaveId, setBusyLeaveId] = useState<string | null>(null);
 
   const [uploading, setUploading] = useState(false);
   const [busyAttachmentId, setBusyAttachmentId] = useState<string | null>(null);
@@ -106,6 +123,8 @@ export default function EmployeeProfilePage() {
       api<{ data: PayrollRun[] }>(`/payroll-runs?employee_id=${id}`).then((r) => setPayrollRuns(r.data)).catch(() => setPayrollRuns([])),
       api<{ data: EmployeeAttachment[] }>(`/employees/${id}/attachments`).then((r) => setAttachments(r.data)).catch(() => setAttachments([])),
       api<{ data: Contract[] }>(`/employees/${id}/contracts`).then((r) => setContracts(r.data)).catch(() => setContracts([])),
+      api<{ data: LeaveRequest[] }>(`/employees/${id}/leave-requests`).then((r) => setLeaveRequests(r.data)).catch(() => setLeaveRequests([])),
+      api<{ data: LeaveBalance[] }>(`/employees/${id}/leave-balances`).then((r) => setLeaveBalances(r.data)).catch(() => setLeaveBalances([])),
     ]).finally(() => setLoading(false));
   }, [id]);
 
@@ -122,6 +141,46 @@ export default function EmployeeProfilePage() {
       toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setBusyContractId(null);
+    }
+  }
+
+  async function approveLeave(r: LeaveRequest) {
+    setBusyLeaveId(r.id);
+    try {
+      await api(`/leave-requests/${r.id}/approve`, { method: 'POST' });
+      success(t('leave_approved'));
+      load();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setBusyLeaveId(null);
+    }
+  }
+
+  async function rejectLeave(r: LeaveRequest) {
+    setBusyLeaveId(r.id);
+    try {
+      await api(`/leave-requests/${r.id}/reject`, { method: 'POST' });
+      success(t('leave_rejected'));
+      load();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setBusyLeaveId(null);
+    }
+  }
+
+  async function cancelLeave(r: LeaveRequest) {
+    if (!window.confirm(t('confirm_cancel_leave_request'))) return;
+    setBusyLeaveId(r.id);
+    try {
+      await api(`/leave-requests/${r.id}`, { method: 'DELETE' });
+      success(tc('deleted'));
+      load();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setBusyLeaveId(null);
     }
   }
 
@@ -187,6 +246,7 @@ export default function EmployeeProfilePage() {
   const tabs: TabDef[] = [
     { id: 'details', label: t('tab_details') },
     { id: 'contracts', label: t('contracts'), count: contracts.length },
+    { id: 'leave', label: t('leave'), count: leaveRequests.length },
     { id: 'attachments', label: t('attachments'), count: attachments.length },
     { id: 'attendance', label: t('attendance'), count: attendance.length },
     { id: 'payroll', label: t('runs'), count: payrollRuns.length },
@@ -299,6 +359,76 @@ export default function EmployeeProfilePage() {
                             <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
                           </Button>
                         </div>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            )}
+          </div>
+        );
+      case 'leave':
+        return (
+          <div className="space-y-3 p-3">
+            {leaveBalances.length === 0 ? (
+              <EmptyPanel>{t('no_leave_balances')}</EmptyPanel>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {leaveBalances.map((b) => (
+                  <div key={b.leave_type_id} className="rounded border border-border p-3">
+                    <p className="text-xs text-muted">{b.leave_type_name}</p>
+                    <p className="num mt-1 text-lg font-semibold text-text">{b.remaining}</p>
+                    <p className="text-[11px] text-muted">
+                      {t('leave_entitled')} {b.entitled} — {t('leave_used')} {b.used}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted">{t('leave_hint')}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => setLeaveDialogOpen(true)}>
+                {t('add_leave_request')}
+              </Button>
+            </div>
+
+            {leaveRequests.length === 0 ? (
+              <EmptyPanel>{t('no_leave_requests')}</EmptyPanel>
+            ) : (
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>{t('leave_type')}</TH>
+                    <TH>{t('start_date')}</TH>
+                    <TH>{t('end_date')}</TH>
+                    <TH className="text-end">{t('leave_days_count')}</TH>
+                    <TH>{t('status_label')}</TH>
+                    <TH />
+                  </TR>
+                </THead>
+                <TBody>
+                  {leaveRequests.map((r) => (
+                    <TR key={r.id}>
+                      <TD>{r.leave_type?.name ?? '—'}</TD>
+                      <TD className="num text-muted" dir="ltr">{r.start_date}</TD>
+                      <TD className="num text-muted" dir="ltr">{r.end_date}</TD>
+                      <TD className="num text-end">{r.days_count}</TD>
+                      <TD><Badge tone={leaveStatusTone[r.status]}>{t(`leave_status_${r.status}`)}</Badge></TD>
+                      <TD className="text-end">
+                        {r.status === 'pending' && (
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" aria-label={t('leave_approve')} disabled={busyLeaveId === r.id} onClick={() => approveLeave(r)}>
+                              <Check className="h-4 w-4 text-positive" strokeWidth={2} />
+                            </Button>
+                            <Button variant="ghost" size="icon" aria-label={t('leave_reject')} disabled={busyLeaveId === r.id} onClick={() => rejectLeave(r)}>
+                              <X className="h-4 w-4 text-negative" strokeWidth={2} />
+                            </Button>
+                            <Button variant="ghost" size="icon" aria-label={t('leave_cancel')} disabled={busyLeaveId === r.id} onClick={() => cancelLeave(r)}>
+                              <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                            </Button>
+                          </div>
+                        )}
                       </TD>
                     </TR>
                   ))}
@@ -477,6 +607,12 @@ export default function EmployeeProfilePage() {
         onSaved={load}
         employeeId={employee.id}
         contract={editingContract}
+      />
+      <LeaveRequestDialog
+        open={leaveDialogOpen}
+        onClose={() => setLeaveDialogOpen(false)}
+        onSaved={load}
+        employeeId={employee.id}
       />
     </div>
   );

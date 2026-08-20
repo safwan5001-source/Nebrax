@@ -114,6 +114,12 @@ class Employee extends BaseModel implements CompanyWide
         return Contract::activeFor($this->id, $referenceDate);
     }
 
+    /** طلبات الإجازة عبر الزمن — انظر LeaveType::balanceFor(). */
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
     /** المسمى الوظيفي — جزءٌ من الهيكل التنظيمي (كيانٌ مُدار لكل مؤسسة). */
     public function jobTitle(): BelongsTo
     {

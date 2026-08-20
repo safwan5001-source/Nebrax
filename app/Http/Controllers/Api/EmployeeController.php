@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\StoreEmployeeAttachmentsRequest;
 use App\Http\Requests\StoreEmployeeRequest;
+use App\Http\Requests\StoreLeaveRequestRequest;
 use App\Http\Requests\UpdateContractRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Http\Requests\UploadEmployeePhotoRequest;
 use App\Http\Resources\ContractResource;
 use App\Http\Resources\EmployeeAttachmentResource;
 use App\Http\Resources\EmployeeResource;
+use App\Http\Resources\LeaveRequestResource;
 use App\Models\Branch;
 use App\Models\Contract;
 use App\Models\Department;
@@ -18,9 +20,12 @@ use App\Models\Employee;
 use App\Models\EmploymentType;
 use App\Models\JobLevel;
 use App\Models\JobTitle;
+use App\Models\LeaveRequest;
+use App\Models\LeaveType;
 use App\Models\Shift;
 use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -292,6 +297,65 @@ class EmployeeController extends ApiController
         return response()->json(['message' => 'تم الحذف.']);
     }
 
+    /** إجازات هذا الموظف عبر الزمن، الأحدث بدءاً أولاً. */
+    public function indexLeaveRequests(string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+
+        return LeaveRequestResource::collection(
+            $employee->leaveRequests()->with(['leaveType', 'approver'])->orderByDesc('start_date')->get()
+        )->response();
+    }
+
+    /**
+     * إنشاء طلب إجازة؛ يبدأ `pending` إن احتاج نوعه موافقة، أو `approved`
+     * تلقائياً فوراً إن لم يحتَج (`leaveType.requires_approval`).
+     */
+    public function storeLeaveRequests(StoreLeaveRequestRequest $request, string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+        $data = $request->validated();
+
+        $leaveType = LeaveType::whereKey($data['leave_type_id'])->where('is_active', true)->first();
+        if (! $leaveType) {
+            abort(422, 'نوع الإجازة غير موجود.');
+        }
+
+        $this->assertNoLeaveOverlap($employee->id, $data['start_date'], $data['end_date']);
+
+        $daysCount = Carbon::parse($data['start_date'])->diffInDays(Carbon::parse($data['end_date'])) + 1;
+        $autoApproved = ! $leaveType->requires_approval;
+
+        $leaveRequest = $employee->leaveRequests()->create([
+            'leave_type_id' => $leaveType->id,
+            'start_date'    => $data['start_date'],
+            'end_date'      => $data['end_date'],
+            'days_count'    => $daysCount,
+            'status'        => $autoApproved ? 'approved' : 'pending',
+            'reason'        => $data['reason'] ?? null,
+            'approved_by'   => $autoApproved ? $request->user()?->id : null,
+            'approved_at'   => $autoApproved ? now() : null,
+            'created_by'    => $request->user()?->id,
+        ]);
+
+        return (new LeaveRequestResource($leaveRequest->load(['leaveType', 'approver'])))->response()->setStatusCode(201);
+    }
+
+    /** رصيد كل نوع إجازةٍ نشطٍ لهذا الموظف عن السنة الحالية — مباشرٌ لا مُخزَّن. */
+    public function leaveBalances(string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+        $leaveTypes = LeaveType::where('is_active', true)->orderBy('name')->get();
+
+        return response()->json([
+            'data' => $leaveTypes->map(fn (LeaveType $type) => array_merge([
+                'leave_type_id'   => $type->id,
+                'leave_type_name' => $type->name,
+                'is_paid'         => $type->is_paid,
+            ], $type->balanceFor($employee->id)))->values(),
+        ]);
+    }
+
     /**
      * يمنع تقاطع عقدٍ جديد أو مُعدَّل مع عقدٍ آخر بحالة `active` لنفس الموظف:
      * عقدان نشطان يتداخلان زمنياً يجعلان «العقد النشط» غامضاً وقت مسيّر
@@ -320,6 +384,23 @@ class EmployeeController extends ApiController
 
         if ($query->exists()) {
             abort(422, 'يوجد عقدٌ آخر نشط لهذا الموظف يتقاطع مع هذه الفترة.');
+        }
+    }
+
+    /**
+     * يمنع تقاطع طلب إجازةٍ جديد مع طلبٍ آخر `pending`/`approved` لنفس
+     * الموظف زمنياً. طلبٌ `rejected`/`cancelled` تاريخي لا يشارك في هذا الفحص.
+     */
+    private function assertNoLeaveOverlap(string $employeeId, string $start, string $end): void
+    {
+        $overlap = LeaveRequest::where('employee_id', $employeeId)
+            ->whereIn('status', ['pending', 'approved'])
+            ->whereDate('start_date', '<=', $end)
+            ->whereDate('end_date', '>=', $start)
+            ->exists();
+
+        if ($overlap) {
+            abort(422, 'يوجد طلب إجازةٍ آخر لهذا الموظف يتقاطع مع هذه الفترة.');
         }
     }
 }

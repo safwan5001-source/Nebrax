@@ -39,6 +39,8 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\JobLevelController;
 use App\Http\Controllers\Api\JobTitleController;
 use App\Http\Controllers\Api\JournalEntryController;
+use App\Http\Controllers\Api\LeaveRequestController;
+use App\Http\Controllers\Api\LeaveTypeController;
 use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
@@ -461,6 +463,22 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('employees/{id}/contracts', [EmployeeController::class, 'storeContracts'])->middleware($perm('hr.manage'));
         Route::put('employees/{id}/contracts/{contractId}', [EmployeeController::class, 'updateContract'])->middleware($perm('hr.manage'));
         Route::delete('employees/{id}/contracts/{contractId}', [EmployeeController::class, 'destroyContract'])->middleware($perm('hr.manage'));
+
+        // الإجازات — نوعٌ فقط + رصيدٌ مباشر (نطاق البناء الأول)، بلا أثرٍ مالي آلي.
+        Route::get('employees/{id}/leave-requests', [EmployeeController::class, 'indexLeaveRequests'])->middleware($perm('hr.view'));
+        Route::post('employees/{id}/leave-requests', [EmployeeController::class, 'storeLeaveRequests'])->middleware($perm('hr.manage'));
+        Route::get('employees/{id}/leave-balances', [EmployeeController::class, 'leaveBalances'])->middleware($perm('hr.view'));
+
+        Route::get('leave-types', [LeaveTypeController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('leave-types', [LeaveTypeController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::put('leave-types/{id}', [LeaveTypeController::class, 'update'])->middleware($perm('hr.manage'));
+        Route::delete('leave-types/{id}', [LeaveTypeController::class, 'destroy'])->middleware($perm('hr.manage'));
+
+        // طابور الموافقة عبر كل الموظفين — انظر LeaveRequestController.
+        Route::get('leave-requests', [LeaveRequestController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('leave-requests/{id}/approve', [LeaveRequestController::class, 'approve'])->middleware($perm('hr.manage'));
+        Route::post('leave-requests/{id}/reject', [LeaveRequestController::class, 'reject'])->middleware($perm('hr.manage'));
+        Route::delete('leave-requests/{id}', [LeaveRequestController::class, 'destroy'])->middleware($perm('hr.manage'));
 
         // الهيكل التنظيمي — مسمى وظيفي/قسم/مستوى وظيفي/نوع وظيفة ككيانات مُدارة.
         Route::get('job-titles', [JobTitleController::class, 'index'])->middleware($perm('hr.view'));
