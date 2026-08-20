@@ -84,6 +84,7 @@ export default function HrPage() {
 
   const [team, setTeam] = useState<TeamUser[]>([]);
   const [userDialog, setUserDialog] = useState(false);
+  const [editingUser, setEditingUser] = useState<TeamUser | null>(null);
   const [scopeUser, setScopeUser] = useState<TeamUser | null>(null);
 
   const loadTeam = useCallback(() => {
@@ -301,10 +302,18 @@ export default function HrPage() {
         ),
       },
       {
+        accessorKey: 'is_active',
+        header: tu('status_label'),
+        cell: ({ row }) => <Badge tone={row.original.is_active ? 'positive' : 'muted'}>{row.original.is_active ? tu('active') : tu('inactive')}</Badge>,
+      },
+      {
         id: 'actions',
         header: '',
         cell: ({ row }) => (
           <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="icon" aria-label={tu('edit')} onClick={() => { setEditingUser(row.original); setUserDialog(true); }}>
+              <Pencil className="h-4 w-4" strokeWidth={1.7} />
+            </Button>
             <Button variant="ghost" size="icon" aria-label={tu('scope_title')} onClick={() => setScopeUser(row.original)}>
               <MapPin className="h-4 w-4 text-muted" strokeWidth={1.7} />
             </Button>
@@ -332,14 +341,14 @@ export default function HrPage() {
         trigger={<><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add')}</>}
       >
         <DropdownItem icon={User} onClick={() => { setEditing(null); setEmpDialog(true); }}>{t('add_employee_option')}</DropdownItem>
-        <DropdownItem icon={UserCog} onClick={() => setUserDialog(true)}>{t('add_user_option')}</DropdownItem>
+        <DropdownItem icon={UserCog} onClick={() => { setEditingUser(null); setUserDialog(true); }}>{t('add_user_option')}</DropdownItem>
       </Dropdown>
     ),
     shifts: () => (<Button onClick={() => { setEditingShift(null); setShiftDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_shift')}</Button>),
     attendance: () => (<Button onClick={() => { setEditingAtt(null); setAttDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_attendance')}</Button>),
     runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
     roles: () => (<Button onClick={() => { setEditingRole(null); setRoleDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_role')}</Button>),
-    users: () => (<Button onClick={() => setUserDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{tu('add')}</Button>),
+    users: () => (<Button onClick={() => { setEditingUser(null); setUserDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{tu('add')}</Button>),
   }[tab];
 
   return (
@@ -393,7 +402,11 @@ export default function HrPage() {
         open={userDialog}
         onClose={() => setUserDialog(false)}
         onSaved={loadTeam}
-        linkedEmployeeIds={team.map((u) => u.employee_id).filter((id): id is string => !!id)}
+        user={editingUser}
+        linkedEmployeeIds={team
+          .filter((u) => u.id !== editingUser?.id)
+          .map((u) => u.employee_id)
+          .filter((id): id is string => !!id)}
       />
       {scopeUser && (
         <UserScopeDialog user={scopeUser} onClose={() => setScopeUser(null)} onSaved={loadTeam} />
