@@ -104,3 +104,26 @@ test('الإجراء السريع في لوحة التحكم يفتح شاشة �
   await expect(page.locator('#general-payment-attachments')).toBeAttached();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
+
+
+test('رصيد مدفوعات الطرف يهيئ القبض أو الصرف ويترك المستند اختيارياً', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enterDemo(page);
+
+  await page.goto(`${baseUrl}/partners/p1`);
+  await expect(page.locator('h1', { hasText: 'مؤسسة الخليج للتجارة' })).toBeVisible();
+  await page.getByRole('link', { name: 'أضف رصيد مدفوعات' }).click();
+  await expect(page).toHaveURL(/\/payments\/new\?partner_id=p1&direction=received$/);
+  await expect(page.locator('#general-payment-direction')).toHaveValue('received');
+  await expect(page.locator('#general-payment-partner')).toHaveValue('p1');
+  await expect(page.locator('#general-payment-document')).toBeVisible();
+  await expect(page.locator('#general-payment-document')).toHaveValue('');
+
+  await page.goto(`${baseUrl}/partners/p7`);
+  await expect(page.locator('h1', { hasText: 'شركة الجزيرة للتوريدات الصناعية' })).toBeVisible();
+  await page.getByRole('link', { name: 'أضف رصيد مدفوعات' }).click();
+  await expect(page).toHaveURL(/\/payments\/new\?partner_id=p7&direction=paid$/);
+  await expect(page.locator('#general-payment-direction')).toHaveValue('paid');
+  await expect(page.locator('#general-payment-partner')).toHaveValue('p7');
+  await expect(page.locator('#general-payment-document')).toHaveValue('');
+});

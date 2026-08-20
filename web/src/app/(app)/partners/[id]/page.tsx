@@ -154,7 +154,7 @@ export default function PartnerProfilePage() {
         .filter(Boolean).join('، ')
     : '';
 
-  const actions = primaryActions(t, id);
+  const actions = primaryActions(t, id, partner?.type);
   const overflow = overflowActions(t);
 
   const tabs: TabDef[] = [
