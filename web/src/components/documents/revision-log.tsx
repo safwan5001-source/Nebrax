@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,9 +46,21 @@ function display(field: string, value: unknown): string {
  * وجودُه هو الغرض: ثلاثة أعطال كانت تغيّر مبالغ الفواتير صامتةً ولم يكشفها
  * إلا مسحٌ متعمَّد للكود. هذه الشاشة تجعل مثلها مرئياً وقت حدوثه.
  */
-export function RevisionLog({ type, id }: { type: 'invoice' | 'quote' | 'procurement'; id: string }) {
+export function RevisionLog({
+  type,
+  id,
+  collapsible = false,
+  defaultOpen = true,
+}: {
+  type: 'invoice' | 'quote' | 'procurement';
+  id: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+}) {
   const t = useTranslations('revisions');
   const [log, setLog] = useState<Revision[] | null>(null);
+  const [open, setOpen] = useState(defaultOpen);
+  const contentId = `revision-log-${type}-${id}`;
 
   useEffect(() => {
     api<{ data: Revision[] }>(`/revisions/${type}/${id}`)
@@ -57,8 +70,21 @@ export function RevisionLog({ type, id }: { type: 'invoice' | 'quote' | 'procure
 
   return (
     <Card className="no-print">
-      <CardHeader><CardTitle>{t('title')}</CardTitle></CardHeader>
-      <CardContent>
+      <CardHeader className={collapsible ? 'p-0' : undefined}>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+            aria-controls={contentId}
+            className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+          >
+            <CardTitle>{t('title')}</CardTitle>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? 'rotate-180 text-primary' : ''}`} strokeWidth={2} />
+          </button>
+        ) : <CardTitle>{t('title')}</CardTitle>}
+      </CardHeader>
+      {(!collapsible || open) && <CardContent id={contentId}>
         {log === null ? (
           <Skeleton className="h-24 w-full" />
         ) : log.length === 0 ? (
@@ -94,7 +120,7 @@ export function RevisionLog({ type, id }: { type: 'invoice' | 'quote' | 'procure
             })}
           </ol>
         )}
-      </CardContent>
+      </CardContent>}
     </Card>
   );
 }
