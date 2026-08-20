@@ -978,7 +978,7 @@
     "delete_confirm": "هل تريد حذف المسودة",
     "delete_success": "تم حذف المسودة",
     "action_failed": "تعذّر تنفيذ الإجراء. حاول مرة أخرى.",
-    "add_payment": "إضافة دفعة",
+    "add_payment": "إضافة عملية دفع",
     "create_return": "إنشاء مرتجع",
     "open_customer": "فتح ملف العميل",
     "document": "المستند",
