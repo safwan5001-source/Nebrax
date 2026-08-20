@@ -21,6 +21,9 @@ interface TeamUser {
   id: string; name: string; email: string; role: string; is_active: boolean;
   // نطاق الوصول — يصل مع القائمة. **الفارغ يعني الكلّ** لا الحرمان.
   branch_ids?: string[]; warehouse_ids?: string[];
+  // الموظف المرتبط (`User ⊃ Employee`) — إن وُجد.
+  employee_id?: string | null;
+  employee?: { id: string; name: string; employee_no?: string } | null;
 }
 
 interface Subscription {
@@ -209,6 +212,7 @@ export default function SettingsPage() {
                   <TH>{tu('name')}</TH>
                   <TH>{tu('email')}</TH>
                   <TH>{tu('role')}</TH>
+                  <TH>{tu('link_employee')}</TH>
                   <TH />
                 </TR>
               </THead>
@@ -218,6 +222,9 @@ export default function SettingsPage() {
                     <TD>{u.name}</TD>
                     <TD className="num text-muted">{u.email}</TD>
                     <TD><Badge tone="muted">{tu(`roles.${u.role}`)}</Badge></TD>
+                    <TD className="text-muted">
+                      {u.employee ? `${u.employee.employee_no ? `${u.employee.employee_no} — ` : ''}${u.employee.name}` : '—'}
+                    </TD>
                     <TD className="text-end">
                       <Button
                         variant="ghost" size="icon" aria-label={tu('scope_title')}
@@ -239,7 +246,12 @@ export default function SettingsPage() {
         </Card>
       )}
 
-      <UserDialog open={userDialog} onClose={() => setUserDialog(false)} onSaved={loadTeam} />
+      <UserDialog
+        open={userDialog}
+        onClose={() => setUserDialog(false)}
+        onSaved={loadTeam}
+        linkedEmployeeIds={team.map((u) => u.employee_id).filter((id): id is string => !!id)}
+      />
       {scopeUser && (
         <UserScopeDialog user={scopeUser} onClose={() => setScopeUser(null)} onSaved={loadTeam} />
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,33 +11,73 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { AccessScopeFields, type AccessScope } from './access-scope-fields';
 
+interface EmployeeOption {
+  id: string;
+  name: string;
+  employee_no?: string;
+}
+
+interface RoleOption {
+  id: string;
+  slug: string;
+  name: string;
+  is_owner: boolean;
+}
+
+// الأدوار النظامية الأربعة لها ترجمة جاهزة؛ المخصَّصة تُعرض باسمها كما أُدخل.
+const SYSTEM_ROLE_KEYS: Record<string, string> = {
+  admin: 'roles.admin',
+  accountant: 'roles.accountant',
+  staff: 'roles.staff',
+};
+
 export function UserDialog({
   open,
   onClose,
   onSaved,
+  linkedEmployeeIds = [],
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /** موظفون مرتبطون بمستخدمين آخرين بالفعل — يُستبعدون من قائمة الاختيار (ربطٌ واحد لكل موظف). */
+  linkedEmployeeIds?: string[];
 }) {
   const t = useTranslations('users');
   const tc = useTranslations('common');
   const { success } = useToast();
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'staff' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'staff', employee_id: '' });
   const [scope, setScope] = useState<AccessScope>({ branch_ids: [], warehouse_ids: [] });
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  // تُحمَّلان عند الفتح فقط — لا حاجة لهما إن لم يُفتح النموذج بعد.
+  useEffect(() => {
+    if (!open) return;
+    api<{ data: EmployeeOption[] }>('/employees')
+      .then((r) => setEmployees(r.data))
+      .catch(() => {});
+    // دور المالك مستبعَد: منحه حكرٌ على المالك نفسه (`guardOwnerRole` بالخادم).
+    api<{ data: RoleOption[] }>('/roles')
+      .then((r) => setRoles(r.data.filter((role) => !role.is_owner)))
+      .catch(() => {});
+  }, [open]);
+
+  const availableEmployees = employees.filter((e) => !linkedEmployeeIds.includes(e.id));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
     try {
-      await api('/users', { method: 'POST', body: { ...form, ...scope } });
+      const { employee_id, ...rest } = form;
+      await api('/users', { method: 'POST', body: { ...rest, employee_id: employee_id || undefined, ...scope } });
       success(tc('created'));
-      setForm({ name: '', email: '', password: '', role: 'staff' });
+      setForm({ name: '', email: '', password: '', role: 'staff', employee_id: '' });
       setScope({ branch_ids: [], warehouse_ids: [] });
       onSaved();
       onClose();
@@ -66,10 +106,25 @@ export function UserDialog({
         <div className="space-y-1.5">
           <Label htmlFor="urole">{t('role')}</Label>
           <Select id="urole" value={form.role} onChange={(e) => set('role', e.target.value)}>
-            <option value="admin">{t('roles.admin')}</option>
-            <option value="accountant">{t('roles.accountant')}</option>
-            <option value="staff">{t('roles.staff')}</option>
+            {roles.map((r) => (
+              <option key={r.id} value={r.slug}>
+                {SYSTEM_ROLE_KEYS[r.slug] ? t(SYSTEM_ROLE_KEYS[r.slug]) : r.name}
+              </option>
+            ))}
           </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="uemployee">{t('link_employee')}</Label>
+          <Select id="uemployee" value={form.employee_id} onChange={(e) => set('employee_id', e.target.value)}>
+            <option value="">{t('no_employee_link')}</option>
+            {availableEmployees.map((emp) => (
+              <option key={emp.id} value={emp.id}>
+                {emp.employee_no ? `${emp.employee_no} — ${emp.name}` : emp.name}
+              </option>
+            ))}
+          </Select>
+          <p className="text-xs text-muted">{t('link_employee_hint')}</p>
         </div>
 
         <AccessScopeFields value={scope} onChange={setScope} />
