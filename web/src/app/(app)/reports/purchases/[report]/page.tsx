@@ -5,6 +5,7 @@ const REPORTS: Record<string, PurchaseReportView> = {
   'by-period': 'period',
   'by-supplier': 'supplier',
   'by-product': 'product',
+  'by-classification': 'classification',
   'by-employee': 'employee',
   balances: 'balances',
   payments: 'payments',

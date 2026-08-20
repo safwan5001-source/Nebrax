@@ -17,6 +17,12 @@ class PurchaseResource extends JsonResource
             'number'              => $this->number,
             'partner_id'          => $this->partner_id,
             'cost_center_id'      => $this->cost_center_id,
+            'classification_id'  => $this->classification_id,
+            'classification' => $this->whenLoaded('classification', fn () => $this->classification ? [
+                'id' => $this->classification->id,
+                'name' => $this->classification->name,
+                'scope' => $this->classification->scope,
+            ] : null),
             'payment_type'        => $this->payment_type,
             'status'              => $this->status,
             'payment_status'      => $this->payment_status,

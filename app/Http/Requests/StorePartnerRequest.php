@@ -31,7 +31,9 @@ class StorePartnerRequest extends FormRequest
             'district'     => ['nullable', 'string', 'max:255'],
             'postal_code'  => ['nullable', 'string', 'max:255'],
             'country'      => ['nullable', 'string', 'max:255'],
-            'classification' => ['nullable', 'string', 'max:255'],
+            'classification' => ['nullable', 'string', 'max:255'], // انتقالياً للتوافق الرجعي
+            'customer_classification_id' => ['nullable', 'uuid'],
+            'supplier_classification_id' => ['nullable', 'uuid'],
             'credit_limit'  => ['nullable', 'integer', 'min:0'],   // هللات — 0/غياب = بلا حد
             'credit_period' => ['nullable', 'integer', 'min:0', 'max:3650'], // أيام
             'opening_balance'      => ['nullable', 'integer', 'min:0'], // هللات — فعل (قيد) لا عمود

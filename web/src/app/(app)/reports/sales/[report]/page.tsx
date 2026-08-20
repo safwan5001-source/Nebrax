@@ -7,6 +7,7 @@ const REPORTS: Record<string, SalesReportView> = {
   'by-period': 'period',
   'by-customer': 'customer',
   'by-product': 'product',
+  'by-classification': 'classification',
   'by-salesperson': 'salesperson',
   profitability: 'profit',
   payments: 'payments',

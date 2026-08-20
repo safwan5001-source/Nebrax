@@ -34,6 +34,7 @@ class StoreInvoiceRequest extends FormRequest
             'adjustment'          => ['nullable', 'integer', 'min:-100000000000', 'max:100000000000'],          // هللات — تسوية/تقريب (+/−)
             'tax_inclusive'       => ['nullable', 'boolean'], // هل أسعار السطور متضمّنة الضريبة (تُستخرَج) أم لا (تُضاف)
             'cost_center_id'      => ['nullable', 'uuid'],
+            'classification_id'   => ['nullable', 'uuid'],
             'salesperson_id'      => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],

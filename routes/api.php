@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BranchSettingsController;
 use App\Http\Controllers\Api\CashBankAccountController;
+use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
+use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CostCenterController;
@@ -54,6 +56,7 @@ use App\Http\Controllers\Api\PurchaseReportController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RecurringInvoiceController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\ReportSettingsController;
 use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\ReturnableController;
 use App\Http\Controllers\Api\ReturnSourcesController;
@@ -178,6 +181,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('product-categories/{id}', [ProductCategoryController::class, 'update'])->middleware($perm('products.manage'));
         Route::delete('product-categories/{id}', [ProductCategoryController::class, 'destroy'])->middleware($perm('products.manage'));
 
+        // تصنيفات العملاء والموردين والمستندات: بُعد تحليلي لا يولّد قيداً.
+        Route::get('classifications', [ClassificationController::class, 'index'])->middleware($perm('reports.view'));
+        Route::post('classifications', [ClassificationController::class, 'store'])->middleware($perm('company.manage'));
+        Route::put('classifications/{id}', [ClassificationController::class, 'update'])->middleware($perm('company.manage'));
+        Route::delete('classifications/{id}', [ClassificationController::class, 'destroy'])->middleware($perm('company.manage'));
+
         Route::get('brands', [BrandController::class, 'index'])->middleware($perm('products.view'));
         Route::post('brands', [BrandController::class, 'store'])->middleware($perm('products.manage'));
         Route::put('brands/{id}', [BrandController::class, 'update'])->middleware($perm('products.manage'));
@@ -274,6 +283,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
         Route::post('invoices/{id}/notes', [InvoiceController::class, 'storeNote'])->middleware($perm('invoices.manage'));
         Route::post('invoices/{id}/duplicate', [InvoiceController::class, 'duplicate'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
+        Route::put('invoices/{id}/classification', [InvoiceController::class, 'updateClassification'])->middleware($perm('invoices.manage'));
         Route::put('invoices/{id}', [InvoiceController::class, 'update'])->middleware($perm('invoices.manage')); // مسوّدة فقط
         Route::delete('invoices/{id}', [InvoiceController::class, 'destroy'])->middleware($perm('invoices.manage')); // مسوّدة فقط
         Route::post('invoices/{id}/post', [InvoiceController::class, 'post'])->middleware($perm('invoices.manage'));
@@ -342,6 +352,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('payments/{id}/attachments/{attachmentId}', [PaymentController::class, 'downloadAttachment'])->middleware($perm('payments.view'));
         Route::get('payments/{id}', [PaymentController::class, 'show'])->middleware($perm('payments.view'));
         Route::post('payments', [PaymentController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('payments/{id}/classification', [PaymentController::class, 'updateClassification'])->middleware($perm('payments.manage'));
         Route::put('payments/{id}', [PaymentController::class, 'update'])->middleware($perm('payments.manage'));
         Route::post('payments/{id}/duplicate', [PaymentController::class, 'duplicate'])->middleware($perm('payments.manage'));
         Route::delete('payments/{id}', [PaymentController::class, 'destroy'])->middleware($perm('payments.manage'));
@@ -365,6 +376,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('purchases/{id}/accounting', [PurchaseController::class, 'accounting'])->middleware($perm('reports.view'));
         Route::get('purchases/{id}/inventory', [PurchaseController::class, 'inventory'])->middleware($perm('products.view'));
         Route::post('purchases', [PurchaseController::class, 'store'])->middleware($perm('purchases.manage'));
+        Route::put('purchases/{id}/classification', [PurchaseController::class, 'updateClassification'])->middleware($perm('purchases.manage'));
         Route::put('purchases/{id}', [PurchaseController::class, 'update'])->middleware($perm('purchases.manage'));    // مسوّدة فقط
         Route::delete('purchases/{id}', [PurchaseController::class, 'destroy'])->middleware($perm('purchases.manage')); // مسوّدة فقط
         Route::post('purchases/{id}/post', [PurchaseController::class, 'post'])->middleware($perm('purchases.manage'));
@@ -402,6 +414,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // لوحة التحكم: تفصيل المبيعات ببُعد (يوم/منتج/فئة/فرع/بائع) — قراءة فقط
         Route::get('dashboard/sales-breakdown', [DashboardController::class, 'salesBreakdown'])->middleware($perm('reports.view'));
         // تقارير المبيعات: تجميعات قراءة فقط مع نطاق تاريخ/فرع/عميل/صنف/مندوب وسداد.
+        // سياسة تعديل البعد التحليلي للتصنيف قبل الترحيل وبعده.
+        Route::get('settings/reports', [ReportSettingsController::class, 'show'])->middleware($perm('reports.view'));
+        Route::put('settings/reports', [ReportSettingsController::class, 'update'])->middleware($perm('company.manage'));
+
+        Route::get('reports/classification-analytics', [ClassificationAnalyticsReportController::class, 'show'])->middleware($perm('reports.view'));
         Route::get('reports/sales', [SalesReportController::class, 'show'])->middleware($perm('reports.view'));
         // تقارير المشتريات: فواتير شراء وسندات صرف مرحّلة فقط؛ لا أثر محاسبي جديد.
         Route::get('reports/purchases', [PurchaseReportController::class, 'show'])->middleware($perm('reports.view'));

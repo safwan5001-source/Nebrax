@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StoreInvoiceNoteRequest;
 use App\Http\Requests\StoreInvoiceRequest;
+use App\Http\Requests\UpdateDocumentClassificationRequest;
 use App\Http\Resources\InvoiceNoteResource;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Account;
@@ -18,6 +19,7 @@ use App\Models\StockMovement;
 use App\Support\Money;
 use App\Services\Accounting\InvoiceRelationsService;
 use App\Services\Accounting\InvoiceService;
+use App\Services\ClassificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -28,6 +30,7 @@ class InvoiceController extends ApiController
     public function __construct(
         protected InvoiceService $invoices,
         protected InvoiceRelationsService $relations,
+        protected ClassificationService $classifications,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -188,6 +191,21 @@ class InvoiceController extends ApiController
         $updated = $this->domain(fn () => $this->invoices->update($invoice, $data, $data['items']));
 
         return (new InvoiceResource($updated->load('lines.product', 'lines.costCenterAllocations.costCenter')))->response();
+    }
+
+    /**
+     * تعديل تحليلي محدود؛ لا يفتح تعديل المبالغ أو البنود أو القيد بعد الترحيل.
+     */
+    public function updateClassification(UpdateDocumentClassificationRequest $request, string $id): JsonResponse
+    {
+        $invoice = Invoice::findOrFail($id);
+        $updated = $this->domain(fn () => $this->classifications->updateDocumentClassification(
+            $invoice,
+            $request->validated('classification_id'),
+            'sales_invoice',
+        ));
+
+        return (new InvoiceResource($updated->load(['classification', 'lines.product', 'lines.costCenterAllocations.costCenter'])))->response();
     }
 
     /** ينشئ مسودة مستقلة من فاتورة مرئية، بلا أثر ترحيل أو سداد من المصدر. */

@@ -3126,6 +3126,10 @@
           "title": "Product sales by period",
           "description": "Product performance across a selected date range."
         },
+        "salesByClassification": {
+          "title": "Sales by invoice classification",
+          "description": "Analyze the value and count of posted sales invoices by classification."
+        },
         "salesByRepresentative": {
           "title": "Sales by representative",
           "description": "Compare revenue and volume between sales representatives."
@@ -3158,6 +3162,10 @@
           "title": "Purchases by product",
           "description": "Analyse purchased quantities and values by product."
         },
+        "purchasesByClassification": {
+          "title": "Purchases by invoice classification",
+          "description": "Analyze the value and count of posted purchase invoices by classification."
+        },
         "purchasesByEmployee": {
           "title": "Purchases by employee",
           "description": "Compare purchases by responsible employee."
@@ -3185,6 +3193,10 @@
         "costCenterProfitability": {
           "title": "Cost-center profitability",
           "description": "Revenue, expense, and profit for each cost center."
+        },
+        "classificationAnalytics": {
+          "title": "Classification analytics",
+          "description": "A unified report for document and partner value by analytical classification."
         },
         "accountLedger": {
           "title": "Account ledger",
@@ -3283,6 +3295,8 @@
       "allCustomers": "All customers",
       "searchCustomer": "Search by name, tax number, or phone",
       "noCustomers": "No matching customers",
+      "customerClassification": "Customer classification",
+      "allCustomerClassifications": "All customer classifications",
       "salesperson": "Sales representative",
       "allSalespeople": "All representatives",
       "searchSalesperson": "Search by representative name",
@@ -3291,6 +3305,10 @@
       "allProducts": "All products",
       "searchProduct": "Search by name, SKU, or barcode",
       "noProducts": "No matching products",
+      "productCategory": "Product classification",
+      "allProductCategories": "All product classifications",
+      "invoiceClassification": "Invoice classification",
+      "allInvoiceClassifications": "All invoice classifications",
       "productInvoiceScope": "For this report, the scope is limited to invoices that contain the selected product.",
       "paymentStatus": "Payment status",
       "allPaymentStatuses": "All payment statuses",
@@ -3309,6 +3327,7 @@
         "period": "Sales by period",
         "customer": "Sales by customer",
         "product": "Product sales",
+        "classification": "Sales by invoice classification",
         "salesperson": "Sales by representative",
         "profit": "Profit by period",
         "payments": "Sales receipts by period"
@@ -3317,6 +3336,7 @@
         "period": "Posted sales invoices grouped by the selected time interval.",
         "customer": "Posted invoice value and count for each customer in the filtered scope.",
         "product": "Sales line value and quantity for each product; it excludes header-level invoice amounts such as shipping.",
+        "classification": "Posted invoice value and count grouped by invoice classification.",
         "salesperson": "Compare the value and count of posted invoices between sales representatives.",
         "profit": "Gross profit before operating expenses and VAT, derived from net sales and cost of goods sold.",
         "payments": "Posted receipt vouchers by receipt date and collection method."
@@ -3359,6 +3379,8 @@
       "allSuppliers": "All suppliers",
       "searchSupplier": "Search by name, tax number, or phone",
       "noSuppliers": "No matching suppliers",
+      "supplierClassification": "Supplier classification",
+      "allSupplierClassifications": "All supplier classifications",
       "creator": "Invoice creator",
       "allCreators": "All invoice creators",
       "searchCreator": "Search by employee or user name",
@@ -3367,6 +3389,10 @@
       "allProducts": "All products",
       "searchProduct": "Search by name, SKU, or barcode",
       "noProducts": "No matching products",
+      "productCategory": "Product classification",
+      "allProductCategories": "All product classifications",
+      "invoiceClassification": "Purchase invoice classification",
+      "allInvoiceClassifications": "All purchase invoice classifications",
       "productInvoiceScope": "For this report, the scope is limited to purchase invoices that contain the selected product.",
       "paymentStatus": "Payment status",
       "allPaymentStatuses": "All payment statuses",
@@ -3392,6 +3418,7 @@
         "period": "Purchases by period",
         "supplier": "Purchases by supplier",
         "product": "Product purchases",
+        "classification": "Purchases by invoice classification",
         "employee": "Purchases by employee",
         "balances": "Supplier balances",
         "payments": "Supplier payments by period"
@@ -3400,6 +3427,7 @@
         "period": "Posted purchase invoices grouped by the selected time interval.",
         "supplier": "Posted purchase invoice value and count for each supplier in the filtered scope.",
         "product": "Purchase line value and quantity for each product; header-level discounts and shipping are not distributed to lines.",
+        "classification": "Posted purchase invoice value and count grouped by invoice classification.",
         "employee": "Compare the value and count of posted purchase invoices by their creating user or linked employee.",
         "balances": "A summary of posted purchase values and open balances for each supplier.",
         "payments": "Posted supplier payment vouchers by payment date and method."
@@ -3421,6 +3449,50 @@
       "empty": "There is no data in the selected filter scope.",
       "loadFailed": "The report could not be loaded. Check your connection and try again.",
       "retry": "Try again"
+    }
+  },
+  "classificationPolicy": {
+    "title": "Classification editing policy",
+    "subtitle": "This policy controls whether the analytical classification may be changed before and after posting.",
+    "backToReports": "Back to reports",
+    "save": "Save policy",
+    "saving": "Saving…",
+    "saved": "Classification policy saved.",
+    "loadFailed": "The classification policy could not be loaded.",
+    "beforeTitle": "Allow editing before posting",
+    "beforeHint": "Allows assigning or changing the classification on a draft. A draft has no accounting effect yet.",
+    "afterTitle": "Allow editing after posting",
+    "afterHint": "Allows changing the analytical classification on a posted document and may change historical report grouping. It never changes journal entries, amounts, or lines.",
+    "enabled": "Allowed",
+    "disabled": "Not allowed",
+    "historyNoticeTitle": "Historical reporting effect",
+    "historyNotice": "When editing after posting is enabled, later reports show the document under its new classification. Leave it disabled when historical comparisons must remain stable.",
+    "retry": "Try again"
+  },
+  "classificationAnalytics": {
+    "title": "Classification analytics",
+    "subtitle": "A custom report measuring documents and partners by the newly added analytical classifications.",
+    "backToReports": "Back to reports",
+    "scope": "Analysis scope",
+    "classification": "Classification",
+    "allClassifications": "All classifications",
+    "records": "Records",
+    "amount": "Amount",
+    "totalAmount": "Total amount",
+    "classifiedRecords": "Classified records",
+    "unclassifiedRecords": "Unclassified records",
+    "unclassified": "Unclassified",
+    "exportCsv": "Export CSV",
+    "empty": "There is no data in the selected filter scope.",
+    "loadFailed": "Classification analytics could not be loaded.",
+    "retry": "Try again",
+    "scopes": {
+      "sales_invoice": "Sales invoice classification",
+      "purchase_invoice": "Purchase invoice classification",
+      "customer": "Customer classification",
+      "supplier": "Supplier classification",
+      "receipt": "Receipt voucher classification",
+      "payment": "Payment voucher classification"
     }
   },
   "returnForm": {

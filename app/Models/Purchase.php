@@ -23,7 +23,7 @@ class Purchase extends BaseModel
 
     protected $fillable = [
         'branch_id', 'warehouse_id',
-        'tenant_id', 'number', 'partner_id', 'cost_center_id', 'payment_type',
+        'tenant_id', 'number', 'partner_id', 'cost_center_id', 'classification_id', 'payment_type',
         'purchase_date', 'due_date', 'supplier_invoice_no', 'status',
         'subtotal', 'tax_amount', 'total', 'tax_inclusive',
         'discount', 'shipping', 'adjustment',
@@ -66,6 +66,12 @@ class Purchase extends BaseModel
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
+    }
+
+    /** تصنيف تحليلي محفوظ على فاتورة الشراء؛ لا يغيّر القيد أو المخزون. */
+    public function classification(): BelongsTo
+    {
+        return $this->referenceBelongsTo(Classification::class);
     }
 
     /** مخزن مثبت على فاتورة الشراء، يحدد موقع الاستلام لا قيمة التقييم. */
