@@ -3,25 +3,45 @@ import { expect, test, type Page } from '@playwright/test';
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
 
 async function enterDemo(page: Page) {
+  await page.context().addCookies([{ name: 'locale', value: 'ar', url: baseUrl }]);
   await page.goto(`${baseUrl}/login`);
   await page.getByRole('button', { name: 'دخول تجريبي' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.waitForLoadState('domcontentloaded');
 }
 
-test('تفاصيل الفاتورة على الجوال: إجراءات ظاهرة وأقسام قابلة للإغلاق', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await enterDemo(page);
-  await page.goto(`${baseUrl}/invoices/inv-118`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: /^(INV-2026-0118|INV-٢٠٢٦-٠١١٨)$/ })).toBeVisible();
-
+async function expectActionMenuWithinViewport(page: Page) {
   const actions = page.getByRole('button', { name: /^(Invoice actions|إجراءات الفاتورة)$/ });
   await actions.click();
   const menu = page.getByRole('menu', { name: /^(Invoice actions|إجراءات الفاتورة)$/ });
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem')).toHaveCount(8);
+  const menuBox = await menu.boundingBox();
+  expect(menuBox).not.toBeNull();
+  expect(menuBox!.x).toBeGreaterThanOrEqual(12);
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(378);
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(832);
   await actions.click();
   await expect(menu).toBeHidden();
+}
+
+test('تفاصيل الفاتورة على الجوال: إجراءات ظاهرة وأقسام قابلة للإغلاق', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enterDemo(page);
+  await page.goto(`${baseUrl}/invoices/inv-118`, { waitUntil: 'commit' }).catch((error: Error) => {
+    if (!error.message.includes('ERR_ABORTED')) throw error;
+  });
+  await expect(page.getByRole('heading', { name: /^(INV-2026-0118|INV-٢٠٢٦-٠١١٨)$/ })).toBeVisible();
+
+  await expectActionMenuWithinViewport(page);
+
+  const documentBeforeDetails = await page.evaluate(() => {
+    const headings = Array.from(document.querySelectorAll('h3'));
+    const documentTitle = headings.find((node) => /^(Document|المستند)$/.test(node.textContent?.trim() ?? ''));
+    const detailsTitle = headings.find((node) => /^(Invoice details|تفاصيل الفاتورة)$/.test(node.textContent?.trim() ?? ''));
+    return Boolean(documentTitle && detailsTitle && (documentTitle.compareDocumentPosition(detailsTitle) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(documentBeforeDetails).toBe(true);
 
   const details = page.getByRole('button', { name: /^(Invoice details|تفاصيل الفاتورة)$/ });
   await details.click();
@@ -42,6 +62,10 @@ test('تفاصيل الفاتورة على الجوال: إجراءات ظاهر
   await revisions.scrollIntoViewIfNeeded();
   await revisions.click();
   await expect(page.locator('#revision-log-invoice-inv-118')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'تبديل اللغة' }).click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  await expectActionMenuWithinViewport(page);
 
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
