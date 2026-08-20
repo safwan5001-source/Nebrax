@@ -46,6 +46,7 @@ cp -r "$CORE_DIR/app/Providers/"*.php            app/Providers/
 cp -r "$CORE_DIR/app/Console/Commands/"*.php    app/Console/Commands/ 2>/dev/null || true
 cp -r "$CORE_DIR/database/migrations/"*.php      database/migrations/
 cp -r "$CORE_DIR/routes/api.php"                 routes/api.php
+cp -r "$CORE_DIR/routes/console.php"             routes/console.php
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/ 2>/dev/null || true
 
 # تسجيل TenancyServiceProvider (حاسم للعزل) إن لم يكن مسجلاً

@@ -120,6 +120,7 @@ jobs:
           cp -r "$CORE/app/Console/Commands/"*.php       app/Console/Commands/ 2>/dev/null || true
           cp -r "$CORE/database/migrations/"*.php         database/migrations/
           cp -r "$CORE/routes/api.php"                    routes/api.php
+          cp -r "$CORE/routes/console.php"                routes/console.php
           cp -r "$CORE/tests/Feature/"*.php               tests/Feature/
 
       - name: تسجيل TenancyServiceProvider + حذف users migration الافتراضية
