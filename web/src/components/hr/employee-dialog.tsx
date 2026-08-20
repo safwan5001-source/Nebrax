@@ -45,9 +45,14 @@ export interface Employee {
   residency_expiry_date?: string | null;
   phone?: string | null;
   personal_email?: string | null;
-  job_title?: string | null;
-  department?: string | null;
-  employment_type?: string | null;
+  job_title_id?: string | null;
+  job_title?: { id: string; name: string } | null;
+  department_id?: string | null;
+  department?: { id: string; name: string } | null;
+  job_level_id?: string | null;
+  job_level?: { id: string; name: string } | null;
+  employment_type_id?: string | null;
+  employment_type?: { id: string; name: string } | null;
   manager_id?: string | null;
   shift_id?: string | null;
   has_photo?: boolean;
@@ -76,7 +81,8 @@ export interface Employee {
 const EMPTY_EMPLOYEE: Employee = {
   id: '', name: '', first_name: '', middle_name: '', last_name: '',
   national_id: '', nationality: '', residency_expiry_date: '',
-  phone: '', personal_email: '', job_title: '', department: '', employment_type: '',
+  phone: '', personal_email: '',
+  job_title_id: '', department_id: '', job_level_id: '', employment_type_id: '',
   manager_id: '', shift_id: '', has_photo: false,
   current_address: '', current_city: '', current_building_no: '', current_street: '',
   current_district: '', current_postal_code: '', current_country: '',
@@ -85,8 +91,13 @@ const EMPTY_EMPLOYEE: Employee = {
   basic_salary: '', allowances: '', gosi: '', other_deductions: '', is_active: true, notes: '',
 };
 
-const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract', 'temporary'] as const;
 const ADDRESS_FIELDS = ['address', 'city', 'building_no', 'street', 'district', 'postal_code', 'country'] as const;
+
+interface OrgOption {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
 
 /** نمط عنوانٍ وطنيٍّ واحد — يتكرّر بادئتين (حالي/دائم) بلا نسخ الحقول يدوياً. */
 function AddressGroup({
@@ -151,6 +162,10 @@ export function EmployeeDialog({
   const [form, setForm] = useState<Employee>(employee ?? EMPTY_EMPLOYEE);
   const [colleagues, setColleagues] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [jobTitles, setJobTitles] = useState<OrgOption[]>([]);
+  const [departments, setDepartments] = useState<OrgOption[]>([]);
+  const [jobLevels, setJobLevels] = useState<OrgOption[]>([]);
+  const [employmentTypes, setEmploymentTypes] = useState<OrgOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -171,6 +186,15 @@ export function EmployeeDialog({
     if (!open) return;
     api<{ data: Employee[] }>('/employees').then((r) => setColleagues(r.data)).catch(() => {});
     api<{ data: Shift[] }>('/shifts').then((r) => setShifts(r.data)).catch(() => {});
+  }, [open]);
+
+  // الهيكل التنظيمي — قوائم اختيار المسمى/القسم/المستوى الوظيفي ونوع التوظيف.
+  useEffect(() => {
+    if (!open) return;
+    api<{ data: OrgOption[] }>('/job-titles').then((r) => setJobTitles(r.data)).catch(() => {});
+    api<{ data: OrgOption[] }>('/departments').then((r) => setDepartments(r.data)).catch(() => {});
+    api<{ data: OrgOption[] }>('/job-levels').then((r) => setJobLevels(r.data)).catch(() => {});
+    api<{ data: OrgOption[] }>('/employment-types').then((r) => setEmploymentTypes(r.data)).catch(() => {});
   }, [open]);
 
   // الأدوار — تُحمَّل فقط حين يظهر قسم الدخول (مالك/مدير).
@@ -272,9 +296,10 @@ export function EmployeeDialog({
       residency_expiry_date: form.residency_expiry_date || null,
       phone: form.phone || null,
       personal_email: form.personal_email || null,
-      job_title: form.job_title || null,
-      department: form.department || null,
-      employment_type: form.employment_type || null,
+      job_title_id: form.job_title_id || null,
+      department_id: form.department_id || null,
+      job_level_id: form.job_level_id || null,
+      employment_type_id: form.employment_type_id || null,
       manager_id: form.manager_id || null,
       shift_id: form.shift_id || null,
       basic_salary: riyalToMinor(form.basic_salary), // ريال → هللات
@@ -448,48 +473,59 @@ export function EmployeeDialog({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="job_title">{t('job_title')}</Label>
-            <Input id="job_title" value={form.job_title ?? ''} onChange={(e) => set('job_title', e.target.value)} />
+            <Label htmlFor="job_title_id">{t('job_title')}</Label>
+            <Select id="job_title_id" value={form.job_title_id ?? ''} onChange={(e) => set('job_title_id', e.target.value)}>
+              <option value="">—</option>
+              {jobTitles.map((jt) => (<option key={jt.id} value={jt.id}>{jt.name}</option>))}
+            </Select>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="department">{t('department')}</Label>
-            <Input id="department" value={form.department ?? ''} onChange={(e) => set('department', e.target.value)} />
+            <Label htmlFor="department_id">{t('department')}</Label>
+            <Select id="department_id" value={form.department_id ?? ''} onChange={(e) => set('department_id', e.target.value)}>
+              <option value="">—</option>
+              {departments.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
+            </Select>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="employment_type">{t('employment_type')}</Label>
-            <Select id="employment_type" value={form.employment_type ?? ''} onChange={(e) => set('employment_type', e.target.value)}>
+            <Label htmlFor="job_level_id">{t('job_level')}</Label>
+            <Select id="job_level_id" value={form.job_level_id ?? ''} onChange={(e) => set('job_level_id', e.target.value)}>
               <option value="">—</option>
-              {EMPLOYMENT_TYPES.map((v) => (
-                <option key={v} value={v}>{t(`employment_type_${v}`)}</option>
-              ))}
+              {jobLevels.map((jl) => (<option key={jl.id} value={jl.id}>{jl.name}</option>))}
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="employment_type_id">{t('employment_type')}</Label>
+            <Select id="employment_type_id" value={form.employment_type_id ?? ''} onChange={(e) => set('employment_type_id', e.target.value)}>
+              <option value="">—</option>
+              {employmentTypes.map((et) => (<option key={et.id} value={et.id}>{et.name}</option>))}
+            </Select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="national_id">{t('national_id')}</Label>
             <Input id="national_id" dir="ltr" value={form.national_id ?? ''} onChange={(e) => set('national_id', e.target.value)} />
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="nationality">{t('nationality')}</Label>
             <Input id="nationality" value={form.nationality ?? ''} onChange={(e) => set('nationality', e.target.value)} />
           </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="residency_expiry_date">{t('residency_expiry_date')}</Label>
             <Input id="residency_expiry_date" type="date" dir="ltr" value={form.residency_expiry_date ?? ''} onChange={(e) => set('residency_expiry_date', e.target.value)} />
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="phone">{t('phone')}</Label>
             <Input id="phone" dir="ltr" className="num" value={form.phone ?? ''} onChange={(e) => set('phone', e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="personal_email">{t('personal_email')}</Label>
-            <Input id="personal_email" type="email" dir="ltr" value={form.personal_email ?? ''} onChange={(e) => set('personal_email', e.target.value)} />
-          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="personal_email">{t('personal_email')}</Label>
+          <Input id="personal_email" type="email" dir="ltr" value={form.personal_email ?? ''} onChange={(e) => set('personal_email', e.target.value)} />
         </div>
 
         <AddressGroup prefix="current" title={t('current_address_title')} form={form} set={set} t={t} />

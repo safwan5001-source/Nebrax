@@ -847,7 +847,7 @@ export interface MockEmployee {
   employee_no: string;
   name: string;
   national_id: string;
-  job_title: string;
+  job_title: { id: string; name: string } | null;
   basic_salary: string;
   allowances: string;
   gosi: string;
@@ -864,7 +864,8 @@ function employee(
   const gross = basic + allow;
   const net = gross - gosi - other;
   return {
-    id, employee_no: no, name, national_id: `10${no.slice(-6)}0`, job_title: job,
+    id, employee_no: no, name, national_id: `10${no.slice(-6)}0`,
+    job_title: { id: `jt-${id}`, name: job },
     basic_salary: basic.toFixed(2), allowances: allow.toFixed(2), gosi: gosi.toFixed(2),
     other_deductions: other.toFixed(2), is_active: active, gross: gross.toFixed(2), net: net.toFixed(2),
   };
@@ -877,6 +878,27 @@ export const mockEmployees: MockEmployee[] = [
   employee('em-4', 'EMP-004', 'منى الشمري', 'موظفة مبيعات', 7000, 2000, 700, 0),
   employee('em-5', 'EMP-005', 'فهد المطيري', 'فني صيانة', 5500, 700, 550, 150),
   employee('em-6', 'EMP-006', 'نورة الغامدي', 'موظفة استقبال', 4500, 500, 450, 0, false),
+];
+
+// الهيكل التنظيمي — كيانات مُدارة (تعرض قوائم اختيار في نموذج الموظف).
+export const mockJobTitles = mockEmployees
+  .map((e) => e.job_title)
+  .filter((jt): jt is { id: string; name: string } => !!jt)
+  .map((jt) => ({ ...jt, is_active: true }));
+export const mockDepartments = [
+  { id: 'dep-1', name: 'المالية', is_active: true },
+  { id: 'dep-2', name: 'المبيعات', is_active: true },
+  { id: 'dep-3', name: 'العمليات', is_active: true },
+];
+export const mockJobLevels = [
+  { id: 'lvl-1', name: 'مبتدئ', is_active: true },
+  { id: 'lvl-2', name: 'متوسط', is_active: true },
+  { id: 'lvl-3', name: 'أول', is_active: true },
+];
+export const mockEmploymentTypes = [
+  { id: 'et-1', name: 'دوام كامل', is_active: true },
+  { id: 'et-2', name: 'دوام جزئي', is_active: true },
+  { id: 'et-3', name: 'عقد', is_active: true },
 ];
 
 export interface MockRun {
@@ -1799,7 +1821,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   }
   if (clean === '/payment-methods') return resolve({ data: mockPaymentMethods });
   if (clean === '/cash-bank-accounts') return resolve({ data: mockCashBankAccounts });
-  if (clean === '/payments/collectors') return resolve({ data: mockEmployees.filter((employee) => employee.is_active).map(({ id, name, employee_no, job_title }) => ({ id, name, employee_no, job_title })) });
+  if (clean === '/payments/collectors') return resolve({ data: mockEmployees.filter((employee) => employee.is_active).map(({ id, name, employee_no }) => ({ id, name, employee_no })) });
   if (clean === '/payments') {
     if ((method ?? 'GET') === 'POST') return resolve({ data: { id: 'pm-demo-draft' } });
     const dir = new URLSearchParams(path.split('?')[1] ?? '').get('direction');
@@ -1813,6 +1835,10 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: found });
   }
   if (clean === '/shifts') return resolve({ data: mockShifts });
+  if (clean === '/job-titles') return resolve({ data: mockJobTitles });
+  if (clean === '/departments') return resolve({ data: mockDepartments });
+  if (clean === '/job-levels') return resolve({ data: mockJobLevels });
+  if (clean === '/employment-types') return resolve({ data: mockEmploymentTypes });
   if (clean === '/attendances') {
     const params = new URLSearchParams(path.split('?')[1] ?? '');
     const date = params.get('date');

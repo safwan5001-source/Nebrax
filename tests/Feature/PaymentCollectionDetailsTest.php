@@ -29,7 +29,6 @@ class PaymentCollectionDetailsTest extends TestCase
         $collector = Employee::create([
             'employee_no' => 'EMP-00001',
             'name' => 'موظف التحصيل',
-            'job_title' => 'محصّل',
         ]);
         User::where('email', 'owner@collection-details.test')->firstOrFail()->update(['employee_id' => $collector->id]);
         $customer = Partner::create(['name' => 'عميل التحصيل', 'type' => 'customer']);

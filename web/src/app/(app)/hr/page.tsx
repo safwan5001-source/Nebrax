@@ -15,6 +15,7 @@ import { AttendanceDialog, type Attendance, type AttendanceStatus } from '@/comp
 import { CreateRunDialog } from '@/components/hr/create-run-dialog';
 import { RunDetailDialog, type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { RoleDialog, type Role } from '@/components/hr/role-dialog';
+import { OrgStructureManager } from '@/components/hr/org-structure-manager';
 import { UserDialog } from '@/components/users/user-dialog';
 import { UserScopeDialog } from '@/components/users/user-scope-dialog';
 import { useToast } from '@/components/ui/toast';
@@ -23,7 +24,7 @@ import { currentUser } from '@/lib/auth';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
-type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'roles' | 'users';
+type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'roles' | 'users' | 'org_structure';
 
 interface TeamUser {
   id: string; name: string; email: string; role: string; is_active: boolean;
@@ -168,7 +169,7 @@ export default function HrPage() {
           </Link>
         ),
       },
-      { accessorKey: 'job_title', header: t('job_title'), cell: ({ row }) => row.original.job_title ?? '—' },
+      { accessorKey: 'job_title', header: t('job_title'), cell: ({ row }) => row.original.job_title?.name ?? '—' },
       { accessorKey: 'basic_salary', header: t('basic_salary'), cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.basic_salary)}</div> },
       {
         id: 'gross',
@@ -400,6 +401,8 @@ export default function HrPage() {
     runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
     roles: () => (<Button onClick={() => { setEditingRole(null); setRoleDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_role')}</Button>),
     users: () => (<Button onClick={() => { setEditing(null); setEmpLinkedUser(null); setEmpInitialAccess(true); setEmpDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{tu('add')}</Button>),
+    // زرّ الإضافة الخاص بهذا القسم داخلي في OrgStructureManager نفسه (يتبدّل حسب القسم الفرعي النشط).
+    org_structure: () => null,
   }[tab];
 
   return (
@@ -410,7 +413,7 @@ export default function HrPage() {
       </div>
 
       <div className="flex gap-1 border-b border-border">
-        {(['employees', 'shifts', 'attendance', 'runs', ...(canManageRoles ? ['roles', 'users'] : [])] as Tab[]).map((key) => (
+        {(['employees', 'shifts', 'attendance', 'runs', ...(canManageRoles ? ['roles', 'users', 'org_structure'] : [])] as Tab[]).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -442,6 +445,7 @@ export default function HrPage() {
       {tab === 'users' && canManageRoles && (
         <DataTable columns={userColumns} data={team} loading={loading} searchPlaceholder={t('search_users')} emptyLabel={t('no_users')} exportName="users" />
       )}
+      {tab === 'org_structure' && canManageRoles && <OrgStructureManager />}
 
       <EmployeeDialog
         open={empDialog}

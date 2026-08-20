@@ -40,7 +40,7 @@ class Employee extends BaseModel implements CompanyWide
         'first_name', 'middle_name', 'last_name',
         'national_id', 'nationality', 'residency_expiry_date',
         'phone', 'personal_email',
-        'job_title', 'department', 'employment_type', 'manager_id', 'shift_id',
+        'job_title_id', 'department_id', 'job_level_id', 'employment_type_id', 'manager_id', 'shift_id',
         'current_address', 'current_city', 'current_building_no', 'current_street',
         'current_district', 'current_postal_code', 'current_country',
         'permanent_address', 'permanent_city', 'permanent_building_no', 'permanent_street',
@@ -100,6 +100,30 @@ class Employee extends BaseModel implements CompanyWide
     public function attachments(): HasMany
     {
         return $this->hasMany(EmployeeAttachment::class);
+    }
+
+    /** المسمى الوظيفي — جزءٌ من الهيكل التنظيمي (كيانٌ مُدار لكل مؤسسة). */
+    public function jobTitle(): BelongsTo
+    {
+        return $this->belongsTo(JobTitle::class);
+    }
+
+    /** القسم — جزءٌ من الهيكل التنظيمي. */
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    /** المستوى الوظيفي — جزءٌ من الهيكل التنظيمي. */
+    public function jobLevel(): BelongsTo
+    {
+        return $this->belongsTo(JobLevel::class);
+    }
+
+    /** نوع التوظيف — جزءٌ من الهيكل التنظيمي. */
+    public function employmentType(): BelongsTo
+    {
+        return $this->belongsTo(EmploymentType::class);
     }
 
     /**

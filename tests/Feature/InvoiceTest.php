@@ -510,7 +510,7 @@ class InvoiceTest extends TestCase
     /** @test */
     public function an_invoice_stores_the_salesperson(): void
     {
-        $emp = \App\Models\Employee::create(['employee_no' => 'EMP-0001', 'name' => 'مندوب', 'job_title' => 'مبيعات']);
+        $emp = \App\Models\Employee::create(['employee_no' => 'EMP-0001', 'name' => 'مندوب']);
 
         $invoice = $this->invoices->create(
             ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'salesperson_id' => $emp->id],

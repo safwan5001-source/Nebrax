@@ -19,9 +19,11 @@ use App\Http\Controllers\Api\CrmActivityController;
 use App\Http\Controllers\Api\CustomerReportController;
 use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeeCustodyController;
+use App\Http\Controllers\Api\EmploymentTypeController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FinanceSettingsController;
@@ -31,6 +33,8 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryReportController;
 use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\JobLevelController;
+use App\Http\Controllers\Api\JobTitleController;
 use App\Http\Controllers\Api\JournalEntryController;
 use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\PartnerController;
@@ -426,6 +430,27 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('employees/{id}/attachments', [EmployeeController::class, 'storeAttachments'])->middleware($perm('hr.manage'));
         Route::get('employees/{id}/attachments/{attachmentId}/download', [EmployeeController::class, 'downloadAttachment'])->middleware($perm('hr.view'));
         Route::delete('employees/{id}/attachments/{attachmentId}', [EmployeeController::class, 'destroyAttachment'])->middleware($perm('hr.manage'));
+
+        // الهيكل التنظيمي — مسمى وظيفي/قسم/مستوى وظيفي/نوع وظيفة ككيانات مُدارة.
+        Route::get('job-titles', [JobTitleController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('job-titles', [JobTitleController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::put('job-titles/{id}', [JobTitleController::class, 'update'])->middleware($perm('hr.manage'));
+        Route::delete('job-titles/{id}', [JobTitleController::class, 'destroy'])->middleware($perm('hr.manage'));
+
+        Route::get('departments', [DepartmentController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('departments', [DepartmentController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::put('departments/{id}', [DepartmentController::class, 'update'])->middleware($perm('hr.manage'));
+        Route::delete('departments/{id}', [DepartmentController::class, 'destroy'])->middleware($perm('hr.manage'));
+
+        Route::get('job-levels', [JobLevelController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('job-levels', [JobLevelController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::put('job-levels/{id}', [JobLevelController::class, 'update'])->middleware($perm('hr.manage'));
+        Route::delete('job-levels/{id}', [JobLevelController::class, 'destroy'])->middleware($perm('hr.manage'));
+
+        Route::get('employment-types', [EmploymentTypeController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('employment-types', [EmploymentTypeController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::put('employment-types/{id}', [EmploymentTypeController::class, 'update'])->middleware($perm('hr.manage'));
+        Route::delete('employment-types/{id}', [EmploymentTypeController::class, 'destroy'])->middleware($perm('hr.manage'));
 
         // الورديات (الوحدة الثانية من معمار الموارد البشرية)
         Route::get('shifts', [ShiftController::class, 'index'])->middleware($perm('hr.view'));

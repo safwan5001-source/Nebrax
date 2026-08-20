@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreEmployeeRequest extends FormRequest
 {
@@ -26,9 +25,11 @@ class StoreEmployeeRequest extends FormRequest
             'residency_expiry_date' => ['nullable', 'date'],
             'phone'          => ['nullable', 'string', 'max:255'],
             'personal_email' => ['nullable', 'email', 'max:255'],
-            'job_title'      => ['nullable', 'string', 'max:255'],
-            'department'     => ['nullable', 'string', 'max:255'],
-            'employment_type' => ['nullable', Rule::in(['full_time', 'part_time', 'contract', 'temporary'])],
+            // الهيكل التنظيمي — كيانات مُدارة لكل مؤسسة، لا نصّاً حرّاً ولا قائمة ثابتة.
+            'job_title_id'      => ['nullable', 'uuid'],
+            'department_id'     => ['nullable', 'uuid'],
+            'job_level_id'      => ['nullable', 'uuid'],
+            'employment_type_id' => ['nullable', 'uuid'],
             // ملكية المعرّفين (المستأجر والفرع الصحيح للوردية) تُتحقَّق في المتحكّم.
             'manager_id'   => ['nullable', 'uuid'],
             'shift_id'     => ['nullable', 'uuid'],
