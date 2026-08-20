@@ -970,6 +970,8 @@
     "add_employee_option": "Employee",
     "add_user_option": "User",
     "add_employee": "Add employee",
+    "allow_access": "Allow access to the system",
+    "allow_access_hint": "Grants this employee their own login account to use the system per the assigned permissions.",
     "shifts": "Shifts",
     "add_shift": "Add shift",
     "edit_shift": "Edit shift",
@@ -3565,7 +3567,8 @@
     "scope_none": "No items available.",
     "link_employee": "Link to employee",
     "no_employee_link": "— No link —",
-    "link_employee_hint": "Optional. Links the login account to an existing employee record; one link per employee."
+    "link_employee_hint": "Optional. Links the login account to an existing employee record; one link per employee.",
+    "access_update_failed": "Couldn't update the login account. The employee's data was saved; try updating access again."
   },
   "voucherDoc": {
     "received_from": "Received from",

@@ -8,7 +8,7 @@ import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
-import { EmployeeDialog, type Employee } from '@/components/hr/employee-dialog';
+import { EmployeeDialog, type Employee, type LinkedUser } from '@/components/hr/employee-dialog';
 import { ShiftDialog, type Shift } from '@/components/hr/shift-dialog';
 import { AttendanceDialog, type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { CreateRunDialog } from '@/components/hr/create-run-dialog';
@@ -51,6 +51,8 @@ export default function HrPage() {
 
   const [empDialog, setEmpDialog] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [empLinkedUser, setEmpLinkedUser] = useState<LinkedUser | null>(null);
+  const [empInitialAccess, setEmpInitialAccess] = useState(false);
   const [shiftDialog, setShiftDialog] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [attDialog, setAttDialog] = useState(false);
@@ -100,6 +102,40 @@ export default function HrPage() {
     loadTeam();
   }
 
+  const toLinkedUser = (u: TeamUser): LinkedUser => ({
+    id: u.id, name: u.name, email: u.email, role: u.role, is_active: u.is_active,
+    branch_ids: u.branch_ids, warehouse_ids: u.warehouse_ids,
+  });
+
+  // فتح نموذج الموظف الموحّد لتعديل موظفٍ من تبويب "الموظفون" — يُرفَق مستخدمه
+  // المرتبط تلقائياً إن وُجد، فيظهر قسم الدخول معبّأً بدل فارغ.
+  function openEmployeeEdit(emp: Employee) {
+    setEditing(emp);
+    const linked = team.find((u) => u.employee_id === emp.id) ?? null;
+    setEmpLinkedUser(linked ? toLinkedUser(linked) : null);
+    setEmpInitialAccess(!!linked);
+    setEmpDialog(true);
+  }
+
+  // فتح نموذج الموظف الموحّد لتعديل مستخدمٍ من تبويب "المستخدمون": يجلب سجلّ
+  // الموظف الكامل إن كان مرتبطاً؛ وإلا يقع على الحوار القديم لمستخدمٍ بلا موظف.
+  async function openUserEdit(row: TeamUser) {
+    if (!row.employee_id) {
+      setEditingUser(row);
+      setUserDialog(true);
+      return;
+    }
+    try {
+      const res = await api<{ data: Employee }>(`/employees/${row.employee_id}`);
+      setEditing(res.data);
+      setEmpLinkedUser(toLinkedUser(row));
+      setEmpInitialAccess(true);
+      setEmpDialog(true);
+    } catch {
+      error(tc('loadFailed'));
+    }
+  }
+
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
@@ -146,13 +182,14 @@ export default function HrPage() {
         id: 'actions',
         header: '',
         cell: ({ row }) => (
-          <Button variant="ghost" size="icon" aria-label={t('edit')} onClick={() => { setEditing(row.original); setEmpDialog(true); }}>
+          <Button variant="ghost" size="icon" aria-label={t('edit')} onClick={() => openEmployeeEdit(row.original)}>
             <Pencil className="h-4 w-4" strokeWidth={1.7} />
           </Button>
         ),
       },
     ],
-    [t]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, team]
   );
 
   const runColumns = useMemo<ColumnDef<PayrollRun, unknown>[]>(
@@ -311,7 +348,7 @@ export default function HrPage() {
         header: '',
         cell: ({ row }) => (
           <div className="flex justify-end gap-1">
-            <Button variant="ghost" size="icon" aria-label={tu('edit')} onClick={() => { setEditingUser(row.original); setUserDialog(true); }}>
+            <Button variant="ghost" size="icon" aria-label={tu('edit')} onClick={() => openUserEdit(row.original)}>
               <Pencil className="h-4 w-4" strokeWidth={1.7} />
             </Button>
             <Button variant="ghost" size="icon" aria-label={tu('scope_title')} onClick={() => setScopeUser(row.original)}>
@@ -340,15 +377,15 @@ export default function HrPage() {
         triggerClassName="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         trigger={<><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add')}</>}
       >
-        <DropdownItem icon={User} onClick={() => { setEditing(null); setEmpDialog(true); }}>{t('add_employee_option')}</DropdownItem>
-        <DropdownItem icon={UserCog} onClick={() => { setEditingUser(null); setUserDialog(true); }}>{t('add_user_option')}</DropdownItem>
+        <DropdownItem icon={User} onClick={() => { setEditing(null); setEmpLinkedUser(null); setEmpInitialAccess(false); setEmpDialog(true); }}>{t('add_employee_option')}</DropdownItem>
+        <DropdownItem icon={UserCog} onClick={() => { setEditing(null); setEmpLinkedUser(null); setEmpInitialAccess(true); setEmpDialog(true); }}>{t('add_user_option')}</DropdownItem>
       </Dropdown>
     ),
     shifts: () => (<Button onClick={() => { setEditingShift(null); setShiftDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_shift')}</Button>),
     attendance: () => (<Button onClick={() => { setEditingAtt(null); setAttDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_attendance')}</Button>),
     runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
     roles: () => (<Button onClick={() => { setEditingRole(null); setRoleDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_role')}</Button>),
-    users: () => (<Button onClick={() => { setEditingUser(null); setUserDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{tu('add')}</Button>),
+    users: () => (<Button onClick={() => { setEditing(null); setEmpLinkedUser(null); setEmpInitialAccess(true); setEmpDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{tu('add')}</Button>),
   }[tab];
 
   return (
@@ -392,7 +429,15 @@ export default function HrPage() {
         <DataTable columns={userColumns} data={team} loading={loading} searchPlaceholder={t('search_users')} emptyLabel={t('no_users')} exportName="users" />
       )}
 
-      <EmployeeDialog open={empDialog} onClose={() => setEmpDialog(false)} onSaved={load} employee={editing} />
+      <EmployeeDialog
+        open={empDialog}
+        onClose={() => setEmpDialog(false)}
+        onSaved={() => { load(); if (canManageRoles) loadTeam(); }}
+        employee={editing}
+        linkedUser={empLinkedUser}
+        initialAllowAccess={empInitialAccess}
+        canManageUsers={canManageRoles}
+      />
       <ShiftDialog open={shiftDialog} onClose={() => setShiftDialog(false)} onSaved={load} shift={editingShift} />
       <AttendanceDialog open={attDialog} onClose={() => setAttDialog(false)} onSaved={load} attendance={editingAtt} />
       <CreateRunDialog open={runDialog} onClose={() => setRunDialog(false)} onCreated={() => { load(); setTab('runs'); }} />
