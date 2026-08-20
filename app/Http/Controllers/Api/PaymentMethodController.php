@@ -6,14 +6,19 @@ use App\Http\Requests\StorePaymentMethodRequest;
 use App\Http\Resources\PaymentMethodResource;
 use App\Models\CashBankAccount;
 use App\Models\PaymentMethod;
+use App\Services\Accounting\CashBankAccountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 /** إدارة بيان طرق الدفع المشترك للمؤسسة، بلا رسوم أو قيود محاسبية. */
 class PaymentMethodController extends ApiController
 {
+    public function __construct(private CashBankAccountService $cashBankAccounts) {}
+
     public function index(): JsonResponse
     {
+        $this->cashBankAccounts->bootstrapDefaults();
+
         return PaymentMethodResource::collection(
             PaymentMethod::query()
                 ->with('cashBankAccount.account')

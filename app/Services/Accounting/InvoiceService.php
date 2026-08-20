@@ -157,6 +157,76 @@ class InvoiceService
     }
 
     /**
+     * ينسخ بيانات فاتورة سابقة إلى مسودة مستقلة قابلة للتعديل.
+     *
+     * لا يُستنسخ أي أثر مرحّل: لا سندات قبض أو تخصيصات سداد أو قيود أو حركات
+     * مخزون أو بيانات ZATCA أو مراجعات طباعة مثبّتة. يمر النسخ عمداً عبر
+     * create() كي يعيد بناء الإجماليات والرقم من السطور الحية نفسها.
+     */
+    public function duplicate(Invoice $invoice, ?string $createdBy = null): Invoice
+    {
+        $invoice->loadMissing('lines.costCenterAllocations');
+        $date = now()->toDateString();
+
+        $data = [
+            'partner_id'      => $invoice->partner_id,
+            'payment_type'    => $invoice->payment_type,
+            'is_paid'         => false,
+            'payment_method'  => $invoice->payment_method,
+            'cash_account_id' => $invoice->cash_account_id,
+            'invoice_date'    => $date,
+            'due_date'        => $invoice->due_date?->toDateString(),
+            'cost_center_id'  => $invoice->cost_center_id,
+            'salesperson_id'  => $invoice->salesperson_id,
+            'discount'        => $invoice->discount,
+            'shipping'        => $invoice->shipping,
+            'adjustment'      => $invoice->adjustment,
+            'tax_inclusive'   => $invoice->tax_inclusive,
+            'notes'           => $invoice->notes,
+            'created_by'      => $createdBy,
+        ];
+
+        // نحافظ على نطاق سلسلة المصدر. الوثائق القديمة بلا فرع تتجه إلى الفرع
+        // النشط عند الإنشاء، لكن رقمها التالي يُشتق صراحةً من سلسلتها القديمة.
+        if ($invoice->branch_id !== null) {
+            $data['branch_id'] = $invoice->branch_id;
+        } else {
+            $data['number'] = $this->nextNumber($date, null);
+        }
+
+        $items = $invoice->lines->map(function (InvoiceLine $line) use ($invoice): array {
+            // عند الأسعار المتضمّنة تُخزَّن line_discount صافيةً؛ نستعيد الخصم
+            // الإجمالي من إجمالي السطر كي تعيد create() حساب الضريبة نفسها.
+            $discount = $invoice->tax_inclusive
+                ? ((int) $line->quantity * (int) $line->unit_price) - (int) $line->line_total
+                : (int) $line->line_discount;
+
+            return [
+                'product_id' => $line->product_id,
+                'description' => $line->description,
+                'quantity' => $line->quantity,
+                'unit' => $line->unit_name,
+                'unit_price' => $line->unit_price,
+                'tax_rate' => $line->tax_rate,
+                'discount' => $discount,
+                'cost_center_allocations' => $line->costCenterAllocations
+                    ->sortBy('position')
+                    ->map(fn (InvoiceLineCostCenterAllocation $allocation) => [
+                        'cost_center_id' => $allocation->cost_center_id,
+                        'mode' => $allocation->mode,
+                        'value' => $allocation->mode === 'percent'
+                            ? $allocation->basis_points
+                            : $allocation->amount,
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        })->all();
+
+        return $this->create($data, $items);
+    }
+
+    /**
      * ═══════════════════════════════════════════════════════════════
      *  «مدفوع بالفعل» يفرض الفاتورة **آجلة** — لا استثناء
      * ═══════════════════════════════════════════════════════════════
@@ -732,10 +802,10 @@ class InvoiceService
     /**
      * توليد رقم فاتورة تسلسلي: INV-2025-00001
      */
-    protected function nextNumber(string $date): string
+    protected function nextNumber(string $date, string|null|false $branchId = false): string
     {
         $prefix = (string) Settings::get('sales', 'invoice_prefix');
 
-        return Invoice::nextDocumentNumber($prefix ?: 'INV', $date);
+        return Invoice::nextDocumentNumber($prefix ?: 'INV', $date, $branchId);
     }
 }
