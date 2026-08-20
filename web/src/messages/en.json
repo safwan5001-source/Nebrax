@@ -2099,7 +2099,7 @@
     "paid": "Pay supplier",
     "partner": "Partner",
     "choose_partner": "Choose partner",
-    "document": "Allocate to document",
+    "document": "Allocate to document (optional)",
     "on_account": "On account — no allocation",
     "remaining": "Remaining",
     "amount": "Amount",

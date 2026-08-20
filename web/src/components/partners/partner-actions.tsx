@@ -29,7 +29,10 @@ export interface PartnerAction {
 }
 
 /** إجراءات الشريط الرئيسي — الأول بارز باللون الأساسي. */
-export function primaryActions(t: (k: string) => string, partnerId: string): PartnerAction[] {
+export function primaryActions(t: (k: string) => string, partnerId: string, partnerType?: string): PartnerAction[] {
+  const paymentDirection = partnerType === 'supplier' ? 'paid' : partnerType === 'customer' ? 'received' : null;
+  const paymentHref = `/payments/new?partner_id=${encodeURIComponent(partnerId)}${paymentDirection ? `&direction=${paymentDirection}` : ''}`;
+
   return [
     { key: 'new_invoice',   label: t('new_invoice'),   icon: FilePlus,      href: '/invoices/new' },
     { key: 'edit',          label: t('edit'),          icon: Pencil,        href: `/partners/${partnerId}/edit` },
@@ -38,7 +41,7 @@ export function primaryActions(t: (k: string) => string, partnerId: string): Par
     { key: 'new_quote',     label: t('new_quote'),     icon: Receipt,       href: '/quotes/new' },
     { key: 'new_credit',    label: t('new_credit'),    icon: CreditCard,    href: '/credit-notes/new' },
     { key: 'statement',     label: t('statement'),     icon: CalendarRange, href: `/partners/${partnerId}/statement`, separatorBefore: true },
-    { key: 'payment_credit', label: t('payment_credit'), icon: Wallet },
+    { key: 'payment_credit', label: t('payment_credit'), icon: Wallet, href: paymentHref },
     { key: 'parcels_in',    label: t('parcels_in'),    icon: PackageOpen },
     { key: 'parcels_out',   label: t('parcels_out'),   icon: Package },
     { key: 'settlement',    label: t('settlement'),    icon: CheckSquare,   separatorBefore: true },
