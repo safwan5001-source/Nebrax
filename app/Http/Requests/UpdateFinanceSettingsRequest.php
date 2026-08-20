@@ -15,6 +15,8 @@ class UpdateFinanceSettingsRequest extends FormRequest
     {
         return [
             'allow_negative_transfer_balance' => ['sometimes', 'boolean'],
+            'financial_alerts_enabled' => ['sometimes', 'boolean'],
+            'alert_check_window_days' => ['sometimes', 'integer', 'min:1', 'max:90'],
         ];
     }
 }

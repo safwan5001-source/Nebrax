@@ -145,6 +145,10 @@ class Settings
          */
         'finance' => [
             'allow_negative_transfer_balance' => false,
+            // تعطيل افتراضي لحماية المستأجرين القائمين إلى أن يقرّروا التفعيل صراحةً.
+            'financial_alerts_enabled'        => false,
+            // نافذة التقارير الدورية بالأيام؛ لا تؤثر في القيد أو الترحيل.
+            'alert_check_window_days'         => 1,
         ],
 
         /**

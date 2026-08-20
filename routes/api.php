@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\EmployeeCustodyController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FinanceSettingsController;
+use App\Http\Controllers\Api\FinancialControlAlertController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryReportController;
@@ -472,6 +473,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('roles', [RoleController::class, 'store'])->middleware($perm('roles.manage'));
         Route::put('roles/{id}', [RoleController::class, 'update'])->middleware($perm('roles.manage'));
         Route::delete('roles/{id}', [RoleController::class, 'destroy'])->middleware($perm('roles.manage'));
+
+        // تنبيهات رقابية داخلية — لا تغيّر القيود أو مستنداتها.
+        Route::get('financial-control-alerts', [FinancialControlAlertController::class, 'index'])->middleware($perm('reports.view'));
+        Route::get('financial-control-alerts/{id}', [FinancialControlAlertController::class, 'show'])->middleware($perm('reports.view'));
+        Route::post('financial-control-alerts/{id}/acknowledge', [FinancialControlAlertController::class, 'acknowledge'])->middleware($perm('accounts.manage'));
+        Route::post('financial-control-alerts/run-check', [FinancialControlAlertController::class, 'runCheck'])->middleware($perm('accounts.manage'));
 
         // التقارير
         Route::get('reports/trial-balance', [ReportController::class, 'trialBalance'])->middleware($perm('reports.view'));
