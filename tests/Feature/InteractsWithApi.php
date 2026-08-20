@@ -49,4 +49,17 @@ trait InteractsWithApi
 
         return $user->createToken('api')->plainTextToken;
     }
+
+    /**
+     * حمولة `items` لعقدٍ يحمل بند "الراتب الأساسي" فقط — بندٌ واحدٌ إلزامي
+     * (design-system/foundations/hr-users-architecture.md «قوالب/بنود الراتب»).
+     * `$extra` يضيف بنوداً إضافية جاهزة (allowance/gosi/other).
+     */
+    protected function basicSalaryItems(int $amount, array $extra = []): array
+    {
+        return [
+            ['category' => 'basic', 'name' => 'الراتب الأساسي', 'amount' => $amount],
+            ...$extra,
+        ];
+    }
 }

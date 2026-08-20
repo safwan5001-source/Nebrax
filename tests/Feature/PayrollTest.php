@@ -51,28 +51,34 @@ class PayrollTest extends TestCase
         return $entry->lines->first(fn (JournalLine $l) => $l->account->code === $code);
     }
 
-    /** الراتب يتبع العقد لا حقول الموظف — كل موظف اختباري يُنشأ بعقدٍ دائم نشط يحمل رقمه. */
+    /**
+     * الراتب يتبع العقد لا حقول الموظف — كل موظف اختباري يُنشأ بعقدٍ دائم نشط
+     * ببنودٍ (design-system/foundations/hr-users-architecture.md «قوالب/بنود
+     * الراتب» — بنودٌ على العقد مباشرة، نطاق البناء الأول).
+     */
     private function employee(int $basic, int $allowances = 0, bool $active = true, int $gosi = 0, int $other = 0): Employee
     {
         $employee = Employee::create([
-            'employee_no'      => 'EMP-' . str_pad((string) (Employee::count() + 1), 5, '0', STR_PAD_LEFT),
-            'name'             => 'موظف',
-            'basic_salary'     => $basic,
-            'allowances'       => $allowances,
-            'gosi'             => $gosi,
-            'other_deductions' => $other,
-            'is_active'        => $active,
+            'employee_no' => 'EMP-' . str_pad((string) (Employee::count() + 1), 5, '0', STR_PAD_LEFT),
+            'name'        => 'موظف',
+            'is_active'   => $active,
         ]);
 
-        $employee->contracts()->create([
-            'type'              => 'permanent',
-            'status'            => 'active',
-            'start_date'        => '2020-01-01',
-            'basic_salary'      => $basic,
-            'allowances'        => $allowances,
-            'gosi'              => $gosi,
-            'other_deductions'  => $other,
+        $contract = $employee->contracts()->create([
+            'type' => 'permanent', 'status' => 'active', 'start_date' => '2020-01-01',
         ]);
+
+        $items = [['category' => 'basic', 'name' => 'الراتب الأساسي', 'amount' => $basic, 'sort_order' => 0]];
+        if ($allowances > 0) {
+            $items[] = ['category' => 'allowance', 'name' => 'بدلات', 'amount' => $allowances, 'sort_order' => 1];
+        }
+        if ($gosi > 0) {
+            $items[] = ['category' => 'gosi', 'name' => 'التأمينات الاجتماعية (GOSI)', 'amount' => $gosi, 'sort_order' => 2];
+        }
+        if ($other > 0) {
+            $items[] = ['category' => 'other', 'name' => 'استقطاعات أخرى', 'amount' => $other, 'sort_order' => 3];
+        }
+        $contract->items()->createMany($items);
 
         return $employee;
     }

@@ -91,8 +91,8 @@ class PayrollService
                 }
 
                 $gross = $contract->gross();
-                $gosi  = (int) $contract->gosi;
-                $other = (int) $contract->other_deductions;
+                $gosi  = $contract->gosiTotal();
+                $other = $contract->otherDeductionsTotal();
                 $net   = $contract->net();
 
                 if ($net < 0) {
@@ -102,8 +102,8 @@ class PayrollService
                 PayrollItem::create([
                     'payroll_run_id'   => $run->id,
                     'employee_id'      => $employee->id,
-                    'basic_salary'     => (int) $contract->basic_salary,
-                    'allowances'       => (int) $contract->allowances,
+                    'basic_salary'     => $contract->basicSalary(),
+                    'allowances'       => $gross - $contract->basicSalary(),
                     'gosi'             => $gosi,
                     'other_deductions' => $other,
                     'gross'            => $gross,

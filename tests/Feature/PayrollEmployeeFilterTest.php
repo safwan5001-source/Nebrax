@@ -23,7 +23,7 @@ class PayrollEmployeeFilterTest extends TestCase
             ->assertCreated()['data']['id'];
 
         $this->withToken($token)->postJson("/api/employees/{$id}/contracts", [
-            'type' => 'permanent', 'start_date' => '2020-01-01', 'basic_salary' => $basicSalary,
+            'type' => 'permanent', 'start_date' => '2020-01-01', 'items' => $this->basicSalaryItems($basicSalary),
         ])->assertCreated();
 
         return $id;
