@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, FileText, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,13 +27,17 @@ export function GeneralPaymentForm() {
   const t = useTranslations('paymentEntry');
   const tc = useTranslations('common');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedPartnerId = searchParams.get('partner_id');
+  const requestedDirection = searchParams.get('direction');
+  const initialDirection: Direction = requestedDirection === 'paid' ? 'paid' : 'received';
   const { success } = useToast();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [documents, setDocuments] = useState<OpenDocument[]>([]);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<CashBankAccount[]>([]);
   const [collectors, setCollectors] = useState<Collector[]>([]);
-  const [direction, setDirection] = useState<Direction>('received');
+  const [direction, setDirection] = useState<Direction>(initialDirection);
   const [partnerId, setPartnerId] = useState('');
   const [documentId, setDocumentId] = useState('');
   const [amount, setAmount] = useState('');
@@ -77,7 +81,11 @@ export function GeneralPaymentForm() {
         if (cancelled) return;
         const activeMethods = methodsResponse.data.filter((method) => method.is_active);
         const defaultMethod = activeMethods.find((method) => method.is_default) ?? activeMethods[0] ?? null;
+        const eligiblePrefilledPartner = requestedPartnerId && partnersResponse.data.some((partner) =>
+          partner.id === requestedPartnerId && (initialDirection === 'received' ? ['customer', 'both'].includes(partner.type) : ['supplier', 'both'].includes(partner.type)),
+        );
         setPartners(partnersResponse.data);
+        setPartnerId(eligiblePrefilledPartner ? requestedPartnerId : '');
         setMethods(activeMethods);
         setAccounts(accountsResponse.data);
         setCollectors(collectorsResponse.data);
@@ -93,7 +101,7 @@ export function GeneralPaymentForm() {
     }
     load();
     return () => { cancelled = true; };
-  }, [resolveAccount, t]);
+  }, [initialDirection, requestedPartnerId, resolveAccount, t]);
 
   useEffect(() => {
     let cancelled = false;

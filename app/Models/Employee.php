@@ -96,6 +96,12 @@ class Employee extends BaseModel implements CompanyWide
         return $this->hasMany(self::class, 'manager_id');
     }
 
+    /** مسوّغات التعيين — مرفقات الموظف (هوية، شهادات، عقود ممسوحة…). */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(EmployeeAttachment::class);
+    }
+
     /**
      * الوردية الافتراضية المقترحة عند تسجيل حضوره. `Shift` مُصنَّف
      * `BranchScoped`، فالوصول المباشر لهذه العلاقة من سياقٍ خارج فرعها لا يُرجع

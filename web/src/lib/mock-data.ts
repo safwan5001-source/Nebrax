@@ -1807,6 +1807,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: list });
   }
   if (clean === '/employees') return resolve({ data: mockEmployees });
+  const employeeMatch = clean.match(/^\/employees\/([^/]+)$/);
+  if (employeeMatch) {
+    const found = mockEmployees.find((e) => e.id === employeeMatch[1]) ?? mockEmployees[0];
+    return resolve({ data: found });
+  }
   if (clean === '/shifts') return resolve({ data: mockShifts });
   if (clean === '/attendances') {
     const params = new URLSearchParams(path.split('?')[1] ?? '');
@@ -1817,7 +1822,16 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     if (employeeId) list = list.filter((a) => a.employee_id === employeeId);
     return resolve({ data: list });
   }
-  if (clean === '/payroll-runs') return resolve({ data: mockPayrollRuns });
+  if (clean === '/payroll-runs') {
+    const employeeId = new URLSearchParams(path.split('?')[1] ?? '').get('employee_id');
+    if (employeeId) {
+      const list = mockPayrollRuns
+        .map((r) => ({ ...r, items: r.items.filter((it) => it.employee.id === employeeId) }))
+        .filter((r) => r.items.length > 0);
+      return resolve({ data: list });
+    }
+    return resolve({ data: mockPayrollRuns });
+  }
   if (clean === '/roles') return resolve({ data: mockRoles, meta: { permissions: mockPermissionCatalogue } });
 
   if (clean === '/inventory') return resolve(mockInventory());
