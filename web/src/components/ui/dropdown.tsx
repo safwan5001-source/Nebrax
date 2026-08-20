@@ -22,6 +22,7 @@ export function Dropdown({
   triggerLabel,
   triggerClassName,
   menuClassName,
+  mobileSheet = false,
 }: {
   trigger: React.ReactNode;
   children: React.ReactNode;
@@ -30,6 +31,8 @@ export function Dropdown({
   triggerLabel?: string;
   triggerClassName?: string;
   menuClassName?: string;
+  /** قائمة طويلة على الجوال: ورقة سفلية ثابتة تمنع خروجها من حافة الشاشة. */
+  mobileSheet?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -94,10 +97,14 @@ export function Dropdown({
         aria-label={menuLabel}
         aria-hidden={!open}
         className={cn(
-          'absolute top-full z-50 mt-1 min-w-44 rounded border border-border bg-surface p-1 shadow-md',
+          mobileSheet
+            ? 'fixed inset-x-3 bottom-5 z-50 max-h-[calc(100dvh-2.5rem)] overflow-y-auto rounded border border-border bg-surface p-1 shadow-lg lg:absolute lg:inset-x-auto lg:bottom-auto lg:top-full lg:mt-1 lg:max-h-none lg:min-w-44 lg:shadow-md'
+            : 'absolute top-full z-50 mt-1 min-w-44 rounded border border-border bg-surface p-1 shadow-md',
           'transition duration-150 ease-out',
-          align === 'end' ? 'end-0' : 'start-0',
-          open ? 'opacity-100 translate-y-0' : 'pointer-events-none -translate-y-1 opacity-0',
+          mobileSheet
+            ? (align === 'end' ? 'lg:end-0' : 'lg:start-0')
+            : (align === 'end' ? 'end-0' : 'start-0'),
+          open ? 'opacity-100 translate-y-0' : 'pointer-events-none translate-y-2 opacity-0',
           menuClassName
         )}
       >

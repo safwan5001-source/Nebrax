@@ -507,6 +507,35 @@ export default function InvoiceDetailPage() {
     </>
   );
 
+  const documentPreview = (
+    <Card>
+      <CardHeader className="no-print"><CardTitle>{t('document')}</CardTitle></CardHeader>
+      <CardContent className="print:p-0">
+        <div className="rounded border border-border bg-background p-3 print:border-0 print:bg-transparent print:p-0">
+          <DocumentScaler>
+            <InvoiceDocument
+              invoice={invoice}
+              company={company}
+              customer={customer}
+              qr={zatca?.qr ?? null}
+              templateId={templateId}
+              themeId={themeId}
+              footerText={footerText}
+              terms={termsText}
+              bank={bankText}
+              stampUrl={stampUrl}
+              signatureUrl={signatureUrl}
+              showLogo={showLogo}
+              logoUrl={logoUrl}
+              logoHeight={logoHeight}
+              layout={layout}
+            />
+          </DocumentScaler>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-5">
       <header className="space-y-4">
@@ -556,6 +585,7 @@ export default function InvoiceDetailPage() {
               align="end"
               menuLabel={t('actions')}
               triggerLabel={t('actions')}
+              mobileSheet
               triggerClassName="h-8 border border-border bg-surface px-2 text-text hover:bg-primary-soft"
               trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}
             >
@@ -593,6 +623,8 @@ export default function InvoiceDetailPage() {
           </Dropdown>
         </div>
       </header>
+
+      {documentPreview}
 
       <section className="grid grid-cols-1 gap-4">
         <Card>
@@ -662,33 +694,6 @@ export default function InvoiceDetailPage() {
         </Card>
         <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => toggleRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="appointments" title={t('appointments')} count={relationsLoading ? undefined : appointments.length} open={relationSection === 'appointments'} onToggle={() => toggleRelationSection('appointments')}>{appointmentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => toggleRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => toggleRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => toggleRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
-
-      <Card>
-        <CardHeader className="no-print"><CardTitle>{t('document')}</CardTitle></CardHeader>
-        <CardContent className="print:p-0">
-          <div className="rounded border border-border bg-background p-3 print:border-0 print:bg-transparent print:p-0">
-            <DocumentScaler>
-              <InvoiceDocument
-                invoice={invoice}
-                company={company}
-                customer={customer}
-                qr={zatca?.qr ?? null}
-                templateId={templateId}
-                themeId={themeId}
-                footerText={footerText}
-                terms={termsText}
-                bank={bankText}
-                stampUrl={stampUrl}
-                signatureUrl={signatureUrl}
-                showLogo={showLogo}
-                logoUrl={logoUrl}
-                logoHeight={logoHeight}
-                layout={layout}
-              />
-            </DocumentScaler>
-          </div>
-        </CardContent>
-      </Card>
 
       {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
         <InvoiceDocument
