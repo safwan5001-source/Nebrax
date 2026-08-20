@@ -15,7 +15,6 @@ class UpdateFinanceSettingsRequest extends FormRequest
     {
         return [
             'allow_negative_transfer_balance' => ['sometimes', 'boolean'],
-            'payment_fee_application' => ['sometimes', 'in:received,paid,both,none'],
         ];
     }
 }

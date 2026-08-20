@@ -3681,6 +3681,7 @@
   "paymentMethods": {
     "title": "Payment Methods",
     "subtitle": "Define receipt and payment methods, link each to a cashbox or bank account, and configure company-borne processing fees.",
+    "subtitleOperational": "Define receipt and payment methods and link each to a cashbox or bank account. Fees, VAT, and their journal entries are deferred to a separate accounting task.",
     "new": "Add payment method",
     "edit": "Edit payment method",
     "delete": "Delete payment method",

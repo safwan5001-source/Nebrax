@@ -6,11 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * طرق الدفع إعدادات مشتركة للمؤسسة؛ لا تخص فرعاً ولا تنشئ قيداً مستقلاً.
-     * تحفظ السندات لقطة الطريقة ورسومها وحساب مصروفها حتى تبقى الوثيقة التاريخية
-     * صادقة إذا عُدلت الطريقة أو عُطلت لاحقاً.
-     */
+    /** طرق دفع مشتركة للمؤسسة؛ تختار وجهة نقدية أو بنكية ولا تنشئ أثراً محاسبياً بذاتها. */
     public function up(): void
     {
         Schema::create('payment_methods', function (Blueprint $table) {
@@ -24,13 +20,6 @@ return new class extends Migration
             $table->boolean('available_online')->default(false);
             $table->boolean('is_active')->default(true);
             $table->boolean('is_default')->default(false);
-            $table->boolean('fees_enabled')->default(false);
-            // 0.7% = 70 نقطة أساس؛ المال والرسوم الثابتة بالهللات.
-            $table->unsignedInteger('fee_rate_bps')->default(0);
-            $table->bigInteger('fee_fixed_amount')->default(0);
-            $table->bigInteger('fee_min_amount')->default(0);
-            $table->unsignedInteger('fee_tax_rate')->default(0);
-            $table->foreignUuid('fee_expense_account_id')->nullable()->constrained('accounts')->restrictOnDelete();
             $table->timestamps();
 
             $table->unique(['tenant_id', 'name']);
@@ -42,9 +31,6 @@ return new class extends Migration
             $table->foreignUuid('payment_method_id')->nullable()->after('method')->constrained('payment_methods')->restrictOnDelete();
             // لقطة الاسم تجعل السند مقروءاً بعد تغيير اسم الطريقة أو تعطيلها.
             $table->string('payment_method_name')->nullable()->after('payment_method_id');
-            $table->bigInteger('fee_amount')->default(0)->after('amount');
-            $table->bigInteger('fee_tax_amount')->default(0)->after('fee_amount');
-            $table->foreignUuid('fee_expense_account_id')->nullable()->after('fee_tax_amount')->constrained('accounts')->restrictOnDelete();
             $table->index(['tenant_id', 'payment_method_id']);
         });
     }
@@ -53,8 +39,7 @@ return new class extends Migration
     {
         Schema::table('payments', function (Blueprint $table) {
             $table->dropIndex(['tenant_id', 'payment_method_id']);
-            $table->dropConstrainedForeignId('fee_expense_account_id');
-            $table->dropColumn(['fee_tax_amount', 'fee_amount', 'payment_method_name']);
+            $table->dropColumn('payment_method_name');
             $table->dropConstrainedForeignId('payment_method_id');
         });
 

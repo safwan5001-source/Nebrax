@@ -4,25 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StorePaymentMethodRequest;
 use App\Http\Resources\PaymentMethodResource;
-use App\Models\Account;
 use App\Models\CashBankAccount;
 use App\Models\PaymentMethod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
-/**
- * إدارة بيان طرق الدفع المشترك للمؤسسة.
- *
- * لا ينشئ المتحكم قيوداً: يثبت صحة الإعدادات، ويقرأ PaymentService اللقطة عند
- * إنشاء السند. يظل إلغاء الطريقة المستخدمة حظراً تدقيقياً، وتعطيلها هو البديل.
- */
+/** إدارة بيان طرق الدفع المشترك للمؤسسة، بلا رسوم أو قيود محاسبية. */
 class PaymentMethodController extends ApiController
 {
     public function index(): JsonResponse
     {
         return PaymentMethodResource::collection(
             PaymentMethod::query()
-                ->with(['cashBankAccount.account', 'feeExpenseAccount'])
+                ->with('cashBankAccount.account')
                 ->withCount('payments')
                 ->orderByDesc('is_default')
                 ->orderBy('name')
@@ -35,7 +29,6 @@ class PaymentMethodController extends ApiController
         $data = $this->normalize($request->validated());
         $this->assertNameFree($data['name']);
         $this->assertCashBankAccount($data['cash_bank_account_id'], $data['settlement_type']);
-        $this->assertFeeExpenseAccount($data);
 
         $method = DB::transaction(function () use ($data) {
             if ($data['is_default']) {
@@ -45,7 +38,7 @@ class PaymentMethodController extends ApiController
             return PaymentMethod::create($data);
         });
 
-        return (new PaymentMethodResource($method->load(['cashBankAccount.account', 'feeExpenseAccount'])))
+        return (new PaymentMethodResource($method->load('cashBankAccount.account')))
             ->response()->setStatusCode(201);
     }
 
@@ -55,7 +48,6 @@ class PaymentMethodController extends ApiController
         $data = $this->normalize($request->validated(), $method);
         $this->assertNameFree($data['name'], $method->id);
         $this->assertCashBankAccount($data['cash_bank_account_id'], $data['settlement_type']);
-        $this->assertFeeExpenseAccount($data);
 
         DB::transaction(function () use ($method, $data) {
             if (! $data['is_active'] && $data['is_default']) {
@@ -71,10 +63,9 @@ class PaymentMethodController extends ApiController
             $method->update($data);
         });
 
-        return (new PaymentMethodResource($method->fresh()->load(['cashBankAccount.account', 'feeExpenseAccount'])))->response();
+        return (new PaymentMethodResource($method->fresh()->load('cashBankAccount.account')))->response();
     }
 
-    /** تعيين الافتراضي إجراء صريح، ويمنع اختيار طريقة معطلة. */
     public function makeDefault(string $id): JsonResponse
     {
         $method = PaymentMethod::findOrFail($id);
@@ -87,10 +78,9 @@ class PaymentMethodController extends ApiController
             $method->update(['is_default' => true]);
         });
 
-        return (new PaymentMethodResource($method->fresh()->load(['cashBankAccount.account', 'feeExpenseAccount'])))->response();
+        return (new PaymentMethodResource($method->fresh()->load('cashBankAccount.account')))->response();
     }
 
-    /** الحذف آمن فقط إن لم يلتقط أي سند لقطة هذه الطريقة. */
     public function destroy(string $id): JsonResponse
     {
         $method = PaymentMethod::findOrFail($id);
@@ -106,15 +96,10 @@ class PaymentMethodController extends ApiController
         return response()->json(['message' => 'deleted']);
     }
 
-    /** يملأ القيم الغائبة من السجل عند التعديل، مع تمييز الغائب عن الصفر أو النص الفارغ. */
     private function normalize(array $data, ?PaymentMethod $current = null): array
     {
         $value = function (string $key, mixed $default) use ($data, $current): mixed {
-            if (array_key_exists($key, $data)) {
-                return $data[$key];
-            }
-
-            return $current?->{$key} ?? $default;
+            return array_key_exists($key, $data) ? $data[$key] : ($current?->{$key} ?? $default);
         };
 
         return [
@@ -126,12 +111,6 @@ class PaymentMethodController extends ApiController
             'available_online' => (bool) $value('available_online', false),
             'is_active' => (bool) $value('is_active', true),
             'is_default' => (bool) $value('is_default', false),
-            'fees_enabled' => (bool) $value('fees_enabled', false),
-            'fee_rate_bps' => (int) $value('fee_rate_bps', 0),
-            'fee_fixed_amount' => (int) $value('fee_fixed_amount', 0),
-            'fee_min_amount' => (int) $value('fee_min_amount', 0),
-            'fee_tax_rate' => (int) $value('fee_tax_rate', 0),
-            'fee_expense_account_id' => $value('fee_expense_account_id', null),
         ];
     }
 
@@ -151,18 +130,6 @@ class PaymentMethodController extends ApiController
         $entity = CashBankAccount::with('account')->find($id);
         if (! $entity || $entity->type !== $type || ! $entity->is_active || ! $entity->account?->is_active) {
             abort(422, 'الخزينة أو الحساب البنكي المختار غير نشط أو لا يطابق نوع التسوية.');
-        }
-    }
-
-    private function assertFeeExpenseAccount(array $data): void
-    {
-        if (! $data['fees_enabled']) {
-            return;
-        }
-
-        $account = Account::find($data['fee_expense_account_id']);
-        if (! $account || $account->type !== 'expense' || $account->is_group) {
-            abort(422, 'حساب رسوم الدفع يجب أن يكون حساب مصروفات فعلياً غير تجميعي.');
         }
     }
 }

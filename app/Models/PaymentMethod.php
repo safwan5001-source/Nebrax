@@ -6,13 +6,7 @@ use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/**
- * طريقة دفع معرفة للمؤسسة.
- *
- * تحدد لغة وسيلة الدفع ووجهتها المالية ورسوم المعالجة، لكنها لا تولد قيداً بذاتها.
- * يلتقط PaymentService قيم الرسوم وحساب المصروف في سند الدفع قبل الترحيل حتى لا
- * تعيد تعديلات الإعدادات اللاحقة تفسير سند مسودة أو سند مرحل.
- */
+/** طريقة دفع تشغيلية مشتركة للمؤسسة، بلا رسوم أو أثر محاسبي مستقل. */
 class PaymentMethod extends BaseModel implements CompanyWide
 {
     protected $fillable = [
@@ -25,23 +19,12 @@ class PaymentMethod extends BaseModel implements CompanyWide
         'available_online',
         'is_active',
         'is_default',
-        'fees_enabled',
-        'fee_rate_bps',
-        'fee_fixed_amount',
-        'fee_min_amount',
-        'fee_tax_rate',
-        'fee_expense_account_id',
     ];
 
     protected $casts = [
         'available_online' => 'boolean',
         'is_active' => 'boolean',
         'is_default' => 'boolean',
-        'fees_enabled' => 'boolean',
-        'fee_rate_bps' => 'integer',
-        'fee_fixed_amount' => 'integer',
-        'fee_min_amount' => 'integer',
-        'fee_tax_rate' => 'integer',
     ];
 
     protected $attributes = [
@@ -49,26 +32,15 @@ class PaymentMethod extends BaseModel implements CompanyWide
         'available_online' => false,
         'is_active' => true,
         'is_default' => false,
-        'fees_enabled' => false,
-        'fee_rate_bps' => 0,
-        'fee_fixed_amount' => 0,
-        'fee_min_amount' => 0,
-        'fee_tax_rate' => 0,
     ];
 
-    /** الخزينة أو الحساب البنكي الذي يستقبل أو يصرف أصل دفعة الطريقة. */
+    /** الخزينة أو الحساب البنكي الذي تقترحه الطريقة عند إنشاء السند. */
     public function cashBankAccount(): BelongsTo
     {
         return $this->belongsTo(CashBankAccount::class, 'cash_bank_account_id');
     }
 
-    /** حساب المصروف الذي تحمل عليه المؤسسة عمولة هذه الطريقة. */
-    public function feeExpenseAccount(): BelongsTo
-    {
-        return $this->belongsTo(Account::class, 'fee_expense_account_id');
-    }
-
-    /** السندات التي اختارت الطريقة؛ تمنع حذف إعداد ذي أثر تدقيقي. */
+    /** السندات التي اختارت الطريقة؛ تمنع حذف إعداد مستخدم. */
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);

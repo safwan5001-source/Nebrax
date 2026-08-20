@@ -145,12 +145,6 @@ class Settings
          */
         'finance' => [
             'allow_negative_transfer_balance' => false,
-            /**
-             * نطاق تطبيق رسوم طرق الدفع التي تتحملها المنشأة.
-             * `both` هو القرار المعتمد لهذه المؤسسة: تُثبت الرسوم في قيد القبض
-             * والصرف، وتبقى القيم الأخرى سياسة صحيحة قابلة للتغيير بلا تعديل كود.
-             */
-            'payment_fee_application' => 'both', // received | paid | both | none
         ],
 
         /**
