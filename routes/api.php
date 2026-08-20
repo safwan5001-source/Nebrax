@@ -407,6 +407,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('employees', [EmployeeController::class, 'store'])->middleware($perm('hr.manage'));
         Route::put('employees/{id}', [EmployeeController::class, 'update'])->middleware($perm('hr.manage'));
         Route::delete('employees/{id}', [EmployeeController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('employees/{id}/photo', [EmployeeController::class, 'showPhoto'])->middleware($perm('hr.view'));
+        Route::post('employees/{id}/photo', [EmployeeController::class, 'uploadPhoto'])->middleware($perm('hr.manage'));
+        Route::delete('employees/{id}/photo', [EmployeeController::class, 'removePhoto'])->middleware($perm('hr.manage'));
 
         // الورديات (الوحدة الثانية من معمار الموارد البشرية)
         Route::get('shifts', [ShiftController::class, 'index'])->middleware($perm('hr.view'));

@@ -73,6 +73,27 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
   return res.json() as Promise<T>;
 }
 
+/**
+ * يجلب ملفاً خاصاً (صورة مثلاً) ويعيد رابط كائن محلي (`blob:`) لعرضه في
+ * `<img src>` — لا `<img>` وحده يرسل ترويسة المصادقة. المستدعي مسؤول عن
+ * `URL.revokeObjectURL` عند الاستغناء عن الرابط (تبديل الصورة أو الفكّ).
+ */
+export async function fetchImageUrl(path: string): Promise<string | null> {
+  if (isDemo()) return null;
+
+  const token = getToken();
+  const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(branchId ? { 'X-Branch-Id': branchId } : {}),
+    },
+  });
+
+  if (!res.ok) return null;
+  return URL.createObjectURL(await res.blob());
+}
+
 /** تنزيل ملف خاص من الـ API مع ترويسات المصادقة والفرع النشط. */
 export async function downloadFile(path: string, fallbackName: string): Promise<void> {
   if (isDemo()) return;

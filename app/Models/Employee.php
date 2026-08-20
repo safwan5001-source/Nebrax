@@ -41,9 +41,16 @@ class Employee extends BaseModel implements CompanyWide
         'national_id', 'nationality', 'residency_expiry_date',
         'phone', 'personal_email',
         'job_title', 'department', 'employment_type', 'manager_id', 'shift_id',
+        'current_address', 'current_city', 'current_building_no', 'current_street',
+        'current_district', 'current_postal_code', 'current_country',
+        'permanent_address', 'permanent_city', 'permanent_building_no', 'permanent_street',
+        'permanent_district', 'permanent_postal_code', 'permanent_country',
         'basic_salary', 'allowances', 'gosi', 'other_deductions',
         'hire_date', 'is_active', 'notes',
     ];
+
+    // photo_path عمداً خارج $fillable — يُدار حصراً عبر EmployeeController::uploadPhoto/removePhoto
+    // (تعيين مباشر على الخاصية)، فلا يقبل مساراً حرّاً يصل عبر تحديث الموظف العادي.
 
     protected $casts = [
         'basic_salary'           => 'integer',

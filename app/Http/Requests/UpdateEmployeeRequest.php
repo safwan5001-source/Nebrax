@@ -14,7 +14,7 @@ class UpdateEmployeeRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        return array_merge([
             'branch_id'    => ['nullable', 'uuid'], // مكان العمل (وصفي — لا يعزل)
             'employee_no'  => ['sometimes', 'string', 'max:255'],
             'name'         => ['sometimes', 'string', 'max:255'],
@@ -38,6 +38,6 @@ class UpdateEmployeeRequest extends FormRequest
             'hire_date'    => ['nullable', 'date'],
             'is_active'    => ['boolean'],
             'notes'        => ['nullable', 'string'],
-        ];
+        ], StoreEmployeeRequest::addressRules());
     }
 }
