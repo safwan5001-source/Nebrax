@@ -24,6 +24,17 @@ interface RoleOption {
   is_owner: boolean;
 }
 
+export interface EditableUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  employee_id?: string | null;
+  branch_ids?: string[];
+  warehouse_ids?: string[];
+}
+
 // الأدوار النظامية الأربعة لها ترجمة جاهزة؛ المخصَّصة تُعرض باسمها كما أُدخل.
 const SYSTEM_ROLE_KEYS: Record<string, string> = {
   admin: 'roles.admin',
@@ -36,24 +47,28 @@ export function UserDialog({
   onClose,
   onSaved,
   linkedEmployeeIds = [],
+  user,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
-  /** موظفون مرتبطون بمستخدمين آخرين بالفعل — يُستبعدون من قائمة الاختيار (ربطٌ واحد لكل موظف). */
+  /** موظفون مرتبطون بمستخدمين آخرين بالفعل — يُستبعدون من قائمة الاختيار (ربطٌ واحد لكل موظف).
+   *  لا يشمل ربط المستخدم الجاري تعديله نفسه — ذاك يبقى ظاهراً ومختاراً. */
   linkedEmployeeIds?: string[];
+  /** مستخدمٌ قائم = تعديل (PUT)؛ غيابه = إضافة (POST). */
+  user?: EditableUser | null;
 }) {
   const t = useTranslations('users');
   const tc = useTranslations('common');
   const { success } = useToast();
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'staff', employee_id: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'staff', employee_id: '', is_active: true });
   const [scope, setScope] = useState<AccessScope>({ branch_ids: [], warehouse_ids: [] });
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: string, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
   // تُحمَّلان عند الفتح فقط — لا حاجة لهما إن لم يُفتح النموذج بعد.
   useEffect(() => {
@@ -67,6 +82,19 @@ export function UserDialog({
       .catch(() => {});
   }, [open]);
 
+  // تعبئة النموذج عند فتحه لمستخدمٍ قائم؛ تفريغه عند فتحه للإضافة.
+  useEffect(() => {
+    if (!open) return;
+    if (user) {
+      setForm({ name: user.name, email: user.email, password: '', role: user.role, employee_id: user.employee_id ?? '', is_active: user.is_active });
+      setScope({ branch_ids: user.branch_ids ?? [], warehouse_ids: user.warehouse_ids ?? [] });
+    } else {
+      setForm({ name: '', email: '', password: '', role: 'staff', employee_id: '', is_active: true });
+      setScope({ branch_ids: [], warehouse_ids: [] });
+    }
+    setError(null);
+  }, [open, user]);
+
   const availableEmployees = employees.filter((e) => !linkedEmployeeIds.includes(e.id));
 
   async function submit(e: React.FormEvent) {
@@ -74,11 +102,18 @@ export function UserDialog({
     setSaving(true);
     setError(null);
     try {
-      const { employee_id, ...rest } = form;
-      await api('/users', { method: 'POST', body: { ...rest, employee_id: employee_id || undefined, ...scope } });
-      success(tc('created'));
-      setForm({ name: '', email: '', password: '', role: 'staff', employee_id: '' });
-      setScope({ branch_ids: [], warehouse_ids: [] });
+      if (user) {
+        const { email: _email, password, ...rest } = form;
+        void _email; // البريد مقفلٌ عند التعديل — لا يُرسَل.
+        const body: Record<string, unknown> = { ...rest, employee_id: form.employee_id || null, ...scope };
+        if (password) body.password = password;
+        await api(`/users/${user.id}`, { method: 'PUT', body });
+        success(tc('updated'));
+      } else {
+        const { employee_id, ...rest } = form;
+        await api('/users', { method: 'POST', body: { ...rest, employee_id: employee_id || undefined, ...scope } });
+        success(tc('created'));
+      }
       onSaved();
       onClose();
     } catch (err) {
@@ -89,7 +124,7 @@ export function UserDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title={t('add')}>
+    <Dialog open={open} onClose={onClose} title={user ? t('edit_title') : t('add')}>
       <form onSubmit={submit} className="space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor="uname">{t('name')}</Label>
@@ -97,11 +132,13 @@ export function UserDialog({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="uemail">{t('email')}</Label>
-          <Input id="uemail" type="email" dir="ltr" value={form.email} onChange={(e) => set('email', e.target.value)} required />
+          <Input id="uemail" type="email" dir="ltr" value={form.email} onChange={(e) => set('email', e.target.value)} required disabled={!!user} />
+          {user && <p className="text-xs text-muted">{t('email_locked_hint')}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="upass">{t('password')}</Label>
-          <Input id="upass" type="password" dir="ltr" value={form.password} onChange={(e) => set('password', e.target.value)} required />
+          <Input id="upass" type="password" dir="ltr" value={form.password} onChange={(e) => set('password', e.target.value)} required={!user} />
+          {user && <p className="text-xs text-muted">{t('password_hint')}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="urole">{t('role')}</Label>
@@ -113,6 +150,15 @@ export function UserDialog({
             ))}
           </Select>
         </div>
+        {user && (
+          <div className="space-y-1.5">
+            <Label htmlFor="ustatus">{t('status_label')}</Label>
+            <Select id="ustatus" value={form.is_active ? '1' : '0'} onChange={(e) => set('is_active', e.target.value === '1')}>
+              <option value="1">{t('active')}</option>
+              <option value="0">{t('inactive')}</option>
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="uemployee">{t('link_employee')}</Label>
