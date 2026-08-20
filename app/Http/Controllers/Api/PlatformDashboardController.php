@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\Tenant;
-use App\Models\User;
+use App\Support\PlatformMetrics;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -14,21 +13,8 @@ use Illuminate\Http\JsonResponse;
  */
 class PlatformDashboardController extends ApiController
 {
-    public function overview(): JsonResponse
+    public function overview(PlatformMetrics $metrics): JsonResponse
     {
-        return response()->json([
-            'data' => [
-                'tenants' => [
-                    'total'    => Tenant::count(),
-                    'active'   => Tenant::where('is_active', true)->count(),
-                    'inactive' => Tenant::where('is_active', false)->count(),
-                ],
-                'users' => [
-                    'total'    => User::count(),
-                    'active'   => User::where('is_active', true)->count(),
-                    'inactive' => User::where('is_active', false)->count(),
-                ],
-            ],
-        ]);
+        return response()->json(['data' => $metrics->overview()]);
     }
 }

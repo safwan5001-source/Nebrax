@@ -218,7 +218,17 @@
     "active": "نشط",
     "inactive": "غير نشط",
     "loadFailed": "تعذر تحميل مؤشرات المنصة.",
-    "retry": "إعادة المحاولة"
+    "retry": "إعادة المحاولة",
+    "subscriptions": "الاشتراكات",
+    "monthlyRecurringRevenue": "الإيراد الشهري المتعاقد عليه",
+    "contractedRevenueNotice": "يمثل قيمة العقود النشطة ولا يثبت التحصيل النقدي أو الفواتير المسددة.",
+    "activeSubscriptions": "اشتراكات نشطة",
+    "trials": "تجارب جارية",
+    "renewalsNext30Days": "تجديدات خلال 30 يوماً",
+    "renewalValueAtRisk": "قيمة التجديدات القريبة",
+    "planBreakdown": "التوزيع حسب الخطة",
+    "plan": "الخطة",
+    "noSubscriptions": "لا توجد اشتراكات نشطة مسجلة بعد."
   },
   "appointments": {
     "title": "المواعيد",

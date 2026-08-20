@@ -15,6 +15,7 @@ import {
   type PlatformAdministrator,
 } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
+import { formatRiyal } from '@/lib/money';
 
 interface MetricGroup {
   total: number;
@@ -22,10 +23,29 @@ interface MetricGroup {
   inactive: number;
 }
 
+interface SubscriptionMetrics {
+  active: number;
+  trials: number;
+  renewals_next_30_days: number;
+  renewal_value_at_risk_minor: number;
+  renewal_value_at_risk: string;
+  monthly_recurring_revenue_minor: number;
+  monthly_recurring_revenue: string;
+  average_active_subscription_minor: number;
+  average_active_subscription: string;
+  by_plan: Array<{
+    plan: string;
+    active: number;
+    monthly_recurring_revenue_minor: number;
+    monthly_recurring_revenue: string;
+  }>;
+}
+
 interface PlatformOverview {
   data: {
     tenants: MetricGroup;
     users: MetricGroup;
+    subscriptions: SubscriptionMetrics;
   };
 }
 
@@ -126,15 +146,89 @@ export default function PlatformDashboardPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Skeleton className="h-52" />
             <Skeleton className="h-52" />
+            <Skeleton className="h-80 sm:col-span-2" />
           </div>
         ) : (
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2" aria-label={t('title')}>
             <MetricCard title={t('tenants')} icon={Building2} metrics={overview.tenants} t={t} />
             <MetricCard title={t('users')} icon={UsersRound} metrics={overview.users} t={t} />
+            <SubscriptionCard metrics={overview.subscriptions} t={t} />
           </section>
         )}
       </div>
     </main>
+  );
+}
+
+function SubscriptionCard({
+  metrics,
+  t,
+}: {
+  metrics: SubscriptionMetrics;
+  t: (key: string, values?: Record<string, string | number | Date>) => string;
+}) {
+  return (
+    <Card className="sm:col-span-2">
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardTitle>{t('subscriptions')}</CardTitle>
+        <span className="text-xs text-muted">{t('readOnly')}</span>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-5 border-b border-border pb-5 sm:grid-cols-[1.4fr_1fr] sm:items-end">
+          <div>
+            <p className="text-sm font-medium text-muted">{t('monthlyRecurringRevenue')}</p>
+            <p className="num mt-2 text-3xl font-bold text-text">{formatRiyal(metrics.monthly_recurring_revenue)}</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">{t('contractedRevenueNotice')}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-muted">{t('activeSubscriptions')}</p>
+              <p className="num mt-1 text-lg font-semibold text-text">{metrics.active}</p>
+            </div>
+            <div>
+              <p className="text-muted">{t('trials')}</p>
+              <p className="num mt-1 text-lg font-semibold text-text">{metrics.trials}</p>
+            </div>
+            <div>
+              <p className="text-muted">{t('renewalsNext30Days')}</p>
+              <p className="num mt-1 text-lg font-semibold text-text">{metrics.renewals_next_30_days}</p>
+            </div>
+            <div>
+              <p className="text-muted">{t('renewalValueAtRisk')}</p>
+              <p className="num mt-1 text-lg font-semibold text-text">{formatRiyal(metrics.renewal_value_at_risk)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <h2 className="text-sm font-semibold text-text">{t('planBreakdown')}</h2>
+          {metrics.by_plan.length === 0 ? (
+            <p className="mt-3 text-sm text-muted">{t('noSubscriptions')}</p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-96 text-sm">
+                <thead className="border-b border-border text-start text-xs text-muted">
+                  <tr>
+                    <th className="pb-2 text-start font-medium">{t('plan')}</th>
+                    <th className="pb-2 text-end font-medium">{t('activeSubscriptions')}</th>
+                    <th className="pb-2 text-end font-medium">{t('monthlyRecurringRevenue')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metrics.by_plan.map((plan) => (
+                    <tr key={plan.plan} className="border-b border-border last:border-0">
+                      <td className="py-2.5 font-medium text-text">{plan.plan}</td>
+                      <td className="num py-2.5 text-end text-text">{plan.active}</td>
+                      <td className="num py-2.5 text-end text-text">{formatRiyal(plan.monthly_recurring_revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

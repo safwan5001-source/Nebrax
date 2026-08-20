@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\PlatformAdministrator;
+use App\Models\PlatformSubscription;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -35,6 +36,89 @@ class PlatformConsoleTest extends TestCase
             ->assertJsonPath('data.users.inactive', 0)
             ->assertJsonMissingPath('data.tenants.items')
             ->assertJsonMissingPath('data.users.items');
+    }
+
+    /** @test */
+    public function platform_overview_aggregates_active_subscription_metrics_without_tenant_details(): void
+    {
+        $alpha = $this->registerTenant('alpha', 'owner@alpha.test');
+        $beta = $this->registerTenant('beta', 'owner@beta.test');
+        $trial = $this->registerTenant('trial', 'owner@trial.test');
+
+        PlatformSubscription::create([
+            'tenant_id'      => $alpha['tenant_id'],
+            'plan'           => 'pro',
+            'status'         => PlatformSubscription::STATUS_ACTIVE,
+            'monthly_amount' => 199000,
+            'starts_on'      => now()->subDay()->toDateString(),
+            'ends_on'        => now()->addDays(14)->toDateString(),
+        ]);
+        PlatformSubscription::create([
+            'tenant_id'      => $beta['tenant_id'],
+            'plan'           => 'basic',
+            'status'         => PlatformSubscription::STATUS_ACTIVE,
+            'monthly_amount' => 99000,
+            'starts_on'      => now()->subDay()->toDateString(),
+        ]);
+        PlatformSubscription::create([
+            'tenant_id'      => $trial['tenant_id'],
+            'plan'           => 'pro',
+            'status'         => PlatformSubscription::STATUS_TRIAL,
+            'monthly_amount' => 0,
+            'starts_on'      => now()->subDay()->toDateString(),
+            'ends_on'        => now()->addDays(7)->toDateString(),
+        ]);
+
+        $administrator = PlatformAdministrator::create([
+            'name'     => 'مشغّل نبراس',
+            'email'    => 'ops@nebrax.test',
+            'password' => 'platform-password-123',
+        ]);
+        $token = $administrator->createToken('platform-console', ['platform:read'])->plainTextToken;
+
+        $this->withToken($token)
+            ->getJson('/api/platform/overview')
+            ->assertOk()
+            ->assertJsonPath('data.subscriptions.active', 2)
+            ->assertJsonPath('data.subscriptions.trials', 1)
+            ->assertJsonPath('data.subscriptions.renewals_next_30_days', 1)
+            ->assertJsonPath('data.subscriptions.monthly_recurring_revenue_minor', 298000)
+            ->assertJsonPath('data.subscriptions.monthly_recurring_revenue', '2980.00')
+            ->assertJsonPath('data.subscriptions.renewal_value_at_risk_minor', 199000)
+            ->assertJsonPath('data.subscriptions.by_plan.0.plan', 'basic')
+            ->assertJsonPath('data.subscriptions.by_plan.0.active', 1)
+            ->assertJsonPath('data.subscriptions.by_plan.1.plan', 'pro')
+            ->assertJsonPath('data.subscriptions.by_plan.1.monthly_recurring_revenue_minor', 199000)
+            ->assertJsonMissingPath('data.subscriptions.tenants');
+    }
+
+    /** @test */
+    public function platform_subscription_command_records_an_active_contract_and_rejects_an_overlap(): void
+    {
+        $tenant = $this->registerTenant('contract', 'owner@contract.test');
+
+        $this->artisan('platform:subscription:record', [
+            'tenant'          => 'contract',
+            '--plan'          => 'pro',
+            '--monthly-minor' => '199000',
+            '--starts-on'     => now()->toDateString(),
+            '--reference'     => 'contract-001',
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('platform_subscriptions', [
+            'tenant_id'      => $tenant['tenant_id'],
+            'plan'           => 'pro',
+            'status'         => PlatformSubscription::STATUS_ACTIVE,
+            'monthly_amount' => 199000,
+        ]);
+
+        $this->artisan('platform:subscription:record', [
+            'tenant'          => 'contract',
+            '--plan'          => 'basic',
+            '--monthly-minor' => '99000',
+            '--starts-on'     => now()->toDateString(),
+            '--reference'     => 'contract-002',
+        ])->assertExitCode(1);
     }
 
     /** @test */

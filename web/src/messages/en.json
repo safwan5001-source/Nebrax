@@ -218,7 +218,17 @@
     "active": "Active",
     "inactive": "Inactive",
     "loadFailed": "Unable to load platform indicators.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "subscriptions": "Subscriptions",
+    "monthlyRecurringRevenue": "Contracted monthly revenue",
+    "contractedRevenueNotice": "This is the value of active contracts; it does not confirm cash collection or paid invoices.",
+    "activeSubscriptions": "Active subscriptions",
+    "trials": "Active trials",
+    "renewalsNext30Days": "Renewals in 30 days",
+    "renewalValueAtRisk": "Upcoming renewal value",
+    "planBreakdown": "Breakdown by plan",
+    "plan": "Plan",
+    "noSubscriptions": "No active subscriptions have been recorded yet."
   },
   "appointments": {
     "title": "Appointments",
