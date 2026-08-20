@@ -71,6 +71,7 @@ use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\TenantApplicationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UnitTemplateController;
 use App\Http\Controllers\Api\NumberingSettingsController;
@@ -347,6 +348,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('payment-methods/{id}', [PaymentMethodController::class, 'update'])->middleware($perm('payments.manage'));
         Route::post('payment-methods/{id}/make-default', [PaymentMethodController::class, 'makeDefault'])->middleware($perm('payments.manage'));
         Route::delete('payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->middleware($perm('payments.manage'));
+
+        // كتالوج التطبيقات مدموجاً بحالة تفعيل المؤسسة — لا إنفاذ على مسارات أخرى بعد.
+        Route::get('applications', [TenantApplicationController::class, 'index'])->middleware($perm('apps.view'));
+        Route::post('applications/enable', [TenantApplicationController::class, 'enable'])->middleware($perm('apps.manage'));
+        Route::post('applications/disable', [TenantApplicationController::class, 'disable'])->middleware($perm('apps.manage'));
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));

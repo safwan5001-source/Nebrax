@@ -64,6 +64,7 @@ class Rbac
         'users.view', 'users.manage',
         'roles.view', 'roles.manage',
         'reports.view', 'zatca.view',
+        'apps.view', 'apps.manage',
     ];
 
     /**
