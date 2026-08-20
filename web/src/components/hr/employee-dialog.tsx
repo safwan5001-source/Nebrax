@@ -198,7 +198,7 @@ export function EmployeeDialog({
           <div className="space-y-1.5">
             <Label htmlFor="shift_id">{t('default_shift')}</Label>
             <Select id="shift_id" value={form.shift_id ?? ''} onChange={(e) => set('shift_id', e.target.value)}>
-              <option value="">{t('no_shift')}</option>
+              <option value="">{t('no_default_shift')}</option>
               {shifts.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}

@@ -1001,7 +1001,7 @@
     "manager": "Direct manager",
     "no_manager": "— No direct manager —",
     "default_shift": "Default shift",
-    "no_shift": "— No default shift —",
+    "no_default_shift": "— No default shift —",
     "basic_salary": "Basic salary",
     "allowances": "Allowances",
     "gosi": "GOSI",
