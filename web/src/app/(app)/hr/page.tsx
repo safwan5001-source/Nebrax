@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Plus, Pencil, Trash2, MapPin, User, UserCog } from 'lucide-react';
@@ -158,7 +159,15 @@ export default function HrPage() {
   const empColumns = useMemo<ColumnDef<Employee, unknown>[]>(
     () => [
       { accessorKey: 'employee_no', header: t('employee_no'), cell: ({ row }) => <span className="num text-muted">{row.original.employee_no}</span> },
-      { accessorKey: 'name', header: t('emp_name') },
+      {
+        accessorKey: 'name',
+        header: t('emp_name'),
+        cell: ({ row }) => (
+          <Link href={`/hr/employees/${row.original.id}`} className="font-medium text-primary hover:underline">
+            {row.original.name}
+          </Link>
+        ),
+      },
       { accessorKey: 'job_title', header: t('job_title'), cell: ({ row }) => row.original.job_title ?? '—' },
       { accessorKey: 'basic_salary', header: t('basic_salary'), cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.basic_salary)}</div> },
       {
@@ -332,11 +341,16 @@ export default function HrPage() {
         id: 'employee',
         header: tu('link_employee'),
         accessorFn: (r) => r.employee?.name ?? '',
-        cell: ({ row }) => (
-          <span className="text-muted">
-            {row.original.employee ? `${row.original.employee.employee_no ? `${row.original.employee.employee_no} — ` : ''}${row.original.employee.name}` : '—'}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const emp = row.original.employee;
+          if (!emp) return <span className="text-muted">—</span>;
+          const label = `${emp.employee_no ? `${emp.employee_no} — ` : ''}${emp.name}`;
+          return (
+            <Link href={`/hr/employees/${emp.id}`} className="text-primary hover:underline">
+              {label}
+            </Link>
+          );
+        },
       },
       {
         accessorKey: 'is_active',
