@@ -962,7 +962,13 @@
   "hr": {
     "title": "Human Resources",
     "employees": "Employees",
+    "users": "Users",
+    "search_users": "Search user…",
+    "no_users": "No users",
     "runs": "Payroll runs",
+    "add": "Add",
+    "add_employee_option": "Employee",
+    "add_user_option": "User",
     "add_employee": "Add employee",
     "shifts": "Shifts",
     "add_shift": "Add shift",

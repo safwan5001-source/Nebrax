@@ -962,7 +962,13 @@
   "hr": {
     "title": "الموارد البشرية",
     "employees": "الموظفون",
+    "users": "المستخدمون",
+    "search_users": "ابحث عن مستخدم…",
+    "no_users": "لا يوجد مستخدمون",
     "runs": "مسيّرات الرواتب",
+    "add": "إضافة",
+    "add_employee_option": "موظف",
+    "add_user_option": "مستخدم",
     "add_employee": "إضافة موظف",
     "shifts": "الورديات",
     "add_shift": "إضافة وردية",
