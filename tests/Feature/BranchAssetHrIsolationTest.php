@@ -270,7 +270,7 @@ class BranchAssetHrIsolationTest extends TestCase
 
             // الراتب يتبع العقد لا حقول الموظف — عقدٌ دائم نشط منذ 2020-01-01.
             $this->withToken($auth['token'])->postJson("/api/employees/{$employeeId}/contracts", [
-                'type' => 'permanent', 'start_date' => '2020-01-01', 'basic_salary' => 500000,
+                'type' => 'permanent', 'start_date' => '2020-01-01', 'items' => $this->basicSalaryItems(500000),
             ])->assertCreated();
         }
 

@@ -218,20 +218,27 @@ class EmployeeController extends ApiController
     {
         $employee = Employee::findOrFail($id);
 
-        return ContractResource::collection($employee->contracts()->orderByDesc('start_date')->get())->response();
+        return ContractResource::collection($employee->contracts()->with('items')->orderByDesc('start_date')->get())->response();
     }
 
     public function storeContracts(StoreContractRequest $request, string $id): JsonResponse
     {
         $employee = Employee::findOrFail($id);
         $data = $request->validated();
+        $items = $data['items'];
+        unset($data['items']);
         $this->assertNoContractOverlap($employee->id, $data);
 
-        $contract = $employee->contracts()->create(array_merge($data, [
-            'created_by' => $request->user()?->id,
-        ]));
+        $contract = $this->domain(function () use ($employee, $data, $items, $request) {
+            $contract = $employee->contracts()->create(array_merge($data, [
+                'created_by' => $request->user()?->id,
+            ]));
+            $this->replaceContractItems($contract, $items);
 
-        return (new ContractResource($contract))->response()->setStatusCode(201);
+            return $contract;
+        });
+
+        return (new ContractResource($contract->load('items')))->response()->setStatusCode(201);
     }
 
     public function updateContract(UpdateContractRequest $request, string $id, string $contractId): JsonResponse
@@ -239,6 +246,8 @@ class EmployeeController extends ApiController
         $employee = Employee::findOrFail($id);
         $contract = $employee->contracts()->whereKey($contractId)->firstOrFail();
         $data = $request->validated();
+        $items = $data['items'] ?? null;
+        unset($data['items']);
 
         $mergedStart = $data['start_date'] ?? $contract->start_date->toDateString();
         $mergedEnd = array_key_exists('end_date', $data) ? $data['end_date'] : optional($contract->end_date)->toDateString();
@@ -252,9 +261,27 @@ class EmployeeController extends ApiController
             'end_date'   => $mergedEnd,
         ]), $contract->id);
 
-        $contract->update($data);
+        $this->domain(function () use ($contract, $data, $items) {
+            $contract->update($data);
+            if ($items !== null) {
+                $this->replaceContractItems($contract, $items);
+            }
+        });
 
-        return (new ContractResource($contract))->response();
+        return (new ContractResource($contract->load('items')))->response();
+    }
+
+    /** يستبدل بنود العقد كاملةً — لا تعديل بندٍ واحدٍ جزئياً (نطاق البناء الأول). */
+    private function replaceContractItems(Contract $contract, array $items): void
+    {
+        $contract->items()->delete();
+        $contract->items()->createMany(array_map(fn (array $item, int $i) => [
+            'tenant_id'  => $contract->tenant_id,
+            'category'   => $item['category'],
+            'name'       => $item['name'],
+            'amount'     => $item['amount'],
+            'sort_order' => $i,
+        ], $items, array_keys($items)));
     }
 
     public function destroyContract(string $id, string $contractId): JsonResponse

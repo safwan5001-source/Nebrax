@@ -1841,7 +1841,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       data: [{
         id: `contract-${found.id}`, employee_id: found.id, type: 'permanent', status: 'active',
         start_date: '2025-01-01', end_date: null, probation_end_date: null,
-        basic_salary: found.basic_salary, allowances: found.allowances, gosi: found.gosi,
+        items: [
+          { id: `item-basic-${found.id}`, category: 'basic', name: 'الراتب الأساسي', amount: found.basic_salary },
+          { id: `item-allowance-${found.id}`, category: 'allowance', name: 'بدلات', amount: found.allowances },
+          { id: `item-gosi-${found.id}`, category: 'gosi', name: 'التأمينات الاجتماعية (GOSI)', amount: found.gosi },
+          { id: `item-other-${found.id}`, category: 'other', name: 'استقطاعات أخرى', amount: found.other_deductions },
+        ],
+        basic_salary: found.basic_salary, gosi: found.gosi,
         other_deductions: found.other_deductions, gross: found.gross, net: found.net,
         notes: null, created_at: '2025-01-01T00:00:00Z',
       }],

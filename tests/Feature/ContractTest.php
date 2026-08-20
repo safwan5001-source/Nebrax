@@ -8,7 +8,8 @@ use Tests\TestCase;
 
 /**
  * عقود الموظفين — مصدر الراتب الفعلي (design-system/foundations/
- * hr-users-architecture.md «القرار النهائي — الراتب يتبع العقد»).
+ * hr-users-architecture.md «القرار النهائي — الراتب يتبع العقد») ببنودٍ
+ * قابلة للتخصيص على العقد مباشرة («قوالب/بنود الراتب» — نطاق البناء الأول).
  * تشغيل: php artisan test --filter=ContractTest
  */
 class ContractTest extends TestCase
@@ -30,11 +31,16 @@ class ContractTest extends TestCase
 
         $created = $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
             'type' => 'permanent', 'start_date' => '2026-01-01',
-            'basic_salary' => 500000, 'allowances' => 100000, 'gosi' => 58500, 'other_deductions' => 0,
+            'items' => [
+                ['category' => 'basic', 'name' => 'الراتب الأساسي', 'amount' => 500000],
+                ['category' => 'allowance', 'name' => 'بدل سكن', 'amount' => 100000],
+                ['category' => 'gosi', 'name' => 'التأمينات الاجتماعية', 'amount' => 58500],
+            ],
         ])->assertCreated()['data'];
 
         $this->assertSame('permanent', $created['type']);
         $this->assertSame('active', $created['status']);
+        $this->assertCount(3, $created['items']);
         $this->assertSame('5000.00', $created['basic_salary']);
         $this->assertSame('6000.00', $created['gross']);
         $this->assertSame('5415.00', $created['net']);
@@ -43,9 +49,73 @@ class ContractTest extends TestCase
             ->assertOk()->assertJsonCount(1, 'data');
 
         $updated = $this->withToken($auth['token'])->putJson("/api/employees/{$emp}/contracts/{$created['id']}", [
-            'basic_salary' => 600000,
+            'items' => $this->basicSalaryItems(600000),
         ])->assertOk()['data'];
         $this->assertSame('6000.00', $updated['basic_salary']);
+        $this->assertCount(1, $updated['items']); // البنود استُبدلت كاملةً لا أُضيفت.
+    }
+
+    /** @test */
+    public function updating_a_contract_without_items_leaves_its_items_untouched(): void
+    {
+        $auth = $this->registerTenant();
+        $emp = $this->employee($auth['token']);
+
+        $created = $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
+            'type' => 'permanent', 'start_date' => '2026-01-01', 'items' => $this->basicSalaryItems(500000),
+        ])->assertCreated()['data'];
+
+        $updated = $this->withToken($auth['token'])->putJson("/api/employees/{$emp}/contracts/{$created['id']}", [
+            'probation_end_date' => '2026-04-01',
+        ])->assertOk()['data'];
+
+        $this->assertSame('2026-04-01', $updated['probation_end_date']);
+        $this->assertSame('5000.00', $updated['basic_salary']);
+        $this->assertCount(1, $updated['items']);
+    }
+
+    /** @test */
+    public function a_contract_must_have_exactly_one_basic_item(): void
+    {
+        $auth = $this->registerTenant();
+        $emp = $this->employee($auth['token']);
+
+        // بلا بند أساسي إطلاقاً.
+        $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
+            'type' => 'permanent', 'start_date' => '2026-01-01',
+            'items' => [['category' => 'allowance', 'name' => 'بدل', 'amount' => 100000]],
+        ])->assertStatus(422);
+
+        // بندان أساسيان معاً.
+        $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
+            'type' => 'permanent', 'start_date' => '2026-01-01',
+            'items' => [
+                ['category' => 'basic', 'name' => 'أساسي ١', 'amount' => 500000],
+                ['category' => 'basic', 'name' => 'أساسي ٢', 'amount' => 100000],
+            ],
+        ])->assertStatus(422);
+    }
+
+    /** @test */
+    public function multiple_items_of_the_same_category_are_summed(): void
+    {
+        $auth = $this->registerTenant();
+        $emp = $this->employee($auth['token']);
+
+        $created = $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
+            'type' => 'permanent', 'start_date' => '2026-01-01',
+            'items' => [
+                ['category' => 'basic', 'name' => 'الراتب الأساسي', 'amount' => 500000],
+                ['category' => 'allowance', 'name' => 'بدل سكن', 'amount' => 80000],
+                ['category' => 'allowance', 'name' => 'بدل نقل', 'amount' => 20000],
+                ['category' => 'other', 'name' => 'سلفة', 'amount' => 15000],
+                ['category' => 'other', 'name' => 'غرامة تأخير', 'amount' => 5000],
+            ],
+        ])->assertCreated()['data'];
+
+        $this->assertSame('6000.00', $created['gross']); // 5000 + 800 + 200
+        $this->assertSame('200.00', $created['other_deductions']); // 150 + 50
+        $this->assertSame('5800.00', $created['net']);
     }
 
     /** @test */
@@ -55,11 +125,11 @@ class ContractTest extends TestCase
         $emp = $this->employee($auth['token']);
 
         $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
-            'type' => 'permanent', 'start_date' => '2026-01-01', 'basic_salary' => 500000,
+            'type' => 'permanent', 'start_date' => '2026-01-01', 'items' => $this->basicSalaryItems(500000),
         ])->assertCreated();
 
         $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
-            'type' => 'permanent', 'start_date' => '2026-06-01', 'basic_salary' => 600000,
+            'type' => 'permanent', 'start_date' => '2026-06-01', 'items' => $this->basicSalaryItems(600000),
         ])->assertStatus(422);
     }
 
@@ -70,7 +140,7 @@ class ContractTest extends TestCase
         $emp = $this->employee($auth['token']);
 
         $old = $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
-            'type' => 'permanent', 'start_date' => '2026-01-01', 'basic_salary' => 500000,
+            'type' => 'permanent', 'start_date' => '2026-01-01', 'items' => $this->basicSalaryItems(500000),
         ])->assertCreated()['data'];
 
         $this->withToken($auth['token'])->putJson("/api/employees/{$emp}/contracts/{$old['id']}", [
@@ -78,7 +148,7 @@ class ContractTest extends TestCase
         ])->assertOk();
 
         $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
-            'type' => 'permanent', 'start_date' => '2026-06-01', 'basic_salary' => 700000,
+            'type' => 'permanent', 'start_date' => '2026-06-01', 'items' => $this->basicSalaryItems(700000),
         ])->assertCreated();
     }
 
@@ -89,7 +159,7 @@ class ContractTest extends TestCase
         $emp = $this->employee($auth['token']);
 
         $created = $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
-            'type' => 'permanent', 'start_date' => '2026-01-01', 'basic_salary' => 500000,
+            'type' => 'permanent', 'start_date' => '2026-01-01', 'items' => $this->basicSalaryItems(500000),
         ])->assertCreated()['data'];
 
         $this->withToken($auth['token'])->deleteJson("/api/employees/{$emp}/contracts/{$created['id']}")->assertOk();
@@ -106,7 +176,7 @@ class ContractTest extends TestCase
 
         $this->withToken($a['token'])->getJson("/api/employees/{$empB}/contracts")->assertStatus(404);
         $this->withToken($a['token'])->postJson("/api/employees/{$empB}/contracts", [
-            'type' => 'permanent', 'start_date' => '2026-01-01', 'basic_salary' => 500000,
+            'type' => 'permanent', 'start_date' => '2026-01-01', 'items' => $this->basicSalaryItems(500000),
         ])->assertStatus(404);
     }
 
@@ -122,7 +192,10 @@ class ContractTest extends TestCase
         $this->assertSame('0.00', $noContract['basic_salary']);
 
         $contract = $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
-            'type' => 'permanent', 'start_date' => '2026-01-01', 'basic_salary' => 500000, 'allowances' => 100000,
+            'type' => 'permanent', 'start_date' => '2026-01-01',
+            'items' => $this->basicSalaryItems(500000, [
+                ['category' => 'allowance', 'name' => 'بدلات', 'amount' => 100000],
+            ]),
         ])->assertCreated()['data'];
 
         $withContract = $this->withToken($auth['token'])->getJson("/api/employees/{$emp}")->assertOk()['data'];
@@ -139,7 +212,7 @@ class ContractTest extends TestCase
 
         $withContract = $this->employee($auth['token']);
         $this->withToken($auth['token'])->postJson("/api/employees/{$withContract}/contracts", [
-            'type' => 'permanent', 'start_date' => '2020-01-01', 'basic_salary' => 500000,
+            'type' => 'permanent', 'start_date' => '2020-01-01', 'items' => $this->basicSalaryItems(500000),
         ])->assertCreated();
 
         $withoutContract = $this->employee($auth['token']); // بلا عقد إطلاقاً
@@ -161,11 +234,12 @@ class ContractTest extends TestCase
 
         // عقدٌ قديمٌ حتى نهاية يناير، ثم عقدٌ جديد من فبراير — نُنشئ مسيّراً عن يناير.
         $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
-            'type' => 'permanent', 'start_date' => '2026-01-01', 'end_date' => '2026-01-31', 'basic_salary' => 400000,
+            'type' => 'permanent', 'start_date' => '2026-01-01', 'end_date' => '2026-01-31',
+            'items' => $this->basicSalaryItems(400000),
         ])->assertCreated();
 
         $this->withToken($auth['token'])->postJson("/api/employees/{$emp}/contracts", [
-            'type' => 'permanent', 'start_date' => '2026-02-01', 'basic_salary' => 900000,
+            'type' => 'permanent', 'start_date' => '2026-02-01', 'items' => $this->basicSalaryItems(900000),
         ])->assertCreated();
 
         $run = $this->withToken($auth['token'])->postJson('/api/payroll-runs', ['period' => '2026-01'])
