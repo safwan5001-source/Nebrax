@@ -111,6 +111,36 @@ class ApiInvoiceTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('items');
     }
 
+    /** @test */
+    public function duplicating_an_invoice_via_api_creates_a_clean_draft_copy(): void
+    {
+        $auth = $this->registerTenant();
+        $token = $auth['token'];
+        $partnerId = $this->withToken($token)->postJson('/api/partners', [
+            'name' => 'عميل النسخ', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+
+        $source = $this->withToken($token)->postJson('/api/invoices', [
+            'partner_id'        => $partnerId,
+            'is_paid'           => true,
+            'payment_method'    => 'transfer',
+            'payment_reference' => 'TRF-API-COPY',
+            'items'             => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated();
+
+        $copy = $this->withToken($token)
+            ->postJson('/api/invoices/'.$source['data']['id'].'/duplicate')
+            ->assertCreated();
+
+        $this->assertNotSame($source['data']['id'], $copy['data']['id']);
+        $this->assertNotSame($source['data']['number'], $copy['data']['number']);
+        $this->assertSame('draft', $copy['data']['status']);
+        $this->assertFalse($copy['data']['is_paid']);
+        $this->assertSame('unpaid', $copy['data']['payment_status']);
+        $this->assertSame('0.00', $copy['data']['paid_amount']);
+        $this->assertSame($source['data']['total'], $copy['data']['total']);
+    }
+
     /**
      * @test
      * الحمولة كما ترسلها شاشة إنشاء الفاتورة بعد تأشير «مدفوع بالفعل»:

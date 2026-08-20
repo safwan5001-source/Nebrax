@@ -188,6 +188,17 @@ class InvoiceController extends ApiController
         return (new InvoiceResource($updated->load('lines.product', 'lines.costCenterAllocations.costCenter')))->response();
     }
 
+    /** ينشئ مسودة مستقلة من فاتورة مرئية، بلا أثر ترحيل أو سداد من المصدر. */
+    public function duplicate(Request $request, string $id): JsonResponse
+    {
+        $invoice = $this->visibleInvoice($request, $id);
+        $copy = $this->domain(fn () => $this->invoices->duplicate($invoice, $request->user()?->id));
+
+        return (new InvoiceResource($copy->load('lines.product', 'lines.costCenterAllocations.costCenter')))
+            ->response()
+            ->setStatusCode(201);
+    }
+
     /**
      * حذف فاتورة مسوّدة (draft فقط). المرحّلة لا تُحذف (سلامة الأثر المحاسبي).
      */

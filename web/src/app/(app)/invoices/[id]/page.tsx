@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import {
-  ArrowRight, Banknote, BookOpen, Boxes, CheckCircle2, ChevronDown, Download, Paperclip,
+  ArrowRight, Banknote, BookOpen, Boxes, CheckCircle2, ChevronDown, Copy, Download, Paperclip,
   FileSpreadsheet, LayoutTemplate, MoreVertical, Pencil, Printer,
   RotateCcw, Share2, Trash2,
 } from 'lucide-react';
@@ -170,6 +170,7 @@ export default function InvoiceDetailPage() {
   const [busy, setBusy] = useState<ExportBusy>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [actioning, setActioning] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -449,6 +450,20 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  async function duplicateInvoice() {
+    if (!invoice || duplicating) return;
+    setDuplicating(true);
+    try {
+      const copy = await api<{ data: Invoice }>(`/invoices/${invoice.id}/duplicate`, { method: 'POST' });
+      success(t('duplicate_success'));
+      router.push(`/invoices/${copy.data.id}/edit`);
+    } catch {
+      errorToast(t('action_failed'));
+    } finally {
+      setDuplicating(false);
+    }
+  }
+
   async function confirmAction() {
     if (!pendingAction || !invoice) return;
     setActioning(true);
@@ -473,16 +488,29 @@ export default function InvoiceDetailPage() {
   const workControls = (
     <>
       {isDraft && (
-        <Link href={`/invoices/${invoice.id}/edit`}>
-          <Button variant="outline" size="sm"><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Button>
-        </Link>
-      )}
-      {isDraft && (
         <Button size="sm" onClick={() => setPendingAction('post')} disabled={actioning}>
           <CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />
           {t('post')}
         </Button>
       )}
+    </>
+  );
+
+  const invoiceActions = (
+    <>
+      {isDraft && <DropdownItem icon={Pencil} href={`/invoices/${invoice.id}/edit`}>{t('edit')}</DropdownItem>}
+      <DropdownItem icon={Copy} onClick={duplicateInvoice} disabled={duplicating}>{duplicating ? t('duplicating') : t('duplicate')}</DropdownItem>
+      {canCollect && <DropdownItem icon={Banknote} onClick={() => setPaymentOpen(true)}>{t('add_payment')}</DropdownItem>}
+      {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
+      <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
+      <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
+      <DropdownItem icon={Download} onClick={handleDownloadPdf}>{busy === 'pdf' ? t('generating') : t('download_pdf')}</DropdownItem>
+      <DropdownItem icon={Share2} onClick={handleShare}>{t('share')}</DropdownItem>
+      <DropdownItem icon={FileSpreadsheet} onClick={handleExcel}>{t('excel')}</DropdownItem>
+      {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+        <DropdownItem icon={Printer} onClick={() => printDocument(thermalPaper, 'thermal-print-root')}>{tPrint('thermal_print')}</DropdownItem>
+      )}
+      {isDraft && <DropdownItem icon={Trash2} tone="danger" onClick={() => setPendingAction('delete')}>{t('delete')}</DropdownItem>}
     </>
   );
 
@@ -552,17 +580,7 @@ export default function InvoiceDetailPage() {
               triggerClassName="h-8 border border-border px-2 text-text hover:bg-primary-soft"
               trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}
             >
-              {canCollect && <DropdownItem icon={Banknote} onClick={() => setPaymentOpen(true)}>{t('add_payment')}</DropdownItem>}
-              {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
-              <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
-              <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
-              <DropdownItem icon={Download} onClick={handleDownloadPdf}>{busy === 'pdf' ? t('generating') : t('download_pdf')}</DropdownItem>
-              <DropdownItem icon={Share2} onClick={handleShare}>{t('share')}</DropdownItem>
-              <DropdownItem icon={FileSpreadsheet} onClick={handleExcel}>{t('excel')}</DropdownItem>
-              {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
-                <DropdownItem icon={Printer} onClick={() => printDocument(thermalPaper, 'thermal-print-root')}>{tPrint('thermal_print')}</DropdownItem>
-              )}
-              {isDraft && <DropdownItem icon={Trash2} tone="danger" onClick={() => setPendingAction('delete')}>{t('delete')}</DropdownItem>}
+              {invoiceActions}
             </Dropdown>
           </div>
         </div>
@@ -578,14 +596,7 @@ export default function InvoiceDetailPage() {
               triggerClassName="h-8 border border-border bg-surface px-2 text-text hover:bg-primary-soft"
               trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}
             >
-              {canCollect && <DropdownItem icon={Banknote} onClick={() => setPaymentOpen(true)}>{t('add_payment')}</DropdownItem>}
-              {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
-              <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
-              <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
-              <DropdownItem icon={Download} onClick={handleDownloadPdf}>{t('download_pdf')}</DropdownItem>
-              <DropdownItem icon={FileSpreadsheet} onClick={handleExcel}>{t('excel')}</DropdownItem>
-              <DropdownItem icon={Share2} onClick={handleShare}>{t('share')}</DropdownItem>
-              {isDraft && <DropdownItem icon={Trash2} tone="danger" onClick={() => setPendingAction('delete')}>{t('delete')}</DropdownItem>}
+              {invoiceActions}
             </Dropdown>
           </div>
         </div>

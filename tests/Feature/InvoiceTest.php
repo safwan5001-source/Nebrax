@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\CashBankAccount;
+use App\Models\CostCenter;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
@@ -203,6 +204,65 @@ class InvoiceTest extends TestCase
         $this->assertSame(22500,  $invoice->tax_amount);  // 225.00
         $this->assertSame(172500, $invoice->total);       // 1725.00
         $this->assertNull($invoice->journal_entry_id);
+    }
+
+    /** @test */
+    public function it_duplicates_a_posted_paid_invoice_into_a_clean_editable_draft(): void
+    {
+        $first = CostCenter::create(['code' => 'CC-COPY-1', 'name' => 'مركز النسخة الأول']);
+        $second = CostCenter::create(['code' => 'CC-COPY-2', 'name' => 'مركز النسخة الثاني']);
+        $source = $this->invoices->post($this->invoices->create([
+            'partner_id'        => $this->customer->id,
+            'is_paid'           => true,
+            'payment_method'    => 'transfer',
+            'payment_reference' => 'TRF-COPY-1',
+            'invoice_date'      => '2026-01-10',
+            'due_date'          => '2026-02-10',
+            'cost_center_id'    => $first->id,
+            'discount'          => 100,
+            'shipping'          => 500,
+            'adjustment'        => -25,
+            'tax_inclusive'     => true,
+            'notes'             => 'بيانات تجارية تُنسخ فقط',
+        ], [[
+            'description' => 'سطر فاتورة متضمن الضريبة',
+            'quantity' => 2,
+            'unit_price' => 11500,
+            'tax_rate' => 15,
+            'discount' => 2300,
+            'cost_center_allocations' => [
+                ['cost_center_id' => $first->id, 'mode' => 'percent', 'value' => 6000],
+                ['cost_center_id' => $second->id, 'mode' => 'percent', 'value' => 4000],
+            ],
+        ]]));
+
+        $copy = $this->invoices->duplicate($source);
+
+        $this->assertNotSame($source->id, $copy->id);
+        $this->assertNotSame($source->number, $copy->number);
+        $this->assertTrue($copy->isDraft());
+        $this->assertSame($this->customer->id, $copy->partner_id);
+        $this->assertSame(now()->toDateString(), $copy->invoice_date->toDateString());
+        $this->assertSame('2026-02-10', $copy->due_date->toDateString());
+        $this->assertSame($source->total, $copy->total);
+        $this->assertSame($source->notes, $copy->notes);
+        $this->assertFalse($copy->is_paid);
+        $this->assertSame(0, $copy->paid_amount);
+        $this->assertSame('unpaid', $copy->payment_status);
+        $this->assertNull($copy->payment_reference);
+        $this->assertNull($copy->journal_entry_id);
+        $this->assertNull($copy->cogs_entry_id);
+        $this->assertNull($copy->zatca_qr);
+        $this->assertNull($copy->zatca_uuid);
+        $this->assertNull($copy->print_template_revision_id);
+        $this->assertCount(1, $copy->lines);
+        $this->assertSame($source->lines->first()->line_total, $copy->lines->first()->line_total);
+        $this->assertSame(2, $copy->lines->first()->costCenterAllocations()->count());
+        $this->assertSame(10000, (int) $copy->lines->first()->costCenterAllocations()->sum('basis_points'));
+
+        // المصدر أنشأ سند قبض وقيدين؛ النسخ لا ينشئ أي سند أو قيد جديد قبل ترحيله.
+        $this->assertSame(1, Payment::count());
+        $this->assertFalse(JournalEntry::where('source_type', Invoice::class)->where('source_id', $copy->id)->exists());
     }
 
     /** @test */
