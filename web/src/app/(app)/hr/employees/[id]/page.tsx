@@ -1,21 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Pencil } from 'lucide-react';
+import { ArrowRight, Download, FileText, Pencil, Trash2, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabPanel, type TabDef } from '@/components/ui/tabs';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { KeyValue, SubHead, EmptyPanel } from '@/components/partners/partner-panels';
+import { useToast } from '@/components/ui/toast';
 import { EmployeeDialog, type Employee, type LinkedUser } from '@/components/hr/employee-dialog';
 import { type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-dialog';
-import { api } from '@/lib/api';
+import { api, ApiError, downloadFile } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatRiyal } from '@/lib/money';
 
@@ -28,7 +29,14 @@ interface EmployeeProfile extends Employee {
   manager?: { id: string; name: string } | null;
 }
 
-const SECTIONS = ['details', 'attendance', 'payroll'] as const;
+interface EmployeeAttachment {
+  id: string;
+  original_name: string;
+  mime_type?: string | null;
+  size: number;
+}
+
+const SECTIONS = ['details', 'attachments', 'attendance', 'payroll'] as const;
 type SectionId = (typeof SECTIONS)[number];
 
 const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' | 'negative'> = {
@@ -38,6 +46,12 @@ const runStatusTone: Record<string, 'positive' | 'warning' | 'muted'> = { paid: 
 
 const ADDRESS_FIELDS = ['address', 'building_no', 'street', 'district', 'city', 'postal_code', 'country'] as const;
 
+function formatBytes(value: number): string {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -46,17 +60,28 @@ export default function EmployeeProfilePage() {
   const ts = useTranslations('status');
   const tc = useTranslations('common');
 
+  const { success, error: toastError } = useToast();
   const [employee, setEmployee] = useState<EmployeeProfile | null>(null);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
+  const [attachments, setAttachments] = useState<EmployeeAttachment[]>([]);
   const [linkedUser, setLinkedUser] = useState<LinkedUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<SectionId>('details');
   const [editOpen, setEditOpen] = useState(false);
 
+  const [uploading, setUploading] = useState(false);
+  const [busyAttachmentId, setBusyAttachmentId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [role, setRole] = useState<string | null>(null);
   useEffect(() => { setRole(currentUser()?.role ?? null); }, []);
   const canManageUsers = role === 'owner' || role === 'admin';
+
+  const loadAttachments = useCallback(() => {
+    if (!id) return;
+    api<{ data: EmployeeAttachment[] }>(`/employees/${id}/attachments`).then((r) => setAttachments(r.data)).catch(() => setAttachments([]));
+  }, [id]);
 
   const load = useCallback(() => {
     if (!id) return;
@@ -65,10 +90,53 @@ export default function EmployeeProfilePage() {
       api<{ data: EmployeeProfile }>(`/employees/${id}`).then((r) => setEmployee(r.data)).catch(() => setEmployee(null)),
       api<{ data: Attendance[] }>(`/attendances?employee_id=${id}`).then((r) => setAttendance(r.data)).catch(() => setAttendance([])),
       api<{ data: PayrollRun[] }>(`/payroll-runs?employee_id=${id}`).then((r) => setPayrollRuns(r.data)).catch(() => setPayrollRuns([])),
+      api<{ data: EmployeeAttachment[] }>(`/employees/${id}/attachments`).then((r) => setAttachments(r.data)).catch(() => setAttachments([])),
     ]).finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => load(), [load]);
+
+  async function uploadAttachments(files: FileList | null) {
+    if (!files || files.length === 0 || !id) return;
+    setUploading(true);
+    try {
+      const body = new FormData();
+      Array.from(files).forEach((file) => body.append('attachments[]', file));
+      await api(`/employees/${id}/attachments`, { method: 'POST', body });
+      success(tc('created'));
+      loadAttachments();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : t('upload_attachment_failed'));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function downloadAttachment(attachment: EmployeeAttachment) {
+    if (!id) return;
+    setBusyAttachmentId(attachment.id);
+    try {
+      await downloadFile(`/employees/${id}/attachments/${attachment.id}`, attachment.original_name);
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : t('download_attachment_failed'));
+    } finally {
+      setBusyAttachmentId(null);
+    }
+  }
+
+  async function deleteAttachment(attachment: EmployeeAttachment) {
+    if (!id || !window.confirm(t('confirm_delete_attachment'))) return;
+    setBusyAttachmentId(attachment.id);
+    try {
+      await api(`/employees/${id}/attachments/${attachment.id}`, { method: 'DELETE' });
+      success(tc('deleted'));
+      setAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : t('delete_attachment_failed'));
+    } finally {
+      setBusyAttachmentId(null);
+    }
+  }
 
   useEffect(() => {
     if (!canManageUsers || !id) { setLinkedUser(null); return; }
@@ -89,6 +157,7 @@ export default function EmployeeProfilePage() {
 
   const tabs: TabDef[] = [
     { id: 'details', label: t('tab_details') },
+    { id: 'attachments', label: t('attachments'), count: attachments.length },
     { id: 'attendance', label: t('attendance'), count: attendance.length },
     { id: 'payroll', label: t('runs'), count: payrollRuns.length },
   ];
@@ -140,6 +209,9 @@ export default function EmployeeProfilePage() {
             <KeyValue label={t('gross')} value={formatRiyal(employee.gross ?? '0')} mono />
             <KeyValue label={t('net')} value={formatRiyal(employee.net ?? '0')} mono />
 
+            <SubHead>{t('notes')}</SubHead>
+            <p className="px-4 py-3 text-sm text-text">{employee.notes || <span className="text-muted">—</span>}</p>
+
             {canManageUsers && (
               <>
                 <SubHead>{t('login_access')}</SubHead>
@@ -155,6 +227,53 @@ export default function EmployeeProfilePage() {
               </>
             )}
           </>
+        );
+      case 'attachments':
+        return (
+          <div className="space-y-3 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted">{t('attachment_hint')}</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.zip"
+                className="hidden"
+                onChange={(e) => { uploadAttachments(e.target.files); e.target.value = ''; }}
+              />
+              <Button type="button" variant="outline" size="sm" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-3.5 w-3.5" strokeWidth={1.8} />
+                {uploading ? t('uploading') : t('attachment_upload')}
+              </Button>
+            </div>
+
+            {attachments.length === 0 ? (
+              <EmptyPanel>{t('no_attachments')}</EmptyPanel>
+            ) : (
+              <div className="divide-y divide-border rounded border border-border">
+                {attachments.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between gap-3 px-3 py-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <FileText className="h-4 w-4 shrink-0 text-primary" strokeWidth={1.7} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-text">{a.original_name}</p>
+                        <p className="text-xs text-muted">{a.mime_type || t('unknown_file_type')} · {formatBytes(a.size)}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button variant="outline" size="sm" disabled={busyAttachmentId === a.id} onClick={() => downloadAttachment(a)}>
+                        <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
+                        {t('download')}
+                      </Button>
+                      <Button variant="ghost" size="icon" aria-label={t('remove_attachment')} disabled={busyAttachmentId === a.id} onClick={() => deleteAttachment(a)}>
+                        <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         );
       case 'attendance':
         return attendance.length === 0 ? (

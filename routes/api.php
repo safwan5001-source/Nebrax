@@ -410,6 +410,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('employees/{id}/photo', [EmployeeController::class, 'showPhoto'])->middleware($perm('hr.view'));
         Route::post('employees/{id}/photo', [EmployeeController::class, 'uploadPhoto'])->middleware($perm('hr.manage'));
         Route::delete('employees/{id}/photo', [EmployeeController::class, 'removePhoto'])->middleware($perm('hr.manage'));
+        // مسوّغات التعيين (مرفقات الموظف)
+        Route::get('employees/{id}/attachments', [EmployeeController::class, 'indexAttachments'])->middleware($perm('hr.view'));
+        Route::post('employees/{id}/attachments', [EmployeeController::class, 'storeAttachments'])->middleware($perm('hr.manage'));
+        Route::get('employees/{id}/attachments/{attachmentId}/download', [EmployeeController::class, 'downloadAttachment'])->middleware($perm('hr.view'));
+        Route::delete('employees/{id}/attachments/{attachmentId}', [EmployeeController::class, 'destroyAttachment'])->middleware($perm('hr.manage'));
 
         // الورديات (الوحدة الثانية من معمار الموارد البشرية)
         Route::get('shifts', [ShiftController::class, 'index'])->middleware($perm('hr.view'));

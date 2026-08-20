@@ -70,6 +70,7 @@ export interface Employee {
   gosi: string;             // ريال (نص)
   other_deductions: string; // ريال (نص)
   is_active: boolean;
+  notes?: string | null;
 }
 
 const EMPTY_EMPLOYEE: Employee = {
@@ -81,7 +82,7 @@ const EMPTY_EMPLOYEE: Employee = {
   current_district: '', current_postal_code: '', current_country: '',
   permanent_address: '', permanent_city: '', permanent_building_no: '', permanent_street: '',
   permanent_district: '', permanent_postal_code: '', permanent_country: '',
-  basic_salary: '', allowances: '', gosi: '', other_deductions: '', is_active: true,
+  basic_salary: '', allowances: '', gosi: '', other_deductions: '', is_active: true, notes: '',
 };
 
 const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract', 'temporary'] as const;
@@ -281,6 +282,7 @@ export function EmployeeDialog({
       gosi: riyalToMinor(form.gosi || '0'),
       other_deductions: riyalToMinor(form.other_deductions || '0'),
       is_active: form.is_active,
+      notes: form.notes || null,
     };
     try {
       let savedEmployeeId = employee?.id ?? null;
@@ -539,6 +541,16 @@ export function EmployeeDialog({
             <option value="1">{t('active')}</option>
             <option value="0">{t('inactive')}</option>
           </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="notes">{t('notes')}</Label>
+          <textarea
+            id="notes"
+            rows={3}
+            className="min-h-20 w-full resize-y rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            value={form.notes ?? ''}
+            onChange={(e) => set('notes', e.target.value)}
+          />
         </div>
 
         {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
