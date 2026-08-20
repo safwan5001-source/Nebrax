@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Warehouse;
 use App\Tenancy\BranchContext;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -78,16 +79,53 @@ abstract class ApiController extends Controller
     }
 
     /**
-     * يمنع التعامل مع مستودع خارج نطاق المستخدم.
+     * يتحقق من أن المخزن موجود داخل المستأجر ونشط ومتاح للمستخدم.
      *
-     * القائمة المصفّاة تُخفي المستودع من الشاشة لا من الـAPI — والطلب المباشر
-     * يبقى ممكناً بلا هذا الحارس. `null` يمرّ: غياب المعرّف يعالجه التحقّق.
+     * القائمة المصفّاة تُحسن التجربة فقط؛ الحارس يمنع حقن معرّف من مستأجر آخر أو
+     * من فرع لا يراه المستخدم أو من مخزن موقوف. المخزن المركزي بلا فرع يمرّ عبر
+     * قيد المستودع نفسه، فلا يُرفض لمجرد عدم حمله `branch_id`.
      */
-    protected function assertWarehouseAllowed(?string $warehouseId): void
-    {
-        if ($warehouseId !== null && ! request()->user()?->canAccessWarehouse($warehouseId)) {
+    protected function assertWarehouseAllowed(
+        ?string $warehouseId,
+        ?string $branchId = null,
+        bool $resolveImplicitWarehouse = true,
+    ): void {
+        // يبقى اختيار المخزن اختيارياً في حفظ المسودات. لا نحلّ افتراضاً لم
+        // يختَره المستخدم إلا عند ترحيل حركة مخزون فعلية، حيث يجب فحص صلاحيته.
+        if ($warehouseId === null && ! $resolveImplicitWarehouse) {
+            return;
+        }
+
+        $warehouse = $warehouseId === null
+            ? ($branchId === null
+                ? Warehouse::default()
+                : Warehouse::where('branch_id', $branchId)->where('is_active', true)
+                    ->orderByDesc('is_default')->orderBy('code')->first() ?? Warehouse::default())
+            : Warehouse::whereKey($warehouseId)->first();
+
+        // المعرّف الصريح غير المرئي في TenantScope محاولةٌ لمعرفة/حقن مخزن أجنبي.
+        if ($warehouseId !== null && ! $warehouse) {
+            abort(422, 'المستودع غير موجود.');
+        }
+        // منشأة لم تنشئ مخازن بعد تبقى متوافقة مع الحركات التاريخية بلا موقع كمية.
+        if (! $warehouse) {
+            return;
+        }
+        if (! $warehouse->is_active) {
+            abort(422, 'المستودع المحدد غير نشط.');
+        }
+
+        $user = request()->user();
+        if (! $user?->canAccessWarehouse($warehouse->id)
+            || ($warehouse->branch_id !== null && ! $user->canAccessBranch($warehouse->branch_id))) {
             abort(422, 'هذا المستودع خارج نطاق صلاحياتك.');
         }
+    }
+
+    /** الفرع النشط الذي سيسم المستندات الجديدة عبر BelongsToBranch. */
+    protected function activeBranchId(): ?string
+    {
+        return app(BranchContext::class)->id();
     }
 
     /**

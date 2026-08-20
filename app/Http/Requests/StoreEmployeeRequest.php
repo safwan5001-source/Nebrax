@@ -33,7 +33,10 @@ class StoreEmployeeRequest extends FormRequest
             // ملكية المعرّفين (المستأجر والفرع الصحيح للوردية) تُتحقَّق في المتحكّم.
             'manager_id'   => ['nullable', 'uuid'],
             'shift_id'     => ['nullable', 'uuid'],
-            'basic_salary'     => ['required', 'integer', 'min:0'], // هللات
+            // حقول راتبٍ قديمة على الموظف نفسه — الآن غير مُدارة من نموذج الموظف؛
+            // الراتب الفعلي يتبع العقد (Contract) حصراً. تبقى هنا غير مُلزمة
+            // فقط لتوافق قراءة بيانات ما قبل العقود، لا كمصدر إدخال حيّ.
+            'basic_salary'     => ['nullable', 'integer', 'min:0'], // هللات
             'allowances'       => ['nullable', 'integer', 'min:0'], // هللات
             'gosi'             => ['nullable', 'integer', 'min:0'], // حصة الموظف (هللات)
             'other_deductions' => ['nullable', 'integer', 'min:0'], // سُلف/أخرى (هللات)

@@ -51,9 +51,10 @@ class PayrollTest extends TestCase
         return $entry->lines->first(fn (JournalLine $l) => $l->account->code === $code);
     }
 
+    /** الراتب يتبع العقد لا حقول الموظف — كل موظف اختباري يُنشأ بعقدٍ دائم نشط يحمل رقمه. */
     private function employee(int $basic, int $allowances = 0, bool $active = true, int $gosi = 0, int $other = 0): Employee
     {
-        return Employee::create([
+        $employee = Employee::create([
             'employee_no'      => 'EMP-' . str_pad((string) (Employee::count() + 1), 5, '0', STR_PAD_LEFT),
             'name'             => 'موظف',
             'basic_salary'     => $basic,
@@ -62,6 +63,18 @@ class PayrollTest extends TestCase
             'other_deductions' => $other,
             'is_active'        => $active,
         ]);
+
+        $employee->contracts()->create([
+            'type'              => 'permanent',
+            'status'            => 'active',
+            'start_date'        => '2020-01-01',
+            'basic_salary'      => $basic,
+            'allowances'        => $allowances,
+            'gosi'              => $gosi,
+            'other_deductions'  => $other,
+        ]);
+
+        return $employee;
     }
 
     /** @test */

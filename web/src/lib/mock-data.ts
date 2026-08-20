@@ -1834,6 +1834,19 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const found = mockEmployees.find((e) => e.id === employeeMatch[1]) ?? mockEmployees[0];
     return resolve({ data: found });
   }
+  const contractsMatch = clean.match(/^\/employees\/([^/]+)\/contracts$/);
+  if (contractsMatch) {
+    const found = mockEmployees.find((e) => e.id === contractsMatch[1]) ?? mockEmployees[0];
+    return resolve({
+      data: [{
+        id: `contract-${found.id}`, employee_id: found.id, type: 'permanent', status: 'active',
+        start_date: '2025-01-01', end_date: null, probation_end_date: null,
+        basic_salary: found.basic_salary, allowances: found.allowances, gosi: found.gosi,
+        other_deductions: found.other_deductions, gross: found.gross, net: found.net,
+        notes: null, created_at: '2025-01-01T00:00:00Z',
+      }],
+    });
+  }
   if (clean === '/shifts') return resolve({ data: mockShifts });
   if (clean === '/job-titles') return resolve({ data: mockJobTitles });
   if (clean === '/departments') return resolve({ data: mockDepartments });

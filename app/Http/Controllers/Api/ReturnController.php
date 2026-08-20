@@ -38,6 +38,7 @@ class ReturnController extends ApiController
         $data = $request->validated();
 
         Partner::findOrFail($data['partner_id']); // عزل الطرف
+        $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $this->activeBranchId());
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
         $return = $this->domain(fn () => $this->returns->create($data, $data['items']));
@@ -50,9 +51,10 @@ class ReturnController extends ApiController
         return (new ReturnResource(ReturnDocument::with('lines')->findOrFail($id)))->response();
     }
 
-    public function post(string $id): JsonResponse
+    public function post(Request $request, string $id): JsonResponse
     {
         $return = ReturnDocument::findOrFail($id);
+        $this->assertWarehouseAllowed($return->warehouse_id, $return->branch_id);
         $posted = $this->domain(fn () => $this->returns->post($return));
 
         return (new ReturnResource($posted->load('lines')))->response();

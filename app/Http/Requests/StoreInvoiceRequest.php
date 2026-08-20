@@ -15,6 +15,8 @@ class StoreInvoiceRequest extends FormRequest
     {
         return [
             'partner_id'          => ['required', 'uuid'],
+            // اختياري للتوافق مع المستندات القديمة؛ يثبت مخزن الإخراج عند إرساله.
+            'warehouse_id'        => ['nullable', 'uuid'],
             // اختياري لا مطلوب: عند الإنشاء يعني الغياب «استخدم تفضيل المستأجر»
             // (`sales.default_payment_type`)، وعند التعديل «أبقِ القيمة كما هي».
             // كونه مطلوباً كان يجعل التفضيل حبراً على ورق.

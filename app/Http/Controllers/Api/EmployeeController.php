@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\StoreEmployeeAttachmentsRequest;
 use App\Http\Requests\StoreEmployeeRequest;
+use App\Http\Requests\UpdateContractRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Http\Requests\UploadEmployeePhotoRequest;
+use App\Http\Resources\ContractResource;
 use App\Http\Resources\EmployeeAttachmentResource;
 use App\Http\Resources\EmployeeResource;
 use App\Models\Branch;
+use App\Models\Contract;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmploymentType;
@@ -207,5 +211,88 @@ class EmployeeController extends ApiController
         Storage::disk($disk)->delete($path);
 
         return response()->json(['message' => 'تم الحذف.']);
+    }
+
+    /** عقود هذا الموظف عبر الزمن، الأحدث بدءاً أولاً. */
+    public function indexContracts(string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+
+        return ContractResource::collection($employee->contracts()->orderByDesc('start_date')->get())->response();
+    }
+
+    public function storeContracts(StoreContractRequest $request, string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+        $data = $request->validated();
+        $this->assertNoContractOverlap($employee->id, $data);
+
+        $contract = $employee->contracts()->create(array_merge($data, [
+            'created_by' => $request->user()?->id,
+        ]));
+
+        return (new ContractResource($contract))->response()->setStatusCode(201);
+    }
+
+    public function updateContract(UpdateContractRequest $request, string $id, string $contractId): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+        $contract = $employee->contracts()->whereKey($contractId)->firstOrFail();
+        $data = $request->validated();
+
+        $mergedStart = $data['start_date'] ?? $contract->start_date->toDateString();
+        $mergedEnd = array_key_exists('end_date', $data) ? $data['end_date'] : optional($contract->end_date)->toDateString();
+        if ($mergedEnd !== null && $mergedEnd < $mergedStart) {
+            abort(422, 'تاريخ نهاية العقد يجب أن يكون بعد تاريخ بدايته أو يساويه.');
+        }
+
+        $this->assertNoContractOverlap($employee->id, array_merge($data, [
+            'status'     => $data['status'] ?? $contract->status,
+            'start_date' => $mergedStart,
+            'end_date'   => $mergedEnd,
+        ]), $contract->id);
+
+        $contract->update($data);
+
+        return (new ContractResource($contract))->response();
+    }
+
+    public function destroyContract(string $id, string $contractId): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+        $employee->contracts()->whereKey($contractId)->firstOrFail()->delete();
+
+        return response()->json(['message' => 'تم الحذف.']);
+    }
+
+    /**
+     * يمنع تقاطع عقدٍ جديد أو مُعدَّل مع عقدٍ آخر بحالة `active` لنفس الموظف:
+     * عقدان نشطان يتداخلان زمنياً يجعلان «العقد النشط» غامضاً وقت مسيّر
+     * الرواتب. عقدٌ بحالة `ended`/`terminated` تاريخي لا يشارك في هذا الفحص.
+     */
+    private function assertNoContractOverlap(string $employeeId, array $data, ?string $exceptId = null): void
+    {
+        if (($data['status'] ?? 'active') !== 'active') {
+            return;
+        }
+
+        $start = $data['start_date'];
+        $end = $data['end_date'] ?? null;
+
+        // whereDate() لا where() — انظر التعليق المطابق في Contract::activeFor().
+        $query = Contract::where('employee_id', $employeeId)
+            ->where('status', 'active')
+            ->whereDate('start_date', '<=', $end ?? '9999-12-31')
+            ->where(function ($q) use ($start) {
+                $q->whereNull('end_date')->orWhereDate('end_date', '>=', $start);
+            });
+
+        if ($exceptId !== null) {
+            $query->whereKeyNot($exceptId);
+        }
+
+        if ($query->exists()) {
+            abort(422, 'يوجد عقدٌ آخر نشط لهذا الموظف يتقاطع مع هذه الفترة.');
+        }
     }
 }

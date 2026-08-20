@@ -65,8 +65,9 @@ class ReturnableController extends ApiController
             'data' => [
                 'id'          => $document->id,
                 'number'      => $document->number,
-                'partner_id'  => $document->partner_id,
-                'date'        => optional($type === 'sales' ? $document->invoice_date : $document->purchase_date)
+                'partner_id'   => $document->partner_id,
+                'warehouse_id' => $document->warehouse_id,
+                'date'         => optional($type === 'sales' ? $document->invoice_date : $document->purchase_date)
                     ->toDateString(),
                 // مستندٌ رُدَّ بالكامل يبقى مرئياً بسطوره صفراً — إخفاؤه يترك
                 // المستخدم يبحث عمّا ردّه بنفسه ظانّاً أنه أخطأ في الرقم.

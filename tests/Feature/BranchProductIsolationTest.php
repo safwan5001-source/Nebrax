@@ -233,12 +233,19 @@ class BranchProductIsolationTest extends TestCase
         $khobar = $this->branch($auth['token'], 'فرع الخبر');
 
         // مخزن يتبع فرع الخبر
-        $this->withToken($auth['token'])->postJson('/api/warehouses', [
+        $warehouseKhobar = $this->withToken($auth['token'])->postJson('/api/warehouses', [
             'name' => 'مخزن الخبر', 'branch_id' => $khobar,
-        ])->assertCreated();
+        ])->assertCreated()['data']['id'];
 
-        $product = $this->product($auth['token'], $main, 'منتج', 5);
-        $invoice = $this->invoice($auth['token'], $khobar, $this->customer($auth['token']), $product['id']);
+        // الرصيد الذي ستصرف منه فاتورة الخبر يجب أن يكون في مخزن الخبر نفسه،
+        // لا في إجمالي المنتج أو في مخزن الفرع الرئيسي.
+        $created = $this->product($auth['token'], $main, 'منتج', 0);
+        $product = Product::withoutGlobalScope(BranchScope::class)->findOrFail($created['id']);
+        app(InventoryService::class)->applyReceipt($product, 5, 10000, [
+            'warehouse_id' => $warehouseKhobar,
+        ]);
+
+        $invoice = $this->invoice($auth['token'], $khobar, $this->customer($auth['token']), $product->id);
         $this->postInvoice($auth['token'], $khobar, $invoice['id']);
 
         $out = StockMovement::where('product_id', $product['id'])->where('type', 'out')->firstOrFail();

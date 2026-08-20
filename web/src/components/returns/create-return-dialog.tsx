@@ -12,6 +12,7 @@ import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
+import type { Warehouse } from '@/lib/warehouse';
 
 interface Partner { id: string; name: string; type: string; phone?: string | null; vat_number?: string | null }
 interface Product {
@@ -66,7 +67,9 @@ export function CreateReturnDialog({
   const [type, setType] = useState<'sales' | 'purchase'>(fixedType ?? 'sales');
   const [partners, setPartners] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [partnerId, setPartnerId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
   const [paymentType, setPaymentType] = useState('credit');
   const [postNow, setPostNow] = useState(true);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
@@ -84,6 +87,11 @@ export function CreateReturnDialog({
     api<{ data: Product[] }>('/products')
       .then((r) => setProducts(r.data.filter((p) => p.is_active)))
       .catch(() => {});
+    api<{ data: Warehouse[] }>('/warehouses').then((r) => {
+      const active = r.data.filter((warehouse) => warehouse.is_active);
+      setWarehouses(active);
+      setWarehouseId((current) => current || active.find((warehouse) => warehouse.is_default)?.id || active[0]?.id || '');
+    }).catch(() => {});
   }, [open]);
 
   // الدخول من فاتورة يثبت النوع والعميل والمصدر؛ اختيار المصدر نفسه يمر عبر
@@ -188,11 +196,11 @@ export function CreateReturnDialog({
 
   async function pickSource(id: string) {
     setSourceId(id);
-    if (!id) { setLines([emptyLine()]); return; }
+    if (!id) { setLines([emptyLine()]); setWarehouseId(''); return; }
 
     setError(null);
     try {
-      const r = await api<{ data: { lines: ReturnableLine[] } }>(`/returns/returnable/${type}/${id}`);
+      const r = await api<{ data: { warehouse_id: string | null; lines: ReturnableLine[] } }>(`/returns/returnable/${type}/${id}`);
       const pulled = r.data.lines
         .filter((l) => l.remaining > 0)
         .map((l) => ({
@@ -206,6 +214,9 @@ export function CreateReturnDialog({
         }));
       if (pulled.length === 0) { setError(t('fully_returned')); setSourceId(''); return; }
       setLines(pulled);
+      // مخزن المصدر هو الافتراضي التشغيلي للمرتجع المرتبط؛ يستطيع المستخدم
+      // تغييره لاحقاً إن كانت البضاعة الفعلية في موقع آخر ضمن نطاقه.
+      setWarehouseId(r.data.warehouse_id ?? '');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('loadFailed'));
       setSourceId('');
@@ -261,7 +272,7 @@ export function CreateReturnDialog({
       const created = await api<{ data: { id: string } }>('/returns', {
         method: 'POST',
         body: {
-          type, partner_id: partnerId, payment_type: paymentType,
+          type, partner_id: partnerId, warehouse_id: warehouseId || null, payment_type: paymentType,
           original_id: sourceId || null,
           // الفراغ يُرسَل `null` لا `false`: «اتبع السياسة» حالةٌ ثالثة لا
           // مرادفَ لـ«لا يعود».
@@ -284,7 +295,7 @@ export function CreateReturnDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t('title')} className="max-w-2xl">
       <form onSubmit={submit} className="space-y-4">
-        <div className={fixedType ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-3 gap-3'}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {/* منتقي النوع يظهر فقط في الشاشة العامة؛ الشاشتان المتخصّصتان تثبّتانه. */}
           {!fixedType && (
             <div className="space-y-1.5">
@@ -332,6 +343,18 @@ export function CreateReturnDialog({
               clearLabel={requireSource ? undefined : t('no_source')}
             />
           </div>
+          {warehouses.length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="warehouse">{t('warehouse')}</Label>
+              <Select id="warehouse" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                <option value="">{t('warehouse_auto')}</option>
+                {warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>
+                ))}
+              </Select>
+              <p className="text-xs text-muted">{t('warehouse_hint')}</p>
+            </div>
+          )}
           {/* الردّ إلى المورّد إخراجٌ من المخزون في كل حال — فلا سؤال في
               مرتجع المشتريات. */}
           {type === 'sales' && (

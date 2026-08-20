@@ -23,7 +23,7 @@ class ReturnDocument extends BaseModel
     protected $table = 'return_documents';
 
     protected $fillable = [
-        'branch_id',
+        'branch_id', 'warehouse_id',
         'tenant_id', 'number', 'type', 'partner_id', 'payment_type',
         'restock',
         'return_date', 'status', 'subtotal', 'tax_amount', 'total',
@@ -56,6 +56,12 @@ class ReturnDocument extends BaseModel
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
+    }
+
+    /** مخزن فعلي مثبت للمرتجع؛ قد يطابق مخزن المصدر أو يختلف عند نقل البضاعة. */
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     public function original(): MorphTo

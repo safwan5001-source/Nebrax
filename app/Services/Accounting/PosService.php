@@ -41,6 +41,7 @@ class PosService
             // 1) فاتورة آجلة (كامل الإجمالي على الذمم) ثم ترحيلها.
             $invoice = $this->invoices->create([
                 'partner_id'    => $data['partner_id'],
+                'warehouse_id'  => $data['warehouse_id'] ?? null,
                 'payment_type'  => 'credit',
                 'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
                 'notes'         => $data['notes'] ?? 'بيع نقطة بيع',
