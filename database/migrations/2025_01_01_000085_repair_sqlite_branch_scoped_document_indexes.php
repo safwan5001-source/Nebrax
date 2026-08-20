@@ -32,35 +32,61 @@ return new class extends Migration
 
     private function restoreBranchScopedNumberIndex(string $table): void
     {
-        $legacy = "{$table}_tenant_id_number_unique";
-        $scoped = "{$table}_tenant_id_branch_id_number_unique";
         $branchless = "{$table}_tenant_id_number_branchless_unique";
         $indexes = $this->sqliteIndexes($table);
 
-        // لا نلمس الجدول إن كانت إعادة البناء قد حفظت الفهرس الصحيح.
-        if (in_array($legacy, $indexes, true)) {
-            Schema::table($table, fn (Blueprint $blueprint) => $blueprint->dropUnique($legacy));
+        // SQLite يسمّي قيد UNIQUE الداخلي sqlite_autoindex_* بعد إعادة البناء؛
+        // لذلك لا يصح الاعتماد على الاسم السابق. نبحث عن القيد الكامل نفسه
+        // بحسب الأعمدة، مع استثناء الفهرس الجزئي الخاص بالصفوف بلا فرع.
+        $legacy = $this->uniqueIndexName($indexes, ['tenant_id', 'number'], false);
+        if ($legacy !== null) {
+            // لا يعتمد SQLite اسم Laravel المتوقع للقيد بعد إعادة البناء؛ نُسقط
+            // الفهرس بالاسم الذي يعيده PRAGMA بالفعل (ومن ذلك branchless الخاطئ).
+            DB::statement('DROP INDEX "' . str_replace('"', '""', $legacy) . '"');
             $indexes = $this->sqliteIndexes($table);
         }
 
-        if (! in_array($scoped, $indexes, true)) {
+        if (! $this->hasUniqueIndex($indexes, ['tenant_id', 'branch_id', 'number'], false)) {
             Schema::table($table, fn (Blueprint $blueprint) => $blueprint->unique(['tenant_id', 'branch_id', 'number']));
             $indexes = $this->sqliteIndexes($table);
         }
 
         // NULL لا يساوي NULL في المفاتيح الفريدة المركبة، لذلك يلزم فهرس جزئي
         // لصفوف بيانات ما قبل الفروع أو عمليات الخلفية بلا BranchContext.
-        if (! in_array($branchless, $indexes, true)) {
+        if (! in_array($branchless, array_column($indexes, 'name'), true)) {
             DB::statement("CREATE UNIQUE INDEX {$branchless} ON {$table} (tenant_id, number) WHERE branch_id IS NULL");
         }
     }
 
-    /** @return array<int, string> */
+    /** @return array<int, array{name:string, columns:array<int,string>, partial:bool}> */
     private function sqliteIndexes(string $table): array
     {
-        return array_map(
-            fn (object $index) => (string) $index->name,
-            DB::select("PRAGMA index_list('{$table}')")
-        );
+        return array_map(function (object $index) use ($table): array {
+            $name = (string) $index->name;
+            $columns = array_map(
+                fn (object $column) => (string) $column->name,
+                DB::select("PRAGMA index_info('{$name}')")
+            );
+
+            return ['name' => $name, 'columns' => $columns, 'partial' => (bool) $index->partial];
+        }, DB::select("PRAGMA index_list('{$table}')"));
+    }
+
+    /** @param array<int, array{name:string, columns:array<int,string>, partial:bool}> $indexes */
+    private function hasUniqueIndex(array $indexes, array $columns, bool $partial): bool
+    {
+        return $this->uniqueIndexName($indexes, $columns, $partial) !== null;
+    }
+
+    /** @param array<int, array{name:string, columns:array<int,string>, partial:bool}> $indexes */
+    private function uniqueIndexName(array $indexes, array $columns, bool $partial): ?string
+    {
+        foreach ($indexes as $index) {
+            if ($index['columns'] === $columns && $index['partial'] === $partial) {
+                return $index['name'];
+            }
+        }
+
+        return null;
     }
 };

@@ -32,27 +32,41 @@ return new class extends Migration
             $table->index(['tenant_id', 'scope', 'name']);
         });
 
-        Schema::table('partners', function (Blueprint $table) {
-            $table->foreignUuid('customer_classification_id')->nullable()->after('classification')
-                ->constrained('classifications')->nullOnDelete();
-            $table->foreignUuid('supplier_classification_id')->nullable()->after('customer_classification_id')
-                ->constrained('classifications')->nullOnDelete();
-        });
+        // SQLite يعيد بناء الجدول كاملاً عند إضافة مفتاح أجنبي. ذلك يعيد قيد
+        // الترقيم القديم (tenant_id, number) ويفسد تسلسل الفروع الذي أنشأته
+        // هجرة 053؛ لذلك نضيف أعمدة UUID فقط في بيئة الاختبار. التكامل المرجعي
+        // محمي أيضاً في الخدمة، بينما PostgreSQL والإنتاج يحتفظان بالـ FK الكامل.
+        if (DB::getDriverName() === 'sqlite') {
+            // `Schema::table()` يعيد بناء جدول SQLite حتى لإضافة عمود بسيط؛
+            // أما ALTER TABLE ... ADD COLUMN فيضيفه في مكانه ويحفظ كل الفهارس.
+            DB::statement('ALTER TABLE partners ADD COLUMN customer_classification_id VARCHAR');
+            DB::statement('ALTER TABLE partners ADD COLUMN supplier_classification_id VARCHAR');
+            DB::statement('ALTER TABLE invoices ADD COLUMN classification_id VARCHAR');
+            DB::statement('ALTER TABLE purchases ADD COLUMN classification_id VARCHAR');
+            DB::statement('ALTER TABLE payments ADD COLUMN classification_id VARCHAR');
+        } else {
+            Schema::table('partners', function (Blueprint $table) {
+                $table->foreignUuid('customer_classification_id')->nullable()->after('classification')
+                    ->constrained('classifications')->nullOnDelete();
+                $table->foreignUuid('supplier_classification_id')->nullable()->after('customer_classification_id')
+                    ->constrained('classifications')->nullOnDelete();
+            });
 
-        Schema::table('invoices', function (Blueprint $table) {
-            $table->foreignUuid('classification_id')->nullable()->after('cost_center_id')
-                ->constrained('classifications')->nullOnDelete();
-        });
+            Schema::table('invoices', function (Blueprint $table) {
+                $table->foreignUuid('classification_id')->nullable()->after('cost_center_id')
+                    ->constrained('classifications')->nullOnDelete();
+            });
 
-        Schema::table('purchases', function (Blueprint $table) {
-            $table->foreignUuid('classification_id')->nullable()->after('cost_center_id')
-                ->constrained('classifications')->nullOnDelete();
-        });
+            Schema::table('purchases', function (Blueprint $table) {
+                $table->foreignUuid('classification_id')->nullable()->after('cost_center_id')
+                    ->constrained('classifications')->nullOnDelete();
+            });
 
-        Schema::table('payments', function (Blueprint $table) {
-            $table->foreignUuid('classification_id')->nullable()->after('invoice_id')
-                ->constrained('classifications')->nullOnDelete();
-        });
+            Schema::table('payments', function (Blueprint $table) {
+                $table->foreignUuid('classification_id')->nullable()->after('invoice_id')
+                    ->constrained('classifications')->nullOnDelete();
+            });
+        }
 
         $this->backfillPartnerClassifications();
     }
