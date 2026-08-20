@@ -36,7 +36,7 @@ export interface EditableUser {
 }
 
 // الأدوار النظامية الأربعة لها ترجمة جاهزة؛ المخصَّصة تُعرض باسمها كما أُدخل.
-const SYSTEM_ROLE_KEYS: Record<string, string> = {
+export const SYSTEM_ROLE_KEYS: Record<string, string> = {
   admin: 'roles.admin',
   accountant: 'roles.accountant',
   staff: 'roles.staff',
