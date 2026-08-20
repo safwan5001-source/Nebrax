@@ -21,6 +21,9 @@ class PaymentResource extends JsonResource
             'payment_method_id' => $this->payment_method_id,
             'payment_method_name' => $this->payment_method_name,
             'reference'    => $this->reference,
+            'payment_details' => $this->payment_details,
+            'collector_employee_id' => $this->collector_employee_id,
+            'collector_employee_name' => $this->whenLoaded('collectorEmployee', fn () => $this->collectorEmployee?->name),
             'cash_account_id' => $this->cash_account_id,
             'cash_account_code' => $this->whenLoaded('cashAccount', fn () => $this->cashAccount?->code),
             'cash_account_name' => $this->whenLoaded('cashAccount', fn () => $this->cashAccount?->name),
@@ -36,6 +39,12 @@ class PaymentResource extends JsonResource
             'thermal_template_revision_id' => $this->thermal_template_revision_id,
             'thermal_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('thermalTemplateRevision')),
             // تخصيصات السند: ما غطّاه من فواتير/مشتريات (نصّ المستند + مبلغ بالريال).
+            'attachments' => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn ($attachment) => [
+                'id'            => $attachment->id,
+                'original_name' => $attachment->original_name,
+                'mime_type'     => $attachment->mime_type,
+                'size'          => $attachment->size,
+            ])->values()),
             'allocations'  => $this->whenLoaded('allocations', fn () => $this->allocations->map(fn ($a) => [
                 'id'               => $a->id,
                 'allocatable_id'   => $a->allocatable_id,

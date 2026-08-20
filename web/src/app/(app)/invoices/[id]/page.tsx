@@ -19,7 +19,6 @@ import { Tabs, TabPanel } from '@/components/ui/tabs';
 import { Accordion, AccordionItem } from '@/components/ui/accordion';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
-import { PaymentDialog } from '@/components/payments/payment-dialog';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
 import { InvoiceNoteDialog } from '@/components/invoices/invoice-note-dialog';
 import { api, downloadFile } from '@/lib/api';
@@ -171,7 +170,6 @@ export default function InvoiceDetailPage() {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [actioning, setActioning] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
-  const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [notesLog, setNotesLog] = useState<InvoiceNote[]>([]);
@@ -500,7 +498,7 @@ export default function InvoiceDetailPage() {
     <>
       {isDraft && <DropdownItem icon={Pencil} href={`/invoices/${invoice.id}/edit`}>{t('edit')}</DropdownItem>}
       <DropdownItem icon={Copy} onClick={duplicateInvoice} disabled={duplicating}>{duplicating ? t('duplicating') : t('duplicate')}</DropdownItem>
-      {canCollect && <DropdownItem icon={Banknote} onClick={() => setPaymentOpen(true)}>{t('add_payment')}</DropdownItem>}
+      {canCollect && <DropdownItem icon={Banknote} href={`/invoices/${invoice.id}/payments/new`}>{t('add_payment')}</DropdownItem>}
       {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
       <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
       <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
@@ -699,13 +697,6 @@ export default function InvoiceDetailPage() {
 
       <section aria-label={t('activity')}><RevisionLog type="invoice" id={id} collapsible defaultOpen={false} /></section>
 
-      <PaymentDialog
-        open={paymentOpen}
-        onClose={() => setPaymentOpen(false)}
-        onSaved={load}
-        fixedDirection="received"
-        initialInvoice={{ id: invoice.id, partnerId: invoice.partner_id, remaining: invoice.remaining }}
-      />
       <CreateReturnDialog
         open={returnOpen}
         onClose={() => setReturnOpen(false)}

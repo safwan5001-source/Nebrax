@@ -150,8 +150,9 @@ class AuthController extends ApiController
             'id'        => $user->id,
             'name'      => $user->name,
             'email'     => $user->email,
-            'role'      => $user->role,
-            'tenant_id' => $user->tenant_id,
+            'role'        => $user->role,
+            'employee_id' => $user->employee_id,
+            'tenant_id'   => $user->tenant_id,
         ];
     }
 

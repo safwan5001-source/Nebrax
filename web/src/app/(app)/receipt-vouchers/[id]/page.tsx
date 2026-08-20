@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Copy, FileText, Pencil, Printer, ReceiptText, Trash2 } from 'lucide-react';
+import { ArrowRight, Copy, Download, FileText, Pencil, Printer, ReceiptText, Trash2 } from 'lucide-react';
 import { Accordion, AccordionItem } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, downloadFile } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 
 interface Allocation { id: string; label: string; amount: string }
@@ -26,7 +26,10 @@ interface Voucher {
   journal_entry_id?: string | null;
   payment_date: string;
   amount: string;
+  payment_details?: string | null;
+  collector_employee_name?: string | null;
   notes?: string | null;
+  attachments?: { id: string; original_name: string; mime_type: string | null; size: number }[];
   status: 'draft' | 'posted' | 'cancelled';
   allocations?: Allocation[];
 }
@@ -139,6 +142,7 @@ export default function ReceiptVoucherDetailPage() {
     [t('customer'), voucher.partner_name || '—'],
     [t('date'), voucher.payment_date],
     [t('method'), t(voucher.method)],
+    [t('collector'), voucher.collector_employee_name || '—'],
     [t('reference'), voucher.reference || '—'],
     [t('default_treasury'), voucher.cash_account_name ? [voucher.cash_account_code, voucher.cash_account_name].filter(Boolean).join(' — ') : t('default_treasury')],
   ];
@@ -180,9 +184,19 @@ export default function ReceiptVoucherDetailPage() {
         ))}
       </dl>
       <div className="border-t border-border pt-4">
-        <p className="text-sm font-medium text-muted">{t('notes')}</p>
+        <p className="text-sm font-medium text-muted">{t('payment_details')}</p>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{voucher.payment_details || '—'}</p>
+      </div>
+      <div className="border-t border-border pt-4">
+        <p className="text-sm font-medium text-muted">{t('receipt_notes')}</p>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{voucher.notes || '—'}</p>
       </div>
+      {(voucher.attachments?.length ?? 0) > 0 && <div className="border-t border-border pt-4">
+        <p className="text-sm font-medium text-muted">{t('attachments')}</p>
+        <ul className="mt-2 divide-y divide-border rounded-md border border-border">
+          {voucher.attachments?.map((attachment) => <li key={attachment.id} className="flex items-center justify-between gap-3 px-3 py-2"><span className="min-w-0 truncate text-sm text-text">{attachment.original_name}</span><Button size="sm" variant="ghost" onClick={() => downloadFile(`/payments/${voucher.id}/attachments/${attachment.id}`, attachment.original_name)}><Download className="h-4 w-4" strokeWidth={1.7} />{t('download_attachment')}</Button></li>)}
+        </ul>
+      </div>}
     </div>
   );
 
