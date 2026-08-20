@@ -93,6 +93,45 @@ class PlatformConsoleTest extends TestCase
     }
 
     /** @test */
+    public function platform_overview_excludes_non_sar_subscriptions_from_monetary_aggregates(): void
+    {
+        $alpha = $this->registerTenant('alpha', 'owner@alpha.test');
+        $foreign = $this->registerTenant('foreign', 'owner@foreign.test');
+
+        PlatformSubscription::create([
+            'tenant_id'      => $alpha['tenant_id'],
+            'plan'           => 'pro',
+            'status'         => PlatformSubscription::STATUS_ACTIVE,
+            'monthly_amount' => 199000,
+            'currency'       => 'SAR',
+            'starts_on'      => now()->subDay()->toDateString(),
+        ]);
+        PlatformSubscription::create([
+            'tenant_id'      => $foreign['tenant_id'],
+            'plan'           => 'pro',
+            'status'         => PlatformSubscription::STATUS_ACTIVE,
+            'monthly_amount' => 500000,
+            'currency'       => 'USD',
+            'starts_on'      => now()->subDay()->toDateString(),
+        ]);
+
+        $administrator = PlatformAdministrator::create([
+            'name'     => 'مشغّل نبراس',
+            'email'    => 'ops@nebrax.test',
+            'password' => 'platform-password-123',
+        ]);
+        $token = $administrator->createToken('platform-console', ['platform:read'])->plainTextToken;
+
+        $this->withToken($token)
+            ->getJson('/api/platform/overview')
+            ->assertOk()
+            ->assertJsonPath('data.subscriptions.active', 1)
+            ->assertJsonPath('data.subscriptions.monthly_recurring_revenue_minor', 199000)
+            ->assertJsonPath('data.subscriptions.average_active_subscription_minor', 199000)
+            ->assertJsonPath('data.subscriptions.by_plan.0.monthly_recurring_revenue_minor', 199000);
+    }
+
+    /** @test */
     public function platform_subscription_command_records_an_active_contract_and_rejects_an_overlap(): void
     {
         $tenant = $this->registerTenant('contract', 'owner@contract.test');
@@ -119,6 +158,73 @@ class PlatformConsoleTest extends TestCase
             '--starts-on'     => now()->toDateString(),
             '--reference'     => 'contract-002',
         ])->assertExitCode(1);
+    }
+
+    /** @test */
+    public function platform_subscription_command_rejects_a_reused_reference_from_a_soft_deleted_contract(): void
+    {
+        $tenant = $this->registerTenant('contract', 'owner@contract.test');
+
+        $subscription = PlatformSubscription::create([
+            'tenant_id'          => $tenant['tenant_id'],
+            'plan'               => 'pro',
+            'status'             => PlatformSubscription::STATUS_ACTIVE,
+            'monthly_amount'     => 199000,
+            'starts_on'          => now()->subDay()->toDateString(),
+            'external_reference' => 'contract-001',
+        ]);
+        $subscription->delete();
+
+        $this->artisan('platform:subscription:record', [
+            'tenant'          => 'contract',
+            '--plan'          => 'basic',
+            '--monthly-minor' => '99000',
+            '--starts-on'     => now()->toDateString(),
+            '--reference'     => 'contract-001',
+        ])->assertExitCode(1);
+    }
+
+    /** @test */
+    public function platform_administrator_command_creates_and_reactivates_a_soft_deleted_account(): void
+    {
+        $this->artisan('platform:administrator', [
+            'email'      => 'ops@nebrax.test',
+            '--name'     => 'مشغّل نبراس',
+            '--password' => 'platform-password-123',
+        ])->assertExitCode(0);
+
+        $administrator = PlatformAdministrator::where('email', 'ops@nebrax.test')->firstOrFail();
+        $this->assertTrue($administrator->is_active);
+
+        $administrator->delete();
+        $this->assertSoftDeleted($administrator);
+
+        $this->artisan('platform:administrator', [
+            'email'      => 'ops@nebrax.test',
+            '--name'     => 'مشغّل نبراس المُجدَّد',
+            '--password' => 'platform-password-456',
+        ])->assertExitCode(0);
+
+        $administrator->refresh();
+        $this->assertTrue($administrator->is_active);
+        $this->assertNull($administrator->deleted_at);
+        $this->assertSame('مشغّل نبراس المُجدَّد', $administrator->name);
+    }
+
+    /** @test */
+    public function platform_administrator_command_rejects_an_invalid_email_or_short_password(): void
+    {
+        $this->artisan('platform:administrator', [
+            'email'      => 'not-an-email',
+            '--password' => 'platform-password-123',
+        ])->assertExitCode(1);
+
+        $this->artisan('platform:administrator', [
+            'email'      => 'ops@nebrax.test',
+            '--password' => 'short',
+        ])->assertExitCode(1);
+
+        $this->assertDatabaseMissing('platform_administrators', ['email' => 'ops@nebrax.test']);
     }
 
     /** @test */

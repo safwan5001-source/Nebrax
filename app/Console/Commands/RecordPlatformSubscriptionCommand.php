@@ -88,7 +88,7 @@ class RecordPlatformSubscriptionCommand extends Command
             return self::FAILURE;
         }
 
-        if ($reference && PlatformSubscription::where('tenant_id', $tenant->id)->where('external_reference', $reference)->exists()) {
+        if ($reference && PlatformSubscription::withTrashed()->where('tenant_id', $tenant->id)->where('external_reference', $reference)->exists()) {
             $this->error('مرجع العقد مستخدم سابقاً لهذا المستأجر.');
 
             return self::FAILURE;

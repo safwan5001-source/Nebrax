@@ -31,6 +31,9 @@ class PlatformSubscription extends Model
         self::STATUS_EXPIRED,
     ];
 
+    /** العملة الوحيدة التي يتعامل بها النظام حالياً؛ أي مبلغ بعملة أخرى يُستبعد من تجميعات المنصة النقدية. */
+    public const CURRENCY_SAR = 'SAR';
+
     public $incrementing = false;
 
     protected $keyType = 'string';

@@ -17,7 +17,10 @@ class PlatformMetrics
     public function overview(): array
     {
         $today = CarbonImmutable::today();
-        $activeSubscriptions = PlatformSubscription::query()->activeOn($today);
+        // النظام أحادي العملة (SAR) اليوم؛ استبعاد أي عملة أخرى يمنع خلطها في مؤشرات نقدية واحدة.
+        $activeSubscriptions = PlatformSubscription::query()
+            ->activeOn($today)
+            ->where('currency', PlatformSubscription::CURRENCY_SAR);
         $monthlyRecurringRevenueMinor = (int) (clone $activeSubscriptions)->sum('monthly_amount');
         $renewalDeadline = $today->addDays(30);
         $renewals = (clone $activeSubscriptions)
@@ -25,6 +28,9 @@ class PlatformMetrics
             ->whereBetween('ends_on', [$today->toDateString(), $renewalDeadline->toDateString()]);
         $renewalValueMinor = (int) (clone $renewals)->sum('monthly_amount');
         $activeSubscriptionCount = (clone $activeSubscriptions)->count();
+        $averageActiveSubscriptionMinor = $activeSubscriptionCount === 0
+            ? 0
+            : intdiv($monthlyRecurringRevenueMinor, $activeSubscriptionCount);
 
         return [
             'tenants' => [
@@ -45,12 +51,8 @@ class PlatformMetrics
                 'renewal_value_at_risk'            => Money::toRiyal($renewalValueMinor),
                 'monthly_recurring_revenue_minor'  => $monthlyRecurringRevenueMinor,
                 'monthly_recurring_revenue'        => Money::toRiyal($monthlyRecurringRevenueMinor),
-                'average_active_subscription_minor' => $activeSubscriptionCount === 0
-                    ? 0
-                    : intdiv($monthlyRecurringRevenueMinor, $activeSubscriptionCount),
-                'average_active_subscription' => Money::toRiyal(
-                    $activeSubscriptionCount === 0 ? 0 : intdiv($monthlyRecurringRevenueMinor, $activeSubscriptionCount)
-                ),
+                'average_active_subscription_minor' => $averageActiveSubscriptionMinor,
+                'average_active_subscription' => Money::toRiyal($averageActiveSubscriptionMinor),
                 'by_plan' => $this->activeByPlan($today),
             ],
         ];
@@ -61,6 +63,7 @@ class PlatformMetrics
     {
         return PlatformSubscription::query()
             ->activeOn($today)
+            ->where('currency', PlatformSubscription::CURRENCY_SAR)
             ->selectRaw('plan, COUNT(*) as active, COALESCE(SUM(monthly_amount), 0) as monthly_recurring_revenue_minor')
             ->groupBy('plan')
             ->orderBy('plan')
