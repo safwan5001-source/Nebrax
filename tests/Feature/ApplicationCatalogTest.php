@@ -52,6 +52,8 @@ class ApplicationCatalogTest extends TestCase
             'operations.time_tracking',
             'operations.manufacturing',
             'operations.workflow',
+            'logistics.fleet',
+            'logistics.shipping',
             'company.branches',
             'communications.sms',
             'commerce.storefront',
@@ -63,7 +65,7 @@ class ApplicationCatalogTest extends TestCase
         sort($expectedKeys);
 
         $this->assertSame($expectedKeys, $actualKeys);
-        $this->assertCount(34, ApplicationCatalog::all());
+        $this->assertCount(36, ApplicationCatalog::all());
         $this->assertSame([], ApplicationCatalog::validationErrors());
     }
 
@@ -106,5 +108,22 @@ class ApplicationCatalogTest extends TestCase
         $this->assertSame('settings', ApplicationCatalog::find('communications.sms')['group']);
         $this->assertSame('sales', ApplicationCatalog::find('commerce.storefront')['group']);
         $this->assertContains('integrations', ApplicationCatalog::groups());
+    }
+
+    /** @test */
+    public function insurance_and_zatca_are_grouped_by_owner_decision_not_by_key_prefix(): void
+    {
+        $this->assertSame('customers', ApplicationCatalog::find('sales.insurance')['group']);
+        $this->assertSame('settings', ApplicationCatalog::find('compliance.zatca')['group']);
+    }
+
+    /** @test */
+    public function logistics_is_a_distinct_group_matching_the_sidebar_taxonomy(): void
+    {
+        $this->assertContains('logistics', ApplicationCatalog::groups());
+        $this->assertSame('logistics', ApplicationCatalog::find('logistics.fleet')['group']);
+        $this->assertSame('logistics', ApplicationCatalog::find('logistics.shipping')['group']);
+        $this->assertSame(ApplicationCatalog::MATURITY_COMING_SOON, ApplicationCatalog::find('logistics.fleet')['maturity']);
+        $this->assertSame(ApplicationCatalog::MATURITY_COMING_SOON, ApplicationCatalog::find('logistics.shipping')['maturity']);
     }
 }

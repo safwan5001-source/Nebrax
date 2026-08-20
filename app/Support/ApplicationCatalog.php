@@ -65,12 +65,11 @@ final class ApplicationCatalog
             'mandatory' => false,
             'dependencies' => ['sales.invoicing'],
         ],
-        'sales.insurance' => [
-            'group' => 'sales',
-            'maturity' => self::MATURITY_COMING_SOON,
-            'mandatory' => false,
-            'dependencies' => ['sales.invoicing'],
-        ],
+        /**
+         * تفعيلها يعيش لاحقاً في إعدادات إدارة التطبيقات (`settings`)، منفصلاً
+         * عن ترقيم الفاتورة الإلكترونية الذي يبقى ضمن المبيعات — فمجموعتها
+         * `settings` تصف مكان مفتاح التفعيل نفسه، لا الوحدة المحاسبية.
+         */
         'compliance.zatca' => [
             'group' => 'settings',
             'maturity' => self::MATURITY_BUILT,
@@ -84,6 +83,12 @@ final class ApplicationCatalog
             'maturity' => self::MATURITY_BUILT,
             'mandatory' => true,
             'dependencies' => [],
+        ],
+        'sales.insurance' => [
+            'group' => 'customers',
+            'maturity' => self::MATURITY_COMING_SOON,
+            'mandatory' => false,
+            'dependencies' => ['sales.invoicing'],
         ],
         'crm.follow_up' => [
             'group' => 'customers',
@@ -221,6 +226,20 @@ final class ApplicationCatalog
         ],
         'operations.workflow' => [
             'group' => 'operations',
+            'maturity' => self::MATURITY_COMING_SOON,
+            'mandatory' => false,
+            'dependencies' => [],
+        ],
+
+        // ───────────────────────── اللوجستيات ─────────────────────────
+        'logistics.fleet' => [
+            'group' => 'logistics',
+            'maturity' => self::MATURITY_COMING_SOON,
+            'mandatory' => false,
+            'dependencies' => [],
+        ],
+        'logistics.shipping' => [
+            'group' => 'logistics',
             'maturity' => self::MATURITY_COMING_SOON,
             'mandatory' => false,
             'dependencies' => [],
