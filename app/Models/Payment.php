@@ -24,8 +24,8 @@ class Payment extends BaseModel
     protected $fillable = [
         'branch_id',
         'tenant_id', 'number', 'partner_id', 'invoice_id',
-        'direction', 'method', 'payment_method_id', 'payment_method_name', 'reference', 'cash_account_id', 'payment_date', 'amount',
-        'status', 'notes', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by',
+        'direction', 'method', 'payment_method_id', 'payment_method_name', 'reference', 'payment_details', 'cash_account_id', 'payment_date', 'amount',
+        'status', 'notes', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by', 'collector_employee_id',
     ];
 
     protected $casts = [
@@ -66,6 +66,18 @@ class Payment extends BaseModel
     public function journalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
+    }
+
+    /** الموظف الذي استلم التحصيل؛ مستقل عن المستخدم الذي أنشأ السند. */
+    public function collectorEmployee(): BelongsTo
+    {
+        return $this->referenceBelongsTo(Employee::class, 'collector_employee_id');
+    }
+
+    /** مرفقات إثبات الدفع الخاصة بالسند. */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(PaymentAttachment::class);
     }
 
     /** المرجع التاريخي للقالب الذي كان منشوراً عند ترحيل السند. */

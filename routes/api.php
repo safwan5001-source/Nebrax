@@ -313,7 +313,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->middleware($perm('payments.manage'));
 
         // المدفوعات
+        Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('payments/{id}/attachments/{attachmentId}', [PaymentController::class, 'downloadAttachment'])->middleware($perm('payments.view'));
         Route::get('payments/{id}', [PaymentController::class, 'show'])->middleware($perm('payments.view'));
         Route::post('payments', [PaymentController::class, 'store'])->middleware($perm('payments.manage'));
         Route::put('payments/{id}', [PaymentController::class, 'update'])->middleware($perm('payments.manage'));

@@ -822,6 +822,16 @@ export const mockAppointments = [
 ];
 
 // ── المدفوعات ──────────────────────────────────────────────────────────────
+export const mockPaymentMethods = [
+  { id: 'pm-method-cash', name: 'نقدي', settlement_type: 'cash', cash_bank_account_id: 'cash-main', is_active: true, is_default: true },
+  { id: 'pm-method-bank', name: 'تحويل بنكي', settlement_type: 'bank', cash_bank_account_id: 'bank-main', is_active: true, is_default: false },
+];
+
+export const mockCashBankAccounts = [
+  { id: 'cash-main', account_id: 'acc-1110', name: 'الخزينة الرئيسية', type: 'cash', is_active: true, is_main: true },
+  { id: 'bank-main', account_id: 'acc-1120', name: 'الحساب البنكي الرئيسي', type: 'bank', is_active: true, is_main: true },
+];
+
 export const mockPayments = [
   { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
   { id: 'pm-50', number: 'PMT-2026-0050', partner_id: 'p2', direction: 'received', method: 'cash', payment_date: '2026-06-22', amount: '6325.00' },
@@ -1787,7 +1797,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const list = rtype === 'sales' || rtype === 'purchase' ? mockReturns.filter((r) => r.type === rtype) : mockReturns;
     return resolve({ data: list });
   }
+  if (clean === '/payment-methods') return resolve({ data: mockPaymentMethods });
+  if (clean === '/cash-bank-accounts') return resolve({ data: mockCashBankAccounts });
+  if (clean === '/payments/collectors') return resolve({ data: mockEmployees.filter((employee) => employee.is_active).map(({ id, name, employee_no, job_title }) => ({ id, name, employee_no, job_title })) });
   if (clean === '/payments') {
+    if ((method ?? 'GET') === 'POST') return resolve({ data: { id: 'pm-demo-draft' } });
     const dir = new URLSearchParams(path.split('?')[1] ?? '').get('direction');
     const list = dir === 'received' || dir === 'paid' ? mockPayments.filter((p) => p.direction === dir) : mockPayments;
     return resolve({ data: list });
@@ -1889,6 +1903,9 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const found = mockReturns.find((r) => r.id === returnMatch[1]) ?? mockReturns[0];
     return resolve({ data: found });
   }
+
+  const paymentPostMatch = clean.match(/^\/payments\/([^/]+)\/post$/);
+  if (paymentPostMatch && (method ?? 'GET') === 'POST') return resolve({ data: { id: paymentPostMatch[1], status: 'posted' } });
 
   // تفاصيل سند القبض/الصرف: القوائم تشير إلى هذا المسار، لذلك نعيد عقداً كاملاً
   // يطابق API الإنتاج ويمنع ظهور سند فارغ في المعاينة أو التصدير.
