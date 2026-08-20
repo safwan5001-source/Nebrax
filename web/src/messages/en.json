@@ -3170,6 +3170,10 @@
           "title": "Cost-center profitability",
           "description": "Revenue, expense, and profit for each cost center."
         },
+        "classificationAnalytics": {
+          "title": "Classification analytics",
+          "description": "A unified report for document and partner value by analytical classification."
+        },
         "accountLedger": {
           "title": "Account ledger",
           "description": "Posted account activity with opening, running, and closing balances."
@@ -3440,6 +3444,32 @@
     "historyNoticeTitle": "Historical reporting effect",
     "historyNotice": "When editing after posting is enabled, later reports show the document under its new classification. Leave it disabled when historical comparisons must remain stable.",
     "retry": "Try again"
+  },
+  "classificationAnalytics": {
+    "title": "Classification analytics",
+    "subtitle": "A custom report measuring documents and partners by the newly added analytical classifications.",
+    "backToReports": "Back to reports",
+    "scope": "Analysis scope",
+    "classification": "Classification",
+    "allClassifications": "All classifications",
+    "records": "Records",
+    "amount": "Amount",
+    "totalAmount": "Total amount",
+    "classifiedRecords": "Classified records",
+    "unclassifiedRecords": "Unclassified records",
+    "unclassified": "Unclassified",
+    "exportCsv": "Export CSV",
+    "empty": "There is no data in the selected filter scope.",
+    "loadFailed": "Classification analytics could not be loaded.",
+    "retry": "Try again",
+    "scopes": {
+      "sales_invoice": "Sales invoice classification",
+      "purchase_invoice": "Purchase invoice classification",
+      "customer": "Customer classification",
+      "supplier": "Supplier classification",
+      "receipt": "Receipt voucher classification",
+      "payment": "Payment voucher classification"
+    }
   },
   "returnForm": {
     "title": "New return",

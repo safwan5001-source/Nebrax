@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BranchSettingsController;
 use App\Http\Controllers\Api\CashBankAccountController;
+use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
 use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ContactController;
@@ -417,6 +418,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('settings/reports', [ReportSettingsController::class, 'show'])->middleware($perm('reports.view'));
         Route::put('settings/reports', [ReportSettingsController::class, 'update'])->middleware($perm('company.manage'));
 
+        Route::get('reports/classification-analytics', [ClassificationAnalyticsReportController::class, 'show'])->middleware($perm('reports.view'));
         Route::get('reports/sales', [SalesReportController::class, 'show'])->middleware($perm('reports.view'));
         // تقارير المشتريات: فواتير شراء وسندات صرف مرحّلة فقط؛ لا أثر محاسبي جديد.
         Route::get('reports/purchases', [PurchaseReportController::class, 'show'])->middleware($perm('reports.view'));

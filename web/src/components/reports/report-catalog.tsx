@@ -88,6 +88,7 @@ const REPORT_CATEGORIES: ReportCategoryDefinition[] = [
       { key: 'incomeStatement', href: '/reports/general/income-statement', icon: FileSpreadsheet, status: 'ready' },
       { key: 'balanceSheet', href: '/reports/general/balance-sheet', icon: Landmark, status: 'ready' },
       { key: 'costCenterProfitability', href: '/reports/general/cost-center-profitability', icon: BarChart3, status: 'ready' },
+      { key: 'classificationAnalytics', href: '/reports/classification-analytics', icon: ClipboardList, status: 'ready' },
       { key: 'accountLedger', href: '/reports/general/account-ledger', icon: BookOpen, status: 'ready' },
       { key: 'cashFlow', href: '/reports/general/cash-flow', icon: WalletCards, status: 'ready' },
       { key: 'journalEntries', href: '/reports/general/journal-entries', icon: ClipboardList, status: 'ready' },
