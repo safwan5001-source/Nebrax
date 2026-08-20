@@ -28,6 +28,8 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryReportController;
 use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\JournalEntryController;
+use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PayrollController;
@@ -175,6 +177,20 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('accounts/{id}', [AccountController::class, 'show'])->middleware($perm('accounts.view'));
         Route::post('accounts', [AccountController::class, 'store'])->middleware($perm('accounts.manage'));
         Route::put('accounts/{id}', [AccountController::class, 'update'])->middleware($perm('accounts.manage'));
+
+        // سجل القيود الموحّد للقراءة: آلي ويدوي، مع سطور ومصدر القيد.
+        Route::get('journal-entries', [JournalEntryController::class, 'index'])->middleware($perm('accounts.view'));
+        Route::get('journal-entries/{id}', [JournalEntryController::class, 'show'])->middleware($perm('accounts.view'));
+
+        // القيود اليدوية: مسودة مستقلة ثم ترحيل حصري عبر LedgerService.
+        Route::get('manual-journals', [ManualJournalController::class, 'index'])->middleware($perm('accounts.view'));
+        Route::get('manual-journals/{id}', [ManualJournalController::class, 'show'])->middleware($perm('accounts.view'));
+        Route::post('manual-journals', [ManualJournalController::class, 'store'])->middleware($perm('accounts.manage'));
+        Route::put('manual-journals/{id}', [ManualJournalController::class, 'update'])->middleware($perm('accounts.manage'));
+        Route::post('manual-journals/{id}/duplicate', [ManualJournalController::class, 'duplicate'])->middleware($perm('accounts.manage'));
+        Route::post('manual-journals/{id}/post', [ManualJournalController::class, 'post'])->middleware($perm('accounts.manage'));
+        Route::post('manual-journals/{id}/reverse', [ManualJournalController::class, 'reverse'])->middleware($perm('accounts.manage'));
+        Route::delete('manual-journals/{id}', [ManualJournalController::class, 'destroy'])->middleware($perm('accounts.manage'));
 
         // تصنيفات المصروفات: بيانات تحليلية بلا أثر محاسبي، تتحكم بها صلاحيات المصروفات.
         Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->middleware($perm('expenses.view'));
