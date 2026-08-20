@@ -3,23 +3,33 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, MapPin, User, UserCog } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { EmployeeDialog, type Employee } from '@/components/hr/employee-dialog';
 import { ShiftDialog, type Shift } from '@/components/hr/shift-dialog';
 import { AttendanceDialog, type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { CreateRunDialog } from '@/components/hr/create-run-dialog';
 import { RunDetailDialog, type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { RoleDialog, type Role } from '@/components/hr/role-dialog';
+import { UserDialog } from '@/components/users/user-dialog';
+import { UserScopeDialog } from '@/components/users/user-scope-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
-type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'roles';
+type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'roles' | 'users';
+
+interface TeamUser {
+  id: string; name: string; email: string; role: string; is_active: boolean;
+  branch_ids?: string[]; warehouse_ids?: string[];
+  employee_id?: string | null;
+  employee?: { id: string; name: string; employee_no?: string } | null;
+}
 const statusTone: Record<string, 'positive' | 'warning' | 'muted'> = { paid: 'positive', posted: 'warning', draft: 'muted' };
 const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' | 'negative'> = {
   present: 'positive', late: 'warning', leave: 'muted', absent: 'negative',
@@ -27,6 +37,7 @@ const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' |
 
 export default function HrPage() {
   const t = useTranslations('hr');
+  const tu = useTranslations('users');
   const ts = useTranslations('status');
   const tc = useTranslations('common');
   const { success, error } = useToast();
@@ -47,10 +58,15 @@ export default function HrPage() {
   const [runDialog, setRunDialog] = useState(false);
   const [activeRun, setActiveRun] = useState<string | null>(null);
 
-  // الأدوار: تبويبٌ حسّاس يظهر لأصحاب الإدارة فقط (owner/admin). الدور يُقرأ بعد
-  // التركيب لتفادي اختلاف الترطيب (localStorage غائب أثناء العرض على الخادم).
+  // الأدوار والمستخدمون: تبويبان حسّاسان يظهران لأصحاب الإدارة فقط (owner/admin).
+  // يُقرآن بعد التركيب لتفادي اختلاف الترطيب (localStorage غائب أثناء العرض على الخادم).
   const [role, setRole] = useState<string | null>(null);
-  useEffect(() => setRole(currentUser()?.role ?? null), []);
+  const [meId, setMeId] = useState<string | null>(null);
+  useEffect(() => {
+    const me = currentUser();
+    setRole(me?.role ?? null);
+    setMeId(me?.id ?? null);
+  }, []);
   const canManageRoles = role === 'owner' || role === 'admin';
 
   const [roles, setRoles] = useState<Role[]>([]);
@@ -65,6 +81,23 @@ export default function HrPage() {
   }, []);
 
   useEffect(() => { if (canManageRoles) reloadRoles(); }, [canManageRoles, reloadRoles]);
+
+  const [team, setTeam] = useState<TeamUser[]>([]);
+  const [userDialog, setUserDialog] = useState(false);
+  const [scopeUser, setScopeUser] = useState<TeamUser | null>(null);
+
+  const loadTeam = useCallback(() => {
+    if (!canManageRoles) return;
+    api<{ data: TeamUser[] }>('/users').then((r) => setTeam(r.data)).catch(() => {});
+  }, [canManageRoles]);
+
+  useEffect(() => { if (canManageRoles) loadTeam(); }, [canManageRoles, loadTeam]);
+
+  async function removeUser(id: string) {
+    await api(`/users/${id}`, { method: 'DELETE' }).catch(() => {});
+    success(tc('deleted'));
+    loadTeam();
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -252,12 +285,61 @@ export default function HrPage() {
     [t, deleteRole]
   );
 
+  const userColumns = useMemo<ColumnDef<TeamUser, unknown>[]>(
+    () => [
+      { accessorKey: 'name', header: tu('name') },
+      { accessorKey: 'email', header: tu('email'), cell: ({ row }) => <span className="num text-muted">{row.original.email}</span> },
+      { accessorKey: 'role', header: tu('role'), cell: ({ row }) => <Badge tone="muted">{tu(`roles.${row.original.role}`)}</Badge> },
+      {
+        id: 'employee',
+        header: tu('link_employee'),
+        accessorFn: (r) => r.employee?.name ?? '',
+        cell: ({ row }) => (
+          <span className="text-muted">
+            {row.original.employee ? `${row.original.employee.employee_no ? `${row.original.employee.employee_no} — ` : ''}${row.original.employee.name}` : '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="icon" aria-label={tu('scope_title')} onClick={() => setScopeUser(row.original)}>
+              <MapPin className="h-4 w-4 text-muted" strokeWidth={1.7} />
+            </Button>
+            {row.original.id !== meId && (
+              <Button variant="ghost" size="icon" aria-label={tu('remove')} onClick={() => removeUser(row.original.id)}>
+                <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+              </Button>
+            )}
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tu, meId]
+  );
+
   const addButton = {
-    employees: () => (<Button onClick={() => { setEditing(null); setEmpDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_employee')}</Button>),
+    // زرٌ عام "إضافة" يفتح خيارَي دفترة نفسيهما (موظف / مستخدم) بدل زرٍّ واحد
+    // يفترض موظفاً دائماً — إنشاء حساب دخول لا يحتاج المرور بنموذج الموظف أولاً.
+    employees: () => (
+      <Dropdown
+        align="end"
+        menuLabel={t('add')}
+        triggerClassName="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        trigger={<><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add')}</>}
+      >
+        <DropdownItem icon={User} onClick={() => { setEditing(null); setEmpDialog(true); }}>{t('add_employee_option')}</DropdownItem>
+        <DropdownItem icon={UserCog} onClick={() => setUserDialog(true)}>{t('add_user_option')}</DropdownItem>
+      </Dropdown>
+    ),
     shifts: () => (<Button onClick={() => { setEditingShift(null); setShiftDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_shift')}</Button>),
     attendance: () => (<Button onClick={() => { setEditingAtt(null); setAttDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_attendance')}</Button>),
     runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
     roles: () => (<Button onClick={() => { setEditingRole(null); setRoleDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_role')}</Button>),
+    users: () => (<Button onClick={() => setUserDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{tu('add')}</Button>),
   }[tab];
 
   return (
@@ -268,7 +350,7 @@ export default function HrPage() {
       </div>
 
       <div className="flex gap-1 border-b border-border">
-        {(['employees', 'shifts', 'attendance', 'runs', ...(canManageRoles ? ['roles'] : [])] as Tab[]).map((key) => (
+        {(['employees', 'shifts', 'attendance', 'runs', ...(canManageRoles ? ['roles', 'users'] : [])] as Tab[]).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -297,6 +379,9 @@ export default function HrPage() {
       {tab === 'roles' && canManageRoles && (
         <DataTable columns={roleColumns} data={roles} loading={loading} searchPlaceholder={t('search_roles')} emptyLabel={t('no_roles')} exportName="roles" />
       )}
+      {tab === 'users' && canManageRoles && (
+        <DataTable columns={userColumns} data={team} loading={loading} searchPlaceholder={t('search_users')} emptyLabel={t('no_users')} exportName="users" />
+      )}
 
       <EmployeeDialog open={empDialog} onClose={() => setEmpDialog(false)} onSaved={load} employee={editing} />
       <ShiftDialog open={shiftDialog} onClose={() => setShiftDialog(false)} onSaved={load} shift={editingShift} />
@@ -304,6 +389,15 @@ export default function HrPage() {
       <CreateRunDialog open={runDialog} onClose={() => setRunDialog(false)} onCreated={() => { load(); setTab('runs'); }} />
       <RunDetailDialog runId={activeRun} onClose={() => setActiveRun(null)} onChanged={load} />
       <RoleDialog open={roleDialog} onClose={() => setRoleDialog(false)} onSaved={reloadRoles} role={editingRole} catalog={permCatalog} />
+      <UserDialog
+        open={userDialog}
+        onClose={() => setUserDialog(false)}
+        onSaved={loadTeam}
+        linkedEmployeeIds={team.map((u) => u.employee_id).filter((id): id is string => !!id)}
+      />
+      {scopeUser && (
+        <UserScopeDialog user={scopeUser} onClose={() => setScopeUser(null)} onSaved={loadTeam} />
+      )}
     </div>
   );
 }

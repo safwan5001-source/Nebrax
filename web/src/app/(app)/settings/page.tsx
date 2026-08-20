@@ -2,29 +2,16 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Trash2, Pencil, MapPin } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
-import { UserDialog } from '@/components/users/user-dialog';
-import { UserScopeDialog } from '@/components/users/user-scope-dialog';
 import { CompanyDialog } from '@/components/settings/company-dialog';
 import { TaxSettingsCard } from '@/components/settings/tax-settings-card';
-import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import type { Company } from '@/lib/company';
-
-interface TeamUser {
-  id: string; name: string; email: string; role: string; is_active: boolean;
-  // نطاق الوصول — يصل مع القائمة. **الفارغ يعني الكلّ** لا الحرمان.
-  branch_ids?: string[]; warehouse_ids?: string[];
-  // الموظف المرتبط (`User ⊃ Employee`) — إن وُجد.
-  employee_id?: string | null;
-  employee?: { id: string; name: string; employee_no?: string } | null;
-}
 
 interface Subscription {
   plan: string;
@@ -58,24 +45,13 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
 
 export default function SettingsPage() {
   const t = useTranslations('settings');
-  const tu = useTranslations('users');
-  const tc = useTranslations('common');
-  const { success } = useToast();
   const [sub, setSub] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const user = currentUser();
   const canManage = user?.role === 'owner' || user?.role === 'admin';
 
-  const [team, setTeam] = useState<TeamUser[]>([]);
-  const [userDialog, setUserDialog] = useState(false);
-  const [scopeUser, setScopeUser] = useState<TeamUser | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [companyDialog, setCompanyDialog] = useState(false);
-
-  const loadTeam = useCallback(() => {
-    if (!canManage) return;
-    api<{ data: TeamUser[] }>('/users').then((r) => setTeam(r.data)).catch(() => {});
-  }, [canManage]);
 
   const loadCompany = useCallback(() => {
     api<{ company: Company }>('/me').then((r) => setCompany(r.company)).catch(() => {});
@@ -83,15 +59,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     api<Subscription>('/subscription').then(setSub).finally(() => setLoading(false));
-    loadTeam();
     loadCompany();
-  }, [loadTeam, loadCompany]);
-
-  async function removeUser(id: string) {
-    await api(`/users/${id}`, { method: 'DELETE' }).catch(() => {});
-    success(tc('deleted'));
-    loadTeam();
-  }
+  }, [loadCompany]);
 
   return (
     <div className="space-y-5">
@@ -196,65 +165,6 @@ export default function SettingsPage() {
 
       <TaxSettingsCard canManage={canManage} />
 
-      {canManage && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{tu('title')}</CardTitle>
-            <Button size="sm" onClick={() => setUserDialog(true)}>
-              <Plus className="h-4 w-4" strokeWidth={1.8} />
-              {tu('add')}
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <THead>
-                <TR>
-                  <TH>{tu('name')}</TH>
-                  <TH>{tu('email')}</TH>
-                  <TH>{tu('role')}</TH>
-                  <TH>{tu('link_employee')}</TH>
-                  <TH />
-                </TR>
-              </THead>
-              <TBody>
-                {team.map((u) => (
-                  <TR key={u.id}>
-                    <TD>{u.name}</TD>
-                    <TD className="num text-muted">{u.email}</TD>
-                    <TD><Badge tone="muted">{tu(`roles.${u.role}`)}</Badge></TD>
-                    <TD className="text-muted">
-                      {u.employee ? `${u.employee.employee_no ? `${u.employee.employee_no} — ` : ''}${u.employee.name}` : '—'}
-                    </TD>
-                    <TD className="text-end">
-                      <Button
-                        variant="ghost" size="icon" aria-label={tu('scope_title')}
-                        onClick={() => setScopeUser(u)}
-                      >
-                        <MapPin className="h-4 w-4 text-muted" strokeWidth={1.7} />
-                      </Button>
-                      {u.id !== user?.id && (
-                        <Button variant="ghost" size="icon" aria-label={tu('remove')} onClick={() => removeUser(u.id)}>
-                          <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
-                        </Button>
-                      )}
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      <UserDialog
-        open={userDialog}
-        onClose={() => setUserDialog(false)}
-        onSaved={loadTeam}
-        linkedEmployeeIds={team.map((u) => u.employee_id).filter((id): id is string => !!id)}
-      />
-      {scopeUser && (
-        <UserScopeDialog user={scopeUser} onClose={() => setScopeUser(null)} onSaved={loadTeam} />
-      )}
       {companyDialog && (
         <CompanyDialog open onClose={() => setCompanyDialog(false)} onSaved={loadCompany} company={company} />
       )}
