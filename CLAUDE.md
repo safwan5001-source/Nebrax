@@ -13,7 +13,7 @@
 - الموارد البشرية (HR): الموظفون + مسيّر رواتب شهري (إنشاء → ترحيل الاستحقاق → الصرف) + الاستقطاعات (GOSI/سُلف).
 - التقارير: ميزان المراجعة، قائمة الدخل، الميزانية، كشف الأستاذ، كشف حساب الطرف، أعمار الديون، وتقارير العملاء (المبيعات، الأرصدة، المقبوضات، والمواعيد)، وتقارير المخزون (لقطة القيمة، أرصدة المخازن الكمية، الحركة الدائمة، الأذون المرحّلة، وفروق الجرد المرحّلة).
 - ZATCA: المرحلة 1 (QR/TLV) + المرحلة 2 جزئياً (UUID + ICV + سلسلة هاش PIH + UBL).
-- REST API كامل (Sanctum + RBAC بالأدوار + عزل tenant) + طبقة الاشتراكات وحدود الخطط وتحصين المصادقة.
+- REST API كامل (Sanctum + RBAC بالأدوار + عزل tenant) + طبقة الاشتراكات وحدود الخطط وتحصين المصادقة. توجد كذلك مساحة تشغيل داخلية للمنصة (`/api/platform/*` و`/platform`) بحساب `PlatformAdministrator` مستقل؛ تعرض مؤشرات مجمّعة للقراءة فقط ولا تمرّ عبر `SetTenant`. يسجل `PlatformSubscription` الإيراد الشهري المتعاقد عليه بالهللات للعقود النشطة؛ وهو ليس فاتورةً أو تحصيلاً نقدياً.
 
 **الواجهة (web/) قيد البناء** — Next.js 15، RTL، متصلة بالـ API: دخول، لوحة تحكم،
 الفواتير (قائمة/إنشاء/تفاصيل + ZATCA QR)، العملاء/الموردون (CRUD + كشف حساب)، المدفوعات،
@@ -52,12 +52,12 @@ app/Services/Accounting/  LedgerService (المحرك), ChartOfAccountsSeeder, I
                           PaymentService, PurchaseService, ReturnService, InventoryService, ZatcaService
 app/Services/Reporting/   ReportService (ميزان/دخل/ميزانية/أستاذ/كشف طرف/أعمار)
 app/Support/           Money, Rbac, Plans, PlanGate
-app/Http/Middleware/   SetTenant, EnsurePermission, EnsureActiveSubscription, EnforcePlanLimit, ForceJsonResponse
-app/Http/Controllers/Api/  Auth, Partner, Product, Account, Invoice, Payment, Purchase, Return, Report
+app/Http/Middleware/   SetTenant, EnsurePermission, EnsurePlatformAdministrator, EnsureActiveSubscription, EnforcePlanLimit, ForceJsonResponse
+app/Http/Controllers/Api/  Auth, PlatformAuth/PlatformDashboard (تشغيل داخلي منفصل), Partner, Product, Account, Invoice, Payment, Purchase, Return, Report
 app/Http/Requests/ · app/Http/Resources/   (تحقق المدخلات + تنسيق المخرجات)
 app/Providers/         TenancyServiceProvider
 routes/api.php         كل مسارات الـ REST API
-database/migrations/   000001..000013 (النواة + المستندات + المخزون + الاشتراكات + ZATCA)
+database/migrations/   000001..000081 (النواة + المستندات + المخزون + الاشتراكات + ZATCA + مديرو المنصة)
 tests/Feature/         LedgerTest + اختبارات كل وحدة + اختبارات API (مصادقة/RBAC/عزل)
 web/                   واجهة Next.js 15 (انظر DESIGN_SYSTEM.md)
 .github/workflows/     ci.yml (php على sqlite+pgsql) · web-ci.yml (بناء Next.js)
@@ -204,3 +204,5 @@ php artisan serve
 
 استكمال تغطية الواجهة: شاشتا **المشتريات** و**المرتجعات** (الـ backend جاهز). ثم: اختبارات الواجهة،
 الإعدادات/الاشتراك، تصدير Excel/PDF، وZATCA المرحلة 2 الكاملة (عند توفّر الشهادات).
+
+> خارطة تشغيل المنصة، وفصل MRR المتعاقد عليه عن الفوترة والتحصيل الفعلي، موثقة في `PLATFORM_DEVELOPMENT_ROADMAP.md`.
