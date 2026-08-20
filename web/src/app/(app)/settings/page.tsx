@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CompanyDialog } from '@/components/settings/company-dialog';
-import { TaxSettingsCard } from '@/components/settings/tax-settings-card';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import type { Company } from '@/lib/company';
@@ -162,8 +161,6 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
-
-      <TaxSettingsCard canManage={canManage} />
 
       {companyDialog && (
         <CompanyDialog open onClose={() => setCompanyDialog(false)} onSaved={loadCompany} company={company} />

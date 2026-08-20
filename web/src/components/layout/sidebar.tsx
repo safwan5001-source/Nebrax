@@ -53,6 +53,7 @@ import {
   LayoutTemplate,
   Settings,
   WalletCards,
+  ReceiptText,
   ChevronDown,
   ChevronLeft,
   ChevronsLeft,
@@ -214,14 +215,15 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: 'system',
+    title: 'settings',
     icon: Settings,
     items: [
       { href: '/reports', icon: BarChart3, key: 'reports', built: true },
       { href: '/document-design', icon: LayoutTemplate, key: 'documentDesign', built: true },
       { href: '/numbering-settings', icon: Hash, key: 'numberingSettings', built: true },
+      { href: '/tax-settings', icon: ReceiptText, key: 'taxSettings', built: true },
       { href: '/payment-methods', icon: WalletCards, key: 'paymentMethods', built: true },
-      { href: '/settings', icon: Settings, key: 'settings', built: true },
+      { href: '/settings', icon: Settings, key: 'accountSettings', built: true },
     ],
   },
 ];
@@ -239,7 +241,7 @@ const SUPER_GROUPS: { label: string; titles: string[] }[] = [
   { label: 'revenue', titles: ['sales', 'pos', 'customers'] },
   { label: 'operations', titles: ['inventory', 'purchases', 'logistics'] },
   { label: 'finance', titles: ['accounting', 'finance', 'hr', 'operations'] },
-  { label: 'admin', titles: ['branches', 'system'] },
+  { label: 'admin', titles: ['branches', 'settings'] },
 ];
 
 export function Sidebar({
