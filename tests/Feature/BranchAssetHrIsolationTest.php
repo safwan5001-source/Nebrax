@@ -264,9 +264,14 @@ class BranchAssetHrIsolationTest extends TestCase
         $khobar = $this->branch($auth['token'], 'فرع الخبر');
 
         foreach ([[$main, 'موظف الرئيسي'], [$khobar, 'موظف الخبر']] as [$branchId, $name]) {
-            $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $branchId])
-                ->postJson('/api/employees', ['name' => $name, 'basic_salary' => 500000])
-                ->assertCreated();
+            $employeeId = $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $branchId])
+                ->postJson('/api/employees', ['name' => $name])
+                ->assertCreated()['data']['id'];
+
+            // الراتب يتبع العقد لا حقول الموظف — عقدٌ دائم نشط منذ 2020-01-01.
+            $this->withToken($auth['token'])->postJson("/api/employees/{$employeeId}/contracts", [
+                'type' => 'permanent', 'start_date' => '2020-01-01', 'basic_salary' => 500000,
+            ])->assertCreated();
         }
 
         // المسيّر يُنشأ من الفرع الرئيسي — ويجب أن يضمّ موظفي الفرعين

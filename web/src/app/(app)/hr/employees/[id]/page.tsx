@@ -13,6 +13,7 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { KeyValue, SubHead, EmptyPanel } from '@/components/partners/partner-panels';
 import { useToast } from '@/components/ui/toast';
 import { EmployeeDialog, type Employee, type LinkedUser } from '@/components/hr/employee-dialog';
+import { ContractDialog, type Contract } from '@/components/hr/contract-dialog';
 import { type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-dialog';
@@ -24,6 +25,12 @@ interface EmployeeProfile extends Employee {
   branch_id?: string | null;
   hire_date?: string | null;
   notes?: string | null;
+  // مصدرها العقد النشط اليوم (Contract)، لا حقول الموظف — للعرض فقط، انظر تبويب العقود.
+  active_contract_id?: string | null;
+  basic_salary?: string;
+  allowances?: string;
+  gosi?: string;
+  other_deductions?: string;
   gross?: string;
   net?: string;
   manager?: { id: string; name: string } | null;
@@ -36,13 +43,16 @@ interface EmployeeAttachment {
   size: number;
 }
 
-const SECTIONS = ['details', 'attachments', 'attendance', 'payroll'] as const;
+const SECTIONS = ['details', 'contracts', 'attachments', 'attendance', 'payroll'] as const;
 type SectionId = (typeof SECTIONS)[number];
 
 const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' | 'negative'> = {
   present: 'positive', late: 'warning', leave: 'muted', absent: 'negative',
 };
 const runStatusTone: Record<string, 'positive' | 'warning' | 'muted'> = { paid: 'positive', posted: 'warning', draft: 'muted' };
+const contractStatusTone: Record<Contract['status'], 'positive' | 'warning' | 'muted'> = {
+  active: 'positive', ended: 'muted', terminated: 'warning',
+};
 
 const ADDRESS_FIELDS = ['address', 'building_no', 'street', 'district', 'city', 'postal_code', 'country'] as const;
 
@@ -65,10 +75,14 @@ export default function EmployeeProfilePage() {
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [attachments, setAttachments] = useState<EmployeeAttachment[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
   const [linkedUser, setLinkedUser] = useState<LinkedUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<SectionId>('details');
   const [editOpen, setEditOpen] = useState(false);
+  const [contractDialogOpen, setContractDialogOpen] = useState(false);
+  const [editingContract, setEditingContract] = useState<Contract | null>(null);
+  const [busyContractId, setBusyContractId] = useState<string | null>(null);
 
   const [uploading, setUploading] = useState(false);
   const [busyAttachmentId, setBusyAttachmentId] = useState<string | null>(null);
@@ -91,10 +105,25 @@ export default function EmployeeProfilePage() {
       api<{ data: Attendance[] }>(`/attendances?employee_id=${id}`).then((r) => setAttendance(r.data)).catch(() => setAttendance([])),
       api<{ data: PayrollRun[] }>(`/payroll-runs?employee_id=${id}`).then((r) => setPayrollRuns(r.data)).catch(() => setPayrollRuns([])),
       api<{ data: EmployeeAttachment[] }>(`/employees/${id}/attachments`).then((r) => setAttachments(r.data)).catch(() => setAttachments([])),
+      api<{ data: Contract[] }>(`/employees/${id}/contracts`).then((r) => setContracts(r.data)).catch(() => setContracts([])),
     ]).finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => load(), [load]);
+
+  async function deleteContract(contract: Contract) {
+    if (!id || !window.confirm(t('confirm_delete_contract'))) return;
+    setBusyContractId(contract.id);
+    try {
+      await api(`/employees/${id}/contracts/${contract.id}`, { method: 'DELETE' });
+      success(tc('deleted'));
+      load();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setBusyContractId(null);
+    }
+  }
 
   async function uploadAttachments(files: FileList | null) {
     if (!files || files.length === 0 || !id) return;
@@ -157,6 +186,7 @@ export default function EmployeeProfilePage() {
 
   const tabs: TabDef[] = [
     { id: 'details', label: t('tab_details') },
+    { id: 'contracts', label: t('contracts'), count: contracts.length },
     { id: 'attachments', label: t('attachments'), count: attachments.length },
     { id: 'attendance', label: t('attendance'), count: attendance.length },
     { id: 'payroll', label: t('runs'), count: payrollRuns.length },
@@ -225,6 +255,57 @@ export default function EmployeeProfilePage() {
               </>
             )}
           </>
+        );
+      case 'contracts':
+        return (
+          <div className="space-y-3 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted">{t('contracts_hint')}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => { setEditingContract(null); setContractDialogOpen(true); }}>
+                {t('add_contract')}
+              </Button>
+            </div>
+
+            {contracts.length === 0 ? (
+              <EmptyPanel>{t('no_contracts')}</EmptyPanel>
+            ) : (
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>{t('contract_type')}</TH>
+                    <TH>{t('start_date')}</TH>
+                    <TH>{t('end_date')}</TH>
+                    <TH className="text-end">{t('gross')}</TH>
+                    <TH className="text-end">{t('net')}</TH>
+                    <TH>{t('status_label')}</TH>
+                    <TH />
+                  </TR>
+                </THead>
+                <TBody>
+                  {contracts.map((c) => (
+                    <TR key={c.id}>
+                      <TD>{t(`type_${c.type}`)}</TD>
+                      <TD className="num text-muted" dir="ltr">{c.start_date}</TD>
+                      <TD className="num text-muted" dir="ltr">{c.end_date ?? '—'}</TD>
+                      <TD className="num text-end">{formatRiyal(c.gross)}</TD>
+                      <TD className="num text-end font-medium">{formatRiyal(c.net)}</TD>
+                      <TD><Badge tone={contractStatusTone[c.status] ?? 'muted'}>{t(`status_${c.status}`)}</Badge></TD>
+                      <TD className="text-end">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" aria-label={t('edit')} onClick={() => { setEditingContract(c); setContractDialogOpen(true); }}>
+                            <Pencil className="h-3.5 w-3.5" strokeWidth={1.7} />
+                          </Button>
+                          <Button variant="ghost" size="icon" aria-label={t('delete_contract')} disabled={busyContractId === c.id} onClick={() => deleteContract(c)}>
+                            <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                          </Button>
+                        </div>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            )}
+          </div>
         );
       case 'attachments':
         return (
@@ -388,6 +469,14 @@ export default function EmployeeProfilePage() {
         linkedUser={linkedUser}
         initialAllowAccess={!!linkedUser}
         canManageUsers={canManageUsers}
+      />
+
+      <ContractDialog
+        open={contractDialogOpen}
+        onClose={() => setContractDialogOpen(false)}
+        onSaved={load}
+        employeeId={employee.id}
+        contract={editingContract}
       />
     </div>
   );

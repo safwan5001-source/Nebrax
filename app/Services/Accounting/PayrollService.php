@@ -79,12 +79,21 @@ class PayrollService
             ]);
 
             $totalGross = $totalGosi = $totalOther = $totalNet = 0;
+            $itemsCount = 0;
 
             foreach ($employees as $employee) {
-                $gross = (int) $employee->basic_salary + (int) $employee->allowances;
-                $gosi  = (int) $employee->gosi;
-                $other = (int) $employee->other_deductions;
-                $net   = $gross - $gosi - $other;
+                // الراتب يتبع العقد لا حقول الموظف الثابتة (القرار المعتمد، انظر
+                // design-system/foundations/hr-users-architecture.md). موظفٌ بلا عقد
+                // نشط ببداية الفترة يُستبعد صامتاً من هذا المسيّر — ليس خطأً يوقف الإنشاء.
+                $contract = $employee->activeContract($start);
+                if ($contract === null) {
+                    continue;
+                }
+
+                $gross = $contract->gross();
+                $gosi  = (int) $contract->gosi;
+                $other = (int) $contract->other_deductions;
+                $net   = $contract->net();
 
                 if ($net < 0) {
                     throw new RuntimeException("استقطاعات الموظف ({$employee->name}) تتجاوز إجمالي راتبه.");
@@ -93,18 +102,23 @@ class PayrollService
                 PayrollItem::create([
                     'payroll_run_id'   => $run->id,
                     'employee_id'      => $employee->id,
-                    'basic_salary'     => (int) $employee->basic_salary,
-                    'allowances'       => (int) $employee->allowances,
+                    'basic_salary'     => (int) $contract->basic_salary,
+                    'allowances'       => (int) $contract->allowances,
                     'gosi'             => $gosi,
                     'other_deductions' => $other,
                     'gross'            => $gross,
                     'net'              => $net,
                 ]);
 
+                $itemsCount++;
                 $totalGross += $gross;
                 $totalGosi  += $gosi;
                 $totalOther += $other;
                 $totalNet   += $net;
+            }
+
+            if ($itemsCount === 0) {
+                throw new RuntimeException('لا يوجد موظفون بعقد عمل نشط لإنشاء مسيّر الرواتب.');
             }
 
             $run->update([
