@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Tenancy\BranchScoped;
 use App\Tenancy\BranchShareable;
 use App\Tenancy\BranchSharing;
+use App\Tenancy\ResolvesBranchReferences;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Partner extends BaseModel implements BranchShareable
 {
     use BranchScoped;
+    use ResolvesBranchReferences;
     use SoftDeletes;
 
     protected $fillable = [
