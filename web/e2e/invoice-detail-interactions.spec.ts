@@ -10,12 +10,13 @@ async function enterDemo(page: Page) {
   await page.waitForLoadState('domcontentloaded');
 }
 
-async function expectActionMenuWithinViewport(page: Page) {
+async function expectActionMenuWithinViewport(page: Page, count: number, expectedItems: RegExp[] = []) {
   const actions = page.getByRole('button', { name: /^(Invoice actions|إجراءات الفاتورة)$/ });
   await actions.click();
   const menu = page.getByRole('menu', { name: /^(Invoice actions|إجراءات الفاتورة)$/ });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveCount(6);
+  await expect(menu.getByRole('menuitem')).toHaveCount(count);
+  for (const name of expectedItems) await expect(menu.getByRole('menuitem', { name })).toBeVisible();
   const menuBox = await menu.boundingBox();
   expect(menuBox).not.toBeNull();
   expect(menuBox!.x).toBeGreaterThanOrEqual(12);
@@ -34,7 +35,7 @@ test('تفاصيل الفاتورة على الجوال: إجراءات ظاهر
   });
   await expect(page.getByRole('heading', { name: /^(INV-2026-0118|INV-٢٠٢٦-٠١١٨)$/ })).toBeVisible();
 
-  await expectActionMenuWithinViewport(page);
+  await expectActionMenuWithinViewport(page, 7, [/^(Duplicate|نسخ)$/]);
 
   const documentBeforeDetails = await page.evaluate(() => {
     const headings = Array.from(document.querySelectorAll('h3'));
@@ -79,7 +80,13 @@ test('تفاصيل الفاتورة على الجوال: إجراءات ظاهر
 
   await page.getByRole('button', { name: 'تبديل اللغة' }).click();
   await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
-  await expectActionMenuWithinViewport(page);
+  await expectActionMenuWithinViewport(page, 7, [/^Duplicate$/]);
+
+  await page.goto(`${baseUrl}/invoices/inv-115`, { waitUntil: 'commit' }).catch((error: Error) => {
+    if (!error.message.includes('ERR_ABORTED')) throw error;
+  });
+  await expect(page.getByRole('heading', { name: 'INV-2026-0115' })).toBeVisible();
+  await expectActionMenuWithinViewport(page, 8, [/^Edit$/, /^Duplicate$/, /^Delete draft$/]);
 
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
