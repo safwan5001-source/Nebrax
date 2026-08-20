@@ -521,3 +521,78 @@ test('P47: يحقق زر إغلاق الإشعار هدف لمس 44px ويغلق
   await dismissToast.click({ force: true });
   await expect(dismissToast).toBeHidden();
 });
+
+
+test('P47.3: يكمل مسار القالب بلوحة المفاتيح مع بديل تحريك الكتل', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await enterDemo(page);
+  await page.goto(`${baseUrl}/document-design`);
+  await expect(page.getByRole('heading', { name: 'مركز قوالب الطباعة' })).toBeVisible();
+
+  const documentType = page.getByRole('button', { name: /^فاتورة ضريبية/ }).first();
+  await documentType.focus();
+  await documentType.press('Enter');
+  await expect(page.getByRole('heading', { name: 'مكتبة قوالب الطباعة' })).toBeVisible();
+
+  const createTemplate = page.getByRole('button', { name: 'قالب جديد' });
+  await createTemplate.focus();
+  await createTemplate.press('Enter');
+  await expect(page.getByRole('heading', { name: 'ابدأ مسودة قالب' })).toBeVisible();
+
+  const usageChoice = page.locator('button[aria-pressed]').first();
+  await usageChoice.focus();
+  await usageChoice.press('Space');
+  await expect(usageChoice).toHaveAttribute('aria-pressed', 'true');
+
+  const nextStep = page.getByRole('button', { name: 'التالي' });
+  await nextStep.focus();
+  await nextStep.press('Enter');
+
+  const sourceChoice = page.locator('button[aria-pressed]').first();
+  await sourceChoice.focus();
+  await sourceChoice.press('Space');
+  await expect(sourceChoice).toHaveAttribute('aria-pressed', 'true');
+  await nextStep.focus();
+  await nextStep.press('Enter');
+
+  const templateName = page.getByLabel('اسم القالب');
+  await templateName.focus();
+  await templateName.press('Control+A');
+  await templateName.pressSequentially('مسودة لوحة المفاتيح P47.3');
+  await expect(templateName).toHaveValue('مسودة لوحة المفاتيح P47.3');
+  const keyboardTemplateName = await templateName.inputValue();
+
+  const createDraft = page.getByRole('button', { name: 'إنشاء المسودة' });
+  await createDraft.focus();
+  await createDraft.press('Enter');
+  await expect(page.getByRole('tab', { name: 'المعاينة' })).toBeVisible();
+
+  const previewTab = page.getByRole('tab', { name: 'المعاينة' });
+  const propertiesTab = page.getByRole('tab', { name: 'الخصائص' });
+  const structureTab = page.getByRole('tab', { name: 'البنية' });
+  await previewTab.focus();
+  await previewTab.press('ArrowRight');
+  await expect(propertiesTab).toBeFocused();
+  await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
+  await propertiesTab.press('ArrowLeft');
+  await expect(previewTab).toBeFocused();
+  await previewTab.press('Home');
+  await expect(structureTab).toBeFocused();
+  await expect(structureTab).toHaveAttribute('aria-selected', 'true');
+
+  const structurePanel = page.locator('#template-structure-panel');
+  const moveDownButtons = structurePanel.locator('button[aria-label*="لأسفل"]:not([disabled])');
+  const orderBefore = await moveDownButtons.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
+  expect(orderBefore.length).toBeGreaterThan(0);
+  const firstMoveDown = moveDownButtons.first();
+  await firstMoveDown.focus();
+  await firstMoveDown.press('Enter');
+  await expect.poll(() => moveDownButtons.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))).not.toEqual(orderBefore);
+
+  await saveEvidence('p47-3-keyboard-journey-mobile-360', {
+    templateName: keyboardTemplateName,
+    activeTab: await page.locator('[role="tab"][aria-selected="true"]').textContent(),
+    structureOrderBefore: orderBefore,
+    structureOrderAfter: await moveDownButtons.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
+  });
+});
