@@ -19,6 +19,7 @@ async function expectActionMenuWithinViewport(page: Page) {
   const menuBox = await menu.boundingBox();
   expect(menuBox).not.toBeNull();
   expect(menuBox!.x).toBeGreaterThanOrEqual(12);
+  expect(menuBox!.width).toBeLessThanOrEqual(352);
   expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(378);
   expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(832);
   await actions.click();
@@ -43,25 +44,38 @@ test('تفاصيل الفاتورة على الجوال: إجراءات ظاهر
   });
   expect(documentBeforeDetails).toBe(true);
 
+  const documentToggle = page.getByRole('button', { name: /^(Document|المستند)$/ });
+  await expect(page.locator('#invoice-document-content')).toBeVisible();
+
   const details = page.getByRole('button', { name: /^(Invoice details|تفاصيل الفاتورة)$/ });
-  await details.click();
   await expect(page.locator('#invoice-details-content')).toHaveCount(0);
   await details.click();
   await expect(page.locator('#invoice-details-content')).toBeVisible();
+  await details.click();
+  await expect(page.locator('#invoice-details-content')).toHaveCount(0);
+
+  const financial = page.getByRole('button', { name: /^(Financial summary|الملخص المالي)$/ });
+  await expect(page.locator('#invoice-financial-content')).toHaveCount(0);
+  await financial.click();
+  await expect(page.locator('#invoice-financial-content')).toBeVisible();
 
   const payments = page.getByRole('button', { name: /^(Payments|المدفوعات)/ });
   const paymentsPanel = page.locator('#acc-payments');
   await payments.scrollIntoViewIfNeeded();
-  await expect(paymentsPanel).toBeVisible();
-  await payments.click();
   await expect(paymentsPanel).toHaveCount(0);
   await payments.click();
   await expect(paymentsPanel).toBeVisible();
+  await payments.click();
+  await expect(paymentsPanel).toHaveCount(0);
 
   const revisions = page.getByRole('button', { name: /^(Change log|سجلّ التغييرات)$/ });
   await revisions.scrollIntoViewIfNeeded();
-  await revisions.click();
   await expect(page.locator('#revision-log-invoice-inv-118')).toHaveCount(0);
+
+  await documentToggle.click();
+  await expect(page.locator('#invoice-document-content')).toBeHidden();
+  await documentToggle.click();
+  await expect(page.locator('#invoice-document-content')).toBeVisible();
 
   await page.getByRole('button', { name: 'تبديل اللغة' }).click();
   await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');

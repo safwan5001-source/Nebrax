@@ -22,7 +22,7 @@ export function Dropdown({
   triggerLabel,
   triggerClassName,
   menuClassName,
-  mobileSheet = false,
+  mobilePopover = false,
 }: {
   trigger: React.ReactNode;
   children: React.ReactNode;
@@ -31,11 +31,13 @@ export function Dropdown({
   triggerLabel?: string;
   triggerClassName?: string;
   menuClassName?: string;
-  /** قائمة طويلة على الجوال: ورقة سفلية ثابتة تمنع خروجها من حافة الشاشة. */
-  mobileSheet?: boolean;
+  /** قائمة الجوال تُثبت تحت زرها وتُقاس داخل النافذة بدل أن تتحول إلى ورقة سفلية. */
+  mobilePopover?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [mobilePopoverPosition, setMobilePopoverPosition] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
 
   // تسجيل مُغلِق هذه القائمة في السجلّ العام (لتحقيق الفتح الحصري).
@@ -63,11 +65,38 @@ export function Dropdown({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !mobilePopover) return;
+    const placeWithinViewport = () => {
+      const anchor = rootRef.current?.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]');
+      const menu = menuRef.current;
+      if (!anchor || !menu) return;
+      const safeMargin = 12;
+      const anchorBox = anchor.getBoundingClientRect();
+      const preferredTop = anchorBox.bottom + 4;
+      const maximumTop = window.innerHeight - menu.offsetHeight - safeMargin;
+      const preferredLeft = anchorBox.right - menu.offsetWidth;
+      const maximumLeft = window.innerWidth - menu.offsetWidth - safeMargin;
+      setMobilePopoverPosition({
+        top: Math.max(safeMargin, Math.min(preferredTop, maximumTop)),
+        left: Math.max(safeMargin, Math.min(preferredLeft, maximumLeft)),
+      });
+    };
+    placeWithinViewport();
+    window.addEventListener('resize', placeWithinViewport);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      window.removeEventListener('resize', placeWithinViewport);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [close, mobilePopover, open]);
+
   function toggle() {
     if (open) {
       setOpen(false);
       return;
     }
+    setMobilePopoverPosition(null);
     // فتح حصري: أغلق كل القوائم الأخرى ثم افتح هذه.
     closers.forEach((c) => {
       if (c !== close) c();
@@ -93,18 +122,20 @@ export function Dropdown({
 
       {/* القائمة تبقى في DOM لانتقال ناعم؛ تُخفى من التفاعل/الوصول عند الإغلاق. */}
       <div
+        ref={menuRef}
         role="menu"
         aria-label={menuLabel}
         aria-hidden={!open}
+        style={mobilePopover ? (mobilePopoverPosition ?? { top: 12, left: 12 }) : undefined}
         className={cn(
-          mobileSheet
-            ? 'fixed inset-x-3 bottom-5 z-50 max-h-[calc(100dvh-2.5rem)] overflow-y-auto rounded border border-border bg-surface p-1 shadow-lg lg:absolute lg:inset-x-auto lg:bottom-auto lg:top-full lg:mt-1 lg:max-h-none lg:min-w-44 lg:shadow-md'
+          mobilePopover
+            ? 'fixed z-50 w-[min(22rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded border border-border bg-surface p-1 shadow-lg lg:absolute lg:w-auto lg:!left-auto lg:!top-auto lg:mt-1 lg:max-h-none lg:min-w-44 lg:shadow-md'
             : 'absolute top-full z-50 mt-1 min-w-44 rounded border border-border bg-surface p-1 shadow-md',
           'transition duration-150 ease-out',
-          mobileSheet
+          mobilePopover
             ? (align === 'end' ? 'lg:end-0' : 'lg:start-0')
             : (align === 'end' ? 'end-0' : 'start-0'),
-          open ? 'opacity-100 translate-y-0' : 'pointer-events-none translate-y-2 opacity-0',
+          open ? 'opacity-100 translate-y-0' : 'pointer-events-none translate-y-1 opacity-0',
           menuClassName
         )}
       >

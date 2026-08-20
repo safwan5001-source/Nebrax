@@ -182,9 +182,10 @@ export default function InvoiceDetailPage() {
   const [accounting, setAccounting] = useState<AccountingLinks | null>(null);
   const [relationsLoading, setRelationsLoading] = useState(true);
   const [relationsUnavailable, setRelationsUnavailable] = useState(false);
-  const [relationSection, setRelationSection] = useState<RelationSection | null>('payments');
-  const [detailsOpen, setDetailsOpen] = useState(true);
-  const [financialOpen, setFinancialOpen] = useState(true);
+  const [relationSection, setRelationSection] = useState<RelationSection | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [financialOpen, setFinancialOpen] = useState(false);
+  const [documentOpen, setDocumentOpen] = useState(true);
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
@@ -498,19 +499,24 @@ export default function InvoiceDetailPage() {
           {t('post')}
         </Button>
       )}
-      {canCollect && (
-        <Button size="sm" onClick={() => setPaymentOpen(true)}>
-          <Banknote className="h-4 w-4" strokeWidth={1.7} />
-          {t('add_payment')}
-        </Button>
-      )}
     </>
   );
 
   const documentPreview = (
     <Card>
-      <CardHeader className="no-print"><CardTitle>{t('document')}</CardTitle></CardHeader>
-      <CardContent className="print:p-0">
+      <CardHeader className="no-print p-0">
+        <button
+          type="button"
+          onClick={() => setDocumentOpen((value) => !value)}
+          aria-expanded={documentOpen}
+          aria-controls="invoice-document-content"
+          className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+        >
+          <CardTitle>{t('document')}</CardTitle>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${documentOpen ? 'rotate-180 text-primary' : ''}`} strokeWidth={2} />
+        </button>
+      </CardHeader>
+      <CardContent id="invoice-document-content" className={documentOpen ? 'print:p-0' : 'hidden print:block print:p-0'}>
         <div className="rounded border border-border bg-background p-3 print:border-0 print:bg-transparent print:p-0">
           <DocumentScaler>
             <InvoiceDocument
@@ -562,6 +568,7 @@ export default function InvoiceDetailPage() {
               triggerClassName="h-8 border border-border px-2 text-text hover:bg-primary-soft"
               trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}
             >
+              {canCollect && <DropdownItem icon={Banknote} onClick={() => setPaymentOpen(true)}>{t('add_payment')}</DropdownItem>}
               {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
               <DropdownItem icon={CalendarPlus} onClick={() => setAppointmentOpen(true)}>{t('schedule_appointment')}</DropdownItem>
               <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
@@ -585,10 +592,11 @@ export default function InvoiceDetailPage() {
               align="end"
               menuLabel={t('actions')}
               triggerLabel={t('actions')}
-              mobileSheet
+              mobilePopover
               triggerClassName="h-8 border border-border bg-surface px-2 text-text hover:bg-primary-soft"
               trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}
             >
+              {canCollect && <DropdownItem icon={Banknote} onClick={() => setPaymentOpen(true)}>{t('add_payment')}</DropdownItem>}
               {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
               <DropdownItem icon={CalendarPlus} onClick={() => setAppointmentOpen(true)}>{t('schedule_appointment')}</DropdownItem>
               <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
@@ -652,7 +660,7 @@ export default function InvoiceDetailPage() {
         </Card>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <section className="grid grid-cols-1 gap-4">
         <Card>
           <CardHeader className="p-0">
             <button type="button" onClick={() => setFinancialOpen((value) => !value)} aria-expanded={financialOpen} aria-controls="invoice-financial-content" className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40">
@@ -672,25 +680,14 @@ export default function InvoiceDetailPage() {
           </CardContent>}
         </Card>
 
-        <Card className="h-fit">
-          <CardHeader><CardTitle>{t('add_payment')}</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm leading-6 text-muted">{canCollect ? t('collect_available') : t('fully_paid')}</p>
-            <div className="flex items-center justify-between gap-3 rounded border border-border bg-background px-3 py-2.5">
-              <span className="text-sm text-muted">{t('remaining')}</span>
-              <span className="num text-sm font-semibold text-text">{formatRiyal(invoice.remaining)}</span>
-            </div>
-            {canCollect && <Button className="w-full" onClick={() => setPaymentOpen(true)}><Banknote className="h-4 w-4" strokeWidth={1.7} />{t('add_payment')}</Button>}
-          </CardContent>
-        </Card>
       </section>
 
       <section aria-label={t('relations')}>
         {relationsUnavailable && <p className="mb-3 rounded border border-border bg-muted/40 px-3 py-2 text-sm text-text">{t('relations_unavailable')}</p>}
         <Card className="hidden lg:block">
           <CardHeader><CardTitle>{t('relations')}</CardTitle></CardHeader>
-          <Tabs tabs={relationTabs} value={relationSection ?? 'payments'} onChange={(value) => setRelationSection(value as RelationSection)} />
-          <CardContent className="p-0"><TabPanel id={relationSection ?? 'payments'}>{relationSection ? relationContent : paymentsContent}</TabPanel></CardContent>
+          <Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as RelationSection)} />
+          {relationSection && <CardContent className="p-0"><TabPanel id={relationSection}>{relationContent}</TabPanel></CardContent>}
         </Card>
         <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => toggleRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="appointments" title={t('appointments')} count={relationsLoading ? undefined : appointments.length} open={relationSection === 'appointments'} onToggle={() => toggleRelationSection('appointments')}>{appointmentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => toggleRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => toggleRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => toggleRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
@@ -710,7 +707,7 @@ export default function InvoiceDetailPage() {
         />
       )}
 
-      <section aria-label={t('activity')}><RevisionLog type="invoice" id={id} collapsible /></section>
+      <section aria-label={t('activity')}><RevisionLog type="invoice" id={id} collapsible defaultOpen={false} /></section>
 
       <PaymentDialog
         open={paymentOpen}
