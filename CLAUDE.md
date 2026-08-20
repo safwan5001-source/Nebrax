@@ -51,7 +51,7 @@ app/Tenancy/           TenantContext, TenantScope, BelongsToTenant
 app/Services/Accounting/  LedgerService (المحرك), ChartOfAccountsSeeder, InvoiceService,
                           PaymentService, PurchaseService, ReturnService, InventoryService, ZatcaService
 app/Services/Reporting/   ReportService (ميزان/دخل/ميزانية/أستاذ/كشف طرف/أعمار)
-app/Support/           Money, Rbac, Plans, PlanGate
+app/Support/           ApplicationCatalog, Money, Rbac, Plans, PlanGate
 app/Http/Middleware/   SetTenant, EnsurePermission, EnsurePlatformAdministrator, EnsureActiveSubscription, EnforcePlanLimit, ForceJsonResponse
 app/Http/Controllers/Api/  Auth, PlatformAuth/PlatformDashboard (تشغيل داخلي منفصل), Partner, Product, Account, Invoice, Payment, Purchase, Return, Report
 app/Http/Requests/ · app/Http/Resources/   (تحقق المدخلات + تنسيق المخرجات)
@@ -103,6 +103,12 @@ web/                   واجهة Next.js 15 (انظر DESIGN_SYSTEM.md)
 
 > **ملاحظة:** شاشتا **المدفوعات** و**المرتجعات** مبنيّتان بالكامل وتظلّان متاحتين بمساراتهما
 > (`/payments`، `/returns`)؛ تُدمجان لاحقاً ضمن تدفّقات المبيعات/الحسابات في الشريط.
+
+## كتالوج التطبيقات — المرحلة الأولى
+
+`App\Support\ApplicationCatalog` هو مصدر حقيقة **نطاق المنتج** للتطبيقات: مفتاح ثابت، مجموعة نبراكس، نضج القدرة (`built` / `coming_soon` / `retired`)، إلزامية، واعتماديات صريحة. لا يخزن هذا الكتالوج قرار مستأجر بتفعيل تطبيق، ولا يستبدل RBAC أو الخطط أو فاحص الجاهزية؛ تلك مراحل لاحقة منفصلة عمداً.
+
+لا يجوز جعل قدرة `coming_soon` قابلة للتفعيل أو تخزين حالة `true` لها. كما لا تنقل حالات المفاتيح في حساب دفترة مرجعي إلى افتراضات مستأجري نبراكس. اختبار `ApplicationCatalogTest` يحرس مفاتيح الكتالوج واعتمادياته وصحة عقده.
 
 ## المحرك — العقد (Contract)
 
