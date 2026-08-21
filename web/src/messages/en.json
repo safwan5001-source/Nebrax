@@ -460,6 +460,7 @@
     "act_updated": "Edited {doc}",
     "act_status": "Status change on {doc}",
     "doc_invoice": "invoice",
+    "doc_purchase": "purchase invoice",
     "doc_quote": "quote",
     "doc_procurement": "purchase document",
     "doc_stocktake": "stocktake",

@@ -133,5 +133,10 @@ class PurchaseDetailRelationsTest extends TestCase
         $this->assertSame('purchase', DocumentRevision::typeKey(Purchase::class));
         $this->assertNotNull($revision);
         $this->assertSame('created', $revision->action);
+
+        $feed = $this->withToken($this->token)->getJson('/api/revisions?limit=10')->assertOk()['data'];
+        $purchaseRow = collect($feed)->firstWhere('document_type', 'purchase');
+        $this->assertNotNull($purchaseRow, 'تغذية لوحة التحكم تعرض نشاط فاتورة الشراء.');
+        $this->assertSame($purchase->number, $purchaseRow['document_number']);
     }
 }

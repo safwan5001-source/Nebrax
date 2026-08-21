@@ -537,6 +537,7 @@ export const mockBreakdown: Record<string, { key: string | null; label: string; 
 };
 
 export const mockFeed = [
+  { id: 'rv5', action: 'created', document_type: 'purchase', document_number: 'PUR-2026-0040', user_name: 'مستخدم المعاينة', created_at: '2026-08-10T10:16:00+03:00', changes: {} },
   { id: 'rv1', action: 'status', document_type: 'invoice', document_number: 'INV-2026-00023', user_name: 'مستخدم المعاينة', created_at: '2026-08-10T09:02:00+03:00', changes: {} },
   { id: 'rv2', action: 'created', document_type: 'invoice', document_number: 'INV-2026-00023', user_name: 'مستخدم المعاينة', created_at: '2026-08-09T16:41:00+03:00', changes: {} },
   { id: 'rv3', action: 'created', document_type: 'quote', document_number: 'QUO-2026-00007', user_name: 'مستخدم المعاينة', created_at: '2026-08-09T14:15:00+03:00', changes: {} },
