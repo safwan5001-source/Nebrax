@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Building2, LogOut, RefreshCw, ShieldCheck, Users2, UsersRound } from 'lucide-react';
+import { Building2, LogOut, RefreshCw, ShieldCheck, Tag, Users2, UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,11 +26,15 @@ interface MetricGroup {
 interface SubscriptionMetrics {
   active: number;
   trials: number;
+  renewals_next_7_days: number;
   renewals_next_30_days: number;
+  renewals_next_60_days: number;
   renewal_value_at_risk_minor: number;
   renewal_value_at_risk: string;
   monthly_recurring_revenue_minor: number;
   monthly_recurring_revenue: string;
+  annual_recurring_revenue_minor: number;
+  annual_recurring_revenue: string;
   average_active_subscription_minor: number;
   average_active_subscription: string;
   by_plan: Array<{
@@ -115,6 +119,10 @@ export default function PlatformDashboardPage() {
               <Users2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('manageTenants')}
             </Button>
+            <Button variant="outline" size="sm" onClick={() => router.push('/platform/prices')}>
+              <Tag className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              {t('managePrices')}
+            </Button>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
               {t('refresh')}
@@ -185,22 +193,12 @@ function SubscriptionCard({
             <p className="mt-1 text-xs leading-relaxed text-muted">{t('contractedRevenueNotice')}</p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-muted">{t('activeSubscriptions')}</p>
-              <p className="num mt-1 text-lg font-semibold text-text">{metrics.active}</p>
-            </div>
-            <div>
-              <p className="text-muted">{t('trials')}</p>
-              <p className="num mt-1 text-lg font-semibold text-text">{metrics.trials}</p>
-            </div>
-            <div>
-              <p className="text-muted">{t('renewalsNext30Days')}</p>
-              <p className="num mt-1 text-lg font-semibold text-text">{metrics.renewals_next_30_days}</p>
-            </div>
-            <div>
-              <p className="text-muted">{t('renewalValueAtRisk')}</p>
-              <p className="num mt-1 text-lg font-semibold text-text">{formatRiyal(metrics.renewal_value_at_risk)}</p>
-            </div>
+            <div><p className="text-muted">{t('annualRecurringRevenue')}</p><p className="num mt-1 text-lg font-semibold text-text">{formatRiyal(metrics.annual_recurring_revenue)}</p></div>
+            <div><p className="text-muted">{t('trials')}</p><p className="num mt-1 text-lg font-semibold text-text">{metrics.trials}</p></div>
+            <div><p className="text-muted">{t('renewalsNext7Days')}</p><p className="num mt-1 text-lg font-semibold text-text">{metrics.renewals_next_7_days}</p></div>
+            <div><p className="text-muted">{t('renewalsNext30Days')}</p><p className="num mt-1 text-lg font-semibold text-text">{metrics.renewals_next_30_days}</p></div>
+            <div><p className="text-muted">{t('renewalsNext60Days')}</p><p className="num mt-1 text-lg font-semibold text-text">{metrics.renewals_next_60_days}</p></div>
+            <div><p className="text-muted">{t('renewalValueAtRisk')}</p><p className="num mt-1 text-lg font-semibold text-text">{formatRiyal(metrics.renewal_value_at_risk)}</p></div>
           </div>
         </div>
 

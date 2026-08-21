@@ -4,31 +4,33 @@ namespace App\Console\Commands;
 
 use App\Models\PlatformSubscription;
 use App\Models\Tenant;
+use App\Support\PlatformSubscriptionLifecycle;
 use App\Support\Plans;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
- * يسجل عقد اشتراك للمنصة من مسار تشغيلي داخلي فقط.
+ * يسجل عقد اشتراك منصة من المسار التشغيلي الداخلي الموحد.
  *
- * لا يغيّر خطة المستأجر أو تواريخ وصوله في جدول tenants؛ تلك سياسة وصول مستقلة.
- * الهدف هنا إعطاء لوحة المنصة مصدراً قابلاً للتدقيق للإيراد الشهري المتعاقد عليه.
+ * السعر لا يدخل يدوياً: يُلتقط من كتالوج منصة مؤرخ وتكتب الخدمة حدثاً ثابتاً.
+ * لا يغير الأمر خطة وصول المستأجر ولا ينشئ فاتورة أو تحصيلاً.
  */
 class RecordPlatformSubscriptionCommand extends Command
 {
     protected $signature = 'platform:subscription:record
         {tenant : معرّف UUID أو slug للمستأجر}
         {--plan= : الخطة المتعاقد عليها: free أو basic أو pro أو enterprise}
-        {--monthly-minor= : المبلغ الشهري المتعاقد عليه بالهللات}
-        {--status=active : حالة العقد: trial أو active أو cancelled أو expired}
+        {--status=active : حالة العقد: trial أو active}
         {--starts-on= : تاريخ البدء YYYY-MM-DD، والافتراض اليوم}
         {--ends-on= : تاريخ الانتهاء YYYY-MM-DD (اختياري)}
-        {--reference= : مرجع خارجي فريد للعقد أو الفاتورة}';
+        {--reference= : مرجع خارجي فريد للعقد أو الفاتورة}
+        {--reason= : سبب تسجيل العقد}';
 
-    protected $description = 'تسجيل عقد اشتراك منصة لمؤشرات الإيراد الشهري المتعاقد عليه';
+    protected $description = 'تسجيل عقد منصة من كتالوج الأسعار لمؤشرات الإيراد الشهري المتعاقد عليه';
 
-    public function handle(): int
+    public function handle(PlatformSubscriptionLifecycle $lifecycle): int
     {
         $tenantKey = (string) $this->argument('tenant');
         $tenant = Tenant::query()
@@ -47,7 +49,6 @@ class RecordPlatformSubscriptionCommand extends Command
 
         $plan = (string) $this->option('plan');
         $status = (string) $this->option('status');
-        $monthlyMinor = $this->option('monthly-minor');
         $reference = trim((string) ($this->option('reference') ?? '')) ?: null;
 
         if (! array_key_exists($plan, Plans::PLANS)) {
@@ -56,21 +57,8 @@ class RecordPlatformSubscriptionCommand extends Command
             return self::FAILURE;
         }
 
-        if (! in_array($status, PlatformSubscription::STATUSES, true)) {
-            $this->error('حالة العقد غير صالحة. استخدم: ' . implode('، ', PlatformSubscription::STATUSES) . '.');
-
-            return self::FAILURE;
-        }
-
-        if ($monthlyMinor === null || ! ctype_digit((string) $monthlyMinor)) {
-            $this->error('مرّر --monthly-minor كمبلغ صحيح بالهللات، مثل 99000 لمبلغ 990.00 ر.س.');
-
-            return self::FAILURE;
-        }
-
-        $monthlyMinor = (int) $monthlyMinor;
-        if ($status === PlatformSubscription::STATUS_ACTIVE && $monthlyMinor < 1) {
-            $this->error('العقد النشط يحتاج مبلغاً شهرياً متعاقداً عليه أكبر من صفر.');
+        if (! in_array($status, [PlatformSubscription::STATUS_ACTIVE, PlatformSubscription::STATUS_TRIAL], true)) {
+            $this->error('حالة العقد غير صالحة. استخدم: trial أو active.');
 
             return self::FAILURE;
         }
@@ -86,49 +74,26 @@ class RecordPlatformSubscriptionCommand extends Command
             return self::FAILURE;
         }
 
-        if ($endsOn && $endsOn->lessThan($startsOn)) {
-            $this->error('تاريخ الانتهاء لا يمكن أن يسبق تاريخ البدء.');
+        try {
+            $lifecycle->createContract(
+                tenant: $tenant,
+                administrator: null,
+                plan: $plan,
+                currency: PlatformSubscription::CURRENCY_SAR,
+                startsOn: $startsOn,
+                endsOn: $endsOn,
+                externalReference: $reference,
+                reason: $this->option('reason'),
+                status: $status,
+            );
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
 
             return self::FAILURE;
         }
 
-        if ($reference && PlatformSubscription::withTrashed()->where('tenant_id', $tenant->id)->where('external_reference', $reference)->exists()) {
-            $this->error('مرجع العقد مستخدم سابقاً لهذا المستأجر.');
-
-            return self::FAILURE;
-        }
-
-        if ($status === PlatformSubscription::STATUS_ACTIVE && $this->hasOverlappingActiveSubscription($tenant->id, $startsOn, $endsOn)) {
-            $this->error('يوجد عقد نشط متداخل لهذا المستأجر؛ أغلِق العقد السابق أو استخدم تاريخ بدء لاحقاً.');
-
-            return self::FAILURE;
-        }
-
-        PlatformSubscription::create([
-            'tenant_id'          => $tenant->id,
-            'plan'               => $plan,
-            'status'             => $status,
-            'monthly_amount'     => $monthlyMinor,
-            'starts_on'          => $startsOn->toDateString(),
-            'ends_on'            => $endsOn?->toDateString(),
-            'cancelled_at'       => $status === PlatformSubscription::STATUS_CANCELLED ? now() : null,
-            'external_reference' => $reference,
-        ]);
-
-        $this->info('تم تسجيل عقد الاشتراك لمؤشرات منصة Nebrax.');
+        $this->info('تم تسجيل عقد الاشتراك من كتالوج أسعار منصة Nebrax.');
 
         return self::SUCCESS;
-    }
-
-    private function hasOverlappingActiveSubscription(string $tenantId, CarbonImmutable $startsOn, ?CarbonImmutable $endsOn): bool
-    {
-        return PlatformSubscription::query()
-            ->where('tenant_id', $tenantId)
-            ->where('status', PlatformSubscription::STATUS_ACTIVE)
-            ->whereDate('starts_on', '<=', $endsOn?->toDateString() ?? '9999-12-31')
-            ->where(function ($query) use ($startsOn): void {
-                $query->whereNull('ends_on')->orWhereDate('ends_on', '>=', $startsOn->toDateString());
-            })
-            ->exists();
     }
 }

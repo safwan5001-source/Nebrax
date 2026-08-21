@@ -22,11 +22,10 @@ class PlatformMetrics
             ->activeOn($today)
             ->where('currency', PlatformSubscription::CURRENCY_SAR);
         $monthlyRecurringRevenueMinor = (int) (clone $activeSubscriptions)->sum('monthly_amount');
-        $renewalDeadline = $today->addDays(30);
-        $renewals = (clone $activeSubscriptions)
-            ->whereNotNull('ends_on')
-            ->whereBetween('ends_on', [$today->toDateString(), $renewalDeadline->toDateString()]);
-        $renewalValueMinor = (int) (clone $renewals)->sum('monthly_amount');
+        $renewalsNext7 = $this->renewalsWithin($activeSubscriptions, $today, 7);
+        $renewalsNext30 = $this->renewalsWithin($activeSubscriptions, $today, 30);
+        $renewalsNext60 = $this->renewalsWithin($activeSubscriptions, $today, 60);
+        $renewalValueMinor = (int) (clone $renewalsNext30)->sum('monthly_amount');
         $activeSubscriptionCount = (clone $activeSubscriptions)->count();
         $averageActiveSubscriptionMinor = $activeSubscriptionCount === 0
             ? 0
@@ -46,16 +45,27 @@ class PlatformMetrics
             'subscriptions' => [
                 'active'                           => $activeSubscriptionCount,
                 'trials'                           => $this->trialsAt($today),
-                'renewals_next_30_days'            => (clone $renewals)->count(),
+                'renewals_next_7_days'             => (clone $renewalsNext7)->count(),
+                'renewals_next_30_days'            => (clone $renewalsNext30)->count(),
+                'renewals_next_60_days'            => (clone $renewalsNext60)->count(),
                 'renewal_value_at_risk_minor'      => $renewalValueMinor,
                 'renewal_value_at_risk'            => Money::toRiyal($renewalValueMinor),
                 'monthly_recurring_revenue_minor'  => $monthlyRecurringRevenueMinor,
                 'monthly_recurring_revenue'        => Money::toRiyal($monthlyRecurringRevenueMinor),
+                'annual_recurring_revenue_minor'   => $monthlyRecurringRevenueMinor * 12,
+                'annual_recurring_revenue'         => Money::toRiyal($monthlyRecurringRevenueMinor * 12),
                 'average_active_subscription_minor' => $averageActiveSubscriptionMinor,
                 'average_active_subscription' => Money::toRiyal($averageActiveSubscriptionMinor),
                 'by_plan' => $this->activeByPlan($today),
             ],
         ];
+    }
+
+    private function renewalsWithin($activeSubscriptions, CarbonImmutable $today, int $days)
+    {
+        return (clone $activeSubscriptions)
+            ->whereNotNull('ends_on')
+            ->whereBetween('ends_on', [$today->toDateString(), $today->addDays($days)->toDateString()]);
     }
 
     /** @return array<int, array{plan: string, active: int, monthly_recurring_revenue_minor: int, monthly_recurring_revenue: string}> */

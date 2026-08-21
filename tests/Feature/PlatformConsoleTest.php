@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\PlatformAdministrator;
+use App\Models\PlatformPriceVersion;
 use App\Models\PlatformSubscription;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -81,9 +82,13 @@ class PlatformConsoleTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.subscriptions.active', 2)
             ->assertJsonPath('data.subscriptions.trials', 1)
+            ->assertJsonPath('data.subscriptions.renewals_next_7_days', 0)
             ->assertJsonPath('data.subscriptions.renewals_next_30_days', 1)
+            ->assertJsonPath('data.subscriptions.renewals_next_60_days', 1)
             ->assertJsonPath('data.subscriptions.monthly_recurring_revenue_minor', 298000)
             ->assertJsonPath('data.subscriptions.monthly_recurring_revenue', '2980.00')
+            ->assertJsonPath('data.subscriptions.annual_recurring_revenue_minor', 3576000)
+            ->assertJsonPath('data.subscriptions.annual_recurring_revenue', '35760.00')
             ->assertJsonPath('data.subscriptions.renewal_value_at_risk_minor', 199000)
             ->assertJsonPath('data.subscriptions.by_plan.0.plan', 'basic')
             ->assertJsonPath('data.subscriptions.by_plan.0.active', 1)
@@ -135,11 +140,16 @@ class PlatformConsoleTest extends TestCase
     public function platform_subscription_command_records_an_active_contract_and_rejects_an_overlap(): void
     {
         $tenant = $this->registerTenant('contract', 'owner@contract.test');
+        PlatformPriceVersion::create([
+            'plan' => 'pro', 'currency' => 'SAR', 'monthly_amount' => 199000, 'effective_on' => now()->toDateString(),
+        ]);
+        PlatformPriceVersion::create([
+            'plan' => 'basic', 'currency' => 'SAR', 'monthly_amount' => 99000, 'effective_on' => now()->toDateString(),
+        ]);
 
         $this->artisan('platform:subscription:record', [
             'tenant'          => 'contract',
             '--plan'          => 'pro',
-            '--monthly-minor' => '199000',
             '--starts-on'     => now()->toDateString(),
             '--reference'     => 'contract-001',
         ])->assertExitCode(0);
@@ -154,7 +164,6 @@ class PlatformConsoleTest extends TestCase
         $this->artisan('platform:subscription:record', [
             'tenant'          => 'contract',
             '--plan'          => 'basic',
-            '--monthly-minor' => '99000',
             '--starts-on'     => now()->toDateString(),
             '--reference'     => 'contract-002',
         ])->assertExitCode(1);
@@ -164,6 +173,9 @@ class PlatformConsoleTest extends TestCase
     public function platform_subscription_command_rejects_a_reused_reference_from_a_soft_deleted_contract(): void
     {
         $tenant = $this->registerTenant('contract', 'owner@contract.test');
+        PlatformPriceVersion::create([
+            'plan' => 'basic', 'currency' => 'SAR', 'monthly_amount' => 99000, 'effective_on' => now()->toDateString(),
+        ]);
 
         $subscription = PlatformSubscription::create([
             'tenant_id'          => $tenant['tenant_id'],
@@ -178,7 +190,6 @@ class PlatformConsoleTest extends TestCase
         $this->artisan('platform:subscription:record', [
             'tenant'          => 'contract',
             '--plan'          => 'basic',
-            '--monthly-minor' => '99000',
             '--starts-on'     => now()->toDateString(),
             '--reference'     => 'contract-001',
         ])->assertExitCode(1);
