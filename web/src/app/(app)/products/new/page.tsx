@@ -16,6 +16,7 @@ import { getSystemTaxInclusive } from '@/lib/tax';
 
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
+interface Listed { id: string; name: string }
 
 export default function NewProductPage() {
   const t = useTranslations('products');
@@ -29,6 +30,8 @@ export default function NewProductPage() {
   const [barcode, setBarcode] = useState('');
   const [type, setType] = useState('good');
   const [unit, setUnit] = useState('piece');
+  const [unitTemplateId, setUnitTemplateId] = useState('');
+  const [templates, setTemplates] = useState<Listed[]>([]);
   const [salePrice, setSalePrice] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [taxRate, setTaxRate] = useState('15');
@@ -60,6 +63,7 @@ export default function NewProductPage() {
     api<{ data: Partner[] }>('/partners')
       .then((r) => setSuppliers(r.data.filter((p) => p.type === 'supplier' || p.type === 'both')))
       .catch(() => {});
+    api<{ data: Listed[] }>('/unit-templates').then((r) => setTemplates(r.data)).catch(() => {});
     api<{ data: Account[] }>('/accounts')
       .then((r) => {
         const leaf = r.data.filter((a) => !a.is_group);
@@ -83,6 +87,7 @@ export default function NewProductPage() {
           barcode: barcode || null,
           type,
           unit: unit || null,
+          unit_template_id: unitTemplateId || null,
           sale_price: riyalToMinor(salePrice),
           purchase_price: riyalToMinor(purchasePrice),
           tax_rate: Number(taxRate) || 0,
@@ -154,6 +159,14 @@ export default function NewProductPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="unit">{t('unit')}</Label>
                 <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="unit-template">{t('unit_template')}</Label>
+                <Select id="unit-template" value={unitTemplateId} onChange={(e) => setUnitTemplateId(e.target.value)}>
+                  <option value="">{t('no_unit_template')}</option>
+                  {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+                </Select>
+                <p className="text-xs text-muted">{t('unit_template_hint')}</p>
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="barcode">{t('barcode')}</Label>
