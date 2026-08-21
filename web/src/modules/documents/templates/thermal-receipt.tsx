@@ -9,7 +9,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === '') return null;
   return (
     <div className="flex justify-between gap-2">
-      <span className="text-gray-500">{label}</span>
+      <span className="text-muted">{label}</span>
       <span className="font-medium">{value}</span>
     </div>
   );
@@ -29,7 +29,7 @@ export function ThermalReceipt({
   const t = useTranslations('invoiceDoc');
   const dt = useTranslations('documentTypes');
   const tv = useTranslations('voucherDoc');
-  const rule = 'my-2 border-t border-dashed border-gray-400';
+  const rule = 'my-2 border-t border-dashed border-border';
   const v = model.voucher;
 
   return (
@@ -37,7 +37,18 @@ export function ThermalReceipt({
       <div className="text-center">
         <div className="text-[13px] font-bold">{model.seller.name || '—'}</div>
         {model.seller.vatNumber && (
-          <div className="num text-[10px] text-gray-600">{t('vat_number')}: {model.seller.vatNumber}</div>
+          <div className="num text-[10px] text-muted">{t('vat_number')}: {model.seller.vatNumber}</div>
+        )}
+        {model.seller.crNumber && (
+          <div className="num text-[10px] text-muted">{t('cr_number')}: {model.seller.crNumber}</div>
+        )}
+        {model.seller.address && (
+          <div className="mt-0.5 break-words text-[9px] text-muted">{model.seller.address}</div>
+        )}
+        {(model.seller.mobile || model.seller.phone) && (
+          <div className="num mt-0.5 text-[10px] text-muted" dir="ltr">
+            {model.seller.mobile || model.seller.phone}
+          </div>
         )}
         <div className="mt-1 text-[12px] font-bold" style={{ color: 'var(--doc-brand)' }}>{dt(model.type)}</div>
       </div>
@@ -67,12 +78,12 @@ export function ThermalReceipt({
           {v.allocations && v.allocations.length > 0 && (
             <>
               <div className={rule} />
-              <div className="text-[10px] text-gray-500">{tv('applied_to')}</div>
+              <div className="text-[10px] text-muted">{tv('applied_to')}</div>
               <div className="mt-1 space-y-0.5">
                 {v.allocations.map((a, i) => (
-                  <div key={i} className="flex justify-between text-gray-600">
+                  <div key={i} className="flex justify-between text-muted">
                     <span className="num">{a.label}</span>
-                    <span className="num text-black">{formatMoney(a.amount)}</span>
+                    <span className="num text-text">{formatMoney(a.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -87,9 +98,9 @@ export function ThermalReceipt({
             {model.lines.map((line) => (
               <div key={line.id}>
                 <div className="truncate">{line.description || '—'}</div>
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-muted">
                   <span className="num">{line.quantity} × {formatMoney(line.unitPrice)}</span>
-                  <span className="num text-black">{formatMoney(line.total)}</span>
+                  <span className="num text-text">{formatMoney(line.total)}</span>
                 </div>
               </div>
             ))}
@@ -114,7 +125,7 @@ export function ThermalReceipt({
       )}
 
       <div className={rule} />
-      <div className="text-center text-[10px] text-gray-500">{model.footerText ?? t('footer')}</div>
+      <div className="text-center text-[10px] text-muted">{model.footerText ?? t('footer')}</div>
     </ThermalLayout>
   );
 }
