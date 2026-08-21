@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -40,6 +41,7 @@ class PlatformSubscription extends Model
 
     protected $fillable = [
         'tenant_id',
+        'platform_price_version_id',
         'plan',
         'status',
         'monthly_amount',
@@ -63,6 +65,16 @@ class PlatformSubscription extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function priceVersion(): BelongsTo
+    {
+        return $this->belongsTo(PlatformPriceVersion::class, 'platform_price_version_id');
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(PlatformSubscriptionEvent::class, 'platform_subscription_id')->orderByDesc('created_at');
     }
 
     /** نطاق الاشتراكات المتعاقد عليها والنافذة في تاريخ محدد. */

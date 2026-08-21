@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PlatformAuthController;
 use App\Http\Controllers\Api\PlatformDashboardController;
+use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformTenantController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
@@ -128,6 +129,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         ->prefix('platform')
         ->group(function () {
             Route::patch('tenants/{tenant}', [PlatformTenantController::class, 'update']);
+            Route::get('prices', [PlatformSubscriptionController::class, 'prices']);
+            Route::post('prices', [PlatformSubscriptionController::class, 'storePrice']);
+            Route::post('tenants/{tenant}/subscriptions', [PlatformSubscriptionController::class, 'store']);
+            Route::post('subscriptions/{subscription}/transition', [PlatformSubscriptionController::class, 'transition']);
+            Route::post('subscriptions/{subscription}/cancel', [PlatformSubscriptionController::class, 'cancel']);
+            Route::post('subscriptions/{subscription}/expire', [PlatformSubscriptionController::class, 'expire']);
+            Route::get('subscriptions/{subscription}/events', [PlatformSubscriptionController::class, 'events']);
         });
 
     // محمي: مصادقة Sanctum + ضبط المستأجر (العزل التلقائي)

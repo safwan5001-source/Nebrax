@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\PlatformAdministrator;
 use App\Models\PlatformAdministratorAction;
+use App\Models\PlatformPriceVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -82,11 +83,13 @@ class PlatformTenantManagementTest extends TestCase
     {
         $tenant = $this->registerTenant('alpha', 'owner@alpha.test');
         $token = $this->administratorToken();
+        PlatformPriceVersion::create([
+            'plan' => 'pro', 'currency' => 'SAR', 'monthly_amount' => 199000, 'effective_on' => now()->toDateString(),
+        ]);
 
         $this->artisan('platform:subscription:record', [
             'tenant'          => 'alpha',
             '--plan'          => 'pro',
-            '--monthly-minor' => '199000',
             '--starts-on'     => now()->toDateString(),
         ])->assertExitCode(0);
 

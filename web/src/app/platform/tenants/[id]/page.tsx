@@ -10,22 +10,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { ContractManagementCard, type ContractSubscription } from '@/components/platform/contract-management-card';
 import { ApiError } from '@/lib/api';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
 
 const PLAN_OPTIONS = ['free', 'basic', 'pro', 'enterprise'] as const;
 
-interface Subscription {
-  id: string;
-  plan: string;
-  status: string;
-  monthly_amount: string;
-  currency: string;
-  starts_on: string | null;
-  ends_on: string | null;
-}
+interface Subscription extends ContractSubscription {}
 
 interface TenantDetail {
   id: string;
@@ -241,39 +233,7 @@ export default function PlatformTenantDetailPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader><CardTitle>{t('subscriptionHistory')}</CardTitle></CardHeader>
-              <CardContent>
-                {tenant.subscriptions.length === 0 ? (
-                  <p className="text-sm text-muted">{t('noSubscriptionHistory')}</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <THead>
-                        <TR>
-                          <TH>{t('plan')}</TH>
-                          <TH>{t('status')}</TH>
-                          <TH className="text-end">{t('monthlyAmount')}</TH>
-                          <TH>{t('startsOn')}</TH>
-                          <TH>{t('endsOn')}</TH>
-                        </TR>
-                      </THead>
-                      <TBody>
-                        {tenant.subscriptions.map((s) => (
-                          <TR key={s.id}>
-                            <TD>{s.plan}</TD>
-                            <TD><Badge tone="muted">{s.status}</Badge></TD>
-                            <TD className="num text-end">{s.monthly_amount}</TD>
-                            <TD className="num text-muted">{s.starts_on ?? '—'}</TD>
-                            <TD className="num text-muted">{s.ends_on ?? '—'}</TD>
-                          </TR>
-                        ))}
-                      </TBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <ContractManagementCard tenantId={tenantId} subscriptions={tenant.subscriptions} onChanged={load} />
 
             <p className="text-center text-xs text-muted">{t('auditNotice')}</p>
           </>

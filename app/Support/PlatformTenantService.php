@@ -45,9 +45,10 @@ class PlatformTenantService
             ->findOrFail($tenantId);
 
         $subscriptions = PlatformSubscription::query()
+            ->with('priceVersion')
             ->where('tenant_id', $tenant->id)
             ->orderByDesc('starts_on')
-            ->get(['id', 'plan', 'status', 'monthly_amount', 'currency', 'starts_on', 'ends_on'])
+            ->get(['id', 'platform_price_version_id', 'plan', 'status', 'monthly_amount', 'currency', 'starts_on', 'ends_on', 'external_reference'])
             ->map(fn (PlatformSubscription $s) => [
                 'id'                   => $s->id,
                 'plan'                 => $s->plan,
@@ -57,6 +58,9 @@ class PlatformTenantService
                 'currency'             => $s->currency,
                 'starts_on'            => $s->starts_on?->toDateString(),
                 'ends_on'              => $s->ends_on?->toDateString(),
+                'external_reference'    => $s->external_reference,
+                'price_version_id'      => $s->platform_price_version_id,
+                'price_effective_on'    => $s->priceVersion?->effective_on?->toDateString(),
             ])
             ->all();
 
