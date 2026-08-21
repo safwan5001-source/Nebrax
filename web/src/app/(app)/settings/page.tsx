@@ -1,15 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import {
   Building2,
   CircleAlert,
-  Download,
-  Globe2,
-  LockKeyhole,
   Pencil,
-  ShieldCheck,
   UserRound,
   UsersRound,
 } from 'lucide-react';
@@ -19,8 +15,11 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TabPanel, Tabs, type TabDef } from '@/components/ui/tabs';
 import { CompanyDialog } from '@/components/settings/company-dialog';
+import { AccountPreferencesCard } from '@/components/settings/account-preferences-card';
+import { AccountSecurityCard } from '@/components/settings/account-security-card';
+import { AccountDataExportCard } from '@/components/settings/account-data-export-card';
 import { api } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
+import { currentUser, persistUser, type AuthUser } from '@/lib/auth';
 import type { Company } from '@/lib/company';
 
 type AccountTab = 'account' | 'subscription' | 'security' | 'data';
@@ -78,8 +77,7 @@ function SectionTitle({ icon: Icon, children }: { icon: typeof Building2; childr
 
 export default function SettingsPage() {
   const t = useTranslations('settings');
-  const locale = useLocale();
-  const user = currentUser();
+  const [user, setUser] = useState<AuthUser | null>(() => currentUser());
   const canManage = user?.role === 'owner' || user?.role === 'admin';
 
   const [tab, setTab] = useState<AccountTab>('account');
@@ -105,8 +103,14 @@ export default function SettingsPage() {
     setLoadingCompany(true);
     setCompanyError(false);
 
-    api<{ company: Company }>('/me')
-      .then((response) => setCompany(response.company))
+    api<{ company: Company; user?: AuthUser }>('/me')
+      .then((response) => {
+        setCompany(response.company);
+        if (response.user) {
+          persistUser(response.user);
+          setUser(response.user);
+        }
+      })
       .catch(() => setCompanyError(true))
       .finally(() => setLoadingCompany(false));
   }, []);
@@ -234,63 +238,9 @@ export default function SettingsPage() {
     </Card>
   );
 
-  const preferenceCard = (
-    <Card>
-      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <SectionTitle icon={Globe2}>{t('preferences')}</SectionTitle>
-          <p className="text-sm text-muted">{t('preferences_hint')}</p>
-        </div>
-        <Badge tone="muted">{t('coming_soon')}</Badge>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-2 text-sm">
-          <span className="rounded border border-border bg-background px-2.5 py-1.5 text-text">{locale === 'ar' ? t('arabic') : t('english')}</span>
-          <span className="rounded border border-border bg-background px-2.5 py-1.5 text-muted">{t('preferences_not_configured')}</span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const securityCard = (
-    <Card>
-      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <SectionTitle icon={ShieldCheck}>{t('security_access')}</SectionTitle>
-          <p className="text-sm text-muted">{t('security_hint')}</p>
-        </div>
-        <Badge tone="muted">{t('coming_soon')}</Badge>
-      </CardHeader>
-      <CardContent>
-        <dl>
-          <DetailRow label={t('email')} value={user?.email ?? '—'} numeric />
-          <DetailRow label={t('password')} value={t('password_protected')} />
-        </dl>
-        <div className="mt-4 rounded border border-border bg-background px-3 py-2.5 text-sm text-muted">
-          <LockKeyhole className="me-2 inline h-4 w-4 align-text-bottom" strokeWidth={1.7} aria-hidden="true" />
-          {t('security_not_available')}
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const dataCard = (
-    <Card>
-      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <SectionTitle icon={Download}>{t('data_privacy')}</SectionTitle>
-          <p className="text-sm text-muted">{t('data_privacy_hint')}</p>
-        </div>
-        <Badge tone="muted">{t('coming_soon')}</Badge>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded border border-border bg-background px-3 py-2.5 text-sm text-muted">
-          <CircleAlert className="me-2 inline h-4 w-4 align-text-bottom" strokeWidth={1.7} aria-hidden="true" />
-          {t('data_export_not_available')}
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const preferenceCard = <AccountPreferencesCard user={user} onSaved={setUser} />;
+  const securityCard = <AccountSecurityCard user={user} onUserChanged={setUser} />;
+  const dataCard = <AccountDataExportCard isOwner={user?.role === 'owner'} />;
 
   return (
     <div className="space-y-5">

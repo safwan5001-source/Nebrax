@@ -10,6 +10,7 @@ export interface AuthUser {
   role: string;
   employee_id?: string | null;
   tenant_id: string;
+  preferences?: { locale: 'ar' | 'en'; theme: 'system' | 'light' | 'dark' };
 }
 
 /**
@@ -37,7 +38,7 @@ export async function login(email: string, password: string): Promise<AuthUser> 
   });
   clearSessionPreferences(); // لا يرث الحسابُ الجديد فرعَ الحساب السابق
   setToken(res.token);
-  localStorage.setItem('user', JSON.stringify(res.user));
+  persistUser(res.user);
   return res.user;
 }
 
@@ -62,7 +63,7 @@ export async function register(payload: RegisterPayload): Promise<AuthUser> {
     body: payload,
   });
   setToken(res.token);
-  localStorage.setItem('user', JSON.stringify(res.user));
+  persistUser(res.user);
   return res.user;
 }
 
@@ -74,6 +75,15 @@ export async function logout(): Promise<void> {
   }
   clearToken();
   clearSessionPreferences();
+}
+
+export function persistUser(user: AuthUser): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('user', JSON.stringify(user));
+  const locale = user.preferences?.locale;
+  if (locale) document.cookie = `locale=${locale}; path=/; max-age=31536000; samesite=lax`;
+  const theme = user.preferences?.theme;
+  if (theme) localStorage.setItem('theme', theme);
 }
 
 export function currentUser(): AuthUser | null {

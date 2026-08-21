@@ -18,7 +18,7 @@ class User extends Authenticatable
     protected $keyType = 'string';
 
     protected $fillable = [
-        'tenant_id', 'employee_id', 'name', 'email', 'phone', 'password', 'role', 'permissions', 'is_active',
+        'tenant_id', 'employee_id', 'name', 'email', 'phone', 'password', 'role', 'permissions', 'preferences', 'is_active',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -27,6 +27,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password'          => 'hashed',
         'permissions'       => 'array',
+        'preferences'       => 'array',
         'is_active'         => 'boolean',
     ];
 
