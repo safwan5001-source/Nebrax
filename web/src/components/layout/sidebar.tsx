@@ -177,10 +177,14 @@ const GROUPS: NavGroup[] = [
     icon: UserCog,
     items: [
       { href: '/hr', icon: UserCog, key: 'employees', built: true },
-      { href: '/attendance', icon: Fingerprint, key: 'attendance' },
-      { href: '/payroll', icon: Banknote, key: 'payroll' },
-      { href: '/contracts', icon: FileSignature, key: 'contracts' },
-      { href: '/requests', icon: Inbox, key: 'requests' },
+      // الأربعة التالية تبويبات داخل /hr نفسها، لا صفحات مستقلة — التوجيه
+      // بمعامل ?tab يفتحها مباشرة (كانت روابط منفصلة تؤدي إلى 404).
+      { href: '/hr?tab=attendance', icon: Fingerprint, key: 'attendance', built: true },
+      { href: '/hr?tab=runs', icon: Banknote, key: 'payroll', built: true },
+      // لا تبويب "كل العقود" مستقلاً — العقود تفصيلية لكل موظف، فالرابط
+      // يفتح قائمة الموظفين ليختار المستخدم ثم يفتح تبويب عقوده.
+      { href: '/hr', icon: FileSignature, key: 'contracts', built: true },
+      { href: '/hr?tab=requests', icon: Inbox, key: 'requests', built: true },
     ],
   },
   {
