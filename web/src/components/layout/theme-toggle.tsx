@@ -1,12 +1,15 @@
 'use client';
 
+/** اتجاه التصميم: «المكتب الواثق» — أدوات رأس صغيرة باسم واضح وحلقة تركيز موحّدة. */
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
+import { useTranslations } from 'next-intl';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from '../ui/button';
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const t = useTranslations('common');
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -15,7 +18,7 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       className="h-11 w-11"
-      aria-label="تبديل الوضع"
+      aria-label={t('themeToggle')}
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
     >
       {mounted && theme === 'dark' ? (

@@ -1,8 +1,15 @@
 'use client';
 
+/**
+ * اتجاه التصميم: «المكتب الواثق» — مسرح منتج غير متماثل، نص عربي مباشر،
+ * ولقطتا سطح المكتب والجوال هما الدليل البصري مع تبديل مصدر واحد لكل سمة.
+ */
+import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useTheme } from 'next-themes';
 import {
   ArrowLeft,
   BarChart3,
@@ -64,16 +71,34 @@ const JOURNEY: { icon: LucideIcon; title: string; desc: string }[] = [
 export default function LandingPage() {
   const t = useTranslations('landing');
   const router = useRouter();
+  const { resolvedTheme } = useTheme();
+  const [themeReady, setThemeReady] = useState(false);
+
+  useEffect(() => {
+    setThemeReady(true);
+  }, []);
+
+  const isDark = themeReady && resolvedTheme === 'dark';
 
   function enterDemo() {
     enableDemo();
     router.push('/dashboard');
   }
 
+  const ghostActionClass = 'inline-flex h-8 items-center justify-center rounded px-3 text-sm font-medium text-text transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background';
+  const outlineActionClass = 'inline-flex h-11 w-full items-center justify-center rounded border border-border bg-surface px-5 text-base font-medium text-text transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto';
+
   return (
     <div
       className="min-h-screen overflow-x-hidden bg-background text-text"
     >
+      <a
+        href="#main-content"
+        className="sr-only absolute start-4 top-4 z-50 rounded bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm focus:not-sr-only focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        onClick={() => window.requestAnimationFrame(() => document.getElementById('main-content')?.focus())}
+      >
+        {t('skip_to_content')}
+      </a>
       <header className="sticky top-0 z-20 border-b border-border/80 bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center" aria-label={t('brand_aria')}>
@@ -83,9 +108,7 @@ export default function LandingPage() {
           <div className="ms-auto flex items-center gap-1.5 sm:gap-2">
             <LangToggle />
             <ThemeToggle />
-            <Link href="/login" className="hidden sm:block">
-              <Button variant="ghost" size="sm" className="px-3">{t('cta_login')}</Button>
-            </Link>
+            <Link href="/login" className={`hidden sm:inline-flex ${ghostActionClass}`}>{t('cta_login')}</Link>
             <Button size="sm" className="px-3 sm:px-4" onClick={enterDemo}>
               {t('cta_demo')}
               <ArrowLeft className="h-4 w-4" strokeWidth={2} />
@@ -94,17 +117,18 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main>
-        <section className="border-b border-border bg-primary-soft/35">
-          <div className="mx-auto grid w-full max-w-7xl items-center gap-10 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1.02fr_0.98fr] lg:gap-14 lg:px-8 lg:py-24">
-            <div className="max-w-2xl">
-              <p className="mb-5 text-sm font-semibold text-primary">
+      <main id="main-content" tabIndex={-1} className="outline-none">
+        <section className="relative overflow-hidden border-b border-border bg-background">
+          <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[0.78fr_1.22fr] lg:gap-10 lg:px-8 lg:py-24">
+            <div className="max-w-xl">
+              <p className="mb-5 inline-flex items-center gap-2 border-b-2 border-primary pb-2 text-sm font-semibold text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
                 {t('tagline')}
               </p>
-              <h1 className="max-w-xl text-4xl font-bold leading-[1.18] tracking-tight sm:text-5xl lg:text-[3.35rem]">
+              <h1 className="max-w-xl text-4xl font-bold leading-[1.16] tracking-tight sm:text-5xl lg:text-[3.65rem]">
                 {t('hero_title')}
               </h1>
-              <p className="mt-5 max-w-xl text-base leading-8 text-muted sm:text-lg">
+              <p className="mt-6 max-w-xl text-base leading-8 text-muted sm:text-lg">
                 {t('hero_subtitle')}
               </p>
 
@@ -113,14 +137,12 @@ export default function LandingPage() {
                   {t('cta_demo')}
                   <ArrowLeft className="h-4 w-4" strokeWidth={2} />
                 </Button>
-                <Link href="/login" className="w-full sm:w-auto">
-                  <Button variant="outline" size="md" className="h-11 w-full px-5 text-base sm:w-auto">
-                    {t('cta_login')}
-                  </Button>
+                <Link href="#modules" className="w-full sm:w-auto">
+                  <span className={outlineActionClass}>{t('hero_secondary_cta')}</span>
                 </Link>
               </div>
 
-              <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted" aria-label={t('trust_aria')}>
+              <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted" aria-label={t('trust_aria')}>
                 {TRUST_ITEMS.map((item) => (
                   <li key={item} className="inline-flex items-center gap-1.5">
                     <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={1.8} aria-hidden="true" />
@@ -130,56 +152,44 @@ export default function LandingPage() {
               </ul>
             </div>
 
-            <div className="mx-auto w-full max-w-xl lg:max-w-none" aria-label={t('preview_aria')}>
-              <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-                <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-                    <span className="text-xs font-semibold text-muted">{t('preview_badge')}</span>
-                  </div>
-                  <div className="flex gap-1.5" aria-hidden="true">
-                    <span className="h-2 w-2 rounded-full bg-border" />
-                    <span className="h-2 w-2 rounded-full bg-border" />
-                    <span className="h-2 w-2 rounded-full bg-border" />
-                  </div>
+            <figure className="mx-auto w-full max-w-3xl lg:max-w-none" aria-label={t('preview_aria')}>
+              <p className="mb-3 text-sm font-semibold text-primary">{t('hero_product_label')}</p>
+              <div className="relative pb-9 sm:pb-12">
+                <div className="relative aspect-[1.40625] overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/10 dark:shadow-black/25">
+                  {themeReady ? (
+                    <Image
+                      src={isDark ? '/landing/dashboard-desktop-dark.png' : '/landing/dashboard-desktop-light.png'}
+                      alt={t('hero_desktop_alt')}
+                      fill
+                      priority
+                      quality={82}
+                      sizes="(max-width: 767px) 94vw, (max-width: 1280px) 56vw, 800px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 animate-pulse bg-primary-soft" aria-hidden="true" />
+                  )}
                 </div>
-                <div className="bg-background p-4 sm:p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold text-primary">{t('preview_eyebrow')}</p>
-                      <h2 className="mt-1 text-lg font-bold sm:text-xl">{t('preview_title')}</h2>
-                    </div>
-                    <div className="rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-muted">{t('preview_realtime')}</div>
-                  </div>
 
-                  <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-3">
-                    <PreviewMetric label={t('preview_cash')} value="217,840.00 ﷼" tone="primary" />
-                    <PreviewMetric label={t('preview_invoices')} value="63,200.00 ﷼" tone="positive" />
-                    <PreviewMetric label={t('preview_income')} value="482,500.00 ﷼" tone="text" />
-                  </div>
-
-                  <div className="mt-4 rounded-lg border border-border bg-surface p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold">{t('preview_balance')}</p>
-                      <BarChart3 className="h-4 w-4 text-primary" aria-hidden="true" />
-                    </div>
-                    <div className="mt-5 flex h-20 items-end gap-1.5" aria-hidden="true">
-                      {[35, 49, 43, 66, 58, 82, 74, 100, 91, 110, 106, 124].map((height, index) => (
-                        <span
-                          key={index}
-                          className="min-w-0 flex-1 rounded-t-sm bg-primary/20 first:bg-primary/55 last:bg-primary"
-                          style={{ height: `${height * 0.55}%` }}
-                        />
-                      ))}
-                    </div>
-                    <div className="mt-3 flex items-center justify-between text-[11px] text-muted">
-                      <span>{t('preview_status')}</span>
-                      <span className="font-semibold text-primary">{t('preview_balanced')}</span>
-                    </div>
+                <div className="absolute -bottom-2 start-3 w-[31%] min-w-[124px] max-w-[184px] sm:-bottom-5 sm:start-7">
+                  <div className="relative aspect-[390/844] overflow-hidden rounded-[1.25rem] border-[5px] border-text bg-background shadow-lg shadow-black/15 dark:shadow-black/40">
+                    {themeReady ? (
+                      <Image
+                        src={isDark ? '/landing/dashboard-mobile-dark.png' : '/landing/dashboard-mobile-light.png'}
+                        alt={t('hero_mobile_alt')}
+                        fill
+                        quality={86}
+                        sizes="(max-width: 767px) 30vw, 170px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-primary-soft" aria-hidden="true" />
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
+              <figcaption className="mt-2 text-sm leading-6 text-muted sm:ms-[12rem]">{t('hero_product_note')}</figcaption>
+            </figure>
           </div>
         </section>
 
@@ -348,16 +358,6 @@ export default function LandingPage() {
           <Link href="/login" className="font-medium text-text transition-colors hover:text-primary">{t('cta_login')}</Link>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function PreviewMetric({ label, value, tone }: { label: string; value: string; tone: 'primary' | 'positive' | 'text' }) {
-  const toneClass = tone === 'positive' ? 'text-positive' : tone === 'primary' ? 'text-primary' : 'text-text';
-  return (
-    <div className="rounded-lg border border-border bg-surface p-3">
-      <p className="truncate text-[10px] font-medium text-muted sm:text-xs">{label}</p>
-      <p dir="ltr" className={`mt-2 text-end font-mono text-sm font-bold tabular-nums tracking-tight sm:text-base ${toneClass}`}>{value}</p>
     </div>
   );
 }
