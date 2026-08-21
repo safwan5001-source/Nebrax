@@ -28,6 +28,8 @@ interface Product {
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
 interface Employee { id: string; name: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
+interface PriceList { id: string; name: string; is_active: boolean; items_count?: number }
+interface PriceListResolution { matched: boolean; price: string | null }
 type AllocationKind = 'none' | 'single' | 'multiple';
 type AllocationInputMode = 'percent' | 'amount';
 interface LineAllocation { costCenterId: string; value: string }
@@ -43,7 +45,7 @@ interface ApiLine {
   minimum_price_override?: { reason: string; approved_by_user_id: string } | null;
 }
 interface ApiInvoice {
-  status: string; partner_id: string; warehouse_id: string | null; payment_type: string; invoice_date: string; due_date: string | null;
+  status: string; partner_id: string; warehouse_id: string | null; price_list_id?: string | null; payment_type: string; invoice_date: string; due_date: string | null;
   cost_center_id: string | null; salesperson_id: string | null; discount: string; shipping: string;
   adjustment: string; tax_inclusive: boolean; notes: string | null; lines: ApiLine[];
   is_paid?: boolean; payment_method?: string | null; payment_reference?: string | null; cash_account_id?: string | null;
@@ -99,8 +101,10 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [cashAccounts, setCashAccounts] = useState<Account[]>([]);
+  const [priceLists, setPriceLists] = useState<PriceList[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
+  const [priceListId, setPriceListId] = useState('');
   const [centerId, setCenterId] = useState('');
   const [salespersonId, setSalespersonId] = useState('');
   const [date, setDate] = useState('');
@@ -122,6 +126,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [applyingPriceList, setApplyingPriceList] = useState(false);
   const [loadingDoc, setLoadingDoc] = useState(!!editId);
   const [newPartner, setNewPartner] = useState(false);
   // السطر الذي فُتحت من منتقيه نافذة «منتج جديد» — ليُختار فيه فور الحفظ.
@@ -156,6 +161,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       if (!editId) setWarehouseId((current) => current || active.find((warehouse) => warehouse.is_default)?.id || active[0]?.id || '');
     }).catch(() => {});
     api<{ data: Employee[] }>('/employees').then((r) => setEmployees(r.data)).catch(() => {});
+    api<{ data: PriceList[] }>('/price-lists').then((r) => setPriceLists(r.data)).catch(() => {});
     // خزائن التحصيل: حسابات النقد والبنوك الفرعية وحدها (111x/112x) — وهو
     // المدى نفسه الذي يقبله `PaymentService`، فلا تُعرَض خزينة يرفضها الخادم.
     api<{ data: Account[] }>('/accounts')
@@ -182,6 +188,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         if (inv.status !== 'draft') { router.replace(`/invoices/${editId}`); return; } // المرحّلة لا تُعدَّل
         setPartnerId(inv.partner_id);
         setWarehouseId(inv.warehouse_id ?? '');
+        setPriceListId(inv.price_list_id ?? '');
         setIsPaid(!!inv.is_paid);
         setPayMethod(inv.payment_method ?? 'cash');
         setPayReference(inv.payment_reference ?? '');
@@ -299,12 +306,54 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     [products, t]
   );
 
-  function pickProduct(key: string, productId: string) {
+  async function resolvePriceListPrice(productId: string, unitName = '', listId = priceListId): Promise<string | null> {
+    if (!listId) return null;
+    const query = new URLSearchParams({ product_id: productId });
+    if (unitName) query.set('unit_name', unitName);
+    try {
+      const result = await api<{ data: PriceListResolution }>(`/price-lists/${listId}/resolve?${query.toString()}`);
+      return result.data.matched ? result.data.price : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function pickProduct(key: string, productId: string) {
     const p = products.find((x) => x.id === productId);
     if (!p) { setLine(key, { productId: null }); return; }
     // تبديل المنتج يُصفّر الوحدة: وحدة المنتج السابق قد لا تكون معرَّفة في
-    // قالب الجديد، وإرسالها كان يُرفض بـ 422 بلا سبب ظاهر للمستخدم.
+    // قالب الجديد، وإرسالها كان يُرفض بـ 422 بلا سبب ظاهر للمستخدم. يبدأ
+    // بالسعر الأساسي ثم تستبدله القائمة المختارة، إن كان لها عنصر مطابق.
     setLine(key, { productId: p.id, description: p.name, price: p.sale_price, tax: String(p.tax_rate), unit: '' });
+    const suggested = await resolvePriceListPrice(p.id);
+    if (suggested !== null) setLines((current) => current.map((line) =>
+      line.key === key && line.productId === p.id && line.unit === '' ? { ...line, price: suggested } : line
+    ));
+  }
+
+  async function changeLineUnit(key: string, unit: string) {
+    const line = lines.find((candidate) => candidate.key === key);
+    setLine(key, { unit });
+    if (!line?.productId) return;
+    const suggested = await resolvePriceListPrice(line.productId, unit);
+    if (suggested !== null) setLines((current) => current.map((candidate) =>
+      candidate.key === key && candidate.productId === line.productId && candidate.unit === unit ? { ...candidate, price: suggested } : candidate
+    ));
+  }
+
+  async function applyPriceListToLines() {
+    if (!priceListId || applyingPriceList) return;
+    setApplyingPriceList(true);
+    try {
+      const resolutions = await Promise.all(lines.map(async (line) => ({
+        key: line.key,
+        price: line.productId ? await resolvePriceListPrice(line.productId, line.unit, priceListId) : null,
+      })));
+      const prices = new Map(resolutions.filter((result) => result.price !== null).map((result) => [result.key, result.price as string]));
+      setLines((current) => current.map((line) => prices.has(line.key) ? { ...line, price: prices.get(line.key) ?? line.price } : line));
+    } finally {
+      setApplyingPriceList(false);
+    }
   }
 
   // معاينة الإجماليات (هللات) — بلا float. مطابق للـ backend.
@@ -434,7 +483,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     // وتفاصيل الدفع **مشروطة بالخانة**: بلا تأشير لا تُرسَل، فلا تُسجَّل
     // خزينةٌ ولا مرجعٌ لفاتورة لم يُعلَن تحصيلها.
     const body = {
-      partner_id: partnerId, warehouse_id: warehouseId || null, invoice_date: date || null, due_date: dueDate || null,
+      partner_id: partnerId, warehouse_id: warehouseId || null, price_list_id: priceListId || null, invoice_date: date || null, due_date: dueDate || null,
       cost_center_id: centerId || null, salesperson_id: salespersonId || null,
       discount: discountMinor, shipping: shippingMinor, adjustment: adjustmentMinor,
       tax_inclusive: taxInclusive, notes: notes || null, items,
@@ -575,6 +624,19 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                     <p className="text-xs text-muted">{t('warehouse_hint')}</p>
                   </div>
                 )}
+                {priceLists.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="price-list">{t('price_list')}</Label>
+                    <div className="flex gap-2">
+                      <Select id="price-list" value={priceListId} onChange={(e) => setPriceListId(e.target.value)}>
+                        <option value="">{t('price_list_base')}</option>
+                        {priceLists.map((list) => <option key={list.id} value={list.id} disabled={!list.is_active && list.id !== priceListId}>{list.name}{!list.is_active ? ` — ${t('price_list_inactive')}` : ''}</option>)}
+                      </Select>
+                      <Button type="button" variant="outline" size="sm" disabled={!priceListId || !priceLists.find((list) => list.id === priceListId)?.is_active || applyingPriceList} onClick={() => void applyPriceListToLines()}>{applyingPriceList ? t('price_list_applying') : t('price_list_apply')}</Button>
+                    </div>
+                    <p className="text-xs text-muted">{t('price_list_hint')}</p>
+                  </div>
+                )}
                 {centers.length > 0 && (
                   <div className="space-y-1.5">
                     <Label htmlFor="center">{t('cost_center')}</Label>
@@ -647,7 +709,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                         const units = products.find((p) => p.id === l.productId)?.units ?? [];
                         if (units.length < 2) return null;
                         return (
-                          <Select className="w-24 shrink-0" value={l.unit} onChange={(e) => setLine(l.key, { unit: e.target.value })} aria-label={t('unit')}>
+                          <Select className="w-24 shrink-0" value={l.unit} onChange={(e) => void changeLineUnit(l.key, e.target.value)} aria-label={t('unit')}>
                             {units.map((u) => (<option key={u.name} value={u.factor === 1 ? '' : u.name}>{u.name}</option>))}
                           </Select>
                         );

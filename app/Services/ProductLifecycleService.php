@@ -8,6 +8,7 @@ use App\Models\ProcurementLine;
 use App\Models\Product;
 use App\Models\ProductActivity;
 use App\Models\ProductWarehouseStock;
+use App\Models\PriceListItem;
 use App\Models\PurchaseLine;
 use App\Models\QuoteLine;
 use App\Models\RecurringInvoiceLine;
@@ -47,6 +48,7 @@ class ProductLifecycleService
             'stock_permit_lines'     => StockPermitLine::where('product_id', $product->id)->count(),
             'stocktake_lines'        => StocktakeLine::where('product_id', $product->id)->count(),
             'warehouse_stocks'       => ProductWarehouseStock::where('product_id', $product->id)->count(),
+            'price_list_items'       => PriceListItem::where('product_id', $product->id)->count(),
         ];
     }
 
