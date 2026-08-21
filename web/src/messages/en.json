@@ -4250,6 +4250,7 @@
     "comingSoonBadge": "Coming soon",
     "enabledBadge": "Enabled",
     "disabledBadge": "Disabled",
+    "suspendedBadge": "Suspended (read-only)",
     "enable": "Enable",
     "disable": "Disable",
     "enableTitle": "Enable {name}",

@@ -113,6 +113,7 @@ export default function ApplicationsPage() {
   function statusCell(app: ApplicationEntry) {
     if (app.mandatory) return <Badge tone="neutral">{t('mandatoryBadge')}</Badge>;
     if (app.maturity !== 'built') return <Badge tone="muted">{t('comingSoonBadge')}</Badge>;
+    if (app.status === 'suspended') return <Badge tone="warning">{t('suspendedBadge')}</Badge>;
     return <Badge tone={app.enabled ? 'positive' : 'muted'}>{app.enabled ? t('enabledBadge') : t('disabledBadge')}</Badge>;
   }
 
