@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\ImportProductsRequest;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
@@ -12,12 +13,16 @@ use App\Models\Partner;
 use App\Models\ProductCategory;
 use App\Models\UnitTemplate;
 use App\Services\Accounting\InventoryService;
+use App\Services\ProductImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 class ProductController extends ApiController
 {
-    public function __construct(protected InventoryService $inventory) {}
+    public function __construct(
+        protected InventoryService $inventory,
+        protected ProductImportService $imports,
+    ) {}
 
     /**
      * تحقق مراجع المنتج: المورّد طرف ضمن المستأجر، وحسابا المبيعات/التكلفة
@@ -44,6 +49,32 @@ class ProductController extends ApiController
         }
 
         return $template;
+    }
+
+    /** قالب CSV ثابت لفتح الاستيراد في Excel أو أي محرر جداول. */
+    public function importTemplate()
+    {
+        return response()->streamDownload(function (): void {
+            echo $this->imports->template();
+        }, 'nebrax-products-import-template.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /** معاينة غير مغيرة للبيانات؛ لا تكتب شيئاً في الكتالوج. */
+    public function importPreview(ImportProductsRequest $request): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->imports->preview($request->file('file'), $request->string('mode')->toString()),
+        ]);
+    }
+
+    /** يكرر التحقق ثم ينشئ أو يحدّث الكتالوج في معاملة واحدة. */
+    public function importApply(ImportProductsRequest $request): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->imports->apply($request->file('file'), $request->string('mode')->toString()),
+        ]);
     }
 
     public function index(): JsonResponse
