@@ -53,7 +53,28 @@ class StoreProductRequest extends FormRequest
                     }
                 },
             ],
-            'barcode'         => ['nullable', 'string', 'max:255'],
+            // الباركود يُمسح عبر نقاط البيع والمستودعات، فلا يجوز أن يشير إلى بندين
+            // مختلفين في المؤسسة ولو كانت المنتجات معزولة بين الفروع.
+            'barcode'         => [
+                'nullable',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, Closure $fail) use ($productId): void {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+
+                    $duplicate = Product::withoutGlobalScope(BranchScope::class)
+                        ->where('barcode', $value)
+                        ->whereNull('deleted_at')
+                        ->when($productId, fn ($query) => $query->where('id', '!=', $productId))
+                        ->exists();
+
+                    if ($duplicate) {
+                        $fail('الباركود مستخدم بالفعل لمنتج آخر في المؤسسة.');
+                    }
+                },
+            ],
             'type'            => ['required', 'in:good,service'],
             'unit'            => ['nullable', 'string', 'max:255'],
             'description'     => ['nullable', 'string', 'max:2000'],

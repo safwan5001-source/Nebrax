@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Upload } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -82,14 +82,22 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <Link href="/products/new">
-          <Button>
-            <Plus className="h-4 w-4" strokeWidth={1.8} />
-            {t('add')}
-          </Button>
-        </Link>
+        <div className="ms-auto flex items-center gap-2">
+          <Link href="/products/import">
+            <Button variant="outline">
+              <Upload className="h-4 w-4" strokeWidth={1.7} />
+              {t('import')}
+            </Button>
+          </Link>
+          <Link href="/products/new">
+            <Button>
+              <Plus className="h-4 w-4" strokeWidth={1.8} />
+              {t('add')}
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="products" />
