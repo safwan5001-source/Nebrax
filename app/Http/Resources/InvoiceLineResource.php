@@ -23,6 +23,13 @@ class InvoiceLineResource extends JsonResource
             'unit_factor'   => (int) $this->unit_factor,
             'unit_price'            => Money::toRiyal($this->unit_price),
             'unit_price_before_tax' => Money::toRiyal($this->getAttribute('unit_price_before_tax') ?? $this->unit_price),
+            'min_sale_price' => $this->min_sale_price_snapshot !== null
+                ? Money::toRiyal($this->min_sale_price_snapshot)
+                : null,
+            'minimum_price_override' => $this->min_sale_price_override_reason !== null ? [
+                'reason' => $this->min_sale_price_override_reason,
+                'approved_by_user_id' => $this->min_sale_price_overridden_by,
+            ] : null,
             'tax_rate'              => $this->tax_rate,
             'line_subtotal' => Money::toRiyal($this->line_subtotal),
             'line_discount' => Money::toRiyal($this->line_discount),

@@ -25,6 +25,7 @@ class StorePosSaleRequest extends FormRequest
             'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'], // هللات
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
             'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات
+            'items.*.minimum_price_override_reason' => ['nullable', 'string', 'min:3', 'max:500'],
             'tenders'             => ['required', 'array'],
             'tenders.cash'        => ['nullable', 'integer', 'min:0'],
             'tenders.card'        => ['nullable', 'integer', 'min:0'],

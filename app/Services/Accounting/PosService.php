@@ -46,6 +46,7 @@ class PosService
                 'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
                 'notes'         => $data['notes'] ?? 'بيع نقطة بيع',
                 'created_by'    => $data['created_by'] ?? null,
+                'minimum_price_override_actor_id' => $data['minimum_price_override_actor_id'] ?? null,
             ], $data['items']);
             $invoice = $this->invoices->post($invoice);
 

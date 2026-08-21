@@ -69,6 +69,18 @@ class Product extends BaseModel implements BranchShareable
         return $this->hasMany(StockMovement::class);
     }
 
+    /** الباركودات البديلة؛ الباركود الأساسي التاريخي يبقى في عمود المنتج. */
+    public function alternateBarcodes(): HasMany
+    {
+        return $this->hasMany(ProductBarcode::class);
+    }
+
+    /** صور المنتج الخاصة، مرتبةً عند طلبها في ملف المنتج لا في الكتالوج. */
+    public function media(): HasMany
+    {
+        return $this->hasMany(ProductMedia::class);
+    }
+
     /**
      * التصنيف والعلامة المُدارَان. الاسمان `productCategory`/`productBrand`
      * لا `category`/`brand`: العمودان النصّيان القديمان يحملان الاسمين، وعلاقةٌ

@@ -22,6 +22,7 @@ class InvoiceLine extends BaseModel implements CompanyWide
         'tenant_id', 'invoice_id', 'product_id', 'product_name_snapshot',
         'product_sku_snapshot', 'product_barcode_snapshot', 'description',
         'quantity', 'unit_name', 'unit_factor', 'unit_price', 'unit_price_before_tax', 'tax_rate',
+        'min_sale_price_snapshot', 'min_sale_price_override_reason', 'min_sale_price_overridden_by',
         'line_subtotal', 'line_discount', 'line_tax', 'line_total',
     ];
 
@@ -30,6 +31,7 @@ class InvoiceLine extends BaseModel implements CompanyWide
         'unit_factor'   => 'integer',
         'unit_price'            => 'integer',
         'unit_price_before_tax' => 'integer',
+        'min_sale_price_snapshot' => 'integer',
         'tax_rate'              => 'integer',
         'line_subtotal' => 'integer',
         'line_discount' => 'integer',

@@ -20,6 +20,7 @@ interface SalesSettings {
   invoice_prefix: string;
   require_return_source: boolean;
   return_window_days: number;
+  enforce_min_sale_price: boolean;
   default_terms: string;
 }
 
@@ -86,6 +87,7 @@ export default function InvoiceSettingsPage() {
           default_payment_type: form.default_payment_type,
           require_return_source: form.require_return_source,
           return_window_days: form.return_window_days,
+          enforce_min_sale_price: form.enforce_min_sale_price,
           default_terms: form.default_terms || null,
         },
       });
@@ -156,6 +158,19 @@ export default function InvoiceSettingsPage() {
                     onChange={(e) => set('return_window_days', Number(e.target.value) || 0)}
                   />
                   <p className="text-xs leading-relaxed text-muted">{t('return_window_days_hint')}</p>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="minimum-price-guard">{t('enforce_min_sale_price')}</Label>
+                  <Select
+                    id="minimum-price-guard"
+                    value={form.enforce_min_sale_price ? '1' : '0'}
+                    onChange={(e) => set('enforce_min_sale_price', e.target.value === '1')}
+                  >
+                    <option value="1">{t('enforce_min_sale_price_on')}</option>
+                    <option value="0">{t('enforce_min_sale_price_off')}</option>
+                  </Select>
+                  <p className="text-xs leading-relaxed text-muted">{t('enforce_min_sale_price_hint')}</p>
                 </div>
               </div>
               {/* الشروط المطبوعة على المستند تأتي من «تصميم المستندات» لا من هنا —
