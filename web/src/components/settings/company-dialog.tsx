@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Trash2, Upload } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { fileToResizedDataUrl } from '@/lib/image';
 import { notifyCompanyUpdated, type Company } from '@/lib/company';
 
 export function CompanyDialog({
@@ -24,12 +26,15 @@ export function CompanyDialog({
   const t = useTranslations('settings');
   const tc = useTranslations('common');
   const { success } = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     name: company?.name ?? '',
     vat_number: company?.vat_number ?? '',
     cr_number: company?.cr_number ?? '',
     currency: company?.currency ?? 'SAR',
     country: company?.country ?? 'SA',
+    logo: company?.logo ?? '',
+    clear_logo: false,
     phone: company?.phone ?? '',
     mobile: company?.mobile ?? '',
     building_no: company?.building_no ?? '',
@@ -43,7 +48,28 @@ export function CompanyDialog({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: Exclude<keyof typeof form, 'clear_logo'>, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  async function pickLogo(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError(t('logo_invalid'));
+      return;
+    }
+
+    try {
+      const logo = await fileToResizedDataUrl(file, 320);
+      setForm((current) => ({ ...current, logo, clear_logo: false }));
+      setError(null);
+    } catch {
+      setError(t('logo_invalid'));
+    }
+  }
+
+  function removeLogo() {
+    setForm((current) => ({ ...current, logo: '', clear_logo: true }));
+    setError(null);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,6 +84,8 @@ export function CompanyDialog({
           cr_number: form.cr_number || null,
           currency: form.currency || null,
           country: form.country || null,
+          // لا نرسل نصاً فارغاً للشعار إلا عند اختيار الإزالة الصريحة.
+          logo: form.logo || null,
         },
       });
       success(tc('updated'));
@@ -74,7 +102,43 @@ export function CompanyDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t('edit_company')} className="max-w-2xl">
       <form onSubmit={submit} className="space-y-5">
-        <div className="space-y-3">
+        <section className="space-y-3" aria-labelledby="company-logo-heading">
+          <h3 id="company-logo-heading" className="text-sm font-semibold text-text">{t('company_logo')}</h3>
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-muted/40">
+              {form.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URL محلي ومصغّر.
+                <img src={form.logo} alt={t('company_logo')} className="max-h-full max-w-full object-contain" />
+              ) : (
+                <span className="text-center text-[10px] text-muted">{t('company_logo')}</span>
+              )}
+            </div>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex flex-wrap gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  onChange={(event) => { void pickLogo(event.target.files?.[0]); event.target.value = ''; }}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                  <Upload className="h-4 w-4" strokeWidth={1.7} />
+                  {t('logo_upload')}
+                </Button>
+                {form.logo && (
+                  <Button type="button" variant="ghost" size="sm" onClick={removeLogo}>
+                    <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                    {t('remove_logo')}
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted">{t('logo_hint')}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-3 border-t border-border pt-4">
           <div className="space-y-1.5">
             <Label htmlFor="cname">{t('company_name')}</Label>
             <Input id="cname" value={form.name} onChange={(e) => set('name', e.target.value)} required />
@@ -99,7 +163,7 @@ export function CompanyDialog({
               <Input id="country" dir="ltr" maxLength={2} value={form.country} onChange={(e) => set('country', e.target.value.toUpperCase())} />
             </div>
           </div>
-        </div>
+        </section>
 
         <section className="space-y-3 border-t border-border pt-4" aria-labelledby="company-contact-heading">
           <h3 id="company-contact-heading" className="text-sm font-semibold text-text">{t('contact_details')}</h3>

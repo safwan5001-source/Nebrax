@@ -24,8 +24,13 @@ class CompanyController extends ApiController
         $tenant->update(Arr::only($validated, CompanyProfile::TENANT_FIELDS));
 
         // تمرير النص الفارغ مقصود لمسح حقل العنوان، أما المفتاح الغائب فلا يغيّر
-        // القيمة المحفوظة. Settings::put يحفظ فقط مفاتيح عقد company المعلنة.
-        Settings::put('company', Arr::only($validated, CompanyProfile::SETTINGS_FIELDS), $tenant);
+        // القيمة المحفوظة. إزالة الشعار تحتاج إشارة صريحة لأن غياب `logo` يعني
+        // الاحتفاظ بالقيمة القائمة. Settings::put يحفظ مفاتيح عقد company فقط.
+        $companySettings = Arr::only($validated, CompanyProfile::SETTINGS_FIELDS);
+        if ($request->boolean('clear_logo')) {
+            $companySettings['logo'] = '';
+        }
+        Settings::put('company', $companySettings, $tenant);
         $tenant->refresh();
 
         return response()->json([

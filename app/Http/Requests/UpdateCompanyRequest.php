@@ -28,6 +28,10 @@ class UpdateCompanyRequest extends FormRequest
             'city'          => ['nullable', 'string', 'max:120'],
             'postal_code'   => ['nullable', 'string', 'max:20'],
             'short_address' => ['nullable', 'string', 'max:50'],
+            // يحوّل العميل الصورة إلى PNG مصغّر قبل الإرسال؛ نحصرها في data URL
+            // لتبقى إعدادات المؤسسة خالية من مسارات أو محتوى غير صورة.
+            'logo' => ['nullable', 'string', 'max:512000', 'regex:/^data:image\\/png;base64,[A-Za-z0-9+\\/=]+$/'],
+            'clear_logo' => ['sometimes', 'boolean'],
         ];
     }
 }
