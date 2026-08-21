@@ -23,12 +23,16 @@ class ProductController extends ApiController
      * تحقق مراجع المنتج: المورّد طرف ضمن المستأجر، وحسابا المبيعات/التكلفة
      * حسابان ورقيان (غير تجميعيين) من النوع الصحيح — يمنع ترحيل الإيراد لحساب نقدية مثلاً.
      */
-    private function assertProductRefs(array $data): void
+    private function assertProductRefs(array $data): ?UnitTemplate
     {
         $this->assertTenantOwned(Partner::class, $data['supplier_id'] ?? null, 'المورّد');
         $this->assertTenantOwned(ProductCategory::class, $data['category_id'] ?? null, 'التصنيف');
         $this->assertTenantOwned(Brand::class, $data['brand_id'] ?? null, 'العلامة التجارية');
         $this->assertTenantOwned(UnitTemplate::class, $data['unit_template_id'] ?? null, 'قالب الوحدات');
+
+        $template = ! empty($data['unit_template_id'])
+            ? UnitTemplate::find($data['unit_template_id'])
+            : null;
 
         foreach ([['sales_account_id', 'revenue', 'حساب المبيعات'], ['cogs_account_id', 'expense', 'حساب التكلفة']] as [$key, $type, $label]) {
             if (! empty($data[$key])) {
@@ -38,6 +42,8 @@ class ProductController extends ApiController
                 }
             }
         }
+
+        return $template;
     }
 
     public function index(): JsonResponse
@@ -52,7 +58,10 @@ class ProductController extends ApiController
     public function store(StoreProductRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $this->assertProductRefs($data);
+        $template = $this->assertProductRefs($data);
+        if ($template !== null) {
+            $data['unit'] = $template->base_unit;
+        }
 
         // ذرّية: إنشاء المنتج وقيد الرصيد الافتتاحي معاملة واحدة —
         // فشل القيد يُرجع المنتج كله (لا منتج يتيم بلا قيده).
@@ -77,7 +86,10 @@ class ProductController extends ApiController
     {
         $product = Product::findOrFail($id);
         $data = $request->validated();
-        $this->assertProductRefs($data);
+        $template = $this->assertProductRefs($data);
+        if ($template !== null) {
+            $data['unit'] = $template->base_unit;
+        }
         $product->update($data);
 
         return (new ProductResource($product))->response();

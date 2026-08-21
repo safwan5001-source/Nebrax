@@ -16,6 +16,7 @@ import { getSystemTaxInclusive } from '@/lib/tax';
 
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
+interface UnitTemplate { id: string; name: string; base_unit: string }
 
 export default function NewProductPage() {
   const t = useTranslations('products');
@@ -28,7 +29,9 @@ export default function NewProductPage() {
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
   const [type, setType] = useState('good');
-  const [unit, setUnit] = useState('piece');
+  const [unit, setUnit] = useState('');
+  const [unitTemplateId, setUnitTemplateId] = useState('');
+  const [templates, setTemplates] = useState<UnitTemplate[]>([]);
   const [salePrice, setSalePrice] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [taxRate, setTaxRate] = useState('15');
@@ -60,6 +63,7 @@ export default function NewProductPage() {
     api<{ data: Partner[] }>('/partners')
       .then((r) => setSuppliers(r.data.filter((p) => p.type === 'supplier' || p.type === 'both')))
       .catch(() => {});
+    api<{ data: UnitTemplate[] }>('/unit-templates').then((r) => setTemplates(r.data)).catch(() => {});
     api<{ data: Account[] }>('/accounts')
       .then((r) => {
         const leaf = r.data.filter((a) => !a.is_group);
@@ -68,6 +72,12 @@ export default function NewProductPage() {
       })
       .catch(() => {});
   }, []);
+
+  function selectUnitTemplate(templateId: string) {
+    setUnitTemplateId(templateId);
+    const template = templates.find((item) => item.id === templateId);
+    if (template) setUnit(template.base_unit);
+  }
 
   async function submit() {
     if (!name.trim()) { setError(tc('saveFailed')); return; }
@@ -83,6 +93,7 @@ export default function NewProductPage() {
           barcode: barcode || null,
           type,
           unit: unit || null,
+          unit_template_id: unitTemplateId || null,
           sale_price: riyalToMinor(salePrice),
           purchase_price: riyalToMinor(purchasePrice),
           tax_rate: Number(taxRate) || 0,
@@ -152,8 +163,16 @@ export default function NewProductPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
+                <Label htmlFor="unit-template">{t('unit_template')}</Label>
+                <Select id="unit-template" value={unitTemplateId} onChange={(e) => selectUnitTemplate(e.target.value)}>
+                  <option value="">{t('no_unit_template')}</option>
+                  {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+                </Select>
+                <p className="text-xs text-muted">{t('unit_template_hint')}</p>
+              </div>
+              <div className="space-y-1.5">
                 <Label htmlFor="unit">{t('unit')}</Label>
-                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} />
+                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} readOnly={Boolean(unitTemplateId)} />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="barcode">{t('barcode')}</Label>
