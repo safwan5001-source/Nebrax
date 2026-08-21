@@ -22,7 +22,7 @@ interface Partner { id: string; name: string; type?: string; phone?: string | nu
 interface ProductUnit { name: string; factor: number }
 interface Product {
   id: string; name: string; sku?: string | null; barcode?: string | null;
-  sale_price: string; tax_rate: number; is_active: boolean;
+  sale_price: string; min_sale_price?: string | null; tax_rate: number; is_active: boolean;
   track_inventory?: boolean; quantity_on_hand?: number; units?: ProductUnit[];
 }
 interface CostCenter { id: string; code: string; name: string; is_active: boolean }
@@ -34,11 +34,13 @@ interface LineAllocation { costCenterId: string; value: string }
 interface Line {
   key: string; productId: string | null; description: string; qty: string; price: string; tax: string; disc: string; unit: string;
   allocationKind: AllocationKind; allocationInputMode: AllocationInputMode; allocations: LineAllocation[];
+  minimumPriceOverrideReason: string;
 }
 interface ApiLineAllocation { cost_center_id: string; mode: AllocationInputMode; basis_points: number; amount: string }
 interface ApiLine {
   product_id: string | null; description: string | null; quantity: number; unit_name: string | null; unit_price: string; tax_rate: number; line_discount: string;
   cost_center_allocations?: ApiLineAllocation[];
+  minimum_price_override?: { reason: string; approved_by_user_id: string } | null;
 }
 interface ApiInvoice {
   status: string; partner_id: string; warehouse_id: string | null; payment_type: string; invoice_date: string; due_date: string | null;
@@ -51,7 +53,7 @@ interface TaxDef { name: string; rate: number; inclusive: boolean }
 let lineSeq = 0;
 const newLine = (): Line => ({
   key: `l${++lineSeq}`, productId: null, description: '', qty: '1', price: '', tax: '15', disc: '', unit: '',
-  allocationKind: 'none', allocationInputMode: 'percent', allocations: [],
+  allocationKind: 'none', allocationInputMode: 'percent', allocations: [], minimumPriceOverrideReason: '',
 });
 
 /** تحويل واجهة النسبة إلى نقاط أساس بلا تعويم: «60.25» ← 6025. */
@@ -215,6 +217,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                     ? basisPointsToPercent(allocation.basis_points)
                     : allocation.amount,
                 })),
+                minimumPriceOverrideReason: l.minimum_price_override?.reason ?? '',
               }))
             : [newLine()]
         );
@@ -418,6 +421,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
           unit_price: riyalToMinor(l.price),
           tax_rate: Number(l.tax) || 0,
           discount: Math.min(Number.isFinite(riyalToMinor(l.disc)) ? riyalToMinor(l.disc) : 0, gross),
+          ...(l.minimumPriceOverrideReason.trim() ? { minimum_price_override_reason: l.minimumPriceOverrideReason.trim() } : {}),
           ...(allocations ? { cost_center_allocations: allocations } : {}),
         };
       });
@@ -655,6 +659,12 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                     <Button type="button" variant="ghost" size="icon" className="col-span-1 ms-auto md:col-span-1" aria-label={t('remove_line')} onClick={() => removeLine(l.key)}>
                       <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
                     </Button>
+
+                    {(() => {
+                      const product = products.find((item) => item.id === l.productId);
+                      if (!product?.min_sale_price || riyalToMinor(product.min_sale_price) <= 0) return null;
+                      return <div className="col-span-2 rounded-md border border-warning/30 bg-warning/5 p-3 md:col-span-12"><div className="space-y-1.5"><Label htmlFor={`minimum-price-reason-${l.key}`}>{t('minimum_price_override_reason')}</Label><Input id={`minimum-price-reason-${l.key}`} value={l.minimumPriceOverrideReason} maxLength={500} onChange={(event) => setLine(l.key, { minimumPriceOverrideReason: event.target.value })} placeholder={t('minimum_price_override_reason_placeholder')} /><p className="text-xs leading-relaxed text-muted">{t('minimum_price_override_reason_hint', { amount: formatRiyal(Number(product.min_sale_price)) })}</p></div></div>;
+                    })()}
 
                     {centers.length > 0 && (() => {
                       const allocationTotal = allocationMinorTotal(l);

@@ -45,6 +45,7 @@ interface Line {
   line_subtotal: string;
   line_tax: string;
   line_total: string;
+  minimum_price_override?: { reason: string; approved_by_user_id: string } | null;
 }
 interface FrozenPrintTemplateRevision {
   id: string;
@@ -199,6 +200,7 @@ export default function InvoiceDetailPage() {
   const isDraft = invoice?.status === 'draft';
   const isPosted = invoice?.status === 'posted';
   const canCollect = isPosted && invoice?.payment_status !== 'paid';
+  const priceOverrides = invoice?.lines.filter((line) => !!line.minimum_price_override?.reason) ?? [];
 
   const load = useCallback(() => {
     setLoading(true);
@@ -644,6 +646,7 @@ export default function InvoiceDetailPage() {
               <p className="text-xs text-muted">{t('notes')}</p>
               <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-text">{invoice.notes || t('no_notes')}</p>
             </div>
+            {priceOverrides.length > 0 && <div className="mt-5 border-t border-border pt-4"><p className="text-xs font-medium text-text">{t('minimum_price_overrides')}</p><ul className="mt-2 space-y-2">{priceOverrides.map((line) => <li key={line.id} className="rounded border border-warning/30 bg-warning/5 px-3 py-2 text-sm"><p className="font-medium text-text">{line.product_name ?? line.description ?? t('unknown_item')}</p><p className="mt-1 whitespace-pre-wrap leading-6 text-muted">{line.minimum_price_override?.reason}</p></li>)}</ul></div>}
           </CardContent>}
         </Card>
       </section>
