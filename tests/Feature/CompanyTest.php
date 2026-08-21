@@ -54,6 +54,28 @@ class CompanyTest extends TestCase
     }
 
     /** @test */
+    public function owner_can_upload_and_remove_company_logo(): void
+    {
+        ['token' => $token, 'tenant_id' => $tenantId] = $this->registerTenant('nibras', 'owner@nibras.test');
+        $logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL6IwAAAABJRU5ErkJggg==';
+
+        $this->withToken($token)->putJson('/api/company', [
+            'name' => 'نبراس للشعار',
+            'logo' => $logo,
+        ])->assertOk()->assertJsonPath('company.logo', $logo);
+
+        $tenant = Tenant::find($tenantId);
+        $this->assertSame($logo, $tenant->settings['company']['logo']);
+
+        $this->withToken($token)->putJson('/api/company', [
+            'name' => 'نبراس للشعار',
+            'clear_logo' => true,
+        ])->assertOk()->assertJsonPath('company.logo', '');
+
+        $this->assertSame('', $tenant->fresh()->settings['company']['logo']);
+    }
+
+    /** @test */
     public function name_is_required(): void
     {
         ['token' => $token] = $this->registerTenant('nibras', 'owner@nibras.test');
