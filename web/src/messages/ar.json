@@ -4242,6 +4242,7 @@
     "comingSoonBadge": "قريباً",
     "enabledBadge": "مفعّلة",
     "disabledBadge": "غير مفعّلة",
+    "suspendedBadge": "معلّقة (قراءة فقط)",
     "enable": "تفعيل",
     "disable": "إيقاف",
     "enableTitle": "تفعيل {name}",

@@ -2,9 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\Branch;
+use App\Models\CrmActivity;
+use App\Models\Employee;
+use App\Models\Partner;
+use App\Models\Payment;
+use App\Models\PosSession;
 use App\Models\TenantApplicationEvent;
+use App\Services\Accounting\InvoiceService;
 use App\Services\TenantApplicationService;
 use App\Support\ApplicationCatalog;
+use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -85,7 +93,130 @@ class TenantApplicationTest extends TestCase
         ])->assertOk();
 
         $this->assertFalse($res['data']['enabled']);
+        $this->assertSame('disabled', $res['data']['status']);
         $this->assertSame('disabled', TenantApplicationEvent::where('application_key', 'hr.employees')->latest()->first()->action);
+    }
+
+    /** @test */
+    public function disabling_a_capability_with_real_data_suspends_it_for_read_only_access(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'hr.employees'])->assertOk();
+
+        Employee::create(['employee_no' => 'EMP-00001', 'name' => 'موظف حقيقي']);
+
+        $res = $this->withToken($auth['token'])->postJson('/api/applications/disable', [
+            'application_key' => 'hr.employees',
+        ])->assertOk();
+
+        $this->assertFalse($res['data']['enabled']);
+        $this->assertSame('suspended', $res['data']['status']);
+        $this->assertSame('suspended', TenantApplicationEvent::where('application_key', 'hr.employees')->latest()->first()->action);
+    }
+
+    /** @test */
+    public function a_suspended_capability_can_be_reenabled_normally(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'hr.employees'])->assertOk();
+        Employee::create(['employee_no' => 'EMP-00001', 'name' => 'موظف حقيقي']);
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'hr.employees'])
+            ->assertOk()->assertJsonPath('data.status', 'suspended');
+
+        $res = $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'hr.employees'])->assertOk();
+
+        $this->assertTrue($res['data']['enabled']);
+        $this->assertSame('enabled', $res['data']['status']);
+    }
+
+    /** @test */
+    public function crm_follow_up_suspends_when_activities_exist(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'crm.follow_up'])->assertOk();
+
+        $partner = Partner::create(['name' => 'عميل', 'type' => 'customer']);
+        CrmActivity::create(['partner_id' => $partner->id, 'subject' => 'متابعة', 'activity_at' => now()]);
+
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'crm.follow_up'])
+            ->assertOk()->assertJsonPath('data.status', 'suspended');
+    }
+
+    /** @test */
+    public function sales_pos_suspends_when_a_session_exists(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'sales.pos'])->assertOk();
+
+        PosSession::create(['number' => 'POS-TEST-1', 'opened_at' => now()]);
+
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'sales.pos'])
+            ->assertOk()->assertJsonPath('data.status', 'suspended');
+    }
+
+    /** @test */
+    public function finance_operations_suspends_when_a_payment_exists_but_not_from_auto_seeded_cash_bank_accounts(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'finance.operations'])->assertOk();
+
+        // تفعيل طرق الدفع يزرع خزينة وحساباً بنكياً افتراضيين — لا يجب أن
+        // يُعلّق finance.operations بمجرد هذا الزرع التلقائي وحده.
+        $this->withToken($auth['token'])->getJson('/api/payment-methods')->assertOk();
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'finance.operations'])
+            ->assertOk()->assertJsonPath('data.status', 'disabled');
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'finance.operations'])->assertOk();
+
+        $partner = Partner::create(['name' => 'عميل السند', 'type' => 'customer']);
+        Payment::create([
+            'number' => 'REC-TEST-1', 'partner_id' => $partner->id, 'direction' => 'received',
+            'method' => 'cash', 'status' => 'posted', 'payment_date' => '2026-01-01', 'amount' => 10000,
+        ]);
+
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'finance.operations'])
+            ->assertOk()->assertJsonPath('data.status', 'suspended');
+    }
+
+    /** @test */
+    public function company_branches_stays_disableable_with_only_the_auto_provisioned_main_branch(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'company.branches'])->assertOk();
+
+        // الفرع الرئيسي مزروع تلقائياً منذ التسجيل — وحده لا يُعلّق الإيقاف.
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'company.branches'])
+            ->assertOk()->assertJsonPath('data.status', 'disabled');
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'company.branches'])->assertOk();
+
+        Branch::create(['code' => '00002', 'name' => 'فرع ثانٍ', 'is_main' => false]);
+
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'company.branches'])
+            ->assertOk()->assertJsonPath('data.status', 'suspended');
+    }
+
+    /** @test */
+    public function compliance_zatca_never_suspends_since_its_data_lives_on_the_mandatory_invoicing_capability(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'compliance.zatca'])->assertOk();
+
+        $customer = Partner::create(['name' => 'عميل الفاتورة', 'type' => 'customer']);
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        );
+        $posted = app(InvoiceService::class)->post($invoice);
+        $this->assertNotNull($posted->zatca_qr);
+
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'compliance.zatca'])
+            ->assertOk()->assertJsonPath('data.status', 'disabled');
     }
 
     /** @test */
