@@ -16,6 +16,7 @@ use App\Models\StockMovement;
 use App\Models\StockPermitLine;
 use App\Models\StocktakeLine;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 /**
@@ -87,7 +88,8 @@ class ProductLifecycleService
 
     public function delete(Product $product, ?string $userId): void
     {
-        DB::transaction(function () use ($product, $userId): void {
+        $media = [];
+        DB::transaction(function () use ($product, $userId, &$media): void {
             $product = Product::lockForUpdate()->findOrFail($product->id);
             $counts = $this->referenceCounts($product);
             $used = array_filter($counts, static fn (int $count): bool => $count > 0);
@@ -99,8 +101,17 @@ class ProductLifecycleService
             $this->record($product, 'deleted', [
                 'is_active' => [$product->is_active, false],
             ], $userId);
+            // لا تبقى باركودات أو صور لمنتج حُذف فعلياً بلا مراجع. نحفظ
+            // قائمة الملفات قبل حذف الصفوف، ثم ننظف التخزين بعد نجاح المعاملة.
+            $media = $product->media()->get(['disk', 'path'])->all();
+            $product->alternateBarcodes()->delete();
+            $product->media()->delete();
             $product->delete();
         });
+
+        foreach ($media as $item) {
+            Storage::disk($item->disk)->delete($item->path);
+        }
     }
 
     /** @return array<int, ProductActivity> */

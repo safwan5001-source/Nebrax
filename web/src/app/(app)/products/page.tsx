@@ -37,7 +37,7 @@ export default function ProductsPage() {
   const columns = useMemo<ColumnDef<Product, unknown>[]>(
     () => [
       { accessorKey: 'sku', header: t('sku'), cell: ({ row }) => <span className="num text-muted">{row.original.sku ?? '—'}</span> },
-      { accessorKey: 'name', header: t('name') },
+      { accessorKey: 'name', header: t('name'), cell: ({ row }) => <Link href={`/products/${row.original.id}`} className="font-medium text-primary hover:underline">{row.original.name}</Link> },
       {
         accessorKey: 'type',
         header: t('type'),
