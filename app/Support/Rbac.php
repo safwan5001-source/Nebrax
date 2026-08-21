@@ -62,9 +62,12 @@ class Rbac
         'branches.view', 'branches.manage',
         'company.manage',
         'users.view', 'users.manage',
-        'roles.view', 'roles.manage',
-        'reports.view', 'zatca.view',
-        'apps.view', 'apps.manage',
+            'roles.view', 'roles.manage',
+            'reports.view', 'zatca.view',
+            // استثناء سعري محروس: owner/admin يملكانه عبر `*`، ويُسند صراحةً
+            // فقط إلى دور مخصص وافق المستأجر على منحه سلطة البيع تحت الحد.
+            'sales.minimum_price_override',
+            'apps.view', 'apps.manage',
     ];
 
     /**

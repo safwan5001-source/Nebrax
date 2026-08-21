@@ -20,6 +20,8 @@ class PosController extends ApiController
     public function checkout(StorePosSaleRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $data['created_by'] = $request->user()?->id;
+        $data['minimum_price_override_actor_id'] = $request->user()?->id;
 
         // عزل: المراجع تخصّ المستأجر الحالي.
         Partner::findOrFail($data['partner_id']);

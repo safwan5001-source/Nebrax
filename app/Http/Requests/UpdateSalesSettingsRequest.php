@@ -19,7 +19,8 @@ class UpdateSalesSettingsRequest extends FormRequest
             'quote_validity_days'  => ['nullable', 'integer', 'min:0', 'max:365'],
             'default_terms'        => ['nullable', 'string', 'max:2000'],
             'require_return_source' => ['nullable', 'boolean'],
-            'return_window_days'    => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'return_window_days'      => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'enforce_min_sale_price' => ['nullable', 'boolean'],
         ];
     }
 }

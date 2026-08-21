@@ -41,6 +41,9 @@ class InvoiceController extends ApiController
     public function store(StoreInvoiceRequest $request): JsonResponse
     {
         $data = $request->validated();
+        // يحقن الخادم الفاعل؛ لا يقبل الطلب معرّف اعتماد أو منشئ من العميل.
+        $data['created_by'] = $request->user()?->id;
+        $data['minimum_price_override_actor_id'] = $request->user()?->id;
 
         // عزل: كل المراجع يجب أن تخص المستأجر الحالي (تصدّ حقن معرّفات مستأجرين آخرين)
         Partner::findOrFail($data['partner_id']);
@@ -180,6 +183,7 @@ class InvoiceController extends ApiController
     {
         $invoice = Invoice::findOrFail($id); // عزل تلقائي بالمستأجر
         $data = $request->validated();
+        $data['minimum_price_override_actor_id'] = $request->user()?->id;
 
         Partner::findOrFail($data['partner_id']);
         $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $invoice->branch_id, false);

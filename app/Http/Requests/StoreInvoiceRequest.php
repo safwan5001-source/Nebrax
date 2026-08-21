@@ -40,6 +40,9 @@ class StoreInvoiceRequest extends FormRequest
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
             'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — خصم على مستوى السطر
+            // لا يمر السبب وحده: الخدمة تطلبه فقط إن خالف السعر الصافي الحد
+            // وسياسة المبيعات مفعّلة، ثم تتحقق من صلاحية الفاعل الفعلية.
+            'items.*.minimum_price_override_reason' => ['nullable', 'string', 'min:3', 'max:500'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
             // اسم الوحدة كما في قالب المنتج. الغياب = وحدة الأساس بمعامل ١؛

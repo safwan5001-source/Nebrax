@@ -10,6 +10,7 @@ use App\Models\InvoiceLineCostCenterAllocation;
 use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Product;
+use App\Models\User;
 use App\Support\Settings;
 use App\Services\PrintTemplates\PrintTemplateService;
 use App\Services\ClassificationService;
@@ -341,6 +342,16 @@ class InvoiceService
                 $lineTotal = $lineNet + $lineTax;
             }
 
+            [$minimumPrice, $overrideReason, $overrideUserId] = $this->minimumPriceDecision(
+                product: $product,
+                lineNet: $lineNet,
+                quantity: $qty,
+                unitFactor: $unitFactor,
+                reason: $item['minimum_price_override_reason'] ?? null,
+                actorId: $data['minimum_price_override_actor_id'] ?? null,
+                tenantId: $invoice->tenant_id,
+            );
+
             $line = InvoiceLine::create([
                 'invoice_id'               => $invoice->id,
                 'product_id'               => $item['product_id'] ?? null,
@@ -353,6 +364,9 @@ class InvoiceService
                 'unit_factor'              => $unitFactor,
                 'unit_price'               => $unitPrice,
                 'unit_price_before_tax'    => $unitPriceBeforeTax,
+                'min_sale_price_snapshot'  => $minimumPrice,
+                'min_sale_price_override_reason' => $overrideReason,
+                'min_sale_price_overridden_by' => $overrideUserId,
                 'tax_rate'                 => $rate,
                 'line_subtotal' => $storedSubtotal,
                 'line_discount' => $storedDiscount,
@@ -401,6 +415,57 @@ class InvoiceService
             'tax_amount' => $taxAmount,
             'total'      => $total,
         ]);
+    }
+
+    /**
+     * حارس الحد الأدنى في خدمة الفاتورة لا في المتحكم: نقطة القرار هذه تخدم
+     * الفاتورة ونقطة البيع معاً، وتعيد لقطة الحد أو الاستثناء فقط؛ لا تعدّل
+     * سعراً ولا ضريبة ولا قيداً.
+     *
+     * `lineNet` صافي السطر بعد خصمه وقبل ضريبته، و`unitFactor` يحول الحد من
+     * وحدة أساس المنتج إلى الوحدة المختارة في السطر.
+     *
+     * @return array{0: ?int, 1: ?string, 2: ?string}
+     */
+    private function minimumPriceDecision(
+        ?Product $product,
+        int $lineNet,
+        int $quantity,
+        int $unitFactor,
+        mixed $reason,
+        ?string $actorId,
+        string $tenantId,
+    ): array {
+        if ($product === null || ! Settings::get('sales', 'enforce_min_sale_price')) {
+            return [null, null, null];
+        }
+
+        $minimum = (int) ($product->min_sale_price ?? 0);
+        if ($minimum <= 0) {
+            return [null, null, null];
+        }
+
+        $minimumLineNet = $minimum * $quantity * $unitFactor;
+        if ($lineNet >= $minimumLineNet) {
+            return [$minimum, null, null];
+        }
+
+        $reason = is_string($reason) ? trim($reason) : '';
+        if ($reason === '') {
+            throw new RuntimeException("سعر «{$product->name}» الصافي أقل من الحد الأدنى. اكتب سبب الاستثناء وأرسله لاعتماد مدير أو مالك.");
+        }
+
+        // يحقن المتحكم الفاعل من المستخدم المصادق عليه حصراً؛ لا يأتي من حمولة
+        // العميل. ويضاف القيد لصلاحيات الأدوار المخصصة كي لا يتحول
+        // اسم «مدير» إلى شرط ثابت غير قابل للإدارة.
+        $actor = $actorId === null
+            ? null
+            : User::where('tenant_id', $tenantId)->whereKey($actorId)->first();
+        if (! $actor?->hasPermission('sales.minimum_price_override')) {
+            throw new RuntimeException('السعر الأقل من الحد الأدنى يتطلب اعتماد مالك أو مدير مخوّل.');
+        }
+
+        return [$minimum, $reason, $actor->id];
     }
 
     /**
