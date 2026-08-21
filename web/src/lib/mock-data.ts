@@ -918,6 +918,22 @@ export const mockLeaveRequests = [
   },
 ];
 
+// إدارة الطلبات — أنواع ثابتة بحقول موحّدة (نطاق البناء الأول)، منفصلة عن الإجازات.
+export const mockRequestTypes = [
+  { id: 'rqt-1', name: 'سلفة', requires_approval: true, is_active: true, employee_requests_count: 1 },
+  { id: 'rqt-2', name: 'استئذان', requires_approval: true, is_active: true, employee_requests_count: 0 },
+  { id: 'rqt-3', name: 'شكوى', requires_approval: false, is_active: true, employee_requests_count: 0 },
+];
+export const mockEmployeeRequests = [
+  {
+    id: 'er-1', employee_id: 'em-1', employee: { id: 'em-1', name: 'أحمد العتيبي' },
+    request_type_id: 'rqt-1', request_type: { id: 'rqt-1', name: 'سلفة' },
+    title: 'سلفة براتب شهر', description: 'سلفة على الراتب لظرف طارئ.', requested_date: '2026-09-10',
+    status: 'pending', rejection_reason: null, approver: null, approved_at: null,
+    created_at: '2026-08-18T10:00:00Z',
+  },
+];
+
 export interface MockRun {
   id: string;
   number: string;
@@ -1903,6 +1919,20 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         };
       }),
     });
+  }
+  if (clean === '/request-types') return resolve({ data: mockRequestTypes });
+  if (clean === '/requests') {
+    const params = new URLSearchParams(path.split('?')[1] ?? '');
+    const status = params.get('status');
+    const employeeId = params.get('employee_id');
+    let list = mockEmployeeRequests;
+    if (status) list = list.filter((r) => r.status === status);
+    if (employeeId) list = list.filter((r) => r.employee_id === employeeId);
+    return resolve({ data: list });
+  }
+  const employeeRequestsMatch = clean.match(/^\/employees\/([^/]+)\/requests$/);
+  if (employeeRequestsMatch) {
+    return resolve({ data: mockEmployeeRequests.filter((r) => r.employee_id === employeeRequestsMatch[1]) });
   }
   if (clean === '/attendances') {
     const params = new URLSearchParams(path.split('?')[1] ?? '');

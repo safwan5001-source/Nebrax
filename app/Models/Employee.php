@@ -120,6 +120,12 @@ class Employee extends BaseModel implements CompanyWide
         return $this->hasMany(LeaveRequest::class);
     }
 
+    /** طلبات عامة (سلفة/استئذان/شكوى...) — وحدةٌ منفصلة عن طلبات الإجازة عمداً. */
+    public function employeeRequests(): HasMany
+    {
+        return $this->hasMany(EmployeeRequest::class);
+    }
+
     /** المسمى الوظيفي — جزءٌ من الهيكل التنظيمي (كيانٌ مُدار لكل مؤسسة). */
     public function jobTitle(): BelongsTo
     {
