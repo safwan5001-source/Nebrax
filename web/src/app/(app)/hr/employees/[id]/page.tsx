@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { EmployeeDialog, type Employee, type LinkedUser } from '@/components/hr/employee-dialog';
 import { ContractDialog, type Contract } from '@/components/hr/contract-dialog';
 import { LeaveRequestDialog, type LeaveRequest } from '@/components/hr/leave-request-dialog';
+import { EmployeeRequestDialog, type EmployeeRequest } from '@/components/hr/employee-request-dialog';
 import { type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-dialog';
@@ -53,7 +54,7 @@ interface LeaveBalance {
   remaining: number;
 }
 
-const SECTIONS = ['details', 'contracts', 'leave', 'attachments', 'attendance', 'payroll'] as const;
+const SECTIONS = ['details', 'contracts', 'leave', 'requests', 'attachments', 'attendance', 'payroll'] as const;
 type SectionId = (typeof SECTIONS)[number];
 
 const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' | 'negative'> = {
@@ -64,6 +65,9 @@ const contractStatusTone: Record<Contract['status'], 'positive' | 'warning' | 'm
   active: 'positive', ended: 'muted', terminated: 'warning',
 };
 const leaveStatusTone: Record<LeaveRequest['status'], 'positive' | 'warning' | 'muted' | 'negative'> = {
+  approved: 'positive', pending: 'warning', rejected: 'negative', cancelled: 'muted',
+};
+const requestStatusTone: Record<EmployeeRequest['status'], 'positive' | 'warning' | 'muted' | 'negative'> = {
   approved: 'positive', pending: 'warning', rejected: 'negative', cancelled: 'muted',
 };
 
@@ -91,6 +95,7 @@ export default function EmployeeProfilePage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
+  const [employeeRequests, setEmployeeRequests] = useState<EmployeeRequest[]>([]);
   const [linkedUser, setLinkedUser] = useState<LinkedUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<SectionId>('details');
@@ -100,6 +105,8 @@ export default function EmployeeProfilePage() {
   const [busyContractId, setBusyContractId] = useState<string | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [busyLeaveId, setBusyLeaveId] = useState<string | null>(null);
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
 
   const [uploading, setUploading] = useState(false);
   const [busyAttachmentId, setBusyAttachmentId] = useState<string | null>(null);
@@ -125,6 +132,7 @@ export default function EmployeeProfilePage() {
       api<{ data: Contract[] }>(`/employees/${id}/contracts`).then((r) => setContracts(r.data)).catch(() => setContracts([])),
       api<{ data: LeaveRequest[] }>(`/employees/${id}/leave-requests`).then((r) => setLeaveRequests(r.data)).catch(() => setLeaveRequests([])),
       api<{ data: LeaveBalance[] }>(`/employees/${id}/leave-balances`).then((r) => setLeaveBalances(r.data)).catch(() => setLeaveBalances([])),
+      api<{ data: EmployeeRequest[] }>(`/employees/${id}/requests`).then((r) => setEmployeeRequests(r.data)).catch(() => setEmployeeRequests([])),
     ]).finally(() => setLoading(false));
   }, [id]);
 
@@ -181,6 +189,46 @@ export default function EmployeeProfilePage() {
       toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setBusyLeaveId(null);
+    }
+  }
+
+  async function approveRequest(r: EmployeeRequest) {
+    setBusyRequestId(r.id);
+    try {
+      await api(`/requests/${r.id}/approve`, { method: 'POST' });
+      success(t('leave_approved'));
+      load();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setBusyRequestId(null);
+    }
+  }
+
+  async function rejectRequest(r: EmployeeRequest) {
+    setBusyRequestId(r.id);
+    try {
+      await api(`/requests/${r.id}/reject`, { method: 'POST' });
+      success(t('leave_rejected'));
+      load();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setBusyRequestId(null);
+    }
+  }
+
+  async function cancelRequest(r: EmployeeRequest) {
+    if (!window.confirm(t('confirm_cancel_employee_request'))) return;
+    setBusyRequestId(r.id);
+    try {
+      await api(`/requests/${r.id}`, { method: 'DELETE' });
+      success(tc('deleted'));
+      load();
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setBusyRequestId(null);
     }
   }
 
@@ -247,6 +295,7 @@ export default function EmployeeProfilePage() {
     { id: 'details', label: t('tab_details') },
     { id: 'contracts', label: t('contracts'), count: contracts.length },
     { id: 'leave', label: t('leave'), count: leaveRequests.length },
+    { id: 'requests', label: t('requests'), count: employeeRequests.length },
     { id: 'attachments', label: t('attachments'), count: attachments.length },
     { id: 'attendance', label: t('attendance'), count: attendance.length },
     { id: 'payroll', label: t('runs'), count: payrollRuns.length },
@@ -437,6 +486,58 @@ export default function EmployeeProfilePage() {
             )}
           </div>
         );
+      case 'requests':
+        return (
+          <div className="space-y-3 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted">{t('requests_hint')}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => setRequestDialogOpen(true)}>
+                {t('add_employee_request')}
+              </Button>
+            </div>
+
+            {employeeRequests.length === 0 ? (
+              <EmptyPanel>{t('no_requests')}</EmptyPanel>
+            ) : (
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>{t('request_type')}</TH>
+                    <TH>{t('request_title')}</TH>
+                    <TH>{t('requested_date')}</TH>
+                    <TH>{t('status_label')}</TH>
+                    <TH />
+                  </TR>
+                </THead>
+                <TBody>
+                  {employeeRequests.map((r) => (
+                    <TR key={r.id}>
+                      <TD>{r.request_type?.name ?? '—'}</TD>
+                      <TD>{r.title}</TD>
+                      <TD className="num text-muted" dir="ltr">{r.requested_date ?? '—'}</TD>
+                      <TD><Badge tone={requestStatusTone[r.status]}>{t(`leave_status_${r.status}`)}</Badge></TD>
+                      <TD className="text-end">
+                        {r.status === 'pending' && (
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" aria-label={t('leave_approve')} disabled={busyRequestId === r.id} onClick={() => approveRequest(r)}>
+                              <Check className="h-4 w-4 text-positive" strokeWidth={2} />
+                            </Button>
+                            <Button variant="ghost" size="icon" aria-label={t('leave_reject')} disabled={busyRequestId === r.id} onClick={() => rejectRequest(r)}>
+                              <X className="h-4 w-4 text-negative" strokeWidth={2} />
+                            </Button>
+                            <Button variant="ghost" size="icon" aria-label={t('leave_cancel')} disabled={busyRequestId === r.id} onClick={() => cancelRequest(r)}>
+                              <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                            </Button>
+                          </div>
+                        )}
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            )}
+          </div>
+        );
       case 'attachments':
         return (
           <div className="space-y-3 p-3">
@@ -611,6 +712,12 @@ export default function EmployeeProfilePage() {
       <LeaveRequestDialog
         open={leaveDialogOpen}
         onClose={() => setLeaveDialogOpen(false)}
+        onSaved={load}
+        employeeId={employee.id}
+      />
+      <EmployeeRequestDialog
+        open={requestDialogOpen}
+        onClose={() => setRequestDialogOpen(false)}
         onSaved={load}
         employeeId={employee.id}
       />

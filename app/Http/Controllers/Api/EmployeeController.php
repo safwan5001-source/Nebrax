@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\StoreEmployeeAttachmentsRequest;
 use App\Http\Requests\StoreEmployeeRequest;
+use App\Http\Requests\StoreEmployeeRequestRequest;
 use App\Http\Requests\StoreLeaveRequestRequest;
 use App\Http\Requests\UpdateContractRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Http\Requests\UploadEmployeePhotoRequest;
 use App\Http\Resources\ContractResource;
 use App\Http\Resources\EmployeeAttachmentResource;
+use App\Http\Resources\EmployeeRequestResource;
 use App\Http\Resources\EmployeeResource;
 use App\Http\Resources\LeaveRequestResource;
 use App\Models\Branch;
@@ -22,6 +24,7 @@ use App\Models\JobLevel;
 use App\Models\JobTitle;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
+use App\Models\RequestType;
 use App\Models\Shift;
 use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
@@ -354,6 +357,46 @@ class EmployeeController extends ApiController
                 'is_paid'         => $type->is_paid,
             ], $type->balanceFor($employee->id)))->values(),
         ]);
+    }
+
+    /** طلبات هذا الموظف العامة (سلفة/استئذان/شكوى...) عبر الزمن، الأحدث أولاً. */
+    public function indexRequests(string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+
+        return EmployeeRequestResource::collection(
+            $employee->employeeRequests()->with(['requestType', 'approver'])->latest()->get()
+        )->response();
+    }
+
+    /**
+     * إنشاء طلبٍ عام؛ يبدأ `pending` إن احتاج نوعه موافقة، أو `approved`
+     * تلقائياً فوراً إن لم يحتَج (`requestType.requires_approval`).
+     */
+    public function storeRequests(StoreEmployeeRequestRequest $request, string $id): JsonResponse
+    {
+        $employee = Employee::findOrFail($id);
+        $data = $request->validated();
+
+        $requestType = RequestType::whereKey($data['request_type_id'])->where('is_active', true)->first();
+        if (! $requestType) {
+            abort(422, 'نوع الطلب غير موجود.');
+        }
+
+        $autoApproved = ! $requestType->requires_approval;
+
+        $employeeRequest = $employee->employeeRequests()->create([
+            'request_type_id' => $requestType->id,
+            'title'           => $data['title'],
+            'description'     => $data['description'] ?? null,
+            'requested_date'  => $data['requested_date'] ?? null,
+            'status'          => $autoApproved ? 'approved' : 'pending',
+            'approved_by'     => $autoApproved ? $request->user()?->id : null,
+            'approved_at'     => $autoApproved ? now() : null,
+            'created_by'      => $request->user()?->id,
+        ]);
+
+        return (new EmployeeRequestResource($employeeRequest->load(['requestType', 'approver'])))->response()->setStatusCode(201);
     }
 
     /**

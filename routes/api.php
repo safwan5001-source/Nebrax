@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeeCustodyController;
+use App\Http\Controllers\Api\EmployeeRequestController;
 use App\Http\Controllers\Api\EmploymentTypeController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
@@ -59,6 +60,7 @@ use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RecurringInvoiceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReportSettingsController;
+use App\Http\Controllers\Api\RequestTypeController;
 use App\Http\Controllers\Api\ReturnController;
 use App\Http\Controllers\Api\ReturnableController;
 use App\Http\Controllers\Api\ReturnSourcesController;
@@ -488,6 +490,21 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('leave-requests/{id}/approve', [LeaveRequestController::class, 'approve'])->middleware($perm('hr.manage'));
         Route::post('leave-requests/{id}/reject', [LeaveRequestController::class, 'reject'])->middleware($perm('hr.manage'));
         Route::delete('leave-requests/{id}', [LeaveRequestController::class, 'destroy'])->middleware($perm('hr.manage'));
+
+        // إدارة الطلبات — أنواع ثابتة بحقول موحّدة (نطاق البناء الأول)، منفصلة عن الإجازات عمداً.
+        Route::get('employees/{id}/requests', [EmployeeController::class, 'indexRequests'])->middleware($perm('hr.view'));
+        Route::post('employees/{id}/requests', [EmployeeController::class, 'storeRequests'])->middleware($perm('hr.manage'));
+
+        Route::get('request-types', [RequestTypeController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('request-types', [RequestTypeController::class, 'store'])->middleware($perm('hr.manage'));
+        Route::put('request-types/{id}', [RequestTypeController::class, 'update'])->middleware($perm('hr.manage'));
+        Route::delete('request-types/{id}', [RequestTypeController::class, 'destroy'])->middleware($perm('hr.manage'));
+
+        // طابور الموافقة عبر كل الموظفين — انظر EmployeeRequestController.
+        Route::get('requests', [EmployeeRequestController::class, 'index'])->middleware($perm('hr.view'));
+        Route::post('requests/{id}/approve', [EmployeeRequestController::class, 'approve'])->middleware($perm('hr.manage'));
+        Route::post('requests/{id}/reject', [EmployeeRequestController::class, 'reject'])->middleware($perm('hr.manage'));
+        Route::delete('requests/{id}', [EmployeeRequestController::class, 'destroy'])->middleware($perm('hr.manage'));
 
         // الهيكل التنظيمي — مسمى وظيفي/قسم/مستوى وظيفي/نوع وظيفة ككيانات مُدارة.
         Route::get('job-titles', [JobTitleController::class, 'index'])->middleware($perm('hr.view'));
