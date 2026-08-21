@@ -111,6 +111,22 @@ class UnitTemplateTest extends TestCase
         );
     }
 
+    /** اختيار قالب الوحدة يجعل وحدة المنتج هي وحدة الأساس، لا قيمة العميل الحرة. */
+    /** @test */
+    public function creating_a_product_derives_its_unit_from_the_selected_template(): void
+    {
+        $template = $this->template();
+
+        $product = $this->withToken($this->token)->postJson('/api/products', [
+            'name' => 'إسمنت بوحدة صحيحة', 'sku' => 'CEM-' . uniqid(), 'type' => 'good',
+            'unit' => 'piece', 'purchase_price' => 1000, 'sale_price' => 2000,
+            'unit_template_id' => $template['id'],
+        ])->assertCreated()['data'];
+
+        $this->assertSame('كيس', $product['unit']);
+        $this->assertSame('كيس', Product::findOrFail($product['id'])->unit);
+    }
+
     /**
      * **جوهر الوحدة.** شراء ٢ طبلية بـ٥٠٠ ريال للطبلية:
      *  • المخزون يزيد ١٠٠ كيساً (٢ × ٥٠)، لا ٢.
