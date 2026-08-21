@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AccountSettingsController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AttendanceController;
@@ -146,6 +147,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // متاح دائماً (حتى مع اشتراك منتهٍ) لرؤية الحالة والخروج
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+        Route::put('account/preferences', [AccountSettingsController::class, 'updatePreferences']);
+        Route::put('account/email', [AccountSettingsController::class, 'updateEmail'])->middleware('throttle:5,1');
+        Route::put('account/password', [AccountSettingsController::class, 'updatePassword'])->middleware('throttle:5,1');
+        Route::get('account/export', [AccountSettingsController::class, 'export'])->middleware('throttle:3,1');
         Route::get('subscription', [SubscriptionController::class, 'show']); // متاح حتى مع اشتراك منتهٍ
 
         $perm = fn (string $p) => EnsurePermission::class . ':' . $p;

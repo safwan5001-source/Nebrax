@@ -153,6 +153,7 @@ class AuthController extends ApiController
             'role'        => $user->role,
             'employee_id' => $user->employee_id,
             'tenant_id'   => $user->tenant_id,
+            'preferences' => $user->preferences ?? ['locale' => 'ar', 'theme' => 'system'],
         ];
     }
 

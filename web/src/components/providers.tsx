@@ -15,7 +15,7 @@ export function Providers({
 }) {
   return (
     <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Riyadh">
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <ToastProvider>{children}</ToastProvider>
       </ThemeProvider>
     </NextIntlClientProvider>
