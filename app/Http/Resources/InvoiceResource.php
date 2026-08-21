@@ -14,6 +14,12 @@ class InvoiceResource extends JsonResource
             'id'             => $this->id,
             'branch_id'      => $this->branch_id,
             'warehouse_id'   => $this->warehouse_id,
+            'price_list_id'  => $this->price_list_id,
+            'price_list'     => $this->whenLoaded('priceList', fn () => $this->priceList ? [
+                'id' => $this->priceList->id,
+                'name' => $this->priceList->name,
+                'is_active' => (bool) $this->priceList->is_active,
+            ] : null),
             'number'         => $this->number,
             'partner_id'     => $this->partner_id,
             'payment_type'   => $this->payment_type,

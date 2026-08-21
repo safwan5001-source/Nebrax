@@ -15,6 +15,7 @@ use App\Models\InvoiceNote;
 use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Models\PriceList;
 use App\Models\StockMovement;
 use App\Support\Money;
 use App\Services\Accounting\InvoiceRelationsService;
@@ -35,7 +36,7 @@ class InvoiceController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        return InvoiceResource::collection($this->scopeToActiveBranch(Invoice::with('lines.product', 'lines.costCenterAllocations.costCenter')->latest(), $request)->get())->response();
+        return InvoiceResource::collection($this->scopeToActiveBranch(Invoice::with('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter')->latest(), $request)->get())->response();
     }
 
     public function store(StoreInvoiceRequest $request): JsonResponse
@@ -48,6 +49,7 @@ class InvoiceController extends ApiController
         // عزل: كل المراجع يجب أن تخص المستأجر الحالي (تصدّ حقن معرّفات مستأجرين آخرين)
         Partner::findOrFail($data['partner_id']);
         $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $this->activeBranchId(), false);
+        $this->assertSelectablePriceList($data['price_list_id'] ?? null);
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertTenantOwned(Employee::class, $data['salesperson_id'] ?? null, 'مسؤول المبيعات');
         $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
@@ -55,13 +57,13 @@ class InvoiceController extends ApiController
 
         $invoice = $this->domain(fn () => $this->invoices->create($data, $data['items']));
 
-        return (new InvoiceResource($invoice->load('lines.product', 'lines.costCenterAllocations.costCenter')))->response()->setStatusCode(201);
+        return (new InvoiceResource($invoice->load('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter')))->response()->setStatusCode(201);
     }
 
     public function show(string $id): JsonResponse
     {
         return (new InvoiceResource(Invoice::with([
-            'lines.product', 'lines.costCenterAllocations.costCenter', 'costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
+            'priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
         ])->findOrFail($id)))->response();
     }
 
@@ -187,6 +189,9 @@ class InvoiceController extends ApiController
 
         Partner::findOrFail($data['partner_id']);
         $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $invoice->branch_id, false);
+        if (array_key_exists('price_list_id', $data)) {
+            $this->assertSelectablePriceList($data['price_list_id'], $invoice->price_list_id);
+        }
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertTenantOwned(Employee::class, $data['salesperson_id'] ?? null, 'مسؤول المبيعات');
         $this->assertTenantOwned(Account::class, $data['cash_account_id'] ?? null, 'الخزينة');
@@ -194,7 +199,7 @@ class InvoiceController extends ApiController
 
         $updated = $this->domain(fn () => $this->invoices->update($invoice, $data, $data['items']));
 
-        return (new InvoiceResource($updated->load('lines.product', 'lines.costCenterAllocations.costCenter')))->response();
+        return (new InvoiceResource($updated->load('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter')))->response();
     }
 
     /**
@@ -218,7 +223,7 @@ class InvoiceController extends ApiController
         $invoice = $this->visibleInvoice($request, $id);
         $copy = $this->domain(fn () => $this->invoices->duplicate($invoice, $request->user()?->id));
 
-        return (new InvoiceResource($copy->load('lines.product', 'lines.costCenterAllocations.costCenter')))
+        return (new InvoiceResource($copy->load('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter')))
             ->response()
             ->setStatusCode(201);
     }
@@ -240,7 +245,7 @@ class InvoiceController extends ApiController
         $this->assertWarehouseAllowed($invoice->warehouse_id, $invoice->branch_id);
         $posted = $this->domain(fn () => $this->invoices->post($invoice));
 
-        return (new InvoiceResource($posted->load(['lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
+        return (new InvoiceResource($posted->load(['priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
     }
 
     public function zatca(string $id): JsonResponse
@@ -255,6 +260,26 @@ class InvoiceController extends ApiController
             'previous_hash' => $invoice->zatca_previous_hash,
             'xml'           => $invoice->zatca_xml,
         ]);
+    }
+
+    /**
+     * اختيار القائمة لا يقبل إلا إعداداً نشطاً في المؤسسة. الاستثناء الوحيد هو
+     * مسودة تحتفظ بالمرجع ذاته بعد تعطيل القائمة؛ لا نعيد تفسير سعر سطورها ولا
+     * نحجب قدرتها على تعديل بيانات غير سعرية.
+     */
+    private function assertSelectablePriceList(?string $priceListId, ?string $currentPriceListId = null): void
+    {
+        if ($priceListId === null) {
+            return;
+        }
+
+        $priceList = PriceList::find($priceListId);
+        if (! $priceList) {
+            abort(422, 'قائمة الأسعار غير موجودة.');
+        }
+        if (! $priceList->is_active && $priceList->id !== $currentPriceListId) {
+            abort(422, 'قائمة الأسعار المحددة غير نشطة.');
+        }
     }
 
     /** الفاتورة وملحقاتها المقروءة تحترم الفرع النشط، لا مجرد عزل المستأجر. */

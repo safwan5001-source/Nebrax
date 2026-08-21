@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentMethodController;
+use App\Http\Controllers\Api\PriceListController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -294,6 +295,17 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('cost-centers', [CostCenterController::class, 'store'])->middleware($perm('cost_centers.manage'));
         Route::put('cost-centers/{id}', [CostCenterController::class, 'update'])->middleware($perm('cost_centers.manage'));
         Route::delete('cost-centers/{id}', [CostCenterController::class, 'destroy'])->middleware($perm('cost_centers.manage'));
+
+        // قوائم الأسعار: إعداد شركة مشترك يختاره البائع يدوياً في المسودة؛
+        // سعر السطر النهائي يبقى لقطة مستقلة ولا يتغير بتعديل القائمة لاحقاً.
+        Route::get('price-lists', [PriceListController::class, 'index'])->middleware($perm('invoices.view'));
+        Route::get('price-lists/{id}', [PriceListController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::get('price-lists/{id}/resolve', [PriceListController::class, 'resolve'])->middleware($perm('invoices.manage'));
+        Route::post('price-lists', [PriceListController::class, 'store'])->middleware($perm('company.manage'));
+        Route::put('price-lists/{id}', [PriceListController::class, 'update'])->middleware($perm('company.manage'));
+        Route::delete('price-lists/{id}', [PriceListController::class, 'destroy'])->middleware($perm('company.manage'));
+        Route::post('price-lists/{id}/items', [PriceListController::class, 'storeItem'])->middleware($perm('company.manage'));
+        Route::delete('price-lists/{id}/items/{itemId}', [PriceListController::class, 'destroyItem'])->middleware($perm('company.manage'));
 
         // الفواتير
         Route::get('invoices', [InvoiceController::class, 'index'])->middleware($perm('invoices.view'));

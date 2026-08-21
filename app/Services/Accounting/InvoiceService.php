@@ -83,6 +83,7 @@ class InvoiceService
                 'partner_id'        => $data['partner_id'],
                 'branch_id'         => $branchId,
                 'warehouse_id'      => $data['warehouse_id'] ?? null,
+                'price_list_id'     => $data['price_list_id'] ?? null,
                 'type'              => 'sale',
                 'payment_type'      => $this->paymentType($data['payment_type'] ?? Settings::get('sales', 'default_payment_type'), $isPaid),
                 'is_paid'           => $isPaid,
@@ -150,6 +151,7 @@ class InvoiceService
             $invoice->update([
                 'partner_id'        => $data['partner_id'],
                 'warehouse_id'      => $keep('warehouse_id', $invoice->warehouse_id),
+                'price_list_id'     => $keep('price_list_id', $invoice->price_list_id),
                 'payment_type'      => $this->paymentType($keep('payment_type', $invoice->payment_type) ?? $invoice->payment_type, $isPaid),
                 'is_paid'           => $isPaid,
                 'payment_method'    => $this->paymentMethod($keep('payment_method', $invoice->payment_method)),
@@ -187,6 +189,7 @@ class InvoiceService
         $data = [
             'partner_id'      => $invoice->partner_id,
             'warehouse_id'    => $invoice->warehouse_id,
+            'price_list_id'   => $invoice->price_list_id,
             'payment_type'    => $invoice->payment_type,
             'is_paid'         => false,
             'payment_method'  => $invoice->payment_method,
