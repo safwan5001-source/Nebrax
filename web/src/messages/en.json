@@ -1451,6 +1451,8 @@
     "due_date": "Due date",
     "notes": "Notes",
     "no_notes": "There are no notes on this invoice.",
+    "minimum_price_overrides": "Minimum-price overrides",
+    "unknown_item": "Unnamed line",
     "payment_section_note": "Payments are recorded through a receipt voucher linked to the invoice. Payment status changes only from a posted voucher.",
     "collect_available": "The outstanding amount can be collected for this invoice.",
     "fully_paid": "This invoice is fully paid.",
@@ -1653,7 +1655,10 @@
     "allocation_percent_invalid": "Percentage allocations must total 100.00%.",
     "allocation_amount_invalid": "Amount allocations must equal the line net.",
     "allocation_invalid_value": "Enter a valid allocation value.",
-    "allocation_hint": "Allocation applies to the line net after its discount; use either percentage or amount at a time."
+    "allocation_hint": "Allocation applies to the line net after its discount; use either percentage or amount at a time.",
+    "minimum_price_override_reason": "Minimum-price override reason",
+    "minimum_price_override_reason_placeholder": "Enter a clear reason for the exception",
+    "minimum_price_override_reason_hint": "The recorded minimum price for this product is {amount}. If the net price is lower and the protection policy is enabled, a clear reason and approval by an authorised owner or manager are required."
   },
   "invoiceTemplates": {
     "classic": "Classic",
