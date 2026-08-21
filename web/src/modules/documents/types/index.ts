@@ -44,6 +44,8 @@ export interface DocumentParty {
   crNumber?: string | null;
   city?: string | null;
   address?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
 }
 
 /** البائع = طرف + هوية بصرية اختيارية. */

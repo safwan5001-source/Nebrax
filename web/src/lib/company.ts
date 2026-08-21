@@ -11,6 +11,15 @@ export interface Company {
   country?: string | null;
   /** data URL أو فارغ — تعرضه قشرة التطبيق ورؤوس المستندات. */
   logo?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  building_no?: string | null;
+  street?: string | null;
+  additional_no?: string | null;
+  district?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  short_address?: string | null;
 }
 
 const COMPANY_UPDATED_EVENT = 'nebrax:company-updated';

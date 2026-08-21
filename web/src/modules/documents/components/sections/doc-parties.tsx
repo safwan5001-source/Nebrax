@@ -7,7 +7,7 @@ import { DocInfoRow } from './doc-info-row';
 import { useDocStyle } from '../doc-style-context';
 
 /** عناوين بطاقات المستند عربية أيضاً؛ تباعد المحارف يكسر وصلها عند رسم PDF. */
-export const DOCUMENT_PARTY_CARD_LABEL_CLASS = 'mb-1.5 text-[10px] font-bold text-gray-400';
+export const DOCUMENT_PARTY_CARD_LABEL_CLASS = 'mb-1.5 text-[10px] font-bold text-muted';
 
 /** بطاقات البائع / المشتري / بيانات المستند. */
 export function DocParties({ model }: { model: DocumentModel }) {
@@ -34,6 +34,9 @@ export function DocParties({ model }: { model: DocumentModel }) {
         <div className="font-semibold text-black">{seller.name || '—'}</div>
         <DocInfoRow label={t('vat_number')} value={seller.vatNumber ? <span className="num">{seller.vatNumber}</span> : null} />
         <DocInfoRow label={t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />
+        <DocInfoRow label={t('national_address')} value={seller.address} />
+        <DocInfoRow label={t('phone')} value={seller.phone ? <span className="num" dir="ltr">{seller.phone}</span> : null} />
+        <DocInfoRow label={t('mobile')} value={seller.mobile ? <span className="num" dir="ltr">{seller.mobile}</span> : null} />
       </div>
       <div className={card}>
         <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{partyLabel}</div>

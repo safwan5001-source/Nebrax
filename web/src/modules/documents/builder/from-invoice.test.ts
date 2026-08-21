@@ -39,4 +39,40 @@ describe('buildInvoiceDocumentModel', () => {
       unitPrice: 115000,
     });
   });
+
+  it('builds the seller national address and contact details from the company profile', () => {
+    const model = buildInvoiceDocumentModel({
+      invoice: {
+        number: 'INV-2026-0002',
+        invoice_date: '2026-08-18',
+        payment_type: 'credit',
+        subtotal: '100.00',
+        tax_amount: '15.00',
+        total: '115.00',
+        lines: [],
+      },
+      company: {
+        name: 'نبراس للتجارة',
+        vat_number: '310122393500003',
+        cr_number: '2050123456',
+        building_no: '7404',
+        street: 'شارع الحارث بن عبدالله',
+        additional_no: '3185',
+        district: 'الخضراء',
+        city: 'مكة المكرمة',
+        postal_code: '24267',
+        short_address: 'RDHA7404',
+        phone: '0123456789',
+        mobile: '0551234567',
+      },
+      customer: null,
+      qr: null,
+    });
+
+    expect(model.seller).toMatchObject({
+      address: '7404، شارع الحارث بن عبدالله، 3185، الخضراء، مكة المكرمة، 24267',
+      phone: '0123456789',
+      mobile: '0551234567',
+    });
+  });
 });

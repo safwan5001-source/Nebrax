@@ -2,9 +2,9 @@
 export function DocInfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === '') return null;
   return (
-    <div className="flex justify-between gap-3 py-0.5">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-medium text-black">{value}</span>
+    <div className="flex items-start justify-between gap-3 py-0.5">
+      <span className="shrink-0 text-muted">{label}</span>
+      <span className="min-w-0 break-words text-end font-medium text-text">{value}</span>
     </div>
   );
 }

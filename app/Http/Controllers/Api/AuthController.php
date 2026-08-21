@@ -7,7 +7,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Models\Branch;
 use App\Models\Warehouse;
 use App\Models\Tenant;
-use App\Support\Settings;
+use App\Support\CompanyProfile;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Accounting\CashBankAccountService;
@@ -159,19 +159,6 @@ class AuthController extends ApiController
     /** بيانات الشركة (البائع) لإظهارها في رأس المستندات كالفاتورة الضريبية. */
     private function companyPayload(?Tenant $tenant): ?array
     {
-        if (! $tenant) {
-            return null;
-        }
-
-        return [
-            'name'       => $tenant->name,
-            'vat_number' => $tenant->vat_number,
-            'cr_number'  => $tenant->cr_number,
-            'currency'   => $tenant->currency,
-            'country'    => $tenant->country,
-            // الشعار مع بقية بيانات الشركة: القشرة تقرؤه من هذا الاستدعاء
-            // القائم بلا طلبٍ إضافي وبلا قيد صلاحية.
-            'logo'       => Settings::group('company', $tenant)['logo'] ?? '',
-        ];
+        return CompanyProfile::payload($tenant);
     }
 }

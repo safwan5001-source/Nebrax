@@ -10,6 +10,6 @@ describe('DOCUMENT_PARTY_CARD_LABEL_CLASS', () => {
   it('يحافظ على الحجم والوزن واللون الدلالي للعناوين', () => {
     expect(DOCUMENT_PARTY_CARD_LABEL_CLASS).toContain('text-[10px]');
     expect(DOCUMENT_PARTY_CARD_LABEL_CLASS).toContain('font-bold');
-    expect(DOCUMENT_PARTY_CARD_LABEL_CLASS).toContain('text-gray-400');
+    expect(DOCUMENT_PARTY_CARD_LABEL_CLASS).toContain('text-muted');
   });
 });
