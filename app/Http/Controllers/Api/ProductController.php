@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\ImportProductsRequest;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
+use App\Http\Resources\ProductActivityResource;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use App\Models\Account;
@@ -14,7 +15,9 @@ use App\Models\ProductCategory;
 use App\Models\UnitTemplate;
 use App\Services\Accounting\InventoryService;
 use App\Services\ProductImportService;
+use App\Services\ProductLifecycleService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ProductController extends ApiController
@@ -22,6 +25,7 @@ class ProductController extends ApiController
     public function __construct(
         protected InventoryService $inventory,
         protected ProductImportService $imports,
+        protected ProductLifecycleService $lifecycle,
     ) {}
 
     /**
@@ -96,11 +100,13 @@ class ProductController extends ApiController
 
         // ذرّية: إنشاء المنتج وقيد الرصيد الافتتاحي معاملة واحدة —
         // فشل القيد يُرجع المنتج كله (لا منتج يتيم بلا قيده).
-        $product = $this->domain(fn () => DB::transaction(function () use ($data) {
+        $userId = $request->user()?->id;
+        $product = $this->domain(fn () => DB::transaction(function () use ($data, $userId) {
             $product = Product::create($data); // initial_quantity ليست عموداً — يحرسها fillable
 
             // رصيد افتتاحي (قيد مدين 1140 / دائن 3130) عند تحديد كمية ابتدائية لمنتج متتبَّع.
             $this->inventory->recordOpeningStock($product, (int) ($data['initial_quantity'] ?? 0));
+            $this->lifecycle->create($product, $userId);
 
             return $product;
         }));
@@ -121,14 +127,22 @@ class ProductController extends ApiController
         if ($template !== null) {
             $data['unit'] = $template->base_unit;
         }
-        $product->update($data);
+        $product = $this->domain(fn () => $this->lifecycle->update($product, $data, $request->user()?->id));
 
         return (new ProductResource($product))->response();
     }
 
-    public function destroy(string $id): JsonResponse
+    public function activity(string $id): JsonResponse
     {
-        Product::findOrFail($id)->delete();
+        $product = Product::findOrFail($id);
+
+        return ProductActivityResource::collection($this->lifecycle->activity($product))->response();
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $product = Product::findOrFail($id);
+        $this->domain(fn () => $this->lifecycle->delete($product, $request->user()?->id));
 
         return response()->json(['message' => 'تم الحذف.']);
     }

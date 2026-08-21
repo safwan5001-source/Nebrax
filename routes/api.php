@@ -177,6 +177,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('products/import/preview', [ProductController::class, 'importPreview'])->middleware($perm('products.manage'));
         Route::post('products/import/apply', [ProductController::class, 'importApply'])->middleware($perm('products.manage'));
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
+        Route::get('products/{id}/activity', [ProductController::class, 'activity'])->middleware($perm('products.view'));
         Route::post('products', [ProductController::class, 'store'])->middleware($perm('products.manage'));
         Route::put('products/{id}', [ProductController::class, 'update'])->middleware($perm('products.manage'));
         Route::delete('products/{id}', [ProductController::class, 'destroy'])->middleware($perm('products.manage'));
