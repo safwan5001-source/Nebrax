@@ -85,10 +85,20 @@ export default function LandingPage() {
     router.push('/dashboard');
   }
 
+  const ghostActionClass = 'inline-flex h-8 items-center justify-center rounded px-3 text-sm font-medium text-text transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background';
+  const outlineActionClass = 'inline-flex h-11 w-full items-center justify-center rounded border border-border bg-surface px-5 text-base font-medium text-text transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto';
+
   return (
     <div
       className="min-h-screen overflow-x-hidden bg-background text-text"
     >
+      <a
+        href="#main-content"
+        className="sr-only absolute start-4 top-4 z-50 rounded bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm focus:not-sr-only focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        onClick={() => window.requestAnimationFrame(() => document.getElementById('main-content')?.focus())}
+      >
+        {t('skip_to_content')}
+      </a>
       <header className="sticky top-0 z-20 border-b border-border/80 bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center" aria-label={t('brand_aria')}>
@@ -98,9 +108,7 @@ export default function LandingPage() {
           <div className="ms-auto flex items-center gap-1.5 sm:gap-2">
             <LangToggle />
             <ThemeToggle />
-            <Link href="/login" className="hidden sm:block">
-              <Button variant="ghost" size="sm" className="px-3">{t('cta_login')}</Button>
-            </Link>
+            <Link href="/login" className={`hidden sm:inline-flex ${ghostActionClass}`}>{t('cta_login')}</Link>
             <Button size="sm" className="px-3 sm:px-4" onClick={enterDemo}>
               {t('cta_demo')}
               <ArrowLeft className="h-4 w-4" strokeWidth={2} />
@@ -109,7 +117,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main>
+      <main id="main-content" tabIndex={-1} className="outline-none">
         <section className="relative overflow-hidden border-b border-border bg-background">
           <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[0.78fr_1.22fr] lg:gap-10 lg:px-8 lg:py-24">
             <div className="max-w-xl">
@@ -130,9 +138,7 @@ export default function LandingPage() {
                   <ArrowLeft className="h-4 w-4" strokeWidth={2} />
                 </Button>
                 <Link href="#modules" className="w-full sm:w-auto">
-                  <Button variant="outline" size="md" className="h-11 w-full px-5 text-base sm:w-auto">
-                    {t('hero_secondary_cta')}
-                  </Button>
+                  <span className={outlineActionClass}>{t('hero_secondary_cta')}</span>
                 </Link>
               </div>
 
@@ -146,7 +152,7 @@ export default function LandingPage() {
               </ul>
             </div>
 
-            <div className="mx-auto w-full max-w-3xl lg:max-w-none" aria-label={t('preview_aria')}>
+            <figure className="mx-auto w-full max-w-3xl lg:max-w-none" aria-label={t('preview_aria')}>
               <p className="mb-3 text-sm font-semibold text-primary">{t('hero_product_label')}</p>
               <div className="relative pb-9 sm:pb-12">
                 <div className="relative aspect-[1.40625] overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/10 dark:shadow-black/25">
@@ -182,8 +188,8 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              <p className="mt-2 text-sm leading-6 text-muted sm:ms-[12rem]">{t('hero_product_note')}</p>
-            </div>
+              <figcaption className="mt-2 text-sm leading-6 text-muted sm:ms-[12rem]">{t('hero_product_note')}</figcaption>
+            </figure>
           </div>
         </section>
 

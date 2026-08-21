@@ -419,7 +419,9 @@
     "loadFailed": "Could not load",
     "yes": "Yes",
     "no": "No",
-    "all": "All"
+    "all": "All",
+    "themeToggle": "Toggle color mode",
+    "languageToggle": "Switch language"
   },
   "contacts": {
     "title": "Contact list",
@@ -1617,6 +1619,7 @@
     "hero_secondary_cta": "See the features",
     "brand_aria": "Back to the Nebrax homepage",
     "trust_aria": "Nebrax trial benefits",
+    "skip_to_content": "Skip to main content",
     "trust_fast": "Clear Arabic interface",
     "trust_arabic": "Responsive experience",
     "trust_secure": "Practical financial visibility",

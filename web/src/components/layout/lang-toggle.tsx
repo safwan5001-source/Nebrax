@@ -1,13 +1,16 @@
 'use client';
 
+/** اتجاه التصميم: «المكتب الواثق» — أدوات رأس صغيرة باسم واضح وحلقة تركيز موحّدة. */
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Languages } from 'lucide-react';
 import { Button } from '../ui/button';
 
 export function LangToggle() {
   const locale = useLocale();
   const router = useRouter();
+  const t = useTranslations('common');
 
   function toggle() {
     const next = locale === 'ar' ? 'en' : 'ar';
@@ -16,7 +19,7 @@ export function LangToggle() {
   }
 
   return (
-    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="تبديل اللغة" onClick={toggle}>
+    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={t('languageToggle')} onClick={toggle}>
       <span className="text-xs font-semibold">{locale === 'ar' ? 'EN' : 'ع'}</span>
       <Languages className="sr-only h-4 w-4" />
     </Button>

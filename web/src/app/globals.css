@@ -1,3 +1,4 @@
+/* اتجاه التصميم: «المكتب الواثق» — تباين هادئ، تركيز صريح، وحركة تحترم تفضيل المستخدم. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -11,6 +12,7 @@
   --primary: #1e40af;
   --primary-hover: #1e3a8a;
   --primary-soft: #eef2ff;
+  --primary-foreground: #ffffff;
   --positive: #166534;
   --negative: #b91c1c;
   --warning: #92400e;
@@ -29,6 +31,7 @@
   --primary: #4f8cff;
   --primary-hover: #6ba0ff;
   --primary-soft: #1b2740;
+  --primary-foreground: #0e1014;
   --positive: #16a34a;
   --negative: #f87171;
   --warning: #d97706;
@@ -41,6 +44,10 @@
     background-color: var(--background);
     color: var(--text);
     font-family: var(--font-sans);
+  }
+  :where(a[href], button, input, select, textarea, summary):focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 3px;
   }
   /* الأرقام المالية والأكواد بخط Mono ومحاذاة عمودية */
   .num {
@@ -65,8 +72,13 @@
   animation: sidebar-group-in 160ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
-  .sidebar-group-in {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
     animation: none;
+    transition-duration: 0.01ms !important;
   }
 }
 

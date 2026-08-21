@@ -15,6 +15,7 @@ export default {
           DEFAULT: 'var(--primary)',
           hover: 'var(--primary-hover)',
           soft: 'var(--primary-soft)',
+          foreground: 'var(--primary-foreground)',
         },
         positive: 'var(--positive)',
         negative: 'var(--negative)',
