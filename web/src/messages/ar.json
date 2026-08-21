@@ -558,6 +558,7 @@
     "act_updated": "تعديل {doc}",
     "act_status": "تغيّر حالة {doc}",
     "doc_invoice": "الفاتورة",
+    "doc_purchase": "فاتورة الشراء",
     "doc_quote": "عرض السعر",
     "doc_procurement": "مستند الشراء",
     "doc_stocktake": "الجرد",

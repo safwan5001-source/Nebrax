@@ -6,7 +6,7 @@ import { CheckCircle2, FileText, ClipboardCheck, Package, PencilLine } from 'luc
 import { Skeleton } from '@/components/ui/skeleton';
 
 type Action = 'created' | 'updated' | 'status';
-type DocType = 'invoice' | 'quote' | 'procurement' | 'stocktake' | 'stock_permit';
+type DocType = 'invoice' | 'purchase' | 'quote' | 'procurement' | 'stocktake' | 'stock_permit';
 
 interface Revision {
   id: string;
@@ -19,6 +19,7 @@ interface Revision {
 
 const ICON: Record<DocType, typeof FileText> = {
   invoice: FileText,
+  purchase: ClipboardCheck,
   quote: ClipboardCheck,
   procurement: ClipboardCheck,
   stocktake: Package,
