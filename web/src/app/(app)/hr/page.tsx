@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Plus, Pencil, Trash2, MapPin, User, UserCog } from 'lucide-react';
@@ -27,6 +28,7 @@ import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
 type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'leave' | 'requests' | 'roles' | 'users' | 'org_structure';
+const TABS: Tab[] = ['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', 'roles', 'users', 'org_structure'];
 
 interface TeamUser {
   id: string; name: string; email: string; role: string; is_active: boolean;
@@ -45,7 +47,13 @@ export default function HrPage() {
   const ts = useTranslations('status');
   const tc = useTranslations('common');
   const { success, error } = useToast();
-  const [tab, setTab] = useState<Tab>('employees');
+  // رابط الشريط الجانبي لبعض التبويبات (الحضور، الرواتب، الطلبات) يفتح
+  // مباشرة على تبويبها عبر `?tab=` — بدل صفحة منفصلة كانت 404 من قبل.
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const [tab, setTab] = useState<Tab>(
+    TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : 'employees'
+  );
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
