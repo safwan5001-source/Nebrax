@@ -28,7 +28,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function the_index_merges_the_catalogue_with_tenant_defaults(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
 
         $res = $this->withToken($auth['token'])->getJson('/api/applications')->assertOk();
 
@@ -41,7 +41,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function enabling_a_built_capability_with_satisfied_dependencies_succeeds(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
 
         $res = $this->withToken($auth['token'])->postJson('/api/applications/enable', [
             'application_key' => 'sales.pos',
@@ -54,7 +54,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function enabling_a_coming_soon_capability_is_rejected(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
 
         $this->withToken($auth['token'])->postJson('/api/applications/enable', [
             'application_key' => 'accounting.cheques',
@@ -64,7 +64,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function enabling_an_unknown_key_is_rejected(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
 
         $this->withToken($auth['token'])->postJson('/api/applications/enable', [
             'application_key' => 'not.a.real.application',
@@ -74,7 +74,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function disabling_a_mandatory_capability_is_rejected(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
 
         $this->withToken($auth['token'])->postJson('/api/applications/disable', [
             'application_key' => 'sales.invoicing',
@@ -84,7 +84,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function disabling_a_normal_capability_succeeds_after_enabling_it(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
         $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'hr.employees'])->assertOk();
 
         $res = $this->withToken($auth['token'])->postJson('/api/applications/disable', [
@@ -100,7 +100,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function disabling_a_capability_with_real_data_suspends_it_for_read_only_access(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'hr.employees'])->assertOk();
 
@@ -118,7 +118,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function a_suspended_capability_can_be_reenabled_normally(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'hr.employees'])->assertOk();
         Employee::create(['employee_no' => 'EMP-00001', 'name' => 'موظف حقيقي']);
@@ -134,7 +134,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function crm_follow_up_suspends_when_activities_exist(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'crm.follow_up'])->assertOk();
 
@@ -148,7 +148,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function sales_pos_suspends_when_a_session_exists(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'sales.pos'])->assertOk();
 
@@ -161,7 +161,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function finance_operations_suspends_when_a_payment_exists_but_not_from_auto_seeded_cash_bank_accounts(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'finance.operations'])->assertOk();
 
@@ -185,7 +185,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function company_branches_stays_disableable_with_only_the_auto_provisioned_main_branch(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'company.branches'])->assertOk();
 
@@ -203,7 +203,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function compliance_zatca_never_suspends_since_its_data_lives_on_the_mandatory_invoicing_capability(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'compliance.zatca'])->assertOk();
 
@@ -222,7 +222,7 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function only_owner_and_admin_can_manage_applications(): void
     {
-        $auth = $this->registerTenant();
+        $auth = $this->registerTenant(autoEnableApplications: false);
         $staff = $this->tokenForRole($auth['tenant_id'], 'staff', 'staff@acme.test');
         $accountant = $this->tokenForRole($auth['tenant_id'], 'accountant', 'accountant@acme.test');
 
@@ -236,10 +236,10 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function tenant_enablement_is_isolated(): void
     {
-        $a = $this->registerTenant('acme', 'owner@acme.test');
+        $a = $this->registerTenant('acme', 'owner@acme.test', autoEnableApplications: false);
         $this->withToken($a['token'])->postJson('/api/applications/enable', ['application_key' => 'hr.employees'])->assertOk();
 
-        $b = $this->registerTenant('other', 'owner@other.test');
+        $b = $this->registerTenant('other', 'owner@other.test', autoEnableApplications: false);
         $res = $this->withToken($b['token'])->getJson('/api/applications')->assertOk();
 
         $this->assertFalse($res['data']['hr.employees']['enabled']);

@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\PurchaseService;
 use App\Services\Reporting\ReportService;
+use App\Services\TenantApplicationService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -48,6 +49,9 @@ class PurchasePaidOnPostTest extends TestCase
 
         app(TenantContext::class)->set($this->tenant->id);
         app(ChartOfAccountsSeeder::class)->seed($this->tenant->id);
+        // هذا المستأجر لا يمرّ عبر `registerTenant()` (ينشئه مباشرة)، فيفوته
+        // التفعيل التلقائي الذي يحاكي هناك مستأجراً أنهى تأسيسه — يُفعَّل هنا يدوياً.
+        app(TenantApplicationService::class)->enable('purchases.cycle', null);
 
         $this->supplier  = Partner::create(['name' => 'مورد', 'type' => 'supplier']);
         $this->product   = Product::create(['name' => 'بضاعة', 'sale_price' => 10000, 'track_inventory' => true]);

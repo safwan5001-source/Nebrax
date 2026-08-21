@@ -84,6 +84,7 @@ use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Controllers\Api\ZatcaSettingsController;
 use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
+use App\Http\Middleware\EnsureApplicationActive;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\ForceJsonResponse;
@@ -152,11 +153,14 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('account/password', [AccountSettingsController::class, 'updatePassword'])->middleware('throttle:5,1');
         Route::get('account/export', [AccountSettingsController::class, 'export'])->middleware('throttle:3,1');
         Route::get('subscription', [SubscriptionController::class, 'show']); // متاح حتى مع اشتراك منتهٍ
+        // مرئية الشريط الجانبي لكل الأدوار — بلا RBAC، لتصحيح التنقّل الأساسي.
+        Route::get('applications/nav-state', [TenantApplicationController::class, 'navState']);
 
         $perm = fn (string $p) => EnsurePermission::class . ':' . $p;
+        $app = fn (string $k) => EnsureApplicationActive::class . ':' . $k;
 
         // الموارد تتطلب اشتراكاً نشطاً
-        Route::middleware(EnsureActiveSubscription::class)->group(function () use ($perm) {
+        Route::middleware(EnsureActiveSubscription::class)->group(function () use ($perm, $app) {
 
         // الأطراف
         Route::get('partners', [PartnerController::class, 'index'])->middleware($perm('partners.view'));
@@ -179,11 +183,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('contacts/{id}', [ContactController::class, 'destroy'])->middleware($perm('partners.manage'));
 
         // سجلّ علاقات العملاء (CRM) — غير محاسبي
-        Route::get('crm-activities', [CrmActivityController::class, 'index'])->middleware($perm('partners.view'));
-        Route::get('crm-activities/{id}', [CrmActivityController::class, 'show'])->middleware($perm('partners.view'));
-        Route::post('crm-activities', [CrmActivityController::class, 'store'])->middleware($perm('partners.manage'));
-        Route::put('crm-activities/{id}', [CrmActivityController::class, 'update'])->middleware($perm('partners.manage'));
-        Route::delete('crm-activities/{id}', [CrmActivityController::class, 'destroy'])->middleware($perm('partners.manage'));
+        Route::get('crm-activities', [CrmActivityController::class, 'index'])->middleware([$perm('partners.view'), $app('crm.follow_up')]);
+        Route::get('crm-activities/{id}', [CrmActivityController::class, 'show'])->middleware([$perm('partners.view'), $app('crm.follow_up')]);
+        Route::post('crm-activities', [CrmActivityController::class, 'store'])->middleware([$perm('partners.manage'), $app('crm.follow_up')]);
+        Route::put('crm-activities/{id}', [CrmActivityController::class, 'update'])->middleware([$perm('partners.manage'), $app('crm.follow_up')]);
+        Route::delete('crm-activities/{id}', [CrmActivityController::class, 'destroy'])->middleware([$perm('partners.manage'), $app('crm.follow_up')]);
 
         Route::delete('partners/{id}', [PartnerController::class, 'destroy'])->middleware($perm('partners.manage'));
 
@@ -229,8 +233,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('unit-templates/{id}', [UnitTemplateController::class, 'destroy'])->middleware($perm('products.manage'));
 
         // تقرير المخزون (قراءة فقط — لا أثر محاسبي)
-        Route::get('inventory', [InventoryController::class, 'index'])->middleware($perm('products.view'));
-        Route::get('inventory/{productId}/movements', [InventoryController::class, 'movements'])->middleware($perm('products.view'));
+        Route::get('inventory', [InventoryController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::get('inventory/{productId}/movements', [InventoryController::class, 'movements'])->middleware([$perm('products.view'), $app('inventory.core')]);
 
         // إعدادات المخزون (سياسة؛ تُقرأ فعلاً في حارس البيع بلا رصيد)
         Route::get('inventory-settings', [InventorySettingsController::class, 'show'])->middleware($perm('products.view'));
@@ -262,14 +266,17 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('expense-categories/{id}', [ExpenseCategoryController::class, 'update'])->middleware($perm('expenses.manage'));
         Route::delete('expense-categories/{id}', [ExpenseCategoryController::class, 'destroy'])->middleware($perm('expenses.manage'));
         // المصروفات (مستند مالي؛ الترحيل يولّد قيداً متوازناً)
-        Route::get('expenses', [ExpenseController::class, 'index'])->middleware($perm('expenses.view'));
-        Route::get('expenses/{id}/attachments/{attachmentId}', [ExpenseController::class, 'downloadAttachment'])->middleware($perm('expenses.view'));
-        Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware($perm('expenses.view'));
-        Route::post('expenses', [ExpenseController::class, 'store'])->middleware($perm('expenses.manage'));
-        Route::put('expenses/{id}', [ExpenseController::class, 'update'])->middleware($perm('expenses.manage'));
-        Route::post('expenses/{id}/duplicate', [ExpenseController::class, 'duplicate'])->middleware($perm('expenses.manage'));
-        Route::delete('expenses/{id}', [ExpenseController::class, 'destroy'])->middleware($perm('expenses.manage'));
-        Route::post('expenses/{id}/post', [ExpenseController::class, 'post'])->middleware($perm('expenses.manage'));
+        // — نطاق finance.operations هنا وحده: العُهَد أدناه أيضاً. لا الخزائن/
+        // الحسابات البنكية ولا السندات (`payments`)، فهي مرجع مشترك تستهلكه
+        // شاشة السندات نفسها غير المرتبطة بأي مفتاح كتالوج (ميزة أساسية دوماً).
+        Route::get('expenses', [ExpenseController::class, 'index'])->middleware([$perm('expenses.view'), $app('finance.operations')]);
+        Route::get('expenses/{id}/attachments/{attachmentId}', [ExpenseController::class, 'downloadAttachment'])->middleware([$perm('expenses.view'), $app('finance.operations')]);
+        Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware([$perm('expenses.view'), $app('finance.operations')]);
+        Route::post('expenses', [ExpenseController::class, 'store'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
+        Route::put('expenses/{id}', [ExpenseController::class, 'update'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
+        Route::post('expenses/{id}/duplicate', [ExpenseController::class, 'duplicate'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
+        Route::delete('expenses/{id}', [ExpenseController::class, 'destroy'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
+        Route::post('expenses/{id}/post', [ExpenseController::class, 'post'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
 
         // الأصول الثابتة (اقتناء + إهلاك؛ كلاهما يولّد قيداً متوازناً)
         Route::get('assets', [AssetController::class, 'index'])->middleware($perm('assets.view'));
@@ -280,21 +287,30 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // مراكز التكلفة (بيانات رئيسية — بُعد تحليلي للقيود)
         // المخازن — تحمل الكميات لكل موقع (التقييم يبقى عالمياً على المنتج).
+        // القائمة (`GET warehouses`) بلا حجب: مرجع مشترك يستهلكه اختيار المخزن
+        // في الفاتورة/المشتريات/نقطة البيع وفلاتر التقارير ونطاق وصول المستخدم
+        // — بلا علاقة بميزة «المخزون» نفسها؛ حجبها يكسرها حتى في الحالة
+        // الطبيعية (مخزن رئيسي واحد فقط). تفاصيل المخزن ورصيده محجوبان.
         Route::get('warehouses', [WarehouseController::class, 'index'])->middleware($perm('products.view'));
-        Route::get('warehouses/{id}', [WarehouseController::class, 'show'])->middleware($perm('products.view'));
-        Route::get('warehouses/{id}/stock', [WarehouseController::class, 'stock'])->middleware($perm('products.view'));
-        Route::post('warehouses', [WarehouseController::class, 'store'])->middleware($perm('products.manage'));
-        Route::put('warehouses/{id}', [WarehouseController::class, 'update'])->middleware($perm('products.manage'));
-        Route::delete('warehouses/{id}', [WarehouseController::class, 'destroy'])->middleware($perm('products.manage'));
+        Route::get('warehouses/{id}', [WarehouseController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::get('warehouses/{id}/stock', [WarehouseController::class, 'stock'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::post('warehouses', [WarehouseController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::put('warehouses/{id}', [WarehouseController::class, 'update'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::delete('warehouses/{id}', [WarehouseController::class, 'destroy'])->middleware([$perm('products.manage'), $app('inventory.core')]);
 
         // الفروع — بنية تنظيمية داخل المؤسسة (بيانات رئيسية، لا أثر محاسبي).
+        // القراءة (`GET branches`) تبقى بلا حجب: مرجع مشترك تستهلكه شاشات أخرى
+        // كثيرة بلا علاقة بميزة «إدارة الفروع» نفسها (نطاق وصول المستخدم،
+        // فلاتر التقارير، إسناد المخزن/الوردية لفرع) — حجبها يكسرها حتى في
+        // الحالة الطبيعية (فرع رئيسي واحد فقط). الإنفاذ على الإنشاء/التعديل
+        // وحدهما، وهو ما يعكس فعلاً نية «تعطيل تعدد الفروع».
         Route::get('branches', [BranchController::class, 'index'])->middleware($perm('branches.view'));
         Route::get('branch-settings', [BranchSettingsController::class, 'show'])->middleware($perm('branches.view'));
-        Route::put('branch-settings', [BranchSettingsController::class, 'update'])->middleware($perm('branches.manage'));
+        Route::put('branch-settings', [BranchSettingsController::class, 'update'])->middleware([$perm('branches.manage'), $app('company.branches')]);
         Route::get('branches/{id}', [BranchController::class, 'show'])->middleware($perm('branches.view'));
-        Route::post('branches', [BranchController::class, 'store'])->middleware($perm('branches.manage'));
-        Route::put('branches/{id}', [BranchController::class, 'update'])->middleware($perm('branches.manage'));
-        Route::delete('branches/{id}', [BranchController::class, 'destroy'])->middleware($perm('branches.manage'));
+        Route::post('branches', [BranchController::class, 'store'])->middleware([$perm('branches.manage'), $app('company.branches')]);
+        Route::put('branches/{id}', [BranchController::class, 'update'])->middleware([$perm('branches.manage'), $app('company.branches')]);
+        Route::delete('branches/{id}', [BranchController::class, 'destroy'])->middleware([$perm('branches.manage'), $app('company.branches')]);
 
         Route::get('cost-centers', [CostCenterController::class, 'index'])->middleware($perm('cost_centers.view'));
         Route::post('cost-centers', [CostCenterController::class, 'store'])->middleware($perm('cost_centers.manage'));
@@ -320,7 +336,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('invoices/{id}/inventory', [InvoiceController::class, 'inventory'])->middleware($perm('products.view'));
         Route::get('invoices/{id}/notes', [InvoiceController::class, 'notes'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}/notes/{noteId}/attachments/{attachmentId}/download', [InvoiceController::class, 'downloadNoteAttachment'])->middleware($perm('invoices.view'));
-        Route::get('invoices/{id}/zatca', [InvoiceController::class, 'zatca'])->middleware($perm('zatca.view'));
+        Route::get('invoices/{id}/zatca', [InvoiceController::class, 'zatca'])->middleware([$perm('zatca.view'), $app('compliance.zatca')]);
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
         Route::post('invoices/{id}/notes', [InvoiceController::class, 'storeNote'])->middleware($perm('invoices.manage'));
         Route::post('invoices/{id}/duplicate', [InvoiceController::class, 'duplicate'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
@@ -353,11 +369,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('recurring-invoices/{id}/generate', [RecurringInvoiceController::class, 'generate'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
 
         // جلسات نقطة البيع (تشغيلي — لا قيود)
-        Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware($perm('invoices.manage'));
-        Route::get('pos-sessions', [PosSessionController::class, 'index'])->middleware($perm('invoices.view'));
-        Route::get('pos-sessions/{id}/report', [PosSessionController::class, 'report'])->middleware($perm('invoices.view'));
-        Route::post('pos-sessions/open', [PosSessionController::class, 'open'])->middleware($perm('invoices.manage'));
-        Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware($perm('invoices.manage'));
+        Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::get('pos-sessions', [PosSessionController::class, 'index'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::get('pos-sessions/{id}/report', [PosSessionController::class, 'report'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::post('pos-sessions/open', [PosSessionController::class, 'open'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
 
         // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.
         Route::get('settings/finance', [FinanceSettingsController::class, 'show'])->middleware($perm('payments.view'));
@@ -405,53 +421,53 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('payments/{id}/post', [PaymentController::class, 'post'])->middleware($perm('payments.manage'));
 
         // عُهَد الموظفين — مسودة ثم صرف مرحّل، وتسوية أحادية السطر بنوع نشط وقيد مستقل.
-        Route::get('employee-custodies', [EmployeeCustodyController::class, 'index'])->middleware($perm('payments.view'));
-        Route::get('employee-custodies/{id}', [EmployeeCustodyController::class, 'show'])->middleware($perm('payments.view'));
-        Route::get('employee-custodies/{id}/settlements', [EmployeeCustodyController::class, 'indexSettlements'])->middleware($perm('payments.view'));
-        Route::post('employee-custodies', [EmployeeCustodyController::class, 'store'])->middleware($perm('payments.manage'));
-        Route::post('employee-custodies/{id}/settlements', [EmployeeCustodyController::class, 'storeSettlement'])->middleware($perm('payments.manage'));
-        Route::put('employee-custodies/{id}', [EmployeeCustodyController::class, 'update'])->middleware($perm('payments.manage'));
-        Route::post('employee-custodies/{id}/duplicate', [EmployeeCustodyController::class, 'duplicate'])->middleware($perm('payments.manage'));
-        Route::delete('employee-custodies/{id}', [EmployeeCustodyController::class, 'destroy'])->middleware($perm('payments.manage'));
-        Route::post('employee-custodies/{id}/post', [EmployeeCustodyController::class, 'post'])->middleware($perm('payments.manage'));
+        Route::get('employee-custodies', [EmployeeCustodyController::class, 'index'])->middleware([$perm('payments.view'), $app('finance.operations')]);
+        Route::get('employee-custodies/{id}', [EmployeeCustodyController::class, 'show'])->middleware([$perm('payments.view'), $app('finance.operations')]);
+        Route::get('employee-custodies/{id}/settlements', [EmployeeCustodyController::class, 'indexSettlements'])->middleware([$perm('payments.view'), $app('finance.operations')]);
+        Route::post('employee-custodies', [EmployeeCustodyController::class, 'store'])->middleware([$perm('payments.manage'), $app('finance.operations')]);
+        Route::post('employee-custodies/{id}/settlements', [EmployeeCustodyController::class, 'storeSettlement'])->middleware([$perm('payments.manage'), $app('finance.operations')]);
+        Route::put('employee-custodies/{id}', [EmployeeCustodyController::class, 'update'])->middleware([$perm('payments.manage'), $app('finance.operations')]);
+        Route::post('employee-custodies/{id}/duplicate', [EmployeeCustodyController::class, 'duplicate'])->middleware([$perm('payments.manage'), $app('finance.operations')]);
+        Route::delete('employee-custodies/{id}', [EmployeeCustodyController::class, 'destroy'])->middleware([$perm('payments.manage'), $app('finance.operations')]);
+        Route::post('employee-custodies/{id}/post', [EmployeeCustodyController::class, 'post'])->middleware([$perm('payments.manage'), $app('finance.operations')]);
 
         // المشتريات
-        Route::get('purchases', [PurchaseController::class, 'index'])->middleware($perm('purchases.view'));
-        Route::get('purchases/{id}', [PurchaseController::class, 'show'])->middleware($perm('purchases.view'));
-        Route::get('purchases/{id}/payments', [PurchaseController::class, 'payments'])->middleware($perm('payments.view'));
-        Route::get('purchases/{id}/accounting', [PurchaseController::class, 'accounting'])->middleware($perm('reports.view'));
-        Route::get('purchases/{id}/inventory', [PurchaseController::class, 'inventory'])->middleware($perm('products.view'));
-        Route::post('purchases', [PurchaseController::class, 'store'])->middleware($perm('purchases.manage'));
-        Route::put('purchases/{id}/classification', [PurchaseController::class, 'updateClassification'])->middleware($perm('purchases.manage'));
-        Route::put('purchases/{id}', [PurchaseController::class, 'update'])->middleware($perm('purchases.manage'));    // مسوّدة فقط
-        Route::delete('purchases/{id}', [PurchaseController::class, 'destroy'])->middleware($perm('purchases.manage')); // مسوّدة فقط
-        Route::post('purchases/{id}/post', [PurchaseController::class, 'post'])->middleware($perm('purchases.manage'));
+        Route::get('purchases', [PurchaseController::class, 'index'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
+        Route::get('purchases/{id}', [PurchaseController::class, 'show'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
+        Route::get('purchases/{id}/payments', [PurchaseController::class, 'payments'])->middleware([$perm('payments.view'), $app('purchases.cycle')]);
+        Route::get('purchases/{id}/accounting', [PurchaseController::class, 'accounting'])->middleware([$perm('reports.view'), $app('purchases.cycle')]);
+        Route::get('purchases/{id}/inventory', [PurchaseController::class, 'inventory'])->middleware([$perm('products.view'), $app('purchases.cycle')]);
+        Route::post('purchases', [PurchaseController::class, 'store'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::put('purchases/{id}/classification', [PurchaseController::class, 'updateClassification'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::put('purchases/{id}', [PurchaseController::class, 'update'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);    // مسوّدة فقط
+        Route::delete('purchases/{id}', [PurchaseController::class, 'destroy'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]); // مسوّدة فقط
+        Route::post('purchases/{id}/post', [PurchaseController::class, 'post'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
 
         // دورة الشراء: طلب → طلب عروض → عرض مورّد → أمر شراء (مستندات غير محاسبية)
-        Route::get('procurement', [ProcurementController::class, 'index'])->middleware($perm('purchases.view'));
-        Route::get('procurement/{id}', [ProcurementController::class, 'show'])->middleware($perm('purchases.view'));
-        Route::post('procurement', [ProcurementController::class, 'store'])->middleware($perm('purchases.manage'));
-        Route::put('procurement/{id}', [ProcurementController::class, 'update'])->middleware($perm('purchases.manage'));
-        Route::delete('procurement/{id}', [ProcurementController::class, 'destroy'])->middleware($perm('purchases.manage'));
-        Route::post('procurement/{id}/issue', [ProcurementController::class, 'issue'])->middleware($perm('purchases.manage'));
-        Route::post('procurement/{id}/revise', [ProcurementController::class, 'revise'])->middleware($perm('purchases.manage'));
-        Route::post('procurement/{id}/transition', [ProcurementController::class, 'transition'])->middleware($perm('purchases.manage'));
-        Route::post('procurement/{id}/convert', [ProcurementController::class, 'convert'])->middleware($perm('purchases.manage'));
+        Route::get('procurement', [ProcurementController::class, 'index'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
+        Route::get('procurement/{id}', [ProcurementController::class, 'show'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
+        Route::post('procurement', [ProcurementController::class, 'store'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::put('procurement/{id}', [ProcurementController::class, 'update'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::delete('procurement/{id}', [ProcurementController::class, 'destroy'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::post('procurement/{id}/issue', [ProcurementController::class, 'issue'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::post('procurement/{id}/revise', [ProcurementController::class, 'revise'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::post('procurement/{id}/transition', [ProcurementController::class, 'transition'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::post('procurement/{id}/convert', [ProcurementController::class, 'convert'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
 
         // الأذون المخزنية (الترحيل يحرّك المخزون ويولّد القيد معاً)
-        Route::get('stock-permits', [StockPermitController::class, 'index'])->middleware($perm('products.view'));
-        Route::get('stock-permits/{id}', [StockPermitController::class, 'show'])->middleware($perm('products.view'));
-        Route::post('stock-permits', [StockPermitController::class, 'store'])->middleware($perm('products.manage'));
-        Route::post('stock-permits/{id}/post', [StockPermitController::class, 'post'])->middleware($perm('products.manage'));
-        Route::delete('stock-permits/{id}', [StockPermitController::class, 'destroy'])->middleware($perm('products.manage'));
+        Route::get('stock-permits', [StockPermitController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::get('stock-permits/{id}', [StockPermitController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::post('stock-permits', [StockPermitController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('stock-permits/{id}/post', [StockPermitController::class, 'post'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::delete('stock-permits/{id}', [StockPermitController::class, 'destroy'])->middleware([$perm('products.manage'), $app('inventory.core')]);
 
         // الجرد (الترحيل يصحّح الكمية ويولّد قيد الفرق معاً)
-        Route::get('stocktakes', [StocktakeController::class, 'index'])->middleware($perm('products.view'));
-        Route::get('stocktakes/{id}', [StocktakeController::class, 'show'])->middleware($perm('products.view'));
-        Route::post('stocktakes', [StocktakeController::class, 'store'])->middleware($perm('products.manage'));
-        Route::post('stocktakes/{id}/count', [StocktakeController::class, 'count'])->middleware($perm('products.manage'));
-        Route::post('stocktakes/{id}/post', [StocktakeController::class, 'post'])->middleware($perm('products.manage'));
-        Route::delete('stocktakes/{id}', [StocktakeController::class, 'destroy'])->middleware($perm('products.manage'));
+        Route::get('stocktakes', [StocktakeController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::get('stocktakes/{id}', [StocktakeController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::post('stocktakes', [StocktakeController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('stocktakes/{id}/count', [StocktakeController::class, 'count'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('stocktakes/{id}/post', [StocktakeController::class, 'post'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::delete('stocktakes/{id}', [StocktakeController::class, 'destroy'])->middleware([$perm('products.manage'), $app('inventory.core')]);
 
         // سجلّ تغييرات المستندات (قراءة فقط — لا أثر محاسبي)
         Route::get('revisions', [DocumentRevisionController::class, 'feed'])->middleware($perm('invoices.view'));
@@ -487,31 +503,33 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('returns', [ReturnController::class, 'store'])->middleware($perm('returns.manage'));
         Route::post('returns/{id}/post', [ReturnController::class, 'post'])->middleware($perm('returns.manage'));
 
-        // الموظفون (HR)
+        // الموظفون (HR) — القائمة (`GET employees`) تبقى بلا حجب: مرجع مشترك
+        // يستهلكه اختيار البائع في الفاتورة وربط حساب المستخدم بموظف، بلا
+        // علاقة بميزة «إدارة الموظفين» نفسها. تفاصيل الموظف وإدارته محجوبة.
         Route::get('employees', [EmployeeController::class, 'index'])->middleware($perm('hr.view'));
-        Route::get('employees/{id}', [EmployeeController::class, 'show'])->middleware($perm('hr.view'));
-        Route::post('employees', [EmployeeController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::put('employees/{id}', [EmployeeController::class, 'update'])->middleware($perm('hr.manage'));
-        Route::delete('employees/{id}', [EmployeeController::class, 'destroy'])->middleware($perm('hr.manage'));
-        Route::get('employees/{id}/photo', [EmployeeController::class, 'showPhoto'])->middleware($perm('hr.view'));
-        Route::post('employees/{id}/photo', [EmployeeController::class, 'uploadPhoto'])->middleware($perm('hr.manage'));
-        Route::delete('employees/{id}/photo', [EmployeeController::class, 'removePhoto'])->middleware($perm('hr.manage'));
+        Route::get('employees/{id}', [EmployeeController::class, 'show'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('employees', [EmployeeController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('employees/{id}', [EmployeeController::class, 'update'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('employees/{id}', [EmployeeController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::get('employees/{id}/photo', [EmployeeController::class, 'showPhoto'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('employees/{id}/photo', [EmployeeController::class, 'uploadPhoto'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('employees/{id}/photo', [EmployeeController::class, 'removePhoto'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
         // مسوّغات التعيين (مرفقات الموظف)
-        Route::get('employees/{id}/attachments', [EmployeeController::class, 'indexAttachments'])->middleware($perm('hr.view'));
-        Route::post('employees/{id}/attachments', [EmployeeController::class, 'storeAttachments'])->middleware($perm('hr.manage'));
-        Route::get('employees/{id}/attachments/{attachmentId}/download', [EmployeeController::class, 'downloadAttachment'])->middleware($perm('hr.view'));
-        Route::delete('employees/{id}/attachments/{attachmentId}', [EmployeeController::class, 'destroyAttachment'])->middleware($perm('hr.manage'));
+        Route::get('employees/{id}/attachments', [EmployeeController::class, 'indexAttachments'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('employees/{id}/attachments', [EmployeeController::class, 'storeAttachments'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::get('employees/{id}/attachments/{attachmentId}/download', [EmployeeController::class, 'downloadAttachment'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::delete('employees/{id}/attachments/{attachmentId}', [EmployeeController::class, 'destroyAttachment'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // عقود العمل — مصدر الراتب الفعلي، انظر design-system/foundations/hr-users-architecture.md
-        Route::get('employees/{id}/contracts', [EmployeeController::class, 'indexContracts'])->middleware($perm('hr.view'));
-        Route::post('employees/{id}/contracts', [EmployeeController::class, 'storeContracts'])->middleware($perm('hr.manage'));
-        Route::put('employees/{id}/contracts/{contractId}', [EmployeeController::class, 'updateContract'])->middleware($perm('hr.manage'));
-        Route::delete('employees/{id}/contracts/{contractId}', [EmployeeController::class, 'destroyContract'])->middleware($perm('hr.manage'));
+        Route::get('employees/{id}/contracts', [EmployeeController::class, 'indexContracts'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('employees/{id}/contracts', [EmployeeController::class, 'storeContracts'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('employees/{id}/contracts/{contractId}', [EmployeeController::class, 'updateContract'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('employees/{id}/contracts/{contractId}', [EmployeeController::class, 'destroyContract'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // الإجازات — نوعٌ فقط + رصيدٌ مباشر (نطاق البناء الأول)، بلا أثرٍ مالي آلي.
-        Route::get('employees/{id}/leave-requests', [EmployeeController::class, 'indexLeaveRequests'])->middleware($perm('hr.view'));
-        Route::post('employees/{id}/leave-requests', [EmployeeController::class, 'storeLeaveRequests'])->middleware($perm('hr.manage'));
-        Route::get('employees/{id}/leave-balances', [EmployeeController::class, 'leaveBalances'])->middleware($perm('hr.view'));
+        Route::get('employees/{id}/leave-requests', [EmployeeController::class, 'indexLeaveRequests'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('employees/{id}/leave-requests', [EmployeeController::class, 'storeLeaveRequests'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::get('employees/{id}/leave-balances', [EmployeeController::class, 'leaveBalances'])->middleware([$perm('hr.view'), $app('hr.employees')]);
 
         Route::get('leave-types', [LeaveTypeController::class, 'index'])->middleware($perm('hr.view'));
         Route::post('leave-types', [LeaveTypeController::class, 'store'])->middleware($perm('hr.manage'));
@@ -525,8 +543,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('leave-requests/{id}', [LeaveRequestController::class, 'destroy'])->middleware($perm('hr.manage'));
 
         // إدارة الطلبات — أنواع ثابتة بحقول موحّدة (نطاق البناء الأول)، منفصلة عن الإجازات عمداً.
-        Route::get('employees/{id}/requests', [EmployeeController::class, 'indexRequests'])->middleware($perm('hr.view'));
-        Route::post('employees/{id}/requests', [EmployeeController::class, 'storeRequests'])->middleware($perm('hr.manage'));
+        Route::get('employees/{id}/requests', [EmployeeController::class, 'indexRequests'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('employees/{id}/requests', [EmployeeController::class, 'storeRequests'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         Route::get('request-types', [RequestTypeController::class, 'index'])->middleware($perm('hr.view'));
         Route::post('request-types', [RequestTypeController::class, 'store'])->middleware($perm('hr.manage'));
@@ -596,7 +614,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // إعدادات الفوترة الإلكترونية (نطاق عدّاد ICV) — منفصلة عن بادئات ترقيم المستندات
         Route::get('zatca-settings', [ZatcaSettingsController::class, 'show'])->middleware($perm('invoices.view'));
-        Route::put('zatca-settings', [ZatcaSettingsController::class, 'update'])->middleware($perm('company.manage'));
+        Route::put('zatca-settings', [ZatcaSettingsController::class, 'update'])->middleware([$perm('company.manage'), $app('compliance.zatca')]);
 
         // أقسام إعدادات المبيعات المتعددة (حالات/تصميمات/قوائم أسعار/شحن…)
         Route::get('sales-config/{section}', [SalesConfigController::class, 'show'])->middleware($perm('invoices.view'));

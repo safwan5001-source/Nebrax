@@ -19,6 +19,16 @@ class TenantApplicationController extends ApiController
         return response()->json(['data' => $this->applications->stateFor()]);
     }
 
+    /**
+     * أي قدرات مرئية اليوم لهذا المستأجر — للشريط الجانبي وحده. متاح لأي
+     * مستخدم مصادَق بلا `apps.view` عمداً: كل الأدوار (بما فيها `staff`) تحتاج
+     * هذه القائمة لعرض تنقّلها الصحيح، وهي بيانات ملاحية لا إدارية.
+     */
+    public function navState(): JsonResponse
+    {
+        return response()->json(['data' => $this->applications->navVisibility()]);
+    }
+
     public function enable(ToggleApplicationRequest $request): JsonResponse
     {
         $key = $request->validated('application_key');

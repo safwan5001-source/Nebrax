@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\TenantApplicationService;
+use App\Support\ApplicationCatalog;
 use App\Tenancy\TenantContext;
 
 /**
@@ -21,7 +23,16 @@ trait InteractsWithApi
         return parent::json($method, $uri, $data, $headers, $options);
     }
 
-    protected function registerTenant(string $slug = 'acme', string $email = 'owner@acme.test'): array
+    /**
+     * `$autoEnableApplications` (الافتراضي `true`) يحاكي مستأجراً أنهى تأسيسه:
+     * كل القدرات المبنية غير الإلزامية مفعّلة فوراً، فتبقى مئات اختبارات
+     * الميزات القائمة تعمل بلا تعديل رغم الإنفاذ الفعلي الجديد على المسارات
+     * (`EnsureApplicationActive`) — الحقيقة الإنتاجية توازيها: مستأجرٌ سُجِّل
+     * قبل تفعيل الإنفاذ يُعامَل كمفعّلٍ تلقائياً (`isGrandfatheredTenant`)،
+     * فهذا المسار يحاكي نفس الحالة لأي مستأجر اختبار. عطّله صراحةً في
+     * اختبارات كتالوج التطبيقات نفسها التي تفحص الحالة الافتراضية الخام.
+     */
+    protected function registerTenant(string $slug = 'acme', string $email = 'owner@acme.test', bool $autoEnableApplications = true): array
     {
         $res = $this->postJson('/api/register', [
             'company_name' => 'شركة ' . $slug,
@@ -32,7 +43,20 @@ trait InteractsWithApi
             'password'     => 'password123',
         ])->assertCreated();
 
-        return ['token' => $res['token'], 'tenant_id' => $res['tenant']['id']];
+        $tenantId = $res['tenant']['id'];
+
+        if ($autoEnableApplications) {
+            app(TenantContext::class)->set($tenantId);
+            $applications = app(TenantApplicationService::class);
+            foreach (ApplicationCatalog::all() as $key => $application) {
+                if ($application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+                    continue;
+                }
+                $applications->enable($key, null);
+            }
+        }
+
+        return ['token' => $res['token'], 'tenant_id' => $tenantId];
     }
 
     protected function tokenForRole(string $tenantId, string $role, string $email): string
