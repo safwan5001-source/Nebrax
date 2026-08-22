@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Printer, Barcode, Wifi, Building2, Power, Clock } from 'lucide-react';
+import { Printer, Barcode, Wifi, Building2, Power, Clock, RotateCcw } from 'lucide-react';
 import type { Warehouse } from '@/lib/warehouse';
 
 /** نقطة حالة ملوّنة (متصل/غير متصل) على زر أداة. */
@@ -25,6 +25,7 @@ export function PosTopbar({
   warehouseDisabled = false,
   onWarehouseChange,
   onEndSession,
+  onReturn,
 }: {
   cashier: string;
   branch: string;
@@ -34,6 +35,7 @@ export function PosTopbar({
   warehouseDisabled?: boolean;
   onWarehouseChange?: (warehouseId: string) => void;
   onEndSession?: () => void;
+  onReturn?: () => void;
 }) {
   const t = useTranslations('pos');
   const [now, setNow] = useState<Date | null>(null);
@@ -56,12 +58,15 @@ export function PosTopbar({
   const time = now?.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) ?? '—';
   const date = now?.toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) ?? '';
 
-  const tool = 'relative grid h-[34px] w-[34px] place-items-center rounded-lg border border-border bg-surface text-text hover:bg-background';
+  const tool = 'relative grid h-[34px] w-[34px] place-items-center rounded-lg border border-border bg-surface text-text hover:bg-background disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border bg-surface px-4">
       <button className={tool} title={t('end_session')} onClick={onEndSession}>
         <Power className="h-4 w-4" strokeWidth={1.8} />
+      </button>
+      <button className={tool} title={t('return_action')} onClick={onReturn} disabled={!session || !onReturn} aria-label={t('return_action')}>
+        <RotateCcw className="h-4 w-4" strokeWidth={1.8} />
       </button>
       <button className={tool} title={t('printer')}>
         <Printer className="h-4 w-4" strokeWidth={1.8} />

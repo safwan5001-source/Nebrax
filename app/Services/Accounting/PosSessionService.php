@@ -8,6 +8,7 @@ use App\Models\PosCashMovement;
 use App\Models\PosDevice;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
+use App\Models\ReturnDocument;
 use App\Models\Shift;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -230,25 +231,39 @@ class PosSessionService
         });
     }
 
-    /** @return array{cash_sales:int,cash_in:int,cash_out:int,net:int} */
+    /**
+     * تقرير X/Z يقرأ مستندات الجلسة الثابتة لا نافذةً زمنية: نقد البيع يدخل،
+     * وردّ النقد المرحّل يخرج، وحركات الدرج التشغيلية لا تمسّ القيود.
+     *
+     * @return array{cash_sales:int,cash_refunds:int,cash_in:int,cash_out:int,sales_count:int,returns_count:int,returns_total:int,net_sales:int,average:int,expected:int}
+     */
     public function report(PosSession $session): array
     {
         $cash = $this->cashMovement($session);
         $invoices = Invoice::where('pos_session_id', $session->id)->where('status', 'posted');
         $salesTotal = (int) $invoices->sum('total');
         $count = (int) $invoices->count();
+        $returns = ReturnDocument::where('pos_session_id', $session->id)
+            ->where('type', 'sales')
+            ->where('status', 'posted');
+        $returnsTotal = (int) $returns->sum('total');
+        $returnsCount = (int) $returns->count();
 
         return [
             'cash_sales' => $cash['cash_sales'],
+            'cash_refunds' => $cash['cash_refunds'],
             'cash_in' => $cash['cash_in'],
             'cash_out' => $cash['cash_out'],
             'sales_count' => $count,
+            'returns_count' => $returnsCount,
+            'returns_total' => $returnsTotal,
+            'net_sales' => $salesTotal - $returnsTotal,
             'average' => $count > 0 ? intdiv($salesTotal, $count) : 0,
             'expected' => $session->opening_balance + $cash['net'],
         ];
     }
 
-    /** @return array{cash_sales:int,cash_in:int,cash_out:int,net:int} */
+    /** @return array{cash_sales:int,cash_refunds:int,cash_in:int,cash_out:int,net:int} */
     protected function cashMovement(PosSession $session): array
     {
         $cashSales = (int) Payment::where('pos_session_id', $session->id)
@@ -256,6 +271,11 @@ class PosSessionService
             ->where('direction', 'received')
             ->where('method', 'cash')
             ->sum('amount');
+        $cashRefunds = (int) ReturnDocument::where('pos_session_id', $session->id)
+            ->where('type', 'sales')
+            ->where('status', 'posted')
+            ->where('payment_type', 'cash')
+            ->sum('total');
         $cashIn = (int) PosCashMovement::where('pos_session_id', $session->id)
             ->where('type', PosCashMovement::TYPE_CASH_IN)
             ->sum('amount');
@@ -265,10 +285,28 @@ class PosSessionService
 
         return [
             'cash_sales' => $cashSales,
+            'cash_refunds' => $cashRefunds,
             'cash_in' => $cashIn,
             'cash_out' => $cashOut,
-            'net' => $cashSales + $cashIn - $cashOut,
+            'net' => $cashSales + $cashIn - $cashOut - $cashRefunds,
         ];
+    }
+
+    /** يسجل أثر المرتجع في السجل فقط؛ القيد والمخزون مرّرا مسبقاً عبر ReturnService. */
+    public function recordReturn(PosSession $session, ReturnDocument $return, User $actor): void
+    {
+        $this->assertDrawerActor($session, $actor);
+        if (! $return->isPosted() || $return->pos_session_id !== $session->id) {
+            throw new RuntimeException('المرتجع المرحّل لا يخص جلسة نقطة البيع المحددة.');
+        }
+
+        $this->recordEvent($session, PosSessionEvent::TYPE_RETURN_RECORDED, $actor, [
+            'return_id' => $return->id,
+            'return_number' => $return->number,
+            'original_id' => $return->original_id,
+            'payment_type' => $return->payment_type,
+            'amount' => (int) $return->total,
+        ]);
     }
 
     private function assertDrawerActor(PosSession $session, User $actor): void

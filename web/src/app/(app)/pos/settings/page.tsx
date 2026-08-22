@@ -16,6 +16,16 @@ export default function PosSettingsPage() {
         { key: 'receipt_footer', label: t('receipt_footer'), type: 'text' },
         { key: 'print_receipt', label: t('print_receipt'), type: 'checkbox' },
         { key: 'allow_discount', label: t('allow_discount'), type: 'checkbox' },
+        {
+          key: 'cash_refund_policy',
+          label: t('cash_refund_policy'),
+          description: t('cash_refund_policy_hint'),
+          type: 'select',
+          options: [
+            { value: 'original_cash_only', label: t('cash_refund_original_cash_only') },
+            { value: 'allow_any_pos_sale', label: t('cash_refund_allow_any_pos_sale') },
+          ],
+        },
       ]}
     />
   );

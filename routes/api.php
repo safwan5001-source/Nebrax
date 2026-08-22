@@ -377,6 +377,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('pos-devices/{id}', [PosDeviceController::class, 'update'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::delete('pos-devices/{id}', [PosDeviceController::class, 'destroy'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::get('pos/returnable-invoices', [PosController::class, 'returnableInvoices'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::get('pos/returnable-invoices/{id}', [PosController::class, 'returnableInvoice'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/returns/quote', [PosController::class, 'quoteReturn'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/returns', [PosController::class, 'storeReturn'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos-sessions', [PosSessionController::class, 'index'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('pos-sessions/{id}/report', [PosSessionController::class, 'report'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('pos-sessions/{id}/cash-movements', [PosSessionController::class, 'cashMovements'])->middleware([$perm('invoices.view'), $app('sales.pos')]);

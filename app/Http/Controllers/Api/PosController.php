@@ -3,15 +3,30 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StorePosSaleRequest;
+use App\Http\Requests\StorePosReturnRequest;
 use App\Http\Resources\InvoiceResource;
+use App\Http\Resources\ReturnResource;
+use App\Models\Invoice;
 use App\Models\Partner;
+use App\Models\Payment;
 use App\Models\Product;
+use App\Models\ReturnDocument;
+use App\Models\ReturnLine;
+use App\Support\Money;
+use App\Support\PosSettings;
 use App\Services\Accounting\PosService;
+use App\Services\Accounting\PosReturnService;
+use App\Services\Accounting\PosSessionService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PosController extends ApiController
 {
-    public function __construct(protected PosService $pos) {}
+    public function __construct(
+        protected PosService $pos,
+        protected PosReturnService $returns,
+        protected PosSessionService $sessions,
+    ) {}
 
     /**
      * إتمام بيع نقطة البيع بوسائل متعدّدة (ذرّياً): فاتورة آجلة مرحّلة + سندات قبض
@@ -32,5 +47,124 @@ class PosController extends ApiController
         $invoice = $this->domain(fn () => $this->pos->checkout($data));
 
         return (new InvoiceResource($invoice->load('lines')))->response()->setStatusCode(201);
+    }
+
+    /**
+     * فواتير الكاشير القابلة للمرتجع في جلسته المفتوحة فقط. لا تعرض الواجهة
+     * فواتير فرع أو كاشير آخر، وتكشف سقف النقد المتبقي وفق السياسة قبل الإرسال.
+     */
+    public function returnableInvoices(Request $request): JsonResponse
+    {
+        $data = $request->validate(['pos_session_id' => ['required', 'uuid']]);
+        $session = $this->domain(fn () => $this->sessions->requireOpenForCheckout(
+            $data['pos_session_id'],
+            $request->user()?->id,
+            $request->user(),
+        ));
+        $policy = PosSettings::cashRefundPolicy();
+        $invoices = Invoice::with('partner')
+            ->where('pos_session_id', $session->id)
+            ->where('status', 'posted')
+            ->orderByDesc('invoice_date')
+            ->orderByDesc('created_at')
+            ->get();
+        $refunds = ReturnDocument::where('type', 'sales')
+            ->where('status', 'posted')
+            ->where('payment_type', 'cash')
+            ->where('original_type', Invoice::class)
+            ->whereIn('original_id', $invoices->pluck('id'))
+            ->groupBy('original_id')
+            ->selectRaw('original_id, SUM(total) as amount')
+            ->pluck('amount', 'original_id');
+        $cashReceived = Payment::whereIn('invoice_id', $invoices->pluck('id'))
+            ->where('status', 'posted')
+            ->where('direction', 'received')
+            ->where('method', 'cash')
+            ->groupBy('invoice_id')
+            ->selectRaw('invoice_id, SUM(amount) as amount')
+            ->pluck('amount', 'invoice_id');
+
+        return response()->json(['data' => $invoices->map(function (Invoice $invoice) use ($policy, $refunds, $cashReceived) {
+            $cashAvailable = max(0, (int) ($cashReceived[$invoice->id] ?? 0) - (int) ($refunds[$invoice->id] ?? 0));
+
+            return [
+                'id' => $invoice->id,
+                'number' => $invoice->number,
+                'invoice_date' => optional($invoice->invoice_date)->toDateString(),
+                'customer_name' => $invoice->partner?->name,
+                'total' => Money::toRiyal($invoice->total),
+                'cash_refund_policy' => $policy,
+                'cash_refund_available' => Money::toRiyal($cashAvailable),
+            ];
+        })->values()]);
+    }
+
+    /** بنود فاتورة POS القابلة للمرتجع في الجلسة المفتوحة، بكمية متبقية صادقة. */
+    public function returnableInvoice(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate(['pos_session_id' => ['required', 'uuid']]);
+        $session = $this->domain(fn () => $this->sessions->requireOpenForCheckout(
+            $data['pos_session_id'],
+            $request->user()?->id,
+            $request->user(),
+        ));
+        $invoice = Invoice::with(['partner', 'lines.product'])
+            ->where('pos_session_id', $session->id)
+            ->where('status', 'posted')
+            ->findOrFail($id);
+        $returned = ReturnLine::whereIn('source_line_id', $invoice->lines->pluck('id'))
+            ->whereHas('return', fn ($query) => $query->where('status', 'posted'))
+            ->groupBy('source_line_id')
+            ->selectRaw('source_line_id, SUM(quantity) as quantity, SUM(line_total) as total')
+            ->get()
+            ->keyBy('source_line_id');
+
+        return response()->json(['data' => [
+            'id' => $invoice->id,
+            'number' => $invoice->number,
+            'customer_name' => $invoice->partner?->name,
+            'total' => Money::toRiyal($invoice->total),
+            'lines' => $invoice->lines->map(function ($line) use ($returned) {
+                $previous = $returned->get($line->id);
+                $already = (int) ($previous?->quantity ?? 0);
+                $returnedTotal = (int) ($previous?->total ?? 0);
+                $lineTotal = (int) $line->line_total;
+
+                return [
+                    'source_line_id' => $line->id,
+                    'description' => $line->product_name_snapshot ?? $line->product?->name ?? $line->description,
+                    'quantity' => (int) $line->quantity,
+                    'returned' => $already,
+                    'remaining' => max(0, (int) $line->quantity - $already),
+                    'line_total' => Money::toRiyal($lineTotal),
+                    'returned_total' => Money::toRiyal($returnedTotal),
+                    'remaining_total' => Money::toRiyal(max(0, $lineTotal - $returnedTotal)),
+                ];
+            })->values(),
+        ]]);
+    }
+
+    /** معاينة مرتجع POS من دون إنشاء مستند أو أثر محاسبي. */
+    public function quoteReturn(StorePosReturnRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $quote = $this->domain(fn () => $this->returns->quote($data, $request->user()));
+
+        return response()->json(['data' => [
+            'total' => Money::toRiyal($quote['total']),
+            'cash_allowed' => $quote['cash_block_reason'] === null,
+            'cash_block_reason' => $quote['cash_block_reason'],
+        ]]);
+    }
+
+    /**
+     * مرتجع POS ذري من فاتورة البيع المصدر: الجلسة والسعر والضريبة والعميل
+     * تُحسم في الخدمة من المستند المرحّل، ثم يرحّل ReturnService القيد والمخزون.
+     */
+    public function storeReturn(StorePosReturnRequest $request): JsonResponse
+    {
+        $return = $this->domain(fn () => $this->returns->create($request->validated(), $request->user()));
+
+        return (new ReturnResource($return->load('lines.product')))->response()->setStatusCode(201);
     }
 }

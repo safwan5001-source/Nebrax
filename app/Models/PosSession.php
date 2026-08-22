@@ -78,6 +78,12 @@ class PosSession extends BaseModel
         return $this->hasMany(PosSessionEvent::class);
     }
 
+    /** مرتجعات POS المرتبطة بالجلسة؛ لا تشمل المرتجعات العامة أو التاريخية. */
+    public function returns(): HasMany
+    {
+        return $this->hasMany(ReturnDocument::class);
+    }
+
     public function differenceAcknowledgedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'difference_acknowledged_by');

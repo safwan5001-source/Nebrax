@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Tenant;
 use App\Support\Settings;
+use App\Support\PosSettings;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * إعدادات أقسام المبيعات المتعددة (تفضيلات غير محاسبية) — تُخزَّن في
@@ -55,6 +57,18 @@ class SalesConfigController extends ApiController
         ])['data'];
 
         $tenant = $this->tenant();
+
+        if ($section === 'pos') {
+            $request->validate([
+                'data.cash_refund_policy' => ['nullable', Rule::in([
+                    PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY,
+                    PosSettings::CASH_REFUND_ALLOW_ANY_POS_SALE,
+                ])],
+            ]);
+            // نحفظ الكائن كاملاً لا قيمة السياسة وحدها، كي تبقى الاستجابة وشاشة
+            // POS والقراءة الخادمية فوق الافتراضات نفسها للمستأجر القديم والجديد.
+            $data = array_merge(PosSettings::group($tenant), $data);
+        }
 
         // ═══════════════════════════════════════════════════════════════
         //  الشعار يُخزَّن على مستوى الشركة لا داخل تصميم المستندات
@@ -108,6 +122,12 @@ class SalesConfigController extends ApiController
     private function current(Tenant $tenant, string $section): mixed
     {
         $stored = $tenant->settings['sales_config'][$section] ?? null;
+
+        // سياسة POS تُقرأ من خادم واحد أيضاً (`PosSettings`) لأنها تغيّر
+        // صلاحية رد النقد الفعلية، لا مجرد تفضيل عرض في شاشة الكاشير.
+        if ($section === 'pos') {
+            return PosSettings::group($tenant);
+        }
 
         return $stored ?? self::DEFAULTS[$section];
     }

@@ -68,7 +68,7 @@ class ReturnService
      *
      * @param  array  $data   ['type'=>'sales|purchase', 'partner_id'=>uuid, 'payment_type'=>'credit|cash',
      *                         'return_date'=>?, 'notes'=>?, 'number'=>?, 'original_type'=>?, 'original_id'=>?]
-     * @param  array  $items  [['product_id'=>?, 'description'=>?, 'quantity'=>int, 'unit_price'=>int, 'tax_rate'=>?int], ...]
+     * @param  array  $items  [['product_id'=>?, 'description'=>?, 'quantity'=>int, 'unit_price'=>int, 'line_discount'=>?int, 'tax_rate'=>?int], ...]
      */
     public function create(array $data, array $items): ReturnDocument
     {
@@ -97,7 +97,11 @@ class ReturnService
                 'partner_id'    => $data['partner_id'],
                 // المصدر يحدد موقع البضاعة افتراضياً؛ الاختيار الصريح يعلو عليه.
                 'warehouse_id'  => $data['warehouse_id'] ?? $source?->warehouse_id,
+                'pos_session_id' => $data['pos_session_id'] ?? null,
                 'payment_type'  => $data['payment_type'] ?? 'credit',
+                // لقطة وضع الضريبة تشرح مصدر قيم السطور التاريخي؛ الافتراض false
+                // يحافظ على تفسير المرتجعات التي سبقت هذا الحقل.
+                'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
                 // null = «اتبع سياسة المستأجر» — تُحسَم عند الترحيل لا الآن،
                 // فتبقى المسوّدة تابعةً للسياسة ولو تغيّرت قبل ترحيلها.
                 'restock'       => array_key_exists('restock', $data) && $data['restock'] !== null
@@ -124,8 +128,29 @@ class ReturnService
                     throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
                 }
 
-                $lineSubtotal = $qty * $unitPrice;
-                $lineTax      = $this->calcTax($lineSubtotal, $rate);
+                // خدمة POS فقط تمرر أساس السطر الموزّع من الوثيقة المصدر؛ أما
+                // API العام فيبقى على كمية × سعر الوحدة كما كان. لا يتحكم عميل
+                // API في المفتاح لأنه غير موجود في طلبه المتحقق منه.
+                $lineSubtotal = array_key_exists('line_subtotal_override', $item)
+                    ? (int) $item['line_subtotal_override']
+                    : $qty * $unitPrice;
+                if ($lineSubtotal < 0) {
+                    throw new RuntimeException('أساس سطر المرتجع لا يمكن أن يكون سالباً.');
+                }
+                $lineDiscount = max(0, (int) ($item['line_discount'] ?? 0));
+                if ($lineDiscount > $lineSubtotal) {
+                    throw new RuntimeException('خصم سطر المرتجع لا يمكن أن يتجاوز إجمالي السطر.');
+                }
+                $lineNet = $lineSubtotal - $lineDiscount;
+                // لا يرسل عميل API هذا المفتاح (طلب المرتجع العام لا يتحقق منه).
+                // تستخدمه خدمة POS فقط بعد اشتقاقه من سطر المصدر المثبت، كي تبقى
+                // هللات ضريبة السعر المتضمن مطابقة للفاصل الضريبي الأصلي.
+                $lineTax = array_key_exists('line_tax_override', $item)
+                    ? (int) $item['line_tax_override']
+                    : $this->calcTax($lineNet, $rate);
+                if ($lineTax < 0) {
+                    throw new RuntimeException('ضريبة سطر المرتجع لا يمكن أن تكون سالبة.');
+                }
 
                 ReturnLine::create([
                     'return_id'      => $return->id,
@@ -136,11 +161,12 @@ class ReturnService
                     'unit_price'    => $unitPrice,
                     'tax_rate'      => $rate,
                     'line_subtotal' => $lineSubtotal,
+                    'line_discount' => $lineDiscount,
                     'line_tax'      => $lineTax,
-                    'line_total'    => $lineSubtotal + $lineTax,
+                    'line_total'    => $lineNet + $lineTax,
                 ]);
 
-                $subtotal += $lineSubtotal;
+                $subtotal += $lineNet;
                 $taxTotal += $lineTax;
             }
 
@@ -360,7 +386,7 @@ class ReturnService
     {
         $return->loadMissing('lines.product');
 
-        $subtotal = (int) $return->lines->sum('line_subtotal');
+        $subtotal = (int) $return->lines->sum(fn (ReturnLine $line) => (int) $line->line_subtotal - (int) $line->line_discount);
         $taxAmount = (int) $return->lines->sum('line_tax');
         $total = $subtotal + $taxAmount;
 
@@ -473,9 +499,9 @@ class ReturnService
             $taxTotal += $line->line_tax;
             $product = $line->product;
             if ($product && $product->track_inventory) {
-                $inventoryTotal += $line->line_subtotal;
+                $inventoryTotal += (int) $line->line_subtotal - (int) $line->line_discount;
             } else {
-                $expenseTotal += $line->line_subtotal;
+                $expenseTotal += (int) $line->line_subtotal - (int) $line->line_discount;
             }
         }
 
