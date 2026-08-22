@@ -6,7 +6,7 @@ import { BranchScope, useBranchVersion } from '@/components/layout/branch-scope'
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 import { DemoBanner } from '@/components/layout/demo-banner';
-import { isAuthenticated } from '@/lib/auth';
+import { currentUser, isAuthenticated } from '@/lib/auth';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -19,6 +19,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isAuthenticated()) {
       router.replace('/login');
+    } else if (currentUser()?.role === 'self_service') {
+      // دور الخدمة الذاتية بلا صلاحياتٍ هنا أصلاً — بوابته المخصَّصة.
+      router.replace('/me');
     } else {
       setReady(true);
     }

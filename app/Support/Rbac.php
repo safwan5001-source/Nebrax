@@ -41,6 +41,11 @@ class Rbac
             'branches.view',
             'accounts.view', 'reports.view', 'zatca.view',
         ],
+        // بوابة الخدمة الذاتية للموظف: دورٌ مقيَّد بصلاحية واحدة فقط، لا تُسند
+        // إليه صلاحيات hr.* الواسعة (غير معزولة بالسجل). مسارات `/me/*` وحدها
+        // تمنح الوصول، ومقيَّدة بنيوياً لبيانات صاحب الحساب (`employee_id`)
+        // دون سواه — انظر design-system/foundations/hr-users-architecture.md.
+        'self_service' => ['self_service.access'],
     ];
 
     /**
@@ -68,6 +73,8 @@ class Rbac
             // فقط إلى دور مخصص وافق المستأجر على منحه سلطة البيع تحت الحد.
             'sales.minimum_price_override',
             'apps.view', 'apps.manage',
+            // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
+            'self_service.access',
     ];
 
     /**
@@ -83,6 +90,7 @@ class Rbac
             'admin'      => ['name' => 'مدير',   'permissions' => self::MATRIX['admin']],
             'accountant' => ['name' => 'محاسب',  'permissions' => self::MATRIX['accountant']],
             'staff'      => ['name' => 'موظف',   'permissions' => self::MATRIX['staff']],
+            'self_service' => ['name' => 'الخدمة الذاتية', 'permissions' => self::MATRIX['self_service']],
         ];
     }
 

@@ -18,13 +18,13 @@ class RoleTest extends TestCase
     use InteractsWithApi;
 
     /** @test */
-    public function registration_seeds_the_four_system_roles(): void
+    public function registration_seeds_the_five_system_roles(): void
     {
         $auth = $this->registerTenant();
         app(TenantContext::class)->set($auth['tenant_id']);
 
         $slugs = Role::pluck('slug')->sort()->values()->all();
-        $this->assertSame(['accountant', 'admin', 'owner', 'staff'], $slugs);
+        $this->assertSame(['accountant', 'admin', 'owner', 'self_service', 'staff'], $slugs);
         $this->assertTrue(Role::where('slug', 'owner')->first()->is_system);
     }
 
@@ -153,8 +153,8 @@ class RoleTest extends TestCase
         ])->assertCreated();
 
         $b = $this->registerTenant('other', 'owner@other.test');
-        // مؤسسة أخرى ترى أدوارها النظامية الأربعة فقط، لا الدور المخصَّص لأكمي.
-        $this->withToken($b['token'])->getJson('/api/roles')->assertOk()->assertJsonCount(4, 'data');
+        // مؤسسة أخرى ترى أدوارها النظامية الخمسة فقط، لا الدور المخصَّص لأكمي.
+        $this->withToken($b['token'])->getJson('/api/roles')->assertOk()->assertJsonCount(5, 'data');
     }
 
     /** @test */

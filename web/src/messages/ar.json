@@ -1823,6 +1823,46 @@
     "password_invalid": "أدخل كلمة المرور للمتابعة.",
     "submitting": "جارٍ تسجيل الدخول…"
   },
+  "selfService": {
+    "portal_title": "بوابة الموظف",
+    "logout": "تسجيل الخروج",
+    "title": "مرحباً، {name}",
+    "load_error": "تعذّر تحميل البيانات",
+    "tabs": {
+      "overview": "نظرة عامة",
+      "attendance": "الحضور",
+      "payroll": "الراتب"
+    },
+    "today_not_checked_in": "لم تُسجِّل حضورك اليوم بعد",
+    "today_checked_in_at": "سُجِّل حضورك اليوم الساعة {time}",
+    "today_checked_out_at": "وانصرافك الساعة {time}",
+    "check_in": "تسجيل حضور",
+    "check_out": "تسجيل انصراف",
+    "checked_in": "تم تسجيل حضورك",
+    "checked_out": "تم تسجيل انصرافك",
+    "profile_title": "البيانات الوظيفية",
+    "employee_no": "الرقم الوظيفي",
+    "hire_date": "تاريخ التعيين",
+    "phone": "الجوال",
+    "personal_email": "البريد الشخصي",
+    "contract_title": "الراتب (العقد النشط)",
+    "no_active_contract": "لا يوجد عقدٌ نشط حالياً",
+    "basic_salary": "الراتب الأساسي",
+    "gosi": "التأمينات الاجتماعية",
+    "other_deductions": "استقطاعات أخرى",
+    "net_salary": "صافي الراتب",
+    "no_attendance": "لا سجلّات حضور بعد",
+    "no_payroll": "لا رواتب مرحّلة بعد",
+    "status": {
+      "present": "حاضر",
+      "late": "متأخر",
+      "leave": "إجازة",
+      "absent": "غائب",
+      "draft": "مسوّدة",
+      "posted": "مرحّل",
+      "paid": "مصروف"
+    }
+  },
   "nav": {
     "dashboard": "لوحة التحكم",
     "soon": "قريباً",
