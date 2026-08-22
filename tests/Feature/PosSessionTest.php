@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Invoice;
 use App\Models\JournalEntry;
+use App\Models\PosCashMovement;
 use App\Models\PosSession;
+use App\Models\PosSessionEvent;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -243,6 +245,115 @@ class PosSessionTest extends TestCase
             ->getJson('/api/pos-sessions')->assertOk()->assertJsonCount(0, 'data');
         $this->withToken($auth['token'])->withHeaders($headers)
             ->getJson('/api/pos-sessions')->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    /** @test */
+    public function drawer_movements_adjust_expected_cash_without_creating_a_journal_entry(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->openSession($auth, 50000);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/cash-movements", [
+            'type' => 'cash_in', 'amount' => 3000, 'reason' => 'تغذية الدرج بفكة',
+        ])->assertCreated()->assertJsonPath('data.amount', '30.00');
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/cash-movements", [
+            'type' => 'cash_out', 'amount' => 2000, 'reason' => 'إيداع جزئي في الخزنة',
+        ])->assertCreated()->assertJsonPath('data.amount', '20.00');
+
+        $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$id}/report")
+            ->assertOk()
+            ->assertJsonPath('report.cash_sales', '0.00')
+            ->assertJsonPath('report.cash_in', '30.00')
+            ->assertJsonPath('report.cash_out', '20.00')
+            ->assertJsonPath('report.expected', '510.00');
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/close", ['closing_balance' => 51000])
+            ->assertOk()
+            ->assertJsonPath('data.difference', '0.00')
+            ->assertJsonPath('data.difference_status', 'not_required');
+        $this->assertSame(2, PosCashMovement::where('pos_session_id', $id)->count());
+        $this->assertSame(0, JournalEntry::where('source_type', PosCashMovement::class)->count());
+    }
+
+    /** @test */
+    public function a_drawer_movement_is_append_only_after_recording(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->openSession($auth, 1000);
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/cash-movements", [
+            'type' => 'cash_in', 'amount' => 100, 'reason' => 'فكة إضافية',
+        ])->assertCreated();
+
+        $movement = PosCashMovement::where('pos_session_id', $id)->sole();
+        $this->expectException(\LogicException::class);
+        $movement->update(['amount' => 200]);
+    }
+
+    /** @test */
+    public function drawer_movement_is_limited_to_its_cashier_and_cannot_take_more_than_expected_cash(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->openSession($auth, 1000);
+        $other = $this->tokenForRole($auth['tenant_id'], 'admin', 'drawer-other@acme.test');
+
+        $this->withToken($other)->postJson("/api/pos-sessions/{$id}/cash-movements", [
+            'type' => 'cash_in', 'amount' => 100, 'reason' => 'محاولة كاشير آخر',
+        ])->assertStatus(422);
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/cash-movements", [
+            'type' => 'cash_out', 'amount' => 1001, 'reason' => 'سحب أكبر من الدرج',
+        ])->assertStatus(422);
+        $this->assertSame(0, PosCashMovement::where('pos_session_id', $id)->count());
+    }
+
+    /** @test */
+    public function a_closing_difference_requires_manager_acknowledgement_and_keeps_an_immutable_audit_trail(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->openSession($auth, 50000);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/close", ['closing_balance' => 49000])
+            ->assertOk()
+            ->assertJsonPath('data.difference', '-10.00')
+            ->assertJsonPath('data.difference_status', 'pending');
+        $this->assertDatabaseHas('pos_session_events', [
+            'pos_session_id' => $id,
+            'type' => PosSessionEvent::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT,
+        ]);
+
+        $accountant = $this->tokenForRole($auth['tenant_id'], 'accountant', 'cash-difference@acme.test');
+        $this->withToken($accountant)->postJson("/api/pos-sessions/{$id}/acknowledge-difference", [
+            'note' => 'فحص الفرق',
+        ])->assertForbidden();
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/acknowledge-difference", [
+            'note' => 'تمت مراجعة النقص مع الكاشير وإحالته للمتابعة التشغيلية.',
+        ])->assertOk()
+            ->assertJsonPath('data.difference_status', 'acknowledged')
+            ->assertJsonPath('data.difference_acknowledgement.note', 'تمت مراجعة النقص مع الكاشير وإحالته للمتابعة التشغيلية.');
+
+        $event = PosSessionEvent::where('pos_session_id', $id)
+            ->where('type', PosSessionEvent::TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED)->sole();
+        $this->expectException(\LogicException::class);
+        $event->update(['type' => 'tampered']);
+    }
+
+    /** @test */
+    public function an_acknowledged_difference_never_creates_a_journal_entry_or_an_automatic_settlement(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->openSession($auth, 10000);
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/close", ['closing_balance' => 9000])->assertOk();
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/acknowledge-difference", [
+            'note' => 'فرق تشغيلي مسجل للمراجعة اللاحقة.',
+        ])->assertOk();
+
+        $this->assertSame(0, JournalEntry::where('source_type', PosSession::class)->count());
+        $this->assertSame(0, JournalEntry::where('source_type', PosSessionEvent::class)->count());
     }
 
     /** @test */

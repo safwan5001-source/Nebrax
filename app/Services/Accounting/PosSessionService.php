@@ -4,27 +4,24 @@ namespace App\Services\Accounting;
 
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\PosCashMovement;
 use App\Models\PosDevice;
 use App\Models\PosSession;
+use App\Models\PosSessionEvent;
 use App\Models\Shift;
-use App\Models\Warehouse;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Tenancy\BranchContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * ═══════════════════════════════════════════════════════════════
- *  PosSessionService — جلسات/ورديات نقطة البيع
- * ═══════════════════════════════════════════════════════════════
- *  - open(): يفتح وردية كاشير على جهاز POS نشط ومخزنه المثبت.
- *  - requireOpenForCheckout(): يقفل الجلسة ويتحقق من مسؤولها وفرعها قبل البيع.
- *  - close(): يحسب المتوقع من سندات القبض النقدية المنسوبة للجلسة نفسها.
+ * جلسات/ورديات نقطة البيع ومطابقة الدرج.
  *
- * الجلسة سجل تشغيلي للمطابقة، وليست منشأ قيد مستقل. البيع وسنداته يرحّلان عبر
- * InvoiceService وPaymentService، ويرتبطان بالجلسة كي لا يخلط التقرير حركة نقدية
- * من جلسة أو خزينة أخرى لمجرد تطابق النافذة الزمنية. كل المبالغ بالهللات.
+ * حركات الدرج هنا تشغيلية داخل الصندوق فقط: لا تمثل قبضاً أو صرفاً خارجياً، ولا
+ * تنشئ قيداً محاسبياً. التحصيل والصرف والتحويل المالي تبقى حصراً في وحداتها.
+ * كل المبالغ بالهللات.
  */
 class PosSessionService
 {
@@ -40,8 +37,6 @@ class PosSessionService
         }
 
         return DB::transaction(function () use ($openingBalance, $deviceId, $shiftId, $userId, $actor) {
-            // قفل الجهاز هو مرساة تزامن فتح الوردية: لا يمر طلبان متزامنان على
-            // exists() نفسه، والفهرس الجزئي يحفظ الثابت على مستوى قاعدة البيانات.
             $device = PosDevice::lockForUpdate()->findOrFail($deviceId);
             $branchId = app(BranchContext::class)->id();
             if ($device->branch_id !== $branchId) {
@@ -80,11 +75,7 @@ class PosSessionService
         });
     }
 
-    /**
-     * يقفل صف الجلسة داخل معاملة بيع POS، فيمنع أن تنزلق عملية بيع بعد الإقفال.
-     * يتحقق كذلك من مسؤول الكاشير والفرع النشط؛ معرّف الجلسة لا يصبح تصريحاً
-     * مستقلاً يمكن تمريره من متصفح آخر أو فرع مختلف.
-     */
+    /** يقفل الجلسة داخل معاملة البيع ويتحقق من مسؤولها وفرعها وصلاحية مخزنها. */
     public function requireOpenForCheckout(string $sessionId, ?string $userId, ?User $actor = null): PosSession
     {
         $session = PosSession::lockForUpdate()->findOrFail($sessionId);
@@ -108,6 +99,54 @@ class PosSessionService
         return $session;
     }
 
+    /**
+     * يسجّل إدخالاً أو إخراجاً مادياً من درج الكاشير المفتوح. لا يمثل حركة مالية
+     * خارج المنشأة ولا يعدّل حساب الصندوق؛ لذلك لا ينشئ قيداً أو سند دفع.
+     */
+    public function recordCashMovement(PosSession $session, string $type, int $amount, string $reason, User $actor): PosCashMovement
+    {
+        if (! in_array($type, PosCashMovement::TYPES, true)) {
+            throw new RuntimeException('نوع حركة الدرج غير صالح.');
+        }
+        if ($amount <= 0) {
+            throw new RuntimeException('مبلغ حركة الدرج يجب أن يكون موجباً.');
+        }
+        $reason = trim($reason);
+        if ($reason === '') {
+            throw new RuntimeException('سبب حركة الدرج مطلوب.');
+        }
+
+        return DB::transaction(function () use ($session, $type, $amount, $reason, $actor) {
+            $session = PosSession::lockForUpdate()->findOrFail($session->id);
+            $this->assertDrawerActor($session, $actor);
+            if ($type === PosCashMovement::TYPE_CASH_OUT
+                && $amount > $session->opening_balance + $this->cashMovement($session)['net']) {
+                throw new RuntimeException('لا يمكن إخراج مبلغ يتجاوز الرصيد المتوقع داخل درج الجلسة.');
+            }
+
+            $movement = PosCashMovement::create([
+                'branch_id'      => $session->branch_id,
+                'pos_session_id' => $session->id,
+                'type'           => $type,
+                'amount'         => $amount,
+                'reason'         => $reason,
+                'recorded_by'    => $actor->id,
+                'created_at'     => now(),
+            ]);
+
+            $this->recordEvent($session, $type === PosCashMovement::TYPE_CASH_IN
+                ? PosSessionEvent::TYPE_CASH_IN_RECORDED
+                : PosSessionEvent::TYPE_CASH_OUT_RECORDED, $actor, [
+                    'cash_movement_id' => $movement->id,
+                    'type' => $type,
+                    'amount' => $amount,
+                    'reason' => $reason,
+                ]);
+
+            return $movement->fresh('recordedBy');
+        });
+    }
+
     public function close(PosSession $session, int $countedBalance, ?string $userId = null): PosSession
     {
         if ($countedBalance < 0) {
@@ -115,8 +154,7 @@ class PosSessionService
         }
 
         return DB::transaction(function () use ($session, $countedBalance, $userId) {
-            // القفل نفسه الذي يأخذه checkout() يحسم سباق الإقفال/البيع: إما يُلحق
-            // البيع بالجلسة قبل العد، أو يرى البيع أن الجلسة أُغلقت فيُرفض.
+            // القفل نفسه الذي يأخذه checkout() وحركة الدرج يحسم سباق الإقفال مع البيع أو السحب.
             $session = PosSession::lockForUpdate()->findOrFail($session->id);
             if (! $session->isOpen()) {
                 throw new RuntimeException('الجلسة مغلقة بالفعل.');
@@ -124,58 +162,144 @@ class PosSessionService
 
             $cash = $this->cashMovement($session);
             $expected = $session->opening_balance + $cash['net'];
+            $difference = $countedBalance - $expected;
+            $requiresAcknowledgement = $difference !== 0;
 
             $session->update([
-                'status'           => 'closed',
-                'closing_balance'  => $countedBalance,
-                'expected_balance' => $expected,
-                'difference'       => $countedBalance - $expected,
-                'closed_at'        => now(),
-                'closed_by'        => $userId,
+                'status'                           => 'closed',
+                'closing_balance'                  => $countedBalance,
+                'expected_balance'                 => $expected,
+                'difference'                       => $difference,
+                'difference_status'                => $requiresAcknowledgement ? 'pending' : 'not_required',
+                'difference_acknowledged_by'       => null,
+                'difference_acknowledged_at'       => null,
+                'difference_acknowledgement_note'  => null,
+                'closed_at'                        => now(),
+                'closed_by'                        => $userId,
+            ]);
+
+            if ($requiresAcknowledgement) {
+                $actor = $userId ? User::find($userId) : null;
+                $this->recordEvent($session, PosSessionEvent::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT, $actor, [
+                    'counted_balance' => $countedBalance,
+                    'expected_balance' => $expected,
+                    'difference' => $difference,
+                ]);
+            }
+
+            return $session->fresh();
+        });
+    }
+
+    /** اعتماد إداري للفرق يقر بالحالة فقط؛ لا ينشئ تسوية أو قيداً محاسبياً. */
+    public function acknowledgeDifference(PosSession $session, string $note, User $actor): PosSession
+    {
+        $note = trim($note);
+        if ($note === '') {
+            throw new RuntimeException('ملاحظة اعتماد فرق الإغلاق مطلوبة.');
+        }
+        if (! $actor->hasPermission('pos.variance.approve')) {
+            throw new RuntimeException('لا تملك صلاحية اعتماد فرق إغلاق نقطة البيع.');
+        }
+
+        return DB::transaction(function () use ($session, $note, $actor) {
+            $session = PosSession::lockForUpdate()->findOrFail($session->id);
+            if ($session->status !== 'closed') {
+                throw new RuntimeException('لا يمكن اعتماد فرق جلسة لم تُغلق بعد.');
+            }
+            if ((int) $session->difference === 0 || $session->difference_status === 'not_required') {
+                throw new RuntimeException('لا يوجد فرق إغلاق يتطلب اعتماداً.');
+            }
+            if ($session->difference_status === 'acknowledged') {
+                throw new RuntimeException('فرق الإغلاق معتمد بالفعل.');
+            }
+
+            $session->update([
+                'difference_status'               => 'acknowledged',
+                'difference_acknowledged_by'      => $actor->id,
+                'difference_acknowledged_at'      => now(),
+                'difference_acknowledgement_note' => $note,
+            ]);
+
+            $this->recordEvent($session, PosSessionEvent::TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED, $actor, [
+                'difference' => (int) $session->difference,
+                'note' => $note,
             ]);
 
             return $session->fresh();
         });
     }
 
-    /**
-     * تقرير الوردية (X/Z): النقد المُستلَم من سندات القبض المنسوبة للجلسة +
-     * المتوقّع + عدد فواتير POS. للجلسة المفتوحة يُحسب حتى الآن؛ للمغلقة من
-     * المستندات المثبتة عليها، لا من نطاق زمني قد يلتقط معاملات غيرها.
-     *
-     * @return array{cash_sales:int, sales_count:int, average:int, expected:int}
-     */
+    /** @return array{cash_sales:int,cash_in:int,cash_out:int,net:int} */
     public function report(PosSession $session): array
     {
         $cash = $this->cashMovement($session);
-        $invoices = Invoice::where('pos_session_id', $session->id)
-            ->where('status', 'posted');
+        $invoices = Invoice::where('pos_session_id', $session->id)->where('status', 'posted');
         $salesTotal = (int) $invoices->sum('total');
         $count = (int) $invoices->count();
 
         return [
-            'cash_sales'  => $cash['inflow'],
+            'cash_sales' => $cash['cash_sales'],
+            'cash_in' => $cash['cash_in'],
+            'cash_out' => $cash['cash_out'],
             'sales_count' => $count,
-            'average'     => $count > 0 ? intdiv($salesTotal, $count) : 0,
-            'expected'    => $session->opening_balance + $cash['net'],
+            'average' => $count > 0 ? intdiv($salesTotal, $count) : 0,
+            'expected' => $session->opening_balance + $cash['net'],
         ];
     }
 
-    /**
-     * النقد الوارد/الصافي من سندات قبض نقدية مرحّلة تخص الجلسة. لا تستخدم
-     * JournalLine ولا التاريخ؛ فذلك يخلط أثر جلسات أخرى أو قبضاً خارج POS.
-     *
-     * @return array{inflow:int, net:int}
-     */
+    /** @return array{cash_sales:int,cash_in:int,cash_out:int,net:int} */
     protected function cashMovement(PosSession $session): array
     {
-        $inflow = (int) Payment::where('pos_session_id', $session->id)
+        $cashSales = (int) Payment::where('pos_session_id', $session->id)
             ->where('status', 'posted')
             ->where('direction', 'received')
             ->where('method', 'cash')
             ->sum('amount');
+        $cashIn = (int) PosCashMovement::where('pos_session_id', $session->id)
+            ->where('type', PosCashMovement::TYPE_CASH_IN)
+            ->sum('amount');
+        $cashOut = (int) PosCashMovement::where('pos_session_id', $session->id)
+            ->where('type', PosCashMovement::TYPE_CASH_OUT)
+            ->sum('amount');
 
-        return ['inflow' => $inflow, 'net' => $inflow];
+        return [
+            'cash_sales' => $cashSales,
+            'cash_in' => $cashIn,
+            'cash_out' => $cashOut,
+            'net' => $cashSales + $cashIn - $cashOut,
+        ];
+    }
+
+    private function assertDrawerActor(PosSession $session, User $actor): void
+    {
+        if (! $session->isOpen()) {
+            throw new RuntimeException('لا يمكن تسجيل حركة درج بعد إغلاق الجلسة.');
+        }
+        if ($session->opened_by !== null && $session->opened_by !== $actor->id) {
+            throw new RuntimeException('حركة الدرج تخص كاشير الجلسة المفتوحة فقط.');
+        }
+
+        $branchId = app(BranchContext::class)->id();
+        if ($session->branch_id !== $branchId || ! $actor->canAccessBranch($branchId)) {
+            throw new RuntimeException('جلسة نقطة البيع لا تخص الفرع النشط أو صلاحياتك.');
+        }
+        if ($session->warehouse_id !== null && ! $actor->canAccessWarehouse($session->warehouse_id)) {
+            throw new RuntimeException('مخزن جلسة نقطة البيع خارج نطاق صلاحياتك.');
+        }
+    }
+
+    /** @param array<string,mixed> $payload */
+    private function recordEvent(PosSession $session, string $type, ?User $actor, array $payload): PosSessionEvent
+    {
+        return PosSessionEvent::create([
+            'branch_id' => $session->branch_id,
+            'pos_session_id' => $session->id,
+            'type' => $type,
+            'actor_id' => $actor?->id,
+            'payload' => $payload,
+            'created_at' => now(),
+        ]);
     }
 
     private function resolveShift(?string $shiftId, ?string $branchId): ?Shift
