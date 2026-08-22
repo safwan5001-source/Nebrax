@@ -18,7 +18,11 @@ import { cn } from '@/lib/utils';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import type { Warehouse } from '@/lib/warehouse';
 
-interface Partner { id: string; name: string; type?: string; phone?: string | null; vat_number?: string | null }
+interface Partner {
+  id: string; name: string; type?: string; phone?: string | null; vat_number?: string | null;
+  default_price_list_id?: string | null;
+  default_price_list?: { id: string; name: string; is_active: boolean } | null;
+}
 interface ProductUnit { name: string; factor: number }
 interface Product {
   id: string; name: string; sku?: string | null; barcode?: string | null;
@@ -132,15 +136,27 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   // السطر الذي فُتحت من منتقيه نافذة «منتج جديد» — ليُختار فيه فور الحفظ.
   const [newProductFor, setNewProductFor] = useState<string | null>(null);
 
+  const selectPartner = useCallback((nextPartnerId: string, availablePartners = partners) => {
+    setPartnerId(nextPartnerId);
+    // الفاتورة المحررة تستعيد قائمتها المحفوظة؛ أما المسودة الجديدة فتبدأ
+    // باقتراح العميل فقط. الاختيار اليدوي اللاحق في حقل القائمة يظل حراً.
+    if (!editId) {
+      const partner = availablePartners.find((candidate) => candidate.id === nextPartnerId);
+      setPriceListId(partner?.default_price_list?.is_active ? partner.default_price_list.id : '');
+    }
+  }, [editId, partners]);
+
   const loadPartners = useCallback(
     (selectFirst = false) =>
       api<{ data: Partner[] }>('/partners')
         .then((r) => {
           setPartners(r.data);
-          if (selectFirst && r.data[0]) setPartnerId((p) => p || r.data[0].id);
+          if (selectFirst && r.data[0]) {
+            selectPartner(r.data[0].id, r.data);
+          }
         })
         .catch(() => {}),
-    []
+    [selectPartner]
   );
 
   const loadProducts = useCallback(
@@ -572,7 +588,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                       id="partner"
                       className="min-w-0 flex-1"
                       value={partnerId}
-                      onChange={setPartnerId}
+                      onChange={selectPartner}
                       options={partnerOptions}
                       placeholder={t('choose_partner')}
                       searchPlaceholder={t('search_partner')}

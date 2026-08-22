@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { MapPin, User, Wallet } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { riyalToMinor } from '@/lib/money';
+import { api } from '@/lib/api';
 
 /**
  * نموذج بيانات الطرف — مشترك بين شاشتَي الإنشاء والتعديل.
@@ -25,7 +27,7 @@ export interface PartnerFormValues {
   classification: string;
   building_no: string; street: string; district: string; postal_code: string; country: string;
   opening_balance: string; opening_balance_date: string;
-  credit_limit: string; credit_period: string;
+  credit_limit: string; credit_period: string; default_price_list_id: string;
   is_active: boolean;
 }
 
@@ -36,7 +38,7 @@ export const EMPTY_PARTNER_FORM: PartnerFormValues = {
   classification: '',
   building_no: '', street: '', district: '', postal_code: '', country: '',
   opening_balance: '', opening_balance_date: '',
-  credit_limit: '', credit_period: '',
+  credit_limit: '', credit_period: '', default_price_list_id: '',
   is_active: true,
 };
 
@@ -49,6 +51,7 @@ export interface PartnerApi {
   building_no: string | null; street: string | null; district: string | null;
   postal_code: string | null; country: string | null;
   credit_limit: string | null; credit_period: number | null;
+  default_price_list_id: string | null;
   is_active: boolean;
 }
 
@@ -76,6 +79,7 @@ export function partnerFormFromApi(p: PartnerApi): PartnerFormValues {
     country: p.country ?? '',
     credit_limit: p.credit_limit ?? '',
     credit_period: p.credit_period != null ? String(p.credit_period) : '',
+    default_price_list_id: p.default_price_list_id ?? '',
     is_active: p.is_active !== false,
   };
 }
@@ -105,6 +109,7 @@ export function partnerFormToPayload(form: PartnerFormValues, withOpeningBalance
     classification: orNull(form.classification),
     credit_limit: form.credit_limit !== '' ? riyalToMinor(form.credit_limit) : null,
     credit_period: form.credit_period !== '' ? Number(form.credit_period) : null,
+    default_price_list_id: form.default_price_list_id || null,
     is_active: form.is_active,
   };
 
@@ -116,6 +121,8 @@ export function partnerFormToPayload(form: PartnerFormValues, withOpeningBalance
   return payload;
 }
 
+interface PriceList { id: string; name: string; is_active: boolean }
+
 export function PartnerForm({
   form,
   onChange,
@@ -126,6 +133,14 @@ export function PartnerForm({
   mode: 'create' | 'edit';
 }) {
   const t = useTranslations('partners');
+  const [priceLists, setPriceLists] = useState<PriceList[]>([]);
+  const isCustomer = form.type === 'customer' || form.type === 'both';
+
+  useEffect(() => {
+    api<{ data: PriceList[] }>('/price-lists')
+      .then((response) => setPriceLists(response.data))
+      .catch(() => {});
+  }, []);
 
   // النوع هنا يختاره المستخدم (عميل/مورد/كلاهما)، فالتسمية تتبعه لحظةً بلحظة.
   // و«كلاهما» لا تصلح له «نوع العميل» ولا «نوع المورّد» — فيَرِد المحايد.
@@ -158,7 +173,10 @@ export function PartnerForm({
             {/* النوع: كان غائباً عن شاشة الإنشاء فكان كل طرف يُنشأ «عميلاً». */}
             <div className="space-y-1.5">
               <Label htmlFor="type">{t('type')}</Label>
-              <Select id="type" value={form.type} onChange={(e) => onChange('type', e.target.value)}>
+              <Select id="type" value={form.type} onChange={(e) => {
+                onChange('type', e.target.value);
+                if (e.target.value === 'supplier') onChange('default_price_list_id', '');
+              }}>
                 <option value="customer">{t('customer')}</option>
                 <option value="supplier">{t('supplier')}</option>
                 <option value="both">{t('both')}</option>
@@ -269,6 +287,17 @@ export function PartnerForm({
               />
             </div>
             <p className="text-[11px] text-muted sm:col-span-2">{t('credit_limit_hint')}</p>
+
+            {isCustomer && (
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="default-price-list">{t('default_price_list')}</Label>
+                <Select id="default-price-list" value={form.default_price_list_id} onChange={(e) => onChange('default_price_list_id', e.target.value)}>
+                  <option value="">{t('default_price_list_none')}</option>
+                  {priceLists.map((priceList) => <option key={priceList.id} value={priceList.id} disabled={!priceList.is_active && priceList.id !== form.default_price_list_id}>{priceList.name}{!priceList.is_active ? ` — ${t('default_price_list_inactive')}` : ''}</option>)}
+                </Select>
+                <p className="text-[11px] leading-relaxed text-muted">{t('default_price_list_hint')}</p>
+              </div>
+            )}
 
             <div className="space-y-1.5 sm:col-span-2">
               <label className="flex items-center gap-2 pt-1 text-sm text-text">
