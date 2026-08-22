@@ -56,19 +56,21 @@ const POS_DEFAULTS: PosConfig = {
   allow_deferred_payment: true,
 };
 
+interface PosUnit { name: string; factor: number; price: string }
 interface Product {
   id: string;
   sku: string | null;
   barcode: string | null;
   name: string;
   sale_price: string;
+  pos_units: PosUnit[];
   tax_rate: number;
   type: string;
   track_inventory: boolean;
   quantity_on_hand: number;
   is_active: boolean;
 }
-interface CartLine { key: string; productId: string | null; description: string; sku: string | null; price: string; qty: number; tax: number; discount: string }
+interface CartLine { key: string; productId: string | null; description: string; sku: string | null; unit: string | null; price: string; qty: number; tax: number; discount: string }
 interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null }
 interface WorkShift { id: string; name: string; is_active: boolean }
 interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
@@ -255,32 +257,63 @@ export default function PosPage() {
     });
   }, [products, search, cat, tab, favs]);
 
+  function pricedUnit(product: Product, unitName: string | null): PosUnit | undefined {
+    return product.pos_units.find((unit) => unit.name === unitName) ?? product.pos_units[0];
+  }
+
   function effectiveLinePrice(line: CartLine): string {
     if (posCfg.allow_unit_price_override || line.productId === null) {
       return line.price;
     }
 
-    return products.find((product) => product.id === line.productId)?.sale_price ?? line.price;
+    const product = products.find((item) => item.id === line.productId);
+    return product ? pricedUnit(product, line.unit)?.price ?? line.price : line.price;
   }
 
-  // لا تبقى سلة قديمة أو مستأنفة بسعر مخصص عندما تكون السياسة مغلقة؛ يستعيد
-  // السطر سعر المنتج الحالي، ويتكرر عند وصول المنتجات أو الإعداد متأخراً.
+  // لا تبقى سلة قديمة أو مستأنفة بوحدة أو سعر لم يعدا في كتالوج العميل. يعيد
+  // السطر إلى أول وحدة مسعّرة (الأساس دائماً) عند وصول الكتالوج أو الإعداد.
   useEffect(() => {
     if (posCfg.allow_unit_price_override || products.length === 0) return;
     setCart((current) => current.map((line) => {
       if (line.productId === null) return line;
-      const price = products.find((product) => product.id === line.productId)?.sale_price;
-      return price && price !== line.price ? { ...line, price } : line;
+      const product = products.find((item) => item.id === line.productId);
+      const unit = product ? pricedUnit(product, line.unit) : undefined;
+      return unit && (unit.name !== line.unit || unit.price !== line.price)
+        ? { ...line, unit: unit.name, price: unit.price }
+        : line;
     }));
   }, [posCfg.allow_unit_price_override, products]);
 
   function addProduct(p: Product) {
+    const unit = pricedUnit(p, null);
+    if (!unit) return;
     setCart((c) => {
-      const ex = c.find((l) => l.productId === p.id);
-      if (ex) return c.map((l) => (l.productId === p.id ? { ...l, qty: l.qty + 1 } : l));
-      return [...c, { key: p.id, productId: p.id, description: p.name, sku: p.sku, price: p.sale_price, qty: 1, tax: p.tax_rate, discount: '' }];
+      const ex = c.find((l) => l.productId === p.id && l.unit === unit.name);
+      if (ex) return c.map((l) => (l.key === ex.key ? { ...l, qty: l.qty + 1 } : l));
+      return [...c, { key: `${p.id}:${unit.name}`, productId: p.id, description: p.name, sku: p.sku, unit: unit.name, price: unit.price, qty: 1, tax: p.tax_rate, discount: '' }];
     });
   }
+
+  const setUnit = (key: string, unitName: string) => {
+    setCart((current) => {
+      const line = current.find((item) => item.key === key);
+      if (!line || line.productId === null) return current;
+      const product = products.find((item) => item.id === line.productId);
+      const unit = product?.pos_units.find((item) => item.name === unitName);
+      if (!unit || unit.name === line.unit) return current;
+
+      const sameUnit = current.find((item) => item.key !== key && item.productId === line.productId && item.unit === unit.name);
+      if (sameUnit) {
+        return current
+          .filter((item) => item.key !== key)
+          .map((item) => item.key === sameUnit.key ? { ...item, qty: item.qty + line.qty } : item);
+      }
+
+      return current.map((item) => item.key === key
+        ? { ...item, key: `${line.productId}:${unit.name}`, unit: unit.name, price: unit.price }
+        : item);
+    });
+  };
   const setQty = (k: string, d: number) => setCart((c) => c.map((l) => (l.key === k ? { ...l, qty: Math.max(1, l.qty + d) } : l)));
   const setDiscount = (k: string, v: string) => {
     if (!posCfg.allow_discount) return;
@@ -311,7 +344,8 @@ export default function PosPage() {
     const message = t('unit_price_invalid');
     setPriceErrors((current) => ({ ...current, [k]: message }));
     errorToast(message);
-    const fallback = products.find((product) => product.id === line.productId)?.sale_price ?? '0.00';
+    const product = products.find((item) => item.id === line.productId);
+    const fallback = product ? pricedUnit(product, line.unit)?.price ?? '0.00' : '0.00';
     setCart((current) => current.map((item) => (item.key === k ? { ...item, price: fallback } : item)));
   };
   const remove = (k: string) => setCart((c) => c.filter((l) => l.key !== k));
@@ -349,6 +383,7 @@ export default function PosPage() {
             description: line.description,
             sku: line.sku,
             quantity: line.qty,
+            unit: line.unit,
             unit_price: riyalToMinor(effectiveLinePrice(line)),
             tax_rate: line.tax,
             discount: posCfg.allow_discount ? lineCalc(line).disc : 0,
@@ -372,9 +407,13 @@ export default function PosPage() {
       productId: item.product_id,
       description: item.description ?? '—',
       sku: item.sku,
+      unit: item.unit,
       price: posCfg.allow_unit_price_override
         ? item.unit_price
-        : products.find((product) => product.id === item.product_id)?.sale_price ?? item.unit_price,
+        : (() => {
+          const product = products.find((entry) => entry.id === item.product_id);
+          return product ? pricedUnit(product, item.unit)?.price ?? item.unit_price : item.unit_price;
+        })(),
       qty: item.quantity,
       tax: item.tax_rate,
       discount: posCfg.allow_discount ? item.discount : '',
@@ -537,6 +576,7 @@ export default function PosPage() {
           product_id: l.productId,
           description: l.description,
           quantity: l.qty,
+          unit: l.unit,
           unit_price: riyalToMinor(effectiveLinePrice(l)),
           tax_rate: l.tax,
           discount: posCfg.allow_discount ? lineCalc(l).disc : 0, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
@@ -566,7 +606,7 @@ export default function PosPage() {
           total: toRiyal(totals.tot),
           notes: null,
           lines: cart.map((l) => { const c = lineCalc(l); return {
-            id: l.key, description: l.description, quantity: l.qty,
+            id: l.key, description: l.unit ? `${l.description} (${l.unit})` : l.description, quantity: l.qty,
             unit_price: effectiveLinePrice(l), tax_rate: l.tax, line_tax: toRiyal(c.tax), line_total: toRiyal(c.total),
           }; }),
         };
@@ -591,7 +631,7 @@ export default function PosPage() {
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
-    name: l.description, qty: l.qty, unitPrice: formatRiyal(effectiveLinePrice(l)), lineTotal: lineCalc(l).total,
+    name: l.unit ? `${l.description} (${l.unit})` : l.description, qty: l.qty, unitPrice: formatRiyal(effectiveLinePrice(l)), lineTotal: lineCalc(l).total,
   }));
 
   const CATS = [
@@ -732,7 +772,9 @@ export default function PosPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3.5">
         {cart.length === 0 && <p className="py-10 text-center text-sm text-muted">{t('empty_cart')}</p>}
-        {cart.map((l) => (
+        {cart.map((l) => {
+          const units = l.productId ? products.find((product) => product.id === l.productId)?.pos_units ?? [] : [];
+          return (
           <div key={l.key} className="flex items-center gap-2.5 border-b border-border py-3 last:border-0">
             <button onClick={() => remove(l.key)} className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-negative/10 text-negative" aria-label={t('remove')}>
               <Trash2 className="h-3 w-3" strokeWidth={2} />
@@ -745,6 +787,19 @@ export default function PosPage() {
             <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-lg bg-background"><Package className="h-4 w-4 text-border" strokeWidth={1.6} /></div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-semibold">{l.description}</div>
+              {l.productId !== null && units.length > 1 ? (
+                <div className="mt-0.5 flex items-center gap-1">
+                  <label htmlFor={`unit-${l.key}`} className="text-[10px] text-muted">{tprod('unit')}</label>
+                  <select
+                    id={`unit-${l.key}`}
+                    value={l.unit ?? ''}
+                    onChange={(event) => setUnit(l.key, event.target.value)}
+                    className="h-5 max-w-24 rounded border border-border bg-background px-1 text-[10px] text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  >
+                    {units.map((unit) => <option key={unit.name} value={unit.name}>{unit.name}</option>)}
+                  </select>
+                </div>
+              ) : l.unit ? <div className="text-[10px] text-muted">{l.unit}</div> : null}
               {(posCfg.allow_unit_price_override || posCfg.allow_discount) ? (
                 <div className="mt-0.5 space-y-1">
                   {posCfg.allow_unit_price_override && (
@@ -782,7 +837,8 @@ export default function PosPage() {
             </div>
             <div className="num shrink-0 text-[12.5px] font-bold">{formatRiyal(lineCalc(l).total / 100)}</div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="space-y-2 p-3">

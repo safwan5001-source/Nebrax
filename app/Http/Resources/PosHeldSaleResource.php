@@ -25,6 +25,7 @@ class PosHeldSaleResource extends JsonResource
                 'description' => $item['description'] ?? null,
                 'sku' => $item['sku'] ?? null,
                 'quantity' => (int) ($item['quantity'] ?? 0),
+                'unit' => $item['unit'] ?? null,
                 'unit_price' => Money::toRiyal((int) ($item['unit_price'] ?? 0)),
                 'tax_rate' => (int) ($item['tax_rate'] ?? 0),
                 'discount' => Money::toRiyal((int) ($item['discount'] ?? 0)),

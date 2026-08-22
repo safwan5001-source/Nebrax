@@ -50,7 +50,7 @@ class PosHeldSaleTest extends TestCase
         ]);
     }
 
-    private function hold(array $auth, string $sessionId, Product $product, ?string $customerId = null)
+    private function hold(array $auth, string $sessionId, Product $product, ?string $customerId = null, ?string $unit = null)
     {
         return $this->withToken($auth['token'])->postJson('/api/pos/held-sales', [
             'pos_session_id' => $sessionId,
@@ -61,6 +61,7 @@ class PosHeldSaleTest extends TestCase
                 'description' => $product->name,
                 'sku' => $product->sku,
                 'quantity' => 2,
+                'unit' => $unit,
                 'unit_price' => 10000,
                 'tax_rate' => 15,
                 'discount' => 100,
@@ -84,11 +85,12 @@ class PosHeldSaleTest extends TestCase
             'journals' => JournalEntry::count(),
         ];
 
-        $response = $this->hold($auth, $session['session_id'], $product, $customerId)
+        $response = $this->hold($auth, $session['session_id'], $product, $customerId, 'carton')
             ->assertCreated()
             ->assertJsonPath('data.status', 'held')
             ->assertJsonPath('data.tax_inclusive', false)
             ->assertJsonPath('data.items.0.quantity', 2)
+            ->assertJsonPath('data.items.0.unit', 'carton')
             ->assertJsonPath('data.items.0.unit_price', '100.00')
             ->assertJsonPath('data.items.0.discount', '1.00');
         $heldId = $response['data']['id'];

@@ -42,6 +42,7 @@ class PosHeldSaleService
                         'description' => $item['description'] ?? null,
                         'sku' => $item['sku'] ?? null,
                         'quantity' => (int) $item['quantity'],
+                        'unit' => $item['unit'] ?? null,
                         'unit_price' => (int) $item['unit_price'],
                         'tax_rate' => (int) ($item['tax_rate'] ?? 0),
                         'discount' => (int) ($item['discount'] ?? 0),

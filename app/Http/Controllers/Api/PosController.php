@@ -58,14 +58,17 @@ class PosController extends ApiController
             Product::query()->where('is_active', true)
         )->with(['productCategory', 'productBrand', 'unitTemplate.units'])
             ->latest()
-            ->get()
-            ->map(function (Product $product) use ($priceList) {
-                // قيمة عرض عابرة للكتالوج؛ لا تعدّل سعر المنتج المخزن ولا تعيد
-                // تفسير فاتورة تاريخية، ويعاد فرضها مجدداً في PosService.
-                $product->setAttribute('sale_price', $this->customerPriceLists->priceFor($priceList, $product));
+            ->get();
+        $catalogUnits = $this->customerPriceLists->catalogUnitsFor($priceList, $products);
 
-                return $product;
-            });
+        $products->each(function (Product $product) use ($catalogUnits): void {
+            // قيم عرض عابرة للكتالوج؛ لا تعدّل المنتج المخزن ولا تعيد تفسير
+            // فاتورة تاريخية. الوحدة الأساسية متاحة دائماً، والبديلة لا تظهر
+            // إلا بسعر صريح من قائمة العميل النشطة.
+            $units = $catalogUnits[$product->id] ?? [];
+            $product->setAttribute('pos_units', $units);
+            $product->setAttribute('sale_price', $units[0]['price'] ?? (int) $product->sale_price);
+        });
 
         return ProductResource::collection($products)->response();
     }

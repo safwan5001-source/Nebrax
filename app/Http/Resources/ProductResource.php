@@ -33,6 +33,16 @@ class ProductResource extends JsonResource
                     ->concat($this->unitTemplate->units->map(fn ($u) => ['name' => $u->name, 'factor' => (int) $u->factor]))
                     ->values()
                 : [],
+            // حقل خاص بكتالوج POS فقط: وحدة الأساس بسعرها ثم البدائل التي
+            // تملك سعراً صريحاً في قائمة العميل. لا يظهر في مورد المنتج العام.
+            'pos_units'        => $this->when(
+                array_key_exists('pos_units', $this->resource->getAttributes()),
+                collect($this->resource->getAttribute('pos_units'))->map(fn (array $unit) => [
+                    'name' => $unit['name'],
+                    'factor' => (int) $unit['factor'],
+                    'price' => Money::toRiyal((int) $unit['price']),
+                ])->values()
+            ),
             'reorder_level'    => $this->reorder_level,
             'supplier_id'      => $this->supplier_id,
             'sales_account_id' => $this->sales_account_id,
