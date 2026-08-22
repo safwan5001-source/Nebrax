@@ -11,21 +11,36 @@ use App\Models\Payment;
 use App\Models\PosSession;
 use App\Models\Purchase;
 use App\Models\StockMovement;
+use App\Models\Tenant;
 use App\Models\TenantApplicationEvent;
 use App\Models\TenantApplicationState;
 use App\Models\User;
 use App\Support\ApplicationCatalog;
+use App\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
  * قرار كل مستأجر بتفعيل/إيقاف قدرة من ApplicationCatalog، مع فحص الاعتماديات
- * والإلزامية وسجل تدقيق. لا تتحكم هذه الخدمة في التنقل أو الصلاحيات — ذلك
- * إنفاذ لاحق منفصل عمداً (P2 التالية).
+ * والإلزامية وسجل تدقيق. الإنفاذ الفعلي على المسارات والشريط الجانبي يقرأ
+ * `statusFor()`/`navVisibility()` وحدهما (`EnsureApplicationActive`).
  */
 class TenantApplicationService
 {
+    /**
+     * لحظة تفعيل الإنفاذ الفعلي. لا صف حالة = "معطّلة" منطقياً في `stateFor()`
+     * منذ P1 — لكن لا مستأجر لمس `/applications` صراحة قبل اليوم، فتطبيق هذا
+     * الافتراض على الإنفاذ الفعلي (حجب المسار/إخفاء الشريط) يحجب استخداماً
+     * حياً قائماً بلا إشعار. المستأجرون المسجَّلون قبل هذا التاريخ يُعامَلون
+     * كمفعّلين فعلياً ما داموا لم يوقفوا القدرة صراحة (صفّ موجود يبقى الحقيقة
+     * دوماً)؛ المستأجرون الجدد بعده يبدؤون بالافتراضي الحقيقي: معطّلة حتى
+     * تُفعَّل صراحة. قرار مالك صريح — لا يغطّي `stateFor()`/لوحة `/applications`
+     * عمداً: تبقى تعرض الحالة المخزَّنة الحرفية كما صُمِّمت واختُبرت في P1/P2.
+     */
+    private const ENFORCEMENT_CUTOVER_AT = '2026-08-21 00:00:00';
+
+
     /**
      * "هل توجد بيانات تشغيلية حقيقية؟" لكل قدرة قابلة للإيقاف — تحوّل الإيقاف
      * إلى `suspended` (قراءة فقط) بدل `disabled` الكاملة. القدرات الإلزامية
@@ -84,6 +99,73 @@ class TenantApplicationService
         }
 
         return $result;
+    }
+
+    /**
+     * حالة قدرة واحدة — لإنفاذ `EnsureApplicationActive` على مساراتها، بمعزل عن
+     * حساب `stateFor()` الكامل لكل الكتالوج. القدرات الإلزامية وغير المبنية
+     * لا تُمرَّر هنا أصلاً (لا مسار مُنفَذ عليها)، فتُعامَل كمفعّلة دوماً لو
+     * استُدعيت بالخطأ — لا حجب لقدرة لا يملك المستأجر خياراً بإيقافها.
+     */
+    public function statusFor(string $key): string
+    {
+        $application = ApplicationCatalog::find($key);
+
+        if ($application === null || $application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+            return 'enabled';
+        }
+
+        $status = TenantApplicationState::query()->where('application_key', $key)->value('status');
+        if ($status !== null) {
+            return $status;
+        }
+
+        return $this->isGrandfatheredTenant() ? 'enabled' : 'disabled';
+    }
+
+    /**
+     * أي قدرات قابلة للإيقاف (غير إلزامية، مبنية) **مرئية** اليوم لهذا المستأجر —
+     * تغذّي الشريط الجانبي وحده، لا صلاحيات ولا إنفاذ مسار. `enabled` و`suspended`
+     * كلاهما مرئي (المعلّقة تبقى قراءة فقط، فروابطها/تقاريرها تبقى متاحة)؛
+     * `disabled` وحدها تُخفي عناصر الشريط المرتبطة بالمفتاح.
+     *
+     * @return array<string, bool>
+     */
+    public function navVisibility(): array
+    {
+        $rows = TenantApplicationState::query()->get()->keyBy('application_key');
+        $grandfathered = $this->isGrandfatheredTenant();
+
+        $result = [];
+        foreach (ApplicationCatalog::all() as $key => $application) {
+            if ($application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+                continue;
+            }
+
+            $row = $rows->get($key);
+            $status = $row?->status ?? ($grandfathered ? 'enabled' : 'disabled');
+            $result[$key] = $status !== 'disabled';
+        }
+
+        return $result;
+    }
+
+    /**
+     * سُجِّل المستأجر قبل لحظة تفعيل الإنفاذ الفعلي؟ راجع تعليق
+     * `ENFORCEMENT_CUTOVER_AT` أعلاه — يحدّد افتراض القدرات التي لم يقرر
+     * المستأجر بشأنها صراحة بعد (لا صفّ `TenantApplicationState`) في
+     * `statusFor()`/`navVisibility()` فقط.
+     */
+    private function isGrandfatheredTenant(): bool
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            return true;
+        }
+
+        $tenant = Tenant::find($tenantId);
+
+        return $tenant === null || $tenant->created_at === null || $tenant->created_at->lt(self::ENFORCEMENT_CUTOVER_AT);
     }
 
     public function enable(string $key, ?User $actor, ?string $reason = null): TenantApplicationState

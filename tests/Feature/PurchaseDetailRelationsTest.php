@@ -13,6 +13,7 @@ use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\PurchaseRelationsService;
 use App\Services\Accounting\PurchaseService;
+use App\Services\TenantApplicationService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -39,6 +40,9 @@ class PurchaseDetailRelationsTest extends TestCase
         ]);
         app(TenantContext::class)->set($this->tenant->id);
         app(ChartOfAccountsSeeder::class)->seed($this->tenant->id);
+        // هذا المستأجر لا يمرّ عبر `registerTenant()` (ينشئه مباشرة)، فيفوته
+        // التفعيل التلقائي الذي يحاكي هناك مستأجراً أنهى تأسيسه — يُفعَّل هنا يدوياً.
+        app(TenantApplicationService::class)->enable('purchases.cycle', null);
 
         $this->supplier = Partner::create(['name' => 'مورد العلاقات', 'type' => 'supplier']);
         $this->purchases = app(PurchaseService::class);

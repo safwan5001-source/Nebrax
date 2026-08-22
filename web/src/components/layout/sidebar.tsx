@@ -65,6 +65,7 @@ import {
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { useCompany } from '@/lib/company';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
 
 interface NavItem {
   href: string;
@@ -72,6 +73,12 @@ interface NavItem {
   key: string;
   /** الوحدات الجاهزة لها شاشة؛ غيرها رابط بشارة «قريباً» حتى تُبنى. */
   built?: boolean;
+  /**
+   * مفتاح `ApplicationCatalog` الذي يتحكم بظهور هذا العنصر وحده — يختفي إن
+   * أوقفه المالك من `/applications`. غياب المفتاح يعني ظهوراً دائماً (قدرة
+   * إلزامية أو بلا مفتاح تفعيل مستقل).
+   */
+  appKey?: string;
 }
 
 interface NavGroup {
@@ -80,6 +87,8 @@ interface NavGroup {
   /** أيقونة المجموعة — هي **كل** ما يظهر في الحالة المطوية، فلا مجموعة بلا أيقونة. */
   icon: LucideIcon;
   items: NavItem[];
+  /** بديل `appKey` على مستوى المجموعة كاملة — يخفيها بعناصرها دفعة واحدة. */
+  appKey?: string;
 }
 
 const GROUPS: NavGroup[] = [
@@ -101,6 +110,7 @@ const GROUPS: NavGroup[] = [
   {
     title: 'pos',
     icon: Store,
+    appKey: 'sales.pos',
     items: [
       { href: '/pos', icon: Store, key: 'posStart', built: true },
       { href: '/pos/sessions', icon: Clock, key: 'posSessions', built: true },
@@ -116,7 +126,7 @@ const GROUPS: NavGroup[] = [
       { href: '/partners/new', icon: UserPlus, key: 'customerCreate', built: true },
       { href: '/appointments', icon: CalendarCheck, key: 'appointments', built: true },
       { href: '/contacts', icon: Contact, key: 'contactList', built: true },
-      { href: '/crm', icon: Handshake, key: 'crm', built: true },
+      { href: '/crm', icon: Handshake, key: 'crm', built: true, appKey: 'crm.follow_up' },
       { href: '/customer-settings', icon: SlidersHorizontal, key: 'customerSettings', built: true },
     ],
   },
@@ -125,10 +135,10 @@ const GROUPS: NavGroup[] = [
     icon: Boxes,
     items: [
       { href: '/products', icon: Package, key: 'products', built: true },
-      { href: '/inventory', icon: Warehouse, key: 'stockBalances', built: true },
-      { href: '/warehouses', icon: Boxes, key: 'warehouses', built: true },
-      { href: '/stock-permits', icon: ClipboardCheck, key: 'stockPermits', built: true },
-      { href: '/stocktaking', icon: Warehouse, key: 'stocktaking', built: true },
+      { href: '/inventory', icon: Warehouse, key: 'stockBalances', built: true, appKey: 'inventory.core' },
+      { href: '/warehouses', icon: Boxes, key: 'warehouses', built: true, appKey: 'inventory.core' },
+      { href: '/stock-permits', icon: ClipboardCheck, key: 'stockPermits', built: true, appKey: 'inventory.core' },
+      { href: '/stocktaking', icon: Warehouse, key: 'stocktaking', built: true, appKey: 'inventory.core' },
       { href: '/inventory-settings', icon: SlidersHorizontal, key: 'inventorySettings', built: true },
     ],
   },
@@ -137,6 +147,7 @@ const GROUPS: NavGroup[] = [
     // المجموعة مكتملة: عشرة أقسام مبنيّة.
     title: 'purchases',
     icon: ShoppingCart,
+    appKey: 'purchases.cycle',
     items: [
       { href: '/purchase-requests', icon: ClipboardList, key: 'purchaseRequests', built: true },
       { href: '/rfq', icon: FileQuestion, key: 'rfq', built: true },
@@ -165,16 +176,17 @@ const GROUPS: NavGroup[] = [
     title: 'finance',
     icon: Banknote,
     items: [
-      { href: '/expenses', icon: Receipt, key: 'expenses', built: true },
+      { href: '/expenses', icon: Receipt, key: 'expenses', built: true, appKey: 'finance.operations' },
       { href: '/receipt-vouchers', icon: FileText, key: 'receiptVouchers', built: true },
       { href: '/cash-and-bank', icon: Building2, key: 'cashAndBank', built: true },
-      { href: '/employee-custodies', icon: Users, key: 'employeeCustodies', built: true },
+      { href: '/employee-custodies', icon: Users, key: 'employeeCustodies', built: true, appKey: 'finance.operations' },
       { href: '/finance-settings', icon: SlidersHorizontal, key: 'financeSettings', built: true },
     ],
   },
   {
     title: 'hr',
     icon: UserCog,
+    appKey: 'hr.employees',
     items: [
       { href: '/hr', icon: UserCog, key: 'employees', built: true },
       // الأربعة التالية تبويبات داخل /hr نفسها، لا صفحات مستقلة — التوجيه
@@ -213,6 +225,7 @@ const GROUPS: NavGroup[] = [
     // في قائمة المستخدم بالشريط العلوي.
     title: 'branches',
     icon: Network,
+    appKey: 'company.branches',
     items: [
       { href: '/branches', icon: MapPin, key: 'branchesManage', built: true },
       { href: '/branches/new', icon: MapPinPlus, key: 'branchAdd', built: true },
@@ -277,6 +290,31 @@ export function Sidebar({
 
   // بيانات الشركة للعلامة في الترويسة — من `/me` القائم بلا طلب إضافي.
   const company = useCompany();
+
+  // مفاتيح القدرات المُعطَّلة اليوم لهذا المستأجر — تُخفي عنصر/مجموعة الشريط
+  // المرتبطة بها. مسار بلا صلاحية `apps.view` عمداً: كل الأدوار تحتاج هذه
+  // القائمة لتصحيح تنقّلها، لا المالك/المدير وحدهما. فشل الجلب لا يُخفي شيئاً
+  // — أسلم من إخفاء الشريط كلّه بخطأ شبكة عابر.
+  const [hiddenAppKeys, setHiddenAppKeys] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    api<{ data: Record<string, boolean> }>('/applications/nav-state')
+      .then((res) => {
+        if (cancelled || Array.isArray(res.data)) return;
+        const hidden = Object.entries(res.data)
+          .filter(([, visible]) => !visible)
+          .map(([key]) => key);
+        setHiddenAppKeys(new Set(hidden));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const groupHidden = (group: NavGroup) => Boolean(group.appKey && hiddenAppKeys.has(group.appKey));
+  const visibleItems = (group: NavGroup) =>
+    group.items.filter((item) => !item.appKey || !hiddenAppKeys.has(item.appKey));
 
   // المجموعة التي انبثقت قائمتها في الحالة المطوية (flyout)، وموضعها الرأسي.
   const [flyout, setFlyout] = useState<{ title: string; top: number } | null>(null);
@@ -455,12 +493,13 @@ export function Sidebar({
 
               {sg.titles.map((title) => {
             const group = GROUPS.find((g) => g.title === title);
-            if (!group) return null;
+            if (!group || groupHidden(group)) return null;
+            const items = visibleItems(group);
             // Accordion حصري: المجموعة مفتوحة فقط إن كانت هي المجموعة النشطة الوحيدة.
             const expanded = openGroup === group.title;
             const GroupIcon = group.icon;
             // في الحالة المطوية لا عنوان يُبرز النشاط، فتحمله الأيقونة نفسها.
-            const groupActive = group.items.some((it) => isActive(it.href));
+            const groupActive = items.some((it) => isActive(it.href));
 
             return (
               <div key={group.title} className="mb-1">
@@ -510,7 +549,7 @@ export function Sidebar({
                     واحد يربط الفروع بأبيها، بدل خطوط مقطّعة بينها فجوات. */}
                 {expanded && !mini && (
                   <div className="sidebar-group-in ms-[29px] flex flex-col gap-0.5 border-s border-border ps-2 pt-0.5">
-                    {group.items.map((item) => {
+                    {items.map((item) => {
                       const Icon = item.icon;
                       const active = isActive(item.href);
                       return (
@@ -561,7 +600,10 @@ export function Sidebar({
           <div className="border-b border-border px-2.5 pb-1.5 pt-1 text-[11px] font-semibold text-muted">
             {t(`groups.${flyout.title}`)}
           </div>
-          {(GROUPS.find((g) => g.title === flyout.title)?.items ?? []).map((item) => {
+          {(() => {
+            const flyoutGroup = GROUPS.find((g) => g.title === flyout.title);
+            return flyoutGroup ? visibleItems(flyoutGroup) : [];
+          })().map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
