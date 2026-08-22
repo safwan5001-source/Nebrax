@@ -56,7 +56,7 @@ class PosController extends ApiController
 
         $products = PosSettings::constrainProductsByCategory(
             Product::query()->where('is_active', true)
-        )->with(['productCategory', 'productBrand', 'unitTemplate.units'])
+        )->with(['productCategory', 'productBrand', 'unitTemplate.units', 'alternateBarcodes'])
             ->latest()
             ->get();
         $catalogUnits = $this->customerPriceLists->catalogUnitsFor($priceList, $products);
@@ -66,7 +66,15 @@ class PosController extends ApiController
             // فاتورة تاريخية. الوحدة الأساسية متاحة دائماً، والبديلة لا تظهر
             // إلا بسعر صريح من قائمة العميل النشطة.
             $units = $catalogUnits[$product->id] ?? [];
+            $allowedUnits = collect($units)->pluck('name')->all();
             $product->setAttribute('pos_units', $units);
+            // لا يحمل الكاشير باركوداً لوحدة بديلة لا تظهر له أصلاً. الباركود
+            // الأساسي التاريخي يبقى في حقل المنتج ويرتبط بوحدة الأساس.
+            $product->setAttribute('pos_barcodes', $product->alternateBarcodes
+                ->filter(fn ($barcode) => in_array($barcode->unit_name, $allowedUnits, true))
+                ->map(fn ($barcode) => ['code' => $barcode->code, 'unit_name' => $barcode->unit_name])
+                ->values()
+                ->all());
             $product->setAttribute('sale_price', $units[0]['price'] ?? (int) $product->sale_price);
         });
 
