@@ -161,12 +161,12 @@ class DebitNoteTest extends TestCase
         $this->assertSame(-100000, $expense['total_expense']);
     }
 
-    /** الإشعار الدائن لم يتغيّر بحرف — النوع الافتراضي يبقى مبيعات. */
+    /** الإشعار الدائن المستقل يحدد نوع المبيعات صراحةً بعد منع الافتراض الخفي. */
     /** @test */
     public function the_sales_credit_note_is_unchanged(): void
     {
         $note = $this->notes->create([
-            'partner_id' => $this->customer->id, 'refund_type' => 'credit',
+            'type' => 'sales', 'partner_id' => $this->customer->id, 'refund_type' => 'credit',
         ], [['description' => 'مرتجع', 'quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]);
         $note = $this->notes->post($note);
 
@@ -183,7 +183,7 @@ class DebitNoteTest extends TestCase
     {
         $debit = $this->debitNote();
         $credit = $this->notes->create([
-            'partner_id' => $this->customer->id,
+            'type' => 'sales', 'partner_id' => $this->customer->id,
         ], [['quantity' => 1, 'unit_price' => 50000, 'tax_rate' => 15]]);
 
         $this->assertStringStartsWith('DN-', $debit->number);

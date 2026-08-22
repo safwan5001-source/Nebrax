@@ -37,7 +37,8 @@ class CreditNoteService
 
     public function __construct(
         protected LedgerService $ledger,
-        protected PrintTemplateService $printTemplates
+        protected PrintTemplateService $printTemplates,
+        protected CreditNoteOwnershipResolver $ownership,
     ) {}
 
     /**
@@ -52,11 +53,12 @@ class CreditNoteService
 
         return DB::transaction(function () use ($data, $items) {
             $date = $data['note_date'] ?? now()->toDateString();
+            $type = $this->ownership->forData($data);
 
             $note = CreditNote::create([
-                'number'              => $data['number'] ?? $this->nextNumber($date, $data['type'] ?? 'sales'),
+                'number'              => $data['number'] ?? $this->nextNumber($date, $type),
                 'partner_id'          => $data['partner_id'],
-                'type'                => $data['type'] ?? 'sales',
+                'type'                => $type,
                 'refund_type'         => $data['refund_type'] ?? 'credit',
                 'note_date'           => $date,
                 'status'              => 'draft',
@@ -115,18 +117,23 @@ class CreditNoteService
             throw new RuntimeException('لا يمكن ترحيل إشعار غير مسوّد (draft).');
         }
 
-        return DB::transaction(function () use ($note) {
+        // هذه نقطة ثقة مستقلة عن الإنشاء: صف محفوظ متناقض لا يُصلح بصمت
+        // ولا يصل إلى القيد أو القالب أو تغيير الحالة.
+        $type = $this->ownership->forNote($note);
+
+        return DB::transaction(function () use ($note, $type) {
             // إعادة احتساب الإجماليات من السطور (مصدر الحقيقة) قبل توليد القيد.
             $note->loadMissing('lines');
             $subtotal  = (int) $note->lines->sum('line_subtotal');
             $taxAmount = (int) $note->lines->sum('line_tax');
             $total     = $subtotal + $taxAmount;
 
-            $lines = $note->isPurchase()
+            $isPurchase = $type === CreditNoteOwnershipResolver::PURCHASE;
+            $lines = $isPurchase
                 ? $this->purchaseLines($note, $subtotal, $taxAmount, $total)
                 : $this->salesLines($note, $subtotal, $taxAmount, $total);
 
-            $label = $note->isPurchase() ? 'إشعار مدين' : 'إشعار دائن';
+            $label = $isPurchase ? 'إشعار مدين' : 'إشعار دائن';
 
             $entry = $this->ledger->post($lines, [
                 'entry_date'  => $note->note_date->toDateString(),
@@ -138,7 +145,7 @@ class CreditNoteService
 
             // يُختار القالب بحسب الجهة داخل معاملة الترحيل ثم يُثبت على
             // المستند؛ لا يعدّل نشر مراجعة أحدث لاحقاً هيئة إشعار صدر بالفعل.
-            $documentType = $note->isPurchase() ? 'debit_note' : 'credit_note';
+            $documentType = $isPurchase ? 'debit_note' : 'credit_note';
             $printAssignment = $this->printTemplates->resolve($documentType, 'print', $note->branch_id);
             $pdfAssignment = $this->printTemplates->resolve($documentType, 'pdf', $note->branch_id);
             $thermalAssignment = $this->printTemplates->resolve($documentType, 'thermal', $note->branch_id);

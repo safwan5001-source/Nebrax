@@ -11,6 +11,7 @@ use App\Models\ReturnDocument;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Accounting\ChartOfAccountsSeeder;
+use App\Services\TenantApplicationService;
 use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,6 +50,7 @@ class ReturnRestockPolicyTest extends TestCase
 
         app(TenantContext::class)->set($this->tenant->id);
         app(ChartOfAccountsSeeder::class)->seed($this->tenant->id);
+        app(TenantApplicationService::class)->enable('purchases.cycle', null);
 
         $this->customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
         $this->product  = Product::create([

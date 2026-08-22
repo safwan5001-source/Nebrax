@@ -27,7 +27,7 @@ echo "▶ 3/4  دمج ملفات النواة وطبقة الـ API..."
 mkdir -p app/Services app/Services/Accounting app/Services/Reporting app/Services/PrintTemplates app/Support \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
          app/Http/Requests app/Http/Resources app/Console/Commands \
-         app/Models/Concerns tests/Feature routes
+         app/Models/Concerns tests/Feature routes config
 cp -r "$CORE_DIR/app/Models/"*.php               app/Models/
 # المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php      app/Models/Concerns/
@@ -43,6 +43,7 @@ cp -r "$CORE_DIR/app/Http/Controllers/Api/"*.php app/Http/Controllers/Api/
 cp -r "$CORE_DIR/app/Http/Requests/"*.php        app/Http/Requests/
 cp -r "$CORE_DIR/app/Http/Resources/"*.php       app/Http/Resources/
 cp -r "$CORE_DIR/app/Providers/"*.php            app/Providers/
+cp -r "$CORE_DIR/config/"*.php                   config/
 # أوامر artisan (تشخيص/صيانة) — بلا هذا السطر لا تصل صورة الإنتاج
 cp -r "$CORE_DIR/app/Console/Commands/"*.php    app/Console/Commands/ 2>/dev/null || true
 cp -r "$CORE_DIR/database/migrations/"*.php      database/migrations/

@@ -87,6 +87,7 @@ use App\Http\Controllers\Api\ZatcaSettingsController;
 use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApplicationActive;
+use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\ForceJsonResponse;
@@ -262,11 +263,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('manual-journals/{id}/reverse', [ManualJournalController::class, 'reverse'])->middleware($perm('accounts.manage'));
         Route::delete('manual-journals/{id}', [ManualJournalController::class, 'destroy'])->middleware($perm('accounts.manage'));
 
-        // تصنيفات المصروفات: بيانات تحليلية بلا أثر محاسبي، تتحكم بها صلاحيات المصروفات.
-        Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->middleware($perm('expenses.view'));
-        Route::post('expense-categories', [ExpenseCategoryController::class, 'store'])->middleware($perm('expenses.manage'));
-        Route::put('expense-categories/{id}', [ExpenseCategoryController::class, 'update'])->middleware($perm('expenses.manage'));
-        Route::delete('expense-categories/{id}', [ExpenseCategoryController::class, 'destroy'])->middleware($perm('expenses.manage'));
+        // تصنيفات المصروفات: بيانات تحليلية بلا أثر محاسبي، لكنها جزء من تشغيل finance.operations وتخضع أيضاً لصلاحيات المصروفات.
+        Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->middleware([$perm('expenses.view'), $app('finance.operations')]);
+        Route::post('expense-categories', [ExpenseCategoryController::class, 'store'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
+        Route::put('expense-categories/{id}', [ExpenseCategoryController::class, 'update'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
+        Route::delete('expense-categories/{id}', [ExpenseCategoryController::class, 'destroy'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
         // المصروفات (مستند مالي؛ الترحيل يولّد قيداً متوازناً)
         // — نطاق finance.operations هنا وحده: العُهَد أدناه أيضاً. لا الخزائن/
         // الحسابات البنكية ولا السندات (`payments`)، فهي مرجع مشترك تستهلكه
@@ -358,10 +359,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('quotes/{id}/convert', [QuoteController::class, 'convert'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
 
         // الإشعارات الدائنة (مستند مالي؛ الترحيل يولّد قيداً عكسياً)
-        Route::get('credit-notes', [CreditNoteController::class, 'index'])->middleware($perm('invoices.view'));
-        Route::get('credit-notes/{id}', [CreditNoteController::class, 'show'])->middleware($perm('invoices.view'));
-        Route::post('credit-notes', [CreditNoteController::class, 'store'])->middleware($perm('invoices.manage'));
-        Route::post('credit-notes/{id}/post', [CreditNoteController::class, 'post'])->middleware($perm('invoices.manage'));
+        Route::get('credit-notes', [CreditNoteController::class, 'index'])->middleware([$perm('invoices.view'), EnsureApplicationOperationActive::class . ':credit-note']);
+        Route::get('credit-notes/{id}', [CreditNoteController::class, 'show'])->middleware([$perm('invoices.view'), EnsureApplicationOperationActive::class . ':credit-note']);
+        Route::post('credit-notes', [CreditNoteController::class, 'store'])->middleware([$perm('invoices.manage'), EnsureApplicationOperationActive::class . ':credit-note']);
+        Route::post('credit-notes/{id}/post', [CreditNoteController::class, 'post'])->middleware([$perm('invoices.manage'), EnsureApplicationOperationActive::class . ':credit-note']);
 
         // الفواتير الدورية (قالب + جدولة؛ التوليد ينتج فاتورة draft)
         Route::get('recurring-invoices', [RecurringInvoiceController::class, 'index'])->middleware($perm('invoices.view'));
@@ -510,20 +511,20 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // تقارير العملاء: قراءة من الفواتير وسندات القبض والمواعيد، بلا أثر محاسبي جديد.
         Route::get('reports/customers', [CustomerReportController::class, 'show'])->middleware($perm('reports.view'));
         // تقارير المخزون: قراءة من الأرصدة والحركات والأذون والجرد المرحّل فقط.
-        Route::get('reports/inventory', [InventoryReportController::class, 'show'])->middleware($perm('reports.view'));
+        Route::get('reports/inventory', [InventoryReportController::class, 'show'])->middleware([$perm('reports.view'), $app('inventory.core')]);
 
         // المرتجعات
         // سطور مستندٍ مصدر بكمياتها المتبقية للردّ — تسبق `returns/{id}` في
         // الترتيب فلا تبتلعها كمعرّف.
         Route::get('returns/returnable/{type}/{id}', ReturnableController::class)
-            ->middleware($perm('returns.view'));
+            ->middleware([$perm('returns.view'), EnsureApplicationOperationActive::class . ':return']);
         // مستندات طرفٍ القابلة للردّ عليها، بسبب المنع لغير الصالح منها.
         Route::get('returns/sources/{type}', ReturnSourcesController::class)
-            ->middleware($perm('returns.view'));
-        Route::get('returns', [ReturnController::class, 'index'])->middleware($perm('returns.view'));
-        Route::get('returns/{id}', [ReturnController::class, 'show'])->middleware($perm('returns.view'));
-        Route::post('returns', [ReturnController::class, 'store'])->middleware($perm('returns.manage'));
-        Route::post('returns/{id}/post', [ReturnController::class, 'post'])->middleware($perm('returns.manage'));
+            ->middleware([$perm('returns.view'), EnsureApplicationOperationActive::class . ':return']);
+        Route::get('returns', [ReturnController::class, 'index'])->middleware([$perm('returns.view'), EnsureApplicationOperationActive::class . ':return']);
+        Route::get('returns/{id}', [ReturnController::class, 'show'])->middleware([$perm('returns.view'), EnsureApplicationOperationActive::class . ':return']);
+        Route::post('returns', [ReturnController::class, 'store'])->middleware([$perm('returns.manage'), EnsureApplicationOperationActive::class . ':return']);
+        Route::post('returns/{id}/post', [ReturnController::class, 'post'])->middleware([$perm('returns.manage'), EnsureApplicationOperationActive::class . ':return']);
 
         // الموظفون (HR) — القائمة (`GET employees`) تبقى بلا حجب: مرجع مشترك
         // يستهلكه اختيار البائع في الفاتورة وربط حساب المستخدم بموظف، بلا
@@ -553,81 +554,81 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('employees/{id}/leave-requests', [EmployeeController::class, 'storeLeaveRequests'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
         Route::get('employees/{id}/leave-balances', [EmployeeController::class, 'leaveBalances'])->middleware([$perm('hr.view'), $app('hr.employees')]);
 
-        Route::get('leave-types', [LeaveTypeController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('leave-types', [LeaveTypeController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::put('leave-types/{id}', [LeaveTypeController::class, 'update'])->middleware($perm('hr.manage'));
-        Route::delete('leave-types/{id}', [LeaveTypeController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('leave-types', [LeaveTypeController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('leave-types', [LeaveTypeController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('leave-types/{id}', [LeaveTypeController::class, 'update'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('leave-types/{id}', [LeaveTypeController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // طابور الموافقة عبر كل الموظفين — انظر LeaveRequestController.
-        Route::get('leave-requests', [LeaveRequestController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('leave-requests/{id}/approve', [LeaveRequestController::class, 'approve'])->middleware($perm('hr.manage'));
-        Route::post('leave-requests/{id}/reject', [LeaveRequestController::class, 'reject'])->middleware($perm('hr.manage'));
-        Route::delete('leave-requests/{id}', [LeaveRequestController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('leave-requests', [LeaveRequestController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('leave-requests/{id}/approve', [LeaveRequestController::class, 'approve'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::post('leave-requests/{id}/reject', [LeaveRequestController::class, 'reject'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('leave-requests/{id}', [LeaveRequestController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // إدارة الطلبات — أنواع ثابتة بحقول موحّدة (نطاق البناء الأول)، منفصلة عن الإجازات عمداً.
         Route::get('employees/{id}/requests', [EmployeeController::class, 'indexRequests'])->middleware([$perm('hr.view'), $app('hr.employees')]);
         Route::post('employees/{id}/requests', [EmployeeController::class, 'storeRequests'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
-        Route::get('request-types', [RequestTypeController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('request-types', [RequestTypeController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::put('request-types/{id}', [RequestTypeController::class, 'update'])->middleware($perm('hr.manage'));
-        Route::delete('request-types/{id}', [RequestTypeController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('request-types', [RequestTypeController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('request-types', [RequestTypeController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('request-types/{id}', [RequestTypeController::class, 'update'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('request-types/{id}', [RequestTypeController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // طابور الموافقة عبر كل الموظفين — انظر EmployeeRequestController.
-        Route::get('requests', [EmployeeRequestController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('requests/{id}/approve', [EmployeeRequestController::class, 'approve'])->middleware($perm('hr.manage'));
-        Route::post('requests/{id}/reject', [EmployeeRequestController::class, 'reject'])->middleware($perm('hr.manage'));
-        Route::delete('requests/{id}', [EmployeeRequestController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('requests', [EmployeeRequestController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('requests/{id}/approve', [EmployeeRequestController::class, 'approve'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::post('requests/{id}/reject', [EmployeeRequestController::class, 'reject'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('requests/{id}', [EmployeeRequestController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // الهيكل التنظيمي — مسمى وظيفي/قسم/مستوى وظيفي/نوع وظيفة ككيانات مُدارة.
-        Route::get('job-titles', [JobTitleController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('job-titles', [JobTitleController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::put('job-titles/{id}', [JobTitleController::class, 'update'])->middleware($perm('hr.manage'));
-        Route::delete('job-titles/{id}', [JobTitleController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('job-titles', [JobTitleController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('job-titles', [JobTitleController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('job-titles/{id}', [JobTitleController::class, 'update'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('job-titles/{id}', [JobTitleController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
-        Route::get('departments', [DepartmentController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('departments', [DepartmentController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::put('departments/{id}', [DepartmentController::class, 'update'])->middleware($perm('hr.manage'));
-        Route::delete('departments/{id}', [DepartmentController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('departments', [DepartmentController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('departments', [DepartmentController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('departments/{id}', [DepartmentController::class, 'update'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('departments/{id}', [DepartmentController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
-        Route::get('job-levels', [JobLevelController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('job-levels', [JobLevelController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::put('job-levels/{id}', [JobLevelController::class, 'update'])->middleware($perm('hr.manage'));
-        Route::delete('job-levels/{id}', [JobLevelController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('job-levels', [JobLevelController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('job-levels', [JobLevelController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('job-levels/{id}', [JobLevelController::class, 'update'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('job-levels/{id}', [JobLevelController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
-        Route::get('employment-types', [EmploymentTypeController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('employment-types', [EmploymentTypeController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::put('employment-types/{id}', [EmploymentTypeController::class, 'update'])->middleware($perm('hr.manage'));
-        Route::delete('employment-types/{id}', [EmploymentTypeController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('employment-types', [EmploymentTypeController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('employment-types', [EmploymentTypeController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('employment-types/{id}', [EmploymentTypeController::class, 'update'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('employment-types/{id}', [EmploymentTypeController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // الورديات (الوحدة الثانية من معمار الموارد البشرية)
-        Route::get('shifts', [ShiftController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('shifts', [ShiftController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::put('shifts/{id}', [ShiftController::class, 'update'])->middleware($perm('hr.manage'));
-        Route::delete('shifts/{id}', [ShiftController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('shifts', [ShiftController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('shifts', [ShiftController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('shifts/{id}', [ShiftController::class, 'update'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('shifts/{id}', [ShiftController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // الحضور والانصراف (تمام الوحدة الثانية)
-        Route::get('attendances', [AttendanceController::class, 'index'])->middleware($perm('hr.view'));
-        Route::post('attendances', [AttendanceController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::put('attendances/{id}', [AttendanceController::class, 'update'])->middleware($perm('hr.manage'));
-        Route::delete('attendances/{id}', [AttendanceController::class, 'destroy'])->middleware($perm('hr.manage'));
+        Route::get('attendances', [AttendanceController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('attendances', [AttendanceController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::put('attendances/{id}', [AttendanceController::class, 'update'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::delete('attendances/{id}', [AttendanceController::class, 'destroy'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // مسيّرات الرواتب
-        Route::get('payroll-runs', [PayrollController::class, 'index'])->middleware($perm('hr.view'));
-        Route::get('payroll-runs/{id}', [PayrollController::class, 'show'])->middleware($perm('hr.view'));
-        Route::post('payroll-runs', [PayrollController::class, 'store'])->middleware($perm('hr.manage'));
-        Route::post('payroll-runs/{id}/post', [PayrollController::class, 'post'])->middleware($perm('hr.manage'));
-        Route::post('payroll-runs/{id}/pay', [PayrollController::class, 'pay'])->middleware($perm('hr.manage'));
+        Route::get('payroll-runs', [PayrollController::class, 'index'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::get('payroll-runs/{id}', [PayrollController::class, 'show'])->middleware([$perm('hr.view'), $app('hr.employees')]);
+        Route::post('payroll-runs', [PayrollController::class, 'store'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::post('payroll-runs/{id}/post', [PayrollController::class, 'post'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
+        Route::post('payroll-runs/{id}/pay', [PayrollController::class, 'pay'])->middleware([$perm('hr.manage'), $app('hr.employees')]);
 
         // بوابة الخدمة الذاتية للموظف — دورٌ مقيَّد (self_service.access)، لا hr.*
         // (تلك غير معزولة صفّياً). كل مسارٍ هنا مقيَّدٌ بنيوياً بـ employee_id
         // المستخدم نفسه — انظر SelfServiceController.
-        Route::get('me/profile', [SelfServiceController::class, 'profile'])->middleware($perm('self_service.access'));
-        Route::get('me/contract', [SelfServiceController::class, 'contract'])->middleware($perm('self_service.access'));
-        Route::get('me/payroll-items', [SelfServiceController::class, 'payrollItems'])->middleware($perm('self_service.access'));
-        Route::get('me/attendances', [SelfServiceController::class, 'attendances'])->middleware($perm('self_service.access'));
-        Route::post('me/attendance/check-in', [SelfServiceController::class, 'checkIn'])->middleware($perm('self_service.access'));
-        Route::post('me/attendance/check-out', [SelfServiceController::class, 'checkOut'])->middleware($perm('self_service.access'));
+        Route::get('me/profile', [SelfServiceController::class, 'profile'])->middleware([$perm('self_service.access'), $app('hr.employees')]);
+        Route::get('me/contract', [SelfServiceController::class, 'contract'])->middleware([$perm('self_service.access'), $app('hr.employees')]);
+        Route::get('me/payroll-items', [SelfServiceController::class, 'payrollItems'])->middleware([$perm('self_service.access'), $app('hr.employees')]);
+        Route::get('me/attendances', [SelfServiceController::class, 'attendances'])->middleware([$perm('self_service.access'), $app('hr.employees')]);
+        Route::post('me/attendance/check-in', [SelfServiceController::class, 'checkIn'])->middleware([$perm('self_service.access'), $app('hr.employees')]);
+        Route::post('me/attendance/check-out', [SelfServiceController::class, 'checkOut'])->middleware([$perm('self_service.access'), $app('hr.employees')]);
 
         // إعدادات الشركة (owner/admin) — تحديث ملف فقط، لا أثر محاسبي
         Route::put('company', [CompanyController::class, 'update'])->middleware($perm('company.manage'));
@@ -637,16 +638,25 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('sales-settings', [SalesSettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // إعدادات المشتريات (تفضيلات؛ تُقرأ فعلاً في خدمتَي الشراء والمشتريات)
-        Route::get('purchase-settings', [PurchaseSettingsController::class, 'show'])->middleware($perm('purchases.view'));
-        Route::put('purchase-settings', [PurchaseSettingsController::class, 'update'])->middleware($perm('company.manage'));
+        Route::get('purchase-settings', [PurchaseSettingsController::class, 'show'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
+        Route::put('purchase-settings', [PurchaseSettingsController::class, 'update'])->middleware([$perm('company.manage'), $app('purchases.cycle')]);
 
         // إعدادات الترقيم المتسلسل — الموضع الواحد لسلاسل المستندات السبع عشرة
         Route::get('numbering-settings', [NumberingSettingsController::class, 'show'])->middleware($perm('invoices.view'));
         Route::put('numbering-settings', [NumberingSettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // إعدادات الفوترة الإلكترونية (نطاق عدّاد ICV) — منفصلة عن بادئات ترقيم المستندات
-        Route::get('zatca-settings', [ZatcaSettingsController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::get('zatca-settings', [ZatcaSettingsController::class, 'show'])->middleware([$perm('invoices.view'), $app('compliance.zatca')]);
         Route::put('zatca-settings', [ZatcaSettingsController::class, 'update'])->middleware([$perm('company.manage'), $app('compliance.zatca')]);
+
+        // POS قسم تشغيلي مستقل داخل متحكم إعدادات مشترك؛ يسبق الـ wildcard
+        // كي تظل بقية أقسام المبيعات core/shared ولا تُحجب بسبب POS.
+        Route::get('sales-config/pos', [SalesConfigController::class, 'show'])
+            ->defaults('section', 'pos')
+            ->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::put('sales-config/pos', [SalesConfigController::class, 'update'])
+            ->defaults('section', 'pos')
+            ->middleware([$perm('company.manage'), $app('sales.pos')]);
 
         // أقسام إعدادات المبيعات المتعددة (حالات/تصميمات/قوائم أسعار/شحن…)
         Route::get('sales-config/{section}', [SalesConfigController::class, 'show'])->middleware($perm('invoices.view'));
