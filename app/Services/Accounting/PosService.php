@@ -48,9 +48,10 @@ class PosService
                 $data['actor'] ?? null,
             );
 
-            // سياسة الكتالوج حارس خادمي قبل أي فاتورة أو حركة مخزون؛ لا يكفي
-            // إخفاء التصنيف في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
+            // سياسة الكتالوج وحاجز الخصم خادميان قبل أي فاتورة أو حركة مخزون؛
+            // لا يكفي إخفاؤهما في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
             $this->assertProductsAllowedForPos($data['items']);
+            $this->assertDiscountsAllowedForPos($data['items']);
 
             // تضمن تهيئة المؤسسة الجديدة كتالوجاً تشغيلياً واحداً فقط، ولا تعيد
             // أي وسيلة حذفها مالكها بعد وجود الكتالوج.
@@ -137,6 +138,18 @@ class PosService
 
         if ($products->contains(fn (Product $product) => ! PosSettings::allowsProductCategory($product->category_id))) {
             throw new RuntimeException('يتضمن البيع منتجاً من تصنيف غير مسموح به في إعدادات نقطة البيع.');
+        }
+    }
+
+    /** يمنع خصم السطر عند إيقاف سياسة الخصم، قبل إنتاج مستند أو أثر محاسبي. */
+    private function assertDiscountsAllowedForPos(array $items): void
+    {
+        if (PosSettings::allowsDiscount()) {
+            return;
+        }
+
+        if (collect($items)->contains(fn (array $item) => (int) ($item['discount'] ?? 0) > 0)) {
+            throw new RuntimeException('الخصم غير مفعّل في إعدادات نقطة البيع.');
         }
     }
 
