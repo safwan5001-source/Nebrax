@@ -204,6 +204,32 @@ class PosCheckoutTest extends TestCase
     }
 
     /** @test */
+    public function pos_discount_policy_defaults_to_allowed_and_blocks_a_manual_discount_without_creating_documents_when_disabled(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $discountedItem = [['quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15, 'discount' => 1000]];
+
+        // افتراض الإعداد لا يغيّر خصومات POS المستخدمة تاريخياً.
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 10350)], $discountedItem)
+            ->assertCreated();
+
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => ['allow_discount' => false],
+        ])->assertOk();
+        $before = Invoice::where('pos_session_id', $sessionId)->count();
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 10350)], $discountedItem)
+            ->assertStatus(422);
+
+        $this->assertSame($before, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame($before, Payment::where('pos_session_id', $sessionId)->count());
+    }
+
+    /** @test */
     public function it_rejects_a_method_not_enabled_for_pos_without_creating_documents(): void
     {
         $auth = $this->registerTenant();

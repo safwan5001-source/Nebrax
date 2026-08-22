@@ -87,6 +87,12 @@ final class PosSettings
         return is_string($id) && $id !== '' ? $id : null;
     }
 
+    /** الخصم سياسة POS صريحة؛ الافتراض يحفظ السلوك التاريخي للمستأجر القائم. */
+    public static function allowsDiscount(?Tenant $tenant = null): bool
+    {
+        return self::group($tenant)['allow_discount'] !== false;
+    }
+
     /** البيع المؤجل سياسة صريحة؛ القيمة غير المعروفة تورّث الإتاحة التاريخية. */
     public static function allowsDeferredPayment(?Tenant $tenant = null): bool
     {

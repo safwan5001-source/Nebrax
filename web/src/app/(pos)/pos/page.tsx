@@ -190,6 +190,15 @@ export default function PosPage() {
     return paymentMethods.filter((method) => enabled.length === 0 || enabled.includes(method.id));
   }, [paymentMethods, posCfg.enabled_payment_method_ids]);
 
+  // قد تصل الإعدادات بعد أن يبدأ الكاشير سلةً مؤقتة؛ لا نترك خصماً معروضاً
+  // أو محفوظاً عندما تكون السياسة الخادمية قد أوقفته.
+  useEffect(() => {
+    if (posCfg.allow_discount) return;
+    setCart((current) => current.some((line) => riyalToMinor(line.discount) > 0)
+      ? current.map((line) => ({ ...line, discount: '' }))
+      : current);
+  }, [posCfg.allow_discount]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter((p) => {
@@ -215,7 +224,10 @@ export default function PosPage() {
     });
   }
   const setQty = (k: string, d: number) => setCart((c) => c.map((l) => (l.key === k ? { ...l, qty: Math.max(1, l.qty + d) } : l)));
-  const setDiscount = (k: string, v: string) => setCart((c) => c.map((l) => (l.key === k ? { ...l, discount: v } : l)));
+  const setDiscount = (k: string, v: string) => {
+    if (!posCfg.allow_discount) return;
+    setCart((c) => c.map((l) => (l.key === k ? { ...l, discount: v } : l)));
+  };
   const remove = (k: string) => setCart((c) => c.filter((l) => l.key !== k));
 
   // عدد المسودات قراءة تشغيلية فقط؛ فتح الحوار يعيد تحميل القائمة الكاملة من الخادم.
@@ -249,7 +261,7 @@ export default function PosPage() {
             quantity: line.qty,
             unit_price: riyalToMinor(line.price),
             tax_rate: line.tax,
-            discount: lineCalc(line).disc,
+            discount: posCfg.allow_discount ? lineCalc(line).disc : 0,
           })),
         },
       });
@@ -273,7 +285,7 @@ export default function PosPage() {
       price: item.unit_price,
       qty: item.quantity,
       tax: item.tax_rate,
-      discount: item.discount,
+      discount: posCfg.allow_discount ? item.discount : '',
     })));
     setSelectedCustomer(held.customer);
     setTaxInclusive(held.tax_inclusive);
@@ -431,7 +443,7 @@ export default function PosPage() {
           quantity: l.qty,
           unit_price: riyalToMinor(l.price),
           tax_rate: l.tax,
-          discount: lineCalc(l).disc, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
+          discount: posCfg.allow_discount ? lineCalc(l).disc : 0, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
         }));
         // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
         const created = await api<{ data: { id: string; number: string; total: string } }>('/pos/checkout', {
@@ -479,7 +491,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive, company, warehouseId, session],
+    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, taxInclusive, company, warehouseId, session],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
