@@ -103,7 +103,7 @@ class LegacyEntitlementDryRunCommand extends Command
         try {
             foreach ($grantRows as $row) {
                 $capabilityKey = $row['capability_key'];
-                $stableReferenceId = "{$tenant->id}:{$capabilityKey}";
+                $stableReferenceId = $tenant->id;
                 $grant = $this->grants->grant(
                     $tenant,
                     $capabilityKey,
@@ -113,7 +113,7 @@ class LegacyEntitlementDryRunCommand extends Command
                     null,
                     'legacy-backfill',
                     $stableReferenceId,
-                    "legacy-backfill:{$tenant->id}",
+                    null,
                     'LEGACY_ENTITLEMENT_BACKFILL',
                     'LEGACY_ENTITLEMENT_BACKFILL',
                     null,

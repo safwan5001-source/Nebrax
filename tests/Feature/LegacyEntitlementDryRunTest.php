@@ -181,7 +181,8 @@ class LegacyEntitlementDryRunTest extends TestCase
         $this->assertSame(EntitlementSourceType::LEGACY_GRANDFATHER->value, $grant->source_type);
         $this->assertSame('LEGACY_ENTITLEMENT_BACKFILL', $grant->grant_reason_code);
         $this->assertSame('legacy-backfill', $grant->source_reference_type);
-        $this->assertSame("{$this->tenant->id}:hr.employees", $grant->source_reference_id);
+        $this->assertSame($this->tenant->id, $grant->source_reference_id);
+        $this->assertNull($grant->grant_group_id);
         $this->assertSame('EXPLICIT_APPLICATION_STATE', $grant->metadata['recommendation_reason']);
         $this->assertSame(ApplicationAccessLevel::DENIED, $before->level);
         $this->assertSame(ApplicationAccessLevel::ALLOWED, app(ApplicationAccessDecision::class)->decide(
