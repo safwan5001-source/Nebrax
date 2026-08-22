@@ -40,6 +40,7 @@ class CreditNoteTest extends TestCase
 
         $res = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
             'partner_id' => $partnerId,
+            'type'       => 'sales',
             'items'      => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
         ])->assertCreated();
 
@@ -58,6 +59,7 @@ class CreditNoteTest extends TestCase
 
         $id = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
             'partner_id'  => $partnerId,
+            'type'        => 'sales',
             'refund_type' => 'credit',
             'items'       => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
         ])['data']['id'];
@@ -194,6 +196,7 @@ class CreditNoteTest extends TestCase
 
         $id = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
             'partner_id'  => $partnerId,
+            'type'        => 'sales',
             'refund_type' => 'cash',
             'items'       => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
         ])['data']['id'];
@@ -212,7 +215,7 @@ class CreditNoteTest extends TestCase
         $auth = $this->registerTenant();
         $partnerId = $this->partner($auth['token']);
         $id = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
-            'partner_id' => $partnerId, 'items' => [['quantity' => 1, 'unit_price' => 10000]],
+            'partner_id' => $partnerId, 'type' => 'sales', 'items' => [['quantity' => 1, 'unit_price' => 10000]],
         ])['data']['id'];
 
         $this->withToken($auth['token'])->postJson("/api/credit-notes/{$id}/post")->assertOk();
@@ -225,7 +228,7 @@ class CreditNoteTest extends TestCase
         $a = $this->registerTenant('acme', 'owner@acme.test');
         $partnerA = $this->partner($a['token']);
         $id = $this->withToken($a['token'])->postJson('/api/credit-notes', [
-            'partner_id' => $partnerA, 'items' => [['quantity' => 1, 'unit_price' => 10000]],
+            'partner_id' => $partnerA, 'type' => 'sales', 'items' => [['quantity' => 1, 'unit_price' => 10000]],
         ])['data']['id'];
 
         $b = $this->registerTenant('globex', 'owner@globex.test');

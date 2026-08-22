@@ -6,6 +6,8 @@ use App\Models\Account;
 use App\Models\CreditNote;
 use App\Models\CreditNoteLine;
 use App\Models\Partner;
+use App\Models\Invoice;
+use App\Models\Purchase;
 use App\Services\PrintTemplates\PrintTemplateService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -52,11 +54,12 @@ class CreditNoteService
 
         return DB::transaction(function () use ($data, $items) {
             $date = $data['note_date'] ?? now()->toDateString();
+            $type = $this->effectiveType($data);
 
             $note = CreditNote::create([
-                'number'              => $data['number'] ?? $this->nextNumber($date, $data['type'] ?? 'sales'),
+                'number'              => $data['number'] ?? $this->nextNumber($date, $type),
                 'partner_id'          => $data['partner_id'],
-                'type'                => $data['type'] ?? 'sales',
+                'type'                => $type,
                 'refund_type'         => $data['refund_type'] ?? 'credit',
                 'note_date'           => $date,
                 'status'              => 'draft',
@@ -156,6 +159,49 @@ class CreditNoteService
 
             return $note->fresh('lines');
         });
+    }
+
+    /**
+     * يحدد مصدر المستند نوع الإشعار حين يوجد، قبل الترقيم والحفظ والترحيل.
+     * `findOrFail` يمر عبر TenantScope الطبيعي؛ مصدر مستأجر آخر يبقى 404 ولا
+     * يُكشف للطالب. الإشعار المستقل مشروع، لكنه لا يملك نوعاً ضمنياً.
+     */
+    private function effectiveType(array $data): string
+    {
+        $purchaseId = $data['original_purchase_id'] ?? null;
+        $invoiceId = $data['original_invoice_id'] ?? null;
+        $requestedType = $data['type'] ?? null;
+
+        if ($purchaseId !== null && $invoiceId !== null) {
+            throw new RuntimeException('لا يجوز ربط الإشعار بفاتورة ومشتريات معاً.');
+        }
+
+        if ($purchaseId !== null) {
+            Purchase::findOrFail($purchaseId);
+            $this->assertRequestedType($requestedType, 'purchase');
+
+            return 'purchase';
+        }
+
+        if ($invoiceId !== null) {
+            Invoice::findOrFail($invoiceId);
+            $this->assertRequestedType($requestedType, 'sales');
+
+            return 'sales';
+        }
+
+        if (! in_array($requestedType, ['sales', 'purchase'], true)) {
+            throw new RuntimeException('نوع الإشعار المستقل مطلوب.');
+        }
+
+        return $requestedType;
+    }
+
+    private function assertRequestedType(?string $requestedType, string $sourceType): void
+    {
+        if ($requestedType !== null && $requestedType !== $sourceType) {
+            throw new RuntimeException('نوع الإشعار لا يطابق المستند المصدر.');
+        }
     }
 
     /** حساب الضريبة كعدد صحيح (تقريب نصفي لأعلى) — بلا float. */

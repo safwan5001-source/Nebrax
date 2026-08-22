@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\TenantApplicationService;
+use App\Support\ApplicationCatalog;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,6 +22,12 @@ class EnsureApplicationActive
 
     public function handle(Request $request, Closure $next, string $key): Response
     {
+        // اسم Middleware أو مفتاح App Guard الخاطئ لا يملك سلوكاً متسامحاً:
+        // الرفض الموحّد لا يكشف إن كان الخطأ ناتجاً من كتالوج أو تهيئة مسار.
+        if (! ApplicationCatalog::exists($key)) {
+            abort(403, 'هذه القدرة غير متاحة لهذه المؤسسة.');
+        }
+
         $status = $this->applications->statusFor($key);
 
         if ($status === 'enabled') {

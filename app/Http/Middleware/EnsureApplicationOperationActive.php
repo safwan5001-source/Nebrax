@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\CreditNote;
+use App\Models\Invoice;
+use App\Models\Purchase;
 use App\Models\ReturnDocument;
 use App\Services\TenantApplicationService;
 use Closure;
@@ -24,10 +26,14 @@ class EnsureApplicationOperationActive
 {
     private const PURCHASES_APPLICATION = 'purchases.cycle';
 
+    /** @var list<string> */
+    private const SUPPORTED_OPERATIONS = ['return', 'credit-note'];
+
     public function __construct(private TenantApplicationService $applications) {}
 
     public function handle(Request $request, Closure $next, string $operation): Response
     {
+        $this->assertSupportedOperation($operation);
         $type = $this->typeFor($request, $operation);
 
         if ($type === 'purchase') {
@@ -62,8 +68,35 @@ class EnsureApplicationOperationActive
             : 'هذه القدرة غير مفعّلة لهذه المؤسسة.');
     }
 
+    private function assertSupportedOperation(string $operation): void
+    {
+        if (! in_array($operation, self::SUPPORTED_OPERATIONS, true)) {
+            abort(403, 'العملية المطلوبة غير متاحة لهذه المؤسسة.');
+        }
+    }
+
     private function typeFor(Request $request, string $operation): ?string
     {
+        // إنشاء الإشعار يملك مصدرين محتملين؛ مصدره المحفوظ هو الحقيقة قبل `type`
+        // المرسل، فلا يختار العميل حارس مبيعات أضعف فوق شراء. الطلب الذي يحمل
+        // المصدرين يترك التحقق الدلالي للـ Request/Service ولا يُشتق منه نوع.
+        if ($operation === 'credit-note') {
+            $purchaseId = $request->input('original_purchase_id');
+            $invoiceId = $request->input('original_invoice_id');
+
+            if ($purchaseId !== null && $invoiceId === null) {
+                Purchase::findOrFail($purchaseId);
+
+                return 'purchase';
+            }
+
+            if ($invoiceId !== null && $purchaseId === null) {
+                Invoice::findOrFail($invoiceId);
+
+                return 'sales';
+            }
+        }
+
         // مسارات مصادر المرتجعات تملك `{type}` صريحاً؛ وهو يسبق `id` الذي يشير
         // هناك إلى الفاتورة/المشتريات المصدر لا إلى ReturnDocument.
         $routeType = $request->route('type');
@@ -78,7 +111,6 @@ class EnsureApplicationOperationActive
             return match ($operation) {
                 'return' => ReturnDocument::findOrFail($id)->type,
                 'credit-note' => CreditNote::findOrFail($id)->type,
-                default => throw new \LogicException("عملية تطبيق مشتركة غير معروفة: {$operation}"),
             };
         }
 

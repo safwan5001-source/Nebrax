@@ -111,7 +111,13 @@ class TenantApplicationService
     {
         $application = ApplicationCatalog::find($key);
 
-        if ($application === null || $application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+        // المفتاح غير المعروف ليس قدرةً إلزامية ولا غير مبنية؛ منحه وصولاً
+        // فعّالاً يجعل أي خطأ إملائي في App Guard تجاوزاً صامتاً للإنفاذ.
+        if ($application === null) {
+            return 'disabled';
+        }
+
+        if ($application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
             return 'enabled';
         }
 
