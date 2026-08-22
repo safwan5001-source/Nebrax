@@ -76,6 +76,15 @@ class TenantApplicationService
     }
 
     /**
+     * دليل بيانات التشغيل الموثوق نفسه المستخدم عند تعليق التطبيق. المستدعي
+     * يظل مسؤولاً عن اختيار TenantContext الصحيح قبل الاستعلام.
+     */
+    public function hasOperationalEvidence(string $key): bool
+    {
+        return $this->hasOperationalData($key);
+    }
+
+    /**
      * دمج الكتالوج الثابت مع حالة المستأجر الحالية.
      *
      * @return array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,enabled:bool,status:string,changed_by:?string,changed_at:?string,reason:?string}>
@@ -171,7 +180,13 @@ class TenantApplicationService
 
         $tenant = Tenant::find($tenantId);
 
-        return $tenant === null || $tenant->created_at === null || $tenant->created_at->lt(self::ENFORCEMENT_CUTOVER_AT);
+        return $tenant === null || $this->isLegacyTenant($tenant);
+    }
+
+    /** Uses the same cutover contract as legacy route reachability. */
+    public function isLegacyTenant(Tenant $tenant): bool
+    {
+        return $tenant->created_at === null || $tenant->created_at->lt(self::ENFORCEMENT_CUTOVER_AT);
     }
 
     public function enable(string $key, ?User $actor, ?string $reason = null): TenantApplicationState
