@@ -36,6 +36,7 @@ interface PosConfig {
   receipt_footer: string;
   print_receipt: boolean;
   allow_discount: boolean;
+  apply_customer_price_list: boolean;
   allow_unit_price_override: boolean;
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   enabled_payment_method_ids: string[];
@@ -47,6 +48,7 @@ const POS_DEFAULTS: PosConfig = {
   receipt_footer: '',
   print_receipt: true,
   allow_discount: true,
+  apply_customer_price_list: true,
   allow_unit_price_override: false,
   held_sale_close_policy: 'discard_on_session_close',
   enabled_payment_method_ids: [],
@@ -87,6 +89,7 @@ export default function PosPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
   const [cashier, setCashier] = useState('—');
@@ -139,8 +142,41 @@ export default function PosPage() {
   const walkinName = posCfg.default_customer?.trim() || WALKIN;
   const customerName = selectedCustomer?.name ?? walkinName;
 
+  const loadProducts = useCallback(async (partnerId: string | null) => {
+    const query = partnerId ? `?partner_id=${encodeURIComponent(partnerId)}` : '';
+    setCatalogLoading(true);
+    try {
+      const result = await api<{ data: Product[] }>(`/pos/products${query}`);
+      setProducts(result.data);
+    } catch {
+      // يبقى آخر كتالوج ظاهر عند فشل الشبكة؛ الإتمام يعيد فرض السعر الخادمي.
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    api<{ data: Product[] }>('/pos/products').then((r) => setProducts(r.data)).catch(() => {});
+    void loadProducts(selectedCustomer?.id ?? null);
+  }, [loadProducts, selectedCustomer?.id]);
+
+  // عندما تتغير قائمة العميل، تصير أسعار الكتالوج الجديد مصدر عرض السلة أيضاً.
+  // الحارس الخادمي يفرض القيمة نفسها عند الإتمام، فلا يكون التغيير واجهة فقط.
+  useEffect(() => {
+    if (!posCfg.apply_customer_price_list || products.length === 0) return;
+    setCart((current) => {
+      let changed = false;
+      const next = current.map((line) => {
+        if (line.productId === null) return line;
+        const price = products.find((product) => product.id === line.productId)?.sale_price;
+        if (!price || price === line.price) return line;
+        changed = true;
+        return { ...line, price };
+      });
+      return changed ? next : current;
+    });
+  }, [posCfg.apply_customer_price_list, products]);
+
+  useEffect(() => {
     api<{ data: Warehouse[] }>('/warehouses').then((r) => {
       const active = r.data.filter((warehouse) => warehouse.is_active);
       setWarehouses(active);
@@ -292,6 +328,10 @@ export default function PosPage() {
 
   // تعليق السلة الخادمي: لا فاتورة ولا قبض ولا قيد ولا حركة مخزون قبل الدفع.
   async function holdSale() {
+    if (catalogLoading) {
+      errorToast(t('price_list_loading'));
+      return;
+    }
     if (cart.length === 0 || !session) {
       if (!session) errorToast(t('open_to_start'));
       return;
@@ -479,6 +519,10 @@ export default function PosPage() {
 
   const confirmPayment = useCallback(
     async (tenders: PosTender[]) => {
+      if (catalogLoading) {
+        setError(t('price_list_loading'));
+        return;
+      }
       if (cart.length === 0) return;
       if (!session) {
         setError(t('open_to_start'));
@@ -543,7 +587,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products],
+    [cart, catalogLoading, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -746,7 +790,7 @@ export default function PosPage() {
           <button
             type="button"
             onClick={holdSale}
-            disabled={cart.length === 0 || !session || holdBusy}
+            disabled={cart.length === 0 || !session || holdBusy || catalogLoading}
             className="flex items-center justify-center gap-1.5 rounded-[9px] border border-border bg-surface px-3 py-2 text-[11.5px] font-semibold text-text hover:border-primary disabled:opacity-50"
           >
             <PauseCircle className="h-3.5 w-3.5" strokeWidth={1.8} />
@@ -784,7 +828,7 @@ export default function PosPage() {
       <div className="p-3.5 pt-0">
         <button
           onClick={() => setStep('payment')}
-          disabled={cart.length === 0}
+          disabled={cart.length === 0 || catalogLoading}
           className="flex w-full items-center justify-between rounded-xl bg-primary px-4 py-3.5 text-base font-bold text-white disabled:opacity-50"
         >
           {t('pay')}

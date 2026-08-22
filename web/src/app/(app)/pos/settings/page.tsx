@@ -18,6 +18,7 @@ interface PosConfig {
   receipt_footer: string;
   print_receipt: boolean;
   allow_discount: boolean;
+  apply_customer_price_list: boolean;
   allow_unit_price_override: boolean;
   enabled_payment_method_ids: string[];
   default_payment_method_id: string | null;
@@ -48,6 +49,7 @@ const DEFAULTS: PosConfig = {
   receipt_footer: '',
   print_receipt: true,
   allow_discount: true,
+  apply_customer_price_list: true,
   allow_unit_price_override: false,
   enabled_payment_method_ids: [],
   default_payment_method_id: null,
@@ -225,6 +227,13 @@ export default function PosSettingsPage() {
                 <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.allow_discount} onChange={(event) => patch('allow_discount', event.target.checked)} />
                 {t('allow_discount')}
               </label>
+              <section className="space-y-1.5">
+                <label className="flex items-center gap-2 text-sm text-text">
+                  <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.apply_customer_price_list} onChange={(event) => patch('apply_customer_price_list', event.target.checked)} />
+                  {t('apply_customer_price_list')}
+                </label>
+                <p className="text-xs leading-relaxed text-muted">{t('apply_customer_price_list_hint')}</p>
+              </section>
               <section className="space-y-1.5">
                 <label className="flex items-center gap-2 text-sm text-text">
                   <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.allow_unit_price_override} onChange={(event) => patch('allow_unit_price_override', event.target.checked)} />
