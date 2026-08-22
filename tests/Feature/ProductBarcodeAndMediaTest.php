@@ -37,7 +37,8 @@ class ProductBarcodeAndMediaTest extends TestCase
 
         $this->withToken($auth['token'])->getJson("/api/products/{$product['id']}/barcodes")
             ->assertOk()->assertJsonPath('data.0.id', $barcode['id'])
-            ->assertJsonPath('data.0.unit_name', 'piece');
+            ->assertJsonPath('data.0.unit_name', 'piece')
+            ->assertJsonPath('data.0.default_quantity', 1);
 
         $this->withToken($auth['token'])
             ->postJson("/api/products/{$product['id']}/barcodes", ['code' => 'PRIMARY-001'])
@@ -47,6 +48,9 @@ class ProductBarcodeAndMediaTest extends TestCase
             ->assertStatus(422);
         $this->withToken($auth['token'])
             ->postJson("/api/products/{$product['id']}/barcodes", ['code' => 'ALT-002', 'unit_name' => 'carton'])
+            ->assertStatus(422);
+        $this->withToken($auth['token'])
+            ->postJson("/api/products/{$product['id']}/barcodes", ['code' => 'ALT-QTY-0', 'default_quantity' => 0])
             ->assertStatus(422);
     }
 

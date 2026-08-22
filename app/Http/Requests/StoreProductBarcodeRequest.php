@@ -16,6 +16,7 @@ class StoreProductBarcodeRequest extends FormRequest
         return [
             'code' => ['required', 'string', 'max:255'],
             'unit_name' => ['nullable', 'string', 'max:255'],
+            'default_quantity' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'label' => ['nullable', 'string', 'max:255'],
         ];
     }

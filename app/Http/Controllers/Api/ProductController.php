@@ -178,6 +178,7 @@ class ProductController extends ApiController
         $barcode = $product->alternateBarcodes()->create([
             'code' => $code,
             'unit_name' => $unitName,
+            'default_quantity' => (int) ($data['default_quantity'] ?? 1),
             'label' => isset($data['label']) ? trim((string) $data['label']) ?: null : null,
             'created_by' => $request->user()?->id,
         ]);

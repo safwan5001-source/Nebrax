@@ -13,6 +13,7 @@ class ProductBarcodeResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'unit_name' => $this->unit_name,
+            'default_quantity' => (int) $this->default_quantity,
             'label' => $this->label,
             'created_at' => optional($this->created_at)->toIso8601String(),
         ];

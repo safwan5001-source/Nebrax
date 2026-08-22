@@ -50,6 +50,7 @@ class ProductResource extends JsonResource
                 collect($this->resource->getAttribute('pos_barcodes'))->map(fn (array $barcode) => [
                     'code' => $barcode['code'],
                     'unit_name' => $barcode['unit_name'],
+                    'default_quantity' => (int) $barcode['default_quantity'],
                 ])->values()
             ),
             'reorder_level'    => $this->reorder_level,

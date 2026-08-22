@@ -72,7 +72,11 @@ class PosController extends ApiController
             // الأساسي التاريخي يبقى في حقل المنتج ويرتبط بوحدة الأساس.
             $product->setAttribute('pos_barcodes', $product->alternateBarcodes
                 ->filter(fn ($barcode) => in_array($barcode->unit_name, $allowedUnits, true))
-                ->map(fn ($barcode) => ['code' => $barcode->code, 'unit_name' => $barcode->unit_name])
+                ->map(fn ($barcode) => [
+                    'code' => $barcode->code,
+                    'unit_name' => $barcode->unit_name,
+                    'default_quantity' => (int) $barcode->default_quantity,
+                ])
                 ->values()
                 ->all());
             $product->setAttribute('sale_price', $units[0]['price'] ?? (int) $product->sale_price);
