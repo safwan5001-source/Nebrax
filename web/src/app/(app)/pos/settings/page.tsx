@@ -17,6 +17,7 @@ interface PosConfig {
   default_customer: string;
   receipt_footer: string;
   print_receipt: boolean;
+  receipt_paper_size: 'thermal_58' | 'thermal_80';
   allow_discount: boolean;
   apply_customer_price_list: boolean;
   allow_unit_price_override: boolean;
@@ -48,6 +49,7 @@ const DEFAULTS: PosConfig = {
   default_customer: '',
   receipt_footer: '',
   print_receipt: true,
+  receipt_paper_size: 'thermal_80',
   allow_discount: true,
   apply_customer_price_list: true,
   allow_unit_price_override: false,
@@ -223,6 +225,14 @@ export default function PosSettingsPage() {
                 <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.print_receipt} onChange={(event) => patch('print_receipt', event.target.checked)} />
                 {t('print_receipt')}
               </label>
+              <section className="space-y-1.5">
+                <Label htmlFor="receipt_paper_size">{t('receipt_paper_size')}</Label>
+                <Select id="receipt_paper_size" value={config.receipt_paper_size} onChange={(event) => patch('receipt_paper_size', event.target.value as PosConfig['receipt_paper_size'])}>
+                  <option value="thermal_80">{t('receipt_paper_80')}</option>
+                  <option value="thermal_58">{t('receipt_paper_58')}</option>
+                </Select>
+                <p className="text-xs leading-relaxed text-muted">{t('receipt_paper_size_hint')}</p>
+              </section>
               <label className="flex items-center gap-2 text-sm text-text">
                 <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.allow_discount} onChange={(event) => patch('allow_discount', event.target.checked)} />
                 {t('allow_discount')}

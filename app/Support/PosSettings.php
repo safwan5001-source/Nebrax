@@ -23,10 +23,15 @@ final class PosSettings
     public const PRODUCT_CATEGORY_VISIBILITY_ALL = 'all';
     public const PRODUCT_CATEGORY_VISIBILITY_ONLY = 'only';
     public const PRODUCT_CATEGORY_VISIBILITY_EXCEPT = 'except';
+    public const RECEIPT_PAPER_THERMAL_58 = 'thermal_58';
+    public const RECEIPT_PAPER_THERMAL_80 = 'thermal_80';
 
     private const DEFAULTS = [
         'default_customer'   => 'عميل نقدي (POS)',
         'print_receipt'      => true,
+        // قالبا الإيصال الحراري المعتمدان في محرّك المستندات. 80 مم يحافظ على
+        // سلوك الكاشير القائم، بينما يتيح 58 مم للطابعات الضيقة بلا تغيير مالي.
+        'receipt_paper_size' => self::RECEIPT_PAPER_THERMAL_80,
         'allow_discount'     => true,
         'receipt_footer'     => '',
         // قائمة فارغة تعني «كل الوسائل النشطة»: لا تتغير شاشة POS للمستأجر
@@ -91,6 +96,16 @@ final class PosSettings
         $id = self::group($tenant)['default_payment_method_id'];
 
         return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    /** ورق الإيصال الحراري المسموح؛ لا تمرر قيمة إعداد غير معتمدة إلى الطباعة. */
+    public static function receiptPaperSize(?Tenant $tenant = null): string
+    {
+        $size = self::group($tenant)['receipt_paper_size'];
+
+        return in_array($size, [self::RECEIPT_PAPER_THERMAL_58, self::RECEIPT_PAPER_THERMAL_80], true)
+            ? $size
+            : self::RECEIPT_PAPER_THERMAL_80;
     }
 
     /** تطبيق قائمة سعر العميل سياسة POS صريحة؛ الافتراض يحدّث السلة عند الاختيار. */

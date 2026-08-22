@@ -64,6 +64,7 @@ class SalesConfigTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.enabled_payment_method_ids', [])
             ->assertJsonPath('data.default_payment_method_id', null)
+            ->assertJsonPath('data.receipt_paper_size', 'thermal_80')
             ->assertJsonPath('data.apply_customer_price_list', true)
             ->assertJsonPath('data.allow_unit_price_override', false)
             ->assertJsonPath('data.allow_deferred_payment', true);
@@ -72,6 +73,7 @@ class SalesConfigTest extends TestCase
             'data' => [
                 'enabled_payment_method_ids' => [$cash['id'], $bank['id']],
                 'default_payment_method_id' => $cash['id'],
+                'receipt_paper_size' => 'thermal_58',
                 'apply_customer_price_list' => false,
                 'allow_unit_price_override' => true,
                 'allow_deferred_payment' => false,
@@ -79,6 +81,7 @@ class SalesConfigTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('data.enabled_payment_method_ids.0', $cash['id'])
             ->assertJsonPath('data.default_payment_method_id', $cash['id'])
+            ->assertJsonPath('data.receipt_paper_size', 'thermal_58')
             ->assertJsonPath('data.apply_customer_price_list', false)
             ->assertJsonPath('data.allow_unit_price_override', true)
             ->assertJsonPath('data.allow_deferred_payment', false);
@@ -87,9 +90,20 @@ class SalesConfigTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.enabled_payment_method_ids.1', $bank['id'])
             ->assertJsonPath('data.default_payment_method_id', $cash['id'])
+            ->assertJsonPath('data.receipt_paper_size', 'thermal_58')
             ->assertJsonPath('data.apply_customer_price_list', false)
             ->assertJsonPath('data.allow_unit_price_override', true)
             ->assertJsonPath('data.allow_deferred_payment', false);
+    }
+
+    /** @test */
+    public function pos_rejects_an_unknown_receipt_paper_size(): void
+    {
+        ['token' => $token] = $this->registerTenant('nibras', 'owner@nibras.test');
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['receipt_paper_size' => 'a4'],
+        ])->assertUnprocessable();
     }
 
     /** @test */
