@@ -1,27 +1,16 @@
 'use client';
 
-import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
-import { DocumentView } from '@/modules/documents/components/document-view';
-import { buildPaymentDocumentModel, type SourcePayment } from '@/modules/documents/builder/from-payment';
+import type { ThemeId } from '@/modules/documents/types';
+import { buildVoucherDocument } from '@/modules/document-families/voucher/from-payment';
+import { VoucherDocumentView } from '@/modules/document-families/voucher/voucher-document-view';
+import type { SourcePayment } from '@/modules/documents/builder/from-payment';
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
 
 export type PaymentDoc = SourcePayment;
 export type PaymentCompany = SourceCompany;
 export type PaymentPartner = SourceCustomer;
 
-/** تخطيط ثابت للسند: لا بنود/إجماليات — جسم السند بدل جدول البنود. */
-const VOUCHER_LAYOUT: DocSectionLayoutItem[] = [
-  { key: 'header', visible: true },
-  { key: 'parties', visible: true },
-  { key: 'voucher', visible: true },
-  { key: 'amountWords', visible: true },
-  { key: 'notes', visible: true },
-  { key: 'signature', visible: true },
-  { key: 'stamp', visible: true },
-  { key: 'footer', visible: true },
-];
-
-/** مستند سند القبض/الصرف — غلاف رفيع فوق `DocumentView` بتخطيط سند ثابت. */
+/** مستند سند القبض/الصرف — غلاف رفيع فوق عارض عائلة السند. */
 export function PaymentDocument({
   payment,
   company,
@@ -51,8 +40,6 @@ export function PaymentDocument({
   logoHeight?: number | null;
   rootId?: string | null;
 }) {
-  const model = buildPaymentDocumentModel({ payment, company, partner, footerText, logoUrl, logoHeight, bank, stampUrl, signatureUrl });
-  return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={VOUCHER_LAYOUT} rootId={rootId} />
-  );
+  const document = buildVoucherDocument({ payment, company, partner, footerText, logoUrl, logoHeight, bank, stampUrl, signatureUrl });
+  return <VoucherDocumentView document={document} templateId={templateId} themeId={themeId} showLogo={showLogo} rootId={rootId} />;
 }

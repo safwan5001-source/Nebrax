@@ -37,6 +37,27 @@ class PrintTemplateContract
         PrintTemplateAssignment::USAGE_THERMAL,
     ];
 
+    /**
+     * مراجعة الطباعة تنتمي إلى عقد عرض واحد. يسمح بمشاركة أنواع البنود داخل
+     * العائلة، لكنه يمنع القالب الهجين الذي لا يستطيع أي عارض تفسيره بصدق.
+     */
+    private const DOCUMENT_FAMILY_BY_TYPE = [
+        'tax_invoice' => 'line_item',
+        'simplified_tax_invoice' => 'line_item',
+        'quotation' => 'line_item',
+        'proforma_invoice' => 'line_item',
+        'sales_order' => 'line_item',
+        'purchase_order' => 'line_item',
+        'purchase_invoice' => 'line_item',
+        'delivery_note' => 'line_item',
+        'packing_list' => 'line_item',
+        'credit_note' => 'line_item',
+        'debit_note' => 'line_item',
+        'receipt_voucher' => 'voucher',
+        'payment_voucher' => 'voucher',
+        'statement_of_account' => 'account_statement',
+    ];
+
     /** الخصائص التي يستطيع عارض كل كتلة استهلاكها؛ مصدر حراسة API. */
     private const BLOCK_PROPERTIES = [
         'header' => [],
@@ -87,6 +108,14 @@ class PrintTemplateContract
             if (! in_array($type, self::DOCUMENT_TYPES, true)) {
                 throw new RuntimeException("نوع المستند «{$type}» غير مدعوم للقوالب.");
             }
+        }
+
+        $families = array_values(array_unique(array_map(
+            static fn (string $type): string => self::DOCUMENT_FAMILY_BY_TYPE[$type],
+            $normalized,
+        )));
+        if (count($families) !== 1) {
+            throw new RuntimeException('لا يجوز أن تجمع مراجعة طباعة واحدة عائلات مستندات مختلفة.');
         }
 
         sort($normalized);

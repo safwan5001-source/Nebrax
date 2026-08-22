@@ -267,6 +267,17 @@ export function getDocumentTypeDefinition(type: DocumentTypeId): DocumentTypeDef
   return DOCUMENT_TYPE_REGISTRY[type];
 }
 
+/**
+ * مراجعة الطباعة تنتمي إلى عائلة عرض واحدة. يسمح بمشاركة الفاتورة وعرض السعر
+ * مثلاً، لكنه يمنع خلطها بالسند أو بكشف الحساب قبل الوصول إلى حارس API.
+ */
+export function validateDocumentTypeFamily(documentTypes: readonly DocumentTypeId[]): DocumentLayoutValidationResult {
+  const families = [...new Set(documentTypes.map((type) => getDocumentTypeDefinition(type).family))];
+  return families.length <= 1
+    ? { valid: true, errors: [] }
+    : { valid: false, errors: ['mixed_document_families'] };
+}
+
 export function getDefaultDocumentLayout(type: DocumentTypeId): DocSectionLayoutItem[] {
   return getDocumentTypeDefinition(type).defaultLayout.map((item) => ({ ...item }));
 }

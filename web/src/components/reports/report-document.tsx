@@ -1,21 +1,29 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import {
+  buildTabularReportDocument,
+  type SourceTabularReportColumn,
+} from '@/modules/document-families/tabular-report/from-legacy-report';
+import type { TabularReportCell } from '@/modules/document-families/types';
 
 export interface Company {
   name: string;
   vat_number?: string | null;
   cr_number?: string | null;
 }
-export interface ReportColumn {
-  label: string;
-  align?: 'start' | 'end';
+
+export type ReportColumn = SourceTabularReportColumn;
+
+function displayCell(cell: TabularReportCell | undefined): string {
+  if (!cell) return '';
+  if (cell.kind === 'document_link') return cell.label;
+  return String(cell.value);
 }
 
 /**
  * مستند تقرير مالي A4 (RTL) للطباعة / حفظ PDF عبر المتصفح.
- * يُعرض داخل #print-root.print-only — مخفيّ على الشاشة، يظهر عند الطباعة فقط.
- * عام: يستقبل عنوان التقرير، الأعمدة، الصفوف، وصف اختياري لصف الإجمالي.
+ * يبني أولاً عقد تقرير جدولي منظماً؛ لا يحسب مبالغاً أو يعيد جمع صفوف المصدر.
  */
 export function ReportDocument({
   title,
@@ -33,22 +41,32 @@ export function ReportDocument({
   totalRow?: string[] | null;
 }) {
   const t = useTranslations('reportDoc');
+  const document = buildTabularReportDocument({
+    reportKey: 'legacy_tabular_report',
+    title,
+    asOf,
+    company,
+    columns,
+    rows,
+    totalRow,
+    generatedAt: new Date().toISOString(),
+  });
+  const group = document.groups[0];
 
   return (
     <div id="print-root" className="print-only">
       <div className="mx-auto max-w-[210mm] bg-white p-6 text-[12px] leading-relaxed text-black">
-        {/* الرأس: الشركة + عنوان التقرير */}
         <div className="border-b-2 border-black pb-3 text-center">
-          <div className="text-lg font-bold">{company?.name ?? '—'}</div>
-          {company?.vat_number && (
+          <div className="text-lg font-bold">{document.organization.name}</div>
+          {document.organization.vatNumber && (
             <div className="text-[11px]">
-              {t('vat_number')}: <span className="num">{company.vat_number}</span>
+              {t('vat_number')}: <span className="num">{document.organization.vatNumber}</span>
             </div>
           )}
-          <div className="mt-2 text-base font-bold">{title}</div>
-          {asOf && (
+          <div className="mt-2 text-base font-bold">{document.title}</div>
+          {document.scope.asOf && (
             <div className="text-[11px] text-gray-600">
-              {t('as_of')}: <span className="num">{asOf}</span>
+              {t('as_of')}: <span className="num">{document.scope.asOf}</span>
             </div>
           )}
         </div>
@@ -56,37 +74,37 @@ export function ReportDocument({
         <table className="mt-4 w-full border-collapse text-[11px]">
           <thead>
             <tr className="bg-gray-100">
-              {columns.map((c, i) => (
+              {document.columns.map((column) => (
                 <th
-                  key={i}
-                  className={`border border-gray-400 p-1.5 ${c.align === 'end' ? 'text-end' : 'text-start'}`}
+                  key={column.id}
+                  className={`border border-gray-400 p-1.5 ${column.alignment === 'end' ? 'text-end' : 'text-start'}`}
                 >
-                  {c.label}
+                  {column.labelKey}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, ri) => (
-              <tr key={ri}>
-                {r.map((cell, ci) => (
+            {group.rows.map((row) => (
+              <tr key={row.id}>
+                {document.columns.map((column) => (
                   <td
-                    key={ci}
-                    className={`border border-gray-400 p-1.5 ${columns[ci]?.align === 'end' ? 'num text-end' : ''}`}
+                    key={column.id}
+                    className={`border border-gray-400 p-1.5 ${column.alignment === 'end' ? 'num text-end' : ''}`}
                   >
-                    {cell}
+                    {displayCell(row.cells[column.id])}
                   </td>
                 ))}
               </tr>
             ))}
-            {totalRow && (
+            {document.grandTotal && (
               <tr className="bg-gray-50 font-bold">
-                {totalRow.map((cell, ci) => (
+                {document.columns.map((column) => (
                   <td
-                    key={ci}
-                    className={`border border-gray-400 p-1.5 ${columns[ci]?.align === 'end' ? 'num text-end' : ''}`}
+                    key={column.id}
+                    className={`border border-gray-400 p-1.5 ${column.alignment === 'end' ? 'num text-end' : ''}`}
                   >
-                    {cell}
+                    {displayCell(document.grandTotal?.[column.id])}
                   </td>
                 ))}
               </tr>

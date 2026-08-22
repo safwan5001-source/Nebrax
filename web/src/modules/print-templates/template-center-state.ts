@@ -1,5 +1,6 @@
 import {
   validateDocumentLayout,
+  validateDocumentTypeFamily,
   type DocumentLayoutValidationResult,
 } from '@/modules/documents/registry/document-types';
 import type { DocSectionLayoutItem, DocumentTypeId } from '@/modules/documents/types';
@@ -47,6 +48,9 @@ export function validateLayoutForDocumentTypes(
   documentTypes: readonly DocumentTypeId[],
   layout: readonly DocSectionLayoutItem[],
 ): DocumentLayoutValidationResult {
+  const familyValidation = validateDocumentTypeFamily(documentTypes);
+  if (!familyValidation.valid) return familyValidation;
+
   const errors = [...new Set(documentTypes.flatMap((type) => validateDocumentLayout(type, layout).errors))];
   return { valid: errors.length === 0, errors };
 }

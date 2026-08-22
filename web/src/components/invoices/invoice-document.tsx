@@ -1,12 +1,12 @@
 'use client';
 
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
-import { DocumentView } from '@/modules/documents/components/document-view';
-import {
-  buildInvoiceDocumentModel,
-  type SourceInvoice,
-  type SourceCompany,
-  type SourceCustomer,
+import { buildInvoiceLineItemDocument } from '@/modules/document-families/line-item/from-invoice';
+import { LineItemDocumentView } from '@/modules/document-families/line-item/line-item-document-view';
+import type {
+  SourceInvoice,
+  SourceCompany,
+  SourceCustomer,
 } from '@/modules/documents/builder/from-invoice';
 
 // توافق رجعي: تبقى الأنواع مُصدَّرة بأسمائها لمن يستوردها (شاشة تفاصيل الفاتورة).
@@ -15,8 +15,7 @@ export type Company = SourceCompany;
 export type Customer = SourceCustomer;
 
 /**
- * مستند الفاتورة الضريبية — غلاف رفيع فوق العارض العامّ `DocumentView`:
- * يبني `DocumentModel` من الفاتورة ويعرض القالب المسجَّل. مصدر واحد للشاشة/الطباعة/الـ PDF.
+ * مستند الفاتورة الضريبية — غلاف رفيع فوق عارض عائلة البنود مع الحفاظ على القالب المسجَّل.
  */
 export function InvoiceDocument({
   invoice,
@@ -53,8 +52,6 @@ export function InvoiceDocument({
   layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
 }) {
-  const model = buildInvoiceDocumentModel({ invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl });
-  return (
-    <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />
-  );
+  const document = buildInvoiceLineItemDocument({ invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl });
+  return <LineItemDocumentView document={document} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />;
 }

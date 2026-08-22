@@ -92,7 +92,8 @@ export interface VoucherDocument extends OperationalDocumentPresentation {
  */
 export interface AccountStatementEntry {
   date: string;
-  journalEntryId: string;
+  /** قد لا توفر واجهات كشف الحساب التاريخية معرّف القيد بعد؛ لا نخترع قيمة. */
+  journalEntryId: string | null;
   journalNumber: string;
   sourceType: string | null;
   sourceId: string | null;
@@ -106,7 +107,7 @@ export interface AccountStatementEntry {
 export interface AccountStatementDocument {
   family: 'account_statement';
   organization: DocumentSeller;
-  subject: DocumentParty;
+  subject: DocumentParty & { id: string; type: string };
   scope: {
     from: string | null;
     to: string | null;
@@ -114,8 +115,9 @@ export interface AccountStatementDocument {
     currency: CurrencyCode;
   };
   openingBalance: string;
-  periodDebit: string;
-  periodCredit: string;
+  /** لا تشتق طبقة العرض مجموع الفترة إن لم يعده محرك التقرير. */
+  periodDebit: string | null;
+  periodCredit: string | null;
   closingBalance: string;
   entries: readonly AccountStatementEntry[];
   generatedAt: string;
@@ -152,7 +154,8 @@ export interface TabularReportGroup {
 export interface TabularReportDocument {
   family: 'tabular_report';
   reportKey: string;
-  titleKey: string;
+  /** عنوان منشأ في طبقة التقرير أو مترجم قبل بناء عقد التصدير. */
+  title: string;
   organization: DocumentSeller;
   scope: Readonly<Record<string, string | readonly string[] | null>>;
   columns: readonly TabularReportColumn[];

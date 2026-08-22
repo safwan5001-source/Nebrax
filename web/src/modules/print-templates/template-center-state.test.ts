@@ -33,7 +33,10 @@ describe('template center state', () => {
   it('requires a shared layout to stay valid for every type attached to the template', () => {
     const invoiceLayout = getDefaultDocumentLayout('tax_invoice');
 
-    expect(validateLayoutForDocumentTypes(['tax_invoice', 'quotation'], invoiceLayout).valid).toBe(true);
-    expect(validateLayoutForDocumentTypes(['tax_invoice', 'receipt_voucher'], invoiceLayout).valid).toBe(false);
+    expect(validateLayoutForDocumentTypes(['tax_invoice', 'quotation'], invoiceLayout)).toEqual({ valid: true, errors: [] });
+    expect(validateLayoutForDocumentTypes(['tax_invoice', 'receipt_voucher'], invoiceLayout)).toEqual({
+      valid: false,
+      errors: ['mixed_document_families'],
+    });
   });
 });

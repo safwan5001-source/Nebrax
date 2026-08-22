@@ -47,6 +47,25 @@ class PrintTemplateTest extends TestCase
     }
 
     /** @test */
+    public function template_revision_cannot_mix_document_families(): void
+    {
+        ['token' => $token] = $this->registerTenant('template-families', 'owner@template-families.test');
+
+        $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'قالب مختلط',
+            'document_types' => ['tax_invoice', 'receipt_voucher'],
+            'definition' => $this->definition(),
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'لا يجوز أن تجمع مراجعة طباعة واحدة عائلات مستندات مختلفة.');
+
+        $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'قالب بنود مشترك',
+            'document_types' => ['tax_invoice', 'quotation'],
+            'definition' => $this->definition(),
+        ])->assertCreated();
+    }
+
+    /** @test */
     public function staff_cannot_create_or_publish_print_templates(): void
     {
         ['tenant_id' => $tenantId] = $this->registerTenant('templates', 'owner@templates.test');
