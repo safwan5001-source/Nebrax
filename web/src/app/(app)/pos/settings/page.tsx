@@ -21,9 +21,17 @@ interface PosConfig {
   enabled_payment_method_ids: string[];
   default_payment_method_id: string | null;
   allow_deferred_payment: boolean;
+  product_category_visibility_mode: 'all' | 'only' | 'except';
+  product_category_ids: string[];
   cash_refund_policy: 'original_cash_only' | 'allow_any_pos_sale';
   exchange_surplus_policy: 'customer_credit_only' | 'allow_cash_refund';
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
+}
+interface ProductCategory {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  is_active: boolean;
 }
 interface PaymentMethod {
   id: string;
@@ -42,6 +50,8 @@ const DEFAULTS: PosConfig = {
   enabled_payment_method_ids: [],
   default_payment_method_id: null,
   allow_deferred_payment: true,
+  product_category_visibility_mode: 'all',
+  product_category_ids: [],
   cash_refund_policy: 'original_cash_only',
   exchange_surplus_policy: 'customer_credit_only',
   held_sale_close_policy: 'discard_on_session_close',
@@ -56,6 +66,7 @@ export default function PosSettingsPage() {
   const { success } = useToast();
   const [config, setConfig] = useState<PosConfig | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -64,12 +75,14 @@ export default function PosSettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [settings, paymentMethods] = await Promise.all([
+      const [settings, paymentMethods, productCategories] = await Promise.all([
         api<{ data: Partial<PosConfig> }>('/sales-config/pos'),
         api<{ data: PaymentMethod[] }>('/payment-methods'),
+        api<{ data: ProductCategory[] }>('/product-categories'),
       ]);
       setConfig({ ...DEFAULTS, ...settings.data });
       setMethods(paymentMethods.data.filter((method) => method.is_active));
+      setCategories(productCategories.data.filter((category) => category.is_active));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('load_failed'));
     } finally {
@@ -84,8 +97,48 @@ export default function PosSettingsPage() {
     return methods.filter((method) => config.enabled_payment_method_ids.includes(method.id));
   }, [config, methods]);
 
+  const categoryRows = useMemo(() => {
+    const byParent = new Map<string | null, ProductCategory[]>();
+    for (const category of categories) {
+      const parent = category.parent_id && categories.some((candidate) => candidate.id === category.parent_id)
+        ? category.parent_id
+        : null;
+      byParent.set(parent, [...(byParent.get(parent) ?? []), category]);
+    }
+    const rows: Array<ProductCategory & { depth: number }> = [];
+    const walk = (parentId: string | null, depth: number) => {
+      for (const category of byParent.get(parentId) ?? []) {
+        rows.push({ ...category, depth });
+        walk(category.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return rows;
+  }, [categories]);
+
   function patch<K extends keyof PosConfig>(key: K, value: PosConfig[K]) {
     setConfig((current) => current ? { ...current, [key]: value } : current);
+  }
+
+  function toggleCategory(categoryId: string) {
+    setConfig((current) => {
+      if (!current) return current;
+      const selected = current.product_category_ids;
+      return {
+        ...current,
+        product_category_ids: selected.includes(categoryId)
+          ? selected.filter((id) => id !== categoryId)
+          : [...selected, categoryId],
+      };
+    });
+  }
+
+  function setCategoryVisibility(mode: PosConfig['product_category_visibility_mode']) {
+    setConfig((current) => current ? {
+      ...current,
+      product_category_visibility_mode: mode,
+      product_category_ids: mode === 'all' ? [] : current.product_category_ids,
+    } : current);
   }
 
   function togglePaymentMethod(methodId: string) {
@@ -210,6 +263,58 @@ export default function PosSettingsPage() {
                 </Select>
                 <p className="text-xs leading-relaxed text-muted">{t('default_payment_method_hint')}</p>
               </div>
+
+              <section className="space-y-3 border-t border-border pt-5">
+                <div>
+                  <Label htmlFor="product_category_visibility_mode">{t('product_category_visibility')}</Label>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">{t('product_category_visibility_hint')}</p>
+                </div>
+                <Select
+                  id="product_category_visibility_mode"
+                  value={config.product_category_visibility_mode}
+                  onChange={(event) => setCategoryVisibility(event.target.value as PosConfig['product_category_visibility_mode'])}
+                >
+                  <option value="all">{t('product_category_visibility_all')}</option>
+                  <option value="only">{t('product_category_visibility_only')}</option>
+                  <option value="except">{t('product_category_visibility_except')}</option>
+                </Select>
+                {config.product_category_visibility_mode !== 'all' && (
+                  <div className="space-y-2" aria-describedby="product-category-selection-hint">
+                    <Label>{t('product_category_selection')}</Label>
+                    <p id="product-category-selection-hint" className="text-xs leading-relaxed text-muted">
+                      {config.product_category_visibility_mode === 'only'
+                        ? t('product_category_selection_only_hint')
+                        : t('product_category_selection_except_hint')}
+                    </p>
+                    {categoryRows.length === 0 ? (
+                      <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text">{t('product_category_selection_empty')}</p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {categoryRows.map((category) => {
+                          const checked = config.product_category_ids.includes(category.id);
+                          return (
+                            <label key={category.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text hover:border-primary">
+                              <input
+                                className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleCategory(category.id)}
+                              />
+                              <span className="truncate font-medium" style={{ paddingInlineStart: `${category.depth * 12}px` }}>{category.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {config.product_category_visibility_mode === 'only' && config.product_category_ids.length === 0 && (
+                  <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-text">{t('product_category_visibility_only_empty')}</p>
+                )}
+                {config.product_category_visibility_mode === 'except' && config.product_category_ids.length === 0 && (
+                  <p className="rounded-lg bg-background px-3 py-2 text-xs text-muted">{t('product_category_visibility_except_empty')}</p>
+                )}
+              </section>
 
               <section className="space-y-2 border-t border-border pt-5">
                 <label className="flex items-center gap-2 text-sm font-medium text-text">

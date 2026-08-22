@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Tenant;
 use App\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * إعدادات نقطة البيع المخزنة في `tenants.settings['sales_config']['pos']`.
@@ -19,6 +20,9 @@ final class PosSettings
     public const EXCHANGE_SURPLUS_ALLOW_CASH_REFUND = 'allow_cash_refund';
     public const HELD_SALE_DISCARD_ON_SESSION_CLOSE = 'discard_on_session_close';
     public const HELD_SALE_KEEP_FOR_NEXT_SESSION = 'keep_for_next_session';
+    public const PRODUCT_CATEGORY_VISIBILITY_ALL = 'all';
+    public const PRODUCT_CATEGORY_VISIBILITY_ONLY = 'only';
+    public const PRODUCT_CATEGORY_VISIBILITY_EXCEPT = 'except';
 
     private const DEFAULTS = [
         'default_customer'   => 'عميل نقدي (POS)',
@@ -32,6 +36,10 @@ final class PosSettings
         'default_payment_method_id' => null,
         // الافتراض يحفظ سلوك POS السابق الذي كان يسمح ببيع جزئي/آجل.
         'allow_deferred_payment' => true,
+        // الافتراض المتوافق: لا تتغير المنتجات الظاهرة للمستأجر القائم. يختار
+        // المالك لاحقاً «فقط» أو «الكل ما عدا» لتقييد تصنيفات الكاشير.
+        'product_category_visibility_mode' => self::PRODUCT_CATEGORY_VISIBILITY_ALL,
+        'product_category_ids' => [],
         // الافتراض الحامي: لا يخرج نقد من الدرج أكثر من النقد الذي دخل منه
         // بسبب فاتورة المصدر نفسها، ما لم يفعّل مالك الشركة الخيار الصريح الآخر.
         'cash_refund_policy' => self::CASH_REFUND_ORIGINAL_CASH_ONLY,
@@ -83,6 +91,68 @@ final class PosSettings
     public static function allowsDeferredPayment(?Tenant $tenant = null): bool
     {
         return self::group($tenant)['allow_deferred_payment'] !== false;
+    }
+
+    /** وضع إتاحة التصنيفات الصالح؛ القيمة غير المعروفة تحافظ على الكتالوج الكامل. */
+    public static function productCategoryVisibilityMode(?Tenant $tenant = null): string
+    {
+        $mode = self::group($tenant)['product_category_visibility_mode'];
+
+        return in_array($mode, [
+            self::PRODUCT_CATEGORY_VISIBILITY_ALL,
+            self::PRODUCT_CATEGORY_VISIBILITY_ONLY,
+            self::PRODUCT_CATEGORY_VISIBILITY_EXCEPT,
+        ], true) ? $mode : self::PRODUCT_CATEGORY_VISIBILITY_ALL;
+    }
+
+    /** قائمة تصنيفات POS الصريحة؛ لا تفسر قائمة فارغة إلا مع وضعها المرافق. */
+    public static function productCategoryIds(?Tenant $tenant = null): array
+    {
+        $ids = self::group($tenant)['product_category_ids'];
+        if (! is_array($ids)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter($ids, fn (mixed $id) => is_string($id) && $id !== '')));
+    }
+
+    /** المنتج بلا تصنيف لا تقيّده السياسة؛ المقصود هو التصنيفات المُدارة حصراً. */
+    public static function allowsProductCategory(?string $categoryId, ?Tenant $tenant = null): bool
+    {
+        if ($categoryId === null) {
+            return true;
+        }
+
+        $ids = self::productCategoryIds($tenant);
+
+        return match (self::productCategoryVisibilityMode($tenant)) {
+            self::PRODUCT_CATEGORY_VISIBILITY_ONLY => in_array($categoryId, $ids, true),
+            self::PRODUCT_CATEGORY_VISIBILITY_EXCEPT => ! in_array($categoryId, $ids, true),
+            default => true,
+        };
+    }
+
+    /** يطبق الحارس نفسه عند تحميل الكتالوج، فلا تكون الفلترة واجهية قابلة للتجاوز. */
+    public static function constrainProductsByCategory(Builder $query, ?Tenant $tenant = null): Builder
+    {
+        $mode = self::productCategoryVisibilityMode($tenant);
+        $ids = self::productCategoryIds($tenant);
+
+        if ($mode === self::PRODUCT_CATEGORY_VISIBILITY_ALL
+            || ($mode === self::PRODUCT_CATEGORY_VISIBILITY_EXCEPT && $ids === [])) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $categories) use ($mode, $ids) {
+            // المنتج التاريخي غير المصنف لا يدخل في نطاق الإقصاء أو الاختيار.
+            $categories->whereNull('category_id');
+            if ($mode === self::PRODUCT_CATEGORY_VISIBILITY_ONLY && $ids !== []) {
+                $categories->orWhereIn('category_id', $ids);
+            }
+            if ($mode === self::PRODUCT_CATEGORY_VISIBILITY_EXCEPT && $ids !== []) {
+                $categories->orWhereNotIn('category_id', $ids);
+            }
+        });
     }
 
     /** سياسة رد النقد الصالحة فقط؛ القيمة المخزنة غير المعروفة تعود للافتراض الحامي. */

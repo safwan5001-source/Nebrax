@@ -137,7 +137,7 @@ export default function PosPage() {
   const customerName = selectedCustomer?.name ?? walkinName;
 
   useEffect(() => {
-    api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
+    api<{ data: Product[] }>('/pos/products').then((r) => setProducts(r.data)).catch(() => {});
     api<{ data: Warehouse[] }>('/warehouses').then((r) => {
       const active = r.data.filter((warehouse) => warehouse.is_active);
       setWarehouses(active);

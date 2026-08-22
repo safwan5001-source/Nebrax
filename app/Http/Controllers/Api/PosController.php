@@ -11,6 +11,7 @@ use App\Http\Requests\StorePosReturnRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\PosExchangeResource;
 use App\Http\Resources\PosHeldSaleResource;
+use App\Http\Resources\ProductResource;
 use App\Http\Resources\ReturnResource;
 use App\Models\Invoice;
 use App\Models\Partner;
@@ -38,6 +39,21 @@ class PosController extends ApiController
         protected PosHeldSaleService $heldSales,
         protected PosSessionService $sessions,
     ) {}
+
+    /**
+     * كتالوج الكاشير التشغيلي: منتجات نشطة ضمن سياسة تصنيفات POS فقط. لا تعتمد
+     * الواجهة على فلترة محلية لأن العقد نفسه يحرس الإتمام داخل PosService.
+     */
+    public function products(): JsonResponse
+    {
+        $products = PosSettings::constrainProductsByCategory(
+            Product::query()->where('is_active', true)
+        )->with(['productCategory', 'productBrand', 'unitTemplate.units'])
+            ->latest()
+            ->get();
+
+        return ProductResource::collection($products)->response();
+    }
 
     /**
      * إتمام بيع نقطة البيع بوسائل متعدّدة (ذرّياً): فاتورة آجلة مرحّلة + سندات قبض

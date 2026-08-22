@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\PaymentMethod;
+use App\Models\ProductCategory;
 use App\Models\Tenant;
 use App\Support\Settings;
 use App\Support\PosSettings;
@@ -38,7 +39,7 @@ class SalesConfigController extends ApiController
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'sections' => [], 'accent_color' => '#2563EB', 'footer_text' => '', 'terms_text' => '', 'bank_text' => '', 'stamp' => '', 'signature' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
-        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'default_payment_method_id' => null, 'allow_deferred_payment' => true, 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE],
+        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'default_payment_method_id' => null, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE],
     ];
 
     public function show(string $section): JsonResponse
@@ -77,11 +78,19 @@ class SalesConfigController extends ApiController
                 'data.enabled_payment_method_ids.*' => ['uuid', 'distinct'],
                 'data.default_payment_method_id' => ['nullable', 'uuid'],
                 'data.allow_deferred_payment' => ['nullable', 'boolean'],
+                'data.product_category_visibility_mode' => ['nullable', Rule::in([
+                    PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL,
+                    PosSettings::PRODUCT_CATEGORY_VISIBILITY_ONLY,
+                    PosSettings::PRODUCT_CATEGORY_VISIBILITY_EXCEPT,
+                ])],
+                'data.product_category_ids' => ['nullable', 'array', 'max:100'],
+                'data.product_category_ids.*' => ['uuid', 'distinct'],
             ]);
             // نحفظ الكائن كاملاً لا قيمة السياسة وحدها، كي تبقى الاستجابة وشاشة
             // POS والقراءة الخادمية فوق الافتراضات نفسها للمستأجر القديم والجديد.
             $data = array_merge(PosSettings::group($tenant), $data);
             $this->assertPosPaymentMethods($data);
+            $this->assertPosProductCategories($data);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -132,6 +141,23 @@ class SalesConfigController extends ApiController
 
         if ($default !== null && $enabled !== [] && ! in_array($default, $enabled, true)) {
             abort(422, 'وسيلة الدفع الافتراضية يجب أن تكون ضمن الوسائل المفعلة في POS.');
+        }
+    }
+
+    /** لا تُحفظ قائمة POS إلا من تصنيفات نشطة يراها سياق الفرع/المستأجر الحالي. */
+    private function assertPosProductCategories(array $data): void
+    {
+        $ids = array_values(array_unique($data['product_category_ids'] ?? []));
+        if ($ids === []) {
+            return;
+        }
+
+        $activeIds = ProductCategory::whereIn('id', $ids)
+            ->where('is_active', true)
+            ->pluck('id')
+            ->all();
+        if (count($activeIds) !== count($ids)) {
+            abort(422, 'تتضمن إعدادات POS تصنيف منتج غير موجود أو معطل أو خارج النطاق.');
         }
     }
 

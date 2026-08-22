@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\Invoice;
 use App\Models\PaymentMethod;
+use App\Models\Product;
 use App\Support\PosSettings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -46,6 +47,10 @@ class PosService
                 $data['created_by'] ?? null,
                 $data['actor'] ?? null,
             );
+
+            // سياسة الكتالوج حارس خادمي قبل أي فاتورة أو حركة مخزون؛ لا يكفي
+            // إخفاء التصنيف في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
+            $this->assertProductsAllowedForPos($data['items']);
 
             // تضمن تهيئة المؤسسة الجديدة كتالوجاً تشغيلياً واحداً فقط، ولا تعيد
             // أي وسيلة حذفها مالكها بعد وجود الكتالوج.
@@ -115,6 +120,24 @@ class PosService
 
             return $invoice->fresh(['lines']);
         });
+    }
+
+    /** يرفض المنتج المصنّف خارج سياسة POS، مع إبقاء السطر الوصفي بلا منتج مشروعاً. */
+    private function assertProductsAllowedForPos(array $items): void
+    {
+        $ids = array_values(array_unique(array_filter(array_column($items, 'product_id'))));
+        if ($ids === []) {
+            return;
+        }
+
+        $products = Product::whereIn('id', $ids)->get(['id', 'category_id']);
+        if ($products->count() !== count($ids)) {
+            throw new RuntimeException('تتضمن عملية POS منتجاً غير موجود أو خارج النطاق.');
+        }
+
+        if ($products->contains(fn (Product $product) => ! PosSettings::allowsProductCategory($product->category_id))) {
+            throw new RuntimeException('يتضمن البيع منتجاً من تصنيف غير مسموح به في إعدادات نقطة البيع.');
+        }
     }
 
     /** يحوّل عقد الواجهة إلى مبالغ هللية موجبة مع منع تكرار الوسيلة في السندات. */
