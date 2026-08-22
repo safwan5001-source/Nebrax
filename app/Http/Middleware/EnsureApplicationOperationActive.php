@@ -3,12 +3,13 @@
 namespace App\Http\Middleware;
 
 use App\Models\CreditNote;
-use App\Models\Invoice;
-use App\Models\Purchase;
 use App\Models\ReturnDocument;
+use App\Services\Accounting\CreditNoteOwnershipResolver;
 use App\Services\TenantApplicationService;
 use Closure;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -29,7 +30,10 @@ class EnsureApplicationOperationActive
     /** @var list<string> */
     private const SUPPORTED_OPERATIONS = ['return', 'credit-note'];
 
-    public function __construct(private TenantApplicationService $applications) {}
+    public function __construct(
+        private TenantApplicationService $applications,
+        private CreditNoteOwnershipResolver $creditNoteOwnership,
+    ) {}
 
     public function handle(Request $request, Closure $next, string $operation): Response
     {
@@ -77,24 +81,8 @@ class EnsureApplicationOperationActive
 
     private function typeFor(Request $request, string $operation): ?string
     {
-        // إنشاء الإشعار يملك مصدرين محتملين؛ مصدره المحفوظ هو الحقيقة قبل `type`
-        // المرسل، فلا يختار العميل حارس مبيعات أضعف فوق شراء. الطلب الذي يحمل
-        // المصدرين يترك التحقق الدلالي للـ Request/Service ولا يُشتق منه نوع.
         if ($operation === 'credit-note') {
-            $purchaseId = $request->input('original_purchase_id');
-            $invoiceId = $request->input('original_invoice_id');
-
-            if ($purchaseId !== null && $invoiceId === null) {
-                Purchase::findOrFail($purchaseId);
-
-                return 'purchase';
-            }
-
-            if ($invoiceId !== null && $purchaseId === null) {
-                Invoice::findOrFail($invoiceId);
-
-                return 'sales';
-            }
+            return $this->creditNoteTypeFor($request);
         }
 
         // مسارات مصادر المرتجعات تملك `{type}` صريحاً؛ وهو يسبق `id` الذي يشير
@@ -117,6 +105,41 @@ class EnsureApplicationOperationActive
         $inputType = $request->input('type');
 
         return in_array($inputType, ['sales', 'purchase'], true) ? $inputType : null;
+    }
+
+    /**
+     * يفحص إنشاء الإشعار ومثيله المحفوظ بالمحلل نفسه. صف متناقض لا يتحول
+     * إلى ملكية مبيعات أو مشتريات بالتخمين، ولا يكشف رسالة داخلية للعميل.
+     */
+    private function creditNoteTypeFor(Request $request): ?string
+    {
+        try {
+            $id = $request->route('id');
+            if (is_string($id) && $id !== '') {
+                return $this->creditNoteOwnership->forNote(CreditNote::findOrFail($id));
+            }
+
+            $data = [
+                'original_purchase_id' => $request->input('original_purchase_id'),
+                'original_invoice_id' => $request->input('original_invoice_id'),
+                'type' => $request->input('type'),
+            ];
+
+            // قائمة مشتركة بلا مرشح تبقى قابلة للقراءة وتستخدم فلتر الإخفاء
+            // أدناه؛ وإنشاء مستند مستقل بلا نوع يصل إلى FormRequest ليعيد خطأ
+            // التحقق المرتبط بالحقل نفسه، لا افتراضاً ضمنياً.
+            if ($data['original_purchase_id'] === null
+                && $data['original_invoice_id'] === null
+                && $data['type'] === null) {
+                return null;
+            }
+
+            return $this->creditNoteOwnership->forData($data);
+        } catch (ModelNotFoundException $exception) {
+            throw $exception;
+        } catch (RuntimeException) {
+            abort(422, 'مصدر الإشعار غير صالح.');
+        }
     }
 
     public static function hiddenPurchaseAttribute(string $operation): string

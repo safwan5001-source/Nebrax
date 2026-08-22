@@ -6,8 +6,6 @@ use App\Models\Account;
 use App\Models\CreditNote;
 use App\Models\CreditNoteLine;
 use App\Models\Partner;
-use App\Models\Invoice;
-use App\Models\Purchase;
 use App\Services\PrintTemplates\PrintTemplateService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -39,7 +37,8 @@ class CreditNoteService
 
     public function __construct(
         protected LedgerService $ledger,
-        protected PrintTemplateService $printTemplates
+        protected PrintTemplateService $printTemplates,
+        protected CreditNoteOwnershipResolver $ownership,
     ) {}
 
     /**
@@ -54,7 +53,7 @@ class CreditNoteService
 
         return DB::transaction(function () use ($data, $items) {
             $date = $data['note_date'] ?? now()->toDateString();
-            $type = $this->effectiveType($data);
+            $type = $this->ownership->forData($data);
 
             $note = CreditNote::create([
                 'number'              => $data['number'] ?? $this->nextNumber($date, $type),
@@ -118,18 +117,23 @@ class CreditNoteService
             throw new RuntimeException('لا يمكن ترحيل إشعار غير مسوّد (draft).');
         }
 
-        return DB::transaction(function () use ($note) {
+        // هذه نقطة ثقة مستقلة عن الإنشاء: صف محفوظ متناقض لا يُصلح بصمت
+        // ولا يصل إلى القيد أو القالب أو تغيير الحالة.
+        $type = $this->ownership->forNote($note);
+
+        return DB::transaction(function () use ($note, $type) {
             // إعادة احتساب الإجماليات من السطور (مصدر الحقيقة) قبل توليد القيد.
             $note->loadMissing('lines');
             $subtotal  = (int) $note->lines->sum('line_subtotal');
             $taxAmount = (int) $note->lines->sum('line_tax');
             $total     = $subtotal + $taxAmount;
 
-            $lines = $note->isPurchase()
+            $isPurchase = $type === CreditNoteOwnershipResolver::PURCHASE;
+            $lines = $isPurchase
                 ? $this->purchaseLines($note, $subtotal, $taxAmount, $total)
                 : $this->salesLines($note, $subtotal, $taxAmount, $total);
 
-            $label = $note->isPurchase() ? 'إشعار مدين' : 'إشعار دائن';
+            $label = $isPurchase ? 'إشعار مدين' : 'إشعار دائن';
 
             $entry = $this->ledger->post($lines, [
                 'entry_date'  => $note->note_date->toDateString(),
@@ -141,7 +145,7 @@ class CreditNoteService
 
             // يُختار القالب بحسب الجهة داخل معاملة الترحيل ثم يُثبت على
             // المستند؛ لا يعدّل نشر مراجعة أحدث لاحقاً هيئة إشعار صدر بالفعل.
-            $documentType = $note->isPurchase() ? 'debit_note' : 'credit_note';
+            $documentType = $isPurchase ? 'debit_note' : 'credit_note';
             $printAssignment = $this->printTemplates->resolve($documentType, 'print', $note->branch_id);
             $pdfAssignment = $this->printTemplates->resolve($documentType, 'pdf', $note->branch_id);
             $thermalAssignment = $this->printTemplates->resolve($documentType, 'thermal', $note->branch_id);
@@ -159,49 +163,6 @@ class CreditNoteService
 
             return $note->fresh('lines');
         });
-    }
-
-    /**
-     * يحدد مصدر المستند نوع الإشعار حين يوجد، قبل الترقيم والحفظ والترحيل.
-     * `findOrFail` يمر عبر TenantScope الطبيعي؛ مصدر مستأجر آخر يبقى 404 ولا
-     * يُكشف للطالب. الإشعار المستقل مشروع، لكنه لا يملك نوعاً ضمنياً.
-     */
-    private function effectiveType(array $data): string
-    {
-        $purchaseId = $data['original_purchase_id'] ?? null;
-        $invoiceId = $data['original_invoice_id'] ?? null;
-        $requestedType = $data['type'] ?? null;
-
-        if ($purchaseId !== null && $invoiceId !== null) {
-            throw new RuntimeException('لا يجوز ربط الإشعار بفاتورة ومشتريات معاً.');
-        }
-
-        if ($purchaseId !== null) {
-            Purchase::findOrFail($purchaseId);
-            $this->assertRequestedType($requestedType, 'purchase');
-
-            return 'purchase';
-        }
-
-        if ($invoiceId !== null) {
-            Invoice::findOrFail($invoiceId);
-            $this->assertRequestedType($requestedType, 'sales');
-
-            return 'sales';
-        }
-
-        if (! in_array($requestedType, ['sales', 'purchase'], true)) {
-            throw new RuntimeException('نوع الإشعار المستقل مطلوب.');
-        }
-
-        return $requestedType;
-    }
-
-    private function assertRequestedType(?string $requestedType, string $sourceType): void
-    {
-        if ($requestedType !== null && $requestedType !== $sourceType) {
-            throw new RuntimeException('نوع الإشعار لا يطابق المستند المصدر.');
-        }
     }
 
     /** حساب الضريبة كعدد صحيح (تقريب نصفي لأعلى) — بلا float. */
