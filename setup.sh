@@ -32,7 +32,7 @@ echo "▶ 4/6  دمج ملفات النواة وطبقة الـ API..."
 cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
 mkdir -p app/Models/Concerns app/Services app/Services/Accounting app/Services/Reporting app/Services/PrintTemplates app/Support \
-         app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
+         app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
          app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature routes
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/"*.php            app/Services/ 2>/dev/null || true
@@ -48,6 +48,7 @@ cp -r "$CORE_DIR/app/Http/Requests/"*.php        app/Http/Requests/
 cp -r "$CORE_DIR/app/Http/Resources/"*.php       app/Http/Resources/
 cp -r "$CORE_DIR/app/Console/Commands/"*.php      app/Console/Commands/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Providers/"*.php            app/Providers/
+cp -r "$CORE_DIR/config/"*.php                   config/
 cp -r "$CORE_DIR/database/migrations/"*.php      database/migrations/
 cp -r "$CORE_DIR/routes/api.php"                 routes/api.php
 cp -r "$CORE_DIR/routes/console.php"             routes/console.php

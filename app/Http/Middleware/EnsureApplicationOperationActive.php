@@ -5,7 +5,11 @@ namespace App\Http\Middleware;
 use App\Models\CreditNote;
 use App\Models\ReturnDocument;
 use App\Services\Accounting\CreditNoteOwnershipResolver;
+use App\Services\ApplicationOperationClassifier;
+use App\Services\EntitlementShadowEvaluator;
 use App\Services\TenantApplicationService;
+use App\Support\ApplicationAccessReason;
+use App\Support\ApplicationAccessResult;
 use Closure;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -33,6 +37,8 @@ class EnsureApplicationOperationActive
     public function __construct(
         private TenantApplicationService $applications,
         private CreditNoteOwnershipResolver $creditNoteOwnership,
+        private ApplicationOperationClassifier $operations,
+        private EntitlementShadowEvaluator $shadow,
     ) {}
 
     public function handle(Request $request, Closure $next, string $operation): Response
@@ -58,6 +64,12 @@ class EnsureApplicationOperationActive
     private function assertActive(Request $request, string $applicationKey): void
     {
         $status = $this->applications->statusFor($applicationKey);
+        $legacy = match (true) {
+            $status === 'enabled' => ApplicationAccessResult::allowed(),
+            $status === 'suspended' && $request->isMethodSafe() => ApplicationAccessResult::readOnly(ApplicationAccessReason::APPLICATION_SUSPENDED_READ_ONLY),
+            default => ApplicationAccessResult::denied(ApplicationAccessReason::APPLICATION_DISABLED),
+        };
+        $this->shadow->observe($request, $applicationKey, $this->operations->classify($request), $legacy);
 
         if ($status === 'enabled') {
             return;
