@@ -17,6 +17,8 @@ final class PosSettings
     public const CASH_REFUND_ALLOW_ANY_POS_SALE = 'allow_any_pos_sale';
     public const EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY = 'customer_credit_only';
     public const EXCHANGE_SURPLUS_ALLOW_CASH_REFUND = 'allow_cash_refund';
+    public const HELD_SALE_DISCARD_ON_SESSION_CLOSE = 'discard_on_session_close';
+    public const HELD_SALE_KEEP_FOR_NEXT_SESSION = 'keep_for_next_session';
 
     private const DEFAULTS = [
         'default_customer'   => 'عميل نقدي (POS)',
@@ -29,6 +31,9 @@ final class PosSettings
         // الافتراض الحامي: فرق المرتجع الزائد يبقى رصيداً للعميل، فلا يخرج
         // نقد من الدرج في الاستبدال إلا بتفويض إداري صريح وسياسة نقد متحققة.
         'exchange_surplus_policy' => self::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY,
+        // الافتراض الحامي: لا تظل مسودات السلة القديمة قابلة للاستئناف بعد إغلاق
+        // ورديتها إلا إذا اختار المالك الاحتفاظ بها صراحةً ضمن نفس الكاشير والمخزن.
+        'held_sale_close_policy' => self::HELD_SALE_DISCARD_ON_SESSION_CLOSE,
     ];
 
     /** جميع إعدادات POS، مدموجة فوق الافتراضات المعتمدة. */
@@ -58,6 +63,16 @@ final class PosSettings
         return in_array($policy, [self::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, self::EXCHANGE_SURPLUS_ALLOW_CASH_REFUND], true)
             ? $policy
             : self::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY;
+    }
+
+    /** سياسة السلال المعلّقة الصالحة فقط؛ القيمة غير المعروفة تلغي المسودة عند الإغلاق. */
+    public static function heldSaleClosePolicy(?Tenant $tenant = null): string
+    {
+        $policy = self::group($tenant)['held_sale_close_policy'];
+
+        return in_array($policy, [self::HELD_SALE_DISCARD_ON_SESSION_CLOSE, self::HELD_SALE_KEEP_FOR_NEXT_SESSION], true)
+            ? $policy
+            : self::HELD_SALE_DISCARD_ON_SESSION_CLOSE;
     }
 
     private static function tenant(): ?Tenant

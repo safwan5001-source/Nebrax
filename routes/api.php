@@ -377,6 +377,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('pos-devices/{id}', [PosDeviceController::class, 'update'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::delete('pos-devices/{id}', [PosDeviceController::class, 'destroy'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::get('pos/held-sales', [PosController::class, 'heldSales'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/held-sales', [PosController::class, 'storeHeldSale'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/held-sales/{id}/resume', [PosController::class, 'resumeHeldSale'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::delete('pos/held-sales/{id}', [PosController::class, 'discardHeldSale'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos/returnable-invoices', [PosController::class, 'returnableInvoices'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos/returnable-invoices/{id}', [PosController::class, 'returnableInvoice'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/returns/quote', [PosController::class, 'quoteReturn'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);

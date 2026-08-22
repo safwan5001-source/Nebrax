@@ -2676,6 +2676,14 @@
     "held_title": "Held sales",
     "no_held": "No held sales",
     "held_done": "Sale held",
+    "held_resumed": "The held cart was resumed at the cashier.",
+    "held_hint": "These are operational drafts tied to the session, cashier, and warehouse; they create no invoice, inventory movement, or journal entry before payment.",
+    "held_empty": "There are no held carts available to resume in this session.",
+    "held_walkin_customer": "Walk-in customer",
+    "held_summary": "{count} units · {items} lines",
+    "held_resume": "Resume",
+    "held_discard": "Discard cart",
+    "held_discard_confirm": "Discard this held cart? The cart has no financial effect, but it cannot be resumed after discarding.",
     "held_items": "{n} items",
     "printer": "Printer",
     "barcode": "Barcode",
@@ -2859,7 +2867,11 @@
     "exchange_surplus_policy": "Exchange surplus settlement policy",
     "exchange_surplus_policy_hint": "When the return exceeds the replacement sale, the difference remains customer credit by default. Cash is available only with this explicit option and after the cash-refund policy and drawer balance pass.",
     "exchange_surplus_customer_credit_only": "Customer credit only",
-    "exchange_surplus_allow_cash_refund": "Allow a cash refund for the exchange difference"
+    "exchange_surplus_allow_cash_refund": "Allow a cash refund for the exchange difference",
+    "held_sale_close_policy": "Held-cart handling when a session closes",
+    "held_sale_close_policy_hint": "Non-financial carts always remain tied to their cashier, branch, and warehouse. Choose whether to discard them at session close or keep them for the same cashier in a compatible later session.",
+    "held_sale_discard_on_session_close": "Discard carts when the session closes",
+    "held_sale_keep_for_next_session": "Keep carts to resume in a later session"
   },
   "products": {
     "title": "Products",

@@ -37,7 +37,7 @@ class SalesConfigController extends ApiController
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'sections' => [], 'accent_color' => '#2563EB', 'footer_text' => '', 'terms_text' => '', 'bank_text' => '', 'stamp' => '', 'signature' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
-        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'allow_discount' => true, 'receipt_footer' => '', 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY],
+        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'allow_discount' => true, 'receipt_footer' => '', 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE],
     ];
 
     public function show(string $section): JsonResponse
@@ -67,6 +67,10 @@ class SalesConfigController extends ApiController
                 'data.exchange_surplus_policy' => ['nullable', Rule::in([
                     PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY,
                     PosSettings::EXCHANGE_SURPLUS_ALLOW_CASH_REFUND,
+                ])],
+                'data.held_sale_close_policy' => ['nullable', Rule::in([
+                    PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE,
+                    PosSettings::HELD_SALE_KEEP_FOR_NEXT_SESSION,
                 ])],
             ]);
             // نحفظ الكائن كاملاً لا قيمة السياسة وحدها، كي تبقى الاستجابة وشاشة
