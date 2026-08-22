@@ -24,6 +24,7 @@ use App\Support\Money;
 use App\Support\PosSettings;
 use App\Services\Accounting\PosService;
 use App\Services\Accounting\PosExchangeService;
+use App\Services\Accounting\PosCustomerPriceListResolver;
 use App\Services\Accounting\PosHeldSaleService;
 use App\Services\Accounting\PosReturnService;
 use App\Services\Accounting\PosSessionService;
@@ -38,19 +39,33 @@ class PosController extends ApiController
         protected PosExchangeService $exchanges,
         protected PosHeldSaleService $heldSales,
         protected PosSessionService $sessions,
+        protected PosCustomerPriceListResolver $customerPriceLists,
     ) {}
 
     /**
      * كتالوج الكاشير التشغيلي: منتجات نشطة ضمن سياسة تصنيفات POS فقط. لا تعتمد
      * الواجهة على فلترة محلية لأن العقد نفسه يحرس الإتمام داخل PosService.
      */
-    public function products(): JsonResponse
+    public function products(Request $request): JsonResponse
     {
+        $data = $request->validate(['partner_id' => ['nullable', 'uuid']]);
+        if (! empty($data['partner_id'])) {
+            Partner::findOrFail($data['partner_id']);
+        }
+        $priceList = $this->customerPriceLists->forPartner($data['partner_id'] ?? null);
+
         $products = PosSettings::constrainProductsByCategory(
             Product::query()->where('is_active', true)
         )->with(['productCategory', 'productBrand', 'unitTemplate.units'])
             ->latest()
-            ->get();
+            ->get()
+            ->map(function (Product $product) use ($priceList) {
+                // قيمة عرض عابرة للكتالوج؛ لا تعدّل سعر المنتج المخزن ولا تعيد
+                // تفسير فاتورة تاريخية، ويعاد فرضها مجدداً في PosService.
+                $product->setAttribute('sale_price', $this->customerPriceLists->priceFor($priceList, $product));
+
+                return $product;
+            });
 
         return ProductResource::collection($products)->response();
     }

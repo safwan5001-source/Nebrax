@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\Invoice;
 use App\Models\PaymentMethod;
+use App\Models\PriceList;
 use App\Models\Product;
 use App\Support\PosSettings;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class PosService
         protected PaymentService $payments,
         protected PosSessionService $sessions,
         protected CashBankAccountService $cashBankAccounts,
+        protected PosCustomerPriceListResolver $customerPriceLists,
     ) {}
 
     /**
@@ -50,8 +52,9 @@ class PosService
 
             // سياسات الكتالوج وسعر الوحدة والخصم خادمية قبل أي فاتورة أو حركة
             // مخزون؛ لا يكفي إخفاؤها في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
+            $priceList = $this->customerPriceLists->forPartner($data['partner_id']);
             $this->assertProductsAllowedForPos($data['items']);
-            $this->assertUnitPricesAllowedForPos($data['items']);
+            $this->assertUnitPricesAllowedForPos($data['items'], $priceList);
             $this->assertDiscountsAllowedForPos($data['items']);
 
             // تضمن تهيئة المؤسسة الجديدة كتالوجاً تشغيلياً واحداً فقط، ولا تعيد
@@ -74,6 +77,7 @@ class PosService
             // 1) فاتورة آجلة (كامل الإجمالي على الذمم) ثم ترحيلها.
             $invoice = $this->invoices->create([
                 'partner_id'    => $data['partner_id'],
+                'price_list_id' => $priceList?->id,
                 'pos_session_id' => $session->id,
                 'warehouse_id'  => $warehouseId,
                 'payment_type'  => 'credit',
@@ -142,23 +146,29 @@ class PosService
         }
     }
 
-    /** يمنع سعر وحدة مخصصاً للمنتج عند إيقاف السياسة؛ السطر الوصفي بلا منتج مستثنى. */
-    private function assertUnitPricesAllowedForPos(array $items): void
+    /**
+     * يمنع سعر وحدة مخصصاً للمنتج عند إيقاف السياسة، ويجعل قائمة سعر العميل
+     * النشطة (إن اختيرت) السعر المرجعي قبل الفاتورة؛ السطر الوصفي مستثنى.
+     */
+    private function assertUnitPricesAllowedForPos(array $items, ?PriceList $priceList): void
     {
         if (PosSettings::allowsUnitPriceOverride()) {
             return;
         }
 
-        $prices = Product::whereIn('id', array_values(array_unique(array_filter(array_column($items, 'product_id')))))
-            ->pluck('sale_price', 'id');
+        $products = Product::whereIn('id', array_values(array_unique(array_filter(array_column($items, 'product_id')))))
+            ->get()
+            ->keyBy('id');
         foreach ($items as $item) {
             $productId = $item['product_id'] ?? null;
             if ($productId === null) {
                 continue;
             }
 
-            if ((int) ($item['unit_price'] ?? 0) !== (int) ($prices[$productId] ?? -1)) {
-                throw new RuntimeException('تعديل سعر وحدة المنتج غير مفعّل في إعدادات نقطة البيع.');
+            $product = $products->get($productId);
+            $expected = $product ? $this->customerPriceLists->priceFor($priceList, $product) : -1;
+            if ((int) ($item['unit_price'] ?? 0) !== $expected) {
+                throw new RuntimeException('سعر المنتج لا يطابق قائمة السعر النشطة للعميل في نقطة البيع.');
             }
         }
     }

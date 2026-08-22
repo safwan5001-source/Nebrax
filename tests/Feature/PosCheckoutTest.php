@@ -97,6 +97,48 @@ class PosCheckoutTest extends TestCase
     }
 
     /** @test */
+    public function customer_price_list_reprices_the_pos_catalog_and_is_enforced_before_checkout(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $product = $this->product($auth['token'], 'صنف قائمة عميل', null);
+        $priceList = $this->withToken($auth['token'])->postJson('/api/price-lists', [
+            'name' => 'قائمة عميل POS',
+        ])->assertCreated()['data'];
+        $this->withToken($auth['token'])->postJson("/api/price-lists/{$priceList['id']}/items", [
+            'product_id' => $product['id'], 'price' => 8500,
+        ])->assertCreated();
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل بسعر خاص', 'type' => 'customer', 'default_price_list_id' => $priceList['id'],
+        ])->assertCreated()['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+
+        $catalog = $this->withToken($auth['token'])->getJson("/api/pos/products?partner_id={$partnerId}")
+            ->assertOk()['data'];
+        $shown = collect($catalog)->firstWhere('id', $product['id']);
+        $this->assertSame('85.00', $shown['sale_price']);
+
+        $pricedItem = $this->productItem($product);
+        $pricedItem['unit_price'] = 8500;
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 9775)], [$pricedItem])
+            ->assertCreated()
+            ->assertJsonPath('data.price_list_id', $priceList['id'])
+            ->assertJsonPath('data.total', '97.75');
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)], [$this->productItem($product)])
+            ->assertStatus(422);
+        $this->assertSame(1, Invoice::where('pos_session_id', $sessionId)->count());
+
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => ['apply_customer_price_list' => false],
+        ])->assertOk();
+        $catalogWithoutList = $this->withToken($auth['token'])->getJson("/api/pos/products?partner_id={$partnerId}")
+            ->assertOk()['data'];
+        $this->assertSame('100.00', collect($catalogWithoutList)->firstWhere('id', $product['id'])['sale_price']);
+    }
+
+    /** @test */
     public function configured_cash_and_bank_methods_route_to_1110_and_1120_and_settle_receivables(): void
     {
         $auth = $this->registerTenant();

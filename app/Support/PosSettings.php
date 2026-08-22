@@ -34,6 +34,9 @@ final class PosSettings
         'enabled_payment_method_ids' => [],
         // اختيار عرضي للواجهة؛ تظل صلاحية الطريقة وتفعيلها مفروضة في الخدمة.
         'default_payment_method_id' => null,
+        // قائمة السعر الافتراضية للعميل تُطبّق افتراضياً؛ الكاشير والخدمة يعيدان
+        // تسعير السلة منها ما لم يعطلها المالك صراحةً.
+        'apply_customer_price_list' => true,
         // تعديل السعر يغير الإيراد مباشرة؛ الافتراض الحامي يمنعه إلى أن يفعّله
         // مالك الشركة صراحةً، بينما يبقى الحد الأدنى وصلاحية استثنائه مستقلين.
         'allow_unit_price_override' => false,
@@ -88,6 +91,12 @@ final class PosSettings
         $id = self::group($tenant)['default_payment_method_id'];
 
         return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    /** تطبيق قائمة سعر العميل سياسة POS صريحة؛ الافتراض يحدّث السلة عند الاختيار. */
+    public static function appliesCustomerPriceList(?Tenant $tenant = null): bool
+    {
+        return self::group($tenant)['apply_customer_price_list'] !== false;
     }
 
     /** تعديل سعر الوحدة سياسة POS صريحة؛ الافتراض الحامي يمنع السعر المخصص. */
