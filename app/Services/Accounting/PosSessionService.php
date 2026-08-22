@@ -2,23 +2,25 @@
 
 namespace App\Services\Accounting;
 
-use App\Models\Account;
-use App\Models\JournalLine;
+use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\PosSession;
+use App\Tenancy\BranchContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
  * ═══════════════════════════════════════════════════════════════
- *  PosSessionService — جلسات نقطة البيع (الورديات)
+ *  PosSessionService — جلسات/ورديات نقطة البيع
  * ═══════════════════════════════════════════════════════════════
- *  - open():  يفتح جلسة برصيد افتتاحي (يُرفض إن وُجدت جلسة مفتوحة).
- *  - close(): يحسب المتوقع = الافتتاحي + المبيعات النقدية المرحّلة خلال
- *             الجلسة، ويسجّل المعدود والفرق ويغلق الجلسة.
+ *  - open(): يفتح جلسة برصيد افتتاحي (يُرفض إن وُجدت جلسة مفتوحة).
+ *  - requireOpenForCheckout(): يقفل الجلسة ويتحقق من مسؤولها وفرعها قبل بيع POS.
+ *  - close(): يحسب المتوقع من سندات القبض النقدية المنسوبة للجلسة نفسها.
  *
- *  سجلّ تشغيلي لمطابقة النقدية — لا يولّد أي قيد محاسبي (البيع نفسه
- *  يُرحَّل عبر InvoiceService). كل المبالغ بالهللات.
+ * الجلسة سجل تشغيلي للمطابقة، وليست منشأ قيد مستقل. البيع وسنداته يرحّلان عبر
+ * InvoiceService وPaymentService، ويرتبطان بالجلسة كي لا يخلط التقرير حركة نقدية
+ * من جلسة أو خزينة أخرى لمجرد تطابق النافذة الزمنية. كل المبالغ بالهللات.
  */
 class PosSessionService
 {
@@ -40,16 +42,45 @@ class PosSessionService
         ]);
     }
 
+    /**
+     * يقفل صف الجلسة داخل معاملة بيع POS، فيمنع أن تنزلق عملية بيع بعد الإقفال.
+     * يتحقق كذلك من مسؤول الكاشير والفرع النشط؛ معرّف الجلسة لا يصبح تصريحاً
+     * مستقلاً يمكن تمريره من متصفح آخر أو فرع مختلف.
+     */
+    public function requireOpenForCheckout(string $sessionId, ?string $userId): PosSession
+    {
+        $session = PosSession::lockForUpdate()->findOrFail($sessionId);
+
+        if (! $session->isOpen()) {
+            throw new RuntimeException('جلسة نقطة البيع مغلقة ولا تقبل عملية بيع جديدة.');
+        }
+        if ($session->opened_by !== null && $session->opened_by !== $userId) {
+            throw new RuntimeException('جلسة نقطة البيع تخص كاشيراً آخر.');
+        }
+
+        $branchId = app(BranchContext::class)->id();
+        if ($session->branch_id !== $branchId) {
+            throw new RuntimeException('جلسة نقطة البيع لا تخص الفرع النشط.');
+        }
+
+        return $session;
+    }
+
     public function close(PosSession $session, int $countedBalance): PosSession
     {
-        if (! $session->isOpen()) {
-            throw new RuntimeException('الجلسة مغلقة بالفعل.');
+        if ($countedBalance < 0) {
+            throw new RuntimeException('الرصيد المعدود لا يكون سالباً.');
         }
 
         return DB::transaction(function () use ($session, $countedBalance) {
-            // المتوقّع = الافتتاحي + صافي حركة الصندوق (1110) خلال الجلسة —
-            // يشمل النقد الوارد من السندات والصادر (مصروفات/مرتجعات) فيصمد لكل الوسائل.
-            $cash = $this->cashMovement($session->opened_at, now());
+            // القفل نفسه الذي يأخذه checkout() يحسم سباق الإقفال/البيع: إما يُلحق
+            // البيع بالجلسة قبل العد، أو يرى البيع أن الجلسة أُغلقت فيُرفض.
+            $session = PosSession::lockForUpdate()->findOrFail($session->id);
+            if (! $session->isOpen()) {
+                throw new RuntimeException('الجلسة مغلقة بالفعل.');
+            }
+
+            $cash = $this->cashMovement($session);
             $expected = $session->opening_balance + $cash['net'];
 
             $session->update([
@@ -65,25 +96,22 @@ class PosSessionService
     }
 
     /**
-     * تقرير الوردية (X/Z): النقد المُستلَم (وارد 1110) + المتوقّع + عدد المبيعات.
-     * للجلسة المفتوحة يُحسب حتى الآن؛ للمغلقة حتى وقت الإغلاق. لا يمسّ القيود.
+     * تقرير الوردية (X/Z): النقد المُستلَم من سندات القبض المنسوبة للجلسة +
+     * المتوقّع + عدد فواتير POS. للجلسة المفتوحة يُحسب حتى الآن؛ للمغلقة من
+     * المستندات المثبتة عليها، لا من نطاق زمني قد يلتقط معاملات غيرها.
      *
      * @return array{cash_sales:int, sales_count:int, average:int, expected:int}
      */
     public function report(PosSession $session): array
     {
-        $end  = $session->closed_at ?? now();
-        $cash = $this->cashMovement($session->opened_at, $end);
-
-        // عدد المبيعات ومتوسّط قيمتها (فواتير مرحّلة خلال النافذة).
-        $invoices   = \App\Models\Invoice::where('status', 'posted')
-            ->where('created_at', '>=', $session->opened_at)
-            ->where('created_at', '<=', $end);
+        $cash = $this->cashMovement($session);
+        $invoices = Invoice::where('pos_session_id', $session->id)
+            ->where('status', 'posted');
         $salesTotal = (int) $invoices->sum('total');
-        $count      = (int) $invoices->count();
+        $count = (int) $invoices->count();
 
         return [
-            'cash_sales'  => $cash['inflow'], // النقد الوارد للدرج
+            'cash_sales'  => $cash['inflow'],
             'sales_count' => $count,
             'average'     => $count > 0 ? intdiv($salesTotal, $count) : 0,
             'expected'    => $session->opening_balance + $cash['net'],
@@ -91,25 +119,20 @@ class PosSessionService
     }
 
     /**
-     * صافي/وارد حركة حساب الصندوق (1110) خلال نافذة زمنية (قيود مرحّلة).
+     * النقد الوارد/الصافي من سندات قبض نقدية مرحّلة تخص الجلسة. لا تستخدم
+     * JournalLine ولا التاريخ؛ فذلك يخلط أثر جلسات أخرى أو قبضاً خارج POS.
      *
      * @return array{inflow:int, net:int}
      */
-    protected function cashMovement($openedAt, $end): array
+    protected function cashMovement(PosSession $session): array
     {
-        $accountId = Account::where('code', '1110')->value('id');
-        if (! $accountId) {
-            return ['inflow' => 0, 'net' => 0];
-        }
+        $inflow = (int) Payment::where('pos_session_id', $session->id)
+            ->where('status', 'posted')
+            ->where('direction', 'received')
+            ->where('method', 'cash')
+            ->sum('amount');
 
-        $row = JournalLine::where('account_id', $accountId)
-            ->whereHas('entry', fn ($q) => $q->where('status', 'posted')
-                ->where('created_at', '>=', $openedAt)
-                ->where('created_at', '<=', $end))
-            ->selectRaw('COALESCE(SUM(debit), 0) as inflow, COALESCE(SUM(debit) - SUM(credit), 0) as net')
-            ->first();
-
-        return ['inflow' => (int) $row->inflow, 'net' => (int) $row->net];
+        return ['inflow' => $inflow, 'net' => $inflow];
     }
 
     protected function nextNumber(): string

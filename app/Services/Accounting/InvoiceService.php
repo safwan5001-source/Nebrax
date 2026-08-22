@@ -87,6 +87,7 @@ class InvoiceService
                 'branch_id'         => $branchId,
                 'warehouse_id'      => $data['warehouse_id'] ?? null,
                 'price_list_id'     => $priceListId,
+                'pos_session_id'    => $data['pos_session_id'] ?? null,
                 'type'              => 'sale',
                 'payment_type'      => $this->paymentType($data['payment_type'] ?? Settings::get('sales', 'default_payment_type'), $isPaid),
                 'is_paid'           => $isPaid,

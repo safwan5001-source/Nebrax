@@ -339,6 +339,10 @@ export default function PosPage() {
   const confirmPayment = useCallback(
     async (tenders: Record<'cash' | 'card' | 'transfer' | 'credit', number>) => {
       if (cart.length === 0) return;
+      if (!session) {
+        setError(t('open_to_start'));
+        return;
+      }
       setPaying(true);
       setError(null);
       try {
@@ -355,7 +359,7 @@ export default function PosPage() {
         // إتمام ذرّي: فاتورة آجلة مرحّلة + سندات قبض حسب الوسائل (نقد→1110، بطاقة/تحويل→1120).
         const created = await api<{ data: { id: string; number: string; total: string } }>('/pos/checkout', {
           method: 'POST',
-          body: { partner_id: partnerId, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, items, tenders },
+          body: { partner_id: partnerId, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, items, tenders },
         });
         const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
         success(t('sale_done'));
@@ -398,7 +402,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive, company, warehouseId],
+    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive, company, warehouseId, session],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
