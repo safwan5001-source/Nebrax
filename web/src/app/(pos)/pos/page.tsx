@@ -23,6 +23,7 @@ import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
 import { PosPayment, type PaymentSummaryItem } from '@/components/pos/pos-payment';
 import { PosExchangeDialog } from '@/components/pos/pos-exchange-dialog';
+import { PosHeldSalesDialog, type PosHeldSale } from '@/components/pos/pos-held-sales-dialog';
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
@@ -35,8 +36,9 @@ interface PosConfig {
   receipt_footer: string;
   print_receipt: boolean;
   allow_discount: boolean;
+  held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
 }
-const POS_DEFAULTS: PosConfig = { default_customer: WALKIN, receipt_footer: '', print_receipt: true, allow_discount: true };
+const POS_DEFAULTS: PosConfig = { default_customer: WALKIN, receipt_footer: '', print_receipt: true, allow_discount: true, held_sale_close_policy: 'discard_on_session_close' };
 
 interface Product {
   id: string;
@@ -56,11 +58,6 @@ interface WorkShift { id: string; name: string; is_active: boolean }
 interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
 
 const FAV_KEY = 'nibras_pos_favs';
-const HELD_KEY = 'nibras_pos_held';
-
-/** بيع معلّق (محلّي): سلة + عميل، لاستئنافه لاحقاً. */
-interface HeldSale { id: string; at: string; cart: CartLine[]; customer: PosCustomer | null; warehouseId?: string }
-
 function stockTone(qty: number) {
   if (qty <= 20) return { w: Math.max(8, (qty / 20) * 40), c: 'var(--negative)' };
   if (qty <= 50) return { w: 40 + ((qty - 20) / 30) * 25, c: 'var(--warning)' };
@@ -116,7 +113,8 @@ export default function PosPage() {
   // العميل المختار (null = العميل النقدي الافتراضي). منتقي عملاء حقيقي.
   const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [heldSales, setHeldSales] = useState<HeldSale[]>([]);
+  const [heldCount, setHeldCount] = useState(0);
+  const [holdBusy, setHoldBusy] = useState(false);
   const [retrieveOpen, setRetrieveOpen] = useState(false);
 
   // اسم العميل الافتراضي (النقدي) من الإعداد؛ والمعروض = المختار أو الافتراضي.
@@ -157,10 +155,6 @@ export default function PosPage() {
       const raw = localStorage.getItem(FAV_KEY);
       if (raw) setFavs(new Set(JSON.parse(raw)));
     } catch { /* ignore */ }
-    try {
-      const raw = localStorage.getItem(HELD_KEY);
-      if (raw) setHeldSales(JSON.parse(raw));
-    } catch { /* ignore */ }
   }, [t]);
 
   const toggleFav = useCallback((id: string) => {
@@ -200,31 +194,71 @@ export default function PosPage() {
   const setDiscount = (k: string, v: string) => setCart((c) => c.map((l) => (l.key === k ? { ...l, discount: v } : l)));
   const remove = (k: string) => setCart((c) => c.filter((l) => l.key !== k));
 
-  const persistHeld = (list: HeldSale[]) => {
-    setHeldSales(list);
-    try { localStorage.setItem(HELD_KEY, JSON.stringify(list)); } catch { /* ignore */ }
-  };
-  // تعليق البيع الحالي (سلة + عميل) وتفريغ الشاشة لبيع جديد.
-  function holdSale() {
-    if (cart.length === 0) return;
-    const entry: HeldSale = { id: `h${Date.now()}`, at: new Date().toISOString(), cart, customer: selectedCustomer, warehouseId };
-    persistHeld([entry, ...heldSales]);
-    setCart([]);
-    setSelectedCustomer(null);
-    success(t('held_done'));
+  // عدد المسودات قراءة تشغيلية فقط؛ فتح الحوار يعيد تحميل القائمة الكاملة من الخادم.
+  const refreshHeldCount = useCallback(async () => {
+    if (!session?.id) { setHeldCount(0); return; }
+    try {
+      const result = await api<{ data: PosHeldSale[] }>(`/pos/held-sales?pos_session_id=${encodeURIComponent(session.id)}`);
+      setHeldCount(result.data.length);
+    } catch { setHeldCount(0); }
+  }, [session?.id]);
+  useEffect(() => { void refreshHeldCount(); }, [refreshHeldCount]);
+
+  // تعليق السلة الخادمي: لا فاتورة ولا قبض ولا قيد ولا حركة مخزون قبل الدفع.
+  async function holdSale() {
+    if (cart.length === 0 || !session) {
+      if (!session) errorToast(t('open_to_start'));
+      return;
+    }
+    setHoldBusy(true);
+    try {
+      await api('/pos/held-sales', {
+        method: 'POST',
+        body: {
+          pos_session_id: session.id,
+          customer_id: selectedCustomer?.id ?? null,
+          tax_inclusive: taxInclusive,
+          items: cart.map((line) => ({
+            product_id: line.productId,
+            description: line.description,
+            sku: line.sku,
+            quantity: line.qty,
+            unit_price: riyalToMinor(line.price),
+            tax_rate: line.tax,
+            discount: lineCalc(line).disc,
+          })),
+        },
+      });
+      setCart([]);
+      setSelectedCustomer(null);
+      setHeldCount((current) => current + 1);
+      success(t('held_done'));
+    } catch (err) {
+      errorToast(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setHoldBusy(false);
+    }
   }
-  // استرجاع بيع معلّق إلى السلة (وحذفه من المعلّقة).
-  function retrieveSale(id: string) {
-    const entry = heldSales.find((h) => h.id === id);
-    if (!entry) return;
-    setCart(entry.cart);
-    setSelectedCustomer(entry.customer);
-    if (entry.warehouseId && !session?.warehouse_id) setWarehouseId(entry.warehouseId);
-    persistHeld(heldSales.filter((h) => h.id !== id));
+
+  function retrieveSale(held: PosHeldSale) {
+    setCart(held.items.map((item, index) => ({
+      key: `${held.id}-${index}`,
+      productId: item.product_id,
+      description: item.description ?? '—',
+      sku: item.sku,
+      price: item.unit_price,
+      qty: item.quantity,
+      tax: item.tax_rate,
+      discount: item.discount,
+    })));
+    setSelectedCustomer(held.customer);
+    setTaxInclusive(held.tax_inclusive);
     setRetrieveOpen(false);
+    setStep('sale');
     setMobileTab('cart');
+    setHeldCount((current) => Math.max(0, current - 1));
+    success(t('held_resumed'));
   }
-  const removeHeld = (id: string) => persistHeld(heldSales.filter((h) => h.id !== id));
 
   // مسح باركود: مطابقة الكود بالـ SKU أو الباركود ثم الإضافة للسلة.
   function scanCode(code: string): boolean {
@@ -604,7 +638,7 @@ export default function PosPage() {
           <button
             type="button"
             onClick={holdSale}
-            disabled={cart.length === 0}
+            disabled={cart.length === 0 || !session || holdBusy}
             className="flex items-center justify-center gap-1.5 rounded-[9px] border border-border bg-surface px-3 py-2 text-[11.5px] font-semibold text-text hover:border-primary disabled:opacity-50"
           >
             <PauseCircle className="h-3.5 w-3.5" strokeWidth={1.8} />
@@ -613,12 +647,12 @@ export default function PosPage() {
           <button
             type="button"
             onClick={() => setRetrieveOpen(true)}
-            disabled={heldSales.length === 0}
+            disabled={!session}
             className="flex items-center justify-center gap-1.5 rounded-[9px] border border-border bg-surface px-3 py-2 text-[11.5px] font-semibold text-text hover:border-primary disabled:opacity-50"
           >
             <Archive className="h-3.5 w-3.5" strokeWidth={1.8} />
             {t('held')}
-            {heldSales.length > 0 && <span className="num rounded bg-primary px-1.5 text-[10px] font-bold text-white">{heldSales.length}</span>}
+            {heldCount > 0 && <span className="num rounded bg-primary px-1.5 text-[10px] font-bold text-white">{heldCount}</span>}
           </button>
         </div>
         <button className="flex w-full items-center gap-2 rounded-[9px] border border-dashed border-border bg-background px-3 py-2 text-[11.5px] text-muted">
@@ -760,33 +794,13 @@ export default function PosPage() {
         onSelect={setSelectedCustomer}
       />
 
-      {/* استرجاع بيع معلّق. */}
-      <Dialog open={retrieveOpen} onClose={() => setRetrieveOpen(false)} title={t('held_title')} className="max-w-md">
-        {heldSales.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">{t('no_held')}</p>
-        ) : (
-          <div className="max-h-80 space-y-2 overflow-y-auto">
-            {heldSales.map((h) => {
-              const items = h.cart.reduce((s, l) => s + l.qty, 0);
-              const gross = h.cart.reduce((s, l) => s + l.qty * riyalToMinor(l.price), 0);
-              return (
-                <div key={h.id} className="flex items-center gap-2 rounded-lg border border-border p-2">
-                  <button type="button" onClick={() => retrieveSale(h.id)} className="min-w-0 flex-1 text-start">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="num text-[11px] text-muted">{h.at.slice(11, 16)} · {h.customer?.name ?? walkinName}</span>
-                      <span className="num text-[12.5px] font-bold text-text">{formatRiyal(gross / 100)}</span>
-                    </div>
-                    <div className="text-[11px] text-muted">{t('held_items', { n: items })}</div>
-                  </button>
-                  <button type="button" onClick={() => removeHeld(h.id)} className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-negative/10 text-negative" aria-label={t('remove')}>
-                    <Trash className="h-3.5 w-3.5" strokeWidth={1.8} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Dialog>
+      <PosHeldSalesDialog
+        open={retrieveOpen}
+        sessionId={session?.id ?? null}
+        onClose={() => setRetrieveOpen(false)}
+        onResumed={retrieveSale}
+        onChanged={refreshHeldCount}
+      />
 
       {/* بوابة الوردية: لا بيع قبل فتح وردية — الإغلاق = مغادرة نقطة البيع. */}
       <Dialog open={sessionReady && !session} onClose={() => router.push('/dashboard')} title={ts('open_title')}>

@@ -36,6 +36,16 @@ export default function PosSettingsPage() {
             { value: 'allow_cash_refund', label: t('exchange_surplus_allow_cash_refund') },
           ],
         },
+        {
+          key: 'held_sale_close_policy',
+          label: t('held_sale_close_policy'),
+          description: t('held_sale_close_policy_hint'),
+          type: 'select',
+          options: [
+            { value: 'discard_on_session_close', label: t('held_sale_discard_on_session_close') },
+            { value: 'keep_for_next_session', label: t('held_sale_keep_for_next_session') },
+          ],
+        },
       ]}
     />
   );

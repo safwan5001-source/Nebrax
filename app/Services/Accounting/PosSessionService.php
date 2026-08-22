@@ -7,12 +7,14 @@ use App\Models\Payment;
 use App\Models\PosCashMovement;
 use App\Models\PosDevice;
 use App\Models\PosExchange;
+use App\Models\PosHeldSale;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
 use App\Models\ReturnDocument;
 use App\Models\Shift;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Support\PosSettings;
 use App\Tenancy\BranchContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -164,6 +166,16 @@ class PosSessionService
 
             $cash = $this->cashMovement($session);
             $expected = $session->opening_balance + $cash['net'];
+            if (PosSettings::heldSaleClosePolicy() === PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE) {
+                // سلال التشغيل لا تملك قيداً أو مخزوناً لعكسه؛ تنتقل فقط إلى
+                // حالة منتهية كي لا تُستأنف في وردية أو درج مختلفين بالخطأ.
+                PosHeldSale::where('pos_session_id', $session->id)
+                    ->where('status', PosHeldSale::STATUS_HELD)
+                    ->update([
+                        'status' => PosHeldSale::STATUS_DISCARDED,
+                        'discarded_at' => now(),
+                    ]);
+            }
             $difference = $countedBalance - $expected;
             $requiresAcknowledgement = $difference !== 0;
 

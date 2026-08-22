@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\QuotePosExchangeRequest;
+use App\Http\Requests\ResumePosHeldSaleRequest;
+use App\Http\Requests\StorePosHeldSaleRequest;
 use App\Http\Requests\StorePosSaleRequest;
 use App\Http\Requests\StorePosExchangeRequest;
 use App\Http\Requests\StorePosReturnRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\PosExchangeResource;
+use App\Http\Resources\PosHeldSaleResource;
 use App\Http\Resources\ReturnResource;
 use App\Models\Invoice;
 use App\Models\Partner;
@@ -20,6 +23,7 @@ use App\Support\Money;
 use App\Support\PosSettings;
 use App\Services\Accounting\PosService;
 use App\Services\Accounting\PosExchangeService;
+use App\Services\Accounting\PosHeldSaleService;
 use App\Services\Accounting\PosReturnService;
 use App\Services\Accounting\PosSessionService;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +35,7 @@ class PosController extends ApiController
         protected PosService $pos,
         protected PosReturnService $returns,
         protected PosExchangeService $exchanges,
+        protected PosHeldSaleService $heldSales,
         protected PosSessionService $sessions,
     ) {}
 
@@ -53,6 +58,44 @@ class PosController extends ApiController
         $invoice = $this->domain(fn () => $this->pos->checkout($data));
 
         return (new InvoiceResource($invoice->load('lines')))->response()->setStatusCode(201);
+    }
+
+    /** يعرض مسودات الكاشير القابلة للاستئناف في الجلسة والمخزن المطابقين فقط. */
+    public function heldSales(Request $request): JsonResponse
+    {
+        $data = $request->validate(['pos_session_id' => ['required', 'uuid']]);
+        $held = $this->domain(fn () => $this->heldSales->list($data['pos_session_id'], $request->user()));
+
+        return PosHeldSaleResource::collection($held)->response();
+    }
+
+    /** يحفظ سلة POS تشغيلية فقط؛ لا ينشئ فاتورة أو قبضاً أو قيداً أو حركة مخزون. */
+    public function storeHeldSale(StorePosHeldSaleRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        if (! empty($data['customer_id'])) {
+            Partner::findOrFail($data['customer_id']);
+        }
+        $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
+        $held = $this->domain(fn () => $this->heldSales->hold($data, $request->user()));
+
+        return (new PosHeldSaleResource($held))->response()->setStatusCode(201);
+    }
+
+    /** يستأنف السلة مرة واحدة فقط؛ تعود لقطة السلة إلى الواجهة ولا تنشئ بيعاً. */
+    public function resumeHeldSale(ResumePosHeldSaleRequest $request, string $id): JsonResponse
+    {
+        $held = $this->domain(fn () => $this->heldSales->resume($id, $request->validated()['pos_session_id'], $request->user()));
+
+        return (new PosHeldSaleResource($held))->response();
+    }
+
+    /** يلغي مسودة غير مالية قابلة للاستئناف داخل سياق الجلسة والكاشير الصحيح. */
+    public function discardHeldSale(ResumePosHeldSaleRequest $request, string $id): JsonResponse
+    {
+        $this->domain(fn () => $this->heldSales->discard($id, $request->validated()['pos_session_id'], $request->user()));
+
+        return response()->json(['data' => null]);
     }
 
     /**
