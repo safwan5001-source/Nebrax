@@ -23,7 +23,7 @@ class Payment extends BaseModel
 
     protected $fillable = [
         'branch_id',
-        'tenant_id', 'number', 'partner_id', 'invoice_id', 'classification_id',
+        'tenant_id', 'number', 'partner_id', 'invoice_id', 'pos_session_id', 'classification_id',
         'direction', 'method', 'payment_method_id', 'payment_method_name', 'reference', 'payment_details', 'cash_account_id', 'payment_date', 'amount',
         'status', 'notes', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by', 'collector_employee_id',
     ];
@@ -55,6 +55,12 @@ class Payment extends BaseModel
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    /** جلسة POS التي أنشأت سند القبض؛ مرجع تشغيلي ثابت للتقرير والمطابقة. */
+    public function posSession(): BelongsTo
+    {
+        return $this->referenceBelongsTo(PosSession::class);
     }
 
     /** الخزينة/الحساب البنكي المستلِم — مرجع اختياري، غيابه يعني الافتراضي بحسب الطريقة. */

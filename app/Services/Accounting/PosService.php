@@ -25,6 +25,7 @@ class PosService
     public function __construct(
         protected InvoiceService $invoices,
         protected PaymentService $payments,
+        protected PosSessionService $sessions,
     ) {}
 
     /**
@@ -38,9 +39,17 @@ class PosService
         }
 
         return DB::transaction(function () use ($data) {
+            // تُقفل الجلسة وتتحقق قبل إنشاء أي مستند: لا بيع يُلحق بورديّة مغلقة
+            // أو بكاشير/فرع آخر، ويظل القفل قائماً حتى اكتمال الفاتورة وسنداتها.
+            $session = $this->sessions->requireOpenForCheckout(
+                $data['pos_session_id'],
+                $data['created_by'] ?? null,
+            );
+
             // 1) فاتورة آجلة (كامل الإجمالي على الذمم) ثم ترحيلها.
             $invoice = $this->invoices->create([
                 'partner_id'    => $data['partner_id'],
+                'pos_session_id' => $session->id,
                 'warehouse_id'  => $data['warehouse_id'] ?? null,
                 'payment_type'  => 'credit',
                 'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
@@ -75,6 +84,7 @@ class PosService
                 $this->payments->post($this->payments->create([
                     'partner_id' => $invoice->partner_id,
                     'invoice_id' => $invoice->id,
+                    'pos_session_id' => $session->id,
                     'direction'  => 'received',
                     'method'     => 'cash',
                     'amount'     => $cashApplied,
@@ -88,6 +98,7 @@ class PosService
                 $this->payments->post($this->payments->create([
                     'partner_id' => $invoice->partner_id,
                     'invoice_id' => $invoice->id,
+                    'pos_session_id' => $session->id,
                     'direction'  => 'received',
                     'method'     => 'bank',
                     'amount'     => $bankApplied,

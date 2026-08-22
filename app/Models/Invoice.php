@@ -22,7 +22,7 @@ class Invoice extends BaseModel
     use GeneratesDocumentNumbers;
 
     protected $fillable = [
-        'branch_id', 'warehouse_id', 'price_list_id',
+        'branch_id', 'warehouse_id', 'price_list_id', 'pos_session_id',
         'tenant_id', 'number', 'partner_id', 'type', 'payment_type',
         'invoice_date', 'due_date', 'cost_center_id', 'classification_id', 'salesperson_id', 'status',
         'subtotal', 'discount', 'shipping', 'adjustment', 'tax_amount', 'total',
@@ -67,6 +67,12 @@ class Invoice extends BaseModel
     public function lines(): HasMany
     {
         return $this->hasMany(InvoiceLine::class);
+    }
+
+    /** مرجع جلسة POS محفوظ؛ لا يختفي عند تبديل سياق الفرع بعد ترحيل الفاتورة. */
+    public function posSession(): BelongsTo
+    {
+        return $this->referenceBelongsTo(PosSession::class);
     }
 
     /** مواعيد تشغيلية مرتبطة بالمستند؛ لا تغيّر مالاً أو قيداً. */

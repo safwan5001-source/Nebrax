@@ -113,10 +113,14 @@ class MinimumSalePriceGuardTest extends TestCase
         $auth = $this->registerTenant();
         $customer = $this->customer($auth['token']);
         $product = $this->product($auth['token']);
+        $sessionId = $this->withToken($auth['token'])
+            ->postJson('/api/pos-sessions/open', ['opening_balance' => 0])
+            ->assertCreated()['data']['id'];
 
         $this->withToken($auth['token'])
             ->postJson('/api/pos/checkout', [
                 'partner_id' => $customer['id'],
+                'pos_session_id' => $sessionId,
                 'items' => [[
                     'product_id' => $product['id'],
                     'quantity' => 1,

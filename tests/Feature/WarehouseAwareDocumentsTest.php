@@ -183,9 +183,13 @@ class WarehouseAwareDocumentsTest extends TestCase
         $product = $this->product($token);
         $warehouse = $this->warehouse($token, 'مخزن المعرض');
         $this->buy($token, $this->supplier($token), $product['id'], $warehouse['id'], 5);
+        $sessionId = $this->withToken($token)
+            ->postJson('/api/pos-sessions/open', ['opening_balance' => 0])
+            ->assertCreated()['data']['id'];
 
         $this->withToken($token)->postJson('/api/pos/checkout', [
             'partner_id' => $this->customer($token),
+            'pos_session_id' => $sessionId,
             'warehouse_id' => $warehouse['id'],
             'tax_inclusive' => false,
             'items' => [[

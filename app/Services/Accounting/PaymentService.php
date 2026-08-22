@@ -99,6 +99,7 @@ class PaymentService
                 'number'          => $number,
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null, // مرجع اختياري للقبض
+                'pos_session_id'  => $data['pos_session_id'] ?? null,
                 'direction'       => $direction,
                 'method'          => $method,
                 'payment_method_id' => $paymentMethod['id'],
