@@ -13,6 +13,7 @@ export interface PosHeldSaleItem {
   description: string | null;
   sku: string | null;
   quantity: number;
+  unit: string | null;
   unit_price: string;
   tax_rate: number;
   discount: string;

@@ -22,6 +22,7 @@ class StorePosHeldSaleRequest extends FormRequest
             'items.*.description' => ['nullable', 'string', 'max:1000'],
             'items.*.sku' => ['nullable', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'items.*.unit' => ['nullable', 'string', 'max:100'],
             'items.*.unit_price' => ['required', 'integer', 'min:0', 'max:100000000000'],
             'items.*.tax_rate' => ['nullable', 'integer', 'min:0', 'max:100'],
             'items.*.discount' => ['nullable', 'integer', 'min:0', 'max:100000000000'],

@@ -148,7 +148,9 @@ class PosService
 
     /**
      * يمنع سعر وحدة مخصصاً للمنتج عند إيقاف السياسة، ويجعل قائمة سعر العميل
-     * النشطة (إن اختيرت) السعر المرجعي قبل الفاتورة؛ السطر الوصفي مستثنى.
+     * النشطة (إن اختيرت) السعر المرجعي قبل الفاتورة. وحدة الأساس تستعمل
+     * سعر المنتج عند غياب عنصر القائمة، أما البديلة فلا تُقبل بلا سعر صريح.
+     * السطر الوصفي مستثنى.
      */
     private function assertUnitPricesAllowedForPos(array $items, ?PriceList $priceList): void
     {
@@ -166,7 +168,12 @@ class PosService
             }
 
             $product = $products->get($productId);
-            $expected = $product ? $this->customerPriceLists->priceFor($priceList, $product) : -1;
+            $expected = $product
+                ? $this->customerPriceLists->posPriceFor($priceList, $product, $item['unit'] ?? null)
+                : null;
+            if ($expected === null) {
+                throw new RuntimeException('وحدة البيع البديلة تحتاج سعراً صريحاً في قائمة السعر النشطة للعميل.');
+            }
             if ((int) ($item['unit_price'] ?? 0) !== $expected) {
                 throw new RuntimeException('سعر المنتج لا يطابق قائمة السعر النشطة للعميل في نقطة البيع.');
             }

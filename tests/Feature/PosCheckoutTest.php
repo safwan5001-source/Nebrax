@@ -139,6 +139,62 @@ class PosCheckoutTest extends TestCase
     }
 
     /** @test */
+    public function pos_sells_an_alternate_unit_only_when_the_customer_price_list_defines_its_explicit_price(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $template = $this->withToken($auth['token'])->postJson('/api/unit-templates', [
+            'name' => 'عبوة POS', 'base_unit' => 'piece',
+            'units' => [['name' => 'carton', 'factor' => 12]],
+        ])->assertCreated()['data'];
+        $product = $this->withToken($auth['token'])->postJson('/api/products', [
+            'name' => 'صنف وحدات POS', 'sku' => 'POS-UNIT-' . uniqid(), 'type' => 'good',
+            'unit' => 'piece', 'unit_template_id' => $template['id'], 'sale_price' => 10000,
+        ])->assertCreated()['data'];
+        $priceList = $this->withToken($auth['token'])->postJson('/api/price-lists', [
+            'name' => 'قائمة عبوات العميل',
+        ])->assertCreated()['data'];
+        $this->withToken($auth['token'])->postJson("/api/price-lists/{$priceList['id']}/items", [
+            'product_id' => $product['id'], 'unit_name' => 'carton', 'price' => 120000,
+        ])->assertCreated();
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل العبوات', 'type' => 'customer', 'default_price_list_id' => $priceList['id'],
+        ])->assertCreated()['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+
+        $catalog = $this->withToken($auth['token'])->getJson("/api/pos/products?partner_id={$partnerId}")
+            ->assertOk()['data'];
+        $shown = collect($catalog)->firstWhere('id', $product['id']);
+        $this->assertSame(['piece', 'carton'], array_column($shown['pos_units'], 'name'));
+        $this->assertSame(['100.00', '1200.00'], array_column($shown['pos_units'], 'price'));
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 138000)], [[
+            'product_id' => $product['id'], 'quantity' => 1, 'unit' => 'carton', 'unit_price' => 120000, 'tax_rate' => 15,
+        ]])->assertCreated()->assertJsonPath('data.total', '1380.00');
+        $invoice = Invoice::where('pos_session_id', $sessionId)->sole();
+        $line = $invoice->lines()->sole();
+        $this->assertSame('carton', $line->unit_name);
+        $this->assertSame(12, $line->unit_factor);
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 138000)], [[
+            'product_id' => $product['id'], 'quantity' => 1, 'unit' => 'carton', 'unit_price' => 119999, 'tax_rate' => 15,
+        ]])->assertStatus(422);
+        $this->assertSame(1, Invoice::where('pos_session_id', $sessionId)->count());
+
+        $walkInCatalog = $this->withToken($auth['token'])->getJson('/api/pos/products')->assertOk()['data'];
+        $walkInProduct = collect($walkInCatalog)->firstWhere('id', $product['id']);
+        $this->assertSame(['piece'], array_column($walkInProduct['pos_units'], 'name'));
+        $walkInId = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل نقدي بلا قائمة وحدات', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+        $this->checkout($auth['token'], $walkInId, $sessionId, [$this->tender($cash, 138000)], [[
+            'product_id' => $product['id'], 'quantity' => 1, 'unit' => 'carton', 'unit_price' => 120000, 'tax_rate' => 15,
+        ]])->assertStatus(422);
+        $this->assertSame(1, Invoice::where('pos_session_id', $sessionId)->count());
+    }
+
+    /** @test */
     public function configured_cash_and_bank_methods_route_to_1110_and_1120_and_settle_receivables(): void
     {
         $auth = $this->registerTenant();
