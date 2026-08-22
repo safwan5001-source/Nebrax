@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\PurchaseService;
+use App\Services\TenantApplicationService;
 use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,6 +51,7 @@ class ReturnWindowPolicyTest extends TestCase
 
         app(TenantContext::class)->set($this->tenant->id);
         app(ChartOfAccountsSeeder::class)->seed($this->tenant->id);
+        app(TenantApplicationService::class)->enable('purchases.cycle', null);
 
         $this->customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
         $this->supplier = Partner::create(['name' => 'مورد', 'type' => 'supplier']);

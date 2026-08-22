@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Requests\StoreCreditNoteRequest;
 use App\Http\Resources\CreditNoteResource;
 use App\Models\CreditNote;
@@ -22,6 +23,8 @@ class CreditNoteController extends ApiController
         $query = CreditNote::with('lines')->latest();
         if (in_array($type, ['sales', 'purchase'], true)) {
             $query->where('type', $type);
+        } elseif ($request->attributes->get(EnsureApplicationOperationActive::hiddenPurchaseAttribute('credit-note'))) {
+            $query->where('type', '!=', 'purchase');
         }
 
         return CreditNoteResource::collection(

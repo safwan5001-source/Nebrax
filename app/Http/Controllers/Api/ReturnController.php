@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Requests\StoreReturnRequest;
 use App\Http\Resources\ReturnResource;
 use App\Models\Partner;
@@ -26,6 +27,8 @@ class ReturnController extends ApiController
         $query = ReturnDocument::with('lines')->latest();
         if (in_array($type, ['sales', 'purchase'], true)) {
             $query->where('type', $type);
+        } elseif ($request->attributes->get(EnsureApplicationOperationActive::hiddenPurchaseAttribute('return'))) {
+            $query->where('type', '!=', 'purchase');
         }
 
         return ReturnResource::collection(
