@@ -46,10 +46,13 @@ class PosReturnTest extends TestCase
         return ['session_id' => $sessionId, 'warehouse_id' => $warehouseId];
     }
 
-    private function product(): Product
+    private function product(int $salePrice = 10000): Product
     {
         return Product::create([
             'name' => 'صنف مرتجع POS',
+            // عملية POS في هذا الاختبار بسعر 100.00؛ نثبته على المنتج كي لا
+            // تتحول بيانات اختبار مرتجع إلى تجاوز متعمد لسياسة سعر الوحدة.
+            'sale_price' => $salePrice,
             'track_inventory' => false,
             'quantity_on_hand' => 0,
             'avg_cost' => 0,
@@ -298,7 +301,7 @@ class PosReturnTest extends TestCase
         $customer = $this->customer($auth['token']);
         $original = $this->checkout($auth, $customer, $session['session_id'], $this->product(), ['cash' => 11500]);
 
-        $response = $this->exchange($auth, $session['session_id'], $original, $this->product(), 20000, ['cash' => 11500])
+        $response = $this->exchange($auth, $session['session_id'], $original, $this->product(20000), 20000, ['cash' => 11500])
             ->assertCreated()
             ->assertJsonPath('data.applied_credit_amount', '115.00')
             ->assertJsonPath('data.cash_refund_amount', '0.00')
@@ -327,7 +330,7 @@ class PosReturnTest extends TestCase
         $session = $this->openSession($auth);
         $original = $this->checkout($auth, $this->customer($auth['token']), $session['session_id'], $this->product(), ['cash' => 11500]);
 
-        $response = $this->exchange($auth, $session['session_id'], $original, $this->product(), 5000)
+        $response = $this->exchange($auth, $session['session_id'], $original, $this->product(5000), 5000)
             ->assertCreated()
             ->assertJsonPath('data.applied_credit_amount', '57.50')
             ->assertJsonPath('data.cash_refund_amount', '0.00')
@@ -351,7 +354,7 @@ class PosReturnTest extends TestCase
         ])->assertOk();
         $original = $this->checkout($auth, $this->customer($auth['token']), $session['session_id'], $this->product(), ['cash' => 11500]);
 
-        $response = $this->exchange($auth, $session['session_id'], $original, $this->product(), 5000, [], 'cash')
+        $response = $this->exchange($auth, $session['session_id'], $original, $this->product(5000), 5000, [], 'cash')
             ->assertCreated()
             ->assertJsonPath('data.cash_refund_amount', '57.50');
         $exchange = PosExchange::findOrFail($response['data']['id']);
@@ -376,7 +379,7 @@ class PosReturnTest extends TestCase
         ])->assertOk();
         $original = $this->checkout($auth, $this->customer($auth['token']), $session['session_id'], $this->product(), ['card' => 11500]);
 
-        $this->exchange($auth, $session['session_id'], $original, $this->product(), 5000, [], 'cash')->assertStatus(422);
+        $this->exchange($auth, $session['session_id'], $original, $this->product(5000), 5000, [], 'cash')->assertStatus(422);
         $this->assertSame(0, PosExchange::count());
         $this->assertSame(0, ReturnDocument::count());
         $this->assertSame(1, Invoice::count());

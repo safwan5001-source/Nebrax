@@ -34,6 +34,9 @@ final class PosSettings
         'enabled_payment_method_ids' => [],
         // اختيار عرضي للواجهة؛ تظل صلاحية الطريقة وتفعيلها مفروضة في الخدمة.
         'default_payment_method_id' => null,
+        // تعديل السعر يغير الإيراد مباشرة؛ الافتراض الحامي يمنعه إلى أن يفعّله
+        // مالك الشركة صراحةً، بينما يبقى الحد الأدنى وصلاحية استثنائه مستقلين.
+        'allow_unit_price_override' => false,
         // الافتراض يحفظ سلوك POS السابق الذي كان يسمح ببيع جزئي/آجل.
         'allow_deferred_payment' => true,
         // الافتراض المتوافق: لا تتغير المنتجات الظاهرة للمستأجر القائم. يختار
@@ -85,6 +88,12 @@ final class PosSettings
         $id = self::group($tenant)['default_payment_method_id'];
 
         return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    /** تعديل سعر الوحدة سياسة POS صريحة؛ الافتراض الحامي يمنع السعر المخصص. */
+    public static function allowsUnitPriceOverride(?Tenant $tenant = null): bool
+    {
+        return self::group($tenant)['allow_unit_price_override'] === true;
     }
 
     /** الخصم سياسة POS صريحة؛ الافتراض يحفظ السلوك التاريخي للمستأجر القائم. */

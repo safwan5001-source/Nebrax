@@ -230,6 +230,31 @@ class PosCheckoutTest extends TestCase
     }
 
     /** @test */
+    public function pos_unit_price_override_defaults_to_blocked_and_allows_an_explicitly_enabled_custom_price(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $product = $this->product($auth['token'], 'صنف سعره مقيّد', null);
+        $customPriceItem = $this->productItem($product);
+        $customPriceItem['unit_price'] = 9000;
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 10350)], [$customPriceItem])
+            ->assertStatus(422);
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
+
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => ['allow_unit_price_override' => true],
+        ])->assertOk();
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 10350)], [$customPriceItem])
+            ->assertCreated()
+            ->assertJsonPath('data.total', '103.50');
+    }
+
+    /** @test */
     public function it_rejects_a_method_not_enabled_for_pos_without_creating_documents(): void
     {
         $auth = $this->registerTenant();

@@ -48,9 +48,10 @@ class PosService
                 $data['actor'] ?? null,
             );
 
-            // سياسة الكتالوج وحاجز الخصم خادميان قبل أي فاتورة أو حركة مخزون؛
-            // لا يكفي إخفاؤهما في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
+            // سياسات الكتالوج وسعر الوحدة والخصم خادمية قبل أي فاتورة أو حركة
+            // مخزون؛ لا يكفي إخفاؤها في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
             $this->assertProductsAllowedForPos($data['items']);
+            $this->assertUnitPricesAllowedForPos($data['items']);
             $this->assertDiscountsAllowedForPos($data['items']);
 
             // تضمن تهيئة المؤسسة الجديدة كتالوجاً تشغيلياً واحداً فقط، ولا تعيد
@@ -138,6 +139,27 @@ class PosService
 
         if ($products->contains(fn (Product $product) => ! PosSettings::allowsProductCategory($product->category_id))) {
             throw new RuntimeException('يتضمن البيع منتجاً من تصنيف غير مسموح به في إعدادات نقطة البيع.');
+        }
+    }
+
+    /** يمنع سعر وحدة مخصصاً للمنتج عند إيقاف السياسة؛ السطر الوصفي بلا منتج مستثنى. */
+    private function assertUnitPricesAllowedForPos(array $items): void
+    {
+        if (PosSettings::allowsUnitPriceOverride()) {
+            return;
+        }
+
+        $prices = Product::whereIn('id', array_values(array_unique(array_filter(array_column($items, 'product_id')))))
+            ->pluck('sale_price', 'id');
+        foreach ($items as $item) {
+            $productId = $item['product_id'] ?? null;
+            if ($productId === null) {
+                continue;
+            }
+
+            if ((int) ($item['unit_price'] ?? 0) !== (int) ($prices[$productId] ?? -1)) {
+                throw new RuntimeException('تعديل سعر وحدة المنتج غير مفعّل في إعدادات نقطة البيع.');
+            }
         }
     }
 

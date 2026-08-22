@@ -123,6 +123,12 @@ class MinimumSalePriceGuardTest extends TestCase
             ->postJson('/api/pos-sessions/open', ['opening_balance' => 0, 'pos_device_id' => $deviceId])
             ->assertCreated()['data']['id'];
 
+        // هذا الاختبار يثبت الحارس الأدنى بعد السماح الصريح بتعديل السعر؛
+        // السياسة الجديدة المغلقة افتراضياً ترفض التعديل قبل بلوغ هذا الحارس.
+        $this->withToken($auth['token'])
+            ->putJson('/api/sales-config/pos', ['data' => ['allow_unit_price_override' => true]])
+            ->assertOk();
+
         $this->withToken($auth['token'])
             ->postJson('/api/pos/checkout', [
                 'partner_id' => $customer['id'],
