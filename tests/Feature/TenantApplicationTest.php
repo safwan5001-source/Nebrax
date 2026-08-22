@@ -94,7 +94,9 @@ class TenantApplicationTest extends TestCase
 
         $this->assertFalse($res['data']['enabled']);
         $this->assertSame('disabled', $res['data']['status']);
-        $this->assertSame('disabled', TenantApplicationEvent::where('application_key', 'hr.employees')->latest()->first()->action);
+        $this->assertDatabaseHas('tenant_application_events', [
+            'tenant_id' => $auth['tenant_id'], 'application_key' => 'hr.employees', 'action' => 'disabled',
+        ]);
     }
 
     /** @test */
@@ -112,7 +114,9 @@ class TenantApplicationTest extends TestCase
 
         $this->assertFalse($res['data']['enabled']);
         $this->assertSame('suspended', $res['data']['status']);
-        $this->assertSame('suspended', TenantApplicationEvent::where('application_key', 'hr.employees')->latest()->first()->action);
+        $this->assertDatabaseHas('tenant_application_events', [
+            'tenant_id' => $auth['tenant_id'], 'application_key' => 'hr.employees', 'action' => 'suspended',
+        ]);
     }
 
     /** @test */

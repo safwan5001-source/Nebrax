@@ -15,6 +15,7 @@ class StorePosSaleRequest extends FormRequest
     {
         return [
             'partner_id'          => ['required', 'uuid'],
+            'pos_session_id'      => ['required', 'uuid'],
             // يثبت مخزن الإخراج على الفاتورة الناتجة من عملية نقطة البيع.
             'warehouse_id'        => ['nullable', 'uuid'],
             'tax_inclusive'       => ['nullable', 'boolean'],

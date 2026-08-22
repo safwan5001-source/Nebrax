@@ -49,6 +49,9 @@ interface Product {
   is_active: boolean;
 }
 interface CartLine { key: string; productId: string | null; description: string; sku: string | null; price: string; qty: number; tax: number; discount: string }
+interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null }
+interface WorkShift { id: string; name: string; is_active: boolean }
+interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
 
 const FAV_KEY = 'nibras_pos_favs';
 const HELD_KEY = 'nibras_pos_held';
@@ -93,8 +96,12 @@ export default function PosPage() {
   // وضع الضريبة من إعدادات النظام (متضمَّن/غير متضمَّن) — يوحّد سلوك كل المعاملات.
   const [taxInclusive, setTaxInclusive] = useState(false);
   // الوردية (الجلسة النقدية) — تُربط بالبيع: تُفتح قبل البيع وتُغلق بعدّ النقد.
-  const [session, setSession] = useState<{ id: string; number: string } | null>(null);
+  const [session, setSession] = useState<PosSession | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
+  const [devices, setDevices] = useState<PosDevice[]>([]);
+  const [shifts, setShifts] = useState<WorkShift[]>([]);
+  const [deviceId, setDeviceId] = useState('');
+  const [shiftId, setShiftId] = useState('');
   const [openBal, setOpenBal] = useState('');
   const [closeOpen, setCloseOpen] = useState(false);
   const [countedBal, setCountedBal] = useState('');
@@ -130,9 +137,16 @@ export default function PosPage() {
       .then((r) => setPosCfg({ ...POS_DEFAULTS, ...r.data }))
       .catch(() => {});
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
-    // الوردية المفتوحة الحالية (إن وُجدت) — وإلا تُعرض بوابة فتح وردية.
-    api<{ data: { id: string; number: string; status: string }[] }>('/pos-sessions')
-      .then((r) => setSession(r.data.find((s) => s.status === 'open') ?? null))
+    api<{ data: PosDevice[] }>('/pos-devices').then((r) => setDevices(r.data.filter((device) => device.is_active))).catch(() => {});
+    api<{ data: WorkShift[] }>('/shifts').then((r) => setShifts(r.data.filter((shift) => shift.is_active))).catch(() => {});
+    // الوردية المفتوحة الحالية (إن وُجدت) — وإلا تُعرض بوابة فتح وردية. يثبّت
+    // مخزن الجهاز على الشاشة حتى لا تعرض اختياراً سيرفضه الخادم لاحقاً.
+    api<{ data: PosSession[] }>('/pos-sessions?mine=1')
+      .then((r) => {
+        const current = r.data.find((item) => item.status === 'open') ?? null;
+        setSession(current);
+        if (current?.warehouse_id) setWarehouseId(current.warehouse_id);
+      })
       .catch(() => {})
       .finally(() => setSessionReady(true));
     try {
@@ -201,7 +215,7 @@ export default function PosPage() {
     if (!entry) return;
     setCart(entry.cart);
     setSelectedCustomer(entry.customer);
-    if (entry.warehouseId) setWarehouseId(entry.warehouseId);
+    if (entry.warehouseId && !session?.warehouse_id) setWarehouseId(entry.warehouseId);
     persistHeld(heldSales.filter((h) => h.id !== id));
     setRetrieveOpen(false);
     setMobileTab('cart');
@@ -298,11 +312,12 @@ export default function PosPage() {
     setSessionBusy(true);
     setSessionError(null);
     try {
-      const r = await api<{ data: { id: string; number: string } }>('/pos-sessions/open', {
+      const r = await api<{ data: PosSession }>('/pos-sessions/open', {
         method: 'POST',
-        body: { opening_balance: riyalToMinor(openBal) },
+        body: { opening_balance: riyalToMinor(openBal), pos_device_id: deviceId, shift_id: shiftId || null },
       });
       setSession(r.data);
+      if (r.data.warehouse_id) setWarehouseId(r.data.warehouse_id);
       setOpenBal('');
     } catch (err) {
       setSessionError(err instanceof ApiError ? err.message : tc('saveFailed'));
@@ -339,6 +354,10 @@ export default function PosPage() {
   const confirmPayment = useCallback(
     async (tenders: Record<'cash' | 'card' | 'transfer' | 'credit', number>) => {
       if (cart.length === 0) return;
+      if (!session) {
+        setError(t('open_to_start'));
+        return;
+      }
       setPaying(true);
       setError(null);
       try {
@@ -355,7 +374,7 @@ export default function PosPage() {
         // إتمام ذرّي: فاتورة آجلة مرحّلة + سندات قبض حسب الوسائل (نقد→1110، بطاقة/تحويل→1120).
         const created = await api<{ data: { id: string; number: string; total: string } }>('/pos/checkout', {
           method: 'POST',
-          body: { partner_id: partnerId, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, items, tenders },
+          body: { partner_id: partnerId, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, items, tenders },
         });
         const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
         success(t('sale_done'));
@@ -398,7 +417,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive, company, warehouseId],
+    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, taxInclusive, company, warehouseId, session],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -656,7 +675,7 @@ export default function PosPage() {
         session={session}
         warehouses={warehouses}
         warehouseId={warehouseId}
-        warehouseDisabled={step === 'payment' || paying}
+        warehouseDisabled={Boolean(session?.warehouse_id) || step === 'payment' || paying}
         onWarehouseChange={setWarehouseId}
         onEndSession={() => (session ? (setCountedBal(''), setSessionError(null), setCloseOpen(true)) : router.push('/dashboard'))}
       />
@@ -752,13 +771,28 @@ export default function PosPage() {
         <form onSubmit={openSession} className="space-y-3">
           <p className="text-xs text-muted">{t('open_to_start')}</p>
           <div className="space-y-1.5">
+            <Label htmlFor="pos-device">{ts('device')}</Label>
+            <select id="pos-device" value={deviceId} onChange={(e) => setDeviceId(e.target.value)} required disabled={sessionBusy || devices.length === 0} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60">
+              <option value="">{ts('select_device')}</option>
+              {devices.map((device) => <option key={device.id} value={device.id}>{device.name}{device.code ? ` · ${device.code}` : ''}{device.warehouse ? ` — ${device.warehouse.name}` : ''}</option>)}
+            </select>
+            {devices.length === 0 && <p className="text-xs text-warning">{ts('no_device')}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="pos-shift">{ts('work_shift')} <span className="text-muted">({ts('optional')})</span></Label>
+            <select id="pos-shift" value={shiftId} onChange={(e) => setShiftId(e.target.value)} disabled={sessionBusy} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60">
+              <option value="">{ts('optional')}</option>
+              {shifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="ob">{ts('opening_balance')}</Label>
             <Input id="ob" className="num text-end" inputMode="decimal" value={openBal} onChange={(e) => setOpenBal(e.target.value)} required autoFocus />
           </div>
           {sessionError && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{sessionError}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => router.push('/dashboard')}>{t('leave')}</Button>
-            <Button type="submit" disabled={sessionBusy}>{ts('open')}</Button>
+            <Button type="submit" disabled={sessionBusy || !deviceId}>{ts('open')}</Button>
           </div>
         </form>
       </Dialog>

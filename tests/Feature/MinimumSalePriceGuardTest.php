@@ -113,10 +113,20 @@ class MinimumSalePriceGuardTest extends TestCase
         $auth = $this->registerTenant();
         $customer = $this->customer($auth['token']);
         $product = $this->product($auth['token']);
+        $warehouseId = $this->withToken($auth['token'])->postJson('/api/warehouses', [
+            'name' => 'مخزن اختبار السعر', 'code' => 'MIN-POS-W', 'is_active' => true,
+        ])->assertCreated()['data']['id'];
+        $deviceId = $this->withToken($auth['token'])->postJson('/api/pos-devices', [
+            'name' => 'كاشير اختبار السعر', 'code' => 'MIN-POS', 'warehouse_id' => $warehouseId, 'is_active' => true,
+        ])->assertCreated()['data']['id'];
+        $sessionId = $this->withToken($auth['token'])
+            ->postJson('/api/pos-sessions/open', ['opening_balance' => 0, 'pos_device_id' => $deviceId])
+            ->assertCreated()['data']['id'];
 
         $this->withToken($auth['token'])
             ->postJson('/api/pos/checkout', [
                 'partner_id' => $customer['id'],
+                'pos_session_id' => $sessionId,
                 'items' => [[
                     'product_id' => $product['id'],
                     'quantity' => 1,

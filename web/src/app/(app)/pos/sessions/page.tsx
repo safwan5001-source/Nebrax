@@ -15,10 +15,17 @@ import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor, isNegative } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
+interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null }
+interface WorkShift { id: string; name: string; is_active: boolean }
 interface Session {
   id: string;
   number: string;
   status: string;
+  pos_device_id: string | null;
+  warehouse_id: string | null;
+  shift_id: string | null;
+  pos_device?: { id: string; name: string; code: string | null } | null;
+  warehouse?: { id: string; code: string; name: string } | null;
   opening_balance: string;
   closing_balance: string | null;
   expected_balance: string | null;
@@ -29,6 +36,7 @@ interface Session {
 
 export default function PosSessionsPage() {
   const t = useTranslations('posSessions');
+  const tp = useTranslations('pos');
   const tc = useTranslations('common');
   const { success } = useToast();
   const [data, setData] = useState<Session[]>([]);
@@ -36,6 +44,10 @@ export default function PosSessionsPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [closeId, setCloseId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
+  const [devices, setDevices] = useState<PosDevice[]>([]);
+  const [shifts, setShifts] = useState<WorkShift[]>([]);
+  const [deviceId, setDeviceId] = useState('');
+  const [shiftId, setShiftId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,14 +56,16 @@ export default function PosSessionsPage() {
     api<{ data: Session[] }>('/pos-sessions').then((r) => setData(r.data)).finally(() => setLoading(false));
   }, []);
   useEffect(() => load(), [load]);
-
-  const hasOpen = data.some((s) => s.status === 'open');
+  useEffect(() => {
+    api<{ data: PosDevice[] }>('/pos-devices').then((r) => setDevices(r.data.filter((device) => device.is_active))).catch(() => {});
+    api<{ data: WorkShift[] }>('/shifts').then((r) => setShifts(r.data.filter((shift) => shift.is_active))).catch(() => {});
+  }, []);
 
   async function submitOpen() {
     setBusy(true); setError(null);
     try {
-      await api('/pos-sessions/open', { method: 'POST', body: { opening_balance: riyalToMinor(amount) } });
-      success(tc('created')); setOpenDialog(false); setAmount(''); load();
+      await api('/pos-sessions/open', { method: 'POST', body: { opening_balance: riyalToMinor(amount), pos_device_id: deviceId, shift_id: shiftId || null } });
+      success(tc('created')); setOpenDialog(false); setAmount(''); setDeviceId(''); setShiftId(''); load();
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
   async function submitClose() {
@@ -67,6 +81,8 @@ export default function PosSessionsPage() {
     () => [
       { accessorKey: 'number', header: t('number'), cell: ({ row }) => <span className="num">{row.original.number}</span> },
       { accessorKey: 'opened_at', header: t('opened_at'), cell: ({ row }) => <span className="num text-muted">{(row.original.opened_at ?? '').slice(0, 16).replace('T', ' ')}</span> },
+      { id: 'device', header: t('device'), cell: ({ row }) => <span>{row.original.pos_device?.name ?? '—'}</span> },
+      { id: 'warehouse', header: tp('warehouse'), cell: ({ row }) => <span>{row.original.warehouse?.name ?? '—'}</span> },
       { accessorKey: 'opening_balance', header: t('opening_balance'), cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.opening_balance)}</div> },
       { accessorKey: 'expected_balance', header: t('expected'), cell: ({ row }) => <div className="num text-end">{row.original.expected_balance ? formatRiyal(row.original.expected_balance) : '—'}</div> },
       { accessorKey: 'closing_balance', header: t('closing_balance'), cell: ({ row }) => <div className="num text-end">{row.original.closing_balance ? formatRiyal(row.original.closing_balance) : '—'}</div> },
@@ -86,24 +102,37 @@ export default function PosSessionsPage() {
         ) : null,
       },
     ],
-    [t],
+    [t, tp],
   );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <Button disabled={hasOpen} onClick={() => { setOpenDialog(true); setAmount(''); setError(null); }}>
+        <Button onClick={() => { setOpenDialog(true); setAmount(''); setDeviceId(''); setShiftId(''); setError(null); }}>
           <Plus className="h-4 w-4" strokeWidth={1.8} />{t('open')}
         </Button>
       </div>
-
-      {!loading && !hasOpen && <p className="rounded border border-border bg-surface px-4 py-3 text-sm text-muted">{t('no_open')}</p>}
 
       <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="pos-sessions" />
 
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} title={t('open_title')}>
         <form onSubmit={(e) => { e.preventDefault(); submitOpen(); }} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="session-device">{t('device')}</Label>
+            <select id="session-device" value={deviceId} onChange={(e) => setDeviceId(e.target.value)} required disabled={busy || devices.length === 0} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60">
+              <option value="">{t('select_device')}</option>
+              {devices.map((device) => <option key={device.id} value={device.id}>{device.name}{device.code ? ` · ${device.code}` : ''}{device.warehouse ? ` — ${device.warehouse.name}` : ''}</option>)}
+            </select>
+            {devices.length === 0 && <p className="text-xs text-warning">{t('no_device')}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="session-shift">{t('work_shift')} <span className="text-muted">({t('optional')})</span></Label>
+            <select id="session-shift" value={shiftId} onChange={(e) => setShiftId(e.target.value)} disabled={busy} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60">
+              <option value="">{t('optional')}</option>
+              {shifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.name}</option>)}
+            </select>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="ob">{t('opening_balance')}</Label>
             <Input id="ob" className="num text-end" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
@@ -111,7 +140,7 @@ export default function PosSessionsPage() {
           {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>{t('cancel')}</Button>
-            <Button type="submit" disabled={busy}>{t('save')}</Button>
+            <Button type="submit" disabled={busy || !deviceId}>{t('save')}</Button>
           </div>
         </form>
       </Dialog>
