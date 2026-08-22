@@ -6,6 +6,7 @@ use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * جلسة نقطة بيع (وردية) — سجلّ تشغيلي لمطابقة النقدية. غير محاسبي.
  * المبالغ بالهللات كـ bigint.
@@ -21,6 +22,7 @@ class PosSession extends BaseModel
         'tenant_id', 'number', 'status', 'opening_balance', 'closing_balance',
         'expected_balance', 'difference', 'opened_at', 'closed_at', 'notes', 'opened_by', 'closed_by',
         'pos_device_id', 'warehouse_id', 'shift_id',
+        'difference_status', 'difference_acknowledged_by', 'difference_acknowledged_at', 'difference_acknowledgement_note',
     ];
 
     protected $casts = [
@@ -30,6 +32,7 @@ class PosSession extends BaseModel
         'difference'       => 'integer',
         'opened_at'        => 'datetime',
         'closed_at'        => 'datetime',
+        'difference_acknowledged_at' => 'datetime',
     ];
 
     protected $attributes = [
@@ -63,6 +66,21 @@ class PosSession extends BaseModel
     public function closedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by');
+    }
+
+    public function cashMovements(): HasMany
+    {
+        return $this->hasMany(PosCashMovement::class);
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(PosSessionEvent::class);
+    }
+
+    public function differenceAcknowledgedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'difference_acknowledged_by');
     }
 
     public function isOpen(): bool

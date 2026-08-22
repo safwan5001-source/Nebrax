@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\AcknowledgePosSessionDifferenceRequest;
 use App\Http\Requests\OpenPosSessionRequest;
+use App\Http\Requests\StorePosCashMovementRequest;
+use App\Http\Resources\PosCashMovementResource;
+use App\Http\Resources\PosSessionEventResource;
 use App\Http\Resources\PosSessionResource;
 use App\Models\PosSession;
 use App\Services\Accounting\PosSessionService;
@@ -21,9 +25,7 @@ class PosSessionController extends ApiController
             $query->where('opened_by', $request->user()?->id);
         }
 
-        $sessions = $this->scopeToActiveBranch($query, $request)->get();
-
-        return PosSessionResource::collection($sessions)->response();
+        return PosSessionResource::collection($this->scopeToActiveBranch($query, $request)->get())->response();
     }
 
     public function open(OpenPosSessionRequest $request): JsonResponse
@@ -43,33 +45,73 @@ class PosSessionController extends ApiController
 
     public function close(Request $request, string $id): JsonResponse
     {
-        $data = $request->validate([
-            'closing_balance' => ['required', 'integer', 'min:0'], // هللات
-        ]);
-
+        $data = $request->validate(['closing_balance' => ['required', 'integer', 'min:0']]); // هللات
         $session = $this->visibleSession($id, $request);
-        $closed = $this->domain(fn () => $this->sessions->close(
-            $session,
-            (int) $data['closing_balance'],
-            $request->user()?->id,
-        ));
+        $closed = $this->domain(fn () => $this->sessions->close($session, (int) $data['closing_balance'], $request->user()?->id));
 
         return (new PosSessionResource($closed->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
     }
 
-    /** تقرير الوردية (X/Z): مبيعات نقدية + متوقّع + مطابقة. */
+    public function cashMovements(Request $request, string $id): JsonResponse
+    {
+        $session = $this->visibleSession($id, $request);
+
+        return PosCashMovementResource::collection(
+            $session->cashMovements()->with('recordedBy')->orderBy('created_at')->get()
+        )->response();
+    }
+
+    public function recordCashMovement(StorePosCashMovementRequest $request, string $id): JsonResponse
+    {
+        $session = $this->visibleSession($id, $request);
+        $data = $request->validated();
+        $movement = $this->domain(fn () => $this->sessions->recordCashMovement(
+            $session,
+            $data['type'],
+            (int) $data['amount'],
+            $data['reason'],
+            $request->user(),
+        ));
+
+        return (new PosCashMovementResource($movement))->response()->setStatusCode(201);
+    }
+
+    public function events(Request $request, string $id): JsonResponse
+    {
+        $session = $this->visibleSession($id, $request);
+
+        return PosSessionEventResource::collection(
+            $session->events()->with('actor')->orderBy('created_at')->get()
+        )->response();
+    }
+
+    public function acknowledgeDifference(AcknowledgePosSessionDifferenceRequest $request, string $id): JsonResponse
+    {
+        $session = $this->visibleSession($id, $request);
+        $acknowledged = $this->domain(fn () => $this->sessions->acknowledgeDifference(
+            $session,
+            $request->validated('note'),
+            $request->user(),
+        ));
+
+        return (new PosSessionResource($acknowledged->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
+    }
+
+    /** تقرير الوردية (X/Z): نقد البيع + حركات الدرج + المتوقّع + المطابقة. */
     public function report(Request $request, string $id): JsonResponse
     {
         $session = $this->visibleSession($id, $request);
-        $r = $this->sessions->report($session);
+        $report = $this->sessions->report($session);
 
         return response()->json([
             'session' => new PosSessionResource($session->load(['posDevice.warehouse', 'warehouse', 'shift'])),
-            'report'  => [
-                'cash_sales'  => Money::toRiyal($r['cash_sales']),
-                'sales_count' => $r['sales_count'],
-                'average'     => Money::toRiyal($r['average']),
-                'expected'    => Money::toRiyal($r['expected']),
+            'report' => [
+                'cash_sales' => Money::toRiyal($report['cash_sales']),
+                'cash_in' => Money::toRiyal($report['cash_in']),
+                'cash_out' => Money::toRiyal($report['cash_out']),
+                'sales_count' => $report['sales_count'],
+                'average' => Money::toRiyal($report['average']),
+                'expected' => Money::toRiyal($report['expected']),
             ],
         ]);
     }

@@ -72,6 +72,8 @@ class Rbac
             // استثناء سعري محروس: owner/admin يملكانه عبر `*`، ويُسند صراحةً
             // فقط إلى دور مخصص وافق المستأجر على منحه سلطة البيع تحت الحد.
             'sales.minimum_price_override',
+            // اعتماد فرق درج POS سلطة إدارية مستقلة عن تنفيذ البيع اليومي.
+            'pos.variance.approve',
             'apps.view', 'apps.manage',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
@@ -100,6 +102,12 @@ class Rbac
         $perms = self::resolve($role);
 
         return in_array('*', $perms, true) || in_array($permission, $perms, true);
+    }
+
+    /** @return array<int,string> قائمة الصلاحيات الفعلية للعميل المصادق، للعرض فقط. */
+    public static function permissionsForRole(string $role): array
+    {
+        return self::resolve($role);
     }
 
     /** هل الدور موجود (في جدول المستأجر أو في المصفوفة الثابتة)؟ */

@@ -8,6 +8,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: string;
+  permissions?: string[];
   employee_id?: string | null;
   tenant_id: string;
   preferences?: { locale: 'ar' | 'en'; theme: 'system' | 'light' | 'dark' };

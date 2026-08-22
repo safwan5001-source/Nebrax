@@ -22,6 +22,12 @@ class PosSessionResource extends JsonResource
             'closing_balance'  => $this->closing_balance !== null ? Money::toRiyal($this->closing_balance) : null,
             'expected_balance' => $this->expected_balance !== null ? Money::toRiyal($this->expected_balance) : null,
             'difference'       => $this->difference !== null ? Money::toRiyal($this->difference) : null,
+            'difference_status' => $this->difference_status,
+            'difference_acknowledgement' => $this->difference_acknowledged_at ? [
+                'acknowledged_by' => $this->difference_acknowledged_by,
+                'acknowledged_at' => $this->difference_acknowledged_at->toIso8601String(),
+                'note' => $this->difference_acknowledgement_note,
+            ] : null,
             'opened_at'        => optional($this->opened_at)->toIso8601String(),
             'closed_at'        => optional($this->closed_at)->toIso8601String(),
             'notes'            => $this->notes,
