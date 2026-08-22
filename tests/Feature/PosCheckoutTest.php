@@ -209,7 +209,7 @@ class PosCheckoutTest extends TestCase
         ])->assertCreated()['data'];
         $code = 'POS-CARTON-' . uniqid();
         $this->withToken($auth['token'])->postJson("/api/products/{$product['id']}/barcodes", [
-            'code' => $code, 'unit_name' => 'carton',
+            'code' => $code, 'unit_name' => 'carton', 'default_quantity' => 5,
         ])->assertCreated();
         $priceList = $this->withToken($auth['token'])->postJson('/api/price-lists', [
             'name' => 'قائمة ماسح العميل',
@@ -224,7 +224,7 @@ class PosCheckoutTest extends TestCase
         $customerCatalog = $this->withToken($auth['token'])->getJson("/api/pos/products?partner_id={$customerId}")
             ->assertOk()['data'];
         $shown = collect($customerCatalog)->firstWhere('id', $product['id']);
-        $this->assertSame([['code' => $code, 'unit_name' => 'carton']], $shown['pos_barcodes']);
+        $this->assertSame([['code' => $code, 'unit_name' => 'carton', 'default_quantity' => 5]], $shown['pos_barcodes']);
 
         $cashCatalog = $this->withToken($auth['token'])->getJson('/api/pos/products')->assertOk()['data'];
         $this->assertSame([], collect($cashCatalog)->firstWhere('id', $product['id'])['pos_barcodes']);

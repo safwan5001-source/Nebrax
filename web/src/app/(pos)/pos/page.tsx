@@ -57,7 +57,7 @@ const POS_DEFAULTS: PosConfig = {
 };
 
 interface PosUnit { name: string; factor: number; price: string }
-interface PosBarcode { code: string; unit_name: string }
+interface PosBarcode { code: string; unit_name: string; default_quantity: number }
 interface Product {
   id: string;
   sku: string | null;
@@ -286,13 +286,14 @@ export default function PosPage() {
     }));
   }, [posCfg.allow_unit_price_override, products]);
 
-  function addProduct(p: Product, unitName: string | null = null) {
+  function addProduct(p: Product, unitName: string | null = null, quantity = 1) {
     const unit = pricedUnit(p, unitName);
+    const qty = Number.isInteger(quantity) && quantity >= 1 && quantity <= 1000000 ? quantity : 1;
     if (!unit) return;
     setCart((c) => {
       const ex = c.find((l) => l.productId === p.id && l.unit === unit.name);
-      if (ex) return c.map((l) => (l.key === ex.key ? { ...l, qty: l.qty + 1 } : l));
-      return [...c, { key: `${p.id}:${unit.name}`, productId: p.id, description: p.name, sku: p.sku, unit: unit.name, price: unit.price, qty: 1, tax: p.tax_rate, discount: '' }];
+      if (ex) return c.map((l) => (l.key === ex.key ? { ...l, qty: l.qty + qty } : l));
+      return [...c, { key: `${p.id}:${unit.name}`, productId: p.id, description: p.name, sku: p.sku, unit: unit.name, price: unit.price, qty, tax: p.tax_rate, discount: '' }];
     });
   }
 
@@ -444,7 +445,7 @@ export default function PosPage() {
       .map((product) => ({ product, barcode: product.pos_barcodes.find((item) => item.code.trim() === c) }))
       .find((match) => match.barcode !== undefined);
     if (alternate?.barcode) {
-      addProduct(alternate.product, alternate.barcode.unit_name);
+      addProduct(alternate.product, alternate.barcode.unit_name, alternate.barcode.default_quantity);
       success(t('scan_added', { name: alternate.product.name }));
       return true;
     }

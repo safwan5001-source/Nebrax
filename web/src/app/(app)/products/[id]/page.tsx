@@ -34,7 +34,7 @@ type Product = {
   is_active: boolean;
 };
 
-type Barcode = { id: string; code: string; unit_name: string | null; label: string | null };
+type Barcode = { id: string; code: string; unit_name: string | null; default_quantity: number; label: string | null };
 type ProductMedia = { id: string; original_name: string; download_url: string; sort_order: number; previewUrl?: string | null };
 type Activity = { id: string; action: string; created_at: string | null; user: { id: string; name: string } | null };
 
@@ -49,6 +49,7 @@ export default function ProductProfilePage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [code, setCode] = useState('');
   const [unitName, setUnitName] = useState('');
+  const [defaultQuantity, setDefaultQuantity] = useState('1');
   const [label, setLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,16 +87,19 @@ export default function ProductProfilePage() {
     if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
   }), [media]);
 
+  const barcodeQuantityValid = /^\d+$/.test(defaultQuantity) && Number(defaultQuantity) >= 1 && Number(defaultQuantity) <= 1000000;
+
   async function addBarcode() {
-    if (!code.trim()) return;
+    if (!code.trim() || !barcodeQuantityValid) return;
     setSavingBarcode(true);
     setError(null);
     try {
       const result = await api<{ data: Barcode }>(`/products/${id}/barcodes`, {
-        method: 'POST', body: { code: code.trim(), unit_name: unitName, label: label.trim() || null },
+        method: 'POST', body: { code: code.trim(), unit_name: unitName, default_quantity: Number(defaultQuantity), label: label.trim() || null },
       });
       setBarcodes((rows) => [result.data, ...rows]);
       setCode('');
+      setDefaultQuantity('1');
       setLabel('');
       success(t('barcode_added'));
     } catch (err) {
@@ -179,13 +183,14 @@ export default function ProductProfilePage() {
           <CardHeader><CardTitle>{t('alternate_barcodes')}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs leading-relaxed text-muted">{t('alternate_barcodes_hint')}</p>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-4">
               <div className="space-y-1"><Label htmlFor="barcode-code">{t('barcode_code')}</Label><Input id="barcode-code" dir="ltr" value={code} onChange={(e) => setCode(e.target.value)} /></div>
               <div className="space-y-1"><Label htmlFor="barcode-unit">{t('unit')}</Label><Select id="barcode-unit" value={unitName} onChange={(e) => setUnitName(e.target.value)}>{product.units.length ? product.units.map((unit) => <option key={unit.name} value={unit.name}>{unit.name}</option>) : <option value={product.unit}>{product.unit}</option>}</Select></div>
+              <div className="space-y-1"><Label htmlFor="barcode-default-quantity">{t('barcode_default_quantity')}</Label><Input id="barcode-default-quantity" type="number" min="1" max="1000000" inputMode="numeric" value={defaultQuantity} onChange={(e) => setDefaultQuantity(e.target.value)} aria-invalid={defaultQuantity !== '' && !barcodeQuantityValid} aria-describedby={defaultQuantity !== '' && !barcodeQuantityValid ? 'barcode-default-quantity-error' : undefined} />{defaultQuantity !== '' && !barcodeQuantityValid && <p id="barcode-default-quantity-error" role="alert" className="text-xs text-negative">{t('barcode_quantity_invalid')}</p>}</div>
               <div className="space-y-1"><Label htmlFor="barcode-label">{t('barcode_label')}</Label><Input id="barcode-label" value={label} onChange={(e) => setLabel(e.target.value)} /></div>
             </div>
-            <Button type="button" disabled={savingBarcode || !code.trim()} onClick={addBarcode}><Plus className="h-4 w-4" />{t('add_barcode')}</Button>
-            {barcodes.length === 0 ? <p className="text-sm text-muted">{t('no_alternate_barcodes')}</p> : <ul className="space-y-2">{barcodes.map((barcode) => <li key={barcode.id} className="flex items-center gap-3 rounded border border-border px-3 py-2"><span className="num min-w-0 flex-1 truncate" dir="ltr">{barcode.code}</span><Badge tone="muted">{barcode.unit_name}</Badge><Button variant="ghost" size="icon" aria-label={t('delete')} onClick={() => removeBarcode(barcode.id)}><Trash2 className="h-4 w-4" /></Button></li>)}</ul>}
+            <Button type="button" disabled={savingBarcode || !code.trim() || !barcodeQuantityValid} onClick={addBarcode}><Plus className="h-4 w-4" />{t('add_barcode')}</Button>
+            {barcodes.length === 0 ? <p className="text-sm text-muted">{t('no_alternate_barcodes')}</p> : <ul className="space-y-2">{barcodes.map((barcode) => <li key={barcode.id} className="flex items-center gap-3 rounded border border-border px-3 py-2"><span className="num min-w-0 flex-1 truncate" dir="ltr">{barcode.code}</span><Badge tone="muted">{barcode.unit_name}</Badge><span className="num text-xs text-muted">{t('barcode_quantity', { quantity: barcode.default_quantity })}</span><Button variant="ghost" size="icon" aria-label={t('delete')} onClick={() => removeBarcode(barcode.id)}><Trash2 className="h-4 w-4" /></Button></li>)}</ul>}
           </CardContent>
         </Card>
       </div>

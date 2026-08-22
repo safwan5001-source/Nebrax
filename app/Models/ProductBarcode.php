@@ -16,8 +16,15 @@ class ProductBarcode extends BaseModel implements CompanyWide
     use ResolvesBranchReferences;
 
     protected $fillable = [
-        'tenant_id', 'product_id', 'code', 'unit_name', 'label', 'created_by',
+        'tenant_id', 'product_id', 'code', 'unit_name', 'default_quantity', 'label', 'created_by',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'default_quantity' => 'integer',
+        ];
+    }
 
     public function product(): BelongsTo
     {
