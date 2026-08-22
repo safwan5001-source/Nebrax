@@ -10,7 +10,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * عقد إتمام بيع POS: بيع مرحّل ذرياً، وسندات قبض مرتبطة بجلسة كاشير مفتوحة.
+ * عقد إتمام بيع POS: بيع مرحّل ذرياً، وسندات قبض بوسائل دفع مهيأة مرتبطة بجلسة
+ * كاشير مفتوحة. لا تنشئ السياسة الجديدة أي قيد خارج InvoiceService/PaymentService.
  */
 class PosCheckoutTest extends TestCase
 {
@@ -52,28 +53,56 @@ class PosCheckoutTest extends TestCase
         ]);
     }
 
+    private function methods(array $auth): array
+    {
+        return $this->withToken($auth['token'])->getJson('/api/payment-methods')->assertOk()['data'];
+    }
+
+    private function methodBySettlement(array $methods, string $settlementType): array
+    {
+        foreach ($methods as $method) {
+            if ($method['settlement_type'] === $settlementType) {
+                return $method;
+            }
+        }
+
+        $this->fail("لا توجد وسيلة دفع {$settlementType} مهيأة للاختبار.");
+    }
+
+    private function tender(array $method, int $amount): array
+    {
+        return ['payment_method_id' => $method['id'], 'amount' => $amount];
+    }
+
     /** @test */
-    public function mixed_cash_and_card_routes_to_1110_and_1120_and_settles_receivables(): void
+    public function configured_cash_and_bank_methods_route_to_1110_and_1120_and_settle_receivables(): void
     {
         $auth = $this->registerTenant();
         app(TenantContext::class)->set($auth['tenant_id']);
         $sessionId = $this->openSession($auth);
         $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل نقدي', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $bank = $this->methodBySettlement($this->methods($auth), 'bank');
 
-        // بيع 115.00 (100 + 15% ضريبة): نقد 50 + بطاقة 65.
+        // بيع 115.00 (100 + 15% ضريبة): نقد 50 + وسيلة بنكية مهيأة 65.
         $res = $this->checkout($auth['token'], $partnerId, $sessionId, [
-            'cash' => 5000, 'card' => 6500, 'transfer' => 0, 'credit' => 0,
+            $this->tender($cash, 5000), $this->tender($bank, 6500),
         ])->assertCreated();
 
         $this->assertSame('115.00', $res['data']['total']);
         $this->assertSame('paid', $res['data']['payment_status']);
 
-        // النقد على الصندوق، البطاقة على البنك، الذمم صفر (سُدِّدت بالكامل).
+        // النقد على الصندوق، الوسيلة البنكية على البنك، الذمم صفر (سُدِّدت بالكامل).
         $this->assertSame(5000, $this->balance('1110'));
         $this->assertSame(6500, $this->balance('1120'));
         $this->assertSame(0, $this->balance('1130'));
         $this->assertSame(10000, $this->balance('4110'));
         $this->assertSame(1500, $this->balance('2120'));
+
+        $invoice = Invoice::findOrFail($res['data']['id']);
+        $payments = Payment::where('invoice_id', $invoice->id)->get()->keyBy('payment_method_id');
+        $this->assertSame($cash['name'], $payments[$cash['id']]->payment_method_name);
+        $this->assertSame($bank['name'], $payments[$bank['id']]->payment_method_name);
     }
 
     /** @test */
@@ -87,11 +116,12 @@ class PosCheckoutTest extends TestCase
         $this->withToken($auth['token'])->postJson('/api/pos/checkout', [
             'partner_id' => $partnerId,
             'items'      => [['quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
-            'tenders'    => ['cash' => 11500],
+            'tenders'    => [],
         ])->assertUnprocessable();
 
         $sessionId = $this->openSession($auth);
-        $res = $this->checkout($auth['token'], $partnerId, $sessionId, ['cash' => 11500])->assertCreated();
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $res = $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])->assertCreated();
         $invoice = Invoice::findOrFail($res['data']['id']);
 
         $this->assertSame($sessionId, $invoice->pos_session_id);
@@ -101,14 +131,15 @@ class PosCheckoutTest extends TestCase
     }
 
     /** @test */
-    public function pure_cash_sale_debits_only_the_cash_account(): void
+    public function a_cash_method_debits_only_its_cash_account(): void
     {
         $auth = $this->registerTenant();
         app(TenantContext::class)->set($auth['tenant_id']);
         $sessionId = $this->openSession($auth);
         $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل نقدي', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
 
-        $this->checkout($auth['token'], $partnerId, $sessionId, ['cash' => 11500])->assertCreated();
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])->assertCreated();
 
         $this->assertSame(11500, $this->balance('1110'));
         $this->assertSame(0, $this->balance('1120'));
@@ -116,19 +147,57 @@ class PosCheckoutTest extends TestCase
     }
 
     /** @test */
-    public function partial_credit_leaves_the_unpaid_amount_on_receivables(): void
+    public function deferred_payment_defaults_to_allowed_and_leaves_the_unpaid_amount_on_receivables(): void
     {
         $auth = $this->registerTenant();
         app(TenantContext::class)->set($auth['tenant_id']);
         $sessionId = $this->openSession($auth);
         $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
 
-        // 115.00: نقد 65 + آجل 50.
-        $res = $this->checkout($auth['token'], $partnerId, $sessionId, ['cash' => 6500, 'credit' => 5000])->assertCreated();
+        // 115.00: نقد 65 + آجل 50 وفق الافتراض المتوافق مع السلوك السابق.
+        $res = $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 6500)])->assertCreated();
 
         $this->assertSame('partial', $res['data']['payment_status']);
         $this->assertSame(6500, $this->balance('1110'));
         $this->assertSame(5000, $this->balance('1130'));
+    }
+
+    /** @test */
+    public function disabled_deferred_payment_rejects_an_unpaid_balance_without_creating_documents(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => ['allow_deferred_payment' => false],
+        ])->assertOk();
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 6500)])->assertStatus(422);
+
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
+    }
+
+    /** @test */
+    public function it_rejects_a_method_not_enabled_for_pos_without_creating_documents(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $bank = $this->methodBySettlement($this->methods($auth), 'bank');
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => ['enabled_payment_method_ids' => [$cash['id']]],
+        ])->assertOk();
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($bank, 11500)])->assertStatus(422);
+
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
     }
 
     /** @test */
@@ -138,11 +207,12 @@ class PosCheckoutTest extends TestCase
         app(TenantContext::class)->set($auth['tenant_id']);
         $sessionId = $this->openSession($auth);
         $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
 
         $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$sessionId}/close", ['closing_balance' => 0])
             ->assertOk();
 
-        $this->checkout($auth['token'], $partnerId, $sessionId, ['cash' => 11500])->assertStatus(422);
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])->assertStatus(422);
         $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
         $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
     }
@@ -155,8 +225,9 @@ class PosCheckoutTest extends TestCase
         app(TenantContext::class)->set($a['tenant_id']);
         $partnerA = $this->withToken($a['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
         $sessionB = $this->openSession($b);
+        $cashForB = $this->methodBySettlement($this->methods($b), 'cash');
 
         // المستأجر B لا يستطيع البيع لعميل المستأجر A، حتى مع جلسة POS تخصه.
-        $this->checkout($b['token'], $partnerA, $sessionB, ['cash' => 11500])->assertNotFound();
+        $this->checkout($b['token'], $partnerA, $sessionB, [$this->tender($cashForB, 11500)])->assertNotFound();
     }
 }
