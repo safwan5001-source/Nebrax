@@ -6,6 +6,7 @@ use App\Models\CreditNote;
 use App\Models\ReturnDocument;
 use App\Services\Accounting\CreditNoteOwnershipResolver;
 use App\Services\ApplicationOperationClassifier;
+use App\Services\EntitlementCohortEnforcer;
 use App\Services\EntitlementShadowEvaluator;
 use App\Services\TenantApplicationService;
 use App\Support\ApplicationAccessReason;
@@ -39,6 +40,7 @@ class EnsureApplicationOperationActive
         private CreditNoteOwnershipResolver $creditNoteOwnership,
         private ApplicationOperationClassifier $operations,
         private EntitlementShadowEvaluator $shadow,
+        private EntitlementCohortEnforcer $cohortEnforcement,
     ) {}
 
     public function handle(Request $request, Closure $next, string $operation): Response
@@ -63,6 +65,7 @@ class EnsureApplicationOperationActive
 
     private function assertActive(Request $request, string $applicationKey): void
     {
+        $this->cohortEnforcement->enforce($request, $applicationKey, $this->operations->classify($request));
         $status = $this->applications->statusFor($applicationKey);
         $legacy = match (true) {
             $status === 'enabled' => ApplicationAccessResult::allowed(),

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\ApplicationOperationClassifier;
+use App\Services\EntitlementCohortEnforcer;
 use App\Services\EntitlementShadowEvaluator;
 use App\Services\TenantApplicationService;
 use App\Support\ApplicationAccessReason;
@@ -26,6 +27,7 @@ class EnsureApplicationActive
         private TenantApplicationService $applications,
         private ApplicationOperationClassifier $operations,
         private EntitlementShadowEvaluator $shadow,
+        private EntitlementCohortEnforcer $cohortEnforcement,
     ) {}
 
     public function handle(Request $request, Closure $next, string $key): Response
@@ -33,6 +35,8 @@ class EnsureApplicationActive
         // اسم Middleware أو مفتاح App Guard الخاطئ لا يملك سلوكاً متسامحاً:
         // الرفض الموحّد لا يكشف إن كان الخطأ ناتجاً من كتالوج أو تهيئة مسار.
         $operation = $this->operations->classify($request);
+        $this->cohortEnforcement->enforce($request, $key, $operation);
+
         if (! ApplicationCatalog::exists($key)) {
             $this->shadow->observe($request, $key, $operation, ApplicationAccessResult::denied(ApplicationAccessReason::UNKNOWN_CAPABILITY));
             abort(403, 'هذه القدرة غير متاحة لهذه المؤسسة.');

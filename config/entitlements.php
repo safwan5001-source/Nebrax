@@ -1,6 +1,9 @@
 <?php
 
 return [
-    // Deployment rollout control only. Entitlements are observational in Phase 2.
+    // off = legacy only; shadow = observational; enforce_cohort = selected trusted tenants only.
     'mode' => env('ENTITLEMENT_MODE', 'off'),
+
+    // Platform-controlled comma-separated UUID allowlist. Empty by default.
+    'enforce_tenants' => env('ENTITLEMENT_ENFORCE_TENANTS', ''),
 ];
