@@ -30,7 +30,7 @@ class Partner extends BaseModel implements BranchShareable
         'tenant_id', 'branch_id', 'code', 'type', 'entity_type', 'name', 'name_en',
         'vat_number', 'cr_number', 'email', 'phone', 'mobile', 'address', 'city',
         'building_no', 'street', 'district', 'postal_code', 'country',
-        'classification', 'customer_classification_id', 'supplier_classification_id', 'credit_limit', 'credit_period', 'is_active',
+        'classification', 'customer_classification_id', 'supplier_classification_id', 'default_price_list_id', 'credit_limit', 'credit_period', 'is_active',
     ];
 
     protected $casts = [
@@ -44,6 +44,12 @@ class Partner extends BaseModel implements BranchShareable
         'entity_type' => 'commercial',
         'is_active'   => true,
     ];
+
+    /** قائمة سعر مشتركة تقترح للعميل عند إنشاء فاتورة جديدة؛ لا تعيد تسعير مستند محفوظ. */
+    public function defaultPriceList(): BelongsTo
+    {
+        return $this->referenceBelongsTo(PriceList::class, 'default_price_list_id');
+    }
 
     /** مرجع تحليلي محفوظ؛ لا يختفي عند تبديل سياق الفرع. */
     public function customerClassification(): BelongsTo

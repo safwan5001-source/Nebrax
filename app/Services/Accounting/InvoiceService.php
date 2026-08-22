@@ -5,10 +5,10 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\CostCenter;
 use App\Models\Invoice;
+use App\Models\Partner;
 use App\Models\InvoiceLine;
 use App\Models\InvoiceLineCostCenterAllocation;
 use App\Models\JournalLine;
-use App\Models\Partner;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\Settings;
@@ -72,6 +72,9 @@ class InvoiceService
         return DB::transaction(function () use ($data, $items) {
             $date   = $data['invoice_date'] ?? now()->toDateString();
             $isPaid = (bool) ($data['is_paid'] ?? false);
+            // الاختيار الصريح، ولو كان null، يتقدم على اقتراح العميل. نقرأ
+            // الافتراضي هنا لا في المتحكم وحده حتى يستفيد كل منشئ للمسودة.
+            $priceListId = $this->defaultPriceListId($data);
 
             // يجب تثبيت الفرع قبل الترقيم: BelongsToBranch يحقنه عند creating،
             // لكن توليد الرقم يسبق ذلك. وإلا وُلّد رقم السلسلة بلا فرع ثم حُفظ
@@ -83,7 +86,7 @@ class InvoiceService
                 'partner_id'        => $data['partner_id'],
                 'branch_id'         => $branchId,
                 'warehouse_id'      => $data['warehouse_id'] ?? null,
-                'price_list_id'     => $data['price_list_id'] ?? null,
+                'price_list_id'     => $priceListId,
                 'type'              => 'sale',
                 'payment_type'      => $this->paymentType($data['payment_type'] ?? Settings::get('sales', 'default_payment_type'), $isPaid),
                 'is_paid'           => $isPaid,
@@ -109,6 +112,22 @@ class InvoiceService
 
             return $invoice->fresh('lines.costCenterAllocations.costCenter');
         });
+    }
+
+    /**
+     * يرجع قائمة العميل النشطة إن لم يرسل المنشئ اختياراً يدوياً. لا تقترح
+     * القائمة على فاتورة تعدّل لاحقاً، ولا تعيد حساب أي مبلغ أو سطر محفوظ.
+     */
+    private function defaultPriceListId(array $data): ?string
+    {
+        if (array_key_exists('price_list_id', $data)) {
+            return $data['price_list_id'];
+        }
+
+        $partner = Partner::with('defaultPriceList')->find($data['partner_id']);
+        $priceList = $partner?->defaultPriceList;
+
+        return $priceList?->is_active ? $priceList->id : null;
     }
 
     /**

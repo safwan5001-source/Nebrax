@@ -7,6 +7,7 @@ use App\Http\Requests\UpdatePartnerRequest;
 use App\Http\Resources\PartnerResource;
 use App\Models\Classification;
 use App\Models\Partner;
+use App\Models\PriceList;
 use App\Tenancy\BranchScope;
 use App\Services\Accounting\PartnerService;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +26,7 @@ class PartnerController extends ApiController
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Partner::with(['customerClassification', 'supplierClassification'])->latest();
+        $query = Partner::with(['customerClassification', 'supplierClassification', 'defaultPriceList'])->latest();
 
         match ($request->query('type')) {
             'customer' => $query->whereIn('type', ['customer', 'both']),
@@ -52,7 +53,7 @@ class PartnerController extends ApiController
                 $data['opening_balance_date'] ?? null,
             );
 
-            return $partner->load(['customerClassification', 'supplierClassification']);
+            return $partner->load(['customerClassification', 'supplierClassification', 'defaultPriceList']);
         }));
 
         return (new PartnerResource($partner))->response()->setStatusCode(201);
@@ -60,25 +61,47 @@ class PartnerController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        return (new PartnerResource(Partner::with(['customerClassification', 'supplierClassification'])->findOrFail($id)))->response();
+        return (new PartnerResource(Partner::with(['customerClassification', 'supplierClassification', 'defaultPriceList'])->findOrFail($id)))->response();
     }
 
     public function update(UpdatePartnerRequest $request, string $id): JsonResponse
     {
         $partner = Partner::findOrFail($id);
         $data = $request->validated();
-        $this->assertPartnerClassifications($data);
+        $this->assertPartnerClassifications($data, $partner);
         $partner->update($data);
 
-        return (new PartnerResource($partner->load(['customerClassification', 'supplierClassification'])))->response();
+        return (new PartnerResource($partner->load(['customerClassification', 'supplierClassification', 'defaultPriceList'])))->response();
     }
 
     /** @param array<string, mixed> $data */
-    private function assertPartnerClassifications(array $data): void
+    private function assertPartnerClassifications(array $data, ?Partner $partner = null): void
     {
         $type = $data['type'];
-        $this->assertClassification($data['customer_classification_id'] ?? null, 'customer', in_array($type, ['customer', 'both'], true));
+        $isCustomer = in_array($type, ['customer', 'both'], true);
+        $this->assertClassification($data['customer_classification_id'] ?? null, 'customer', $isCustomer);
         $this->assertClassification($data['supplier_classification_id'] ?? null, 'supplier', in_array($type, ['supplier', 'both'], true));
+
+        // الغياب في التعديل يبقي المرجع القديم؛ الإرسال الفارغ يمحوه عمداً.
+        $priceListId = array_key_exists('default_price_list_id', $data)
+            ? $data['default_price_list_id']
+            : $partner?->default_price_list_id;
+        $this->assertDefaultPriceList($priceListId, $isCustomer, $partner?->default_price_list_id);
+    }
+
+    private function assertDefaultPriceList(?string $id, bool $allowedForType, ?string $currentId = null): void
+    {
+        if ($id === null) {
+            return;
+        }
+        if (! $allowedForType) {
+            abort(422, 'لا يمكن إسناد قائمة سعر افتراضية لطرف ليس عميلاً.');
+        }
+
+        $priceList = PriceList::find($id);
+        if (! $priceList || (! $priceList->is_active && $priceList->id !== $currentId)) {
+            abort(422, 'قائمة السعر الافتراضية غير موجودة أو غير نشطة.');
+        }
     }
 
     private function assertClassification(?string $id, string $scope, bool $allowedForType): void

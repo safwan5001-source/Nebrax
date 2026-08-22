@@ -71,6 +71,9 @@ class PriceListService
         if ($priceList->invoices()->exists()) {
             throw new RuntimeException('لا يمكن حذف قائمة أسعار استُخدمت في فاتورة. عطّلها بدلاً من ذلك.');
         }
+        if ($priceList->defaultPartners()->exists()) {
+            throw new RuntimeException('لا يمكن حذف قائمة أسعار معيّنة افتراضياً لعميل. أزلها من العميل أو عطّلها بدلاً من ذلك.');
+        }
 
         $priceList->delete();
     }

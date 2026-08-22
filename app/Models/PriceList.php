@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\BranchScope;
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -32,6 +33,13 @@ class PriceList extends BaseModel implements CompanyWide
     public function items(): HasMany
     {
         return $this->hasMany(PriceListItem::class);
+    }
+
+    /** العملاء قد يجعلونها اقتراحهم الافتراضي عند بدء فاتورة جديدة. */
+    public function defaultPartners(): HasMany
+    {
+        return $this->hasMany(Partner::class, 'default_price_list_id')
+            ->withoutGlobalScope(BranchScope::class);
     }
 
     /** الفواتير تحفظ المرجع لتظهر القائمة المختارة عند مراجعة المستند. */

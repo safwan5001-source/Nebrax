@@ -32,6 +32,12 @@ class PartnerResource extends JsonResource
             'classification' => $this->classification, // حقل انتقالي للتوافق الرجعي
             'customer_classification_id' => $this->customer_classification_id,
             'supplier_classification_id' => $this->supplier_classification_id,
+            'default_price_list_id' => $this->default_price_list_id,
+            'default_price_list' => $this->whenLoaded('defaultPriceList', fn () => $this->defaultPriceList ? [
+                'id' => $this->defaultPriceList->id,
+                'name' => $this->defaultPriceList->name,
+                'is_active' => (bool) $this->defaultPriceList->is_active,
+            ] : null),
             'customer_classification' => $this->whenLoaded('customerClassification', fn () => [
                 'id' => $this->customerClassification?->id,
                 'name' => $this->customerClassification?->name,
