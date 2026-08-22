@@ -195,6 +195,42 @@ class PosCheckoutTest extends TestCase
     }
 
     /** @test */
+    public function pos_catalog_exposes_an_alternate_barcode_only_for_its_explicitly_priced_customer_unit(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $template = $this->withToken($auth['token'])->postJson('/api/unit-templates', [
+            'name' => 'قالب باركود POS', 'base_unit' => 'piece',
+            'units' => [['name' => 'carton', 'factor' => 12]],
+        ])->assertCreated()['data'];
+        $product = $this->withToken($auth['token'])->postJson('/api/products', [
+            'name' => 'صنف باركود وحدة POS', 'sku' => 'POS-SCAN-' . uniqid(), 'type' => 'good',
+            'unit' => 'piece', 'unit_template_id' => $template['id'], 'sale_price' => 10000,
+        ])->assertCreated()['data'];
+        $code = 'POS-CARTON-' . uniqid();
+        $this->withToken($auth['token'])->postJson("/api/products/{$product['id']}/barcodes", [
+            'code' => $code, 'unit_name' => 'carton',
+        ])->assertCreated();
+        $priceList = $this->withToken($auth['token'])->postJson('/api/price-lists', [
+            'name' => 'قائمة ماسح العميل',
+        ])->assertCreated()['data'];
+        $this->withToken($auth['token'])->postJson("/api/price-lists/{$priceList['id']}/items", [
+            'product_id' => $product['id'], 'unit_name' => 'carton', 'price' => 120000,
+        ])->assertCreated();
+        $customerId = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل ماسح الوحدة', 'type' => 'customer', 'default_price_list_id' => $priceList['id'],
+        ])->assertCreated()['data']['id'];
+
+        $customerCatalog = $this->withToken($auth['token'])->getJson("/api/pos/products?partner_id={$customerId}")
+            ->assertOk()['data'];
+        $shown = collect($customerCatalog)->firstWhere('id', $product['id']);
+        $this->assertSame([['code' => $code, 'unit_name' => 'carton']], $shown['pos_barcodes']);
+
+        $cashCatalog = $this->withToken($auth['token'])->getJson('/api/pos/products')->assertOk()['data'];
+        $this->assertSame([], collect($cashCatalog)->firstWhere('id', $product['id'])['pos_barcodes']);
+    }
+
+    /** @test */
     public function configured_cash_and_bank_methods_route_to_1110_and_1120_and_settle_receivables(): void
     {
         $auth = $this->registerTenant();

@@ -57,6 +57,7 @@ const POS_DEFAULTS: PosConfig = {
 };
 
 interface PosUnit { name: string; factor: number; price: string }
+interface PosBarcode { code: string; unit_name: string }
 interface Product {
   id: string;
   sku: string | null;
@@ -64,6 +65,7 @@ interface Product {
   name: string;
   sale_price: string;
   pos_units: PosUnit[];
+  pos_barcodes: PosBarcode[];
   tax_rate: number;
   type: string;
   track_inventory: boolean;
@@ -284,8 +286,8 @@ export default function PosPage() {
     }));
   }, [posCfg.allow_unit_price_override, products]);
 
-  function addProduct(p: Product) {
-    const unit = pricedUnit(p, null);
+  function addProduct(p: Product, unitName: string | null = null) {
+    const unit = pricedUnit(p, unitName);
     if (!unit) return;
     setCart((c) => {
       const ex = c.find((l) => l.productId === p.id && l.unit === unit.name);
@@ -427,12 +429,25 @@ export default function PosPage() {
     success(t('held_resumed'));
   }
 
-  // مسح باركود: مطابقة الكود بالـ SKU أو الباركود ثم الإضافة للسلة.
+  // مسح باركود: الأساسي/SKU يبيع وحدة الأساس، أما البديل فيحمل وحدته من
+  // كتالوج POS المسعّر؛ فلا يتحول مسح كرتون غير مسعّر إلى بيع قطعة بصمت.
   function scanCode(code: string): boolean {
     const c = code.trim();
     if (!c) return false;
-    const p = products.find((x) => (x.sku ?? '').trim() === c || (x.barcode ?? '').trim() === c);
-    if (p) { addProduct(p); success(t('scan_added', { name: p.name })); return true; }
+    const baseProduct = products.find((product) => (product.sku ?? '').trim() === c || (product.barcode ?? '').trim() === c);
+    if (baseProduct) {
+      addProduct(baseProduct);
+      success(t('scan_added', { name: baseProduct.name }));
+      return true;
+    }
+    const alternate = products
+      .map((product) => ({ product, barcode: product.pos_barcodes.find((item) => item.code.trim() === c) }))
+      .find((match) => match.barcode !== undefined);
+    if (alternate?.barcode) {
+      addProduct(alternate.product, alternate.barcode.unit_name);
+      success(t('scan_added', { name: alternate.product.name }));
+      return true;
+    }
     errorToast(t('scan_not_found', { code: c }));
     return false;
   }
@@ -668,9 +683,8 @@ export default function PosPage() {
             onKeyDown={(e) => {
               // Enter في البحث: إن طابق النصّ كوداً بالضبط أُضيف المنتج ونُظّف الحقل.
               if (e.key === 'Enter' && search.trim()) {
-                const c = search.trim();
-                const p = products.find((x) => (x.sku ?? '').trim() === c || (x.barcode ?? '').trim() === c);
-                if (p) { e.preventDefault(); addProduct(p); success(t('scan_added', { name: p.name })); setSearch(''); }
+                e.preventDefault();
+                if (scanCode(search.trim())) setSearch('');
               }
             }}
             placeholder={t('search_products')}

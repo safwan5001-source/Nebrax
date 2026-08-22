@@ -43,6 +43,15 @@ class ProductResource extends JsonResource
                     'price' => Money::toRiyal((int) $unit['price']),
                 ])->values()
             ),
+            // باركودات كتالوج POS المؤقتة مقيدة بوحدات `pos_units` الظاهرة؛
+            // لا تتسرب إلى عقد المنتج العام ولا تعرض وحدة غير مسعّرة للعميل.
+            'pos_barcodes'     => $this->when(
+                array_key_exists('pos_barcodes', $this->resource->getAttributes()),
+                collect($this->resource->getAttribute('pos_barcodes'))->map(fn (array $barcode) => [
+                    'code' => $barcode['code'],
+                    'unit_name' => $barcode['unit_name'],
+                ])->values()
+            ),
             'reorder_level'    => $this->reorder_level,
             'supplier_id'      => $this->supplier_id,
             'sales_account_id' => $this->sales_account_id,
