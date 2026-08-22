@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\Invoice;
+use App\Models\PosExchange;
 use App\Models\PosSessionEvent;
 use App\Models\Product;
 use App\Models\ReturnDocument;
@@ -257,5 +258,150 @@ class PosReturnTest extends TestCase
             ->assertJsonPath('data.total', '115.00')
             ->assertJsonPath('data.cash_allowed', false)
             ->assertJsonPath('data.cash_block_reason', 'سياسة نقطة البيع تسمح برد النقد حتى المبلغ النقدي المقبوض على الفاتورة المصدر فقط.');
+    }
+
+    private function exchange(
+        array $auth,
+        string $sessionId,
+        Invoice $original,
+        Product $replacement,
+        int $replacementPrice,
+        array $tenders = [],
+        string $surplusRefundMethod = 'credit',
+    ) {
+        return $this->withToken($auth['token'])->postJson('/api/pos/exchanges', [
+            'pos_session_id' => $sessionId,
+            'original_invoice_id' => $original->id,
+            'return_items' => [[
+                'source_line_id' => $original->lines->firstOrFail()->id,
+                'quantity' => 1,
+            ]],
+            'surplus_refund_method' => $surplusRefundMethod,
+            'replacement' => [
+                'items' => [[
+                    'product_id' => $replacement->id,
+                    'quantity' => 1,
+                    'unit_price' => $replacementPrice,
+                    'tax_rate' => 15,
+                ]],
+                'tenders' => $tenders ?: ['cash' => 0],
+            ],
+        ]);
+    }
+
+    /** @test */
+    public function exchange_applies_return_credit_to_the_replacement_and_collects_only_the_difference(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $session = $this->openSession($auth);
+        $customer = $this->customer($auth['token']);
+        $original = $this->checkout($auth, $customer, $session['session_id'], $this->product(), ['cash' => 11500]);
+
+        $response = $this->exchange($auth, $session['session_id'], $original, $this->product(), 20000, ['cash' => 11500])
+            ->assertCreated()
+            ->assertJsonPath('data.applied_credit_amount', '115.00')
+            ->assertJsonPath('data.cash_refund_amount', '0.00')
+            ->assertJsonPath('data.status', 'posted');
+        $exchange = PosExchange::findOrFail($response['data']['id']);
+        $replacement = Invoice::findOrFail($exchange->replacement_invoice_id);
+
+        $this->assertSame(23000, (int) $replacement->paid_amount);
+        $this->assertSame('paid', $replacement->payment_status);
+        $this->assertSame(0, $this->balance('1130'));
+        $this->assertSame(23000, $this->balance('1110'));
+        $this->assertSame(20000, $this->balance('4110'));
+        $this->assertSame(3000, $this->balance('2120'));
+        $this->assertDatabaseHas('pos_session_events', [
+            'pos_session_id' => $session['session_id'],
+            'type' => PosSessionEvent::TYPE_EXCHANGE_RECORDED,
+            'payload->exchange_id' => $exchange->id,
+        ]);
+    }
+
+    /** @test */
+    public function default_exchange_policy_keeps_a_surplus_as_customer_credit_without_reducing_the_drawer(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $session = $this->openSession($auth);
+        $original = $this->checkout($auth, $this->customer($auth['token']), $session['session_id'], $this->product(), ['cash' => 11500]);
+
+        $response = $this->exchange($auth, $session['session_id'], $original, $this->product(), 5000)
+            ->assertCreated()
+            ->assertJsonPath('data.applied_credit_amount', '57.50')
+            ->assertJsonPath('data.cash_refund_amount', '0.00')
+            ->assertJsonPath('data.journal_entry_id', null);
+
+        $this->assertSame(-5750, $this->balance('1130'));
+        $report = $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$session['session_id']}/report")
+            ->assertOk()->json('report');
+        $this->assertSame('0.00', $report['cash_refunds']);
+        $this->assertSame('115.00', $report['expected']);
+    }
+
+    /** @test */
+    public function exchange_cash_surplus_requires_the_opt_in_policy_and_updates_drawer_and_ledger(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $session = $this->openSession($auth);
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => ['exchange_surplus_policy' => 'allow_cash_refund'],
+        ])->assertOk();
+        $original = $this->checkout($auth, $this->customer($auth['token']), $session['session_id'], $this->product(), ['cash' => 11500]);
+
+        $response = $this->exchange($auth, $session['session_id'], $original, $this->product(), 5000, [], 'cash')
+            ->assertCreated()
+            ->assertJsonPath('data.cash_refund_amount', '57.50');
+        $exchange = PosExchange::findOrFail($response['data']['id']);
+
+        $this->assertNotNull($exchange->journal_entry_id);
+        $this->assertSame(0, $this->balance('1130'));
+        $this->assertSame(5750, $this->balance('1110'));
+        $report = $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$session['session_id']}/report")
+            ->assertOk()->json('report');
+        $this->assertSame('57.50', $report['cash_refunds']);
+        $this->assertSame('57.50', $report['expected']);
+    }
+
+    /** @test */
+    public function exchange_rejects_a_cash_surplus_that_fails_the_existing_cash_refund_policy_without_writing_documents(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $session = $this->openSession($auth, 20000);
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => ['exchange_surplus_policy' => 'allow_cash_refund'],
+        ])->assertOk();
+        $original = $this->checkout($auth, $this->customer($auth['token']), $session['session_id'], $this->product(), ['card' => 11500]);
+
+        $this->exchange($auth, $session['session_id'], $original, $this->product(), 5000, [], 'cash')->assertStatus(422);
+        $this->assertSame(0, PosExchange::count());
+        $this->assertSame(0, ReturnDocument::count());
+        $this->assertSame(1, Invoice::count());
+    }
+
+    /** @test */
+    public function exchange_quote_exposes_the_default_credit_only_policy_before_posting(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $session = $this->openSession($auth);
+        $original = $this->checkout($auth, $this->customer($auth['token']), $session['session_id'], $this->product(), ['cash' => 11500]);
+
+        $this->withToken($auth['token'])->postJson('/api/pos/exchanges/quote', [
+            'pos_session_id' => $session['session_id'],
+            'original_invoice_id' => $original->id,
+            'return_items' => [['source_line_id' => $original->lines->firstOrFail()->id, 'quantity' => 1]],
+            'cash_surplus_amount' => 5750,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.return_total', '115.00')
+            ->assertJsonPath('data.exchange_surplus_policy', 'customer_credit_only')
+            ->assertJsonPath('data.cash_allowed', false)
+            ->assertJsonPath('data.cash_block_reason', 'إعدادات نقطة البيع تجعل فائض الاستبدال رصيداً للعميل فقط.');
+        $this->assertSame(0, PosExchange::count());
+        $this->assertSame(0, ReturnDocument::count());
     }
 }

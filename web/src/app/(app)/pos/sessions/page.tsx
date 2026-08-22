@@ -165,6 +165,7 @@ export default function PosSessionsPage() {
     cash_in_recorded: t('event_cash_in_recorded'),
     cash_out_recorded: t('event_cash_out_recorded'),
     return_recorded: t('event_return_recorded'),
+    exchange_recorded: t('event_exchange_recorded'),
     closing_difference_requires_acknowledgement: t('event_closing_difference_requires_acknowledgement'),
     closing_difference_acknowledged: t('event_closing_difference_acknowledged'),
   };

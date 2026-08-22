@@ -84,6 +84,12 @@ class PosSession extends BaseModel
         return $this->hasMany(ReturnDocument::class);
     }
 
+    /** عمليات الاستبدال الذرية التي نفذت في هذه الجلسة. */
+    public function exchanges(): HasMany
+    {
+        return $this->hasMany(PosExchange::class);
+    }
+
     public function differenceAcknowledgedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'difference_acknowledged_by');

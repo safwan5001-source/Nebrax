@@ -381,6 +381,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('pos/returnable-invoices/{id}', [PosController::class, 'returnableInvoice'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/returns/quote', [PosController::class, 'quoteReturn'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/returns', [PosController::class, 'storeReturn'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/exchanges/quote', [PosController::class, 'quoteExchange'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/exchanges', [PosController::class, 'storeExchange'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos-sessions', [PosSessionController::class, 'index'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('pos-sessions/{id}/report', [PosSessionController::class, 'report'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('pos-sessions/{id}/cash-movements', [PosSessionController::class, 'cashMovements'])->middleware([$perm('invoices.view'), $app('sales.pos')]);

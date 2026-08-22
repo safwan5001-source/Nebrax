@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PosCashMovement;
 use App\Models\PosDevice;
+use App\Models\PosExchange;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
 use App\Models\ReturnDocument;
@@ -276,6 +277,11 @@ class PosSessionService
             ->where('status', 'posted')
             ->where('payment_type', 'cash')
             ->sum('total');
+        // الاستبدال ينشئ المرتجع بالذمم حتى يُطبّق على البديل؛ لا يخرج من
+        // الدرج إلا الفرق النقدي المسجل صراحةً على سجل الاستبدال.
+        $cashRefunds += (int) PosExchange::where('pos_session_id', $session->id)
+            ->where('status', 'posted')
+            ->sum('cash_refund_amount');
         $cashIn = (int) PosCashMovement::where('pos_session_id', $session->id)
             ->where('type', PosCashMovement::TYPE_CASH_IN)
             ->sum('amount');
@@ -306,6 +312,24 @@ class PosSessionService
             'original_id' => $return->original_id,
             'payment_type' => $return->payment_type,
             'amount' => (int) $return->total,
+        ]);
+    }
+
+    /** يسجل الاستبدال بعد ترحيل مستنداته وقيد سداد الفائض — إن وجد — عبر المحرك. */
+    public function recordExchange(PosSession $session, PosExchange $exchange, User $actor): void
+    {
+        $this->assertDrawerActor($session, $actor);
+        if ($exchange->status !== 'posted' || $exchange->pos_session_id !== $session->id) {
+            throw new RuntimeException('استبدال POS المرحّل لا يخص جلسة الكاشير المحددة.');
+        }
+
+        $this->recordEvent($session, PosSessionEvent::TYPE_EXCHANGE_RECORDED, $actor, [
+            'exchange_id' => $exchange->id,
+            'original_invoice_id' => $exchange->original_invoice_id,
+            'return_id' => $exchange->return_id,
+            'replacement_invoice_id' => $exchange->replacement_invoice_id,
+            'applied_credit_amount' => (int) $exchange->applied_credit_amount,
+            'cash_refund_amount' => (int) $exchange->cash_refund_amount,
         ]);
     }
 

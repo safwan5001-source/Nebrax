@@ -22,6 +22,7 @@ import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
 import { PosPayment, type PaymentSummaryItem } from '@/components/pos/pos-payment';
+import { PosExchangeDialog } from '@/components/pos/pos-exchange-dialog';
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
@@ -106,6 +107,7 @@ export default function PosPage() {
   const [openBal, setOpenBal] = useState('');
   const [closeOpen, setCloseOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
+  const [exchangeOpen, setExchangeOpen] = useState(false);
   const [countedBal, setCountedBal] = useState('');
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -681,6 +683,8 @@ export default function PosPage() {
         onWarehouseChange={setWarehouseId}
         onEndSession={() => (session ? (setCountedBal(''), setSessionError(null), setCloseOpen(true)) : router.push('/dashboard'))}
         onReturn={() => setReturnOpen(true)}
+        onExchange={() => setExchangeOpen(true)}
+        exchangeDisabled={cart.length === 0 || step === 'payment' || paying}
       />
 
       {step === 'payment' ? (
@@ -738,6 +742,15 @@ export default function PosPage() {
         sessionId={session?.id ?? null}
         onClose={() => setReturnOpen(false)}
         onReturned={(number) => { setReturnOpen(false); success(t('return_done', { number })); }}
+      />
+      <PosExchangeDialog
+        open={exchangeOpen}
+        sessionId={session?.id ?? null}
+        replacementItems={cart}
+        replacementTotalMinor={totalMinor}
+        taxInclusive={taxInclusive}
+        onClose={() => setExchangeOpen(false)}
+        onExchanged={(number) => { setExchangeOpen(false); setCart([]); setSelectedCustomer(null); setStep('sale'); setMobileTab('products'); success(t('exchange_done', { number })); }}
       />
 
       <CustomerPickerDialog
