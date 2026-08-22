@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Printer, Barcode, Wifi, Building2, Power, Clock, RotateCcw } from 'lucide-react';
+import { Printer, Barcode, Wifi, Building2, Power, Clock, Repeat2, RotateCcw } from 'lucide-react';
 import type { Warehouse } from '@/lib/warehouse';
 
 /** نقطة حالة ملوّنة (متصل/غير متصل) على زر أداة. */
@@ -26,6 +26,8 @@ export function PosTopbar({
   onWarehouseChange,
   onEndSession,
   onReturn,
+  onExchange,
+  exchangeDisabled = false,
 }: {
   cashier: string;
   branch: string;
@@ -36,6 +38,8 @@ export function PosTopbar({
   onWarehouseChange?: (warehouseId: string) => void;
   onEndSession?: () => void;
   onReturn?: () => void;
+  onExchange?: () => void;
+  exchangeDisabled?: boolean;
 }) {
   const t = useTranslations('pos');
   const [now, setNow] = useState<Date | null>(null);
@@ -67,6 +71,9 @@ export function PosTopbar({
       </button>
       <button className={tool} title={t('return_action')} onClick={onReturn} disabled={!session || !onReturn} aria-label={t('return_action')}>
         <RotateCcw className="h-4 w-4" strokeWidth={1.8} />
+      </button>
+      <button className={tool} title={t('exchange_action')} onClick={onExchange} disabled={!session || !onExchange || exchangeDisabled} aria-label={t('exchange_action')}>
+        <Repeat2 className="h-4 w-4" strokeWidth={1.8} />
       </button>
       <button className={tool} title={t('printer')}>
         <Printer className="h-4 w-4" strokeWidth={1.8} />

@@ -26,6 +26,16 @@ export default function PosSettingsPage() {
             { value: 'allow_any_pos_sale', label: t('cash_refund_allow_any_pos_sale') },
           ],
         },
+        {
+          key: 'exchange_surplus_policy',
+          label: t('exchange_surplus_policy'),
+          description: t('exchange_surplus_policy_hint'),
+          type: 'select',
+          options: [
+            { value: 'customer_credit_only', label: t('exchange_surplus_customer_credit_only') },
+            { value: 'allow_cash_refund', label: t('exchange_surplus_allow_cash_refund') },
+          ],
+        },
       ]}
     />
   );

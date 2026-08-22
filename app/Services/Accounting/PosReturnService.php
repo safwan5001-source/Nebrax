@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\PosExchange;
 use App\Models\PosSession;
 use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
@@ -193,7 +194,8 @@ class PosReturnService
         ));
     }
 
-    private function cashRefundBlockReason(Invoice $invoice, PosSession $session, int $refundTotal): ?string
+    /** يعيد سبب المنع أو null لرد نقدي يطابق سياسة POS ورصيد الدرج الحالي. */
+    public function cashRefundBlockReason(Invoice $invoice, PosSession $session, int $refundTotal): ?string
     {
         if ($refundTotal <= 0) {
             return 'مبلغ رد النقد يجب أن يكون موجباً.';
@@ -211,6 +213,9 @@ class PosReturnService
                 ->where('original_type', Invoice::class)
                 ->where('original_id', $invoice->id)
                 ->sum('total');
+            $cashRefunded += (int) PosExchange::where('original_invoice_id', $invoice->id)
+                ->where('status', 'posted')
+                ->sum('cash_refund_amount');
             $available = $cashReceived - $cashRefunded;
 
             if ($refundTotal > $available) {
