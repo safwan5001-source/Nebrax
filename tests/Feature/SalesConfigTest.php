@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -49,6 +50,58 @@ class SalesConfigTest extends TestCase
             ->assertOk();
         $this->withToken($token)->getJson('/api/sales-config/einvoice')
             ->assertOk()->assertJsonPath('data.enabled', true)->assertJsonPath('data.phase', '2');
+    }
+
+    /** @test */
+    public function pos_payment_settings_default_to_all_active_methods_and_keep_deferred_sales_enabled(): void
+    {
+        ['token' => $token] = $this->registerTenant('nibras', 'owner@nibras.test');
+        $methods = $this->withToken($token)->getJson('/api/payment-methods')->assertOk()['data'];
+        $cash = collect($methods)->firstWhere('settlement_type', 'cash');
+        $bank = collect($methods)->firstWhere('settlement_type', 'bank');
+
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.enabled_payment_method_ids', [])
+            ->assertJsonPath('data.default_payment_method_id', null)
+            ->assertJsonPath('data.allow_deferred_payment', true);
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => [
+                'enabled_payment_method_ids' => [$cash['id'], $bank['id']],
+                'default_payment_method_id' => $cash['id'],
+                'allow_deferred_payment' => false,
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.enabled_payment_method_ids.0', $cash['id'])
+            ->assertJsonPath('data.default_payment_method_id', $cash['id'])
+            ->assertJsonPath('data.allow_deferred_payment', false);
+
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.enabled_payment_method_ids.1', $bank['id'])
+            ->assertJsonPath('data.default_payment_method_id', $cash['id'])
+            ->assertJsonPath('data.allow_deferred_payment', false);
+    }
+
+    /** @test */
+    public function pos_payment_settings_reject_invalid_or_disabled_default_selection(): void
+    {
+        ['token' => $token] = $this->registerTenant('nibras', 'owner@nibras.test');
+        $methods = $this->withToken($token)->getJson('/api/payment-methods')->assertOk()['data'];
+        $cash = collect($methods)->firstWhere('settlement_type', 'cash');
+        $bank = collect($methods)->firstWhere('settlement_type', 'bank');
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => [
+                'enabled_payment_method_ids' => [$cash['id']],
+                'default_payment_method_id' => $bank['id'],
+            ],
+        ])->assertUnprocessable();
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['enabled_payment_method_ids' => [(string) Str::uuid()]],
+        ])->assertUnprocessable();
     }
 
     /** @test */

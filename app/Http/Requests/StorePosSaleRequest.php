@@ -13,7 +13,7 @@ class StorePosSaleRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'partner_id'          => ['required', 'uuid'],
             'pos_session_id'      => ['required', 'uuid'],
             // يثبت مخزن الإخراج على الفاتورة الناتجة من عملية نقطة البيع.
@@ -27,11 +27,26 @@ class StorePosSaleRequest extends FormRequest
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
             'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات
             'items.*.minimum_price_override_reason' => ['nullable', 'string', 'min:3', 'max:500'],
-            'tenders'             => ['required', 'array'],
-            'tenders.cash'        => ['nullable', 'integer', 'min:0'],
-            'tenders.card'        => ['nullable', 'integer', 'min:0'],
-            'tenders.transfer'    => ['nullable', 'integer', 'min:0'],
-            'tenders.credit'      => ['nullable', 'integer', 'min:0'],
+            'tenders'             => ['required', 'array', 'max:20'],
+        ];
+
+        // العقد الجديد: قائمة وسائل مهيأة بالهللات. العقد القديم يبقى مقبولاً
+        // للمحطات والتكاملات القائمة، ويُحوَّل خادمياً إلى الوسائل المهيأة.
+        if (array_is_list($this->input('tenders', []))) {
+            return [
+                ...$rules,
+                'tenders.*'                   => ['required', 'array:payment_method_id,amount'],
+                'tenders.*.payment_method_id' => ['required', 'uuid', 'distinct'],
+                'tenders.*.amount'            => ['required', 'integer', 'min:1', 'max:100000000000'], // هللات
+            ];
+        }
+
+        return [
+            ...$rules,
+            'tenders.cash'     => ['nullable', 'integer', 'min:0', 'max:100000000000'],
+            'tenders.card'     => ['nullable', 'integer', 'min:0', 'max:100000000000'],
+            'tenders.transfer' => ['nullable', 'integer', 'min:0', 'max:100000000000'],
+            'tenders.credit'   => ['nullable', 'integer', 'min:0', 'max:100000000000'],
         ];
     }
 }

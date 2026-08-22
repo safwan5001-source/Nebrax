@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\PaymentMethod;
 use App\Models\Tenant;
 use App\Support\Settings;
 use App\Support\PosSettings;
@@ -37,7 +38,7 @@ class SalesConfigController extends ApiController
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'sections' => [], 'accent_color' => '#2563EB', 'footer_text' => '', 'terms_text' => '', 'bank_text' => '', 'stamp' => '', 'signature' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
-        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'allow_discount' => true, 'receipt_footer' => '', 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE],
+        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'default_payment_method_id' => null, 'allow_deferred_payment' => true, 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE],
     ];
 
     public function show(string $section): JsonResponse
@@ -72,10 +73,15 @@ class SalesConfigController extends ApiController
                     PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE,
                     PosSettings::HELD_SALE_KEEP_FOR_NEXT_SESSION,
                 ])],
+                'data.enabled_payment_method_ids' => ['nullable', 'array', 'max:50'],
+                'data.enabled_payment_method_ids.*' => ['uuid', 'distinct'],
+                'data.default_payment_method_id' => ['nullable', 'uuid'],
+                'data.allow_deferred_payment' => ['nullable', 'boolean'],
             ]);
             // نحفظ الكائن كاملاً لا قيمة السياسة وحدها، كي تبقى الاستجابة وشاشة
             // POS والقراءة الخادمية فوق الافتراضات نفسها للمستأجر القديم والجديد.
             $data = array_merge(PosSettings::group($tenant), $data);
+            $this->assertPosPaymentMethods($data);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -100,6 +106,33 @@ class SalesConfigController extends ApiController
         $tenant->update(['settings' => $settings]);
 
         return response()->json(['data' => $this->withCompanyLogo($section, $data)]);
+    }
+
+    /**
+     * لا تسمح إعدادات POS إلا بوسائل دفع نشطة تملكها المؤسسة الحالية. القائمة
+     * الفارغة تعني كل الوسائل النشطة للحفاظ على سلوك المستأجرين قبل هذه المرحلة.
+     */
+    private function assertPosPaymentMethods(array $data): void
+    {
+        $enabled = array_values(array_unique($data['enabled_payment_method_ids'] ?? []));
+        $default = $data['default_payment_method_id'] ?? null;
+        $ids = array_values(array_unique(array_filter([...$enabled, $default])));
+
+        if ($ids === []) {
+            return;
+        }
+
+        $activeIds = PaymentMethod::whereIn('id', $ids)
+            ->where('is_active', true)
+            ->pluck('id')
+            ->all();
+        if (count($activeIds) !== count($ids)) {
+            abort(422, 'تتضمن إعدادات POS وسيلة دفع غير موجودة أو معطلة.');
+        }
+
+        if ($default !== null && $enabled !== [] && ! in_array($default, $enabled, true)) {
+            abort(422, 'وسيلة الدفع الافتراضية يجب أن تكون ضمن الوسائل المفعلة في POS.');
+        }
     }
 
     private function assertSection(string $section): void

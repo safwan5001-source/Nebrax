@@ -8,8 +8,8 @@ use App\Tenancy\TenantContext;
 /**
  * إعدادات نقطة البيع المخزنة في `tenants.settings['sales_config']['pos']`.
  *
- * لا تقرأ خدمة المرتجعات حمولة العميل أو متحكماً؛ هذه هي نقطة القراءة الخادمية
- * الموحدة للسياسات التي تؤثر في سلوك POS التشغيلي والمالي.
+ * لا تقرأ خدمة المرتجعات أو البيع حمولة العميل أو متحكماً؛ هذه هي نقطة القراءة
+ * الخادمية الموحدة للسياسات التي تؤثر في سلوك POS التشغيلي والمالي.
  */
 final class PosSettings
 {
@@ -25,6 +25,13 @@ final class PosSettings
         'print_receipt'      => true,
         'allow_discount'     => true,
         'receipt_footer'     => '',
+        // قائمة فارغة تعني «كل الوسائل النشطة»: لا تتغير شاشة POS للمستأجر
+        // القائم عند ترقية المرحلة قبل أن يختار تقييداً صريحاً.
+        'enabled_payment_method_ids' => [],
+        // اختيار عرضي للواجهة؛ تظل صلاحية الطريقة وتفعيلها مفروضة في الخدمة.
+        'default_payment_method_id' => null,
+        // الافتراض يحفظ سلوك POS السابق الذي كان يسمح ببيع جزئي/آجل.
+        'allow_deferred_payment' => true,
         // الافتراض الحامي: لا يخرج نقد من الدرج أكثر من النقد الذي دخل منه
         // بسبب فاتورة المصدر نفسها، ما لم يفعّل مالك الشركة الخيار الصريح الآخر.
         'cash_refund_policy' => self::CASH_REFUND_ORIGINAL_CASH_ONLY,
@@ -43,6 +50,39 @@ final class PosSettings
         $stored = $tenant?->settings['sales_config']['pos'] ?? [];
 
         return array_merge(self::DEFAULTS, array_intersect_key($stored, self::DEFAULTS));
+    }
+
+    /** قائمة معرّفات الوسائل المقيدة صراحةً؛ الفارغة تعني جميع الوسائل النشطة. */
+    public static function enabledPaymentMethodIds(?Tenant $tenant = null): array
+    {
+        $ids = self::group($tenant)['enabled_payment_method_ids'];
+        if (! is_array($ids)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter($ids, fn (mixed $id) => is_string($id) && $id !== '')));
+    }
+
+    /** لا تتجاوز واجهة الكاشير الوسائل التي قيّدها المالك، مع توافق القائمة الفارغة. */
+    public static function allowsPaymentMethod(string $paymentMethodId, ?Tenant $tenant = null): bool
+    {
+        $enabled = self::enabledPaymentMethodIds($tenant);
+
+        return $enabled === [] || in_array($paymentMethodId, $enabled, true);
+    }
+
+    /** المعرّف الافتراضي المفضّل للعرض؛ قد يعود null إن لم يحدد المالك وسيلة. */
+    public static function defaultPaymentMethodId(?Tenant $tenant = null): ?string
+    {
+        $id = self::group($tenant)['default_payment_method_id'];
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    /** البيع المؤجل سياسة صريحة؛ القيمة غير المعروفة تورّث الإتاحة التاريخية. */
+    public static function allowsDeferredPayment(?Tenant $tenant = null): bool
+    {
+        return self::group($tenant)['allow_deferred_payment'] !== false;
     }
 
     /** سياسة رد النقد الصالحة فقط؛ القيمة المخزنة غير المعروفة تعود للافتراض الحامي. */

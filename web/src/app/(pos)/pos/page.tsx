@@ -21,7 +21,7 @@ import type { Warehouse } from '@/lib/warehouse';
 import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
-import { PosPayment, type PaymentSummaryItem } from '@/components/pos/pos-payment';
+import { PosPayment, type PaymentSummaryItem, type PosPaymentMethod, type PosTender } from '@/components/pos/pos-payment';
 import { PosExchangeDialog } from '@/components/pos/pos-exchange-dialog';
 import { PosHeldSalesDialog, type PosHeldSale } from '@/components/pos/pos-held-sales-dialog';
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
@@ -37,8 +37,20 @@ interface PosConfig {
   print_receipt: boolean;
   allow_discount: boolean;
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
+  enabled_payment_method_ids: string[];
+  default_payment_method_id: string | null;
+  allow_deferred_payment: boolean;
 }
-const POS_DEFAULTS: PosConfig = { default_customer: WALKIN, receipt_footer: '', print_receipt: true, allow_discount: true, held_sale_close_policy: 'discard_on_session_close' };
+const POS_DEFAULTS: PosConfig = {
+  default_customer: WALKIN,
+  receipt_footer: '',
+  print_receipt: true,
+  allow_discount: true,
+  held_sale_close_policy: 'discard_on_session_close',
+  enabled_payment_method_ids: [],
+  default_payment_method_id: null,
+  allow_deferred_payment: true,
+};
 
 interface Product {
   id: string;
@@ -92,6 +104,9 @@ export default function PosPage() {
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [posCfg, setPosCfg] = useState<PosConfig>(POS_DEFAULTS);
+  const [paymentMethods, setPaymentMethods] = useState<PosPaymentMethod[]>([]);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
+  const [paymentMethodsError, setPaymentMethodsError] = useState<string | null>(null);
   // وضع الضريبة من إعدادات النظام (متضمَّن/غير متضمَّن) — يوحّد سلوك كل المعاملات.
   const [taxInclusive, setTaxInclusive] = useState(false);
   // الوردية (الجلسة النقدية) — تُربط بالبيع: تُفتح قبل البيع وتُغلق بعدّ النقد.
@@ -138,6 +153,10 @@ export default function PosPage() {
     api<{ data: Partial<PosConfig> }>('/sales-config/pos')
       .then((r) => setPosCfg({ ...POS_DEFAULTS, ...r.data }))
       .catch(() => {});
+    api<{ data: PosPaymentMethod[] }>('/payment-methods')
+      .then((r) => setPaymentMethods(r.data.filter((method) => method.is_active)))
+      .catch((err) => setPaymentMethodsError(err instanceof ApiError ? err.message : tc('loadFailed')))
+      .finally(() => setPaymentMethodsLoading(false));
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
     api<{ data: PosDevice[] }>('/pos-devices').then((r) => setDevices(r.data.filter((device) => device.is_active))).catch(() => {});
     api<{ data: WorkShift[] }>('/shifts').then((r) => setShifts(r.data.filter((shift) => shift.is_active))).catch(() => {});
@@ -155,7 +174,7 @@ export default function PosPage() {
       const raw = localStorage.getItem(FAV_KEY);
       if (raw) setFavs(new Set(JSON.parse(raw)));
     } catch { /* ignore */ }
-  }, [t]);
+  }, [t, tc]);
 
   const toggleFav = useCallback((id: string) => {
     setFavs((prev) => {
@@ -165,6 +184,11 @@ export default function PosPage() {
       return next;
     });
   }, []);
+
+  const availablePaymentMethods = useMemo(() => {
+    const enabled = posCfg.enabled_payment_method_ids;
+    return paymentMethods.filter((method) => enabled.length === 0 || enabled.includes(method.id));
+  }, [paymentMethods, posCfg.enabled_payment_method_ids]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -390,7 +414,7 @@ export default function PosPage() {
   }
 
   const confirmPayment = useCallback(
-    async (tenders: Record<'cash' | 'card' | 'transfer' | 'credit', number>) => {
+    async (tenders: PosTender[]) => {
       if (cart.length === 0) return;
       if (!session) {
         setError(t('open_to_start'));
@@ -409,7 +433,7 @@ export default function PosPage() {
           tax_rate: l.tax,
           discount: lineCalc(l).disc, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
         }));
-        // إتمام ذرّي: فاتورة آجلة مرحّلة + سندات قبض حسب الوسائل (نقد→1110، بطاقة/تحويل→1120).
+        // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
         const created = await api<{ data: { id: string; number: string; total: string } }>('/pos/checkout', {
           method: 'POST',
           body: { partner_id: partnerId, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, items, tenders },
@@ -423,8 +447,8 @@ export default function PosPage() {
           (a, l) => { const c = lineCalc(l); return { sub: a.sub + c.net, tax: a.tax + c.tax, tot: a.tot + c.total }; },
           { sub: 0, tax: 0, tot: 0 },
         );
-        // نوع الدفع للعرض: نقدي إن سُدِّد فوراً بأي وسيلة، وإلا آجل.
-        const paidNow = tenders.cash + tenders.card + tenders.transfer;
+        // نوع الدفع للعرض: مسدّد فوراً بأي وسيلة مهيأة، وإلا آجل.
+        const paidNow = tenders.reduce((sum, tender) => sum + tender.amount, 0);
         const receiptInvoice: SourceInvoice = {
           number: created.data.number,
           invoice_date: new Date().toISOString().slice(0, 10),
@@ -726,6 +750,11 @@ export default function PosPage() {
           totalMinor={totalMinor}
           items={summaryItems}
           customerName={customerName}
+          paymentMethods={availablePaymentMethods}
+          defaultPaymentMethodId={posCfg.default_payment_method_id}
+          allowDeferredPayment={posCfg.allow_deferred_payment}
+          paymentMethodsLoading={paymentMethodsLoading}
+          paymentMethodsLoadError={paymentMethodsError}
           paying={paying}
           error={error}
           onBack={() => setStep('sale')}
