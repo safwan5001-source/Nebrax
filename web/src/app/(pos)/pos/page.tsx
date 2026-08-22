@@ -35,6 +35,7 @@ interface PosConfig {
   default_customer: string;
   receipt_footer: string;
   print_receipt: boolean;
+  receipt_paper_size: 'thermal_58' | 'thermal_80';
   allow_discount: boolean;
   apply_customer_price_list: boolean;
   allow_unit_price_override: boolean;
@@ -47,6 +48,7 @@ const POS_DEFAULTS: PosConfig = {
   default_customer: WALKIN,
   receipt_footer: '',
   print_receipt: true,
+  receipt_paper_size: 'thermal_80',
   allow_discount: true,
   apply_customer_price_list: true,
   allow_unit_price_override: false,
@@ -998,7 +1000,7 @@ export default function PosPage() {
         </>
       )}
 
-      <ReceiptDialog receipt={receipt} autoPrint={posCfg.print_receipt} onClose={() => setReceipt(null)} />
+      <ReceiptDialog receipt={receipt} autoPrint={posCfg.print_receipt} paperSize={posCfg.receipt_paper_size} onClose={() => setReceipt(null)} />
       <PosReturnDialog
         open={returnOpen}
         sessionId={session?.id ?? null}
