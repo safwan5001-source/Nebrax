@@ -107,9 +107,13 @@ class PosSessionController extends ApiController
             'session' => new PosSessionResource($session->load(['posDevice.warehouse', 'warehouse', 'shift'])),
             'report' => [
                 'cash_sales' => Money::toRiyal($report['cash_sales']),
+                'cash_refunds' => Money::toRiyal($report['cash_refunds']),
                 'cash_in' => Money::toRiyal($report['cash_in']),
                 'cash_out' => Money::toRiyal($report['cash_out']),
                 'sales_count' => $report['sales_count'],
+                'returns_count' => $report['returns_count'],
+                'returns_total' => Money::toRiyal($report['returns_total']),
+                'net_sales' => Money::toRiyal($report['net_sales']),
                 'average' => Money::toRiyal($report['average']),
                 'expected' => Money::toRiyal($report['expected']),
             ],

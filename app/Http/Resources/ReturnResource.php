@@ -13,6 +13,7 @@ class ReturnResource extends JsonResource
         return [
             'id'           => $this->id,
             'warehouse_id' => $this->warehouse_id,
+            'pos_session_id' => $this->pos_session_id,
             'number'       => $this->number,
             'type'         => $this->type,
             'partner_id'   => $this->partner_id,

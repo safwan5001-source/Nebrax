@@ -23,8 +23,8 @@ class ReturnDocument extends BaseModel
     protected $table = 'return_documents';
 
     protected $fillable = [
-        'branch_id', 'warehouse_id',
-        'tenant_id', 'number', 'type', 'partner_id', 'payment_type',
+        'branch_id', 'warehouse_id', 'pos_session_id',
+        'tenant_id', 'number', 'type', 'partner_id', 'payment_type', 'tax_inclusive',
         'restock',
         'return_date', 'status', 'subtotal', 'tax_amount', 'total',
         'notes', 'original_type', 'original_id',
@@ -34,6 +34,7 @@ class ReturnDocument extends BaseModel
     protected $casts = [
         'return_date' => 'date',
         'restock'     => 'boolean',
+        'tax_inclusive' => 'boolean',
         'subtotal'    => 'integer',
         'tax_amount'  => 'integer',
         'total'       => 'integer',
@@ -62,6 +63,12 @@ class ReturnDocument extends BaseModel
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    /** جلسة POS اختيارية؛ مرجع تشغيلي محفوظ لا يختفي بتبدل سياق الفرع. */
+    public function posSession(): BelongsTo
+    {
+        return $this->referenceBelongsTo(PosSession::class);
     }
 
     public function original(): MorphTo

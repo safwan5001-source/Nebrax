@@ -18,6 +18,7 @@ export interface FormField {
   label: string;
   type: 'text' | 'number' | 'color' | 'checkbox' | 'select';
   options?: { value: string; label: string }[];
+  description?: string;
 }
 type Values = Record<string, string | number | boolean>;
 
@@ -111,6 +112,7 @@ export function ConfigForm({
                         onChange={(e) => set(f.key, e.target.value)}
                       />
                     )}
+                    {f.description && <p className="text-xs leading-relaxed text-muted">{f.description}</p>}
                   </div>
                 ),
               )}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { CircleDollarSign, ClipboardCheck, History, LockKeyhole, Plus } from 'lucide-react';
+import { BarChart3, CircleDollarSign, ClipboardCheck, History, LockKeyhole, Plus } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,18 @@ interface Session {
   opened_at: string | null;
   closed_at: string | null;
 }
+interface SessionReport {
+  cash_sales: string;
+  cash_refunds: string;
+  cash_in: string;
+  cash_out: string;
+  sales_count: number;
+  returns_count: number;
+  returns_total: string;
+  net_sales: string;
+  average: string;
+  expected: string;
+}
 interface SessionEvent {
   id: string;
   type: string;
@@ -56,6 +68,9 @@ export default function PosSessionsPage() {
   const [movementSessionId, setMovementSessionId] = useState<string | null>(null);
   const [acknowledgementSessionId, setAcknowledgementSessionId] = useState<string | null>(null);
   const [historySession, setHistorySession] = useState<Session | null>(null);
+  const [reportSession, setReportSession] = useState<Session | null>(null);
+  const [report, setReport] = useState<SessionReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [amount, setAmount] = useState('');
@@ -130,6 +145,14 @@ export default function PosSessionsPage() {
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
 
+  async function openReport(session: Session) {
+    setReportSession(session); setReport(null); setError(null); setReportLoading(true);
+    try {
+      const result = await api<{ report: SessionReport }>(`/pos-sessions/${session.id}/report`);
+      setReport(result.report);
+    } catch (e) { setError(e instanceof ApiError ? e.message : tc('loadFailed')); } finally { setReportLoading(false); }
+  }
+
   async function openHistory(session: Session) {
     setHistorySession(session); setEvents([]); setError(null); setHistoryLoading(true);
     try {
@@ -141,6 +164,7 @@ export default function PosSessionsPage() {
   const eventLabels: Record<string, string> = {
     cash_in_recorded: t('event_cash_in_recorded'),
     cash_out_recorded: t('event_cash_out_recorded'),
+    return_recorded: t('event_return_recorded'),
     closing_difference_requires_acknowledgement: t('event_closing_difference_requires_acknowledgement'),
     closing_difference_acknowledged: t('event_closing_difference_acknowledged'),
   };
@@ -176,6 +200,9 @@ export default function PosSessionsPage() {
         id: 'actions', header: t('actions'),
         cell: ({ row }) => (
           <div className="flex flex-wrap justify-end gap-1.5">
+            <Button variant="ghost" size="sm" onClick={() => openReport(row.original)} aria-label={t('view_report')}>
+              <BarChart3 className="h-3.5 w-3.5" strokeWidth={1.7} />{t('view_report')}
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => openHistory(row.original)} aria-label={t('view_audit')}>
               <History className="h-3.5 w-3.5" strokeWidth={1.7} />{t('view_audit')}
             </Button>
@@ -293,6 +320,28 @@ export default function PosSessionsPage() {
             <Button type="submit" disabled={busy || acknowledgementNote.trim().length < 3}>{t('acknowledge_difference')}</Button>
           </div>
         </form>
+      </Dialog>
+
+      <Dialog open={!!reportSession} onClose={() => setReportSession(null)} title={t('report_title')}>
+        <div className="space-y-3">
+          <p className="rounded bg-primary-soft px-3 py-2 text-xs text-text">{t('report_hint')}</p>
+          {reportLoading && <p className="text-sm text-muted">{tc('loading')}</p>}
+          {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
+          {report && <dl className="grid gap-x-5 sm:grid-cols-2">
+            {[
+              [t('cash_sales'), report.cash_sales],
+              [t('cash_refunds'), report.cash_refunds],
+              [t('cash_in_total'), report.cash_in],
+              [t('cash_out_total'), report.cash_out],
+              [t('returns_total'), report.returns_total],
+              [t('net_sales'), report.net_sales],
+              [t('expected'), report.expected],
+              [t('average'), report.average],
+            ].map(([label, amount]) => <div key={String(label)} className="flex items-center justify-between gap-3 border-b border-border py-2.5 text-sm"><dt className="text-muted">{label}</dt><dd className="num font-semibold text-text">{formatRiyal(String(amount))}</dd></div>)}
+            <div className="flex items-center justify-between gap-3 border-b border-border py-2.5 text-sm"><dt className="text-muted">{t('sales_count')}</dt><dd className="num font-semibold text-text">{report.sales_count}</dd></div>
+            <div className="flex items-center justify-between gap-3 border-b border-border py-2.5 text-sm"><dt className="text-muted">{t('returns_count')}</dt><dd className="num font-semibold text-text">{report.returns_count}</dd></div>
+          </dl>}
+        </div>
       </Dialog>
 
       <Dialog open={!!historySession} onClose={() => setHistorySession(null)} title={t('audit_log_title')}>
