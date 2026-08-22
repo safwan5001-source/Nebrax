@@ -53,6 +53,7 @@ use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PosController;
+use App\Http\Controllers\Api\PosDeviceController;
 use App\Http\Controllers\Api\PosSessionController;
 use App\Http\Controllers\Api\PrintTemplateController;
 use App\Http\Controllers\Api\ProcurementController;
@@ -369,7 +370,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('recurring-invoices/{id}', [RecurringInvoiceController::class, 'destroy'])->middleware($perm('invoices.manage'));
         Route::post('recurring-invoices/{id}/generate', [RecurringInvoiceController::class, 'generate'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
 
-        // جلسات نقطة البيع (تشغيلي — لا قيود)
+        // أجهزة وجلسات نقطة البيع (تشغيلي — لا قيود). الكاشير يقرأ الأجهزة
+        // المتاحة لفتح ورديته، أما تهيئة الجهاز فتظل إدارة شركة لا صلاحية بيع.
+        Route::get('pos-devices', [PosDeviceController::class, 'index'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos-devices', [PosDeviceController::class, 'store'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        Route::put('pos-devices/{id}', [PosDeviceController::class, 'update'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        Route::delete('pos-devices/{id}', [PosDeviceController::class, 'destroy'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos-sessions', [PosSessionController::class, 'index'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('pos-sessions/{id}/report', [PosSessionController::class, 'report'])->middleware([$perm('invoices.view'), $app('sales.pos')]);

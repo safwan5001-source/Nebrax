@@ -44,13 +44,25 @@ class PosService
             $session = $this->sessions->requireOpenForCheckout(
                 $data['pos_session_id'],
                 $data['created_by'] ?? null,
+                $data['actor'] ?? null,
             );
+
+            // الجلسات الجديدة تلتقط مخزن الجهاز عند الافتتاح؛ لا يقبل البيع أن
+            // يستبدله بطلب عميل. تبقى الجلسات التاريخية بلا مخزن على سلوكها السابق.
+            $warehouseId = $session->warehouse_id;
+            if ($warehouseId !== null
+                && array_key_exists('warehouse_id', $data)
+                && $data['warehouse_id'] !== null
+                && $data['warehouse_id'] !== $warehouseId) {
+                throw new RuntimeException('مخزن البيع يجب أن يطابق مخزن جهاز نقطة البيع في الجلسة.');
+            }
+            $warehouseId ??= $data['warehouse_id'] ?? null;
 
             // 1) فاتورة آجلة (كامل الإجمالي على الذمم) ثم ترحيلها.
             $invoice = $this->invoices->create([
                 'partner_id'    => $data['partner_id'],
                 'pos_session_id' => $session->id,
-                'warehouse_id'  => $data['warehouse_id'] ?? null,
+                'warehouse_id'  => $warehouseId,
                 'payment_type'  => 'credit',
                 'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
                 'notes'         => $data['notes'] ?? 'بيع نقطة بيع',

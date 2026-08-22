@@ -22,6 +22,7 @@ class PosController extends ApiController
         $data = $request->validated();
         $data['created_by'] = $request->user()?->id;
         $data['minimum_price_override_actor_id'] = $request->user()?->id;
+        $data['actor'] = $request->user();
 
         // عزل: المراجع تخصّ المستأجر الحالي.
         Partner::findOrFail($data['partner_id']);

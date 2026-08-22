@@ -2747,7 +2747,12 @@
     "save": "Save",
     "cancel": "Cancel",
     "open_title": "Open new session",
-    "close_title": "Close session"
+    "close_title": "Close session",
+    "device": "POS device",
+    "select_device": "Select a device",
+    "no_device": "No active POS device is available in this branch.",
+    "work_shift": "Work shift",
+    "optional": "Optional"
   },
   "posSettings": {
     "title": "POS settings",

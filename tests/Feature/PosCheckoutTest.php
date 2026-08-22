@@ -24,10 +24,21 @@ class PosCheckoutTest extends TestCase
         return $account?->balance?->balance ?? 0;
     }
 
+    private int $deviceSequence = 0;
+
     private function openSession(array $auth, int $openingBalance = 0): string
     {
+        $n = ++$this->deviceSequence;
+        $warehouseId = $this->withToken($auth['token'])->postJson('/api/warehouses', [
+            'name' => "مخزن بيع {$n}", 'code' => "POS-C-W-{$n}", 'is_active' => true,
+        ])->assertCreated()['data']['id'];
+        $deviceId = $this->withToken($auth['token'])->postJson('/api/pos-devices', [
+            'name' => "كاشير بيع {$n}", 'code' => "POS-C-{$n}", 'warehouse_id' => $warehouseId, 'is_active' => true,
+        ])->assertCreated()['data']['id'];
+
         return $this->withToken($auth['token'])->postJson('/api/pos-sessions/open', [
             'opening_balance' => $openingBalance,
+            'pos_device_id'  => $deviceId,
         ])->assertCreated()['data']['id'];
     }
 
