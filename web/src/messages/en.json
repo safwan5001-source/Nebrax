@@ -1823,6 +1823,46 @@
     "password_invalid": "Enter your password to continue.",
     "submitting": "Signing in…"
   },
+  "selfService": {
+    "portal_title": "Employee Portal",
+    "logout": "Sign out",
+    "title": "Hello, {name}",
+    "load_error": "Failed to load data",
+    "tabs": {
+      "overview": "Overview",
+      "attendance": "Attendance",
+      "payroll": "Payroll"
+    },
+    "today_not_checked_in": "You haven't checked in today yet",
+    "today_checked_in_at": "You checked in today at {time}",
+    "today_checked_out_at": "and checked out at {time}",
+    "check_in": "Check in",
+    "check_out": "Check out",
+    "checked_in": "Checked in successfully",
+    "checked_out": "Checked out successfully",
+    "profile_title": "Job details",
+    "employee_no": "Employee no.",
+    "hire_date": "Hire date",
+    "phone": "Mobile",
+    "personal_email": "Personal email",
+    "contract_title": "Salary (active contract)",
+    "no_active_contract": "No active contract",
+    "basic_salary": "Basic salary",
+    "gosi": "Social insurance (GOSI)",
+    "other_deductions": "Other deductions",
+    "net_salary": "Net salary",
+    "no_attendance": "No attendance records yet",
+    "no_payroll": "No posted payroll yet",
+    "status": {
+      "present": "Present",
+      "late": "Late",
+      "leave": "Leave",
+      "absent": "Absent",
+      "draft": "Draft",
+      "posted": "Posted",
+      "paid": "Paid"
+    }
+  },
   "nav": {
     "dashboard": "Dashboard",
     "soon": "Soon",

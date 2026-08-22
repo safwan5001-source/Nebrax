@@ -72,6 +72,7 @@ use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesReportController;
 use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\SettlementTypeController;
+use App\Http\Controllers\Api\SelfServiceController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\StocktakeController;
@@ -596,6 +597,16 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('payroll-runs', [PayrollController::class, 'store'])->middleware($perm('hr.manage'));
         Route::post('payroll-runs/{id}/post', [PayrollController::class, 'post'])->middleware($perm('hr.manage'));
         Route::post('payroll-runs/{id}/pay', [PayrollController::class, 'pay'])->middleware($perm('hr.manage'));
+
+        // بوابة الخدمة الذاتية للموظف — دورٌ مقيَّد (self_service.access)، لا hr.*
+        // (تلك غير معزولة صفّياً). كل مسارٍ هنا مقيَّدٌ بنيوياً بـ employee_id
+        // المستخدم نفسه — انظر SelfServiceController.
+        Route::get('me/profile', [SelfServiceController::class, 'profile'])->middleware($perm('self_service.access'));
+        Route::get('me/contract', [SelfServiceController::class, 'contract'])->middleware($perm('self_service.access'));
+        Route::get('me/payroll-items', [SelfServiceController::class, 'payrollItems'])->middleware($perm('self_service.access'));
+        Route::get('me/attendances', [SelfServiceController::class, 'attendances'])->middleware($perm('self_service.access'));
+        Route::post('me/attendance/check-in', [SelfServiceController::class, 'checkIn'])->middleware($perm('self_service.access'));
+        Route::post('me/attendance/check-out', [SelfServiceController::class, 'checkOut'])->middleware($perm('self_service.access'));
 
         // إعدادات الشركة (owner/admin) — تحديث ملف فقط، لا أثر محاسبي
         Route::put('company', [CompanyController::class, 'update'])->middleware($perm('company.manage'));

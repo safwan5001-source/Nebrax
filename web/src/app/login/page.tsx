@@ -36,8 +36,9 @@ export default function LoginPage() {
   async function onSubmit(values: FormValues) {
     setServerError(null);
     try {
-      await login(values.email, values.password);
-      router.replace('/dashboard');
+      const user = await login(values.email, values.password);
+      // دور الخدمة الذاتية بلا صلاحياتٍ على شاشات الإدارة — بوابته المخصَّصة.
+      router.replace(user.role === 'self_service' ? '/me' : '/dashboard');
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : t('error'));
     }
