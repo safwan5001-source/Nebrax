@@ -36,6 +36,7 @@ interface PosConfig {
   receipt_footer: string;
   print_receipt: boolean;
   allow_discount: boolean;
+  allow_unit_price_override: boolean;
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   enabled_payment_method_ids: string[];
   default_payment_method_id: string | null;
@@ -46,6 +47,7 @@ const POS_DEFAULTS: PosConfig = {
   receipt_footer: '',
   print_receipt: true,
   allow_discount: true,
+  allow_unit_price_override: false,
   held_sale_close_policy: 'discard_on_session_close',
   enabled_payment_method_ids: [],
   default_payment_method_id: null,
@@ -98,6 +100,7 @@ export default function PosPage() {
   const [tab, setTab] = useState('all');
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [priceErrors, setPriceErrors] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'sale' | 'payment'>('sale');
   const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products');
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -216,6 +219,25 @@ export default function PosPage() {
     });
   }, [products, search, cat, tab, favs]);
 
+  function effectiveLinePrice(line: CartLine): string {
+    if (posCfg.allow_unit_price_override || line.productId === null) {
+      return line.price;
+    }
+
+    return products.find((product) => product.id === line.productId)?.sale_price ?? line.price;
+  }
+
+  // لا تبقى سلة قديمة أو مستأنفة بسعر مخصص عندما تكون السياسة مغلقة؛ يستعيد
+  // السطر سعر المنتج الحالي، ويتكرر عند وصول المنتجات أو الإعداد متأخراً.
+  useEffect(() => {
+    if (posCfg.allow_unit_price_override || products.length === 0) return;
+    setCart((current) => current.map((line) => {
+      if (line.productId === null) return line;
+      const price = products.find((product) => product.id === line.productId)?.sale_price;
+      return price && price !== line.price ? { ...line, price } : line;
+    }));
+  }, [posCfg.allow_unit_price_override, products]);
+
   function addProduct(p: Product) {
     setCart((c) => {
       const ex = c.find((l) => l.productId === p.id);
@@ -227,6 +249,34 @@ export default function PosPage() {
   const setDiscount = (k: string, v: string) => {
     if (!posCfg.allow_discount) return;
     setCart((c) => c.map((l) => (l.key === k ? { ...l, discount: v } : l)));
+  };
+  const setUnitPrice = (k: string, v: string) => {
+    if (!posCfg.allow_unit_price_override) return;
+    setPriceErrors((current) => {
+      const { [k]: _cleared, ...rest } = current;
+      return rest;
+    });
+    setCart((c) => c.map((l) => (l.key === k ? { ...l, price: v } : l)));
+  };
+  const normalizeUnitPrice = (k: string) => {
+    const line = cart.find((current) => current.key === k);
+    if (!line) return;
+
+    const minor = riyalToMinor(line.price);
+    if (Number.isFinite(minor) && minor >= 0) {
+      setPriceErrors((current) => {
+        const { [k]: _cleared, ...rest } = current;
+        return rest;
+      });
+      setCart((current) => current.map((item) => (item.key === k ? { ...item, price: (minor / 100).toFixed(2) } : item)));
+      return;
+    }
+
+    const message = t('unit_price_invalid');
+    setPriceErrors((current) => ({ ...current, [k]: message }));
+    errorToast(message);
+    const fallback = products.find((product) => product.id === line.productId)?.sale_price ?? '0.00';
+    setCart((current) => current.map((item) => (item.key === k ? { ...item, price: fallback } : item)));
   };
   const remove = (k: string) => setCart((c) => c.filter((l) => l.key !== k));
 
@@ -259,7 +309,7 @@ export default function PosPage() {
             description: line.description,
             sku: line.sku,
             quantity: line.qty,
-            unit_price: riyalToMinor(line.price),
+            unit_price: riyalToMinor(effectiveLinePrice(line)),
             tax_rate: line.tax,
             discount: posCfg.allow_discount ? lineCalc(line).disc : 0,
           })),
@@ -282,7 +332,9 @@ export default function PosPage() {
       productId: item.product_id,
       description: item.description ?? '—',
       sku: item.sku,
-      price: item.unit_price,
+      price: posCfg.allow_unit_price_override
+        ? item.unit_price
+        : products.find((product) => product.id === item.product_id)?.sale_price ?? item.unit_price,
       qty: item.quantity,
       tax: item.tax_rate,
       discount: posCfg.allow_discount ? item.discount : '',
@@ -355,7 +407,7 @@ export default function PosPage() {
 
   // حساب السطر حسب وضع الضريبة والخصم: الخصم يقلّل الأساس قبل الضريبة (مطابق للـ backend).
   const lineCalc = (l: CartLine) => {
-    const gross = l.qty * riyalToMinor(l.price);
+    const gross = l.qty * riyalToMinor(effectiveLinePrice(l));
     const raw = riyalToMinor(l.discount);
     const disc = Number.isFinite(raw) ? Math.min(Math.max(0, raw), gross) : 0;
     const discounted = gross - disc;
@@ -441,7 +493,7 @@ export default function PosPage() {
           product_id: l.productId,
           description: l.description,
           quantity: l.qty,
-          unit_price: riyalToMinor(l.price),
+          unit_price: riyalToMinor(effectiveLinePrice(l)),
           tax_rate: l.tax,
           discount: posCfg.allow_discount ? lineCalc(l).disc : 0, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
         }));
@@ -471,7 +523,7 @@ export default function PosPage() {
           notes: null,
           lines: cart.map((l) => { const c = lineCalc(l); return {
             id: l.key, description: l.description, quantity: l.qty,
-            unit_price: l.price, tax_rate: l.tax, line_tax: toRiyal(c.tax), line_total: toRiyal(c.total),
+            unit_price: effectiveLinePrice(l), tax_rate: l.tax, line_tax: toRiyal(c.tax), line_total: toRiyal(c.total),
           }; }),
         };
         const model = buildInvoiceDocumentModel({
@@ -491,11 +543,11 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, taxInclusive, company, warehouseId, session],
+    [cart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
-    name: l.description, qty: l.qty, unitPrice: formatRiyal(l.price), lineTotal: lineCalc(l).total,
+    name: l.description, qty: l.qty, unitPrice: formatRiyal(effectiveLinePrice(l)), lineTotal: lineCalc(l).total,
   }));
 
   const CATS = [
@@ -649,16 +701,36 @@ export default function PosPage() {
             <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-lg bg-background"><Package className="h-4 w-4 text-border" strokeWidth={1.6} /></div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-semibold">{l.description}</div>
-              {posCfg.allow_discount ? (
-                <div className="mt-0.5 flex items-center gap-1">
-                  <span className="text-[10px] text-muted">{t('discount')}</span>
-                  <input
-                    value={l.discount}
-                    onChange={(e) => setDiscount(l.key, e.target.value)}
-                    inputMode="decimal"
-                    placeholder="0"
-                    className="num w-14 rounded border border-border bg-background px-1 py-0.5 text-end text-[10px] text-text outline-none focus:border-primary"
-                  />
+              {(posCfg.allow_unit_price_override || posCfg.allow_discount) ? (
+                <div className="mt-0.5 space-y-1">
+                  {posCfg.allow_unit_price_override && (
+                    <div className="flex items-center gap-1">
+                      <label htmlFor={`unit-price-${l.key}`} className="text-[10px] text-muted">{t('unit_price')}</label>
+                      <input
+                        id={`unit-price-${l.key}`}
+                        value={l.price}
+                        onChange={(e) => setUnitPrice(l.key, e.target.value)}
+                        onBlur={() => normalizeUnitPrice(l.key)}
+                        inputMode="decimal"
+                        aria-invalid={Boolean(priceErrors[l.key])}
+                        aria-describedby={priceErrors[l.key] ? `unit-price-error-${l.key}` : undefined}
+                        className="num w-16 rounded border border-border bg-background px-1 py-0.5 text-end text-[10px] text-text outline-none focus:border-primary aria-[invalid=true]:border-negative"
+                      />
+                    </div>
+                  )}
+                  {priceErrors[l.key] && <p id={`unit-price-error-${l.key}`} className="text-[10px] text-negative">{priceErrors[l.key]}</p>}
+                  {posCfg.allow_discount && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted">{t('discount')}</span>
+                      <input
+                        value={l.discount}
+                        onChange={(e) => setDiscount(l.key, e.target.value)}
+                        inputMode="decimal"
+                        placeholder="0"
+                        className="num w-14 rounded border border-border bg-background px-1 py-0.5 text-end text-[10px] text-text outline-none focus:border-primary"
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 l.sku && <div className="num text-[10px] text-muted">{l.sku}</div>

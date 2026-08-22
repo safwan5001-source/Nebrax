@@ -64,23 +64,27 @@ class SalesConfigTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.enabled_payment_method_ids', [])
             ->assertJsonPath('data.default_payment_method_id', null)
+            ->assertJsonPath('data.allow_unit_price_override', false)
             ->assertJsonPath('data.allow_deferred_payment', true);
 
         $this->withToken($token)->putJson('/api/sales-config/pos', [
             'data' => [
                 'enabled_payment_method_ids' => [$cash['id'], $bank['id']],
                 'default_payment_method_id' => $cash['id'],
+                'allow_unit_price_override' => true,
                 'allow_deferred_payment' => false,
             ],
         ])->assertOk()
             ->assertJsonPath('data.enabled_payment_method_ids.0', $cash['id'])
             ->assertJsonPath('data.default_payment_method_id', $cash['id'])
+            ->assertJsonPath('data.allow_unit_price_override', true)
             ->assertJsonPath('data.allow_deferred_payment', false);
 
         $this->withToken($token)->getJson('/api/sales-config/pos')
             ->assertOk()
             ->assertJsonPath('data.enabled_payment_method_ids.1', $bank['id'])
             ->assertJsonPath('data.default_payment_method_id', $cash['id'])
+            ->assertJsonPath('data.allow_unit_price_override', true)
             ->assertJsonPath('data.allow_deferred_payment', false);
     }
 
