@@ -376,6 +376,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('pos-devices', [PosDeviceController::class, 'store'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::put('pos-devices/{id}', [PosDeviceController::class, 'update'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::delete('pos-devices/{id}', [PosDeviceController::class, 'destroy'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        Route::get('pos/products', [PosController::class, 'products'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos/held-sales', [PosController::class, 'heldSales'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/held-sales', [PosController::class, 'storeHeldSale'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);

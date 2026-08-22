@@ -43,14 +43,36 @@ class PosCheckoutTest extends TestCase
         ])->assertCreated()['data']['id'];
     }
 
-    private function checkout(string $token, string $partnerId, string $sessionId, array $tenders): \Illuminate\Testing\TestResponse
+    private function checkout(string $token, string $partnerId, string $sessionId, array $tenders, ?array $items = null): \Illuminate\Testing\TestResponse
     {
         return $this->withToken($token)->postJson('/api/pos/checkout', [
             'partner_id'     => $partnerId,
             'pos_session_id' => $sessionId,
-            'items'          => [['quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
+            'items'          => $items ?? [['quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
             'tenders'        => $tenders,
         ]);
+    }
+
+    private function category(string $token, string $name): array
+    {
+        return $this->withToken($token)->postJson('/api/product-categories', ['name' => $name])
+            ->assertCreated()['data'];
+    }
+
+    private function product(string $token, string $name, ?string $categoryId): array
+    {
+        return $this->withToken($token)->postJson('/api/products', [
+            'name' => $name,
+            'sku' => 'POS-CAT-' . uniqid(),
+            'type' => 'good',
+            'sale_price' => 10000,
+            'category_id' => $categoryId,
+        ])->assertCreated()['data'];
+    }
+
+    private function productItem(array $product): array
+    {
+        return ['product_id' => $product['id'], 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15];
     }
 
     private function methods(array $auth): array
@@ -198,6 +220,51 @@ class PosCheckoutTest extends TestCase
 
         $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
         $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
+    }
+
+    /** @test */
+    public function pos_category_policy_filters_the_catalogue_and_rejects_a_manually_submitted_forbidden_product(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $allowedCategory = $this->category($auth['token'], 'مسموح');
+        $blockedCategory = $this->category($auth['token'], 'محظور');
+        $allowed = $this->product($auth['token'], 'صنف مسموح', $allowedCategory['id']);
+        $blocked = $this->product($auth['token'], 'صنف محظور', $blockedCategory['id']);
+        $uncategorized = $this->product($auth['token'], 'صنف بلا تصنيف', null);
+
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => [
+                'product_category_visibility_mode' => 'only',
+                'product_category_ids' => [$allowedCategory['id']],
+            ],
+        ])->assertOk();
+
+        $onlyIds = collect($this->withToken($auth['token'])->getJson('/api/pos/products')->assertOk()['data'])->pluck('id')->all();
+        $this->assertContains($allowed['id'], $onlyIds);
+        $this->assertContains($uncategorized['id'], $onlyIds);
+        $this->assertNotContains($blocked['id'], $onlyIds);
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)], [$this->productItem($allowed)])
+            ->assertCreated();
+        $beforeForbidden = Invoice::where('pos_session_id', $sessionId)->count();
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)], [$this->productItem($blocked)])
+            ->assertStatus(422);
+        $this->assertSame($beforeForbidden, Invoice::where('pos_session_id', $sessionId)->count());
+
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => [
+                'product_category_visibility_mode' => 'except',
+                'product_category_ids' => [$allowedCategory['id']],
+            ],
+        ])->assertOk();
+        $exceptIds = collect($this->withToken($auth['token'])->getJson('/api/pos/products')->assertOk()['data'])->pluck('id')->all();
+        $this->assertNotContains($allowed['id'], $exceptIds);
+        $this->assertContains($blocked['id'], $exceptIds);
+        $this->assertContains($uncategorized['id'], $exceptIds);
     }
 
     /** @test */
