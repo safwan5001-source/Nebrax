@@ -5066,7 +5066,8 @@
     "loadFailed": "Unable to load the Fuel Stations workspace.",
     "retry": "Try again",
     "commercialGuard": "Access to this workspace is enforced on the server by commercial entitlement, application state, and role permissions.",
-    "manageMasterData": "Manage station data"
+    "manageMasterData": "Manage station data",
+    "manageReceiving": "Fuel supply & receiving"
   },
   "fuelStationsMasterData": {
     "title": "Station master data",
@@ -5122,5 +5123,40 @@
     "nozzleNumber": "Nozzle number",
     "manageHint": "The server validates station, branch, tank, pump, and product consistency. This area creates no inventory movement or accounting entry.",
     "backWorkspace": "Back to stations workspace"
+  },
+  "fuelStationsReceiving": {
+    "title": "Fuel supply & receiving",
+    "subtitle": "Record the actual received quantity in a draft, then explicitly approve it to enter inventory and post to GRNI. Invoice matching never creates a second inventory movement.",
+    "backWorkspace": "Back to station workspace",
+    "refresh": "Refresh",
+    "grniHint": "Approval requires an explicitly assigned GRNI account at tenant or station level. Supplier invoice value differences remain pending for review and are never absorbed into inventory or 5180 automatically.",
+    "deliveries": "Fuel receipts",
+    "newDelivery": "New receipt draft",
+    "supplierInvoices": "Supplier invoices",
+    "emptyDeliveries": "No fuel receipts yet.",
+    "emptyInvoices": "No fuel supplier invoices yet.",
+    "station": "Station",
+    "warehouse": "Warehouse",
+    "warehouseHint": "The explicit station warehouse must match its branch; fuel receiving never uses a default warehouse.",
+    "tank": "Tank",
+    "fuelProduct": "Fuel product",
+    "supplier": "Supplier",
+    "dispatched": "Dispatched quantity (L)",
+    "received": "Received quantity (L)",
+    "value": "Value",
+    "valueMinor": "Receipt value (minor units)",
+    "deliveryNote": "Delivery note number",
+    "status": "Status",
+    "status_draft": "Draft",
+    "status_approved": "Approved",
+    "createDraft": "Create draft",
+    "created": "Receipt draft created.",
+    "loadFailed": "Could not load supply and receiving data.",
+    "saveFailed": "Could not create the receipt draft.",
+    "invoiceNumber": "Invoice number",
+    "invoice_unmatched": "Unmatched",
+    "invoice_partially_matched": "Partially matched",
+    "invoice_matched": "Matched",
+    "invoice_value_variance_pending": "Value variance pending"
   }
 }

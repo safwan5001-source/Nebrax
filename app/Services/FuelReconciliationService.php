@@ -30,6 +30,7 @@ class FuelReconciliationService
     public function __construct(
         private FuelQuantity $quantity,
         private FuelStationSettingsService $settings,
+        private FuelCostBasisService $costBasis,
         private InventoryService $inventory,
         private LedgerService $ledger,
     ) {}
@@ -168,18 +169,28 @@ class FuelReconciliationService
             $this->quantity->assertFuelUnitMapping($fuelProduct, $product);
             $this->lockBookStock($warehouse->id, $product->id);
             $difference = (int) $reconciliation->variance_milliliters;
-            $unitCost = (int) $product->avg_cost;
-            $value = $this->multiply($difference, $unitCost);
+            $unitCost = 0; // توافق StockMovement فقط؛ Fuel Cost Basis هو مصدر القيمة.
+            $value = 0;
             $stockMovement = null;
             $entry = null;
 
             if ($difference > 0) {
-                $stockMovement = $this->inventory->applyReceipt($product, $difference, $unitCost, $this->movementMeta($reconciliation, $warehouse));
-                $entry = $this->postEntry($reconciliation, $station, abs($value), true, $approverId);
+                $quote = $this->costBasis->quoteGain($fuelProduct, $warehouse, $difference);
+                $value = $quote['posted_cost_minor'];
+                $unitCost = intdiv($value, $difference);
+                $stockMovement = $this->inventory->applyReceipt($product, $difference, $unitCost, $this->movementMeta($reconciliation, $warehouse), $value);
+                $entry = $this->postEntry($reconciliation, $station, $value, true, $approverId);
+                $this->costBasis->recordGain($fuelProduct, $warehouse, $stockMovement, $difference, $value, $entry);
             } elseif ($difference < 0) {
-                $this->assertWarehouseAvailable($warehouse->id, $product->id, -$difference);
-                $stockMovement = $this->inventory->applyIssue($product, -$difference, $unitCost, $this->movementMeta($reconciliation, $warehouse) + ['enforce_stock' => true]);
-                $entry = $this->postEntry($reconciliation, $station, abs($value), false, $approverId);
+                $lossQuantity = -$difference;
+                $this->assertWarehouseAvailable($warehouse->id, $product->id, $lossQuantity);
+                $quote = $this->costBasis->quoteIssue($fuelProduct, $warehouse, $lossQuantity);
+                $lossValue = $quote['posted_cost_minor'];
+                $value = -$lossValue;
+                $unitCost = intdiv($lossValue, $lossQuantity);
+                $stockMovement = $this->inventory->applyIssue($product, $lossQuantity, $unitCost, $this->movementMeta($reconciliation, $warehouse) + ['enforce_stock' => true], $lossValue);
+                $entry = $this->postEntry($reconciliation, $station, $lossValue, false, $approverId);
+                $this->costBasis->recordIssue($fuelProduct, $warehouse, $stockMovement, $lossQuantity, $lossValue, $entry);
             }
 
             $balance = $this->bookBalance($warehouse->id, $product->id);

@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FuelStationMasterDataController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelReconciliationController;
+use App\Http\Controllers\Api\FuelSupplyReceivingController;
 use App\Http\Controllers\Api\FinancialControlAlertController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
@@ -510,6 +511,16 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('fuel-stations/reconciliations', [FuelReconciliationController::class, 'index'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/reconciliations', [FuelReconciliationController::class, 'store'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/reconciliations/{id}/approve', [FuelReconciliationController::class, 'approve'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        // Cycle 3 — استلام المورد → GRNI، ثم مطابقة فاتورة المورد بلا حركة مخزون ثانية.
+        Route::get('fuel-stations/deliveries', [FuelSupplyReceivingController::class, 'deliveries'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/deliveries/{id}', [FuelSupplyReceivingController::class, 'showDelivery'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/deliveries', [FuelSupplyReceivingController::class, 'storeDelivery'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/deliveries/{id}/approve', [FuelSupplyReceivingController::class, 'approveDelivery'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/supplier-invoices', [FuelSupplyReceivingController::class, 'invoices'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/supplier-invoices/{id}', [FuelSupplyReceivingController::class, 'showInvoice'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/supplier-invoices', [FuelSupplyReceivingController::class, 'storeInvoice'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/supplier-invoices/{id}/matches', [FuelSupplyReceivingController::class, 'matchInvoice'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));

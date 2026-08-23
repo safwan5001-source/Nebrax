@@ -67,7 +67,7 @@ class FuelStationSettingsService
         foreach ($known as $key => $value) {
             // Settings::put لا يكتب null (يعني «اتركه»)، لذا الفراغ الصريح هو
             // مسح mapping الحساب والعودة إلى fallback الموثق لمحرك الجرد.
-            $normalized = in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id'], true) && $value === null ? '' : $value;
+            $normalized = in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id'], true) && $value === null ? '' : $value;
             $known[$key] = $normalized;
             if ($current[$key] !== $normalized) {
                 $changed[$key] = ['before' => $current[$key], 'after' => $normalized];
@@ -242,12 +242,12 @@ class FuelStationSettingsService
             return;
         }
 
-        if (in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id'], true)) {
+        if (in_array($key, ['inventory_variance_account_id', 'inventory_gain_account_id', 'grni_account_id'], true)) {
             if ($value === null || $value === '') {
                 return;
             }
             if (! is_string($value) || ! $this->accountAllowedFor($key, $value)) {
-                throw new RuntimeException('حساب تسوية الوقود يجب أن يكون نشطاً وقابلاً للترحيل ومن نفس المستأجر وباتجاهه المحاسبي الصحيح.');
+                throw new RuntimeException('حساب الوقود يجب أن يكون نشطاً وقابلاً للترحيل ومن نفس المستأجر وباتجاهه المحاسبي الصحيح.');
             }
         }
     }
@@ -259,9 +259,26 @@ class FuelStationSettingsService
             return false;
         }
 
-        return $key === 'inventory_variance_account_id'
-            ? $account->type === 'expense'
-            : in_array($account->type, ['expense', 'revenue'], true);
+        return match ($key) {
+            'inventory_variance_account_id' => $account->type === 'expense',
+            'inventory_gain_account_id' => in_array($account->type, ['expense', 'revenue'], true),
+            'grni_account_id' => $account->type === 'liability',
+            default => false,
+        };
+    }
+
+    /**
+     * GRNI لا يملك fallback: الاستلام المعتمد لا يثبت التزاماً مؤقتاً في حساب
+     * افتراضي أو عام. يلزم أن يحدد المستأجر أو المحطة حساب التزام صريحاً.
+     */
+    public function grniAccountFor(FuelStation $station): Account
+    {
+        $id = $this->get($station, 'grni_account_id');
+        if (! is_string($id) || $id === '' || ! $this->accountAllowedFor('grni_account_id', $id)) {
+            throw new RuntimeException('لا يمكن اعتماد استلام الوقود قبل تعيين حساب GRNI / مخزون مستلم غير مفوتر صالح للمحطة أو المستأجر.');
+        }
+
+        return Account::findOrFail($id);
     }
 
     private function requireTenantContext(): void

@@ -236,6 +236,8 @@ class Settings
             // null = fallback متحقق إلى حساب فروق المخزون القائم (5180) فقط.
             'inventory_variance_account_id' => null,
             'inventory_gain_account_id' => null,
+            // Cycle 3: لا fallback لحساب استلام غير مفوتر؛ الاعتماد يفشل حتى يعيّنه المستأجر أو المحطة صراحةً.
+            'grni_account_id' => null,
             'device_event_max_lateness_seconds' => 86400,
             'offline_event_retention_days' => 30,
         ],
