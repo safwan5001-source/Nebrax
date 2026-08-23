@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { useTranslations } from 'next-intl';
+import { ImagePlus, Trash2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 
@@ -74,6 +76,11 @@ interface FormState {
 interface Acct { id: string; code: string; name: string; type: string; is_group: boolean }
 /** عنصر قائمة مُدارة (تصنيف/علامة) — الاسم وحده يكفي للاختيار. */
 interface Listed { id: string; name: string }
+interface ProductMedia { id: string; original_name: string; download_url: string; sort_order: number; previewUrl?: string | null }
+
+const MAX_PRODUCT_IMAGES = 8;
+const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
+const PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const emptyForm = (): FormState => ({
   name: '', sku: '', barcode: '', name_en: '', type: 'good', unit: 'piece',
@@ -117,6 +124,34 @@ export function ProductDialog({
   const [brands, setBrands] = useState<Listed[]>([]);
   const [templates, setTemplates] = useState<Listed[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [media, setMedia] = useState<ProductMedia[]>([]);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const mediaObjectUrls = useRef<string[]>([]);
+
+  const revokeMediaObjectUrls = useCallback(() => {
+    mediaObjectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    mediaObjectUrls.current = [];
+  }, []);
+
+  const loadMedia = useCallback(async () => {
+    if (!product?.id) return;
+    setLoadingMedia(true);
+    try {
+      const result = await api<{ data: ProductMedia[] }>(`/products/${product.id}/media`);
+      const hydrated = await Promise.all(result.data.map(async (item) => ({
+        ...item,
+        previewUrl: await fetchImageUrl(item.download_url),
+      })));
+      revokeMediaObjectUrls();
+      mediaObjectUrls.current = hydrated.flatMap((item) => item.previewUrl ? [item.previewUrl] : []);
+      setMedia(hydrated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
+    } finally {
+      setLoadingMedia(false);
+    }
+  }, [product?.id, revokeMediaObjectUrls, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -132,6 +167,10 @@ export function ProductDialog({
       })
       .catch(() => {});
   }, [open]);
+  useEffect(() => {
+    if (open && product?.id) void loadMedia();
+  }, [loadMedia, open, product?.id]);
+  useEffect(() => () => revokeMediaObjectUrls(), [revokeMediaObjectUrls]);
   const [saving, setSaving] = useState(false);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -183,8 +222,49 @@ export function ProductDialog({
     }
   }
 
+  async function uploadMedia(event: ChangeEvent<HTMLInputElement>) {
+    if (!product?.id) return;
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (files.length === 0) return;
+    if (media.length + files.length > MAX_PRODUCT_IMAGES) {
+      setError(t('media_limit_reached'));
+      return;
+    }
+    if (files.some((file) => !PRODUCT_IMAGE_TYPES.includes(file.type) || file.size > MAX_PRODUCT_IMAGE_SIZE)) {
+      setError(t('media_invalid_file'));
+      return;
+    }
+
+    setUploadingMedia(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      files.forEach((file) => body.append('media[]', file));
+      await api(`/products/${product.id}/media`, { method: 'POST', body });
+      await loadMedia();
+      success(t('media_uploaded'));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
+    } finally {
+      setUploadingMedia(false);
+    }
+  }
+
+  async function removeMedia(mediaId: string) {
+    if (!product?.id) return;
+    setError(null);
+    try {
+      await api(`/products/${product.id}/media/${mediaId}`, { method: 'DELETE' });
+      await loadMedia();
+      success(t('media_deleted'));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
+    }
+  }
+
   return (
-    <Dialog open={open} onClose={onClose} title={product?.id ? t('edit') : t('add')} className="max-w-xl">
+    <Dialog open={open} onClose={onClose} title={product?.id ? t('edit') : t('add')} className="max-w-2xl">
       <form onSubmit={submit} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
@@ -337,13 +417,66 @@ export function ProductDialog({
           </div>
         )}
 
+        {product?.id && (
+          <section className="space-y-3 rounded-md border border-border p-3" aria-labelledby="edit-product-media-title">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 id="edit-product-media-title" className="text-sm font-medium text-text">{t('product_media')}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{t('product_media_hint')}</p>
+              </div>
+              <span className="num text-xs text-muted">{t('selected_media_count', { count: media.length, max: MAX_PRODUCT_IMAGES })}</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Label htmlFor="edit-product-media" className="sr-only">{t('upload_media')}</Label>
+              <Input
+                id="edit-product-media"
+                type="file"
+                accept={PRODUCT_IMAGE_TYPES.join(',')}
+                multiple
+                disabled={uploadingMedia || loadingMedia || media.length >= MAX_PRODUCT_IMAGES}
+                onChange={uploadMedia}
+                className="max-w-sm"
+              />
+              {(uploadingMedia || loadingMedia) && <span className="text-xs text-muted">{t('loading_profile')}</span>}
+            </div>
+
+            {!loadingMedia && media.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2 text-sm text-muted">
+                <ImagePlus className="h-4 w-4" strokeWidth={1.6} aria-hidden />
+                {t('no_media')}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {media.map((item) => (
+                  <div key={item.id} className="overflow-hidden rounded-md border border-border bg-surface">
+                    <div className="relative aspect-square bg-background">
+                      {item.previewUrl ? (
+                        <Image src={item.previewUrl} alt={item.original_name} fill sizes="(max-width: 640px) 50vw, 160px" unoptimized className="object-cover" />
+                      ) : (
+                        <span className="grid h-full place-items-center text-muted" aria-hidden><ImagePlus className="h-5 w-5" strokeWidth={1.5} /></span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 p-2">
+                      <span className="min-w-0 flex-1 truncate text-xs" title={item.original_name}>{item.original_name}</span>
+                      <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${item.original_name}`} onClick={() => removeMedia(item.id)} disabled={uploadingMedia || loadingMedia}>
+                        <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || uploadingMedia || loadingMedia}>
             {t('save')}
           </Button>
         </div>
