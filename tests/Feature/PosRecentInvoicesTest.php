@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Invoice;
 use App\Models\PosSession;
+use App\Models\Payment;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -94,6 +95,10 @@ class PosRecentInvoicesTest extends TestCase
         // رقم جلسة الاختبار الثاني يحتاج تمييزاً صريحاً؛ قيد الرقم الحالي
         // على مستوى المستأجر وليس الفرع، وهذا الاختبار لا يغيّر مولد الإنتاج.
         PosSession::whereKey($session['id'])->update(['number' => 'POS-RECENT-MAIN-001']);
+        Payment::where('pos_session_id', $session['id'])->get()->values()
+            ->each(fn (Payment $payment, int $index) => $payment->update([
+                'number' => sprintf('REC-RECENT-MAIN-%03d', $index + 1),
+            ]));
 
         $otherBranch = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع فواتير آخر'])
             ->assertCreated()['data']['id'];
