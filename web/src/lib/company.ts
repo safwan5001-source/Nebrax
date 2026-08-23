@@ -5,6 +5,8 @@ import { api } from './api';
 
 export interface Company {
   name: string;
+  account_number?: number | null;
+  support_number?: number | null;
   vat_number?: string | null;
   cr_number?: string | null;
   currency?: string | null;

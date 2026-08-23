@@ -46,8 +46,10 @@ class CompanyProfile
         $company = Settings::group('company', $tenant);
 
         return [
-            'name'          => $tenant->name,
-            'vat_number'    => $tenant->vat_number,
+            'name'           => $tenant->name,
+            'account_number' => $tenant->account_number,
+            'support_number' => $tenant->support_number,
+            'vat_number'     => $tenant->vat_number,
             'cr_number'     => $tenant->cr_number,
             'currency'      => $tenant->currency,
             'country'       => $tenant->country,

@@ -9,7 +9,10 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    environmentMatchGlobs: [['src/components/platform/**/*.test.tsx', 'jsdom']],
+    environmentMatchGlobs: [
+      ['src/components/platform/**/*.test.tsx', 'jsdom'],
+      ['src/app/platform/tenants/**/*.test.tsx', 'jsdom'],
+    ],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
 });

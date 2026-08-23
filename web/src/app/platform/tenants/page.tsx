@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -20,6 +21,8 @@ interface TenantRow {
   id: string;
   name: string;
   slug: string;
+  account_number: number | null;
+  support_number: number | null;
   plan: string;
   is_active: boolean;
   trial_ends_at: string | null;
@@ -40,27 +43,31 @@ export default function PlatformTenantsPage() {
   const [error, setError] = useState<string | null>(null);
   const [planFilter, setPlanFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await platformApi<TenantsResponse>('/platform/tenants?per_page=100');
+      const params = new URLSearchParams({ per_page: '100' });
+      if (search.trim() !== '') params.set('search', search.trim());
+      const response = await platformApi<TenantsResponse>(`/platform/tenants?${params.toString()}`);
       setRows(response.data);
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : t('loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [search, t]);
 
   useEffect(() => {
     if (!isPlatformAuthenticated()) {
       router.replace('/platform/login');
       return;
     }
-    load();
-  }, [load, router]);
+    const timer = window.setTimeout(() => load(), search.trim() === '' ? 0 : 250);
+    return () => window.clearTimeout(timer);
+  }, [load, router, search]);
 
   const columns = useMemo<ColumnDef<TenantRow, unknown>[]>(
     () => [
@@ -77,6 +84,16 @@ export default function PlatformTenantsPage() {
             <span className="ms-1.5 text-xs text-muted">({row.original.slug})</span>
           </button>
         ),
+      },
+      {
+        accessorKey: 'account_number',
+        header: t('accountNumber'),
+        cell: ({ row }) => <span className="num text-text" dir="ltr">{row.original.account_number ?? '—'}</span>,
+      },
+      {
+        accessorKey: 'support_number',
+        header: t('supportNumber'),
+        cell: ({ row }) => <span className="num text-text" dir="ltr">{row.original.support_number ?? '—'}</span>,
       },
       {
         id: 'contactName',
@@ -195,6 +212,8 @@ export default function PlatformTenantsPage() {
               data={filteredRows}
               loading={loading}
               searchPlaceholder={t('search')}
+              searchValue={search}
+              onSearchChange={setSearch}
               emptyLabel={t('empty')}
               exportName="tenants"
             />
