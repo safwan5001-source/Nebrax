@@ -36,5 +36,5 @@ class CommercialProductVersionCapability extends Model
         static::deleting($guard);
     }
 
-    public function productVersion(): BelongsTo { return $this->belongsTo(CommercialProductVersion::class); }
+    public function productVersion(): BelongsTo { return $this->belongsTo(CommercialProductVersion::class, 'commercial_product_version_id'); }
 }

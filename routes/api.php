@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PlatformAuthController;
+use App\Http\Controllers\Api\PlatformCommercialAssignmentController;
 use App\Http\Controllers\Api\PlatformDashboardController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformTenantController;
@@ -110,6 +111,8 @@ use Illuminate\Support\Facades\Route;
  */
 $uuid = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 Route::pattern('id', $uuid);
+Route::pattern('tenant', $uuid);
+Route::pattern('assignment', $uuid);
 Route::pattern('productId', $uuid);
 Route::pattern('partnerId', $uuid);
 Route::pattern('accountId', $uuid);
@@ -144,6 +147,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             Route::post('subscriptions/{subscription}/cancel', [PlatformSubscriptionController::class, 'cancel']);
             Route::post('subscriptions/{subscription}/expire', [PlatformSubscriptionController::class, 'expire']);
             Route::get('subscriptions/{subscription}/events', [PlatformSubscriptionController::class, 'events']);
+            Route::get('tenants/{tenant}/commercial-assignments', [PlatformCommercialAssignmentController::class, 'index']);
+            Route::post('tenants/{tenant}/commercial-assignments/preview', [PlatformCommercialAssignmentController::class, 'preview']);
+            Route::post('tenants/{tenant}/commercial-assignments/plan', [PlatformCommercialAssignmentController::class, 'assignPlan']);
+            Route::post('tenants/{tenant}/commercial-assignments/addon', [PlatformCommercialAssignmentController::class, 'assignAddon']);
+            Route::post('commercial-assignments/{assignment}/cancel', [PlatformCommercialAssignmentController::class, 'cancel']);
+            Route::post('commercial-assignments/{assignment}/revoke', [PlatformCommercialAssignmentController::class, 'revoke']);
         });
 
     // محمي: مصادقة Sanctum + ضبط المستأجر (العزل التلقائي)

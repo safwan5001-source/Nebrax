@@ -21,30 +21,25 @@ class CommercialEntitlementMaterializationService
         CommercialPlanVersion $planVersion,
         DateTimeInterface $startsAt,
         ?DateTimeInterface $endsAt = null,
+        ?string $grantGroupId = null,
+        ?string $grantedByPlatformAdministratorId = null,
+        array $assignmentMetadata = [],
     ): array {
         $this->assertAvailablePlan($planVersion);
 
-        $capabilityKeys = [];
-        foreach ($planVersion->products()->get() as $planProduct) {
-            $productVersion = CommercialProductVersion::query()->findOrFail($planProduct->commercial_product_version_id);
-            $this->assertAvailableProduct($productVersion);
-            foreach ($productVersion->capabilities()->orderBy('capability_key')->pluck('capability_key') as $capabilityKey) {
-                $capabilityKeys[$capabilityKey] = true;
-            }
-        }
-
         return $this->grantCapabilities(
             $tenant,
-            array_keys($capabilityKeys),
+            $this->planCapabilityKeys($planVersion),
             EntitlementSourceType::PLAN,
             'commercial-plan-version',
             $planVersion->id,
-            $planVersion->id,
+            $grantGroupId ?? $planVersion->id,
             $startsAt,
             $endsAt,
             'COMMERCIAL_PLAN_VERSION',
             'Commercial plan version',
-            ['commercial_plan_version_id' => $planVersion->id],
+            ['commercial_plan_version_id' => $planVersion->id, ...$assignmentMetadata],
+            $grantedByPlatformAdministratorId,
         );
     }
 
@@ -54,6 +49,9 @@ class CommercialEntitlementMaterializationService
         CommercialProductVersion $productVersion,
         DateTimeInterface $startsAt,
         ?DateTimeInterface $endsAt = null,
+        ?string $grantGroupId = null,
+        ?string $grantedByPlatformAdministratorId = null,
+        array $assignmentMetadata = [],
     ): array {
         $this->assertAvailableProduct($productVersion);
 
@@ -63,13 +61,55 @@ class CommercialEntitlementMaterializationService
             EntitlementSourceType::ADDON,
             'commercial-product-version',
             $productVersion->id,
-            $productVersion->id,
+            $grantGroupId ?? $productVersion->id,
             $startsAt,
             $endsAt,
             'COMMERCIAL_PRODUCT_VERSION',
             'Commercial product version',
-            ['commercial_product_version_id' => $productVersion->id],
+            ['commercial_product_version_id' => $productVersion->id, ...$assignmentMetadata],
+            $grantedByPlatformAdministratorId,
         );
+    }
+
+    /** @return array{source_type:string,version_id:string,products:list<string>,capability_keys:list<string>} */
+    public function previewPlan(CommercialPlanVersion $planVersion): array
+    {
+        $this->assertAvailablePlan($planVersion);
+
+        return [
+            'source_type' => EntitlementSourceType::PLAN->value,
+            'version_id' => $planVersion->id,
+            'products' => $planVersion->products()->pluck('commercial_product_version_id')->all(),
+            'capability_keys' => $this->planCapabilityKeys($planVersion),
+        ];
+    }
+
+    /** @return array{source_type:string,version_id:string,products:list<string>,capability_keys:list<string>} */
+    public function previewAddon(CommercialProductVersion $productVersion): array
+    {
+        $this->assertAvailableProduct($productVersion);
+
+        return [
+            'source_type' => EntitlementSourceType::ADDON->value,
+            'version_id' => $productVersion->id,
+            'products' => [$productVersion->id],
+            'capability_keys' => $productVersion->capabilities()->orderBy('capability_key')->pluck('capability_key')->all(),
+        ];
+    }
+
+    /** @return list<string> */
+    private function planCapabilityKeys(CommercialPlanVersion $planVersion): array
+    {
+        $capabilityKeys = [];
+        foreach ($planVersion->products()->get() as $planProduct) {
+            $productVersion = CommercialProductVersion::query()->findOrFail($planProduct->commercial_product_version_id);
+            $this->assertAvailableProduct($productVersion);
+            foreach ($productVersion->capabilities()->orderBy('capability_key')->pluck('capability_key') as $capabilityKey) {
+                $capabilityKeys[$capabilityKey] = true;
+            }
+        }
+
+        return array_keys($capabilityKeys);
     }
 
     private function assertAvailablePlan(CommercialPlanVersion $planVersion): void
@@ -109,6 +149,7 @@ class CommercialEntitlementMaterializationService
         string $grantReasonCode,
         string $reason,
         array $metadata,
+        ?string $grantedByPlatformAdministratorId = null,
     ): array {
         $grants = [];
         foreach ($capabilityKeys as $capabilityKey) {
@@ -124,7 +165,7 @@ class CommercialEntitlementMaterializationService
                 $grantGroupId,
                 $grantReasonCode,
                 $reason,
-                null,
+                $grantedByPlatformAdministratorId,
                 $metadata,
             );
         }

@@ -1,0 +1,121 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Requests\CommercialAssignmentLifecycleRequest;
+use App\Http\Requests\CommercialAssignmentPreviewRequest;
+use App\Http\Requests\CommercialAssignmentStoreRequest;
+use App\Models\CommercialPlanVersion;
+use App\Models\CommercialProductVersion;
+use App\Models\PlatformAdministrator;
+use App\Models\Tenant;
+use App\Models\TenantCommercialAssignment;
+use App\Services\CommercialAssignmentService;
+use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class PlatformCommercialAssignmentController extends ApiController
+{
+    public function __construct(private CommercialAssignmentService $assignments) {}
+
+    public function index(Tenant $tenant): JsonResponse
+    {
+        return response()->json([
+            'data' => TenantCommercialAssignment::query()
+                ->where('tenant_id', $tenant->id)
+                ->with(['planVersion', 'productVersion', 'events'])
+                ->latest('created_at')
+                ->get()
+                ->map(fn (TenantCommercialAssignment $assignment) => $this->assignmentData($assignment))
+                ->all(),
+        ]);
+    }
+
+    public function preview(CommercialAssignmentPreviewRequest $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validated();
+        $startsAt = CarbonImmutable::parse($data['starts_at'], 'UTC');
+        $endsAt = isset($data['ends_at']) ? CarbonImmutable::parse($data['ends_at'], 'UTC') : null;
+        $preview = $data['source_type'] === TenantCommercialAssignment::SOURCE_PLAN
+            ? $this->assignments->previewPlan($tenant, CommercialPlanVersion::query()->findOrFail($data['version_id']), $startsAt, $endsAt)
+            : $this->assignments->previewAddon($tenant, CommercialProductVersion::query()->findOrFail($data['version_id']), $startsAt, $endsAt);
+
+        return response()->json(['data' => $preview]);
+    }
+
+    public function assignPlan(CommercialAssignmentStoreRequest $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validated();
+        $assignment = $this->assignments->assignPlan(
+            $tenant,
+            $this->administrator($request),
+            CommercialPlanVersion::query()->findOrFail($data['version_id']),
+            CarbonImmutable::parse($data['starts_at'], 'UTC'),
+            isset($data['ends_at']) ? CarbonImmutable::parse($data['ends_at'], 'UTC') : null,
+            $data['reason'] ?? null,
+        );
+
+        return response()->json(['data' => $this->assignmentData($assignment)], $assignment->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function assignAddon(CommercialAssignmentStoreRequest $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validated();
+        $assignment = $this->assignments->assignAddon(
+            $tenant,
+            $this->administrator($request),
+            CommercialProductVersion::query()->findOrFail($data['version_id']),
+            CarbonImmutable::parse($data['starts_at'], 'UTC'),
+            isset($data['ends_at']) ? CarbonImmutable::parse($data['ends_at'], 'UTC') : null,
+            $data['reason'] ?? null,
+        );
+
+        return response()->json(['data' => $this->assignmentData($assignment)], $assignment->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function cancel(CommercialAssignmentLifecycleRequest $request, TenantCommercialAssignment $assignment): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->assignmentData($this->assignments->cancel($assignment, $this->administrator($request), $request->validated('reason'))),
+        ]);
+    }
+
+    public function revoke(CommercialAssignmentLifecycleRequest $request, TenantCommercialAssignment $assignment): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->assignmentData($this->assignments->revoke($assignment, $this->administrator($request), $request->validated('reason'))),
+        ]);
+    }
+
+    private function administrator(Request $request): PlatformAdministrator
+    {
+        /** @var PlatformAdministrator $administrator */
+        $administrator = $request->user();
+
+        return $administrator;
+    }
+
+    /** @return array<string, mixed> */
+    private function assignmentData(TenantCommercialAssignment $assignment): array
+    {
+        return [
+            'id' => $assignment->id,
+            'tenant_id' => $assignment->tenant_id,
+            'source_type' => $assignment->source_type,
+            'status' => $assignment->status,
+            'plan_version_id' => $assignment->commercial_plan_version_id,
+            'product_version_id' => $assignment->commercial_product_version_id,
+            'starts_at' => $assignment->starts_at?->toIso8601String(),
+            'ends_at' => $assignment->ends_at?->toIso8601String(),
+            'cancelled_at' => $assignment->cancelled_at?->toIso8601String(),
+            'revoked_at' => $assignment->revoked_at?->toIso8601String(),
+            'reason' => $assignment->reason,
+            'events' => $assignment->events->map(fn ($event) => [
+                'action' => $event->action,
+                'effective_at' => $event->effective_at?->toIso8601String(),
+                'reason' => $event->reason,
+            ])->values()->all(),
+        ];
+    }
+}
