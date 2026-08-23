@@ -1381,12 +1381,19 @@ A tenant can only reach Fuel Stations backend operations when the full access ch
 **المؤجل عمداً إلى Cycle 8:** تسجيل قارئ أو Device Registry، أسرار/هوية جهاز، adapters أو drivers لمورد، أمر فتح مضخة، callbacks وATG، وoffline/store-and-forward الفعلي. تبقى مفردات الأحداث `vehicle.identified` و`fuel.authorization.approved/denied` جاهزة للعقد المعياري من دون producer خارجي.
 
 ### Cycle 8 — Forecourt, ATG & Device Integration Platform
-- Device registry
-- Driver/adapters
-- Forecourt normalized events
-- ATG normalized readings
-- Offline/store-and-forward contracts
-- Fake drivers
+
+**الحالة: مكتملة — قيد دمج PR Cycle 8.** يبني التنفيذ منصة تكامل محايدة عن المورد فوق الحد المعياري القائم: سجل أجهزة يملك المحطة والفرع، حالات دورة الحياة والصحة والمزامنة، ومرجع اعتماد خارجي آمن بلا secret خام. يرتبط كل دليل حدث بجهاز نشط ويخضع لتسلسل المصدر وchecksum وidempotency وعزل المستأجر/الفرع، مع سجل محاولات append-only وفشل مرئي وحدود إعادة المحاولة.
+
+**المنفذ:**
+- Device Registry لأنواع forecourt controller وATG وRFID reader وpayment terminal وstation gateway، مع metadata آمنة وصحة/آخر ظهور/فشل
+- عقود adapter معلنة ومحولّات `FakeForecourtDriver` و`FakeAtgDriver` و`FakeRfidDriver` لإنتاج أحداث معيارية فقط
+- إدخال محاكى محروس للصحة والتحقق الزمني والتسلسل/replay، ومعالجة دليل لا تخلق فاتورة أو دفعة أو حركة مخزون أو قيداً
+- ATG readings وtank alarms وforecourt evidence وvehicle identification بوصفها أدلة تشغيلية لا أرصدة دفترية أو أوامر أجهزة
+- RBAC مستقل (`fuel.device.view/manage` و`fuel.integration.view/ingest/retry`) وقدرة `fuel_stations.integrations` مبنية
+- واجهة RTL ثنائية اللغة لسجل الأجهزة وسجل الأحداث ومحاكاة عقد الاختبار، مع إخفاء مراجع الاعتماد وبيانات الشبكة الحساسة
+- تحقق SQLite كامل، هجرة PostgreSQL محلية، وفحوص TypeScript/Vitest/Next production build
+
+**المؤجل عمداً إلى مرحلة المورّد/الإطلاق المنضبط:** SDK أو بروتوكول مورّد حقيقي، TCP/MQTT/webhook/polling أو gateway دائم، مصادقة جهاز إنتاجية وvault/mTLS، أوامر فتح المضخة، retry daemon، وATG-driven reconciliation أو أثر مخزني/مالي. تظل العقود والسجل والـ fake drivers جاهزة لاستبدالها بمحول معتمد من دون تسريب منطق مورّد إلى نواة الوقود.
 
 ### Cycle 9 — Maintenance, Safety, Accounting, Reports & Readiness
 - Maintenance

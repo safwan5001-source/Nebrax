@@ -91,6 +91,10 @@ class Rbac
             // Cycle 7: العرض والإدارة وإصدار القرار منفصلة؛ لا يرثها مسؤول
             // المحطة من fuel_stations.manage ولا بطاقة الوقود منطقياً.
             'fuel.avi.view', 'fuel.avi.manage', 'fuel.avi.authorize',
+            // Cycle 8: سجل الأجهزة وإدخال الأدلة وإعادة المعالجة صلاحيات منفصلة؛
+            // لا تمنح تشغيل محول أو أمراً خارجياً ولا ترث من إدارة المحطة العامة.
+            'fuel.device.view', 'fuel.device.manage',
+            'fuel.integration.view', 'fuel.integration.ingest', 'fuel.integration.retry',
             'fuel.credit.view', 'fuel.credit.manage',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',

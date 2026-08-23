@@ -283,6 +283,7 @@ class FuelStationSettingsService
             'fuel_sales_allow_deferred_payment',
             'corporate_credit_enabled', 'require_active_contract', 'driver_required', 'vehicle_required', 'fuel_card_required',
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_enforce_vehicle_tank_capacity',
+            'device_simulated_ingress_enabled',
         ];
         if (in_array($key, $shiftBooleanKeys, true)) {
             if (! is_bool($value)) {
@@ -327,6 +328,8 @@ class FuelStationSettingsService
             'shift_meter_tolerance_milliliters', 'shift_tank_tolerance_milliliters',
             'default_corporate_credit_limit_minor', 'avi_min_refill_interval_seconds',
             'avi_denial_window_seconds', 'avi_repeated_denial_threshold', 'avi_authorization_ttl_seconds',
+            'device_event_max_lateness_seconds', 'offline_event_retention_days', 'device_max_future_skew_seconds',
+            'device_offline_after_seconds', 'device_max_retry_attempts',
         ];
         if (in_array($key, $nonNegativeIntegerKeys, true)) {
             if (! is_int($value) || $value < 0 || ($key === 'reconciliation_tolerance_basis_points' && $value > 1000000)) {
@@ -334,6 +337,9 @@ class FuelStationSettingsService
             }
             if (in_array($key, ['avi_denial_window_seconds', 'avi_repeated_denial_threshold', 'avi_authorization_ttl_seconds'], true) && $value <= 0) {
                 throw new RuntimeException('نافذة رفض AVI/RFID والعتبة ومدة صلاحية التفويض يجب أن تكون أعداداً صحيحة موجبة.');
+            }
+            if (in_array($key, ['device_event_max_lateness_seconds', 'offline_event_retention_days', 'device_max_future_skew_seconds', 'device_offline_after_seconds', 'device_max_retry_attempts'], true) && $value <= 0) {
+                throw new RuntimeException('سياسات زمن الحدث وصحة الجهاز وإعادة المحاولة يجب أن تكون أعداداً صحيحة موجبة.');
             }
 
             return;

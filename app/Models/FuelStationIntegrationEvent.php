@@ -25,6 +25,7 @@ class FuelStationIntegrationEvent extends BaseModel
         'tenant_id',
         'branch_id',
         'fuel_station_id',
+        'fuel_station_device_id',
         'source_id',
         'event_id',
         'sequence',
@@ -34,6 +35,7 @@ class FuelStationIntegrationEvent extends BaseModel
         'checksum',
         'payload',
         'status',
+        'retry_count',
         'received_at',
         'processed_at',
         'failure_reason',
@@ -41,6 +43,7 @@ class FuelStationIntegrationEvent extends BaseModel
 
     protected $casts = [
         'sequence' => 'integer',
+        'retry_count' => 'integer',
         'occurred_at' => 'datetime',
         'payload' => 'array',
         'received_at' => 'datetime',
@@ -55,5 +58,15 @@ class FuelStationIntegrationEvent extends BaseModel
     public function station(): BelongsTo
     {
         return $this->belongsTo(FuelStation::class, 'fuel_station_id');
+    }
+
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(FuelStationDevice::class, 'fuel_station_device_id');
+    }
+
+    public function attempts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(FuelStationIntegrationEventAttempt::class, 'fuel_station_integration_event_id');
     }
 }
