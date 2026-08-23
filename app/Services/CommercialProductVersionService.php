@@ -15,7 +15,10 @@ class CommercialProductVersionService
     public function setCapabilities(CommercialProductVersion $version, array $capabilityKeys): void
     {
         if ($version->published_at !== null) throw new LogicException('A published product composition is immutable.');
-        $keys = array_values(array_unique($capabilityKeys));
+        $keys = array_values($capabilityKeys);
+        if (count($keys) !== count(array_unique($keys))) {
+            throw ValidationException::withMessages(['capability_keys' => 'A product version cannot contain duplicate capabilities.']);
+        }
         $invalid = array_values(array_filter($keys, fn (string $key): bool => ! ApplicationCatalog::isActivatable($key)));
         if ($invalid !== []) throw ValidationException::withMessages(['capability_keys' => 'Unknown or unbuilt capabilities: '.implode(', ', $invalid)]);
 
@@ -42,6 +45,19 @@ class CommercialProductVersionService
         if ($version->published_at !== null) return $version;
         if (! $version->capabilities()->exists()) throw ValidationException::withMessages(['capabilities' => 'A product version must contain capabilities before publication.']);
         $version->forceFill(['published_at' => now('UTC')])->save();
+
+        return $version->refresh();
+    }
+
+    public function retire(CommercialProductVersion $version): CommercialProductVersion
+    {
+        if ($version->published_at === null) {
+            throw ValidationException::withMessages(['product_version' => 'Only published product versions may be retired.']);
+        }
+        if ($version->retired_at !== null) return $version;
+
+        $version->forceFill(['retired_at' => now('UTC')])->save();
+
         return $version->refresh();
     }
 }

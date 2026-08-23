@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Support\ApplicationCatalog;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 
 class CommercialProductVersionCapability extends Model
@@ -22,6 +24,13 @@ class CommercialProductVersionCapability extends Model
                 throw new LogicException('A published product composition is immutable.');
             }
         };
+        $validateCapability = function (self $mapping): void {
+            if (! ApplicationCatalog::isActivatable($mapping->capability_key)) {
+                throw ValidationException::withMessages(['capability_key' => 'The capability must exist and be built.']);
+            }
+        };
+        static::creating($validateCapability);
+        static::updating($validateCapability);
         static::creating($guard);
         static::updating($guard);
         static::deleting($guard);

@@ -33,6 +33,19 @@ class CommercialPlanVersionService
         if ($planVersion->published_at !== null) return $planVersion;
         if (! $planVersion->products()->exists()) throw ValidationException::withMessages(['products' => 'A plan version must contain products before publication.']);
         $planVersion->forceFill(['published_at' => now('UTC')])->save();
+
+        return $planVersion->refresh();
+    }
+
+    public function retire(CommercialPlanVersion $planVersion): CommercialPlanVersion
+    {
+        if ($planVersion->published_at === null) {
+            throw ValidationException::withMessages(['plan_version' => 'Only published plan versions may be retired.']);
+        }
+        if ($planVersion->retired_at !== null) return $planVersion;
+
+        $planVersion->forceFill(['retired_at' => now('UTC')])->save();
+
         return $planVersion->refresh();
     }
 }
