@@ -12,6 +12,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
+use App\Services\TenantReferenceNumberService;
 use App\Support\PlanGate;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
@@ -45,6 +46,8 @@ class AuthController extends ApiController
                 'plan'          => 'free',
                 'trial_ends_at' => now()->addDays(self::TRIAL_DAYS),
             ]);
+
+            $tenant = app(TenantReferenceNumberService::class)->assign($tenant);
 
             app(TenantContext::class)->set($tenant->id);
             app(ChartOfAccountsSeeder::class)->seed($tenant->id);
@@ -90,7 +93,13 @@ class AuthController extends ApiController
         return response()->json([
             'token'  => $this->issueToken($user),
             'user'   => $this->userPayload($user),
-            'tenant' => ['id' => $tenant->id, 'name' => $tenant->name, 'slug' => $tenant->slug],
+            'tenant' => [
+                'id'             => $tenant->id,
+                'name'           => $tenant->name,
+                'slug'           => $tenant->slug,
+                'account_number' => $tenant->account_number,
+                'support_number' => $tenant->support_number,
+            ],
         ], 201);
     }
 

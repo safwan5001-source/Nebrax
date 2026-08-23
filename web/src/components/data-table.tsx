@@ -24,11 +24,15 @@ interface DataTableProps<T> {
   searchPlaceholder?: string;
   emptyLabel?: string;
   exportName?: string;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }
 
-export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyLabel, exportName }: DataTableProps<T>) {
+export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyLabel, exportName, searchValue, onSearchChange }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
+  const [internalGlobalFilter, setInternalGlobalFilter] = useState('');
+  const globalFilter = searchValue ?? internalGlobalFilter;
+  const setGlobalFilter = onSearchChange ?? setInternalGlobalFilter;
 
   const table = useReactTable({
     data,

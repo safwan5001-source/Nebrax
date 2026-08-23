@@ -210,6 +210,8 @@ export default function SettingsPage() {
         ) : (
           <dl className="grid gap-x-6 sm:grid-cols-2">
             <DetailRow label={t('company_name')} value={company.name} />
+            <DetailRow label={t('account_number')} value={company.account_number?.toString() ?? '—'} numeric />
+            <DetailRow label={t('support_number')} value={company.support_number?.toString() ?? '—'} numeric />
             <DetailRow label={t('vat_number')} value={company.vat_number ?? '—'} numeric />
             <DetailRow label={t('cr_number')} value={company.cr_number ?? '—'} numeric />
             <DetailRow label={t('base_currency')} value={company.currency ?? '—'} numeric />

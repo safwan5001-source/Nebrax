@@ -29,6 +29,8 @@ class Tenant extends Model
         'is_active'            => 'boolean',
         'trial_ends_at'        => 'datetime',
         'subscription_ends_at' => 'datetime',
+        'account_number'       => 'integer',
+        'support_number'       => 'integer',
     ];
 
     protected $attributes = [

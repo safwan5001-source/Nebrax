@@ -1,9 +1,10 @@
 'use client';
 
+import * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Copy, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +25,8 @@ interface TenantDetail {
   id: string;
   name: string;
   slug: string;
+  account_number: number | null;
+  support_number: number | null;
   plan: string;
   is_active: boolean;
   trial_ends_at: string | null;
@@ -71,6 +74,17 @@ export default function PlatformTenantDetailPage() {
     }
     load();
   }, [load, router]);
+
+  async function copyReference(value: number | null) {
+    if (value === null || !navigator.clipboard) return;
+
+    try {
+      await navigator.clipboard.writeText(String(value));
+      setNotice(t('referenceCopied'));
+    } catch {
+      setError(t('loadFailed_detail'));
+    }
+  }
 
   async function savePlan() {
     setSaving(true);
@@ -175,6 +189,12 @@ export default function PlatformTenantDetailPage() {
                 <CardTitle>{t('detailTitle')}</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+                <Info label={t('accountNumber')}>
+                  <ReferenceValue value={tenant.account_number} copyLabel={t('copyReference')} onCopy={copyReference} />
+                </Info>
+                <Info label={t('supportNumber')}>
+                  <ReferenceValue value={tenant.support_number} copyLabel={t('copyReference')} onCopy={copyReference} />
+                </Info>
                 <Info label={t('contactName')} value={tenant.contact?.name ?? '—'} />
                 <Info label={t('contact')} value={tenant.contact?.email ?? '—'} />
                 <Info label={t('phone')} value={tenant.contact?.phone ?? '—'} />
@@ -242,6 +262,19 @@ export default function PlatformTenantDetailPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function ReferenceValue({ value, copyLabel, onCopy }: { value: number | null; copyLabel: string; onCopy: (value: number | null) => void }) {
+  return (
+    <span className="flex items-center gap-1.5" dir="ltr">
+      <span className="num">{value ?? '—'}</span>
+      {value !== null && (
+        <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onCopy(value)} aria-label={copyLabel} title={copyLabel}>
+          <Copy className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+        </Button>
+      )}
+    </span>
   );
 }
 

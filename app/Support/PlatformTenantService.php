@@ -26,11 +26,18 @@ class PlatformTenantService
             ->with(['users' => fn ($q) => $q->where('role', 'owner')->oldest()->limit(1)]);
 
         if ($search !== null && trim($search) !== '') {
-            $term = '%' . trim($search) . '%';
-            $query->where(function ($q) use ($term): void {
+            $search = trim($search);
+            $term = '%' . $search . '%';
+
+            $query->where(function ($q) use ($search, $term): void {
                 $q->where('name', 'like', $term)
                     ->orWhere('slug', 'like', $term)
                     ->orWhereHas('users', fn ($u) => $u->where('role', 'owner')->where('email', 'like', $term));
+
+                if (ctype_digit($search)) {
+                    $q->orWhere('account_number', (int) $search)
+                        ->orWhere('support_number', (int) $search);
+                }
             });
         }
 
@@ -140,6 +147,8 @@ class PlatformTenantService
             'id'                    => $tenant->id,
             'name'                  => $tenant->name,
             'slug'                  => $tenant->slug,
+            'account_number'        => $tenant->account_number,
+            'support_number'        => $tenant->support_number,
             'plan'                  => $tenant->plan,
             'is_active'             => $tenant->is_active,
             'trial_ends_at'         => $tenant->trial_ends_at?->toDateString(),
