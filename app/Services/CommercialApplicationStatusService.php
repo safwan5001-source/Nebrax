@@ -19,7 +19,7 @@ class CommercialApplicationStatusService
      * Read-only projection for Settings → Applications. It is deliberately not
      * an authority for navigation, enforcement, or TenantApplicationState.
      *
-     * @return array<string, array{commercial:array{availability:string,source_count:int},effective_access:string,dependency_status:string}>
+     * @return array<string, array{commercial:array{availability:string,source_count:int,source_types:list<string>,trial_until:?string,cancels_at:?string,expired:bool},effective_access:string,dependency_status:string}>
      */
     public function forTenant(Tenant $tenant): array
     {
@@ -67,6 +67,7 @@ class CommercialApplicationStatusService
                 'commercial' => [
                     'availability' => $availability,
                     'source_count' => count($sources),
+                    'source_types' => $sources,
                     'trial_until' => $trialGrant?->ends_at?->toIso8601String(),
                     'cancels_at' => $scheduledCancellation?->toIso8601String(),
                     'expired' => $availability === 'not_available' && $expiredTrials->has($key),

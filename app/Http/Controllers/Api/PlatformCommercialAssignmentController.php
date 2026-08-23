@@ -16,6 +16,7 @@ use App\Services\CommercialAssignmentService;
 use App\Services\CommercialAssignmentLifecycleService;
 use App\Services\CommercialTrialService;
 use App\Services\CommercialAccessInspectorService;
+use App\Services\PlatformTenantCommercialApplicationService;
 use App\Support\ApplicationOperationClass;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -28,14 +29,20 @@ class PlatformCommercialAssignmentController extends ApiController
         private CommercialAssignmentLifecycleService $lifecycle,
         private CommercialTrialService $trials,
         private CommercialAccessInspectorService $inspector,
+        private PlatformTenantCommercialApplicationService $commercialApplications,
     ) {}
+
+    public function commercialApplications(Tenant $tenant): JsonResponse
+    {
+        return response()->json(['data' => $this->commercialApplications->summary($tenant)]);
+    }
 
     public function index(Tenant $tenant): JsonResponse
     {
         return response()->json([
             'data' => TenantCommercialAssignment::query()
                 ->where('tenant_id', $tenant->id)
-                ->with(['planVersion', 'productVersion', 'events'])
+                ->with(['planVersion.products.productVersion.product', 'productVersion.product', 'events'])
                 ->latest('created_at')
                 ->get()
                 ->map(fn (TenantCommercialAssignment $assignment) => $this->assignmentData($assignment))
@@ -48,9 +55,21 @@ class PlatformCommercialAssignmentController extends ApiController
         $data = $request->validated();
         $startsAt = CarbonImmutable::parse($data['starts_at'], 'UTC');
         $endsAt = isset($data['ends_at']) ? CarbonImmutable::parse($data['ends_at'], 'UTC') : null;
-        $preview = $data['source_type'] === TenantCommercialAssignment::SOURCE_PLAN
-            ? $this->assignments->previewPlan($tenant, CommercialPlanVersion::query()->findOrFail($data['version_id']), $startsAt, $endsAt)
-            : $this->assignments->previewAddon($tenant, CommercialProductVersion::query()->findOrFail($data['version_id']), $startsAt, $endsAt);
+        $preview = match ($data['source_type']) {
+            TenantCommercialAssignment::SOURCE_PLAN => $this->assignments->previewPlan(
+                $tenant, CommercialPlanVersion::query()->findOrFail($data['version_id']), $startsAt, $endsAt,
+            ),
+            TenantCommercialAssignment::SOURCE_ADDON => $this->assignments->previewAddon(
+                $tenant, CommercialProductVersion::query()->findOrFail($data['version_id']), $startsAt, $endsAt,
+            ),
+            TenantCommercialAssignment::SOURCE_TRIAL => $data['trial_target'] === TenantCommercialAssignment::SOURCE_PLAN
+                ? $this->assignments->previewPlanTrial(
+                    $tenant, CommercialPlanVersion::query()->findOrFail($data['version_id']), $startsAt, (int) $data['duration_days'],
+                )
+                : $this->assignments->previewAddonTrial(
+                    $tenant, CommercialProductVersion::query()->findOrFail($data['version_id']), $startsAt, (int) $data['duration_days'],
+                ),
+        };
 
         return response()->json(['data' => $preview]);
     }
@@ -148,6 +167,34 @@ class PlatformCommercialAssignmentController extends ApiController
         ]);
     }
 
+    public function scheduleCancellationForTenant(CommercialAssignmentLifecycleDateRequest $request, Tenant $tenant, TenantCommercialAssignment $assignment): JsonResponse
+    {
+        $data = $request->validated();
+        return response()->json([
+            'data' => $this->assignmentData($this->lifecycle->scheduleCancellation(
+                $this->assignmentForTenant($tenant, $assignment), $this->administrator($request), CarbonImmutable::parse($data['effective_at'], 'UTC'), $data['reason'] ?? null,
+            )),
+        ]);
+    }
+
+    public function cancelForTenant(CommercialAssignmentLifecycleRequest $request, Tenant $tenant, TenantCommercialAssignment $assignment): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->assignmentData($this->assignments->cancel(
+                $this->assignmentForTenant($tenant, $assignment), $this->administrator($request), $request->validated('reason'),
+            )),
+        ]);
+    }
+
+    public function revokeForTenant(CommercialAssignmentLifecycleRequest $request, Tenant $tenant, TenantCommercialAssignment $assignment): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->assignmentData($this->assignments->revoke(
+                $this->assignmentForTenant($tenant, $assignment), $this->administrator($request), $request->validated('reason'),
+            )),
+        ]);
+    }
+
     public function cancel(CommercialAssignmentLifecycleRequest $request, TenantCommercialAssignment $assignment): JsonResponse
     {
         return response()->json([
@@ -160,6 +207,13 @@ class PlatformCommercialAssignmentController extends ApiController
         return response()->json([
             'data' => $this->assignmentData($this->assignments->revoke($assignment, $this->administrator($request), $request->validated('reason'))),
         ]);
+    }
+
+    private function assignmentForTenant(Tenant $tenant, TenantCommercialAssignment $assignment): TenantCommercialAssignment
+    {
+        abort_unless($assignment->tenant_id === $tenant->id, 404);
+
+        return $assignment;
     }
 
     private function administrator(Request $request): PlatformAdministrator
@@ -180,6 +234,17 @@ class PlatformCommercialAssignmentController extends ApiController
             'status' => $assignment->status,
             'plan_version_id' => $assignment->commercial_plan_version_id,
             'product_version_id' => $assignment->commercial_product_version_id,
+            'plan_version' => $assignment->planVersion === null ? null : [
+                'id' => $assignment->planVersion->id,
+                'plan_code' => $assignment->planVersion->plan_code,
+                'version' => $assignment->planVersion->version,
+            ],
+            'product_version' => $assignment->productVersion === null ? null : [
+                'id' => $assignment->productVersion->id,
+                'version' => $assignment->productVersion->version,
+                'product_code' => $assignment->productVersion->product?->code,
+                'product_name' => $assignment->productVersion->product?->name,
+            ],
             'starts_at' => $assignment->starts_at?->toIso8601String(),
             'ends_at' => $assignment->ends_at?->toIso8601String(),
             'lifecycle_state' => $assignment->lifecycle_state,

@@ -37,6 +37,18 @@ class CommercialAssignmentService
         return $this->preview($tenant, TenantCommercialAssignment::SOURCE_ADDON, $productVersion, $startsAt, $endsAt);
     }
 
+    /** @return array<string, mixed> */
+    public function previewPlanTrial(Tenant $tenant, CommercialPlanVersion $planVersion, DateTimeInterface $startsAt, int $durationDays): array
+    {
+        return $this->previewTrial($tenant, $planVersion, $startsAt, $durationDays);
+    }
+
+    /** @return array<string, mixed> */
+    public function previewAddonTrial(Tenant $tenant, CommercialProductVersion $productVersion, DateTimeInterface $startsAt, int $durationDays): array
+    {
+        return $this->previewTrial($tenant, $productVersion, $startsAt, $durationDays);
+    }
+
     public function assignPlan(
         Tenant $tenant,
         ?PlatformAdministrator $administrator,
@@ -73,11 +85,16 @@ class CommercialAssignmentService
     private function preview(Tenant $tenant, string $sourceType, object $version, DateTimeInterface $startsAt, ?DateTimeInterface $endsAt): array
     {
         [$start, $end] = $this->interval($startsAt, $endsAt);
-        $definition = $sourceType === TenantCommercialAssignment::SOURCE_PLAN
+        $isPlan = $version instanceof CommercialPlanVersion;
+        $definition = $isPlan
             ? $this->materialization->previewPlan($version)
             : $this->materialization->previewAddon($version);
-        $source = $sourceType === TenantCommercialAssignment::SOURCE_PLAN ? EntitlementSourceType::PLAN : EntitlementSourceType::ADDON;
-        $referenceType = $sourceType === TenantCommercialAssignment::SOURCE_PLAN ? 'commercial-plan-version' : 'commercial-product-version';
+        $source = match ($sourceType) {
+            TenantCommercialAssignment::SOURCE_PLAN => EntitlementSourceType::PLAN,
+            TenantCommercialAssignment::SOURCE_ADDON => EntitlementSourceType::ADDON,
+            TenantCommercialAssignment::SOURCE_TRIAL => EntitlementSourceType::TRIAL,
+        };
+        $referenceType = $isPlan ? 'commercial-plan-version' : 'commercial-product-version';
 
         $existingGrants = TenantApplicationEntitlement::query()
             ->where('tenant_id', $tenant->id)
@@ -98,7 +115,7 @@ class CommercialAssignmentService
             ->where('tenant_id', $tenant->id)
             ->where('source_type', $sourceType)
             ->where('status', TenantCommercialAssignment::STATUS_ACTIVE)
-            ->when($sourceType === TenantCommercialAssignment::SOURCE_PLAN,
+            ->when($isPlan,
                 fn ($query) => $query->where('commercial_plan_version_id', $version->id),
                 fn ($query) => $query->where('commercial_product_version_id', $version->id),
             )
@@ -131,6 +148,32 @@ class CommercialAssignmentService
             'conflicts' => $hasConflictingOverlap ? ['An active assignment for the same commercial version overlaps this interval.'] : [],
             'resulting_effective_access' => array_map(fn (string $key) => ['capability_key' => $key, 'access_mode' => 'full'], $definition['capability_keys']),
         ];
+    }
+
+    /** @param CommercialPlanVersion|CommercialProductVersion $version @return array<string, mixed> */
+    private function previewTrial(Tenant $tenant, object $version, DateTimeInterface $startsAt, int $durationDays): array
+    {
+        if ($durationDays < 1 || $durationDays > 90) {
+            throw ValidationException::withMessages(['duration_days' => 'Trial duration must be between 1 and 90 days.']);
+        }
+
+        $preview = $this->preview($tenant, TenantCommercialAssignment::SOURCE_TRIAL, $version, $startsAt, CarbonImmutable::instance($startsAt)->utc()->addDays($durationDays));
+        $isPlan = $version instanceof CommercialPlanVersion;
+        $hasRecordedTrial = TenantCommercialAssignment::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('source_type', TenantCommercialAssignment::SOURCE_TRIAL)
+            ->when($isPlan,
+                fn ($query) => $query->where('commercial_plan_version_id', $version->id),
+                fn ($query) => $query->where('commercial_product_version_id', $version->id),
+            )
+            ->exists();
+
+        if ($hasRecordedTrial) {
+            $preview['conflicts'][] = 'A trial for this commercial version has already been recorded for this tenant.';
+        }
+        $preview['trial_duration_days'] = $durationDays;
+
+        return $preview;
     }
 
     /** @param CommercialPlanVersion|CommercialProductVersion $version */

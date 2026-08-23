@@ -164,6 +164,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             Route::post('commercial-product-versions/{version}/retire', [PlatformCommercialCatalogController::class, 'retireProduct']);
             Route::post('commercial-plan-versions/{version}/publish', [PlatformCommercialCatalogController::class, 'publishPlan']);
             Route::post('commercial-plan-versions/{version}/retire', [PlatformCommercialCatalogController::class, 'retirePlan']);
+            Route::get('tenants/{tenant}/commercial-applications', [PlatformCommercialAssignmentController::class, 'commercialApplications']);
             Route::get('tenants/{tenant}/commercial-assignments', [PlatformCommercialAssignmentController::class, 'index']);
             Route::get('tenants/{tenant}/commercial-access/{capabilityKey}', [PlatformCommercialAssignmentController::class, 'inspectAccess']);
             Route::post('tenants/{tenant}/commercial-assignments/preview', [PlatformCommercialAssignmentController::class, 'preview']);
@@ -171,6 +172,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             Route::post('tenants/{tenant}/commercial-assignments/addon', [PlatformCommercialAssignmentController::class, 'assignAddon']);
             Route::post('tenants/{tenant}/commercial-trials/plan', [PlatformCommercialAssignmentController::class, 'startPlanTrial']);
             Route::post('tenants/{tenant}/commercial-trials/addon', [PlatformCommercialAssignmentController::class, 'startAddonTrial']);
+            Route::post('tenants/{tenant}/commercial-assignments/{assignment}/schedule-cancellation', [PlatformCommercialAssignmentController::class, 'scheduleCancellationForTenant']);
+            Route::post('tenants/{tenant}/commercial-assignments/{assignment}/cancel', [PlatformCommercialAssignmentController::class, 'cancelForTenant']);
+            Route::post('tenants/{tenant}/commercial-assignments/{assignment}/revoke', [PlatformCommercialAssignmentController::class, 'revokeForTenant']);
             Route::post('commercial-assignments/{assignment}/payment-failure', [PlatformCommercialAssignmentController::class, 'paymentFailure']);
             Route::post('commercial-assignments/{assignment}/schedule-cancellation', [PlatformCommercialAssignmentController::class, 'scheduleCancellation']);
             Route::post('commercial-assignments/{assignment}/reconcile', [PlatformCommercialAssignmentController::class, 'reconcile']);

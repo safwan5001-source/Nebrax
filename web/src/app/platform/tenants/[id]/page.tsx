@@ -235,7 +235,7 @@ export default function PlatformTenantDetailPage() {
             </Card>
 
             <ContractManagementCard tenantId={tenantId} subscriptions={tenant.subscriptions} onChanged={load} />
-            <CommercialOperationsCard tenantId={tenantId} />
+            <CommercialOperationsCard tenantId={tenantId} onChanged={load} />
 
             <p className="text-center text-xs text-muted">{t('auditNotice')}</p>
           </>
