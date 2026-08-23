@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 29086)
-Total output lines: 2195
-
 // بيانات وهمية واقعية لوضع المعاينة (Demo). كل المبالغ بالريال كنصوص (مثل ما يعيده الـ API)
 // لأن التحويل من الهللات يتم في طبقة موارد الـ backend. لا يُستخدم أي float في حساب مالي حقيقي هنا.
 
@@ -804,7 +801,609 @@ export const mockRecurring: MockRecurring[] = [
   recurring('rc-3', 'إيجار وحدة سنوي', 'p5', 'yearly', '2026-01-01', '2027-01-01', 1, [line('l1', 'إيجار سنوي', 1, 60000)]),
 ];
 
-// ── سجلّ علاقات العملاء (CRM) …9086 tokens truncated…interval') ?? 'month', source: 'posted_customer_invoices' },
+// ── سجلّ علاقات العملاء (CRM) ──────────────────────────────────────────────
+export const mockCrmActivities = [
+  { id: 'cr-1', partner_id: 'p1', type: 'call', subject: 'متابعة عرض السعر', activity_at: '2026-06-26T11:00:00', status: 'done', notes: 'مهتم، سيردّ الأسبوع القادم' },
+  { id: 'cr-2', partner_id: 'p4', type: 'meeting', subject: 'اجتماع تجديد العقد', activity_at: '2026-07-03T09:30:00', status: 'open', notes: null },
+  { id: 'cr-3', partner_id: 'p2', type: 'task', subject: 'إرسال كتالوج المنتجات', activity_at: '2026-06-29T08:00:00', status: 'open', notes: null },
+];
+
+// ── جهات الاتصال ───────────────────────────────────────────────────────────
+export const mockContacts = [
+  { id: 'ct-1', partner_id: 'p1', name: 'سعد المالكي', job_title: 'مدير المشتريات', email: 'saad@gulf-trade.sa', phone: '0551112233', notes: null },
+  { id: 'ct-2', partner_id: 'p4', name: 'هند العتيبي', job_title: 'محاسبة', email: 'hind@najd-supply.sa', phone: '0554445566', notes: null },
+  { id: 'ct-3', partner_id: null, name: 'مكتب الاستشارات القانونية', job_title: 'مستشار', email: 'info@legal.sa', phone: '0138001122', notes: 'جهة خارجية' },
+];
+
+// ── المواعيد ───────────────────────────────────────────────────────────────
+export const mockAppointments = [
+  { id: 'ap-1', partner_id: 'p1', title: 'اجتماع متابعة العقد', appointment_at: '2026-07-02T10:00:00', duration_minutes: 60, status: 'scheduled', location: 'مكتب الدمام', notes: null },
+  { id: 'ap-2', partner_id: 'p4', title: 'عرض المنتجات الجديدة', appointment_at: '2026-06-28T13:30:00', duration_minutes: 45, status: 'scheduled', location: 'عبر الهاتف', notes: null },
+  { id: 'ap-3', partner_id: 'p2', title: 'توقيع اتفاقية', appointment_at: '2026-06-20T09:00:00', duration_minutes: 30, status: 'done', location: 'الخبر', notes: 'تم بنجاح' },
+];
+
+// ── المدفوعات ──────────────────────────────────────────────────────────────
+export const mockPaymentMethods = [
+  { id: 'pm-method-cash', name: 'نقدي', settlement_type: 'cash', cash_bank_account_id: 'cash-main', is_active: true, is_default: true },
+  { id: 'pm-method-bank', name: 'تحويل بنكي', settlement_type: 'bank', cash_bank_account_id: 'bank-main', is_active: true, is_default: false },
+];
+
+export const mockCashBankAccounts = [
+  { id: 'cash-main', account_id: 'acc-1110', name: 'الخزينة الرئيسية', type: 'cash', is_active: true, is_main: true },
+  { id: 'bank-main', account_id: 'acc-1120', name: 'الحساب البنكي الرئيسي', type: 'bank', is_active: true, is_main: true },
+];
+
+export const mockPayments = [
+  { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
+  { id: 'pm-50', number: 'PMT-2026-0050', partner_id: 'p2', direction: 'received', method: 'cash', payment_date: '2026-06-22', amount: '6325.00' },
+  { id: 'pm-49', number: 'PMT-2026-0049', partner_id: 'p7', direction: 'paid', method: 'bank', payment_date: '2026-06-20', amount: '6900.00' },
+  { id: 'pm-48', number: 'PMT-2026-0048', partner_id: 'p5', direction: 'received', method: 'bank', payment_date: '2026-06-18', amount: '21275.00' },
+  { id: 'pm-47', number: 'PMT-2026-0047', partner_id: 'p8', direction: 'paid', method: 'cash', payment_date: '2026-06-12', amount: '3450.00' },
+  { id: 'pm-46', number: 'PMT-2026-0046', partner_id: 'p6', direction: 'received', method: 'bank', payment_date: '2026-06-08', amount: '4600.00' },
+];
+
+// ── الموارد البشرية ────────────────────────────────────────────────────────
+export interface MockEmployee {
+  id: string;
+  employee_no: string;
+  name: string;
+  national_id: string;
+  job_title: { id: string; name: string } | null;
+  basic_salary: string;
+  allowances: string;
+  gosi: string;
+  other_deductions: string;
+  is_active: boolean;
+  gross: string;
+  net: string;
+}
+
+function employee(
+  id: string, no: string, name: string, job: string,
+  basic: number, allow: number, gosi: number, other: number, active = true
+): MockEmployee {
+  const gross = basic + allow;
+  const net = gross - gosi - other;
+  return {
+    id, employee_no: no, name, national_id: `10${no.slice(-6)}0`,
+    job_title: { id: `jt-${id}`, name: job },
+    basic_salary: basic.toFixed(2), allowances: allow.toFixed(2), gosi: gosi.toFixed(2),
+    other_deductions: other.toFixed(2), is_active: active, gross: gross.toFixed(2), net: net.toFixed(2),
+  };
+}
+
+export const mockEmployees: MockEmployee[] = [
+  employee('em-1', 'EMP-001', 'أحمد العتيبي', 'مدير مالي', 18000, 4000, 1800, 0),
+  employee('em-2', 'EMP-002', 'سارة القحطاني', 'محاسبة', 9000, 1500, 900, 0),
+  employee('em-3', 'EMP-003', 'خالد الدوسري', 'أمين مستودع', 6000, 800, 600, 200),
+  employee('em-4', 'EMP-004', 'منى الشمري', 'موظفة مبيعات', 7000, 2000, 700, 0),
+  employee('em-5', 'EMP-005', 'فهد المطيري', 'فني صيانة', 5500, 700, 550, 150),
+  employee('em-6', 'EMP-006', 'نورة الغامدي', 'موظفة استقبال', 4500, 500, 450, 0, false),
+];
+
+// الهيكل التنظيمي — كيانات مُدارة (تعرض قوائم اختيار في نموذج الموظف).
+export const mockJobTitles = mockEmployees
+  .map((e) => e.job_title)
+  .filter((jt): jt is { id: string; name: string } => !!jt)
+  .map((jt) => ({ ...jt, is_active: true }));
+export const mockDepartments = [
+  { id: 'dep-1', name: 'المالية', is_active: true },
+  { id: 'dep-2', name: 'المبيعات', is_active: true },
+  { id: 'dep-3', name: 'العمليات', is_active: true },
+];
+export const mockJobLevels = [
+  { id: 'lvl-1', name: 'مبتدئ', is_active: true },
+  { id: 'lvl-2', name: 'متوسط', is_active: true },
+  { id: 'lvl-3', name: 'أول', is_active: true },
+];
+export const mockEmploymentTypes = [
+  { id: 'et-1', name: 'دوام كامل', is_active: true },
+  { id: 'et-2', name: 'دوام جزئي', is_active: true },
+  { id: 'et-3', name: 'عقد', is_active: true },
+];
+
+// الإجازات — نطاق البناء الأول (نوعٌ فقط + رصيدٌ مباشر).
+export const mockLeaveTypes = [
+  { id: 'lt-1', name: 'سنوية', is_paid: true, annual_days: 21, requires_approval: true, is_active: true, leave_requests_count: 1 },
+  { id: 'lt-2', name: 'مرضية', is_paid: true, annual_days: 30, requires_approval: true, is_active: true, leave_requests_count: 0 },
+  { id: 'lt-3', name: 'بلا راتب', is_paid: false, annual_days: 0, requires_approval: true, is_active: true, leave_requests_count: 0 },
+];
+export const mockLeaveRequests = [
+  {
+    id: 'lr-1', employee_id: 'em-1', employee: { id: 'em-1', name: 'أحمد العتيبي' },
+    leave_type_id: 'lt-1', leave_type: { id: 'lt-1', name: 'سنوية', is_paid: true },
+    start_date: '2026-09-01', end_date: '2026-09-05', days_count: 5, status: 'pending',
+    reason: 'سفر عائلي', rejection_reason: null, approver: null, approved_at: null,
+    created_at: '2026-08-15T09:00:00Z',
+  },
+];
+
+// إدارة الطلبات — أنواع ثابتة بحقول موحّدة (نطاق البناء الأول)، منفصلة عن الإجازات.
+export const mockRequestTypes = [
+  { id: 'rqt-1', name: 'سلفة', requires_approval: true, is_active: true, employee_requests_count: 1 },
+  { id: 'rqt-2', name: 'استئذان', requires_approval: true, is_active: true, employee_requests_count: 0 },
+  { id: 'rqt-3', name: 'شكوى', requires_approval: false, is_active: true, employee_requests_count: 0 },
+];
+export const mockEmployeeRequests = [
+  {
+    id: 'er-1', employee_id: 'em-1', employee: { id: 'em-1', name: 'أحمد العتيبي' },
+    request_type_id: 'rqt-1', request_type: { id: 'rqt-1', name: 'سلفة' },
+    title: 'سلفة براتب شهر', description: 'سلفة على الراتب لظرف طارئ.', requested_date: '2026-09-10',
+    status: 'pending', rejection_reason: null, approver: null, approved_at: null,
+    created_at: '2026-08-18T10:00:00Z',
+  },
+];
+
+export interface MockRun {
+  id: string;
+  number: string;
+  period: string;
+  status: string;
+  pay_method: string | null;
+  total_gross: string;
+  total_gosi: string;
+  total_other_deductions: string;
+  total_deductions: string;
+  total_net: string;
+  items: {
+    id: string;
+    employee: { id: string; name: string };
+    basic_salary: string;
+    allowances: string;
+    gosi: string;
+    other_deductions: string;
+    gross: string;
+    net: string;
+  }[];
+}
+
+function payrollRun(id: string, number: string, period: string, status: string, payMethod: string | null): MockRun {
+  const items = mockEmployees.map((e) => ({
+    id: `${id}-${e.id}`,
+    employee: { id: e.id, name: e.name },
+    basic_salary: e.basic_salary,
+    allowances: e.allowances,
+    gosi: e.gosi,
+    other_deductions: e.other_deductions,
+    gross: e.gross,
+    net: e.net,
+  }));
+  const sum = (k: 'gross' | 'gosi' | 'other_deductions' | 'net') =>
+    items.reduce((s, it) => s + Number(it[k]), 0);
+  const gross = sum('gross');
+  const gosi = sum('gosi');
+  const other = sum('other_deductions');
+  return {
+    id, number, period, status, pay_method: payMethod,
+    total_gross: gross.toFixed(2), total_gosi: gosi.toFixed(2), total_other_deductions: other.toFixed(2),
+    total_deductions: (gosi + other).toFixed(2), total_net: sum('net').toFixed(2), items,
+  };
+}
+
+export const mockPayrollRuns: MockRun[] = [
+  payrollRun('run-06', 'PR-2026-06', '2026-06', 'posted', null),
+  payrollRun('run-05', 'PR-2026-05', '2026-05', 'paid', 'bank'),
+  payrollRun('run-04', 'PR-2026-04', '2026-04', 'paid', 'bank'),
+];
+
+// ── المستخدمون والاشتراك ───────────────────────────────────────────────────
+export const mockUsers = [
+  { id: DEMO_USER.id, name: DEMO_USER.name, email: DEMO_USER.email, role: 'owner', is_active: true },
+  { id: 'us-2', name: 'سارة القحطاني', email: 'sara@nibras.sa', role: 'accountant', is_active: true },
+  { id: 'us-3', name: 'خالد الدوسري', email: 'khalid@nibras.sa', role: 'staff', is_active: true },
+];
+
+export const mockSalesConfig: Record<string, unknown> = {
+  statuses: [
+    { name: 'مسودة', color: '#6B7280' },
+    { name: 'مرحّلة', color: '#1E40AF' },
+    { name: 'مدفوعة', color: '#16A34A' },
+    { name: 'ملغاة', color: '#DC2626' },
+  ],
+  fields: [
+    { label: 'رقم أمر الشراء', type: 'text' },
+    { label: 'تاريخ التسليم', type: 'date' },
+  ],
+  pricelists: [
+    { name: 'قائمة التجزئة', adjustment: 0 },
+    { name: 'قائمة الجملة', adjustment: -10 },
+  ],
+  sources: [{ name: 'المتجر الإلكتروني' }, { name: 'الفرع الرئيسي' }, { name: 'مندوب المبيعات' }],
+  shipping: [
+    { name: 'توصيل داخل المدينة', rate: 25 },
+    { name: 'شحن بين المدن', rate: 60 },
+  ],
+  taxes: [
+    { name: 'VAT', rate: 15, inclusive: false },
+    { name: 'Zero Rated', rate: 0, inclusive: false },
+    { name: 'Tax Free', rate: 0, inclusive: false },
+  ],
+  einvoice: { enabled: true, phase: '2', vat_number: '310122393500003' },
+  designs: { template: 'classic', theme: 'blue', show_logo: true, logo: '', logo_height: 56, sections: [], accent_color: '#1E40AF', footer_text: 'شكراً لتعاملكم معنا', terms_text: 'السداد خلال 30 يوماً من تاريخ الفاتورة.' },
+  orders: { auto_convert: false, require_approval: true, prefix: 'SO' },
+  pos: {
+    default_customer: 'عميل نقدي (POS)',
+    print_receipt: true,
+    receipt_paper_size: 'thermal_80',
+    allow_discount: true,
+    receipt_footer: 'شكراً لزيارتكم',
+    enabled_payment_method_ids: [],
+    payment_methods_mode: 'all_active',
+    default_payment_method_id: 'pm-method-cash',
+    allow_deferred_payment: true,
+    show_product_images: true,
+    cash_drawer_enabled: false,
+    cash_drawer_driver: 'unavailable',
+    cash_drawer_auto_open_after_cash: false,
+  },
+};
+
+export const mockBranches = [
+  { id: 'br-1', code: '00001', name: 'الفرع الرئيسي', is_main: true, phone: '0138100000', mobile: '0550000000', address_line1: 'طريق الملك فهد', address_line2: '', city: 'الدمام', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: 'الأحد–الخميس ٩ص–٥م', latitude: 26.4207, longitude: 50.0888, is_active: true },
+  { id: 'br-2', code: '00002', name: 'فرع الخبر', is_main: false, phone: '0138200000', mobile: '0551111111', address_line1: 'شارع الأمير فيصل', address_line2: '', city: 'الخبر', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: 26.2794, longitude: 50.2083, is_active: true },
+  { id: 'br-3', code: '00003', name: 'فرع الجبيل', is_main: false, phone: '0133000000', mobile: '', address_line1: '', address_line2: '', city: 'الجبيل', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: null, longitude: null, is_active: false },
+];
+
+export const mockWarehouses = [
+  { id: 'wh-1', code: '00001', name: 'المخزن الرئيسي', branch_id: 'br-1', city: 'الدمام', address: '', notes: '', is_default: true, is_active: true },
+  { id: 'wh-2', code: '00002', name: 'مخزن الخبر', branch_id: 'br-2', city: 'الخبر', address: '', notes: '', is_default: false, is_active: true },
+  { id: 'wh-3', code: '00003', name: 'مخزن مركزي', branch_id: null, city: 'الدمام', address: '', notes: '', is_default: false, is_active: false },
+];
+
+export const mockBranchSettings = {
+  main_branch_id: 'br-1',
+  share_customers: true,
+  share_products: true,
+  share_suppliers: true,
+  share_cost_centers: true,
+  account_branch_scoping: false,
+};
+
+export const mockPosSessions = [
+  { id: 'ps-2', number: 'POS-2026-0002', status: 'open', opening_balance: '500.00', closing_balance: null, expected_balance: null, difference: null, opened_at: '2026-06-28T08:00:00', closed_at: null },
+  { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00' },
+];
+
+export const mockCustomerSettings = {
+  default_type: 'customer',
+  default_city: 'الدمام',
+  payment_terms_days: 30,
+  require_tax_number: false,
+  loyalty_enabled: false,
+};
+
+export const mockSalesSettings = {
+  default_tax_rate: 15,
+  default_payment_type: 'credit',
+  quote_validity_days: 14,
+  invoice_prefix: 'INV',
+  default_terms: 'الدفع خلال 30 يوماً من تاريخ الفاتورة.',
+};
+
+export const mockSubscription = {
+  plan: 'pro',
+  active: true,
+  trial_ends_at: null as string | null,
+  subscription_ends_at: '2026-12-31',
+  limits: { invoices_per_month: 1000, users: 10 },
+  usage: { invoices_this_month: 147, users: 3 },
+};
+
+// ── التقارير ───────────────────────────────────────────────────────────────
+export const mockTrialBalance = {
+  rows: [
+    { code: '1110', name: 'الصندوق', debit: '54320.00', credit: '0.00' },
+    { code: '1120', name: 'البنك', debit: '163520.00', credit: '0.00' },
+    { code: '1130', name: 'العملاء', debit: '63200.00', credit: '0.00' },
+    { code: '1140', name: 'المخزون', debit: '85000.00', credit: '0.00' },
+    { code: '1150', name: 'ضريبة المدخلات', debit: '12400.00', credit: '0.00' },
+    { code: '2110', name: 'الموردون', debit: '0.00', credit: '41250.00' },
+    { code: '2120', name: 'ضريبة المخرجات', debit: '0.00', credit: '33960.00' },
+    { code: '2130', name: 'رواتب مستحقة', debit: '0.00', credit: '5350.00' },
+    { code: '3110', name: 'رأس المال', debit: '0.00', credit: '138000.00' },
+    { code: '4110', name: 'إيرادات المبيعات', debit: '0.00', credit: '482500.00' },
+    { code: '5110', name: 'تكلفة البضاعة المباعة', debit: '264660.00', credit: '0.00' },
+    { code: '5120', name: 'الرواتب والأجور', debit: '54150.00', credit: '0.00' },
+    { code: '5140', name: 'الوقود', debit: '3810.00', credit: '0.00' },
+  ],
+  total_debit: '701060.00',
+  total_credit: '701060.00',
+  balanced: true,
+};
+
+export const mockCostCenterProfit = {
+  rows: [
+    { cost_center_id: 'cc-1', code: 'CC-DMM', name: 'فرع الدمام', revenue: '210000.00', expense: '84300.00', profit: '125700.00' },
+    { cost_center_id: 'cc-2', code: 'CC-KHB', name: 'فرع الخبر', revenue: '148000.00', expense: '96500.00', profit: '51500.00' },
+    { cost_center_id: 'cc-3', code: 'CC-JBL', name: 'فرع الجبيل', revenue: '124500.00', expense: '132000.00', profit: '-7500.00' },
+    { cost_center_id: 'cc-4', code: 'CC-ADM', name: 'الإدارة العامة', revenue: '0.00', expense: '18750.00', profit: '-18750.00' },
+  ],
+  total_revenue: '482500.00',
+  total_expense: '331550.00',
+  total_profit: '150950.00',
+};
+
+// تقارير الحسابات العامة في وضع العرض: تطابق عقود Laravel الحقيقية كي يبقى
+// اختبار الواجهة التجريبية كاشفاً لانحراف العقد لا سبباً لانهيار وقت التشغيل.
+export const mockCashFlow = {
+  operating: {
+    inflows: '38250.00', outflows: '14400.00', net: '23850.00',
+    entries: [
+      { date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', inflow: '5750.00', outflow: '0.00', net: '5750.00' },
+      { date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', inflow: '0.00', outflow: '6900.00', net: '-6900.00' },
+    ],
+  },
+  investing: {
+    inflows: '0.00', outflows: '45000.00', net: '-45000.00',
+    entries: [{ date: '2026-06-15', number: 'JRN-2026-0042', description: 'شراء معدات', inflow: '0.00', outflow: '45000.00', net: '-45000.00' }],
+  },
+  financing: {
+    inflows: '60000.00', outflows: '0.00', net: '60000.00',
+    entries: [{ date: '2026-06-01', number: 'JRN-2026-0038', description: 'ضخ رأس مال', inflow: '60000.00', outflow: '0.00', net: '60000.00' }],
+  },
+  net_cash_flow: '38850.00',
+};
+
+export const mockTaxReport = {
+  input_vat: '12150.00',
+  output_vat: '21300.00',
+  net_vat: '9150.00',
+  status: 'payable',
+};
+
+export const mockJournalEntries = {
+  rows: [
+    {
+      entry_id: 'jrn-51', date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', debit: '5750.00', credit: '5750.00',
+      lines: [
+        { account_id: 'a1120', account_code: '1120', account_name: 'البنك', description: null, debit: '5750.00', credit: '0.00' },
+        { account_id: 'a1130', account_code: '1130', account_name: 'العملاء (المدينون)', description: null, debit: '0.00', credit: '5750.00' },
+      ],
+    },
+    {
+      entry_id: 'jrn-49', date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', debit: '6900.00', credit: '6900.00',
+      lines: [
+        { account_id: 'a2110', account_code: '2110', account_name: 'الموردون (الدائنون)', description: null, debit: '6900.00', credit: '0.00' },
+        { account_id: 'a1110', account_code: '1110', account_name: 'الصندوق', description: null, debit: '0.00', credit: '6900.00' },
+      ],
+    },
+  ],
+  total_debit: '12650.00',
+  total_credit: '12650.00',
+};
+
+function accountLedgerFor(accountId: string) {
+  const account = mockAccounts.find((candidate) => candidate.id === accountId) ?? mockAccounts.find((candidate) => candidate.code === '1110')!;
+  const rows = account.code === '1120'
+    ? [{ date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', debit: '5750.00', credit: '0.00', balance: '163520.00' }]
+    : [{ date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', debit: '0.00', credit: '6900.00', balance: '54320.00' }];
+  return { account: { id: account.id, code: account.code, name: account.name }, opening_balance: account.code === '1120' ? '157770.00' : '61220.00', rows, closing_balance: rows[rows.length - 1].balance };
+}
+
+function agingFor(type: string) {
+  if (type === 'payable') {
+    return {
+      type, as_of: '2026-06-26',
+      rows: [
+        { partner_id: 'p3', name: 'مصنع الشرق للبلاستيك', b0_30: '3450.00', b31_60: '0.00', b61_90: '0.00', b90_plus: '0.00', total: '3450.00' },
+        { partner_id: 'p5', name: 'شركة البحر الأحمر اللوجستية', b0_30: '0.00', b31_60: '2300.00', b61_90: '0.00', b90_plus: '0.00', total: '2300.00' },
+      ],
+      totals: { b0_30: '3450.00', b31_60: '2300.00', b61_90: '0.00', b90_plus: '0.00', total: '5750.00' },
+    };
+  }
+  return {
+    type: 'receivable', as_of: '2026-06-26',
+    rows: [
+      { partner_id: 'p2', name: 'شركة الواحة للمقاولات', b0_30: '6325.00', b31_60: '0.00', b61_90: '0.00', b90_plus: '6612.50', total: '12937.50' },
+      { partner_id: 'p3', name: 'مصنع الشرق للبلاستيك', b0_30: '0.00', b31_60: '8280.00', b61_90: '0.00', b90_plus: '0.00', total: '8280.00' },
+      { partner_id: 'p6', name: 'مؤسسة الفيصل للأجهزة', b0_30: '5200.00', b31_60: '0.00', b61_90: '0.00', b90_plus: '0.00', total: '5200.00' },
+    ],
+    totals: { b0_30: '11525.00', b31_60: '8280.00', b61_90: '0.00', b90_plus: '6612.50', total: '26417.50' },
+  };
+}
+
+function partnerStatement(id: string) {
+  const p = mockPartners.find((x) => x.id === id) ?? mockPartners[0];
+  const base = { partner: { id: p.id, name: p.name, type: p.type }, opening_balance: '0.00' };
+
+  // عند فتح التقرير عبر المورد، لا نعيد إطلاقاً مستندات مبيعات أو سندات قبض.
+  // المورد p7 لديه دورة متكاملة: شراء آجل، إشعار مدين، ثم سند صرف.
+  if (p.type === 'supplier' || p.type === 'both') {
+    if (p.id !== 'p7') return { ...base, rows: [], closing_balance: '0.00' };
+    return {
+      ...base,
+      rows: [
+        {
+          date: '2026-06-15', number: 'JRN-2026-0043', description: 'فاتورة شراء PUR-2026-0043',
+          debit: '0.00', credit: '13800.00', balance: '-13800.00',
+          source: { kind: 'purchase', id: 'pu-43', label: 'فاتورة شراء PUR-2026-0043', allocations: [] },
+        },
+        {
+          date: '2026-06-19', number: 'JRN-2026-0044', description: 'إشعار مدين DN-2026-0002',
+          debit: '1200.00', credit: '0.00', balance: '-12600.00',
+          source: { kind: 'credit_note', id: 'dn-2', label: 'إشعار مدين DN-2026-0002', allocations: [] },
+        },
+        {
+          date: '2026-06-20', number: 'JRN-2026-0049', description: 'سند صرف PMT-2026-0049',
+          debit: '6900.00', credit: '0.00', balance: '-5700.00',
+          source: {
+            kind: 'payment', id: 'pm-49', label: 'سند صرف PMT-2026-0049',
+            allocations: [{ kind: 'purchase', id: 'pu-43', number: 'PUR-2026-0043', amount: '6900.00' }],
+          },
+        },
+      ],
+      closing_balance: '-5700.00',
+    };
+  }
+
+  return {
+    ...base,
+    rows: [
+      {
+        date: '2026-06-01', number: 'JRN-2026-0117', description: 'فاتورة مبيعات INV-2026-0117',
+        debit: '12650.00', credit: '0.00', balance: '12650.00',
+        source: { kind: 'invoice', id: 'inv-0117', label: 'فاتورة INV-2026-0117', allocations: [] },
+      },
+      {
+        date: '2026-06-22', number: 'JRN-2026-0050', description: 'دفعة مستلمة PMT-2026-0050',
+        debit: '0.00', credit: '6325.00', balance: '6325.00',
+        source: {
+          kind: 'payment', id: 'pmt-0050', label: 'دفعة PMT-2026-0050',
+          allocations: [{ kind: 'invoice', id: 'inv-0117', number: 'INV-2026-0117', amount: '6325.00' }],
+        },
+      },
+    ],
+    closing_balance: '6325.00',
+  };
+}
+
+// ── تقرير المبيعات في وضع العرض التجريبي ───────────────────────────────────
+// يبقى هذا المسار محصوراً في `isDemo()`؛ الواجهة الحقيقية تقرأ عقد Laravel نفسه.
+function salesReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'period';
+  const from = query.get('from') ?? '';
+  const to = query.get('to') ?? '';
+  const customerId = query.get('customer_id') ?? '';
+  const paymentStatus = query.get('payment_status') ?? '';
+  const receiptMethod = query.get('receipt_method') ?? '';
+  const money = (value: number) => value.toFixed(2);
+  const inRange = (date: string) => (!from || date >= from) && (!to || date <= to);
+  const invoices = mockInvoices.filter((invoice) => invoice.status === 'posted'
+    && inRange(invoice.invoice_date)
+    && (!customerId || invoice.partner_id === customerId)
+    && (!paymentStatus || invoice.payment_status === paymentStatus));
+  const amount = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const netSales = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.subtotal), 0);
+  const tax = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.tax_amount), 0);
+  const invoiceTotals = { invoices: invoices.length, amount: money(amount(invoices)), net_sales: money(netSales(invoices)), tax: money(tax(invoices)) };
+  const group = <T extends { key: string; label: string }>(items: T[], value: (item: T) => number, countKey: 'invoices' | 'quantity' | 'receipts') => {
+    const buckets = new Map<string, { key: string; label: string; count: number; amount: number }>();
+    items.forEach((item) => {
+      const bucket = buckets.get(item.key) ?? { key: item.key, label: item.label, count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += value(item);
+      buckets.set(item.key, bucket);
+    });
+    return [...buckets.values()].sort((a, b) => b.amount - a.amount).map((bucket) => ({ key: bucket.key, label: bucket.label, [countKey]: bucket.count, amount: money(bucket.amount) }));
+  };
+
+  if (view === 'payments') {
+    const receipts = mockPayments.filter((payment) => payment.direction === 'received' && inRange(payment.payment_date) && (!receiptMethod || payment.method === receiptMethod));
+    const rows = group(receipts.map((payment) => ({ key: payment.payment_date.slice(0, 7), label: payment.payment_date.slice(0, 7), amount: Number(payment.amount) })), (row) => row.amount, 'receipts');
+    return { view, data: rows, totals: { receipts: receipts.length, amount: money(receipts.reduce((sum, receipt) => sum + Number(receipt.amount), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_receipts' } };
+  }
+
+  if (view === 'product') {
+    const rows = group(invoices.flatMap((invoice) => invoice.lines.map((line) => ({ key: line.description ?? 'manual', label: line.description ?? 'بند وصفي', amount: Number(line.line_total), quantity: line.quantity }))), (row) => row.amount, 'quantity');
+    const quantityByProduct = new Map(invoices.flatMap((invoice) => invoice.lines).map((line) => [line.description ?? 'manual', line.quantity]));
+    return { view, data: rows.map((row) => ({ ...row, quantity: quantityByProduct.get(row.key) ?? row.quantity })), totals: { invoices: invoices.length, amount: money(invoices.flatMap((invoice) => invoice.lines).reduce((sum, line) => sum + Number(line.line_total), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+
+  if (view === 'customer') {
+    const rows = group(invoices.map((invoice) => ({ key: invoice.partner_id, label: mockPartners.find((partner) => partner.id === invoice.partner_id)?.name ?? 'غير مسند', amount: Number(invoice.total) })), (row) => row.amount, 'invoices');
+    return { view, data: rows, totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+
+  const periods = group(invoices.map((invoice) => ({ key: invoice.invoice_date.slice(0, 7), label: invoice.invoice_date.slice(0, 7), amount: Number(invoice.total) })), (row) => row.amount, 'invoices');
+  if (view === 'profit') {
+    const rows = periods.map((row) => ({ ...row, revenue: row.amount, cost: '0.00', profit: row.amount, margin_bp: 10000 }));
+    const revenue = netSales(invoices);
+    return { view, data: rows, totals: { revenue: money(revenue), cost: '0.00', profit: money(revenue), margin_bp: 10000 }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+  if (view === 'salesperson') {
+    return { view, data: [{ key: 'unassigned', label: 'غير مسند', invoices: invoices.length, amount: money(amount(invoices)) }], totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+  return { view, data: periods, totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+}
+
+// ── تقرير المشتريات في وضع العرض التجريبي ───────────────────────────────────
+// هذا الموجّه لا يُستدعى إلا مع `isDemo()`؛ وهو يسهّل مراجعة واجهة التقارير
+// المتجاوبة من دون طلب أي بيانات حقيقية أو تغيير منطق تقارير Laravel.
+function purchasesReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'period';
+  const from = query.get('from') ?? '';
+  const to = query.get('to') ?? '';
+  const supplierId = query.get('supplier_id') ?? '';
+  const paymentStatus = query.get('payment_status') ?? '';
+  const paymentMethod = query.get('payment_method') ?? '';
+  const money = (value: number) => value.toFixed(2);
+  const inRange = (date: string) => (!from || date >= from) && (!to || date <= to);
+  const purchases = mockPurchases.filter((purchase) => purchase.status === 'posted'
+    && inRange(purchase.purchase_date)
+    && (!supplierId || purchase.partner_id === supplierId)
+    && (!paymentStatus || purchase.payment_status === paymentStatus));
+  const amount = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.total), 0);
+  const net = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.subtotal), 0);
+  const tax = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.tax_amount), 0);
+  const balance = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.remaining), 0);
+  const totals = {
+    purchases: purchases.length,
+    amount: money(amount(purchases)),
+    net_purchases: money(net(purchases)),
+    tax: money(tax(purchases)),
+    balance: money(balance(purchases)),
+  };
+  const group = <T extends { key: string; label: string }>(items: T[], value: (item: T) => number, countKey: 'purchases' | 'payments') => {
+    const buckets = new Map<string, { key: string; label: string; count: number; amount: number }>();
+    items.forEach((item) => {
+      const bucket = buckets.get(item.key) ?? { key: item.key, label: item.label, count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += value(item);
+      buckets.set(item.key, bucket);
+    });
+    return [...buckets.values()].sort((a, b) => b.amount - a.amount).map((bucket) => ({ key: bucket.key, label: bucket.label, [countKey]: bucket.count, amount: money(bucket.amount) }));
+  };
+
+  if (view === 'payments') {
+    const payments = mockPayments.filter((payment) => payment.direction === 'paid'
+      && inRange(payment.payment_date)
+      && (!paymentMethod || payment.method === paymentMethod));
+    const rows = group(payments.map((payment) => ({ key: payment.payment_date.slice(0, 7), label: payment.payment_date.slice(0, 7), amount: Number(payment.amount) })), (row) => row.amount, 'payments');
+    return { view, data: rows, totals: { payments: payments.length, amount: money(payments.reduce((sum, payment) => sum + Number(payment.amount), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_supplier_payments' } };
+  }
+
+  if (view === 'product') {
+    const rows = group(purchases.flatMap((purchase) => purchase.lines.map((line) => ({ key: line.description ?? 'manual', label: line.description ?? 'بند وصفي', amount: Number(line.line_total), quantity: line.quantity }))), (row) => row.amount, 'purchases');
+    const quantityByProduct = new Map(purchases.flatMap((purchase) => purchase.lines).map((line) => [line.description ?? 'manual', line.quantity]));
+    return { view, data: rows.map((row) => ({ ...row, quantity: quantityByProduct.get(row.key) ?? row.purchases })), totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  if (view === 'supplier' || view === 'balances') {
+    const rows = group(purchases.map((purchase) => ({ key: purchase.partner_id, label: mockPartners.find((partner) => partner.id === purchase.partner_id)?.name ?? 'غير مسند', amount: Number(purchase.total), balance: Number(purchase.remaining) })), (row) => row.amount, 'purchases');
+    if (view === 'balances') {
+      const balances = new Map<string, number>();
+      purchases.forEach((purchase) => balances.set(purchase.partner_id, (balances.get(purchase.partner_id) ?? 0) + Number(purchase.remaining)));
+      return { view, data: rows.map((row) => ({ ...row, balance: money(balances.get(row.key) ?? 0) })), totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+    }
+    return { view, data: rows, totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  if (view === 'employee') {
+    return { view, data: [{ key: 'unassigned', label: 'غير مسند', purchases: purchases.length, amount: money(amount(purchases)) }], totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  const periods = group(purchases.map((purchase) => ({ key: purchase.purchase_date.slice(0, 7), label: purchase.purchase_date.slice(0, 7), amount: Number(purchase.total) })), (row) => row.amount, 'purchases');
+  return { view, data: periods, totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+}
+
+// تقارير العملاء في وضع العرض: عقود مطابقة للـ API، لا استجابة افتراضية فارغة.
+function customersReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'sales';
+  const customer = query.get('customer_id') ?? 'p-customer-1';
+  const customers = [
+    { key: customer, label: 'شركة الروّاد', invoices: 7, amount: '38250.00', balance: '9450.00' },
+    { key: 'p-customer-2', label: 'مؤسسة المدى', invoices: 4, amount: '17400.00', balance: '2200.00' },
+  ];
+
+  if (view === 'balances') {
+    return {
+      view,
+      data: customers,
+      totals: { invoices: 11, amount: '55650.00', balance: '11650.00' },
+      scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_invoices' },
     };
   }
   if (view === 'payments') {

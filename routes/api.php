@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 20552)
-Total output lines: 793
-
 <?php
 
 use App\Http\Controllers\Api\AccountController;
@@ -430,7 +427,26 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-movements', [PosSessionController::class, 'recordCashMovement'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-drawer/open', [PosSessionController::class, 'openCashDrawer'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
-        Route::po…552 tokens truncated…ware($perm('payments.manage'));
+        Route::post('pos-sessions/{id}/acknowledge-difference', [PosSessionController::class, 'acknowledgeDifference'])->middleware([$perm('pos.variance.approve'), $app('sales.pos')]);
+
+        // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.
+        Route::get('settings/finance', [FinanceSettingsController::class, 'show'])->middleware($perm('payments.view'));
+        Route::put('settings/finance', [FinanceSettingsController::class, 'update'])->middleware($perm('payments.manage'));
+
+        // أنواع التسوية: بيانات رئيسية مشتركة؛ لا تنشئ قيداً حتى تُبنى تسويات العُهَد.
+        Route::get('settlement-types', [SettlementTypeController::class, 'index'])->middleware($perm('payments.view'));
+        Route::post('settlement-types', [SettlementTypeController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('settlement-types/{id}', [SettlementTypeController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::delete('settlement-types/{id}', [SettlementTypeController::class, 'destroy'])->middleware($perm('payments.manage'));
+
+        // الخزائن والحسابات البنكية والتحويلات الداخلية
+        Route::get('cash-bank-accounts', [CashBankAccountController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('cash-bank-accounts/{id}', [CashBankAccountController::class, 'show'])->middleware($perm('payments.view'));
+        Route::post('cash-bank-accounts', [CashBankAccountController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::put('cash-bank-accounts/{id}', [CashBankAccountController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::post('cash-bank-accounts/{id}/deactivate', [CashBankAccountController::class, 'deactivate'])->middleware($perm('payments.manage'));
+        Route::post('cash-bank-accounts/{id}/make-main', [CashBankAccountController::class, 'makeMain'])->middleware($perm('payments.manage'));
+        Route::delete('cash-bank-accounts/{id}', [CashBankAccountController::class, 'destroy'])->middleware($perm('payments.manage'));
         Route::get('cash-bank-transfers', [CashBankAccountController::class, 'transfers'])->middleware($perm('payments.view'));
         Route::post('cash-bank-transfers', [CashBankAccountController::class, 'transfer'])->middleware($perm('payments.manage'));
 
