@@ -15,7 +15,7 @@ class DocumentWorkflowService
     private const TRANSITIONS = [
         'draft' => [DocumentWorkflowStatus::RECEIVING, DocumentWorkflowStatus::CANCELLED],
         'receiving' => [DocumentWorkflowStatus::RECEIVED, DocumentWorkflowStatus::FAILED, DocumentWorkflowStatus::QUARANTINED, DocumentWorkflowStatus::CANCELLED],
-        'received' => [DocumentWorkflowStatus::QUEUED, DocumentWorkflowStatus::NEEDS_REVIEW, DocumentWorkflowStatus::DUPLICATE, DocumentWorkflowStatus::ARCHIVED, DocumentWorkflowStatus::CANCELLED],
+        'received' => [DocumentWorkflowStatus::QUEUED, DocumentWorkflowStatus::NEEDS_REVIEW, DocumentWorkflowStatus::QUARANTINED, DocumentWorkflowStatus::DUPLICATE, DocumentWorkflowStatus::ARCHIVED, DocumentWorkflowStatus::CANCELLED],
         'queued' => [DocumentWorkflowStatus::PROCESSING, DocumentWorkflowStatus::FAILED, DocumentWorkflowStatus::CANCELLED],
         'processing' => [DocumentWorkflowStatus::NEEDS_REVIEW, DocumentWorkflowStatus::READY_FOR_DRAFT, DocumentWorkflowStatus::FAILED, DocumentWorkflowStatus::QUARANTINED],
         'needs_review' => [DocumentWorkflowStatus::READY_FOR_DRAFT, DocumentWorkflowStatus::QUEUED, DocumentWorkflowStatus::ARCHIVED, DocumentWorkflowStatus::CANCELLED],

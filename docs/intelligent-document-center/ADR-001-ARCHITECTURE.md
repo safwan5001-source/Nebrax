@@ -73,3 +73,23 @@ The foundation has a small stable schema and a strong audit trail. Later provide
 | Integrations PR | Channel identity, authentication, replay prevention, rate limits and revocation |
 
 A gate is complete only when its decision, threat model, rollback behavior, and tests are recorded in a follow-up ADR before implementation begins.
+
+## PR-2 accepted storage and intake decision
+
+Nebrax uses a private, platform-managed Cloudflare R2 bucket through the S3-compatible
+Flysystem adapter. Application code depends only on `DocumentStorageService`; object keys
+and credentials never appear in API resources. Runtime credentials remain server-side
+environment secrets. A later platform-admin screen may manage named storage profiles, and
+tenant BYOS may add profiles, without changing the intake contract.
+
+Authenticated manual intake stores files as `pending` and never permits download until an
+internal safety scanner records `clean`. `infected` and scanner `failed` decisions are
+fail-closed and quarantine the batch. The scanner worker belongs to PR-3; PR-2 exposes only
+the internal decision-recording boundary. Downloads use a short-lived signed application
+route which re-runs authentication, tenant/branch scopes, RBAC, and commercial access.
+
+File evidence is immutable: detected MIME, SHA-256, byte length, page count, and object key
+cannot be rewritten through the model. Upload validation combines Laravel edge rules with
+server-side magic-byte detection, extension agreement, image bounds, and `pdfinfo` page
+limits. The initial retention period is 365 days and purge remains retention-aware work for
+the governance PR; no endpoint can physically delete evidence in PR-2.

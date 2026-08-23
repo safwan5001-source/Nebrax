@@ -80,6 +80,11 @@ jobs:
           extensions: mbstring, pdo_sqlite, sqlite3, pgsql, pdo_pgsql, bcmath, intl, fileinfo
           coverage: none
 
+      - name: تثبيت فاحص بنية PDF
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
+
       # Laravel 11 دخل الدعم الأمني فقط، فصارت إصداراته تحمل تنبيهات أمنية
       # يحجبها Composer 2.10+ افتراضياً. نعطّل الحجب في بيئة CI المؤقتة فقط.
       - name: السماح بتثبيت Laravel 11 (بيئة CI مؤقتة)
@@ -88,10 +93,10 @@ jobs:
       - name: إنشاء مشروع Laravel 11
         run: composer create-project "laravel/laravel:^11.0" "$APP_DIR" --prefer-dist --no-progress
 
-      - name: تثبيت Sanctum + تفعيل مسارات API
+      - name: تثبيت Sanctum + تخزين S3/R2 + تفعيل مسارات API
         working-directory: ${{ env.APP_DIR }}
         run: |
-          composer require laravel/sanctum --quiet
+          composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 --quiet
           php artisan install:api --no-interaction --quiet || true
           rm -f database/migrations/*_create_personal_access_tokens_table.php
 
@@ -102,7 +107,7 @@ jobs:
           mkdir -p app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
-                   app/Models/Concerns tests/Feature routes
+                   app/Models/Concerns tests/Feature routes config
           cp -r "$CORE/app/Models/"*.php                  app/Models/
           # المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
           cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
@@ -120,6 +125,7 @@ jobs:
           cp -r "$CORE/app/Http/Requests/"*.php           app/Http/Requests/
           cp -r "$CORE/app/Http/Resources/"*.php          app/Http/Resources/
           cp -r "$CORE/app/Providers/"*.php               app/Providers/
+          cp -r "$CORE/config/"*.php                      config/
           # أوامر artisan (تشخيص/صيانة) — بلا هذا السطر توجد في المستودع ولا تصل الاختبار
           cp -r "$CORE/app/Console/Commands/"*.php       app/Console/Commands/ 2>/dev/null || true
           cp -r "$CORE/database/migrations/"*.php         database/migrations/

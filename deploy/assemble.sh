@@ -16,8 +16,8 @@ if [ ! -f "$APP_DIR/artisan" ]; then
 fi
 cd "$APP_DIR"
 
-echo "▶ 2/4  Sanctum + تفعيل طبقة الـ API..."
-composer require laravel/sanctum --no-interaction
+echo "▶ 2/4  Sanctum + تخزين S3/R2 + تفعيل طبقة الـ API..."
+composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 --no-interaction
 # --without-migration-prompt: لا نرحّل وقت البناء (الترحيل الحقيقي في entrypoint على pgsql)
 php artisan install:api --no-interaction --without-migration-prompt || true
 # جدول personal_access_tokens مضمَّن في migration النواة — نحذف نسخة Sanctum لتجنّب التكرار
