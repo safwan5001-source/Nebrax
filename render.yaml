@@ -1,8 +1,7 @@
 # ════════════════════════════════════════════════════════════════
-#  Render Blueprint — نبراس ERP (Backend)
-#  ينشر خدمة ويب (Docker) + قاعدة PostgreSQL مُدارة، ويربط المتغيّرات.
-#  الاستخدام: Render Dashboard → New → Blueprint → اربط هذا المستودع.
-#  ثم اضبط APP_KEY و FRONTEND_URL (المشار إليهما بـ sync:false).
+#  Render Blueprint — Nebrax ERP Backend
+#  Web API + PostgreSQL + persistent Valkey queue + document worker.
+#  APP_KEY remains the root encryption key and must be identical on API/worker.
 # ════════════════════════════════════════════════════════════════
 databases:
   - name: nibras-db
@@ -11,6 +10,13 @@ databases:
     region: frankfurt
 
 services:
+  - type: keyvalue
+    name: nibras-document-queue
+    plan: starter
+    region: frankfurt
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
   - type: web
     name: nibras-api
     runtime: docker
@@ -20,13 +26,24 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: APP_KEY
-        sync: false               # ولّده: php artisan key:generate --show
+        sync: false
       - key: FRONTEND_URL
-        sync: false               # نطاق الواجهة على Vercel (مثل https://nibras.vercel.app)
+        sync: false
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
         value: "false"
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: REDIS_CLIENT
+        value: predis
+      - key: CACHE_STORE
+        value: redis
+      - key: REDIS_URL
+        fromService:
+          name: nibras-document-queue
+          type: keyvalue
+          property: connectionString
       - key: DOCUMENT_STORAGE_DRIVER
         value: s3
       - key: DOCUMENT_STORAGE_KEY
@@ -43,6 +60,87 @@ services:
         value: "true"
       - key: DOCUMENT_RETENTION_DAYS
         value: "365"
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: nibras-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: nibras-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: nibras-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: nibras-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: nibras-db
+          property: password
+
+  - type: worker
+    name: nibras-document-worker
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerCommand: php artisan queue:work redis --queue=documents --sleep=1 --tries=5 --timeout=150 --max-time=3600
+    maxShutdownDelaySeconds: 180
+    envVars:
+      - key: APP_KEY
+        fromService:
+          name: nibras-api
+          type: web
+          envVarKey: APP_KEY
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: REDIS_CLIENT
+        value: predis
+      - key: CACHE_STORE
+        value: redis
+      - key: REDIS_URL
+        fromService:
+          name: nibras-document-queue
+          type: keyvalue
+          property: connectionString
+      - key: DOCUMENT_STORAGE_DRIVER
+        fromService:
+          name: nibras-api
+          type: web
+          envVarKey: DOCUMENT_STORAGE_DRIVER
+      - key: DOCUMENT_STORAGE_KEY
+        fromService:
+          name: nibras-api
+          type: web
+          envVarKey: DOCUMENT_STORAGE_KEY
+      - key: DOCUMENT_STORAGE_SECRET
+        fromService:
+          name: nibras-api
+          type: web
+          envVarKey: DOCUMENT_STORAGE_SECRET
+      - key: DOCUMENT_STORAGE_BUCKET
+        fromService:
+          name: nibras-api
+          type: web
+          envVarKey: DOCUMENT_STORAGE_BUCKET
+      - key: DOCUMENT_STORAGE_ENDPOINT
+        fromService:
+          name: nibras-api
+          type: web
+          envVarKey: DOCUMENT_STORAGE_ENDPOINT
+      - key: DOCUMENT_STORAGE_REGION
+        value: auto
+      - key: DOCUMENT_STORAGE_PATH_STYLE
+        value: "true"
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_HOST

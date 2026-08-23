@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\PlatformAuthController;
 use App\Http\Controllers\Api\PlatformCommercialAssignmentController;
 use App\Http\Controllers\Api\PlatformCommercialCatalogController;
 use App\Http\Controllers\Api\PlatformDashboardController;
+use App\Http\Controllers\Api\PlatformIntegrationController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformTenantController;
 use App\Http\Controllers\Api\BranchController;
@@ -150,6 +151,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('logout', [PlatformAuthController::class, 'logout']);
         Route::get('me', [PlatformAuthController::class, 'me']);
         Route::get('overview', [PlatformDashboardController::class, 'overview']);
+        Route::get('integrations', [PlatformIntegrationController::class, 'index']);
         Route::get('tenants', [PlatformTenantController::class, 'index']);
         Route::get('tenants/{tenant}', [PlatformTenantController::class, 'show']);
     });
@@ -157,6 +159,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         ->prefix('platform')
         ->group(function () {
             Route::patch('tenants/{tenant}', [PlatformTenantController::class, 'update']);
+            Route::put('integrations/{integration}', [PlatformIntegrationController::class, 'update']);
+            Route::post('integrations/{integration}/test', [PlatformIntegrationController::class, 'test']);
             Route::get('prices', [PlatformSubscriptionController::class, 'prices']);
             Route::post('prices', [PlatformSubscriptionController::class, 'storePrice']);
             Route::post('tenants/{tenant}/subscriptions', [PlatformSubscriptionController::class, 'store']);

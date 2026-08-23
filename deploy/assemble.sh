@@ -17,18 +17,20 @@ fi
 cd "$APP_DIR"
 
 echo "▶ 2/4  Sanctum + تخزين S3/R2 + تفعيل طبقة الـ API..."
-composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 --no-interaction
+composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 --no-interaction
 # --without-migration-prompt: لا نرحّل وقت البناء (الترحيل الحقيقي في entrypoint على pgsql)
 php artisan install:api --no-interaction --without-migration-prompt || true
 # جدول personal_access_tokens مضمَّن في migration النواة — نحذف نسخة Sanctum لتجنّب التكرار
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
 
 echo "▶ 3/4  دمج ملفات النواة وطبقة الـ API..."
-mkdir -p app/Services app/Services/Accounting app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
+mkdir -p app/Contracts app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
          app/Http/Requests app/Http/Resources app/Console/Commands \
          app/Models/Concerns tests/Feature routes config
 cp -r "$CORE_DIR/app/Models/"*.php               app/Models/
+cp -r "$CORE_DIR/app/Contracts/"*.php             app/Contracts/
+cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php   app/Jobs/DocumentCenter/
 # المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php      app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/"*.php               app/Services/ 2>/dev/null || true
@@ -58,6 +60,9 @@ cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/ 2>/dev/null || t
 # تسجيل TenancyServiceProvider (حاسم للعزل) إن لم يكن مسجلاً
 if ! grep -q "TenancyServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
+fi
+if ! grep -q "DocumentCenterServiceProvider" bootstrap/providers.php; then
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\DocumentCenterServiceProvider::class,|" bootstrap/providers.php
 fi
 
 # حذف users migration الافتراضية (لدينا واحدة خاصة بالمستأجرين)
