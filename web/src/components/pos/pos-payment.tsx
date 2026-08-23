@@ -88,23 +88,24 @@ export function PosPayment({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface px-4 py-2.5">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] font-semibold text-text hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-[13px] font-semibold text-text hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <ArrowRight className="h-4 w-4" strokeWidth={2} />
           {t('back_to_cart')}
         </button>
         <div className="flex-1" />
-        <div className="flex items-center gap-1.5 text-xs text-muted">
+        <div className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
           {t('cart')} ‹ <b className="text-primary-hover">{t('payment')}</b> ‹ {t('receipt')}
         </div>
+        <div className="text-sm font-bold text-text sm:hidden">{t('payment')}</div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[340px_1fr] lg:overflow-hidden">
-        <aside className="flex flex-col border-b border-border bg-surface lg:border-b-0 lg:border-e lg:overflow-y-auto">
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[340px_1fr]">
+        <aside className="hidden flex-col border-b border-border bg-surface lg:flex lg:border-b-0 lg:border-e lg:overflow-y-auto">
           <div className="border-b border-border p-5">
             <div className="mb-1.5 text-xs font-semibold text-muted">{t('invoice_total')}</div>
             <div className="num text-3xl font-extrabold text-primary-hover">
@@ -128,15 +129,46 @@ export function PosPayment({
           </div>
         </aside>
 
-        <main className="flex flex-col gap-5 overflow-y-auto p-5 lg:p-7">
+        <main className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain p-3 sm:p-5 lg:gap-5 lg:p-7">
+          <section className="rounded-lg border border-border bg-surface p-3 lg:hidden">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold text-muted">{t('invoice_total')}</div>
+                <div className="num mt-0.5 text-2xl font-extrabold text-primary-hover">
+                  {formatRiyal(totalMinor / 100)}
+                </div>
+              </div>
+              <div className="flex min-w-0 max-w-[55%] items-center gap-1.5 rounded-lg bg-background px-2.5 py-2 text-xs font-semibold">
+                <User className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.7} />
+                <span className="truncate">{customerName}</span>
+              </div>
+            </div>
+            <details className="mt-2 border-t border-border pt-2">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                {t('cart')} ({items.length})
+              </summary>
+              <div className="mt-2 max-h-36 overflow-y-auto pe-1">
+                {items.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between gap-3 border-b border-border py-2 text-xs last:border-0">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{item.name}</div>
+                      <span className="num text-[10px] text-muted">{item.qty} × {item.unitPrice}</span>
+                    </div>
+                    <div className="num shrink-0 font-bold">{formatRiyal(item.lineTotal / 100)}</div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </section>
+
           <div>
-            <div className="mb-3 text-sm font-bold">{t('payment_methods')}</div>
+            <div className="mb-2 text-sm font-bold lg:mb-3">{t('payment_methods')}</div>
             {paymentMethodsLoading ? (
               <p className="rounded-lg border border-border bg-surface px-3 py-3 text-sm text-muted">{t('payment_methods_loading')}</p>
             ) : paymentMethods.length === 0 ? (
               <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-3 text-sm text-text">{t('payment_methods_empty')}</p>
             ) : (
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
                 {paymentMethods.map((method) => {
                   const selected = selectedMethodId === method.id;
                   const applied = riyalToMinor(tenders[method.id] ?? '') > 0;
@@ -144,10 +176,10 @@ export function PosPayment({
                   return (
                     <div
                       key={method.id}
-                      className={'rounded-2xl border-[1.5px] bg-surface p-4 ' + (selected || applied ? 'border-primary bg-primary-soft' : 'border-border')}
+                      className={'rounded-lg border-[1.5px] bg-surface p-3 sm:p-4 ' + (selected || applied ? 'border-primary bg-primary-soft' : 'border-border')}
                     >
-                      <div className="mb-2.5 flex items-center justify-between">
-                        <div className={'grid h-9 w-9 place-items-center rounded-[10px] ' + (selected || applied ? 'bg-primary text-white' : 'bg-background text-muted')}>
+                      <div className="mb-2 flex items-center justify-between sm:mb-2.5">
+                        <div className={'grid h-8 w-8 place-items-center rounded-lg sm:h-9 sm:w-9 ' + (selected || applied ? 'bg-primary text-white' : 'bg-background text-muted')}>
                           <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
                         </div>
                         {applied && (
@@ -156,7 +188,7 @@ export function PosPayment({
                           </div>
                         )}
                       </div>
-                      <div className="mb-2 truncate text-[13px] font-bold" title={label(method)}>{label(method)}</div>
+                      <div className="mb-1.5 truncate text-xs font-bold sm:mb-2 sm:text-[13px]" title={label(method)}>{label(method)}</div>
                       <input
                         aria-label={label(method)}
                         value={tenders[method.id] ?? ''}
@@ -164,7 +196,7 @@ export function PosPayment({
                         onChange={(event) => set(method.id, event.target.value)}
                         inputMode="decimal"
                         placeholder="0.00"
-                        className="num w-full rounded-lg border border-border bg-background px-2.5 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40"
+                        className="num w-full rounded-lg border border-border bg-background px-2 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40"
                       />
                     </div>
                   );
@@ -185,15 +217,16 @@ export function PosPayment({
           )}
 
           <div>
-            <div className="mb-2.5 text-sm font-bold">{t('quick_amounts')}</div>
-            <div className="flex flex-wrap gap-2">
+            <div className="mb-2 text-sm font-bold lg:mb-2.5">{t('quick_amounts')}</div>
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               {quick.map((amount, index) => (
                 <button
                   key={index}
                   onClick={() => selectedMethod && set(selectedMethod.id, amount.toFixed(2))}
                   disabled={!selectedMethod}
                   className={
-                    'num rounded-lg border px-4 py-2 text-[13px] font-bold focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 ' +
+                    'num min-h-10 rounded-lg border px-2 py-2 text-[13px] font-bold focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 ' +
+                    (index === 0 ? 'col-span-2 sm:col-auto ' : '') +
                     (index === 0 ? 'border-primary bg-primary-soft text-primary-hover' : 'border-border bg-background text-text hover:border-primary')
                   }
                 >
@@ -203,18 +236,18 @@ export function PosPayment({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <div className="mb-1.5 text-[11px] font-semibold text-muted">{t('paid')}</div>
-              <div className="num text-lg font-extrabold text-positive">{formatRiyal(paidMinor / 100)}</div>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="min-w-0 rounded-lg border border-border bg-surface p-2.5 sm:p-4">
+              <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('paid')}</div>
+              <div className="num truncate text-sm font-extrabold text-positive sm:text-lg" title={formatRiyal(paidMinor / 100)}>{formatRiyal(paidMinor / 100)}</div>
             </div>
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <div className="mb-1.5 text-[11px] font-semibold text-muted">{t('remaining')}</div>
-              <div className="num text-lg font-extrabold text-negative">{formatRiyal(remainingMinor / 100)}</div>
+            <div className="min-w-0 rounded-lg border border-border bg-surface p-2.5 sm:p-4">
+              <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('remaining')}</div>
+              <div className="num truncate text-sm font-extrabold text-negative sm:text-lg" title={formatRiyal(remainingMinor / 100)}>{formatRiyal(remainingMinor / 100)}</div>
             </div>
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <div className="mb-1.5 text-[11px] font-semibold text-muted">{t('change')}</div>
-              <div className="num text-lg font-extrabold text-primary-hover">{formatRiyal(changeMinor / 100)}</div>
+            <div className="min-w-0 rounded-lg border border-border bg-surface p-2.5 sm:p-4">
+              <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('change')}</div>
+              <div className="num truncate text-sm font-extrabold text-primary-hover sm:text-lg" title={formatRiyal(changeMinor / 100)}>{formatRiyal(changeMinor / 100)}</div>
             </div>
           </div>
 
@@ -222,11 +255,11 @@ export function PosPayment({
         </main>
       </div>
 
-      <footer className="flex shrink-0 border-t border-border bg-surface p-4">
+      <footer className="flex shrink-0 border-t border-border bg-surface px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:p-4">
         <button
           onClick={() => onConfirm(tenderPayload())}
           disabled={!canConfirm || paying || paymentMethodsLoading}
-          className="flex flex-1 items-center justify-center gap-2.5 rounded-xl bg-primary py-3 text-base font-bold text-white focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+          className="flex min-h-12 flex-1 items-center justify-center gap-2.5 rounded-lg bg-primary px-4 py-3 text-base font-bold text-white focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
         >
           <Check className="h-5 w-5" strokeWidth={2.2} />
           {t('confirm_payment')}
