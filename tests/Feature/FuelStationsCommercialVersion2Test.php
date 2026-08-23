@@ -106,9 +106,11 @@ class FuelStationsCommercialVersion2Test extends TestCase
             'password' => 'platform-password-123',
         ]);
         $readToken = $admin->createToken('fuel-catalog-read', ['platform:read'])->plainTextToken;
+        $manageToken = $admin->createToken('fuel-catalog-manage', ['platform:manage'])->plainTextToken;
 
         $this->withToken($tenant['token'])->getJson('/api/platform/commercial-catalog')->assertForbidden();
-        $products = $this->withToken($readToken)->getJson('/api/platform/commercial-catalog')->assertOk()->json('data.products');
+        $this->withToken($readToken)->getJson('/api/platform/commercial-catalog')->assertForbidden();
+        $products = $this->withToken($manageToken)->getJson('/api/platform/commercial-catalog')->assertOk()->json('data.products');
         $catalogProduct = collect($products)->firstWhere('code', self::PRODUCT_CODE);
         $version = collect($catalogProduct['versions'])->firstWhere('version', 2);
 
