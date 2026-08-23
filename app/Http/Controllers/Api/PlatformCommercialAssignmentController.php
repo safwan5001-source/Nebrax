@@ -6,6 +6,7 @@ use App\Http\Requests\CommercialAssignmentLifecycleRequest;
 use App\Http\Requests\CommercialAssignmentLifecycleDateRequest;
 use App\Http\Requests\CommercialAssignmentPreviewRequest;
 use App\Http\Requests\CommercialAssignmentStoreRequest;
+use App\Http\Requests\CommercialTrialStoreRequest;
 use App\Models\CommercialPlanVersion;
 use App\Models\CommercialProductVersion;
 use App\Models\PlatformAdministrator;
@@ -13,6 +14,7 @@ use App\Models\Tenant;
 use App\Models\TenantCommercialAssignment;
 use App\Services\CommercialAssignmentService;
 use App\Services\CommercialAssignmentLifecycleService;
+use App\Services\CommercialTrialService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +24,7 @@ class PlatformCommercialAssignmentController extends ApiController
     public function __construct(
         private CommercialAssignmentService $assignments,
         private CommercialAssignmentLifecycleService $lifecycle,
+        private CommercialTrialService $trials,
     ) {}
 
     public function index(Tenant $tenant): JsonResponse
@@ -77,6 +80,30 @@ class PlatformCommercialAssignmentController extends ApiController
         );
 
         return response()->json(['data' => $this->assignmentData($assignment)], $assignment->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function startPlanTrial(CommercialTrialStoreRequest $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validated();
+        $version = CommercialPlanVersion::query()->findOrFail($data['version_id']);
+        $assignment = $this->trials->startPlanTrial(
+            $tenant, $this->administrator($request), $version,
+            CarbonImmutable::parse($data['starts_at'] ?? now('UTC'), 'UTC'), (int) $data['duration_days'], $data['reason'] ?? null,
+        );
+
+        return response()->json(['data' => $this->assignmentData($assignment)], 201);
+    }
+
+    public function startAddonTrial(CommercialTrialStoreRequest $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validated();
+        $version = CommercialProductVersion::query()->findOrFail($data['version_id']);
+        $assignment = $this->trials->startAddonTrial(
+            $tenant, $this->administrator($request), $version,
+            CarbonImmutable::parse($data['starts_at'] ?? now('UTC'), 'UTC'), (int) $data['duration_days'], $data['reason'] ?? null,
+        );
+
+        return response()->json(['data' => $this->assignmentData($assignment)], 201);
     }
 
     public function paymentFailure(CommercialAssignmentLifecycleDateRequest $request, TenantCommercialAssignment $assignment): JsonResponse

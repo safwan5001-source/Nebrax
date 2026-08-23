@@ -151,6 +151,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             Route::post('tenants/{tenant}/commercial-assignments/preview', [PlatformCommercialAssignmentController::class, 'preview']);
             Route::post('tenants/{tenant}/commercial-assignments/plan', [PlatformCommercialAssignmentController::class, 'assignPlan']);
             Route::post('tenants/{tenant}/commercial-assignments/addon', [PlatformCommercialAssignmentController::class, 'assignAddon']);
+            Route::post('tenants/{tenant}/commercial-trials/plan', [PlatformCommercialAssignmentController::class, 'startPlanTrial']);
+            Route::post('tenants/{tenant}/commercial-trials/addon', [PlatformCommercialAssignmentController::class, 'startAddonTrial']);
             Route::post('commercial-assignments/{assignment}/payment-failure', [PlatformCommercialAssignmentController::class, 'paymentFailure']);
             Route::post('commercial-assignments/{assignment}/schedule-cancellation', [PlatformCommercialAssignmentController::class, 'scheduleCancellation']);
             Route::post('commercial-assignments/{assignment}/reconcile', [PlatformCommercialAssignmentController::class, 'reconcile']);
