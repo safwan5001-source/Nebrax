@@ -229,6 +229,7 @@ const GROUPS: NavGroup[] = [
     appKey: 'fuel_stations.core',
     items: [
       { href: '/fuel-stations', icon: Fuel, key: 'fuelStationsWorkspace', built: true },
+      { href: '/fuel-stations/avi-rfid', icon: Fingerprint, key: 'fuelStationsAvi', built: true, appKey: 'fuel_stations.avi' },
     ],
   },
   {

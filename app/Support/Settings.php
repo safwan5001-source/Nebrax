@@ -268,6 +268,17 @@ class Settings
             'driver_required' => false,
             'vehicle_required' => false,
             'fuel_card_required' => false,
+            // Cycle 7: الهوية الذكية قرار منفصل عن البطاقة المنطقية والدفع. تعطيلها
+            // افتراضاً يحفظ مسار Cycle 5/6 القائم حتى يقرر المستأجر التفعيل صراحةً.
+            'avi_rfid_enabled' => false,
+            'avi_driver_identity_required' => false,
+            // 0 = بلا فاصل زمني بين التفويضات؛ تعطيل صريح لا قيمة سحرية.
+            'avi_min_refill_interval_seconds' => 0,
+            // تجاوز سعة خزان مركبة معلومة طلب غير معقول، فلا يتحول إلى خيار سعر.
+            'avi_enforce_vehicle_tank_capacity' => true,
+            'avi_denial_window_seconds' => 900,
+            'avi_repeated_denial_threshold' => 3,
+            'avi_authorization_ttl_seconds' => 120,
             // Cycle 5: تحصيل FuelSale الرسمي يمر دائماً عبر PaymentService.
             // القائمة الفارغة تمنع التحصيل حتى يختار المستأجر طرقه النشطة صراحةً.
             'fuel_sales_allowed_payment_method_ids' => [],

@@ -276,7 +276,7 @@ final class ApplicationCatalog
         ],
         'fuel_stations.avi' => [
             'group' => 'fuel_stations',
-            'maturity' => self::MATURITY_COMING_SOON,
+            'maturity' => self::MATURITY_BUILT,
             'mandatory' => false,
             'dependencies' => ['fuel_stations.core'],
         ],

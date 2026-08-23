@@ -23,6 +23,9 @@ enum FuelStationEventType: string
     case SHIFT_APPROVED = 'shift.approved';
     case FUEL_DELIVERY_RECEIVED = 'fuel.delivery.received';
     case FUEL_INVENTORY_RECONCILED = 'fuel.inventory.reconciled';
+    case VEHICLE_IDENTIFIED = 'vehicle.identified';
+    case FUEL_AUTHORIZATION_APPROVED = 'fuel.authorization.approved';
+    case FUEL_AUTHORIZATION_DENIED = 'fuel.authorization.denied';
     case DEVICE_HEALTH_CHANGED = 'device.health.changed';
     case DEVICE_CONNECTION_CHANGED = 'device.connection.changed';
 }

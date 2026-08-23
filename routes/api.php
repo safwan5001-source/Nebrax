@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\FuelStationsWorkspaceController;
+use App\Http\Controllers\Api\FuelAviController;
 use App\Http\Controllers\Api\FuelStationMasterDataController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
@@ -566,6 +567,15 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('fuel-stations/fleet/drivers', [FuelFleetController::class, 'storeDriver'])->middleware([$perm('fuel.fleet.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/fuel-cards', [FuelFleetController::class, 'cards'])->middleware([$perm('fuel.card.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/fuel-cards', [FuelFleetController::class, 'storeCard'])->middleware([$perm('fuel.card.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        // Cycle 7 — هوية محايدة عن المورّد وقرار تفويض صريح؛ لا قارئ أو مضخة أو
+        // adapter هنا. مسارات الإدارة لا تكشف قيمة الوسم الخام أو hash الاعتماد.
+        Route::get('fuel-stations/avi-rfid/tags', [FuelAviController::class, 'indexTags'])->middleware([$perm('fuel.avi.view'), $commercialApp('fuel_stations.avi')]);
+        Route::post('fuel-stations/avi-rfid/tags', [FuelAviController::class, 'storeTag'])->middleware([$perm('fuel.avi.manage'), $commercialApp('fuel_stations.avi', 'write')]);
+        Route::put('fuel-stations/avi-rfid/tags/{id}', [FuelAviController::class, 'updateTag'])->middleware([$perm('fuel.avi.manage'), $commercialApp('fuel_stations.avi', 'write')]);
+        Route::post('fuel-stations/avi-rfid/tags/{id}/replace', [FuelAviController::class, 'replaceTag'])->middleware([$perm('fuel.avi.manage'), $commercialApp('fuel_stations.avi', 'write')]);
+        Route::get('fuel-stations/avi-rfid/authorizations', [FuelAviController::class, 'indexAuthorizations'])->middleware([$perm('fuel.avi.view'), $commercialApp('fuel_stations.avi')]);
+        Route::post('fuel-stations/avi-rfid/authorizations', [FuelAviController::class, 'authorize'])->middleware([$perm('fuel.avi.authorize'), $commercialApp('fuel_stations.avi', 'write')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));

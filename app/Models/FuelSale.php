@@ -40,7 +40,7 @@ class FuelSale extends BaseModel
         'invoice_id', 'stock_movement_id', 'cogs_journal_entry_id', 'cogs_minor', 'payment_status', 'paid_minor',
         'corporate_fuel_contract_id', 'corporate_fuel_contract_price_id', 'fuel_card_id', 'fuel_fleet_vehicle_id',
         'fuel_fleet_driver_id', 'corporate_price_source', 'contract_payment_terms_days', 'odometer_snapshot',
-        'idempotency_key', 'finalized_at', 'finalized_by', 'created_by',
+        'fuel_avi_authorization_id', 'idempotency_key', 'finalized_at', 'finalized_by', 'created_by',
     ];
 
     protected $casts = [
@@ -97,6 +97,7 @@ class FuelSale extends BaseModel
     public function fuelCard(): BelongsTo { return $this->referenceBelongsTo(FuelCard::class, 'fuel_card_id'); }
     public function fleetVehicle(): BelongsTo { return $this->referenceBelongsTo(FuelFleetVehicle::class, 'fuel_fleet_vehicle_id'); }
     public function fleetDriver(): BelongsTo { return $this->referenceBelongsTo(FuelFleetDriver::class, 'fuel_fleet_driver_id'); }
+    public function aviAuthorization(): BelongsTo { return $this->referenceBelongsTo(FuelAviAuthorization::class, 'fuel_avi_authorization_id'); }
     public function finalizer(): BelongsTo { return $this->referenceBelongsTo(User::class, 'finalized_by'); }
     public function creator(): BelongsTo { return $this->referenceBelongsTo(User::class, 'created_by'); }
 }

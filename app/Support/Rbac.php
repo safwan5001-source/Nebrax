@@ -88,6 +88,9 @@ class Rbac
             'fuel.contract.view', 'fuel.contract.manage', 'fuel.contract.activate', 'fuel.contract.suspend',
             'fuel.fleet.view', 'fuel.fleet.manage',
             'fuel.card.view', 'fuel.card.manage', 'fuel.card.suspend',
+            // Cycle 7: العرض والإدارة وإصدار القرار منفصلة؛ لا يرثها مسؤول
+            // المحطة من fuel_stations.manage ولا بطاقة الوقود منطقياً.
+            'fuel.avi.view', 'fuel.avi.manage', 'fuel.avi.authorize',
             'fuel.credit.view', 'fuel.credit.manage',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
