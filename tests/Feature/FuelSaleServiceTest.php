@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\CorporateFuelContract;
+use App\Models\FuelCardUsage;
 use App\Models\FuelNozzle;
 use App\Models\FuelProduct;
 use App\Models\FuelPump;
@@ -19,6 +21,9 @@ use App\Models\Warehouse;
 use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\InvoiceService;
+use App\Services\CorporateFuelAuthorizationService;
+use App\Services\CorporateFuelContractService;
+use App\Services\FuelCardService;
 use App\Services\FuelCostBasisService;
 use App\Services\FuelSaleService;
 use App\Services\FuelShiftService;
@@ -235,6 +240,125 @@ class FuelSaleServiceTest extends TestCase
         $other = $this->fixture('other');
         $this->expectException(RuntimeException::class);
         $prices->effective($other['station'], $other['fuelProduct'], now());
+    }
+
+    /** @test */
+    public function it_uses_audited_contract_pricing_and_blocks_credit_and_card_limit_before_official_effects(): void
+    {
+        $fixture = $this->fixture('corporate');
+        $settings = app(FuelStationSettingsService::class);
+        $settings->putStationValues($fixture['station'], [
+            'corporate_credit_enabled' => true,
+            'fuel_price_tax_mode' => 'tax_exclusive',
+        ], $fixture['actor'], 'تفعيل عقد الشركات للاختبار');
+        app(FuelStationProductPriceService::class)->create([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_product_id' => $fixture['fuelProduct']->id,
+            'price_per_liter_minor' => 230,
+            'effective_from' => now()->subMinute()->toIso8601String(),
+        ], $fixture['actor']);
+        $contractService = app(CorporateFuelContractService::class);
+        $contract = $contractService->create([
+            'partner_id' => $fixture['customer_id'],
+            'effective_from' => now()->subMinute()->toIso8601String(),
+            'credit_limit_minor' => 1000,
+            'payment_terms_days' => 30,
+            'station_restriction_mode' => 'selected',
+            'station_ids' => [$fixture['station']->id],
+            'fuel_restriction_mode' => 'selected',
+            'fuel_product_ids' => [$fixture['fuelProduct']->id],
+            'reason' => 'عقد ائتمان تجريبي',
+        ], $fixture['actor']);
+        $contract = $contractService->activate($contract, $fixture['actor'], 'اعتماد عقد الاختبار');
+        $price = $contractService->createPrice($contract, [
+            'fuel_product_id' => $fixture['fuelProduct']->id,
+            'price_per_liter_minor' => 200,
+            'tax_mode' => 'tax_inclusive',
+            'effective_from' => now()->subMinute()->toIso8601String(),
+            'reason' => 'سعر عقد شامل VAT',
+        ], $fixture['actor']);
+        $card = app(FuelCardService::class)->create([
+            'public_identifier' => 'CARD-CORPORATE-1',
+            'credential' => 'secret-card-token',
+            'partner_id' => $fixture['customer_id'],
+            'corporate_fuel_contract_id' => $contract->id,
+            'effective_from' => now()->subMinute()->toIso8601String(),
+            'daily_transaction_count' => 1,
+            'reason' => 'بطاقة اختبار منطقية',
+        ], $fixture['actor']);
+        $shift = app(FuelShiftService::class)->open([
+            'fuel_station_id' => $fixture['station']->id,
+            'opening_float_minor' => 0,
+            'idempotency_key' => 'corporate-shift',
+        ], $fixture['actor']);
+        $sales = app(FuelSaleService::class);
+        $sale = $sales->finalize($sales->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_nozzle_id' => $fixture['nozzle']->id,
+            'fuel_shift_id' => $shift->id,
+            'partner_id' => $fixture['customer_id'],
+            'corporate_fuel_contract_id' => $contract->id,
+            'fuel_card_id' => $card->id,
+            'quantity_milliliters' => 1000,
+            'idempotency_key' => 'corporate-sale-1',
+        ], $fixture['actor']), $fixture['actor']);
+
+        $invoice = $sale->invoice()->firstOrFail();
+        $this->assertSame(200, $sale->price_per_liter_minor);
+        $this->assertSame('tax_inclusive', $sale->fuel_price_tax_mode);
+        $this->assertSame('contract_special_price', $sale->corporate_price_source);
+        $this->assertSame($price->id, $sale->corporate_fuel_contract_price_id);
+        $this->assertSame(30, $sale->contract_payment_terms_days);
+        $this->assertSame(now()->toDateString(), $invoice->invoice_date->toDateString());
+        $this->assertSame(now()->addDays(30)->toDateString(), $invoice->due_date->toDateString());
+        $this->assertSame(200, $invoice->total, 'السعر العقدي الشامل لا يضيف VAT مرة ثانية.');
+        $this->assertSame(200, app(CorporateFuelAuthorizationService::class)->officialExposure($fixture['customer_id']));
+        $this->assertSame(1, FuelCardUsage::where('fuel_card_id', $card->id)->count());
+
+        $blocked = $sales->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_nozzle_id' => $fixture['nozzle']->id,
+            'fuel_shift_id' => $shift->id,
+            'partner_id' => $fixture['customer_id'],
+            'corporate_fuel_contract_id' => $contract->id,
+            'fuel_card_id' => $card->id,
+            'quantity_milliliters' => 1000,
+            'idempotency_key' => 'corporate-sale-card-limit',
+        ], $fixture['actor']);
+        try {
+            $sales->finalize($blocked, $fixture['actor']);
+            $this->fail('كان يجب أن يمنع الحد اليومي للبطاقة البيع الثاني.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('FUEL_CARD_daily_TRANSACTION_COUNT_LIMIT', $exception->getMessage());
+        }
+        $this->assertNull($blocked->fresh()->invoice_id);
+        $this->assertSame(1, FuelCardUsage::where('fuel_card_id', $card->id)->count());
+
+        $unrestrictedCard = app(FuelCardService::class)->create([
+            'public_identifier' => 'CARD-CORPORATE-2',
+            'credential' => 'secret-card-token-2',
+            'partner_id' => $fixture['customer_id'],
+            'corporate_fuel_contract_id' => $contract->id,
+            'effective_from' => now()->subMinute()->toIso8601String(),
+        ], $fixture['actor']);
+        $creditBlocked = $sales->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_nozzle_id' => $fixture['nozzle']->id,
+            'fuel_shift_id' => $shift->id,
+            'partner_id' => $fixture['customer_id'],
+            'corporate_fuel_contract_id' => $contract->id,
+            'fuel_card_id' => $unrestrictedCard->id,
+            'quantity_milliliters' => 5000,
+            'idempotency_key' => 'corporate-sale-credit-limit',
+        ], $fixture['actor']);
+        try {
+            $sales->finalize($creditBlocked, $fixture['actor']);
+            $this->fail('كان يجب أن يمنع حد ائتمان العقد البيع المتوقع فوق السقف.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('CORPORATE_CREDIT_LIMIT_EXCEEDED', $exception->getMessage());
+        }
+        $this->assertNull($creditBlocked->fresh()->invoice_id);
+        $this->assertSame(0, FuelCardUsage::where('fuel_card_id', $unrestrictedCard->id)->count());
     }
 
     /** @return array<string,mixed> */

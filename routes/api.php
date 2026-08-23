@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\CashBankAccountController;
 use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
 use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CorporateFuelContractController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CostCenterController;
 use App\Http\Controllers\Api\CreditNoteController;
@@ -38,6 +39,7 @@ use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FuelStationMasterDataController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
+use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelSaleController;
 use App\Http\Controllers\Api\FuelReconciliationController;
@@ -547,6 +549,23 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('fuel-stations/sales/{id}/payments', [FuelSaleController::class, 'collectPayment'])->middleware([$perm('fuel.sale.collect'), $commercialApp('fuel_stations.core', 'write')]);
         Route::get('fuel-stations/prices', [FuelSaleController::class, 'priceIndex'])->middleware([$perm('fuel.sale.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/prices', [FuelSaleController::class, 'storePrice'])->middleware([$perm('fuel.sale.price.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        // Cycle 6: عقد شركات منفصل وسعره وحد ائتمانه؛ لا توجد صلاحية ضمنية
+        // لمسؤول المحطة لتغيير هذه السياسات التجارية الحساسة.
+        Route::get('fuel-stations/corporate-contracts', [CorporateFuelContractController::class, 'index'])->middleware([$perm('fuel.contract.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/corporate-contracts/{id}', [CorporateFuelContractController::class, 'show'])->middleware([$perm('fuel.contract.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/corporate-contracts', [CorporateFuelContractController::class, 'store'])->middleware([$perm('fuel.contract.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::put('fuel-stations/corporate-contracts/{id}', [CorporateFuelContractController::class, 'update'])->middleware([$perm('fuel.contract.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/corporate-contracts/{id}/activate', [CorporateFuelContractController::class, 'activate'])->middleware([$perm('fuel.contract.activate'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/corporate-contracts/{id}/suspend', [CorporateFuelContractController::class, 'suspend'])->middleware([$perm('fuel.contract.suspend'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/corporate-contracts/{id}/prices', [CorporateFuelContractController::class, 'storePrice'])->middleware([$perm('fuel.contract.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/corporate-contracts/{id}/credit-exposure', [CorporateFuelContractController::class, 'exposure'])->middleware([$perm('fuel.credit.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/fleet/vehicles', [FuelFleetController::class, 'vehicles'])->middleware([$perm('fuel.fleet.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/fleet/vehicles', [FuelFleetController::class, 'storeVehicle'])->middleware([$perm('fuel.fleet.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/fleet/drivers', [FuelFleetController::class, 'drivers'])->middleware([$perm('fuel.fleet.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/fleet/drivers', [FuelFleetController::class, 'storeDriver'])->middleware([$perm('fuel.fleet.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/fuel-cards', [FuelFleetController::class, 'cards'])->middleware([$perm('fuel.card.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/fuel-cards', [FuelFleetController::class, 'storeCard'])->middleware([$perm('fuel.card.manage'), $commercialApp('fuel_stations.core', 'write')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));

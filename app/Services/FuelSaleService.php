@@ -43,6 +43,8 @@ class FuelSaleService
         private PaymentService $payments,
         private FuelStationSettingsService $settings,
         private LedgerService $ledger,
+        private CorporateFuelAuthorizationService $corporateAuthorizations,
+        private FuelFleetService $fleet,
     ) {}
 
     /** @param array<string,mixed> $attributes */
@@ -88,6 +90,13 @@ class FuelSaleService
                     'fuel_product_id' => $fuelProduct->id,
                     'product_id' => $product->id,
                     'partner_id' => $attributes['partner_id'] ?? null,
+                    // Cycle 6: هذه مراجع طلب، وتتحول إلى snapshot مقفل فقط بعد
+                    // أن ينجح التفويض الخادمي قبل أثر Invoice/Inventory/COGS.
+                    'corporate_fuel_contract_id' => $attributes['corporate_fuel_contract_id'] ?? null,
+                    'fuel_card_id' => $attributes['fuel_card_id'] ?? null,
+                    'fuel_fleet_vehicle_id' => $attributes['fuel_fleet_vehicle_id'] ?? null,
+                    'fuel_fleet_driver_id' => $attributes['fuel_fleet_driver_id'] ?? null,
+                    'odometer_snapshot' => $attributes['odometer'] ?? null,
                     'quantity_milliliters' => $quantity,
                     'meter_start_milliliters' => $attributes['meter_start_milliliters'] ?? null,
                     'meter_end_milliliters' => $attributes['meter_end_milliliters'] ?? null,
@@ -137,12 +146,22 @@ class FuelSaleService
                 throw new RuntimeException('منتج الوقود في المسودة لم يعد صالحاً للإنهاء.');
             }
             $this->quantity->assertFuelUnitMapping($fuelProduct, $product);
-            $price = $this->prices->effective($station, $fuelProduct, now());
-            $taxMode = $this->settings->fuelPriceTaxMode($station);
+            $finalizationAt = now();
+            $authorization = $this->corporateAuthorizations->resolve($sale, $station, $fuelProduct, $finalizationAt);
+            if ($authorization !== null && $authorization['price_source'] === 'contract_special_price') {
+                $pricePerLiter = $authorization['price_per_liter_minor'];
+                $taxMode = $authorization['tax_mode'];
+            } else {
+                // يحافظ fallback على resolver Cycle 5 كاملاً: station override ثم
+                // tenant default ثم fail-closed؛ لا يعيد Cycle 6 بناءه أو يقرأ Product.sale_price.
+                $stationPrice = $this->prices->effective($station, $fuelProduct, $finalizationAt);
+                $pricePerLiter = (int) $stationPrice->price_per_liter_minor;
+                $taxMode = $this->settings->fuelPriceTaxMode($station);
+            }
             $precision = $this->linePrecision->fromItem([
                 'quantity_numerator' => $sale->quantity_milliliters,
                 'quantity_denominator' => FuelQuantity::MILLILITERS_PER_LITER,
-            ], (int) $price->price_per_liter_minor) ?? throw new RuntimeException('تعذر بناء تسعير الوقود النسبي.');
+            ], $pricePerLiter) ?? throw new RuntimeException('تعذر بناء تسعير الوقود النسبي.');
 
             $invoice = $this->invoices->create([
                 'partner_id' => $sale->partner_id,
@@ -150,7 +169,10 @@ class FuelSaleService
                 'warehouse_id' => $warehouse->id,
                 'payment_type' => 'credit',
                 'is_paid' => false,
-                'invoice_date' => now()->toDateString(),
+                'invoice_date' => $finalizationAt->toDateString(),
+                'due_date' => $authorization === null
+                    ? $finalizationAt->toDateString()
+                    : $finalizationAt->copy()->addDays((int) $authorization['contract']->payment_terms_days)->toDateString(),
                 'tax_inclusive' => $taxMode === 'tax_inclusive',
                 'notes' => "بيع وقود {$sale->number}",
                 'created_by' => $actor->id,
@@ -160,9 +182,15 @@ class FuelSaleService
                 'unit' => $fuelProduct->display_unit,
                 'quantity_numerator' => $precision['quantity_numerator'],
                 'quantity_denominator' => $precision['quantity_denominator'],
-                'unit_price' => (int) $price->price_per_liter_minor,
+                'unit_price' => $pricePerLiter,
                 'tax_rate' => (int) \App\Support\Settings::get('sales', 'default_tax_rate'),
             ]]);
+
+            // لا يوجد read→write مفصول في الائتمان: تتحقق الخدمة بعد أن تحسب
+            // الفاتورة المسودة الإجمالي الرسمي وقبل post()/المخزون/COGS.
+            if ($authorization !== null) {
+                $this->corporateAuthorizations->assertFinancialLimits($authorization, $sale, $station, (int) $invoice->total);
+            }
 
             $stockMovement = null;
             $cogsEntry = null;
@@ -211,9 +239,16 @@ class FuelSaleService
                 'notes' => "بيع وقود نهائي {$sale->number}",
             ]);
 
+            if ($authorization !== null) {
+                $this->corporateAuthorizations->recordApprovedUsage($authorization, $sale, $station, (int) $invoice->total);
+                if ($authorization['odometer'] !== null && $authorization['vehicle'] !== null) {
+                    $this->fleet->recordOdometer($authorization['vehicle'], $authorization['odometer'], $sale->id, $actor);
+                }
+            }
+
             $sale->update([
                 'status' => FuelSale::STATUS_FINALIZED,
-                'price_per_liter_minor' => (int) $price->price_per_liter_minor,
+                'price_per_liter_minor' => $pricePerLiter,
                 'fuel_price_tax_mode' => $taxMode,
                 'pricing_numerator' => $precision['pricing_numerator'],
                 'pricing_denominator' => $precision['pricing_denominator'],
@@ -225,7 +260,15 @@ class FuelSaleService
                 'stock_movement_id' => $stockMovement->id,
                 'cogs_journal_entry_id' => $cogsEntry?->id,
                 'cogs_minor' => $cogsMinor,
-                'finalized_at' => now(),
+                'corporate_fuel_contract_id' => $authorization === null ? null : $authorization['contract']->id,
+                'corporate_fuel_contract_price_id' => $authorization === null ? null : $authorization['contract_price_id'],
+                'fuel_card_id' => $authorization === null ? null : $authorization['card']?->id,
+                'fuel_fleet_vehicle_id' => $authorization === null ? null : $authorization['vehicle']?->id,
+                'fuel_fleet_driver_id' => $authorization === null ? null : $authorization['driver']?->id,
+                'corporate_price_source' => $authorization === null ? null : $authorization['price_source'],
+                'contract_payment_terms_days' => $authorization === null ? null : (int) $authorization['contract']->payment_terms_days,
+                'odometer_snapshot' => $authorization === null ? null : $authorization['odometer'],
+                'finalized_at' => $finalizationAt,
                 'finalized_by' => $actor->id,
             ]);
 

@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Asset;
 use App\Models\Branch;
 use App\Models\CashBankTransfer;
+use App\Models\CorporateFuelContract;
 use App\Models\CreditNote;
 use App\Models\Employee;
 use App\Models\EmployeeCustody;
@@ -168,6 +169,11 @@ class DocumentNumberingCatalog
             'model'  => FuelSale::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'FSL']],
+        ],
+        'corporate_fuel_contract' => [
+            'model'  => CorporateFuelContract::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'CFC']],
         ],
         'journal_entry' => [
             'model'  => JournalEntry::class,

@@ -5089,7 +5089,8 @@
     "manageMasterData": "Manage station data",
     "manageReceiving": "Fuel supply & receiving",
     "manageShifts": "Operational shift and forecourt",
-    "manageSales": "Official fuel sales"
+    "manageSales": "Official fuel sales",
+    "manageCorporate": "Corporate & fleet contracts"
   },
   "fuelStationsMasterData": {
     "title": "Station master data",
@@ -5313,5 +5314,28 @@
     "amount": "Amount (SAR)",
     "paymentSeparationHint": "This creates an official receipt and updates the invoice only. It does not add a shift cash movement or settle a Cycle 4 variance.",
     "paymentCollected": "Receipt posted and invoice payment status updated."
+  },
+  "fuelStationsCorporate": {
+    "eyebrow": "Fuel stations · corporate & fleet",
+    "title": "Corporate fuel contracts",
+    "subtitle": "An effective-dated contract governs credit and special fuel pricing before an invoice is created. This screen never creates an independent receipt or journal.",
+    "newContract": "New corporate contract",
+    "number": "Contract number",
+    "customer": "Customer",
+    "status": "Status",
+    "actions": "Actions",
+    "creditLimit": "Credit limit (minor units)",
+    "paymentTerms": "Due-term days",
+    "effectiveFrom": "Effective from",
+    "createTitle": "Corporate contract draft",
+    "createHint": "The contract starts as a draft. Activation is a separate audited action and rejects overlapping active customer contracts.",
+    "selectCustomer": "Select a registered customer",
+    "create": "Save draft",
+    "created": "Contract draft created.",
+    "activated": "Contract activated.",
+    "activate": "Activate",
+    "empty": "No corporate fuel contracts exist for this tenant yet.",
+    "search": "Search by contract or customer",
+    "noPermission": "You do not have permission to manage corporate contracts."
   }
 }
