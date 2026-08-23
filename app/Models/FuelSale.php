@@ -38,6 +38,8 @@ class FuelSale extends BaseModel
         'rounding_remainder_numerator', 'rounding_remainder_denominator', 'rounding_policy',
         'meter_start_milliliters', 'meter_end_milliliters', 'meter_source_reference', 'source_references',
         'invoice_id', 'stock_movement_id', 'cogs_journal_entry_id', 'cogs_minor', 'payment_status', 'paid_minor',
+        'corporate_fuel_contract_id', 'corporate_fuel_contract_price_id', 'fuel_card_id', 'fuel_fleet_vehicle_id',
+        'fuel_fleet_driver_id', 'corporate_price_source', 'contract_payment_terms_days', 'odometer_snapshot',
         'idempotency_key', 'finalized_at', 'finalized_by', 'created_by',
     ];
 
@@ -50,6 +52,8 @@ class FuelSale extends BaseModel
         'source_references' => 'array',
         'cogs_minor' => 'integer',
         'paid_minor' => 'integer',
+        'contract_payment_terms_days' => 'integer',
+        'odometer_snapshot' => 'integer',
         'finalized_at' => 'datetime',
     ];
 
@@ -88,6 +92,11 @@ class FuelSale extends BaseModel
     public function stockMovement(): BelongsTo { return $this->referenceBelongsTo(StockMovement::class); }
     public function cogsJournalEntry(): BelongsTo { return $this->referenceBelongsTo(JournalEntry::class, 'cogs_journal_entry_id'); }
     public function paymentReceipts(): HasMany { return $this->hasMany(FuelSalePaymentReceipt::class); }
+    public function corporateContract(): BelongsTo { return $this->referenceBelongsTo(CorporateFuelContract::class, 'corporate_fuel_contract_id'); }
+    public function corporateContractPrice(): BelongsTo { return $this->referenceBelongsTo(CorporateFuelContractPrice::class, 'corporate_fuel_contract_price_id'); }
+    public function fuelCard(): BelongsTo { return $this->referenceBelongsTo(FuelCard::class, 'fuel_card_id'); }
+    public function fleetVehicle(): BelongsTo { return $this->referenceBelongsTo(FuelFleetVehicle::class, 'fuel_fleet_vehicle_id'); }
+    public function fleetDriver(): BelongsTo { return $this->referenceBelongsTo(FuelFleetDriver::class, 'fuel_fleet_driver_id'); }
     public function finalizer(): BelongsTo { return $this->referenceBelongsTo(User::class, 'finalized_by'); }
     public function creator(): BelongsTo { return $this->referenceBelongsTo(User::class, 'created_by'); }
 }

@@ -259,6 +259,15 @@ class Settings
             // (المستأجر ثم المحطة). القيمة الفارغة ليست وضعاً تشغيلياً: تحلها
             // الخدمة من onboarding/locale السعودي أو تفشل بوضوح خارج ذلك.
             'fuel_price_tax_mode' => '', // tax_inclusive | tax_exclusive
+            // Cycle 6: لا يدخل العميل في مسار عقد/ائتمان/بطاقة ما لم يفعله
+            // المستأجر صراحةً؛ حد 0 يمنع إنشاء exposure غير مهيأ.
+            'corporate_credit_enabled' => false,
+            'require_active_contract' => true,
+            'default_corporate_credit_limit_minor' => 0,
+            'odometer_policy' => 'optional', // disabled | optional | required
+            'driver_required' => false,
+            'vehicle_required' => false,
+            'fuel_card_required' => false,
             // Cycle 5: تحصيل FuelSale الرسمي يمر دائماً عبر PaymentService.
             // القائمة الفارغة تمنع التحصيل حتى يختار المستأجر طرقه النشطة صراحةً.
             'fuel_sales_allowed_payment_method_ids' => [],
