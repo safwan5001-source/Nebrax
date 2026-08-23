@@ -45,6 +45,26 @@ class DocumentCenterProcessingTest extends TestCase
         config()->set('document_center.storage.disk', 'local');
         config()->set('queue.default', 'redis');
         Queue::fake();
+        PlatformIntegrationSetting::create([
+            'integration_key' => 'document_processing',
+            'provider' => 'redis',
+            'enabled' => true,
+            'configuration' => [
+                'max_attempts' => 3,
+                'timeout_seconds' => 90,
+                'backoff_seconds' => [30, 120, 300],
+            ],
+        ]);
+        PlatformIntegrationSetting::create([
+            'integration_key' => 'malware_scanner',
+            'provider' => 'clamav_tcp',
+            'enabled' => true,
+            'configuration' => [
+                'host' => 'clamav.internal',
+                'port' => 3310,
+                'timeout_seconds' => 10,
+            ],
+        ]);
         $this->png = base64_decode(
             'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
             true,
@@ -129,16 +149,13 @@ class DocumentCenterProcessingTest extends TestCase
     public function scanner_exhaustion_fails_closed_quarantines_the_batch_and_keeps_only_safe_errors(): void
     {
         $auth = $this->authorizedTenant('processing-failed');
-        PlatformIntegrationSetting::create([
-            'integration_key' => 'document_processing',
-            'provider' => 'redis',
-            'enabled' => true,
-            'configuration' => [
-                'max_attempts' => 1,
-                'timeout_seconds' => 30,
-                'backoff_seconds' => [1],
-            ],
-        ]);
+        $processingSetting = PlatformIntegrationSetting::where('integration_key', 'document_processing')->firstOrFail();
+        $processingSetting->configuration = [
+            'max_attempts' => 1,
+            'timeout_seconds' => 30,
+            'backoff_seconds' => [1],
+        ];
+        $processingSetting->save();
         $batch = $this->batchWithFile($auth['token']);
         $this->withToken($auth['token'])->postJson("/api/document-batches/{$batch['id']}/complete")->assertOk();
         $job = $this->queuedJob();
@@ -178,6 +195,21 @@ class DocumentCenterProcessingTest extends TestCase
         $this->assertSame(DocumentWorkflowStatus::QUARANTINED, DocumentBatch::findOrFail($batch['id'])->status);
         $this->assertFalse(app(TenantContext::class)->has());
         $this->assertFalse(app(BranchContext::class)->has());
+    }
+
+    /** @test */
+    public function completing_intake_does_not_queue_work_while_platform_processing_is_disabled(): void
+    {
+        PlatformIntegrationSetting::where('integration_key', 'document_processing')->update(['enabled' => false]);
+        $auth = $this->authorizedTenant('processing-disabled');
+        $batch = $this->batchWithFile($auth['token']);
+
+        $this->withToken($auth['token'])->postJson("/api/document-batches/{$batch['id']}/complete")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'received');
+
+        $this->assertDatabaseCount('document_processing_runs', 0);
+        Queue::assertNothingPushed();
     }
 
     private function queuedJob(): ScanDocumentFile

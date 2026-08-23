@@ -41,12 +41,20 @@ changed field names only—never values. Connection tests use a temporary empty 
 storage and `PING` for ClamAV. AI credentials may be stored ahead of PR-4, but no provider is
 called until the extraction contract and data-region gate are accepted.
 
-## Deployment and cost gate
+## Deployment and activation gate
 
-The Blueprint adds a persistent Render Key Value service and a paid background worker. This is
-an infrastructure cost change. PR-3 may be reviewed and tested without provisioning them, but
-must not be merged into an auto-synced production Blueprint until the owner approves the plans.
-The worker receives `SIGTERM` and has 180 seconds to finish or release in-flight jobs.
+PR-3 installs the queue contracts, Predis client, jobs, worker heartbeat, scanner adapter, and
+administrative settings, but deliberately leaves the production Blueprint unchanged. It does
+not provision a Render Key Value service, background worker, or ClamAV service and therefore
+introduces no paid Render resource when merged. Processing and scanner settings default to
+disabled; completing intake creates no processing run while they are disabled or the queue is
+still synchronous.
+
+Activation is a later operational action: approve the plans, add a persistent private Render
+Key Value service with `noeviction`, add a dedicated worker for the `documents` queue, provide
+a private ClamAV endpoint, wire the shared `APP_KEY`/database/Redis settings, then enable the
+integration from the platform console. The activation change must preserve graceful worker
+shutdown and bounded retries.
 
 ## Explicitly deferred
 

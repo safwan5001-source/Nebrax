@@ -22,6 +22,14 @@ class DocumentProcessingService
 
     public function queueSafetyScans(DocumentBatch $batch): int
     {
+        // البنية جاهزة، لكن التشغيل يبقى opt-in. لا ننشئ محاولات معلقة
+        // قبل تفعيل السياسة من منصة الإدارة وتجهيز Queue/Worker فعليين.
+        if (config('queue.default') === 'sync'
+            || $this->settings->activeConfiguration('document_processing') === []
+            || $this->settings->activeConfiguration('malware_scanner') === []) {
+            return 0;
+        }
+
         $dispatched = 0;
         $batch->files()
             ->where('scan_status', DocumentScanStatus::PENDING->value)
@@ -40,12 +48,6 @@ class DocumentProcessingService
                 );
 
                 if (! $run->wasRecentlyCreated) {
-                    return;
-                }
-
-                // HTTP must never execute malware scanning synchronously. In local/test
-                // environments the run remains visible as queued until a real worker is used.
-                if (config('queue.default') === 'sync') {
                     return;
                 }
 
