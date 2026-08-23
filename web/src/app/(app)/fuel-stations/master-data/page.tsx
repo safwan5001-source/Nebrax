@@ -18,6 +18,7 @@ type Kind = 'stations' | 'products' | 'tanks' | 'pumps' | 'nozzles';
 type Item = Record<string, string | number | boolean | null | undefined> & { id: string };
 type Branch = { id: string; name: string; code: string };
 type Product = { id: string; name: string; sku?: string | null; unit?: string | null };
+type Warehouse = { id: string; name: string; code: string; branch_id?: string | null; is_active?: boolean };
 
 const ENDPOINTS: Record<Kind, string> = {
   stations: '/fuel-stations/stations',
@@ -28,7 +29,7 @@ const ENDPOINTS: Record<Kind, string> = {
 };
 
 const EMPTY: Record<Kind, Record<string, string>> = {
-  stations: { branch_id: '', code: '', name: '', city: '', timezone: 'Asia/Riyadh', status: 'active' },
+  stations: { branch_id: '', warehouse_id: '', code: '', name: '', city: '', timezone: 'Asia/Riyadh', status: 'active' },
   products: { product_id: '', code: '', name: '', density_kg_per_m3: '', tax_category: '', is_active: 'true' },
   tanks: { fuel_station_id: '', fuel_product_id: '', code: '', name: '', capacity_milliliters: '', safe_capacity_milliliters: '', minimum_level_milliliters: '0', dead_stock_milliliters: '0', opening_volume_milliliters: '0', atg_source_key: '', status: 'active' },
   pumps: { fuel_station_id: '', pump_number: '', name: '', controller_key: '', status: 'active' },
@@ -42,6 +43,7 @@ export default function FuelStationsMasterDataPage() {
   const [rows, setRows] = useState<Record<Kind, Item[]>>({ stations: [], products: [], tanks: [], pumps: [], nozzles: [] });
   const [branches, setBranches] = useState<Branch[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Item | null>(null);
@@ -62,9 +64,10 @@ export default function FuelStationsMasterDataPage() {
       api<{ data: Item[] }>(ENDPOINTS.nozzles),
       api<{ data: Branch[] }>('/branches'),
       api<{ data: Product[] }>('/products'),
-    ] as const).then(([stations, fuelProducts, tanks, pumps, nozzles, branchResponse, productResponse]) => {
+      api<{ data: Warehouse[] }>('/warehouses'),
+    ] as const).then(([stations, fuelProducts, tanks, pumps, nozzles, branchResponse, productResponse, warehouseResponse]) => {
       setRows({ stations: stations.data, products: fuelProducts.data, tanks: tanks.data, pumps: pumps.data, nozzles: nozzles.data });
-      setBranches(branchResponse.data); setProducts(productResponse.data);
+      setBranches(branchResponse.data); setProducts(productResponse.data); setWarehouses(warehouseResponse.data);
     }).catch((err) => setError(err instanceof ApiError ? err.message : t('loadFailed'))).finally(() => setLoading(false));
   }, [t]);
 
@@ -107,6 +110,9 @@ export default function FuelStationsMasterDataPage() {
 
   function selectOptions(key: string) {
     if (key === 'branch_id') return branches.map((row) => ({ value: row.id, label: `${row.name} · ${row.code}` }));
+    if (key === 'warehouse_id') return warehouses
+      .filter((row) => row.is_active !== false && (!row.branch_id || row.branch_id === form.branch_id))
+      .map((row) => ({ value: row.id, label: `${row.name} · ${row.code}` }));
     if (key === 'product_id') return products.map((row) => ({ value: row.id, label: row.name }));
     if (key === 'fuel_station_id') return choices.stations.map((row) => ({ value: row.id, label: `${row.name ?? ''} · ${row.code ?? ''}` }));
     if (key === 'fuel_product_id') return choices.fuelProducts.map((row) => ({ value: row.id, label: `${row.name ?? ''} · ${row.code ?? ''}` }));
@@ -115,7 +121,7 @@ export default function FuelStationsMasterDataPage() {
     return null;
   }
 
-  const fieldLabel = (key: string) => ({ branch_id: t('branch'), code: t('code'), name: t('name'), city: t('city'), timezone: t('timezone'), status: t('status'), product_id: t('product'), density_kg_per_m3: t('density'), tax_category: t('taxCategory'), fuel_station_id: t('station'), fuel_product_id: t('fuelProduct'), capacity_milliliters: t('capacity'), safe_capacity_milliliters: t('safeCapacity'), minimum_level_milliliters: t('minimumLevel'), dead_stock_milliliters: t('deadStock'), opening_volume_milliliters: t('openingVolume'), atg_source_key: t('atgKey'), pump_number: t('pumpNumber'), controller_key: t('controllerKey'), fuel_pump_id: t('pump'), fuel_tank_id: t('tank'), nozzle_number: t('nozzleNumber'), meter_opening_milliliters: t('meterOpening'), is_active: t('status') }[key] ?? key);
+  const fieldLabel = (key: string) => ({ branch_id: t('branch'), warehouse_id: t('warehouse'), code: t('code'), name: t('name'), city: t('city'), timezone: t('timezone'), status: t('status'), product_id: t('product'), density_kg_per_m3: t('density'), tax_category: t('taxCategory'), fuel_station_id: t('station'), fuel_product_id: t('fuelProduct'), capacity_milliliters: t('capacity'), safe_capacity_milliliters: t('safeCapacity'), minimum_level_milliliters: t('minimumLevel'), dead_stock_milliliters: t('deadStock'), opening_volume_milliliters: t('openingVolume'), atg_source_key: t('atgKey'), pump_number: t('pumpNumber'), controller_key: t('controllerKey'), fuel_pump_id: t('pump'), fuel_tank_id: t('tank'), nozzle_number: t('nozzleNumber'), meter_opening_milliliters: t('meterOpening'), is_active: t('status') }[key] ?? key);
 
   if (loading) return <div className="space-y-4">{[0, 1].map((row) => <Skeleton key={row} className="h-44 w-full" />)}</div>;
 
@@ -125,11 +131,12 @@ export default function FuelStationsMasterDataPage() {
       <Button onClick={startCreate}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('add')} {labels[kind]}</Button>
     </div>
     <p className="rounded-md border border-border bg-surface px-3 py-2 text-xs leading-relaxed text-muted">{t('manageHint')}</p>
+    {kind === 'stations' && rows.stations.some((row) => !row.warehouse_id) && <p role="note" className="rounded-md border border-border bg-primary-soft px-3 py-2 text-xs leading-relaxed text-text">{t('warehouseUnsetWarning')}</p>}
     <div className="flex flex-wrap gap-2" role="tablist">{(Object.keys(labels) as Kind[]).map((tab) => <Button key={tab} type="button" size="sm" variant={kind === tab ? 'primary' : 'outline'} onClick={() => { setKind(tab); cancel(); }}>{labels[tab]}</Button>)}</div>
     {error && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,0.65fr)]">
       <Card><CardHeader><CardTitle>{labels[kind]}</CardTitle></CardHeader><CardContent>{rows[kind].length === 0 ? <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted">{t('empty')}</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-border text-start text-xs text-muted"><tr><th className="px-2 py-2 text-start">{t('name')}</th><th className="px-2 py-2 text-start">{t('code')}</th><th className="px-2 py-2 text-start">{t('status')}</th><th className="px-2 py-2" /></tr></thead><tbody>{rows[kind].map((row) => <tr key={row.id} className="border-b border-border/70 last:border-0"><td className="px-2 py-3 font-medium text-text">{String(row.name ?? row.pump_number ?? row.nozzle_number ?? '—')}</td><td className="num px-2 py-3 text-muted">{String(row.code ?? row.pump_number ?? row.nozzle_number ?? '—')}</td><td className="px-2 py-3">{row.status ? <Badge tone={row.status === 'active' ? 'positive' : 'muted'}>{t(String(row.status) as 'active' | 'inactive' | 'maintenance')}</Badge> : '—'}</td><td className="px-2 py-3"><div className="flex justify-end gap-1"><Button type="button" variant="ghost" size="icon" aria-label={t('edit')} onClick={() => startEdit(row)}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button><Button type="button" variant="ghost" size="icon" aria-label={t('delete')} onClick={() => remove(row)}><Trash2 className="h-4 w-4" strokeWidth={1.7} /></Button></div></td></tr>)}</tbody></table></div>}</CardContent></Card>
-      <Card><CardHeader><CardTitle>{editing ? t('edit') : t('add')} {labels[kind]}</CardTitle></CardHeader><CardContent><form onSubmit={submit} className="grid gap-3">{Object.keys(form).map((key) => { const options = selectOptions(key); const status = key === 'status'; const boolean = key === 'is_active'; return <div key={key} className="space-y-1.5"><Label htmlFor={key}>{fieldLabel(key)}</Label>{options || status || boolean ? <Select id={key} value={form[key]} onChange={(event) => set(key, event.target.value)}>{options && <><option value="">—</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</>}{status && <><option value="active">{t('active')}</option><option value="inactive">{t('inactive')}</option><option value="maintenance">{t('maintenance')}</option></>}{boolean && <><option value="true">{t('active')}</option><option value="false">{t('inactive')}</option></>}</Select> : <Input id={key} value={form[key]} type={key.includes('milliliters') || key.includes('density') ? 'number' : 'text'} dir={key.includes('code') || key.includes('key') ? 'ltr' : undefined} onChange={(event) => set(key, event.target.value)} required={['branch_id', 'code', 'name', 'product_id', 'fuel_station_id', 'fuel_product_id', 'fuel_pump_id', 'fuel_tank_id', 'pump_number', 'nozzle_number', 'capacity_milliliters', 'safe_capacity_milliliters'].includes(key)} />}</div>; })}<div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={cancel}>{t('cancel')}</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} />}{t('save')}</Button></div></form></CardContent></Card>
+      <Card><CardHeader><CardTitle>{editing ? t('edit') : t('add')} {labels[kind]}</CardTitle></CardHeader><CardContent><form onSubmit={submit} className="grid gap-3">{Object.keys(form).map((key) => { const options = selectOptions(key); const status = key === 'status'; const boolean = key === 'is_active'; return <div key={key} className="space-y-1.5"><Label htmlFor={key}>{fieldLabel(key)}</Label>{options || status || boolean ? <><Select id={key} value={form[key]} onChange={(event) => set(key, event.target.value)}>{options && <><option value="">—</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</>}{status && <><option value="active">{t('active')}</option><option value="inactive">{t('inactive')}</option><option value="maintenance">{t('maintenance')}</option></>}{boolean && <><option value="true">{t('active')}</option><option value="false">{t('inactive')}</option></>}</Select>{key === 'warehouse_id' && <p className="text-xs leading-relaxed text-muted">{t('warehouseHint')}</p>}</> : <Input id={key} value={form[key]} type={key.includes('milliliters') || key.includes('density') ? 'number' : 'text'} dir={key.includes('code') || key.includes('key') ? 'ltr' : undefined} onChange={(event) => set(key, event.target.value)} required={['branch_id', 'code', 'name', 'product_id', 'fuel_station_id', 'fuel_product_id', 'fuel_pump_id', 'fuel_tank_id', 'pump_number', 'nozzle_number', 'capacity_milliliters', 'safe_capacity_milliliters'].includes(key)} />}</div>; })}<div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={cancel}>{t('cancel')}</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} />}{t('save')}</Button></div></form></CardContent></Card>
     </div>
   </div>;
 }

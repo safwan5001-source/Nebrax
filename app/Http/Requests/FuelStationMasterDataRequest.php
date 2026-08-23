@@ -36,6 +36,7 @@ class FuelStationMasterDataRequest extends FormRequest
     {
         return [
             'branch_id' => [$creating ? 'required' : 'sometimes', 'uuid'],
+            'warehouse_id' => ['sometimes', 'nullable', 'uuid'],
             'code' => [$creating ? 'required' : 'sometimes', 'string', 'max:64'],
             'name' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
             'country_code' => ['sometimes', 'nullable', 'string', 'size:2'],

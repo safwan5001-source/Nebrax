@@ -33,8 +33,8 @@ use RuntimeException;
  */
 class StocktakeService
 {
-    private const ACC_INVENTORY  = '1140';
-    private const ACC_ADJUSTMENT = '5180';
+    public const INVENTORY_ACCOUNT_CODE = '1140';
+    public const VARIANCE_ACCOUNT_CODE = '5180';
 
     public function __construct(
         protected LedgerService $ledger,
@@ -179,8 +179,8 @@ class StocktakeService
             return null;
         }
 
-        $inventory  = $this->accountId(self::ACC_INVENTORY);
-        $adjustment = $this->accountId(self::ACC_ADJUSTMENT);
+        $inventory  = $this->accountId(self::INVENTORY_ACCOUNT_CODE);
+        $adjustment = $this->accountId(self::VARIANCE_ACCOUNT_CODE);
         $amount     = abs($net);
 
         $lines = $net > 0

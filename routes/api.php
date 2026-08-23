@@ -37,6 +37,8 @@ use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FuelStationMasterDataController;
+use App\Http\Controllers\Api\FuelStationSettingsController;
+use App\Http\Controllers\Api\FuelReconciliationController;
 use App\Http\Controllers\Api\FinancialControlAlertController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
@@ -494,6 +496,19 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('fuel-stations/nozzles', [FuelStationMasterDataController::class, 'storeNozzle'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::put('fuel-stations/nozzles/{id}', [FuelStationMasterDataController::class, 'updateNozzle'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::delete('fuel-stations/nozzles/{id}', [FuelStationMasterDataController::class, 'destroyNozzle'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        // Cycle 2: حدود التسوية وتعيينات حسابات الفروق إعدادات مدققة: tenant ثم station.
+        Route::get('fuel-stations/settings', [FuelStationSettingsController::class, 'showTenant'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::put('fuel-stations/settings', [FuelStationSettingsController::class, 'updateTenant'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/stations/{id}/settings', [FuelStationSettingsController::class, 'showStation'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::put('fuel-stations/stations/{id}/settings', [FuelStationSettingsController::class, 'updateStation'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        // Cycle 2: evidence stays read-only until an explicit approved reconciliation posts inventory and ledger effects.
+        Route::get('fuel-stations/readings', [FuelReconciliationController::class, 'readings'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/readings', [FuelReconciliationController::class, 'storeReading'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/reconciliations', [FuelReconciliationController::class, 'index'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/reconciliations', [FuelReconciliationController::class, 'store'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/reconciliations/{id}/approve', [FuelReconciliationController::class, 'approve'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));

@@ -230,6 +230,12 @@ class Settings
             'operating_timezone' => 'Asia/Riyadh',
             'operating_day_starts_at' => '00:00',
             'volume_unit' => 'liter',
+            // Cycle 2: 0 = لا فرق يمر بلا تصعيد؛ تُسجّل الفروق دائماً.
+            'reconciliation_tolerance_absolute_milliliters' => 0,
+            'reconciliation_tolerance_basis_points' => 0,
+            // null = fallback متحقق إلى حساب فروق المخزون القائم (5180) فقط.
+            'inventory_variance_account_id' => null,
+            'inventory_gain_account_id' => null,
             'device_event_max_lateness_seconds' => 86400,
             'offline_event_retention_days' => 30,
         ],
