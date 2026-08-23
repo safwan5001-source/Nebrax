@@ -245,6 +245,54 @@ final class ApplicationCatalog
             'dependencies' => [],
         ],
 
+        // ───────────────────── إدارة محطات الوقود ─────────────────────
+        // المنتج التجاري الأول هو `fuel-stations`، لكن الكتالوج يعرّف قدرات
+        // تقنية فقط. لا يصبح أي مفتاح هنا منتجاً مدفوعاً مستقلاً تلقائياً.
+        // تبدأ دورة 0 بـ core وحدها؛ لا تُمنح/تُفعَّل القدرات المؤجلة قبل أن
+        // يكتمل نطاقها الحقيقي في دورته، فيبقى كتالوج التطبيقات صادقاً.
+        'fuel_stations.core' => [
+            'group' => 'fuel_stations',
+            'maturity' => self::MATURITY_BUILT,
+            'mandatory' => false,
+            'dependencies' => [],
+        ],
+        'fuel_stations.inventory' => [
+            'group' => 'fuel_stations',
+            'maturity' => self::MATURITY_COMING_SOON,
+            'mandatory' => false,
+            'dependencies' => ['fuel_stations.core'],
+        ],
+        'fuel_stations.forecourt' => [
+            'group' => 'fuel_stations',
+            'maturity' => self::MATURITY_COMING_SOON,
+            'mandatory' => false,
+            'dependencies' => ['fuel_stations.core'],
+        ],
+        'fuel_stations.fleet' => [
+            'group' => 'fuel_stations',
+            'maturity' => self::MATURITY_COMING_SOON,
+            'mandatory' => false,
+            'dependencies' => ['fuel_stations.core'],
+        ],
+        'fuel_stations.avi' => [
+            'group' => 'fuel_stations',
+            'maturity' => self::MATURITY_COMING_SOON,
+            'mandatory' => false,
+            'dependencies' => ['fuel_stations.core'],
+        ],
+        'fuel_stations.maintenance' => [
+            'group' => 'fuel_stations',
+            'maturity' => self::MATURITY_COMING_SOON,
+            'mandatory' => false,
+            'dependencies' => ['fuel_stations.core'],
+        ],
+        'fuel_stations.integrations' => [
+            'group' => 'fuel_stations',
+            'maturity' => self::MATURITY_COMING_SOON,
+            'mandatory' => false,
+            'dependencies' => ['fuel_stations.core'],
+        ],
+
         // ───────────────────────── البنية والإضافات ─────────────────────────
         'company.branches' => [
             'group' => 'branches',

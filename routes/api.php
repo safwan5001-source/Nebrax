@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\EmploymentTypeController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FinanceSettingsController;
+use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FinancialControlAlertController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
@@ -90,6 +91,7 @@ use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApplicationActive;
 use App\Http\Middleware\EnsureApplicationOperationActive;
+use App\Http\Middleware\EnsureCommercialApplicationAccess;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\ForceJsonResponse;
@@ -182,9 +184,12 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         $perm = fn (string $p) => EnsurePermission::class . ':' . $p;
         $app = fn (string $k) => EnsureApplicationActive::class . ':' . $k;
+        // للمسارات التي تُبنى بعد منصة الاستحقاقات: الإنفاذ التجاري المركب
+        // إلزامي من اليوم الأول ولا يعتمد cohort rollout للجسور القديمة.
+        $commercialApp = fn (string $k, string $operation = 'read') => EnsureCommercialApplicationAccess::class . ':' . $k . ',' . $operation;
 
         // الموارد تتطلب اشتراكاً نشطاً
-        Route::middleware(EnsureActiveSubscription::class)->group(function () use ($perm, $app) {
+        Route::middleware(EnsureActiveSubscription::class)->group(function () use ($perm, $app, $commercialApp) {
 
         // الأطراف
         Route::get('partners', [PartnerController::class, 'index'])->middleware($perm('partners.view'));
@@ -451,6 +456,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('applications', [TenantApplicationController::class, 'index'])->middleware($perm('apps.view'));
         Route::post('applications/enable', [TenantApplicationController::class, 'enable'])->middleware($perm('apps.manage'));
         Route::post('applications/disable', [TenantApplicationController::class, 'disable'])->middleware($perm('apps.manage'));
+
+        // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
+        // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.
+        Route::get('fuel-stations/workspace', [FuelStationsWorkspaceController::class, 'index'])
+            ->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));

@@ -1894,7 +1894,8 @@
       "pos": "نقطة البيع",
       "branches": "الفروع",
       "purchases": "المشتريات",
-      "finance": "المالية"
+      "finance": "المالية",
+      "fuelStations": "محطات الوقود"
     },
     "invoices": "الفواتير وعروض الأسعار",
     "pos": "نقطة البيع",
@@ -1987,7 +1988,8 @@
     "receiptVouchers": "سندات القبض",
     "cashAndBank": "خزائن وحسابات بنكية",
     "employeeCustodies": "عُهَد الموظفين",
-    "financeSettings": "إعدادات المالية"
+    "financeSettings": "إعدادات المالية",
+    "fuelStationsWorkspace": "مساحة عمل المحطات"
   },
   "partnerProfile": {
     "back": "رجوع",
@@ -4706,7 +4708,8 @@
       "logistics": "اللوجستيات",
       "branches": "الفروع",
       "settings": "الإعدادات",
-      "integrations": "التكاملات"
+      "integrations": "التكاملات",
+      "fuel_stations": "محطات الوقود"
     },
     "keys": {
       "sales_invoicing": "الفواتير وعروض الأسعار",
@@ -4744,7 +4747,14 @@
       "company_branches": "الفروع",
       "communications_sms": "الرسائل النصية (SMS)",
       "commerce_storefront": "المتجر الإلكتروني",
-      "integration_mudad": "تكامل مُدد"
+      "integration_mudad": "تكامل مُدد",
+      "fuel_stations_core": "أساس إدارة المحطات",
+      "fuel_stations_inventory": "مخزون الوقود والخزانات",
+      "fuel_stations_forecourt": "عمليات الساحة والورديات",
+      "fuel_stations_fleet": "العملاء المؤسسيون والأساطيل",
+      "fuel_stations_avi": "التموين الذكي AVI/RFID",
+      "fuel_stations_maintenance": "الصيانة والسلامة",
+      "fuel_stations_integrations": "تكاملات أجهزة المحطة"
     }
   },
   "numberingSettings": {
@@ -5014,5 +5024,21 @@
     "item_delete_failed": "تعذر حذف سعر المنتج.",
     "invalid_price": "أدخل سعراً صحيحاً بالريال.",
     "choose_list": "اختر قائمة أسعار لعرض تفاصيلها أو أنشئ قائمة جديدة."
+  },
+  "fuelStations": {
+    "eyebrow": "إدارة محطات الوقود",
+    "title": "مساحة عمل المحطات",
+    "subtitle": "أساس تشغيلي وتجاري موحّد يُبنى فوقه المخزون والورديات والساحة والتكاملات من دون إنشاء محركات موازية.",
+    "status": "حالة الأساس",
+    "foundationReady": "الأساس جاهز",
+    "stations": "المحطات المسجلة",
+    "stationsHint": "ستُتاح إدارة المحطات والخزانات والمضخات في Cycle 1؛ هذه القائمة تؤكد سياق الملكية التشغيلي فقط.",
+    "noStations": "لا توجد محطات مسجلة بعد.",
+    "settings": "إعدادات الأساس",
+    "deferred": "قدرات مخططة لاحقاً",
+    "deferredHint": "لا يمكن منح هذه القدرات أو تفعيلها قبل اكتمال نطاقها الفعلي واختبارها.",
+    "loadFailed": "تعذر تحميل مساحة عمل محطات الوقود.",
+    "retry": "إعادة المحاولة",
+    "commercialGuard": "الوصول إلى هذه المساحة محكوم بالاستحقاق التجاري وحالة التطبيق وصلاحيات الدور من الخادم."
   }
 }

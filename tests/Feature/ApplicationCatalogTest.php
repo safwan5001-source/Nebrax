@@ -52,6 +52,13 @@ class ApplicationCatalogTest extends TestCase
             'operations.time_tracking',
             'operations.manufacturing',
             'operations.workflow',
+            'fuel_stations.core',
+            'fuel_stations.inventory',
+            'fuel_stations.forecourt',
+            'fuel_stations.fleet',
+            'fuel_stations.avi',
+            'fuel_stations.maintenance',
+            'fuel_stations.integrations',
             'logistics.fleet',
             'logistics.shipping',
             'company.branches',
@@ -65,7 +72,7 @@ class ApplicationCatalogTest extends TestCase
         sort($expectedKeys);
 
         $this->assertSame($expectedKeys, $actualKeys);
-        $this->assertCount(36, ApplicationCatalog::all());
+        $this->assertCount(43, ApplicationCatalog::all());
         $this->assertSame([], ApplicationCatalog::validationErrors());
     }
 
@@ -74,7 +81,9 @@ class ApplicationCatalogTest extends TestCase
     {
         $this->assertTrue(ApplicationCatalog::isActivatable('sales.pos'));
         $this->assertTrue(ApplicationCatalog::isActivatable('compliance.zatca'));
+        $this->assertTrue(ApplicationCatalog::isActivatable('fuel_stations.core'));
         $this->assertFalse(ApplicationCatalog::isActivatable('accounting.cheques'));
+        $this->assertFalse(ApplicationCatalog::isActivatable('fuel_stations.forecourt'));
         $this->assertFalse(ApplicationCatalog::isActivatable('operations.workflow'));
         $this->assertFalse(ApplicationCatalog::isActivatable('not.a.real.application'));
     }
@@ -115,6 +124,17 @@ class ApplicationCatalogTest extends TestCase
     {
         $this->assertSame('customers', ApplicationCatalog::find('sales.insurance')['group']);
         $this->assertSame('settings', ApplicationCatalog::find('compliance.zatca')['group']);
+    }
+
+    /** @test */
+    public function fuel_station_foundation_is_the_only_activatable_capability_in_its_product_family(): void
+    {
+        $this->assertSame('fuel_stations', ApplicationCatalog::find('fuel_stations.core')['group']);
+        $this->assertSame(ApplicationCatalog::MATURITY_BUILT, ApplicationCatalog::find('fuel_stations.core')['maturity']);
+        foreach (['fuel_stations.inventory', 'fuel_stations.forecourt', 'fuel_stations.fleet', 'fuel_stations.avi', 'fuel_stations.maintenance', 'fuel_stations.integrations'] as $key) {
+            $this->assertSame(ApplicationCatalog::MATURITY_COMING_SOON, ApplicationCatalog::find($key)['maturity']);
+            $this->assertSame(['fuel_stations.core'], ApplicationCatalog::dependenciesFor($key));
+        }
     }
 
     /** @test */

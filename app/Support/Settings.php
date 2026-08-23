@@ -220,6 +220,19 @@ class Settings
             'branch_prefix'    => '',
             'warehouse_prefix' => '',
         ],
+        /**
+         * أساس إعدادات محطات الوقود. تظل سياسات التشغيل التفصيلية داخل دوراتها
+         * (المخزون، الورديات، الساحة…)؛ هذه المفاتيح المتاحة اليوم محدودة عمداً
+         * ولا تعلن قدرة غير مبنية. تُقرأ عبر FuelStationSettings مع overrides
+         * المحطة والجهاز، ولا تعتمد الواجهة أو المتحكم وحدهما كمصدر قرار.
+         */
+        'fuel_stations' => [
+            'operating_timezone' => 'Asia/Riyadh',
+            'operating_day_starts_at' => '00:00',
+            'volume_unit' => 'liter',
+            'device_event_max_lateness_seconds' => 86400,
+            'offline_event_retention_days' => 30,
+        ],
     ];
 
     /** كل إعدادات مجموعة، مدموجةً فوق افتراضاتها. */
