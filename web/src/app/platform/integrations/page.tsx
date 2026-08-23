@@ -412,8 +412,10 @@ function hydrateForms(current: Record<IntegrationKey, FormState>, integrations: 
 export function payloadFor(key: IntegrationKey, form: FormState): Record<string, unknown> {
   if (key === 'document_storage') return {
     enabled: form.enabled, provider: form.provider, endpoint: form.endpoint, bucket: form.bucket,
-    region: form.region, access_key_id: form.access_key_id || undefined,
-    secret_access_key: form.secret_access_key || undefined, use_path_style_endpoint: form.use_path_style_endpoint,
+    region: form.region,
+    ...(form.access_key_id ? { access_key_id: form.access_key_id } : {}),
+    ...(form.secret_access_key ? { secret_access_key: form.secret_access_key } : {}),
+    use_path_style_endpoint: form.use_path_style_endpoint,
     current_password: form.current_password,
   };
   if (key === 'malware_scanner') return {
