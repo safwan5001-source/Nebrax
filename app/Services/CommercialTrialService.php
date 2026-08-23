@@ -14,6 +14,7 @@ use Carbon\CarbonImmutable;
 use Closure;
 use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 
 class CommercialTrialService
@@ -59,20 +60,31 @@ class CommercialTrialService
                 throw ValidationException::withMessages(['trial' => 'A trial for this commercial version has already been recorded for this tenant.']);
             }
 
-            $assignment = TenantCommercialAssignment::create([
-                'tenant_id' => $tenant->id,
-                'source_type' => TenantCommercialAssignment::SOURCE_TRIAL,
-                'commercial_plan_version_id' => $isPlan ? $version->id : null,
-                'commercial_product_version_id' => $isPlan ? null : $version->id,
-                'status' => TenantCommercialAssignment::STATUS_ACTIVE,
-                'lifecycle_state' => TenantCommercialAssignment::LIFECYCLE_ACTIVE,
-                'starts_at' => $start,
-                'ends_at' => $end,
-                'assigned_by_platform_administrator_id' => $administrator?->id,
-                'reason' => trim((string) $reason) ?: null,
-                'metadata' => ['trial_duration_days' => $durationDays, 'commercial_version_id' => $version->id],
-                'idempotency_key' => hash('sha256', json_encode([$tenant->id, 'trial', $version->id], JSON_THROW_ON_ERROR)),
-            ]);
+            $identity = hash('sha256', json_encode([$tenant->id, 'trial', $version->id], JSON_THROW_ON_ERROR));
+            try {
+                $assignment = DB::transaction(fn (): TenantCommercialAssignment => TenantCommercialAssignment::create([
+                    'tenant_id' => $tenant->id,
+                    'source_type' => TenantCommercialAssignment::SOURCE_TRIAL,
+                    'commercial_plan_version_id' => $isPlan ? $version->id : null,
+                    'commercial_product_version_id' => $isPlan ? null : $version->id,
+                    'status' => TenantCommercialAssignment::STATUS_ACTIVE,
+                    'lifecycle_state' => TenantCommercialAssignment::LIFECYCLE_ACTIVE,
+                    'starts_at' => $start,
+                    'ends_at' => $end,
+                    'assigned_by_platform_administrator_id' => $administrator?->id,
+                    'reason' => trim((string) $reason) ?: null,
+                    'metadata' => ['trial_duration_days' => $durationDays, 'commercial_version_id' => $version->id],
+                    'idempotency_key' => $identity,
+                ]));
+            } catch (QueryException $exception) {
+                $duplicate = TenantCommercialAssignment::query()
+                    ->where('tenant_id', $tenant->id)
+                    ->where('idempotency_key', $identity)
+                    ->first();
+                if ($duplicate === null) throw $exception;
+
+                throw ValidationException::withMessages(['trial' => 'A trial for this commercial version has already been recorded for this tenant.']);
+            }
             if ($isPlan) {
                 $this->materialization->materializePlan($tenant, $version, $start, $end, $assignment->id, $administrator?->id, ['commercial_assignment_id' => $assignment->id, 'trial' => true], false, \App\Support\EntitlementAccessMode::FULL, EntitlementSourceType::TRIAL);
             } else {
