@@ -84,6 +84,33 @@ class DocumentCenterSecureIntakeTest extends TestCase
     }
 
     /** @test */
+    public function a_valid_pdf_is_counted_and_the_page_limit_fails_closed(): void
+    {
+        $auth = $this->authorizedTenant('secure-intake-pdf');
+        $batch = $this->createBatch($auth['token']);
+        $pdf = base64_decode(
+            'JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAwCj4+CnN0cmVhbQoKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyMTQgMDAwMDAgbiAKdHJhaWxlcgo8PAovU2l6ZSA1Ci9Sb290IDEgMCBSCj4+CnN0YXJ0eHJlZgoyNjQKJSVFT0YK',
+            true,
+        );
+
+        $this->upload(
+            $auth['token'],
+            $batch['id'],
+            UploadedFile::fake()->createWithContent('invoice.pdf', $pdf),
+        )->assertCreated()
+            ->assertJsonPath('data.mime_type', 'application/pdf')
+            ->assertJsonPath('data.page_count', 1);
+
+        config()->set('document_center.intake.max_pdf_pages', 0);
+        $other = $this->createBatch($auth['token']);
+        $this->upload(
+            $auth['token'],
+            $other['id'],
+            UploadedFile::fake()->createWithContent('too-many.pdf', $pdf . "\n"),
+        )->assertStatus(422);
+    }
+
+    /** @test */
     public function pending_files_cannot_be_downloaded_and_clean_files_use_a_short_lived_signed_route(): void
     {
         $auth = $this->authorizedTenant('secure-intake-c');
