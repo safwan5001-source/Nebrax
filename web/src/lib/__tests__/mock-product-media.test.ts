@@ -29,11 +29,13 @@ describe('demo product image persistence', () => {
     );
 
     const products = await mockApi<{ data: Array<{ id: string; name: string }> }>('/products');
+    const detail = await mockApi<{ data: { units: Array<{ name: string; factor: number }> } }>(`/products/${created.data.id}`);
     const media = await mockApi<{ data: Array<{ id: string; download_url: string }> }>(`/products/${created.data.id}/media`);
     const pos = await mockApi<{ data: Array<{ id: string; pos_image: { download_url: string } | null }> }>('/pos/products');
     const savedFile = await readDemoMediaFile(uploaded.data[0].download_url);
 
     expect(products.data).toContainEqual(expect.objectContaining({ id: created.data.id, name: 'منتج تجريبي بصورة' }));
+    expect(detail.data.units).toEqual([{ name: 'piece', factor: 1 }]);
     expect(media.data).toHaveLength(1);
     expect(pos.data.find((item) => item.id === created.data.id)?.pos_image?.download_url)
       .toBe(uploaded.data[0].download_url);

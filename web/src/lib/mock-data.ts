@@ -309,6 +309,7 @@ export interface MockProduct {
   name_en: string | null;
   type: string;
   unit: string;
+  units: Array<{ name: string; factor: number }>;
   description: string | null;
   category: string | null;
   brand: string | null;
@@ -337,6 +338,7 @@ function product(
 ): MockProduct {
   return {
     id, sku, barcode: sku ? '2' + sku.replace(/\D/g, '').padStart(12, '0') : null, name, name_en: null, type, unit,
+    units: unit ? [{ name: unit, factor: 1 }] : [],
     description: null, category: null, brand: null, reorder_level: track ? 10 : null,
     supplier_id: null, sales_account_id: null, cogs_account_id: null, min_sale_price: null, discount: null, discount_type: null, profit_margin: null, tags: null, internal_notes: null,
     sale_price: sale.toFixed(2), purchase_price: purchase.toFixed(2), tax_rate: 15,
@@ -356,7 +358,10 @@ export const mockProducts: MockProduct[] = [
 ];
 
 function allMockProducts(): MockProduct[] {
-  const stored = listDemoProducts() as unknown as MockProduct[];
+  const stored = (listDemoProducts() as unknown as MockProduct[]).map((item) => ({
+    ...item,
+    units: Array.isArray(item.units) ? item.units : item.unit ? [{ name: item.unit, factor: 1 }] : [],
+  }));
   const storedIds = new Set(stored.map((item) => item.id));
   return [...stored, ...mockProducts.filter((item) => !storedIds.has(item.id))];
 }
@@ -374,6 +379,7 @@ function productFromDemoInput(body: unknown): MockProduct {
     name_en: typeof input.name_en === 'string' && input.name_en ? input.name_en : null,
     type: String(input.type ?? 'good'),
     unit: String(input.unit ?? ''),
+    units: input.unit ? [{ name: String(input.unit), factor: 1 }] : [],
     description: typeof input.description === 'string' && input.description ? input.description : null,
     category: typeof input.category === 'string' && input.category ? input.category : null,
     brand: typeof input.brand === 'string' && input.brand ? input.brand : null,
