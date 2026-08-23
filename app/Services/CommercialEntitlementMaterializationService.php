@@ -26,20 +26,21 @@ class CommercialEntitlementMaterializationService
         array $assignmentMetadata = [],
         bool $allowRetiredExistingSource = false,
         EntitlementAccessMode $accessMode = EntitlementAccessMode::FULL,
+        EntitlementSourceType $sourceType = EntitlementSourceType::PLAN,
     ): array {
         $this->assertAvailablePlan($planVersion, $allowRetiredExistingSource);
 
         return $this->grantCapabilities(
             $tenant,
             $this->planCapabilityKeys($planVersion),
-            EntitlementSourceType::PLAN,
+            $sourceType,
             'commercial-plan-version',
             $planVersion->id,
             $grantGroupId ?? $planVersion->id,
             $startsAt,
             $endsAt,
-            'COMMERCIAL_PLAN_VERSION',
-            'Commercial plan version',
+            $sourceType === EntitlementSourceType::TRIAL ? 'COMMERCIAL_TRIAL_PLAN_VERSION' : 'COMMERCIAL_PLAN_VERSION',
+            $sourceType === EntitlementSourceType::TRIAL ? 'Commercial plan trial version' : 'Commercial plan version',
             ['commercial_plan_version_id' => $planVersion->id, ...$assignmentMetadata],
             $grantedByPlatformAdministratorId,
             $accessMode,
@@ -57,20 +58,21 @@ class CommercialEntitlementMaterializationService
         array $assignmentMetadata = [],
         bool $allowRetiredExistingSource = false,
         EntitlementAccessMode $accessMode = EntitlementAccessMode::FULL,
+        EntitlementSourceType $sourceType = EntitlementSourceType::ADDON,
     ): array {
         $this->assertAvailableProduct($productVersion, $allowRetiredExistingSource);
 
         return $this->grantCapabilities(
             $tenant,
             $productVersion->capabilities()->orderBy('capability_key')->pluck('capability_key')->all(),
-            EntitlementSourceType::ADDON,
+            $sourceType,
             'commercial-product-version',
             $productVersion->id,
             $grantGroupId ?? $productVersion->id,
             $startsAt,
             $endsAt,
-            'COMMERCIAL_PRODUCT_VERSION',
-            'Commercial product version',
+            $sourceType === EntitlementSourceType::TRIAL ? 'COMMERCIAL_TRIAL_PRODUCT_VERSION' : 'COMMERCIAL_PRODUCT_VERSION',
+            $sourceType === EntitlementSourceType::TRIAL ? 'Commercial product trial version' : 'Commercial product version',
             ['commercial_product_version_id' => $productVersion->id, ...$assignmentMetadata],
             $grantedByPlatformAdministratorId,
             $accessMode,

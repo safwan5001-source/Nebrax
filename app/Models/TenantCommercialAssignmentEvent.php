@@ -22,6 +22,7 @@ class TenantCommercialAssignmentEvent extends Model implements CompanyWide
     public const ACTION_GRACE_READ_ONLY_STARTED = 'grace_read_only_started';
     public const ACTION_EXPIRED = 'expired';
     public const ACTION_CANCELLATION_SCHEDULED = 'cancellation_scheduled';
+    public const ACTION_TRIAL_STARTED = 'trial_started';
 
     protected $fillable = [
         'tenant_commercial_assignment_id', 'tenant_id', 'platform_administrator_id',

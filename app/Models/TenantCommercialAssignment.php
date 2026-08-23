@@ -15,6 +15,7 @@ class TenantCommercialAssignment extends Model implements CompanyWide
 
     public const SOURCE_PLAN = 'plan';
     public const SOURCE_ADDON = 'addon';
+    public const SOURCE_TRIAL = 'trial';
 
     public const STATUS_ACTIVE = 'active';
     public const STATUS_CANCELLED = 'cancelled';
@@ -26,6 +27,7 @@ class TenantCommercialAssignment extends Model implements CompanyWide
     public const LIFECYCLE_ENDED_DENIED = 'ended_denied';
     public const LIFECYCLE_SCHEDULED_CANCELLATION = 'scheduled_cancellation';
     public const LIFECYCLE_REVOKED = 'revoked';
+    public const LIFECYCLE_EXPIRED = 'expired';
 
     protected $fillable = [
         'tenant_id', 'source_type', 'commercial_plan_version_id', 'commercial_product_version_id',

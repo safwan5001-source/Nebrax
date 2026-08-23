@@ -31,6 +31,9 @@ interface ApplicationEntry {
   commercial?: {
     availability: CommercialAvailability;
     source_count: number;
+    trial_until?: string | null;
+    cancels_at?: string | null;
+    expired?: boolean;
   };
   effective_access?: EffectiveAccess;
   dependency_status?: 'satisfied' | 'missing' | 'not_applicable';
@@ -143,6 +146,16 @@ export default function ApplicationsPage() {
     return <Badge tone={commercialTone[commercial]}>{t(`commercial.${commercial}`)}</Badge>;
   }
 
+  function commercialDetail(app: ApplicationEntry) {
+    const commercial = app.commercial;
+    if (!commercial) return null;
+    const date = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
+    if (commercial.trial_until) return <p className="mt-1 text-xs text-muted">{t('commercialDetails.trialUntil', { date: date(commercial.trial_until) })}</p>;
+    if (commercial.cancels_at) return <p className="mt-1 text-xs text-muted">{t('commercialDetails.cancelsAt', { date: date(commercial.cancels_at) })}</p>;
+    if (commercial.expired) return <p className="mt-1 text-xs text-muted">{t('commercialDetails.expired')}</p>;
+    return null;
+  }
+
   function accessBadge(app: ApplicationEntry) {
     const access = accessFor(app);
     return <Badge tone={accessTone[access]}>{t(`access.${access}`)}</Badge>;
@@ -213,13 +226,13 @@ export default function ApplicationsPage() {
                     <th className="px-3 py-3 font-medium">{t('columns.name')}</th><th className="px-3 py-3 font-medium">{t('columns.group')}</th><th className="px-3 py-3 font-medium">{t('columns.commercial')}</th><th className="px-3 py-3 font-medium">{t('columns.access')}</th><th className="px-3 py-3 font-medium">{t('columns.operational')}</th><th className="px-3 py-3 font-medium">{t('columns.dependencies')}</th><th className="px-3 py-3 text-end font-medium">{t('columns.actions')}</th>
                   </tr></thead>
                   <tbody>{visible.map((app) => <tr key={app.key} className={`border-b border-border/70 last:border-0 ${app.maturity !== 'built' ? 'opacity-70' : ''}`}>
-                    <td className="px-3 py-3 font-medium text-text">{labelFor(app.key)}</td><td className="px-3 py-3 text-muted">{groupLabels[app.group] ?? app.group}</td><td className="px-3 py-3">{commercialBadge(app)}</td><td className="px-3 py-3">{accessBadge(app)}</td><td className="px-3 py-3">{operationalBadge(app)}</td><td className="px-3 py-3">{dependencyBadge(app)}</td><td className="px-3 py-3 text-end">{actionsCell(app)}</td>
+                    <td className="px-3 py-3 font-medium text-text">{labelFor(app.key)}</td><td className="px-3 py-3 text-muted">{groupLabels[app.group] ?? app.group}</td><td className="px-3 py-3">{commercialBadge(app)}{commercialDetail(app)}</td><td className="px-3 py-3">{accessBadge(app)}</td><td className="px-3 py-3">{operationalBadge(app)}</td><td className="px-3 py-3">{dependencyBadge(app)}</td><td className="px-3 py-3 text-end">{actionsCell(app)}</td>
                   </tr>)}</tbody>
                 </table>
               </div>
               <div className="space-y-3 lg:hidden">{visible.map((app) => <article key={app.key} className={`rounded-md border border-border p-3 ${app.maturity !== 'built' ? 'opacity-70' : ''}`}>
                 <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="font-medium text-text">{labelFor(app.key)}</h2><p className="mt-1 text-sm text-muted">{groupLabels[app.group] ?? app.group}</p></div>{operationalBadge(app)}</div>
-                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3 border-t border-border pt-3 text-xs"><div><dt className="text-muted">{t('columns.commercial')}</dt><dd className="mt-1">{commercialBadge(app)}</dd></div><div><dt className="text-muted">{t('columns.access')}</dt><dd className="mt-1">{accessBadge(app)}</dd></div><div><dt className="text-muted">{t('columns.dependencies')}</dt><dd className="mt-1">{dependencyBadge(app)}</dd></div><div><dt className="text-muted">{t('columns.operational')}</dt><dd className="mt-1">{operationalBadge(app)}</dd></div></dl>
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3 border-t border-border pt-3 text-xs"><div><dt className="text-muted">{t('columns.commercial')}</dt><dd className="mt-1">{commercialBadge(app)}{commercialDetail(app)}</dd></div><div><dt className="text-muted">{t('columns.access')}</dt><dd className="mt-1">{accessBadge(app)}</dd></div><div><dt className="text-muted">{t('columns.dependencies')}</dt><dd className="mt-1">{dependencyBadge(app)}</dd></div><div><dt className="text-muted">{t('columns.operational')}</dt><dd className="mt-1">{operationalBadge(app)}</dd></div></dl>
                 <div className="mt-3 border-t border-border pt-3">{actionsCell(app)}</div>
               </article>)}</div>
             </>
