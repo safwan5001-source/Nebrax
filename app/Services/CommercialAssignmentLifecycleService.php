@@ -159,7 +159,9 @@ class CommercialAssignmentLifecycleService
         $this->grants->revokeGrantGroup($assignment->tenant, $assignment->id, $administrator?->id, $at);
         $assignment->forceFill([
             'status' => 'ended',
-            'lifecycle_state' => TenantCommercialAssignment::LIFECYCLE_ENDED_DENIED,
+            'lifecycle_state' => $assignment->source_type === TenantCommercialAssignment::SOURCE_TRIAL
+                ? TenantCommercialAssignment::LIFECYCLE_EXPIRED
+                : TenantCommercialAssignment::LIFECYCLE_ENDED_DENIED,
             'ended_at' => $at,
         ])->save();
         $this->event($assignment, $administrator, TenantCommercialAssignmentEvent::ACTION_EXPIRED, $at, $reason);
