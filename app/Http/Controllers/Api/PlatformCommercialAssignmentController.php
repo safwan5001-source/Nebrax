@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\CommercialAssignmentLifecycleRequest;
+use App\Http\Requests\CommercialAssignmentLifecycleDateRequest;
 use App\Http\Requests\CommercialAssignmentPreviewRequest;
 use App\Http\Requests\CommercialAssignmentStoreRequest;
 use App\Models\CommercialPlanVersion;
@@ -11,13 +12,17 @@ use App\Models\PlatformAdministrator;
 use App\Models\Tenant;
 use App\Models\TenantCommercialAssignment;
 use App\Services\CommercialAssignmentService;
+use App\Services\CommercialAssignmentLifecycleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PlatformCommercialAssignmentController extends ApiController
 {
-    public function __construct(private CommercialAssignmentService $assignments) {}
+    public function __construct(
+        private CommercialAssignmentService $assignments,
+        private CommercialAssignmentLifecycleService $lifecycle,
+    ) {}
 
     public function index(Tenant $tenant): JsonResponse
     {
@@ -74,6 +79,36 @@ class PlatformCommercialAssignmentController extends ApiController
         return response()->json(['data' => $this->assignmentData($assignment)], $assignment->wasRecentlyCreated ? 201 : 200);
     }
 
+    public function paymentFailure(CommercialAssignmentLifecycleDateRequest $request, TenantCommercialAssignment $assignment): JsonResponse
+    {
+        $data = $request->validated();
+        return response()->json([
+            'data' => $this->assignmentData($this->lifecycle->recordPaymentFailure(
+                $assignment, $this->administrator($request), CarbonImmutable::parse($data['effective_at'], 'UTC'), $data['reason'] ?? null,
+            )),
+        ]);
+    }
+
+    public function scheduleCancellation(CommercialAssignmentLifecycleDateRequest $request, TenantCommercialAssignment $assignment): JsonResponse
+    {
+        $data = $request->validated();
+        return response()->json([
+            'data' => $this->assignmentData($this->lifecycle->scheduleCancellation(
+                $assignment, $this->administrator($request), CarbonImmutable::parse($data['effective_at'], 'UTC'), $data['reason'] ?? null,
+            )),
+        ]);
+    }
+
+    public function reconcile(CommercialAssignmentLifecycleDateRequest $request, TenantCommercialAssignment $assignment): JsonResponse
+    {
+        $data = $request->validated();
+        return response()->json([
+            'data' => $this->assignmentData($this->lifecycle->reconcile(
+                $assignment, $this->administrator($request), CarbonImmutable::parse($data['effective_at'], 'UTC'), $data['reason'] ?? null,
+            )),
+        ]);
+    }
+
     public function cancel(CommercialAssignmentLifecycleRequest $request, TenantCommercialAssignment $assignment): JsonResponse
     {
         return response()->json([
@@ -108,6 +143,10 @@ class PlatformCommercialAssignmentController extends ApiController
             'product_version_id' => $assignment->commercial_product_version_id,
             'starts_at' => $assignment->starts_at?->toIso8601String(),
             'ends_at' => $assignment->ends_at?->toIso8601String(),
+            'lifecycle_state' => $assignment->lifecycle_state,
+            'payment_failed_at' => $assignment->payment_failed_at?->toIso8601String(),
+            'scheduled_cancellation_at' => $assignment->scheduled_cancellation_at?->toIso8601String(),
+            'ended_at' => $assignment->ended_at?->toIso8601String(),
             'cancelled_at' => $assignment->cancelled_at?->toIso8601String(),
             'revoked_at' => $assignment->revoked_at?->toIso8601String(),
             'reason' => $assignment->reason,
