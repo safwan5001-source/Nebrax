@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 30229)
-Total output lines: 2271
-
 // بيانات وهمية واقعية لوضع المعاينة (Demo). كل المبالغ بالريال كنصوص (مثل ما يعيده الـ API)
 // لأن التحويل من الهللات يتم في طبقة موارد الـ backend. لا يُستخدم أي float في حساب مالي حقيقي هنا.
 
@@ -1156,7 +1153,24 @@ export const mockTrialBalance = {
     { code: '3110', name: 'رأس المال', debit: '0.00', credit: '138000.00' },
     { code: '4110', name: 'إيرادات المبيعات', debit: '0.00', credit: '482500.00' },
     { code: '5110', name: 'تكلفة البضاعة المباعة', debit: '264660.00', credit: '0.00' },
-    { code: '5120', name: 'الرواتب وال…229 tokens truncated…,
+    { code: '5120', name: 'الرواتب والأجور', debit: '54150.00', credit: '0.00' },
+    { code: '5140', name: 'الوقود', debit: '3810.00', credit: '0.00' },
+  ],
+  total_debit: '701060.00',
+  total_credit: '701060.00',
+  balanced: true,
+};
+
+export const mockCostCenterProfit = {
+  rows: [
+    { cost_center_id: 'cc-1', code: 'CC-DMM', name: 'فرع الدمام', revenue: '210000.00', expense: '84300.00', profit: '125700.00' },
+    { cost_center_id: 'cc-2', code: 'CC-KHB', name: 'فرع الخبر', revenue: '148000.00', expense: '96500.00', profit: '51500.00' },
+    { cost_center_id: 'cc-3', code: 'CC-JBL', name: 'فرع الجبيل', revenue: '124500.00', expense: '132000.00', profit: '-7500.00' },
+    { cost_center_id: 'cc-4', code: 'CC-ADM', name: 'الإدارة العامة', revenue: '0.00', expense: '18750.00', profit: '-18750.00' },
+  ],
+  total_revenue: '482500.00',
+  total_expense: '331550.00',
+  total_profit: '150950.00',
 };
 
 // تقارير الحسابات العامة في وضع العرض: تطابق عقود Laravel الحقيقية كي يبقى
