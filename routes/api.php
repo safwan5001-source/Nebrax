@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FuelAviController;
 use App\Http\Controllers\Api\FuelStationMasterDataController;
 use App\Http\Controllers\Api\FuelStationDeviceController;
+use App\Http\Controllers\Api\FuelStationReadinessController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelShiftController;
@@ -592,6 +593,30 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('fuel-stations/integration-events', [FuelStationDeviceController::class, 'indexEvents'])->middleware([$perm('fuel.integration.view'), $commercialApp('fuel_stations.integrations')]);
         Route::post('fuel-stations/devices/{id}/simulate-event', [FuelStationDeviceController::class, 'simulate'])->middleware([$perm('fuel.integration.ingest'), $commercialApp('fuel_stations.integrations', 'write')]);
         Route::post('fuel-stations/integration-events/{id}/retry', [FuelStationDeviceController::class, 'retry'])->middleware([$perm('fuel.integration.retry'), $commercialApp('fuel_stations.integrations', 'write')]);
+
+        // Cycle 9: الصيانة والسلامة والتقارير قراءةً من الحقائق الرسمية فقط؛ لا
+        // تفتح جهازاً ولا تنشئ قيداً أو مصروفاً أو أثراً مخزونياً مستقلاً.
+        Route::get('fuel-stations/maintenance', [FuelStationReadinessController::class, 'maintenance'])->middleware([$perm('fuel.maintenance.view'), $commercialApp('fuel_stations.maintenance')]);
+        Route::post('fuel-stations/maintenance/schedules', [FuelStationReadinessController::class, 'storeSchedule'])->middleware([$perm('fuel.maintenance.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/maintenance/work-orders', [FuelStationReadinessController::class, 'storeWorkOrder'])->middleware([$perm('fuel.maintenance.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/maintenance/work-orders/{id}/transition', [FuelStationReadinessController::class, 'transitionWorkOrder'])->middleware([$perm('fuel.maintenance.transition'), $commercialApp('fuel_stations.maintenance', 'write')]);
+
+        Route::get('fuel-stations/safety', [FuelStationReadinessController::class, 'safety'])->middleware([$perm('fuel.safety.view'), $commercialApp('fuel_stations.maintenance')]);
+        Route::post('fuel-stations/safety/inspections', [FuelStationReadinessController::class, 'storeInspection'])->middleware([$perm('fuel.safety.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/safety/inspections/{id}/perform', [FuelStationReadinessController::class, 'performInspection'])->middleware([$perm('fuel.safety.inspect'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/safety/findings/{id}/corrective-actions', [FuelStationReadinessController::class, 'storeCorrectiveAction'])->middleware([$perm('fuel.safety.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/safety/corrective-actions/{id}/transition', [FuelStationReadinessController::class, 'transitionCorrectiveAction'])->middleware([$perm('fuel.safety.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/safety/inspections/{id}/verify', [FuelStationReadinessController::class, 'verifyInspection'])->middleware([$perm('fuel.safety.verify'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/safety/inspections/{id}/close', [FuelStationReadinessController::class, 'closeInspection'])->middleware([$perm('fuel.safety.verify'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/safety/permits', [FuelStationReadinessController::class, 'storePermit'])->middleware([$perm('fuel.safety.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+
+        Route::get('fuel-stations/alerts', [FuelStationReadinessController::class, 'alerts'])->middleware([$perm('fuel.alerts.view'), $commercialApp('fuel_stations.maintenance')]);
+        Route::post('fuel-stations/alerts/scan', [FuelStationReadinessController::class, 'scanAlerts'])->middleware([$perm('fuel.alerts.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/alerts/{id}/acknowledge', [FuelStationReadinessController::class, 'acknowledgeAlert'])->middleware([$perm('fuel.alerts.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+        Route::post('fuel-stations/alerts/{id}/assign', [FuelStationReadinessController::class, 'assignAlert'])->middleware([$perm('fuel.alerts.manage'), $commercialApp('fuel_stations.maintenance', 'write')]);
+
+        Route::get('fuel-stations/dashboard', [FuelStationReadinessController::class, 'dashboard'])->middleware([$perm('fuel.reports.view'), $commercialApp('fuel_stations.maintenance')]);
+        Route::get('fuel-stations/reports/{family}', [FuelStationReadinessController::class, 'report'])->middleware([$perm('fuel.reports.view'), $commercialApp('fuel_stations.maintenance')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));

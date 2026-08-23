@@ -13,6 +13,8 @@ use App\Models\EmployeeCustodySettlement;
 use App\Models\Expense;
 use App\Models\FuelShift;
 use App\Models\FuelSale;
+use App\Models\FuelStationSafetyInspection;
+use App\Models\FuelStationWorkOrder;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\ManualJournal;
@@ -169,6 +171,16 @@ class DocumentNumberingCatalog
             'model'  => FuelSale::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'FSL']],
+        ],
+        'fuel_maintenance_work_order' => [
+            'model'  => FuelStationWorkOrder::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'FMWO']],
+        ],
+        'fuel_safety_inspection' => [
+            'model'  => FuelStationSafetyInspection::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'FSIN']],
         ],
         'corporate_fuel_contract' => [
             'model'  => CorporateFuelContract::class,

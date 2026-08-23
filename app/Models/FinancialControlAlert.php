@@ -26,6 +26,8 @@ class FinancialControlAlert extends BaseModel
         'last_detected_at',
         'resolved_at',
         'acknowledged_by',
+        'assigned_to',
+        'assignment_reason',
         'acknowledged_at',
         'acknowledgement_note',
     ];
@@ -41,5 +43,10 @@ class FinancialControlAlert extends BaseModel
     public function acknowledgedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'acknowledged_by');
+    }
+
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
     }
 }
