@@ -160,6 +160,8 @@ return new class extends Migration
             $table->string('reason', 500)->nullable();
             $table->foreignUuid('performed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('occurred_at')->useCurrent();
+            // BaseModel يضبط timestamps؛ يبقى الصف append-only رغم وجود updated_at.
+            $table->timestamps();
 
             $table->index(['tenant_id', 'branch_id', 'subject_type', 'subject_id', 'occurred_at'], 'fuel_readiness_event_subject_index');
         });
