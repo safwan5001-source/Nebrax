@@ -234,9 +234,28 @@ class FuelStationSettingsService
 
     private function assertValue(string $key, mixed $value): void
     {
-        if (in_array($key, ['reconciliation_tolerance_absolute_milliliters', 'reconciliation_tolerance_basis_points'], true)) {
+        $shiftBooleanKeys = [
+            'shift_opening_meter_reading_required', 'shift_opening_tank_reading_required',
+            'shift_opening_cash_float_required', 'shift_closing_meter_reading_required',
+            'shift_closing_tank_reading_required', 'shift_mandatory_staff_assignment',
+            'shift_mandatory_cash_count', 'shift_supervisor_approval_required',
+            'shift_allow_close_with_pending_cash_variance', 'shift_allow_close_with_unresolved_operational_variance',
+        ];
+        if (in_array($key, $shiftBooleanKeys, true)) {
+            if (! is_bool($value)) {
+                throw new RuntimeException('سياسة الشفت يجب أن تكون قيمة منطقية صريحة.');
+            }
+
+            return;
+        }
+
+        $nonNegativeIntegerKeys = [
+            'reconciliation_tolerance_absolute_milliliters', 'reconciliation_tolerance_basis_points',
+            'shift_meter_tolerance_milliliters', 'shift_tank_tolerance_milliliters',
+        ];
+        if (in_array($key, $nonNegativeIntegerKeys, true)) {
             if (! is_int($value) || $value < 0 || ($key === 'reconciliation_tolerance_basis_points' && $value > 1000000)) {
-                throw new RuntimeException('حدود تسوية الوقود يجب أن تكون أعداداً صحيحة غير سالبة ضمن المدى المسموح.');
+                throw new RuntimeException('حدود محطات الوقود يجب أن تكون أعداداً صحيحة غير سالبة ضمن المدى المسموح.');
             }
 
             return;

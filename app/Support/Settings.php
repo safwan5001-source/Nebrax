@@ -240,6 +240,21 @@ class Settings
             'grni_account_id' => null,
             'device_event_max_lateness_seconds' => 86400,
             'offline_event_retention_days' => 30,
+            // Cycle 4: سياسات الشفت التشغيلي؛ لا تنشئ بيعاً أو دفعة أو قيداً.
+            'shift_opening_meter_reading_required' => true,
+            'shift_opening_tank_reading_required' => true,
+            'shift_opening_cash_float_required' => true,
+            'shift_closing_meter_reading_required' => true,
+            'shift_closing_tank_reading_required' => true,
+            'shift_mandatory_staff_assignment' => false,
+            'shift_mandatory_cash_count' => true,
+            'shift_supervisor_approval_required' => true,
+            // A2: الفرق يبقى pending_review؛ هذا المفتاح يحدد منع الإغلاق لا تسويته.
+            'shift_allow_close_with_pending_cash_variance' => true,
+            // فرق الخزان التشغيلي لا يغيّر Book Stock؛ يمنع الإغلاق فقط إن اختار المستأجر ذلك.
+            'shift_allow_close_with_unresolved_operational_variance' => true,
+            'shift_meter_tolerance_milliliters' => 0,
+            'shift_tank_tolerance_milliliters' => 0,
         ],
     ];
 
