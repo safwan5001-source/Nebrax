@@ -26,9 +26,11 @@ failed scan states, fail-closed quarantine, and short-lived signed downloads. De
 retention is 365 days and remains configurable. No OCR, queue, worker, automatic scanner,
 public object URL, provider-secret API, purge endpoint, or transaction creation belongs here.
 
-### PR-3 — Processing orchestration
+### PR-3 — Processing orchestration and platform integrations
 
-**Gate before implementation:** select queue/worker technology, deployment topology, idempotency, concurrency, retries, dead-letter handling, and observability. Add processing attempts/runs and worker orchestration without provider-specific extraction data.
+**Accepted implementation:** establish Laravel Redis queue contracts for a future persistent private Render Key Value service with the `noeviction` policy and a dedicated worker on the `documents` queue. PR-3 does not provision those paid services and leaves processing disabled by default. Processing runs are branch-scoped and idempotent per file/stage, jobs rebuild trusted tenant and branch contexts and clear them in `finally`, retries are bounded, failures are stored only as safe codes/messages, and worker heartbeat plus run counts are visible to platform administrators after activation.
+
+The platform administration console owns encrypted operational settings for private document storage, ClamAV TCP scanning, processing policy, and a deferred AI credential profile. Secret values are masked after save and configuration changes require the current platform administrator password. Bootstrap secrets such as `APP_KEY`, database credentials, and `REDIS_URL` remain deployment-managed. After the operator activates both processing and scanning and provides a real asynchronous queue, this phase queues malware scanning after intake; while inactive it creates no processing run. It adds no OCR, AI extraction, matching, transaction creation, posting, journal, or inventory behavior.
 
 ### PR-4 — Extraction provider
 

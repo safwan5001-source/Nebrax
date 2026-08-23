@@ -57,7 +57,7 @@ jobs:
       #  الـ CI هنا** برسالة تقول أين يُضاف.
       - name: حارس قائمة النسخ
         run: |
-          ALLOWED="app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware \
+          ALLOWED="app/Contracts app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware \
                    app/Services/Reporting app/Services/PrintTemplates app/Support app/Tenancy \
                    app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Providers \
@@ -96,7 +96,7 @@ jobs:
       - name: تثبيت Sanctum + تخزين S3/R2 + تفعيل مسارات API
         working-directory: ${{ env.APP_DIR }}
         run: |
-          composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 --quiet
+          composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 --quiet
           php artisan install:api --no-interaction --quiet || true
           rm -f database/migrations/*_create_personal_access_tokens_table.php
 
@@ -104,11 +104,13 @@ jobs:
         run: |
           CORE="$GITHUB_WORKSPACE"
           cd "$APP_DIR"
-          mkdir -p app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
+          mkdir -p app/Contracts app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
                    app/Models/Concerns tests/Feature routes config
           cp -r "$CORE/app/Models/"*.php                  app/Models/
+          cp -r "$CORE/app/Contracts/"*.php                app/Contracts/
+          cp -r "$CORE/app/Jobs/DocumentCenter/"*.php      app/Jobs/DocumentCenter/
           # المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
           cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
           cp -r "$CORE/app/Services/"*.php                app/Services/ 2>/dev/null || true
@@ -138,6 +140,8 @@ jobs:
         run: |
           grep -q "TenancyServiceProvider" bootstrap/providers.php || \
             sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
+          grep -q "DocumentCenterServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\DocumentCenterServiceProvider::class,|" bootstrap/providers.php
           rm -f database/migrations/0001_01_01_000000_create_users_table.php
 
       - name: تهيئة قاعدة البيانات (${{ matrix.db }})

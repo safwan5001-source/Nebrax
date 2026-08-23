@@ -18,6 +18,7 @@ class DocumentFileIntakeService
         private readonly DocumentFileInspector $inspector,
         private readonly DocumentStorageService $storage,
         private readonly DocumentWorkflowService $workflow,
+        private readonly DocumentProcessingService $processing,
     ) {
     }
 
@@ -99,7 +100,7 @@ class DocumentFileIntakeService
             throw ValidationException::withMessages(['batch' => 'يجب أن تكون الحزمة قيد الاستقبال وتحتوي ملفًا واحدًا على الأقل.']);
         }
 
-        return $this->workflow->transition(
+        $completed = $this->workflow->transition(
             $batch,
             DocumentWorkflowStatus::RECEIVED,
             'file_intake_completed',
@@ -108,6 +109,9 @@ class DocumentFileIntakeService
             null,
             ['file_count' => $batch->files()->count()],
         );
+        $this->processing->queueSafetyScans($completed);
+
+        return $completed;
     }
 
     private function objectKey(DocumentBatch $batch, string $extension): string

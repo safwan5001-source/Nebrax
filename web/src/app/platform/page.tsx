@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Building2, LogOut, RefreshCw, ShieldCheck, Tag, Users2, UsersRound } from 'lucide-react';
+import { Building2, LogOut, RefreshCw, ServerCog, ShieldCheck, Tag, Users2, UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -122,6 +122,10 @@ export default function PlatformDashboardPage() {
             <Button variant="outline" size="sm" onClick={() => router.push('/platform/prices')}>
               <Tag className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('managePrices')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => router.push('/platform/integrations')}>
+              <ServerCog className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              {t('manageIntegrations')}
             </Button>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
