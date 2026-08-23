@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CommercialProduct;
 use App\Models\FuelStation;
+use App\Models\FuelStationDevice;
 use App\Models\FuelStationConfigurationEvent;
 use App\Models\FuelStationIntegrationEvent;
 use App\Models\Tenant;
@@ -87,6 +88,13 @@ class FuelStationsFoundationTest extends TestCase
         $auth = $this->registerTenant();
         app(TenantContext::class)->set($auth['tenant_id']);
         $station = FuelStation::create(['code' => 'FS-002', 'name' => 'محطة الساحة']);
+        FuelStationDevice::create([
+            'fuel_station_id' => $station->id,
+            'device_key' => 'atg-01',
+            'name' => 'وحدة قياس الخزان',
+            'device_type' => FuelStationDevice::TYPE_ATG,
+            'adapter_key' => 'generic-atg',
+        ]);
         $service = app(FuelStationIntegrationEventService::class);
         $identity = new FuelStationDeviceIdentity($station->id, 'atg-01', 'generic-atg', 'tank-console-01');
         $event = new FuelStationNormalizedEvent('evt-001', FuelStationEventType::ATG_READING_RECORDED, CarbonImmutable::parse('2026-08-23 00:00:00Z'), ['reading' => ['volume_liters' => 1200, 'temperature' => 27]], 42, 'corr-001');

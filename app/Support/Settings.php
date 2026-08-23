@@ -240,6 +240,12 @@ class Settings
             'grni_account_id' => null,
             'device_event_max_lateness_seconds' => 86400,
             'offline_event_retention_days' => 30,
+            // Cycle 8: حماية منصة أجهزة الساحة. هذه القيم تضبط قبول الدليل
+            // المعياري وصحته فقط ولا تمنح جهازاً سلطة بيع أو جرد أو قيد.
+            'device_max_future_skew_seconds' => 300,
+            'device_offline_after_seconds' => 300,
+            'device_max_retry_attempts' => 3,
+            'device_simulated_ingress_enabled' => true,
             // Cycle 4: سياسات الشفت التشغيلي؛ لا تنشئ بيعاً أو دفعة أو قيداً.
             'shift_opening_meter_reading_required' => true,
             'shift_opening_tank_reading_required' => true,

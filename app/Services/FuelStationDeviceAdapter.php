@@ -10,6 +10,12 @@ namespace App\Services;
  */
 interface FuelStationDeviceAdapter
 {
+    /** مفتاح ثابت غير سري يطابق adapter_key في سجل الجهاز. */
+    public function adapterKey(): string;
+
+    /** @return list<string> أنواع FuelStationDevice التي يقبلها المحول. */
+    public function supportedDeviceTypes(): array;
+
     /** @param array<string, mixed> $payload */
     public function normalize(FuelStationDeviceIdentity $source, array $payload): FuelStationNormalizedEvent;
 }

@@ -108,4 +108,9 @@ class FuelStation extends BaseModel implements CompanyWide
     {
         return $this->hasMany(FuelStationIntegrationEvent::class);
     }
+
+    public function devices(): HasMany
+    {
+        return $this->hasMany(FuelStationDevice::class);
+    }
 }
