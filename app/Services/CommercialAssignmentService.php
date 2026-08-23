@@ -15,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Closure;
 use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 
 class CommercialAssignmentService
@@ -150,20 +151,28 @@ class CommercialAssignmentService
         ], JSON_THROW_ON_ERROR));
 
         return $this->withTenantContext($tenant, fn (): TenantCommercialAssignment => DB::transaction(function () use ($tenant, $administrator, $sourceType, $version, $start, $end, $reason, $identity): TenantCommercialAssignment {
-            $assignment = TenantCommercialAssignment::query()->firstOrCreate(
-                ['tenant_id' => $tenant->id, 'idempotency_key' => $identity],
-                [
-                    'source_type' => $sourceType,
-                    'commercial_plan_version_id' => $sourceType === TenantCommercialAssignment::SOURCE_PLAN ? $version->id : null,
-                    'commercial_product_version_id' => $sourceType === TenantCommercialAssignment::SOURCE_ADDON ? $version->id : null,
-                    'status' => TenantCommercialAssignment::STATUS_ACTIVE,
-                    'starts_at' => $start,
-                    'ends_at' => $end,
-                    'assigned_by_platform_administrator_id' => $administrator?->id,
-                    'reason' => $this->normalizedReason($reason),
-                    'metadata' => ['commercial_version_id' => $version->id],
-                ],
-            );
+            try {
+                $assignment = DB::transaction(fn (): TenantCommercialAssignment => TenantCommercialAssignment::query()->firstOrCreate(
+                    ['tenant_id' => $tenant->id, 'idempotency_key' => $identity],
+                    [
+                        'source_type' => $sourceType,
+                        'commercial_plan_version_id' => $sourceType === TenantCommercialAssignment::SOURCE_PLAN ? $version->id : null,
+                        'commercial_product_version_id' => $sourceType === TenantCommercialAssignment::SOURCE_ADDON ? $version->id : null,
+                        'status' => TenantCommercialAssignment::STATUS_ACTIVE,
+                        'starts_at' => $start,
+                        'ends_at' => $end,
+                        'assigned_by_platform_administrator_id' => $administrator?->id,
+                        'reason' => $this->normalizedReason($reason),
+                        'metadata' => ['commercial_version_id' => $version->id],
+                    ],
+                ));
+            } catch (QueryException $exception) {
+                $assignment = TenantCommercialAssignment::query()
+                    ->where('tenant_id', $tenant->id)
+                    ->where('idempotency_key', $identity)
+                    ->first();
+                if ($assignment === null) throw $exception;
+            }
 
             if ($assignment->wasRecentlyCreated) {
                 $this->recordEvent($assignment, $administrator, TenantCommercialAssignmentEvent::ACTION_ASSIGNED, $start, $reason);
