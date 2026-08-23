@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import {
-  Archive, Building2, ChevronDown, CircleDot, History, Languages, LogOut,
+  Archive, Banknote, Building2, ChevronDown, CircleDot, History, Languages, LogOut,
   MoreHorizontal, Moon, Power, ReceiptText, Repeat2, RotateCcw, Settings,
   Sun, UserRound, Warehouse,
 } from 'lucide-react';
@@ -26,10 +26,13 @@ export function PosTopbar({
   onManageSession,
   onOpenHeld,
   onOpenRecentInvoices,
+  onOpenCashDrawer,
   onReturn,
   onExchange,
   onLogout,
   exchangeDisabled = false,
+  cashDrawerDisabled = true,
+  cashDrawerBusy = false,
 }: {
   cashier: string;
   branch: string;
@@ -42,10 +45,13 @@ export function PosTopbar({
   onManageSession?: () => void;
   onOpenHeld?: () => void;
   onOpenRecentInvoices?: () => void;
+  onOpenCashDrawer?: () => void;
   onReturn?: () => void;
   onExchange?: () => void;
   onLogout?: () => void;
   exchangeDisabled?: boolean;
+  cashDrawerDisabled?: boolean;
+  cashDrawerBusy?: boolean;
 }) {
   const t = useTranslations('pos');
   const tc = useTranslations('common');
@@ -126,7 +132,7 @@ export function PosTopbar({
           aria-label={t('recent_pos_invoices')}
         >
           <ReceiptText className="h-4 w-4" strokeWidth={1.7} />
-          <span className="hidden 2xl:inline">{t('recent_pos_invoices')}</span>
+          <span className="hidden xl:inline">{t('recent_pos_invoices')}</span>
         </button>
         <button
           type="button"
@@ -181,6 +187,13 @@ export function PosTopbar({
                 {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>)}
               </select>
             </label>
+          )}
+          <div className="my-1 border-t border-border" />
+          <DropdownItem icon={Banknote} onClick={onOpenCashDrawer} disabled={cashDrawerDisabled}>
+            {cashDrawerBusy ? t('cash_drawer_opening') : t('sc_drawer')}
+          </DropdownItem>
+          {cashDrawerDisabled && (
+            <p className="px-3 pb-2 text-xs leading-relaxed text-muted">{t('cash_drawer_unavailable')}</p>
           )}
           <div className="my-1 border-t border-border" />
           <DropdownItem icon={RotateCcw} onClick={onReturn} disabled={!session}>{t('return_action')}</DropdownItem>

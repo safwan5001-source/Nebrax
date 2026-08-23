@@ -49,6 +49,9 @@ interface PosConfig {
   default_payment_method_id: string | null;
   allow_deferred_payment: boolean;
   show_product_images: boolean;
+  cash_drawer_enabled: boolean;
+  cash_drawer_driver: string;
+  cash_drawer_auto_open_after_cash: boolean;
 }
 const POS_DEFAULTS: PosConfig = {
   default_customer: WALKIN,
@@ -64,6 +67,9 @@ const POS_DEFAULTS: PosConfig = {
   default_payment_method_id: null,
   allow_deferred_payment: true,
   show_product_images: true,
+  cash_drawer_enabled: false,
+  cash_drawer_driver: 'unavailable',
+  cash_drawer_auto_open_after_cash: false,
 };
 
 interface PosUnit { name: string; factor: number; price: string }
@@ -140,6 +146,7 @@ export default function PosPage() {
   const [exchangeOpen, setExchangeOpen] = useState(false);
   const [countedBal, setCountedBal] = useState('');
   const [sessionBusy, setSessionBusy] = useState(false);
+  const [drawerBusy, setDrawerBusy] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const ts = useTranslations('posSessions');
 
@@ -408,6 +415,25 @@ export default function PosPage() {
     } catch { setHeldCount(0); }
   }, [session?.id]);
   useEffect(() => { void refreshHeldCount(); }, [refreshHeldCount]);
+
+  async function openCashDrawer() {
+    if (!session || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable') {
+      errorToast(t('cash_drawer_unavailable'));
+      return;
+    }
+    setDrawerBusy(true);
+    try {
+      await api(`/pos-sessions/${session.id}/cash-drawer/open`, {
+        method: 'POST',
+        body: { reason: t('cash_drawer_manual_reason') },
+      });
+      success(t('cash_drawer_opened'));
+    } catch (err) {
+      errorToast(err instanceof ApiError ? err.message : t('cash_drawer_open_failed'));
+    } finally {
+      setDrawerBusy(false);
+    }
+  }
 
   // تعليق السلة الخادمي: لا فاتورة ولا قبض ولا قيد ولا حركة مخزون قبل الدفع.
   async function holdSale() {
@@ -1013,6 +1039,9 @@ export default function PosPage() {
         onManageSession={() => (session ? (setCountedBal(''), setSessionError(null), setCloseOpen(true)) : router.push('/dashboard'))}
         onOpenHeld={() => setRetrieveOpen(true)}
         onOpenRecentInvoices={() => setRecentInvoicesOpen(true)}
+        onOpenCashDrawer={() => void openCashDrawer()}
+        cashDrawerDisabled={!session || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable' || drawerBusy}
+        cashDrawerBusy={drawerBusy}
         onReturn={() => setReturnOpen(true)}
         onExchange={() => setExchangeOpen(true)}
         onLogout={requestLogout}
