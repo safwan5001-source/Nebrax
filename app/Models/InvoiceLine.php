@@ -22,6 +22,8 @@ class InvoiceLine extends BaseModel implements CompanyWide
         'tenant_id', 'invoice_id', 'product_id', 'product_name_snapshot',
         'product_sku_snapshot', 'product_barcode_snapshot', 'description',
         'quantity', 'unit_name', 'unit_factor', 'unit_price', 'unit_price_before_tax', 'tax_rate',
+        'quantity_numerator', 'quantity_denominator', 'pricing_numerator', 'pricing_denominator',
+        'rounded_gross_minor', 'rounding_remainder_numerator', 'rounding_remainder_denominator', 'rounding_policy',
         'min_sale_price_snapshot', 'min_sale_price_override_reason', 'min_sale_price_overridden_by',
         'line_subtotal', 'line_discount', 'line_tax', 'line_total',
     ];
@@ -29,6 +31,9 @@ class InvoiceLine extends BaseModel implements CompanyWide
     protected $casts = [
         'quantity'      => 'integer',
         'unit_factor'   => 'integer',
+        'quantity_numerator' => 'integer',
+        'quantity_denominator' => 'integer',
+        'rounded_gross_minor' => 'integer',
         'unit_price'            => 'integer',
         'unit_price_before_tax' => 'integer',
         'min_sale_price_snapshot' => 'integer',

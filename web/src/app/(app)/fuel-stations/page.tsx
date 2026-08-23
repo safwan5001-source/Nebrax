@@ -68,7 +68,7 @@ export default function FuelStationsWorkspacePage() {
         <p className="mt-1 text-sm leading-relaxed text-muted">{t('subtitle')}</p>
       </header>
 
-      <div className="flex flex-wrap justify-end gap-2"><Link href="/fuel-stations/shifts"><Button>{t('manageShifts')}</Button></Link><Link href="/fuel-stations/receiving"><Button variant="outline">{t('manageReceiving')}</Button></Link><Link href="/fuel-stations/master-data"><Button variant="outline">{t('manageMasterData')}</Button></Link></div>
+      <div className="flex flex-wrap justify-end gap-2"><Link href="/fuel-stations/sales"><Button>{t('manageSales')}</Button></Link><Link href="/fuel-stations/shifts"><Button variant="outline">{t('manageShifts')}</Button></Link><Link href="/fuel-stations/receiving"><Button variant="outline">{t('manageReceiving')}</Button></Link><Link href="/fuel-stations/master-data"><Button variant="outline">{t('manageMasterData')}</Button></Link></div>
 
       <section className="grid gap-3 md:grid-cols-3" aria-label={t('status')}>
         <Card>

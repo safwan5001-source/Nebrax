@@ -31,6 +31,10 @@ class UpdateFuelStationSettingsRequest extends FormRequest
             'shift_allow_close_with_unresolved_operational_variance' => ['sometimes', 'nullable', 'boolean'],
             'shift_meter_tolerance_milliliters' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'shift_tank_tolerance_milliliters' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'fuel_price_tax_mode' => ['sometimes', 'nullable', 'in:tax_inclusive,tax_exclusive'],
+            'fuel_sales_allowed_payment_method_ids' => ['sometimes', 'nullable', 'array'],
+            'fuel_sales_allowed_payment_method_ids.*' => ['uuid', 'distinct'],
+            'fuel_sales_allow_deferred_payment' => ['sometimes', 'nullable', 'boolean'],
             'reason' => ['nullable', 'string', 'max:1000'],
         ];
     }

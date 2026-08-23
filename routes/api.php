@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FuelStationMasterDataController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelShiftController;
+use App\Http\Controllers\Api\FuelSaleController;
 use App\Http\Controllers\Api\FuelReconciliationController;
 use App\Http\Controllers\Api\FuelSupplyReceivingController;
 use App\Http\Controllers\Api\FinancialControlAlertController;
@@ -536,6 +537,16 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('fuel-stations/shifts/{id}/approve', [FuelShiftController::class, 'approve'])->middleware([$perm('fuel.shift.approve'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/cash-variance/review', [FuelShiftController::class, 'reviewCashVariance'])->middleware([$perm('fuel.shift.cash_variance_review'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/shifts/{id}/corrections', [FuelShiftController::class, 'requestCorrection'])->middleware([$perm('fuel.shift.correct'), $commercialApp('fuel_stations.core', 'write')]);
+
+        // Cycle 5 — بيع الوقود الرسمي: FuelSale → Invoice → Payment/Receipt منفصل.
+        Route::get('fuel-stations/sales', [FuelSaleController::class, 'index'])->middleware([$perm('fuel.sale.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/sales/{id}', [FuelSaleController::class, 'show'])->middleware([$perm('fuel.sale.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/sales', [FuelSaleController::class, 'store'])->middleware([$perm('fuel.sale.create'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/sales/{id}/finalize', [FuelSaleController::class, 'finalize'])->middleware([$perm('fuel.sale.finalize'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/stations/{stationId}/sale-payment-methods', [FuelSaleController::class, 'paymentMethods'])->middleware([$perm('fuel.sale.collect'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/sales/{id}/payments', [FuelSaleController::class, 'collectPayment'])->middleware([$perm('fuel.sale.collect'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::get('fuel-stations/prices', [FuelSaleController::class, 'priceIndex'])->middleware([$perm('fuel.sale.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/prices', [FuelSaleController::class, 'storePrice'])->middleware([$perm('fuel.sale.price.manage'), $commercialApp('fuel_stations.core', 'write')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));

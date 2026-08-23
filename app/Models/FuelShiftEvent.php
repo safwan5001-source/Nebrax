@@ -16,6 +16,8 @@ class FuelShiftEvent extends BaseModel
     public const TYPE_METER_RECORDED = 'meter_recorded';
     public const TYPE_TANK_RECORDED = 'tank_recorded';
     public const TYPE_CASH_MOVEMENT_RECORDED = 'cash_movement_recorded';
+    // Cycle 5: دليل مقارنة فقط؛ لا يغير cash movement أو فرق نقد Cycle 4.
+    public const TYPE_OFFICIAL_CASH_PAYMENT_RECORDED = 'official_cash_payment_recorded';
     public const TYPE_CLOSED = 'closed';
     public const TYPE_CASH_VARIANCE_PENDING = 'cash_variance_pending_review';
     public const TYPE_CASH_VARIANCE_REVIEWED = 'cash_variance_reviewed';

@@ -255,6 +255,14 @@ class Settings
             'shift_allow_close_with_unresolved_operational_variance' => true,
             'shift_meter_tolerance_milliliters' => 0,
             'shift_tank_tolerance_milliliters' => 0,
+            // Cycle 5: تسعير الوقود يملك وضع VAT صريحاً قابلاً للوراثة
+            // (المستأجر ثم المحطة). القيمة الفارغة ليست وضعاً تشغيلياً: تحلها
+            // الخدمة من onboarding/locale السعودي أو تفشل بوضوح خارج ذلك.
+            'fuel_price_tax_mode' => '', // tax_inclusive | tax_exclusive
+            // Cycle 5: تحصيل FuelSale الرسمي يمر دائماً عبر PaymentService.
+            // القائمة الفارغة تمنع التحصيل حتى يختار المستأجر طرقه النشطة صراحةً.
+            'fuel_sales_allowed_payment_method_ids' => [],
+            'fuel_sales_allow_deferred_payment' => false,
         ],
     ];
 
