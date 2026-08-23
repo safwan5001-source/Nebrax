@@ -1,5 +1,6 @@
 import { isDemo } from './demo';
 import { mockApi } from './mock-data';
+import { readDemoMediaFile } from './demo-product-store';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
@@ -79,7 +80,10 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
  * `URL.revokeObjectURL` عند الاستغناء عن الرابط (تبديل الصورة أو الفكّ).
  */
 export async function fetchImageUrl(path: string): Promise<string | null> {
-  if (isDemo()) return null;
+  if (isDemo()) {
+    const file = await readDemoMediaFile(path);
+    return file ? URL.createObjectURL(file) : null;
+  }
 
   const token = getToken();
   const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;

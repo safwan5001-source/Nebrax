@@ -1,7 +1,18 @@
+Warning: truncated output (original token count: 30229)
+Total output lines: 2271
+
 // بيانات وهمية واقعية لوضع المعاينة (Demo). كل المبالغ بالريال كنصوص (مثل ما يعيده الـ API)
 // لأن التحويل من الهللات يتم في طبقة موارد الـ backend. لا يُستخدم أي float في حساب مالي حقيقي هنا.
 
 import { DEMO_USER } from './demo';
+import {
+  deleteDemoProductMedia,
+  demoId,
+  listDemoProductMedia,
+  listDemoProducts,
+  saveDemoProduct,
+  saveDemoProductMedia,
+} from './demo-product-store';
 
 // ── العملاء ───────────────────────────────────────────────────────────────
 export interface MockPartner {
@@ -346,6 +357,48 @@ export const mockProducts: MockProduct[] = [
   product('pr7', 'SKU-007', 'رخصة برنامج سنوية', 'service', 'license', 1500, 0, false, 0, 0),
   product('pr8', 'SKU-008', 'عقد صيانة شهري', 'service', 'service', 400, 0, false, 0, 0, false),
 ];
+
+function allMockProducts(): MockProduct[] {
+  const stored = listDemoProducts() as unknown as MockProduct[];
+  const storedIds = new Set(stored.map((item) => item.id));
+  return [...stored, ...mockProducts.filter((item) => !storedIds.has(item.id))];
+}
+
+function productFromDemoInput(body: unknown): MockProduct {
+  const input = (body ?? {}) as Record<string, unknown>;
+  const minorToRiyal = (value: unknown) => (Number(value ?? 0) / 100).toFixed(2);
+  const purchasePrice = minorToRiyal(input.purchase_price);
+
+  return {
+    id: demoId('product'),
+    sku: typeof input.sku === 'string' && input.sku ? input.sku : '',
+    barcode: typeof input.barcode === 'string' && input.barcode ? input.barcode : null,
+    name: String(input.name ?? 'منتج تجريبي'),
+    name_en: typeof input.name_en === 'string' && input.name_en ? input.name_en : null,
+    type: String(input.type ?? 'good'),
+    unit: String(input.unit ?? ''),
+    description: typeof input.description === 'string' && input.description ? input.description : null,
+    category: typeof input.category === 'string' && input.category ? input.category : null,
+    brand: typeof input.brand === 'string' && input.brand ? input.brand : null,
+    reorder_level: input.reorder_level === null || input.reorder_level === undefined ? null : Number(input.reorder_level),
+    supplier_id: typeof input.supplier_id === 'string' && input.supplier_id ? input.supplier_id : null,
+    sales_account_id: typeof input.sales_account_id === 'string' && input.sales_account_id ? input.sales_account_id : null,
+    cogs_account_id: typeof input.cogs_account_id === 'string' && input.cogs_account_id ? input.cogs_account_id : null,
+    min_sale_price: input.min_sale_price === null || input.min_sale_price === undefined ? null : minorToRiyal(input.min_sale_price),
+    discount: input.discount === null || input.discount === undefined ? null : Number(input.discount),
+    discount_type: typeof input.discount_type === 'string' && input.discount_type ? input.discount_type : null,
+    profit_margin: input.profit_margin === null || input.profit_margin === undefined ? null : Number(input.profit_margin),
+    tags: typeof input.tags === 'string' && input.tags ? input.tags : null,
+    internal_notes: typeof input.internal_notes === 'string' && input.internal_notes ? input.internal_notes : null,
+    sale_price: minorToRiyal(input.sale_price),
+    purchase_price: purchasePrice,
+    tax_rate: Number(input.tax_rate ?? 0),
+    track_inventory: Boolean(input.track_inventory),
+    quantity_on_hand: Number(input.initial_quantity ?? 0),
+    avg_cost: purchasePrice,
+    is_active: input.is_active !== false,
+  };
+}
 
 // مجمّع إجماليات مستند من سطوره (الإجماليات مشتقّة لا مُدخلة).
 function docTotals(lines: MockLine[]) {
@@ -1103,24 +1156,7 @@ export const mockTrialBalance = {
     { code: '3110', name: 'رأس المال', debit: '0.00', credit: '138000.00' },
     { code: '4110', name: 'إيرادات المبيعات', debit: '0.00', credit: '482500.00' },
     { code: '5110', name: 'تكلفة البضاعة المباعة', debit: '264660.00', credit: '0.00' },
-    { code: '5120', name: 'الرواتب والأجور', debit: '54150.00', credit: '0.00' },
-    { code: '5140', name: 'الوقود', debit: '3810.00', credit: '0.00' },
-  ],
-  total_debit: '701060.00',
-  total_credit: '701060.00',
-  balanced: true,
-};
-
-export const mockCostCenterProfit = {
-  rows: [
-    { cost_center_id: 'cc-1', code: 'CC-DMM', name: 'فرع الدمام', revenue: '210000.00', expense: '84300.00', profit: '125700.00' },
-    { cost_center_id: 'cc-2', code: 'CC-KHB', name: 'فرع الخبر', revenue: '148000.00', expense: '96500.00', profit: '51500.00' },
-    { cost_center_id: 'cc-3', code: 'CC-JBL', name: 'فرع الجبيل', revenue: '124500.00', expense: '132000.00', profit: '-7500.00' },
-    { cost_center_id: 'cc-4', code: 'CC-ADM', name: 'الإدارة العامة', revenue: '0.00', expense: '18750.00', profit: '-18750.00' },
-  ],
-  total_revenue: '482500.00',
-  total_expense: '331550.00',
-  total_profit: '150950.00',
+    { code: '5120', name: 'الرواتب وال…229 tokens truncated…,
 };
 
 // تقارير الحسابات العامة في وضع العرض: تطابق عقود Laravel الحقيقية كي يبقى
@@ -1640,6 +1676,24 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   // الطفرات (إنشاء/تعديل/حذف/ترحيل) — نجاح صوري دون أي أثر فعلي.
   if (m !== 'GET') {
     if (clean === '/logout') return resolve(null);
+    if (clean === '/products' && m === 'POST') {
+      const created = productFromDemoInput(body);
+      saveDemoProduct(created);
+      return resolve({ data: created });
+    }
+    const productMediaCollection = clean.match(/^\/products\/([^/]+)\/media$/);
+    if (productMediaCollection && m === 'POST') {
+      const files = body instanceof FormData
+        ? [...body.getAll('media[]'), ...body.getAll('media')].filter((item): item is File => typeof item !== 'string')
+        : [];
+      const current = listDemoProductMedia(productMediaCollection[1]);
+      if (current.length + files.length > 8) return Promise.reject(new Error('الحد الأقصى لوسائط المنتج هو 8 صور.'));
+      return saveDemoProductMedia(productMediaCollection[1], files).then((data) => ({ data }) as T);
+    }
+    const productMediaItem = clean.match(/^\/products\/([^/]+)\/media\/([^/]+)$/);
+    if (productMediaItem && m === 'DELETE') {
+      return deleteDemoProductMedia(productMediaItem[1], productMediaItem[2]).then(() => ({ message: 'تم حذف الوسيط.' }) as T);
+    }
     if (clean === '/print-templates') {
       const template = createMockPrintTemplate((body ?? {}) as { name?: string; document_types?: unknown; definition?: unknown });
       mockPrintTemplates.unshift(template);
@@ -1801,7 +1855,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/users') return resolve({ data: mockUsers });
   if (clean === '/pos/products') {
     return resolve({
-      data: mockProducts.filter((product) => product.is_active).map((product) => ({
+      data: allMockProducts().filter((product) => product.is_active).map((product) => ({
         id: product.id,
         sku: product.sku,
         barcode: product.barcode,
@@ -1811,7 +1865,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         pos_barcodes: product.barcode
           ? [{ code: product.barcode, unit_name: product.unit, default_quantity: 1 }]
           : [],
-        pos_image: null,
+        pos_image: listDemoProductMedia(product.id)[0] ?? null,
         category_id: null,
         category: product.category,
         tax_rate: product.tax_rate,
@@ -1822,7 +1876,15 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       })),
     });
   }
-  if (clean === '/products') return resolve({ data: mockProducts });
+  if (clean === '/products') return resolve({ data: allMockProducts() });
+  const productMediaCollection = clean.match(/^\/products\/([^/]+)\/media$/);
+  if (productMediaCollection) return resolve({ data: listDemoProductMedia(productMediaCollection[1]) });
+  const productBarcodes = clean.match(/^\/products\/([^/]+)\/barcodes$/);
+  if (productBarcodes) return resolve({ data: [] });
+  const productActivity = clean.match(/^\/products\/([^/]+)\/activity$/);
+  if (productActivity) return resolve({ data: [] });
+  const productDetail = clean.match(/^\/products\/([^/]+)$/);
+  if (productDetail) return resolve({ data: allMockProducts().find((item) => item.id === productDetail[1]) ?? null });
   if (clean === '/branches') return resolve({ data: mockBranches, main_branch_id: mockBranchSettings.main_branch_id });
   if (clean === '/warehouses') return resolve({ data: mockWarehouses });
   const whStockMatch = clean.match(/^\/warehouses\/([^/]+)\/stock$/);
