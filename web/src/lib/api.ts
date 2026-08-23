@@ -4,6 +4,21 @@ import { readDemoMediaFile } from './demo-product-store';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
+export function resolveApiUrl(path: string, baseUrl = BASE_URL): string {
+  if (/^https?:\/\//i.test(path)) return path;
+
+  const base = baseUrl.replace(/\/+$/, '');
+  let relativePath = path.replace(/^\/+/, '');
+
+  // Laravel media links are returned as `/api/...`, while NEXT_PUBLIC_API_URL
+  // already ends with `/api`. Avoid producing `/api/api/...`.
+  if (/\/api$/i.test(base) && /^api(?:\/|$)/i.test(relativePath)) {
+    relativePath = relativePath.replace(/^api\/?/i, '');
+  }
+
+  return relativePath ? `${base}/${relativePath}` : base;
+}
+
 export class ApiError extends Error {
   status: number;
   body: unknown;
@@ -49,7 +64,7 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
     ...(options.headers as Record<string, string> | undefined),
   };
 
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(resolveApiUrl(path), {
     ...options,
     headers,
     body: options.body !== undefined
@@ -87,7 +102,7 @@ export async function fetchImageUrl(path: string): Promise<string | null> {
 
   const token = getToken();
   const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(resolveApiUrl(path), {
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(branchId ? { 'X-Branch-Id': branchId } : {}),
@@ -104,7 +119,7 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
 
   const token = getToken();
   const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(resolveApiUrl(path), {
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(branchId ? { 'X-Branch-Id': branchId } : {}),
