@@ -53,4 +53,16 @@ describe('demo product image persistence', () => {
     const media = await mockApi<{ data: unknown[] }>(`/products/${created.data.id}/media`);
     expect(media.data).toEqual([]);
   });
+
+  it('uploads an image to an existing product from the edit flow', async () => {
+    const body = new FormData();
+    body.append('media[]', new Blob(['edited-image'], { type: 'image/jpeg' }), 'edited.jpg');
+
+    await mockApi('/products/pr2/media', 'POST', body);
+
+    const media = await mockApi<{ data: Array<{ original_name: string; download_url: string }> }>('/products/pr2/media');
+    expect(media.data).toHaveLength(1);
+    expect(media.data[0].original_name).toBe('edited.jpg');
+    expect(await (await readDemoMediaFile(media.data[0].download_url))?.text()).toBe('edited-image');
+  });
 });
