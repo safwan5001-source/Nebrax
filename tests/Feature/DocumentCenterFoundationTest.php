@@ -23,6 +23,7 @@ use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use LogicException;
@@ -77,17 +78,17 @@ class DocumentCenterFoundationTest extends TestCase
                 $at->subMinute(),
                 $source === EntitlementSourceType::TRIAL ? $at->addMinute() : null,
                 'document-center-test',
-                "source-{$index}",
+                (string) Str::uuid(),
             );
             $this->assertSame(ApplicationAccessLevel::ALLOWED, $decision->decide($this->tenant, 'document_center.core', ApplicationOperationClass::READ, true, $at)->level);
             $grant->forceFill(['revoked_at' => $at])->save();
         }
 
-        $expired = $grants->grant($this->tenant, 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::TRIAL, $at->subHours(2), $at->subHour(), 'expired', 'trial-expired');
+        $expired = $grants->grant($this->tenant, 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::TRIAL, $at->subHours(2), $at->subHour(), 'expired', (string) Str::uuid());
         $this->assertNotNull($expired);
         $this->assertSame(ApplicationAccessLevel::DENIED, $decision->decide($this->tenant, 'document_center.core', ApplicationOperationClass::READ, true, $at)->level);
 
-        $active = $grants->grant($this->tenant, 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::ADDON, $at, null, 'active', 'addon-active');
+        $active = $grants->grant($this->tenant, 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::ADDON, $at, null, 'active', (string) Str::uuid());
         $this->assertSame(ApplicationAccessLevel::DENIED, $decision->decide($this->tenant, 'document_center.core', ApplicationOperationClass::READ, false, $at)->level);
 
         TenantApplicationState::where('application_key', 'document_center.core')->update(['status' => 'disabled']);
