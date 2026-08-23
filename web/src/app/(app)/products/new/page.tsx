@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Package, Tag, Warehouse, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { ArrowRight, Package, Tag, Warehouse, SlidersHorizontal, RefreshCw, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,12 +17,17 @@ import { getSystemTaxInclusive } from '@/lib/tax';
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
 interface UnitTemplate { id: string; name: string; base_unit: string }
+interface SelectedProductImage { file: File; previewUrl: string }
+
+const MAX_PRODUCT_IMAGES = 8;
+const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
+const PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export default function NewProductPage() {
   const t = useTranslations('products');
   const tc = useTranslations('common');
   const router = useRouter();
-  const { success } = useToast();
+  const { success, error: toastError } = useToast();
 
   const [name, setName] = useState('');
   const [nameEn, setNameEn] = useState('');
@@ -57,6 +62,8 @@ export default function NewProductPage() {
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [productImages, setProductImages] = useState<SelectedProductImage[]>([]);
+  const productImageUrls = useRef<string[]>([]);
 
   useEffect(() => {
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
@@ -73,10 +80,44 @@ export default function NewProductPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => () => {
+    productImageUrls.current.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
+  }, []);
+
   function selectUnitTemplate(templateId: string) {
     setUnitTemplateId(templateId);
     const template = templates.find((item) => item.id === templateId);
     if (template) setUnit(template.base_unit);
+  }
+
+  function selectProductImages(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (files.length === 0) return;
+
+    if (files.length + productImages.length > MAX_PRODUCT_IMAGES) {
+      setError(t('media_limit_reached'));
+      return;
+    }
+
+    if (files.some((file) => !PRODUCT_IMAGE_TYPES.includes(file.type) || file.size > MAX_PRODUCT_IMAGE_SIZE)) {
+      setError(t('media_invalid_file'));
+      return;
+    }
+
+    const selected = files.map((file) => {
+      const previewUrl = URL.createObjectURL(file);
+      productImageUrls.current.push(previewUrl);
+      return { file, previewUrl };
+    });
+    setProductImages((current) => [...current, ...selected]);
+    setError(null);
+  }
+
+  function removeProductImage(previewUrl: string) {
+    URL.revokeObjectURL(previewUrl);
+    productImageUrls.current = productImageUrls.current.filter((url) => url !== previewUrl);
+    setProductImages((current) => current.filter((image) => image.previewUrl !== previewUrl));
   }
 
   async function submit() {
@@ -84,7 +125,7 @@ export default function NewProductPage() {
     setSaving(true);
     setError(null);
     try {
-      await api('/products', {
+      const created = await api<{ data: { id: string } }>('/products', {
         method: 'POST',
         body: {
           name,
@@ -115,10 +156,24 @@ export default function NewProductPage() {
           is_active: isActive,
         },
       });
+
+      if (productImages.length > 0) {
+        const mediaBody = new FormData();
+        productImages.forEach(({ file }) => mediaBody.append('media[]', file));
+        try {
+          await api(`/products/${created.data.id}/media`, { method: 'POST', body: mediaBody });
+        } catch {
+          toastError(t('media_upload_failed_after_create'));
+          router.push(`/products/${created.data.id}`);
+          return;
+        }
+      }
+
       success(tc('created'));
       router.push('/products');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
       setSaving(false);
     }
   }
@@ -200,6 +255,31 @@ export default function NewProductPage() {
                   </Select>
                 </div>
               )}
+              <div className="space-y-2 sm:col-span-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label htmlFor="product-images">{t('product_media')}</Label>
+                  <span className="text-xs text-muted">{t('selected_media_count', { count: productImages.length, max: MAX_PRODUCT_IMAGES })}</span>
+                </div>
+                <Input id="product-images" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || productImages.length === MAX_PRODUCT_IMAGES} onChange={selectProductImages} aria-describedby="product-images-hint" />
+                <p id="product-images-hint" className="text-xs leading-relaxed text-muted">{t('product_media_hint')}</p>
+                {productImages.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {productImages.map((image, index) => (
+                      <div key={image.previewUrl} className="overflow-hidden rounded border border-border bg-surface">
+                        <div className="aspect-square bg-muted/30">
+                          <img src={image.previewUrl} alt={t('image_preview', { number: index + 1 })} className="h-full w-full object-cover" />
+                        </div>
+                        <div className="flex items-center gap-1 p-2">
+                          <span className="min-w-0 flex-1 truncate text-xs text-text" title={image.file.name}>{image.file.name}</span>
+                          <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${image.file.name}`} disabled={saving} onClick={() => removeProductImage(image.previewUrl)}>
+                            <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="description">{t('description')}</Label>
                 <textarea id="description" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-16 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-muted focus:border-primary" />
