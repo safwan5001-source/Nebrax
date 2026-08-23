@@ -82,6 +82,7 @@ class ApplicationCatalogTest extends TestCase
         $this->assertTrue(ApplicationCatalog::isActivatable('sales.pos'));
         $this->assertTrue(ApplicationCatalog::isActivatable('compliance.zatca'));
         $this->assertTrue(ApplicationCatalog::isActivatable('fuel_stations.core'));
+        $this->assertTrue(ApplicationCatalog::isActivatable('fuel_stations.avi'));
         $this->assertFalse(ApplicationCatalog::isActivatable('accounting.cheques'));
         $this->assertFalse(ApplicationCatalog::isActivatable('fuel_stations.forecourt'));
         $this->assertFalse(ApplicationCatalog::isActivatable('operations.workflow'));
@@ -127,11 +128,13 @@ class ApplicationCatalogTest extends TestCase
     }
 
     /** @test */
-    public function fuel_station_foundation_is_the_only_activatable_capability_in_its_product_family(): void
+    public function fuel_station_foundation_and_avi_are_activatable_capabilities_in_their_product_family(): void
     {
         $this->assertSame('fuel_stations', ApplicationCatalog::find('fuel_stations.core')['group']);
         $this->assertSame(ApplicationCatalog::MATURITY_BUILT, ApplicationCatalog::find('fuel_stations.core')['maturity']);
-        foreach (['fuel_stations.inventory', 'fuel_stations.forecourt', 'fuel_stations.fleet', 'fuel_stations.avi', 'fuel_stations.maintenance', 'fuel_stations.integrations'] as $key) {
+        $this->assertSame(ApplicationCatalog::MATURITY_BUILT, ApplicationCatalog::find('fuel_stations.avi')['maturity']);
+        $this->assertSame(['fuel_stations.core'], ApplicationCatalog::dependenciesFor('fuel_stations.avi'));
+        foreach (['fuel_stations.inventory', 'fuel_stations.forecourt', 'fuel_stations.fleet', 'fuel_stations.maintenance', 'fuel_stations.integrations'] as $key) {
             $this->assertSame(ApplicationCatalog::MATURITY_COMING_SOON, ApplicationCatalog::find($key)['maturity']);
             $this->assertSame(['fuel_stations.core'], ApplicationCatalog::dependenciesFor($key));
         }

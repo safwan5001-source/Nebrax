@@ -40,6 +40,7 @@ class FuelSaleResource extends JsonResource
             'fuel_card_id' => $this->fuel_card_id,
             'fuel_fleet_vehicle_id' => $this->fuel_fleet_vehicle_id,
             'fuel_fleet_driver_id' => $this->fuel_fleet_driver_id,
+            'fuel_avi_authorization_id' => $this->fuel_avi_authorization_id,
             'odometer_snapshot' => $this->odometer_snapshot === null ? null : (int) $this->odometer_snapshot,
             'gross_minor' => $this->gross_minor === null ? null : (int) $this->gross_minor,
             'gross' => $this->gross_minor === null ? null : Money::toRiyal((int) $this->gross_minor),

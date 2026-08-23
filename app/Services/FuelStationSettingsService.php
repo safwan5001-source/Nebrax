@@ -195,6 +195,9 @@ class FuelStationSettingsService
             'fuel_price_tax_mode', 'corporate_credit_enabled', 'require_active_contract',
             'default_corporate_credit_limit_minor', 'odometer_policy', 'driver_required',
             'vehicle_required', 'fuel_card_required',
+            'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_min_refill_interval_seconds',
+            'avi_enforce_vehicle_tank_capacity', 'avi_denial_window_seconds',
+            'avi_repeated_denial_threshold', 'avi_authorization_ttl_seconds',
         ], true)) {
             throw new RuntimeException('سياسات التسعير والائتمان والأسطول لا تقبل override على مستوى الجهاز؛ استخدم المستأجر أو المحطة.');
         }
@@ -279,6 +282,7 @@ class FuelStationSettingsService
             'shift_allow_close_with_pending_cash_variance', 'shift_allow_close_with_unresolved_operational_variance',
             'fuel_sales_allow_deferred_payment',
             'corporate_credit_enabled', 'require_active_contract', 'driver_required', 'vehicle_required', 'fuel_card_required',
+            'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_enforce_vehicle_tank_capacity',
         ];
         if (in_array($key, $shiftBooleanKeys, true)) {
             if (! is_bool($value)) {
@@ -321,11 +325,15 @@ class FuelStationSettingsService
         $nonNegativeIntegerKeys = [
             'reconciliation_tolerance_absolute_milliliters', 'reconciliation_tolerance_basis_points',
             'shift_meter_tolerance_milliliters', 'shift_tank_tolerance_milliliters',
-            'default_corporate_credit_limit_minor',
+            'default_corporate_credit_limit_minor', 'avi_min_refill_interval_seconds',
+            'avi_denial_window_seconds', 'avi_repeated_denial_threshold', 'avi_authorization_ttl_seconds',
         ];
         if (in_array($key, $nonNegativeIntegerKeys, true)) {
             if (! is_int($value) || $value < 0 || ($key === 'reconciliation_tolerance_basis_points' && $value > 1000000)) {
                 throw new RuntimeException('حدود محطات الوقود يجب أن تكون أعداداً صحيحة غير سالبة ضمن المدى المسموح.');
+            }
+            if (in_array($key, ['avi_denial_window_seconds', 'avi_repeated_denial_threshold', 'avi_authorization_ttl_seconds'], true) && $value <= 0) {
+                throw new RuntimeException('نافذة رفض AVI/RFID والعتبة ومدة صلاحية التفويض يجب أن تكون أعداداً صحيحة موجبة.');
             }
 
             return;

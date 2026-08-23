@@ -1366,12 +1366,19 @@ A tenant can only reach Fuel Stations backend operations when the full access ch
 - Fleet usage
 
 ### Cycle 7 — AVI / RFID Smart Fueling
-- RFID
-- AVI
-- Authorization engine
-- Policies
-- Anti-fraud
-- Driver + vehicle identification
+
+**الحالة: مكتملة — 2026-08-23.** يطبق التنفيذ هوية وسوم محايدة عن المورد (مركبة/سائق وRFID/QR/PIN)، تخزين بصمة اعتماد فقط، قرار تفويض صريح append-only، سياقات عميل/عقد/بطاقة/مركبة/سائق مقفلة، idempotency، وعزل المستأجر/الفرع. يعيد محرك القرار استخدام فحوص Cycle 6 للعقد والقيود والبطاقة والائتمان، ثم لا يسمح بأثر رسمي إلا عبر `FuelSale → InvoiceService → PaymentService` القائم. لا ينشئ قرار التفويض نفسه فاتورة أو دفعة أو حركة مخزون أو قيداً.
+
+**المنفذ:**
+- RFID/AVI identity domain مع حالات تعليق/فقد/blacklist/استبدال وسجل تدقيق
+- هوية المركبة والسائق (المفردة والثنائية) وربطها بالعقد والأسطول
+- Authorization engine بأسباب رفض صريحة وإشارات إعادة تعبئة مبكرة وسعة خزان ونمط رفض متكرر
+- سياسات مستأجر/محطة مدققة: التفعيل، السائق المطلوب، فاصل التزويد، سعة المركبة، نافذة/عتبة الرفض وTTL
+- ربط قرار موافق واحد بمسودة بيع مطابقة وإعادة تحقق قبل الإنهاء
+- RBAC مستقل (`fuel.avi.view/manage/authorize`) وقدرة `fuel_stations.avi` مبنية
+- واجهة عربية RTL لإدارة الوسوم وقرارات التفويض، مع دعم مرجع تفويض في مسودة البيع
+
+**المؤجل عمداً إلى Cycle 8:** تسجيل قارئ أو Device Registry، أسرار/هوية جهاز، adapters أو drivers لمورد، أمر فتح مضخة، callbacks وATG، وoffline/store-and-forward الفعلي. تبقى مفردات الأحداث `vehicle.identified` و`fuel.authorization.approved/denied` جاهزة للعقد المعياري من دون producer خارجي.
 
 ### Cycle 8 — Forecourt, ATG & Device Integration Platform
 - Device registry

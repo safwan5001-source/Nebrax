@@ -19,6 +19,7 @@ class StoreFuelSaleRequest extends FormRequest
             'fuel_card_id' => ['nullable', 'uuid'],
             'fuel_fleet_vehicle_id' => ['nullable', 'uuid'],
             'fuel_fleet_driver_id' => ['nullable', 'uuid'],
+            'fuel_avi_authorization_id' => ['nullable', 'uuid'],
             'odometer' => ['nullable', 'integer', 'min:0'],
             'quantity_milliliters' => ['required', 'integer', 'min:1'],
             'meter_start_milliliters' => ['nullable', 'integer', 'min:0', 'required_with:meter_end_milliliters'],

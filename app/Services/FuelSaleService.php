@@ -44,6 +44,7 @@ class FuelSaleService
         private FuelStationSettingsService $settings,
         private LedgerService $ledger,
         private CorporateFuelAuthorizationService $corporateAuthorizations,
+        private FuelAviAuthorizationService $aviAuthorizations,
         private FuelFleetService $fleet,
     ) {}
 
@@ -57,6 +58,7 @@ class FuelSaleService
 
         try {
             return DB::transaction(function () use ($attributes, $actor, $stationId, $nozzleId, $idempotencyKey, $quantity) {
+                $attributes = $this->aviAuthorizations->prepareDraftAttributes($attributes);
                 $station = FuelStation::lockForUpdate()->findOrFail($stationId);
                 $this->assertStationBranch($station);
                 $nozzle = FuelNozzle::lockForUpdate()->findOrFail($nozzleId);
@@ -77,7 +79,7 @@ class FuelSaleService
                     return $existing;
                 }
 
-                return FuelSale::create([
+                $sale = FuelSale::create([
                     'branch_id' => $station->branch_id,
                     'number' => FuelSale::nextDocumentNumber('FSL', now()->toDateString(), $station->branch_id),
                     'status' => FuelSale::STATUS_DRAFT,
@@ -96,6 +98,7 @@ class FuelSaleService
                     'fuel_card_id' => $attributes['fuel_card_id'] ?? null,
                     'fuel_fleet_vehicle_id' => $attributes['fuel_fleet_vehicle_id'] ?? null,
                     'fuel_fleet_driver_id' => $attributes['fuel_fleet_driver_id'] ?? null,
+                    'fuel_avi_authorization_id' => $attributes['fuel_avi_authorization_id'] ?? null,
                     'odometer_snapshot' => $attributes['odometer'] ?? null,
                     'quantity_milliliters' => $quantity,
                     'meter_start_milliliters' => $attributes['meter_start_milliliters'] ?? null,
@@ -107,6 +110,9 @@ class FuelSaleService
                     'idempotency_key' => $idempotencyKey,
                     'created_by' => $actor->id,
                 ]);
+                $this->aviAuthorizations->attachToSale($sale);
+
+                return $sale;
             });
         } catch (QueryException $exception) {
             throw new RuntimeException('تعذر إنشاء مسودة البيع بسبب تضارب متزامن؛ أعد المحاولة بالمفتاح نفسه.', previous: $exception);
@@ -139,6 +145,7 @@ class FuelSaleService
                 throw new RuntimeException('تغير ربط الفوهة بالمنتج أو الخزان؛ لا يمكن إنهاء مسودة البيع الحالية.');
             }
             $this->assertFinalizationShift($sale, $station);
+            $this->aviAuthorizations->assertFinalizationAllowed($sale);
 
             $fuelProduct = FuelProduct::findOrFail($sale->fuel_product_id);
             $product = Product::findOrFail($sale->product_id);
