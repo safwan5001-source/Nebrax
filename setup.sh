@@ -31,12 +31,14 @@ echo "▶ 4/6  دمج ملفات النواة وطبقة الـ API..."
 # نسخ النماذج والخدمات والـ migrations فوق المشروع
 cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
-mkdir -p app/Models/Concerns app/Services app/Services/Accounting app/Services/Reporting app/Services/PrintTemplates app/Support \
+mkdir -p app/Models/Concerns app/Services app/Services/Accounting app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
          app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature routes
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/"*.php            app/Services/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
+cp -r "$CORE_DIR/app/Services/Pos/"*.php         app/Services/Pos/
+cp -r "$CORE_DIR/app/Services/Pos/Hardware/"*.php app/Services/Pos/Hardware/
 cp -r "$CORE_DIR/app/Services/Reporting/"*.php   app/Services/Reporting/
 cp -r "$CORE_DIR/app/Services/PrintTemplates/"*.php app/Services/PrintTemplates/
 cp -r "$CORE_DIR/app/Support/"*.php              app/Support/

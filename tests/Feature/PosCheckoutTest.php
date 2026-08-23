@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -403,6 +404,77 @@ class PosCheckoutTest extends TestCase
 
         $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($bank, 11500)])->assertStatus(422);
 
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
+    }
+
+    /** @test */
+    public function only_configured_active_methods_are_accepted_for_every_tender_including_mixed_payments(): void
+    {
+        $auth = $this->registerTenant('pos-payment-enforcement', 'owner@pos-payment-enforcement.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل طرق الدفع', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $bank = $this->methodBySettlement($this->methods($auth), 'bank');
+
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => [
+                'payment_methods_mode' => 'only',
+                'enabled_payment_method_ids' => [$cash['id']],
+                'default_payment_method_id' => $cash['id'],
+            ],
+        ])->assertOk();
+
+        // وجود جزء نقدي صحيح لا يرخص الجزء البنكي المحظور في دفعة مختلطة.
+        $this->checkout($auth['token'], $partnerId, $sessionId, [
+            $this->tender($cash, 5000), $this->tender($bank, 6500),
+        ])->assertUnprocessable();
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
+
+        // الطريقة المسموح بها إعدادياً لا تكون صالحة إذا عُطلت في المصدر المشترك.
+        PaymentMethod::whereKey($cash['id'])->update(['is_active' => false]);
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])
+            ->assertUnprocessable();
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
+    }
+
+    /** @test */
+    public function a_pos_with_no_enabled_payment_methods_cannot_create_an_invoice_even_when_deferred_sales_are_allowed(): void
+    {
+        $auth = $this->registerTenant('pos-no-methods', 'owner@pos-no-methods.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل بلا تحصيل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => [
+                'payment_methods_mode' => 'none',
+                'enabled_payment_method_ids' => [],
+                'default_payment_method_id' => null,
+                'allow_deferred_payment' => true,
+            ],
+        ])->assertOk();
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])
+            ->assertUnprocessable();
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
+    }
+
+    /** @test */
+    public function checkout_rejects_a_foreign_tenant_payment_method_before_creating_documents(): void
+    {
+        $a = $this->registerTenant('pos-payment-owner-a', 'owner@pos-payment-owner-a.test');
+        $b = $this->registerTenant('pos-payment-owner-b', 'owner@pos-payment-owner-b.test');
+        app(TenantContext::class)->set($b['tenant_id']);
+        $sessionId = $this->openSession($b);
+        $partnerId = $this->withToken($b['token'])->postJson('/api/partners', ['name' => 'عميل المستأجر ب', 'type' => 'customer'])['data']['id'];
+        $foreignCash = $this->methodBySettlement($this->methods($a), 'cash');
+
+        $this->checkout($b['token'], $partnerId, $sessionId, [$this->tender($foreignCash, 11500)])->assertNotFound();
         $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
         $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
     }

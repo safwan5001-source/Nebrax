@@ -85,6 +85,27 @@ class ProductBarcodeAndMediaTest extends TestCase
     }
 
     /** @test */
+    public function pos_catalog_exposes_the_first_product_image_through_an_authenticated_download_url(): void
+    {
+        Storage::fake('local');
+        $auth = $this->registerTenant('pos-product-image', 'owner@pos-product-image.test');
+        $withImage = $this->product($auth['token'], ['name' => 'منتج بصورة POS', 'sku' => 'POS-IMAGE-001']);
+        $withoutImage = $this->product($auth['token'], ['name' => 'منتج بلا صورة POS', 'sku' => 'POS-IMAGE-002']);
+        $media = $this->withToken($auth['token'])->postJson("/api/products/{$withImage['id']}/media", [
+            'media' => [UploadedFile::fake()->image('pos-card.jpg', 640, 480)],
+        ])->assertCreated()['data'][0];
+
+        $catalog = $this->withToken($auth['token'])->getJson('/api/pos/products')->assertOk()['data'];
+        $imaged = collect($catalog)->firstWhere('id', $withImage['id']);
+        $plain = collect($catalog)->firstWhere('id', $withoutImage['id']);
+        $expectedUrl = "/api/products/{$withImage['id']}/media/{$media['id']}/download";
+
+        $this->assertSame($expectedUrl, $imaged['pos_image']['download_url']);
+        $this->assertNull($plain['pos_image']);
+        $this->withToken($auth['token'])->get($expectedUrl)->assertOk();
+    }
+
+    /** @test */
     public function product_media_and_barcodes_are_isolated_and_files_are_cleaned_when_an_unused_product_is_deleted(): void
     {
         Storage::fake('local');

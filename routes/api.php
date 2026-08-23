@@ -424,6 +424,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('pos-sessions/open', [PosSessionController::class, 'open'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-movements', [PosSessionController::class, 'recordCashMovement'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos-sessions/{id}/cash-drawer/open', [PosSessionController::class, 'openCashDrawer'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/acknowledge-difference', [PosSessionController::class, 'acknowledgeDifference'])->middleware([$perm('pos.variance.approve'), $app('sales.pos')]);
 
         // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.

@@ -22,6 +22,7 @@ interface PosConfig {
   apply_customer_price_list: boolean;
   allow_unit_price_override: boolean;
   enabled_payment_method_ids: string[];
+  payment_methods_mode: 'all_active' | 'only' | 'none';
   default_payment_method_id: string | null;
   allow_deferred_payment: boolean;
   product_category_visibility_mode: 'all' | 'only' | 'except';
@@ -30,6 +31,9 @@ interface PosConfig {
   exchange_surplus_policy: 'customer_credit_only' | 'allow_cash_refund';
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   show_product_images: boolean;
+  cash_drawer_enabled: boolean;
+  cash_drawer_driver: 'unavailable';
+  cash_drawer_auto_open_after_cash: boolean;
 }
 interface ProductCategory {
   id: string;
@@ -55,6 +59,7 @@ const DEFAULTS: PosConfig = {
   apply_customer_price_list: true,
   allow_unit_price_override: false,
   enabled_payment_method_ids: [],
+  payment_methods_mode: 'all_active',
   default_payment_method_id: null,
   allow_deferred_payment: true,
   product_category_visibility_mode: 'all',
@@ -63,6 +68,9 @@ const DEFAULTS: PosConfig = {
   exchange_surplus_policy: 'customer_credit_only',
   held_sale_close_policy: 'discard_on_session_close',
   show_product_images: true,
+  cash_drawer_enabled: false,
+  cash_drawer_driver: 'unavailable',
+  cash_drawer_auto_open_after_cash: false,
 };
 
 /** إعدادات تشغيل POS: السياسات ووسائل التحصيل الخادمية في مصدر إعداد واحد. */
@@ -101,7 +109,8 @@ export default function PosSettingsPage() {
   useEffect(() => { void load(); }, [load]);
 
   const enabledMethods = useMemo(() => {
-    if (!config || config.enabled_payment_method_ids.length === 0) return methods;
+    if (!config || config.payment_methods_mode === 'none') return [];
+    if (config.payment_methods_mode === 'all_active') return methods;
     return methods.filter((method) => config.enabled_payment_method_ids.includes(method.id));
   }, [config, methods]);
 
@@ -153,14 +162,14 @@ export default function PosSettingsPage() {
     setConfig((current) => {
       if (!current) return current;
       const allIds = methods.map((method) => method.id);
-      const selected = current.enabled_payment_method_ids.length === 0 ? allIds : current.enabled_payment_method_ids;
-      if (selected.length === 1 && selected.includes(methodId)) return current;
+      const selected = current.payment_methods_mode === 'all_active' ? allIds : current.enabled_payment_method_ids;
       const next = selected.includes(methodId)
         ? selected.filter((id) => id !== methodId)
         : [...selected, methodId];
       return {
         ...current,
-        enabled_payment_method_ids: next,
+        payment_methods_mode: next.length === allIds.length ? 'all_active' : (next.length > 0 ? 'only' : 'none'),
+        enabled_payment_method_ids: next.length === allIds.length ? [] : next,
         default_payment_method_id: current.default_payment_method_id === methodId && !next.includes(methodId)
           ? null
           : current.default_payment_method_id,
@@ -255,7 +264,7 @@ export default function PosSettingsPage() {
                   <>
                     <div className="grid gap-2 sm:grid-cols-2">
                     {methods.map((method) => {
-                      const checked = config.enabled_payment_method_ids.length === 0 || config.enabled_payment_method_ids.includes(method.id);
+                      const checked = config.payment_methods_mode === 'all_active' || (config.payment_methods_mode === 'only' && config.enabled_payment_method_ids.includes(method.id));
                       return (
                         <label key={method.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text hover:border-primary">
                           <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={checked} onChange={() => togglePaymentMethod(method.id)} />
@@ -265,7 +274,8 @@ export default function PosSettingsPage() {
                       );
                     })}
                     </div>
-                    <Button type="button" variant="ghost" className="px-0 text-primary" onClick={() => patch('enabled_payment_method_ids', [])}>{t('all_active_payment_methods')}</Button>
+                    {config.payment_methods_mode === 'none' && <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text">{t('payment_methods_empty')}</p>}
+                    <Button type="button" variant="ghost" className="px-0 text-primary" onClick={() => setConfig((current) => current ? { ...current, payment_methods_mode: 'all_active', enabled_payment_method_ids: [], default_payment_method_id: current.default_payment_method_id } : current)}>{t('all_active_payment_methods')}</Button>
                   </>
                 )}
               </section>
@@ -342,6 +352,15 @@ export default function PosSettingsPage() {
                   {t('allow_deferred_payment')}
                 </label>
                 <p className="text-xs leading-relaxed text-muted">{t('allow_deferred_payment_hint')}</p>
+              </section>
+
+              <section className="space-y-2 border-t border-border pt-5" aria-labelledby="cash-drawer-contract-title">
+                <Label id="cash-drawer-contract-title">{t('cash_drawer_contract')}</Label>
+                <label className="flex items-center gap-2 text-sm text-muted">
+                  <input className="h-4 w-4 accent-primary" type="checkbox" checked={false} disabled />
+                  {t('cash_drawer_enable')}
+                </label>
+                <p className="text-xs leading-relaxed text-muted">{t('cash_drawer_unsupported_hint')}</p>
               </section>
 
               <div className="space-y-1.5">

@@ -10,13 +10,17 @@ use App\Http\Resources\PosSessionEventResource;
 use App\Http\Resources\PosSessionResource;
 use App\Models\PosSession;
 use App\Services\Accounting\PosSessionService;
+use App\Services\Pos\CashDrawerService;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PosSessionController extends ApiController
 {
-    public function __construct(protected PosSessionService $sessions) {}
+    public function __construct(
+        protected PosSessionService $sessions,
+        protected CashDrawerService $cashDrawer,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -74,6 +78,20 @@ class PosSessionController extends ApiController
         ));
 
         return (new PosCashMovementResource($movement))->response()->setStatusCode(201);
+    }
+
+    /** يحاول الموصل المحلي فقط بعد تحقق RBAC والجلسة؛ لا ينشئ أثراً مالياً. */
+    public function openCashDrawer(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
+        $session = $this->visibleSession($id, $request);
+        $result = $this->domain(fn () => $this->cashDrawer->openManually(
+            $session,
+            $request->user(),
+            $data['reason'] ?? null,
+        ));
+
+        return response()->json(['data' => $result], $result['status'] === 'opened' ? 200 : 409);
     }
 
     public function events(Request $request, string $id): JsonResponse

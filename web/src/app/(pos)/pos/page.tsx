@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
+import { logout } from '@/lib/auth';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { useBranches } from '@/lib/branch';
@@ -44,6 +45,7 @@ interface PosConfig {
   allow_unit_price_override: boolean;
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   enabled_payment_method_ids: string[];
+  payment_methods_mode: 'all_active' | 'only' | 'none';
   default_payment_method_id: string | null;
   allow_deferred_payment: boolean;
   show_product_images: boolean;
@@ -58,6 +60,7 @@ const POS_DEFAULTS: PosConfig = {
   allow_unit_price_override: false,
   held_sale_close_policy: 'discard_on_session_close',
   enabled_payment_method_ids: [],
+  payment_methods_mode: 'all_active',
   default_payment_method_id: null,
   allow_deferred_payment: true,
   show_product_images: true,
@@ -117,6 +120,7 @@ export default function PosPage() {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const paymentRequestRef = useRef(false);
   const [posCfg, setPosCfg] = useState<PosConfig>(POS_DEFAULTS);
   const [paymentMethods, setPaymentMethods] = useState<PosPaymentMethod[]>([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
@@ -164,6 +168,7 @@ export default function PosPage() {
   const [cartToClose, setCartToClose] = useState<string | null>(null);
   const [clearCartOpen, setClearCartOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [unsavedExitAction, setUnsavedExitAction] = useState<'close_session' | 'logout' | null>(null);
 
   // اسم العميل الافتراضي (النقدي) من الإعداد؛ والمعروض = المختار أو الافتراضي.
   useEffect(() => {
@@ -264,9 +269,10 @@ export default function PosPage() {
   }, []);
 
   const availablePaymentMethods = useMemo(() => {
+    if (posCfg.payment_methods_mode === 'none') return [];
     const enabled = posCfg.enabled_payment_method_ids;
-    return paymentMethods.filter((method) => enabled.length === 0 || enabled.includes(method.id));
-  }, [paymentMethods, posCfg.enabled_payment_method_ids]);
+    return paymentMethods.filter((method) => posCfg.payment_methods_mode === 'all_active' || enabled.includes(method.id));
+  }, [paymentMethods, posCfg.enabled_payment_method_ids, posCfg.payment_methods_mode]);
 
   // قد تصل الإعدادات بعد أن يبدأ الكاشير سلةً مؤقتة؛ لا نترك خصماً معروضاً
   // أو محفوظاً عندما تكون السياسة الخادمية قد أوقفته.
@@ -588,8 +594,7 @@ export default function PosPage() {
     }
   }
 
-  async function closeSession(e: React.FormEvent) {
-    e.preventDefault();
+  async function finishCloseSession() {
     if (!session) return;
     setSessionBusy(true);
     setSessionError(null);
@@ -603,6 +608,36 @@ export default function PosPage() {
       setSessionError(err instanceof ApiError ? err.message : tc('saveFailed'));
       setSessionBusy(false);
     }
+  }
+
+  function closeSession(e: React.FormEvent) {
+    e.preventDefault();
+    if (!session) return;
+    if (carts.some(cartHasUnsavedData)) {
+      setUnsavedExitAction('close_session');
+      return;
+    }
+    void finishCloseSession();
+  }
+
+  function requestLogout() {
+    if (carts.some(cartHasUnsavedData)) {
+      setUnsavedExitAction('logout');
+      return;
+    }
+    void finishLogout();
+  }
+
+  async function finishLogout() {
+    await logout();
+    router.replace('/login');
+  }
+
+  async function confirmUnsavedExit() {
+    const action = unsavedExitAction;
+    setUnsavedExitAction(null);
+    if (action === 'close_session') await finishCloseSession();
+    if (action === 'logout') await finishLogout();
   }
 
   async function ensureWalkin(): Promise<string> {
@@ -624,6 +659,8 @@ export default function PosPage() {
         setError(t('open_to_start'));
         return;
       }
+      if (paymentRequestRef.current) return;
+      paymentRequestRef.current = true;
       setPaying(true);
       setError(null);
       try {
@@ -681,6 +718,7 @@ export default function PosPage() {
       } catch (e) {
         setError(e instanceof ApiError ? e.message : tc('saveFailed'));
       } finally {
+        paymentRequestRef.current = false;
         setPaying(false);
       }
     },
@@ -765,7 +803,7 @@ export default function PosPage() {
                 className={'flex w-full flex-col rounded-lg border border-border bg-surface p-2.5 text-start hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (posCfg.show_product_images ? '' : 'min-h-28 justify-between')}
               >
                 {posCfg.show_product_images && (
-                  <div className="mb-2.5 aspect-[4/3] overflow-hidden rounded-md bg-background">
+                  <div className={'mb-2.5 overflow-hidden rounded-md bg-background ' + (p.pos_image?.download_url ? 'aspect-[4/3]' : 'h-10')}>
                     <PosProductImage path={p.pos_image?.download_url} alt={p.name} />
                   </div>
                 )}
@@ -977,6 +1015,7 @@ export default function PosPage() {
         onOpenRecentInvoices={() => setRecentInvoicesOpen(true)}
         onReturn={() => setReturnOpen(true)}
         onExchange={() => setExchangeOpen(true)}
+        onLogout={requestLogout}
         exchangeDisabled={cart.length === 0 || step === 'payment' || paying}
       />
 
@@ -1145,6 +1184,14 @@ export default function PosPage() {
             <Button type="submit" disabled={sessionBusy || !deviceId}>{ts('open')}</Button>
           </div>
         </form>
+      </Dialog>
+
+      <Dialog open={unsavedExitAction !== null} onClose={() => setUnsavedExitAction(null)} title={t('unsaved_carts_exit_title')}>
+        <p className="text-sm leading-relaxed text-muted">{t('unsaved_carts_exit_description')}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => setUnsavedExitAction(null)}>{ts('cancel')}</Button>
+          <Button type="button" variant="danger" onClick={() => void confirmUnsavedExit()}>{t('unsaved_carts_exit_confirm')}</Button>
+        </div>
       </Dialog>
 
       {/* إغلاق الوردية: عدّ النقد → المتوقّع/الفرق يُحسبان في الخادم ثم نغادر. */}

@@ -39,7 +39,7 @@ class SalesConfigController extends ApiController
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'sections' => [], 'accent_color' => '#2563EB', 'footer_text' => '', 'terms_text' => '', 'bank_text' => '', 'stamp' => '', 'signature' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
-        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true],
+        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'payment_methods_mode' => PosSettings::PAYMENT_METHODS_ALL_ACTIVE, 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true, 'cash_drawer_enabled' => false, 'cash_drawer_driver' => 'unavailable', 'cash_drawer_auto_open_after_cash' => false],
     ];
 
     public function show(string $section): JsonResponse
@@ -61,6 +61,7 @@ class SalesConfigController extends ApiController
         $tenant = $this->tenant();
 
         if ($section === 'pos') {
+            $posInput = $data;
             $request->validate([
                 'data.cash_refund_policy' => ['nullable', Rule::in([
                     PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY,
@@ -76,6 +77,11 @@ class SalesConfigController extends ApiController
                 ])],
                 'data.enabled_payment_method_ids' => ['nullable', 'array', 'max:50'],
                 'data.enabled_payment_method_ids.*' => ['uuid', 'distinct'],
+                'data.payment_methods_mode' => ['nullable', Rule::in([
+                    PosSettings::PAYMENT_METHODS_ALL_ACTIVE,
+                    PosSettings::PAYMENT_METHODS_ONLY,
+                    PosSettings::PAYMENT_METHODS_NONE,
+                ])],
                 'data.default_payment_method_id' => ['nullable', 'uuid'],
                 'data.receipt_paper_size' => ['nullable', Rule::in([
                     PosSettings::RECEIPT_PAPER_THERMAL_58,
@@ -85,6 +91,9 @@ class SalesConfigController extends ApiController
                 'data.allow_unit_price_override' => ['nullable', 'boolean'],
                 'data.allow_deferred_payment' => ['nullable', 'boolean'],
                 'data.show_product_images' => ['nullable', 'boolean'],
+                'data.cash_drawer_enabled' => ['nullable', 'boolean'],
+                'data.cash_drawer_driver' => ['nullable', Rule::in(['unavailable'])],
+                'data.cash_drawer_auto_open_after_cash' => ['nullable', 'boolean'],
                 'data.product_category_visibility_mode' => ['nullable', Rule::in([
                     PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL,
                     PosSettings::PRODUCT_CATEGORY_VISIBILITY_ONLY,
@@ -96,8 +105,17 @@ class SalesConfigController extends ApiController
             // نحفظ الكائن كاملاً لا قيمة السياسة وحدها، كي تبقى الاستجابة وشاشة
             // POS والقراءة الخادمية فوق الافتراضات نفسها للمستأجر القديم والجديد.
             $data = array_merge(PosSettings::group($tenant), $data);
+            // قبل هذا العقد كانت القائمة غير الفارغة تعني «المحدد فقط»؛ لا
+            // تُحوّل تحديثات العميل القديمة إلى «كل الطرق» عند ترقية الخادم.
+            if (array_key_exists('enabled_payment_method_ids', $posInput)
+                && ! array_key_exists('payment_methods_mode', $posInput)) {
+                $data['payment_methods_mode'] = $posInput['enabled_payment_method_ids'] === []
+                    ? PosSettings::PAYMENT_METHODS_ALL_ACTIVE
+                    : PosSettings::PAYMENT_METHODS_ONLY;
+            }
             $this->assertPosPaymentMethods($data);
             $this->assertPosProductCategories($data);
+            $this->assertCashDrawerContract($data);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -131,7 +149,17 @@ class SalesConfigController extends ApiController
     private function assertPosPaymentMethods(array $data): void
     {
         $enabled = array_values(array_unique($data['enabled_payment_method_ids'] ?? []));
+        $mode = $data['payment_methods_mode'] ?? PosSettings::PAYMENT_METHODS_ALL_ACTIVE;
         $default = $data['default_payment_method_id'] ?? null;
+        if ($mode === PosSettings::PAYMENT_METHODS_NONE && ($enabled !== [] || $default !== null)) {
+            abort(422, 'لا تقبل نقطة البيع طريقة افتراضية أو قائمة طرق عند تعطيل التحصيل.');
+        }
+        if ($mode === PosSettings::PAYMENT_METHODS_ONLY && $enabled === []) {
+            abort(422, 'وضع الطرق المحددة يحتاج وسيلة دفع واحدة مفعلة على الأقل.');
+        }
+        if ($mode === PosSettings::PAYMENT_METHODS_ALL_ACTIVE && $enabled !== []) {
+            abort(422, 'وضع كل الطرق النشطة لا يقبل قائمة طرق محددة.');
+        }
         $ids = array_values(array_unique(array_filter([...$enabled, $default])));
 
         if ($ids === []) {
@@ -146,12 +174,25 @@ class SalesConfigController extends ApiController
             abort(422, 'تتضمن إعدادات POS وسيلة دفع غير موجودة أو معطلة.');
         }
 
-        if ($default !== null && $enabled !== [] && ! in_array($default, $enabled, true)) {
+        if ($default !== null && $mode === PosSettings::PAYMENT_METHODS_ONLY && ! in_array($default, $enabled, true)) {
             abort(422, 'وسيلة الدفع الافتراضية يجب أن تكون ضمن الوسائل المفعلة في POS.');
         }
     }
 
-    /** لا تُحفظ قائمة POS إلا من تصنيفات نشطة يراها سياق الفرع/المستأجر الحالي. */
+    /** لا يسمح بتفعيل درج نقدية قبل تسجيل Driver محلي مدعوم صراحةً. */
+    private function assertCashDrawerContract(array $data): void
+    {
+        if (($data['cash_drawer_driver'] ?? 'unavailable') !== 'unavailable') {
+            abort(422, 'موصل درج النقدية المحدد غير مدعوم في هذا النشر.');
+        }
+        if (($data['cash_drawer_enabled'] ?? false) || ($data['cash_drawer_auto_open_after_cash'] ?? false)) {
+            abort(422, 'لا يمكن تفعيل درج النقدية قبل تهيئة موصل أجهزة مدعوم.');
+        }
+    }
+
+    /**
+     * لا تُحفظ قائمة POS إلا من تصنيفات نشطة يراها سياق الفرع/المستأجر الحالي.
+ */
     private function assertPosProductCategories(array $data): void
     {
         $ids = array_values(array_unique($data['product_category_ids'] ?? []));

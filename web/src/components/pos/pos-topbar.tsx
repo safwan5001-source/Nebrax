@@ -28,6 +28,7 @@ export function PosTopbar({
   onOpenRecentInvoices,
   onReturn,
   onExchange,
+  onLogout,
   exchangeDisabled = false,
 }: {
   cashier: string;
@@ -43,6 +44,7 @@ export function PosTopbar({
   onOpenRecentInvoices?: () => void;
   onReturn?: () => void;
   onExchange?: () => void;
+  onLogout?: () => void;
   exchangeDisabled?: boolean;
 }) {
   const t = useTranslations('pos');
@@ -69,6 +71,10 @@ export function PosTopbar({
   const deviceLabel = session?.pos_device?.code || session?.pos_device?.name || null;
 
   async function handleLogout() {
+    if (onLogout) {
+      onLogout();
+      return;
+    }
     await logout();
     router.replace('/login');
   }
@@ -102,7 +108,7 @@ export function PosTopbar({
 
       <div className="hidden min-w-0 items-center gap-1.5 text-xs md:flex">
         <CircleDot className={'h-3.5 w-3.5 shrink-0 ' + (online ? 'text-positive' : 'text-negative')} strokeWidth={1.8} aria-hidden />
-        <span className={online ? 'text-text' : 'text-negative'}>{online ? t('connected') : t('offline')}</span>
+        <span className={online ? 'text-text' : 'text-negative'}>{online ? t('network_connected') : t('network_offline')}</span>
       </div>
 
       {sessionLabel && (
@@ -154,7 +160,7 @@ export function PosTopbar({
             <div className="text-sm font-semibold text-text">{t('pos_title')}</div>
             <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
               <CircleDot className={'h-3.5 w-3.5 ' + (online ? 'text-positive' : 'text-negative')} strokeWidth={1.8} />
-              {online ? t('connected') : t('offline')}
+              {online ? t('network_connected') : t('network_offline')}
               {sessionLabel && <><span aria-hidden>·</span><span className="num">{sessionLabel}</span></>}
             </div>
           </div>
