@@ -18,8 +18,8 @@ class FuelProduct extends BaseModel implements CompanyWide
     use ResolvesBranchReferences;
 
     protected $fillable = [
-        'tenant_id', 'product_id', 'code', 'name', 'density_kg_per_m3',
-        'tax_category', 'is_active',
+        'tenant_id', 'product_id', 'code', 'name', 'inventory_base_unit', 'display_unit',
+        'density_kg_per_m3', 'tax_category', 'is_active',
     ];
 
     protected $casts = [
@@ -28,6 +28,8 @@ class FuelProduct extends BaseModel implements CompanyWide
     ];
 
     protected $attributes = [
+        'inventory_base_unit' => 'mL',
+        'display_unit' => 'L',
         'is_active' => true,
     ];
 

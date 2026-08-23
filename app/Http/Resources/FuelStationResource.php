@@ -15,6 +15,8 @@ class FuelStationResource extends JsonResource
             'id' => $this->id,
             'branch_id' => $this->branch_id,
             'branch' => $this->whenLoaded('branch', fn () => ['id' => $this->branch?->id, 'name' => $this->branch?->name, 'code' => $this->branch?->code]),
+            'warehouse_id' => $this->warehouse_id,
+            'warehouse' => $this->whenLoaded('warehouse', fn () => ['id' => $this->warehouse?->id, 'name' => $this->warehouse?->name, 'code' => $this->warehouse?->code]),
             'code' => $this->code,
             'name' => $this->name,
             'country_code' => $this->country_code,

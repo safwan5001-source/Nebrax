@@ -40,7 +40,7 @@ class FuelStationMasterDataController extends ApiController
 
     public function updateStation(FuelStationMasterDataRequest $request, string $id): JsonResponse
     {
-        return (new FuelStationResource($this->domain(fn () => $this->masterData->updateStation(FuelStation::findOrFail($id), $request->validated()))))->response();
+        return (new FuelStationResource($this->domain(fn () => $this->masterData->updateStation(FuelStation::findOrFail($id), $request->validated()))->load($this->stationRelations())))->response();
     }
 
     public function destroyStation(string $id): JsonResponse
@@ -161,6 +161,6 @@ class FuelStationMasterDataController extends ApiController
     /** @return list<string> */
     private function stationRelations(): array
     {
-        return ['branch', 'manager', 'defaultInventoryAccount', 'defaultRevenueAccount', 'defaultCogsAccount'];
+        return ['branch', 'warehouse', 'manager', 'defaultInventoryAccount', 'defaultRevenueAccount', 'defaultCogsAccount'];
     }
 }
