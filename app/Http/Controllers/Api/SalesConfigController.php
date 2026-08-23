@@ -39,7 +39,7 @@ class SalesConfigController extends ApiController
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'sections' => [], 'accent_color' => '#2563EB', 'footer_text' => '', 'terms_text' => '', 'bank_text' => '', 'stamp' => '', 'signature' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
-        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE],
+        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true],
     ];
 
     public function show(string $section): JsonResponse
@@ -84,6 +84,7 @@ class SalesConfigController extends ApiController
                 'data.apply_customer_price_list' => ['nullable', 'boolean'],
                 'data.allow_unit_price_override' => ['nullable', 'boolean'],
                 'data.allow_deferred_payment' => ['nullable', 'boolean'],
+                'data.show_product_images' => ['nullable', 'boolean'],
                 'data.product_category_visibility_mode' => ['nullable', Rule::in([
                     PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL,
                     PosSettings::PRODUCT_CATEGORY_VISIBILITY_ONLY,

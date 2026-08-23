@@ -29,6 +29,7 @@ interface PosConfig {
   cash_refund_policy: 'original_cash_only' | 'allow_any_pos_sale';
   exchange_surplus_policy: 'customer_credit_only' | 'allow_cash_refund';
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
+  show_product_images: boolean;
 }
 interface ProductCategory {
   id: string;
@@ -61,6 +62,7 @@ const DEFAULTS: PosConfig = {
   cash_refund_policy: 'original_cash_only',
   exchange_surplus_policy: 'customer_credit_only',
   held_sale_close_policy: 'discard_on_session_close',
+  show_product_images: true,
 };
 
 /** إعدادات تشغيل POS: السياسات ووسائل التحصيل الخادمية في مصدر إعداد واحد. */
@@ -220,6 +222,13 @@ export default function PosSettingsPage() {
                 <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.allow_discount} onChange={(event) => patch('allow_discount', event.target.checked)} />
                 {t('allow_discount')}
               </label>
+              <section className="space-y-1.5">
+                <label className="flex items-center gap-2 text-sm text-text">
+                  <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.show_product_images} onChange={(event) => patch('show_product_images', event.target.checked)} />
+                  {t('show_product_images')}
+                </label>
+                <p className="text-xs leading-relaxed text-muted">{t('show_product_images_hint')}</p>
+              </section>
               <section className="space-y-1.5">
                 <label className="flex items-center gap-2 text-sm text-text">
                   <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.apply_customer_price_list} onChange={(event) => patch('apply_customer_price_list', event.target.checked)} />

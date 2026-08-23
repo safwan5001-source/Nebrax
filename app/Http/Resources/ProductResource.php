@@ -53,6 +53,15 @@ class ProductResource extends JsonResource
                     'default_quantity' => (int) $barcode['default_quantity'],
                 ])->values()
             ),
+            // كتالوج POS يطلب الوسائط صراحةً، فتصل أول صورة حقيقية فقط كرابط
+            // تحميل مصادق عليه. لا يظهر الحقل في مورد المنتج العام دون eager load.
+            'pos_image' => $this->whenLoaded('media', function () {
+                $media = $this->media->first(fn ($item) => str_starts_with((string) $item->mime_type, 'image/'));
+
+                return $media ? [
+                    'download_url' => "/api/products/{$this->id}/media/{$media->id}/download",
+                ] : null;
+            }),
             'reorder_level'    => $this->reorder_level,
             'supplier_id'      => $this->supplier_id,
             'sales_account_id' => $this->sales_account_id,

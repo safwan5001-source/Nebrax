@@ -171,6 +171,23 @@ class SalesConfigTest extends TestCase
     }
 
     /** @test */
+    public function pos_product_images_default_to_enabled_and_are_tenant_isolated(): void
+    {
+        ['token' => $aToken] = $this->registerTenant('images-a', 'images-a@nibras.test');
+        ['token' => $bToken] = $this->registerTenant('images-b', 'images-b@nibras.test');
+
+        $this->withToken($aToken)->getJson('/api/sales-config/pos')
+            ->assertOk()->assertJsonPath('data.show_product_images', true);
+
+        $this->withToken($aToken)->putJson('/api/sales-config/pos', [
+            'data' => ['show_product_images' => false],
+        ])->assertOk()->assertJsonPath('data.show_product_images', false);
+
+        $this->withToken($bToken)->getJson('/api/sales-config/pos')
+            ->assertOk()->assertJsonPath('data.show_product_images', true);
+    }
+
+    /** @test */
     public function staff_cannot_update_config(): void
     {
         ['tenant_id' => $tid] = $this->registerTenant('nibras', 'owner@nibras.test');

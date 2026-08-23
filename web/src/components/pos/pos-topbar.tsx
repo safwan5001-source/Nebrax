@@ -1,21 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { Printer, Barcode, Wifi, Building2, Power, Clock, Repeat2, RotateCcw } from 'lucide-react';
-import type { Warehouse } from '@/lib/warehouse';
+import { useLocale, useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
+import {
+  Archive, Building2, ChevronDown, CircleDot, History, Languages, LogOut,
+  MoreHorizontal, Moon, Power, ReceiptText, Repeat2, RotateCcw, Settings,
+  Sun, UserRound, Warehouse,
+} from 'lucide-react';
+import type { Warehouse as WarehouseType } from '@/lib/warehouse';
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
+import { logout } from '@/lib/auth';
 
-/** نقطة حالة ملوّنة (متصل/غير متصل) على زر أداة. */
-function StatusDot({ ok }: { ok: boolean }) {
-  return (
-    <span
-      className="absolute end-1 top-1 h-[7px] w-[7px] rounded-full border-2 border-surface"
-      style={{ background: ok ? 'var(--positive)' : 'var(--negative)' }}
-    />
-  );
-}
-
-/** الشريط العلوي الخاص بنقطة البيع: حالة الأجهزة + ساعة حيّة + الفرع + الكاشير. */
+/** شريط تشغيلي لـ POS: يعرض السياق الفعلي والإجراءات المتاحة فقط. */
 export function PosTopbar({
   cashier,
   branch,
@@ -23,115 +21,190 @@ export function PosTopbar({
   warehouses = [],
   warehouseId = '',
   warehouseDisabled = false,
+  heldCount = 0,
   onWarehouseChange,
-  onEndSession,
+  onManageSession,
+  onOpenHeld,
+  onOpenRecentInvoices,
   onReturn,
   onExchange,
   exchangeDisabled = false,
 }: {
   cashier: string;
   branch: string;
-  session?: { number: string } | null;
-  warehouses?: Warehouse[];
+  session?: { number: string; pos_device?: { name: string; code: string | null } | null } | null;
+  warehouses?: WarehouseType[];
   warehouseId?: string;
   warehouseDisabled?: boolean;
+  heldCount?: number;
   onWarehouseChange?: (warehouseId: string) => void;
-  onEndSession?: () => void;
+  onManageSession?: () => void;
+  onOpenHeld?: () => void;
+  onOpenRecentInvoices?: () => void;
   onReturn?: () => void;
   onExchange?: () => void;
   exchangeDisabled?: boolean;
 }) {
   const t = useTranslations('pos');
-  const [now, setNow] = useState<Date | null>(null);
+  const tc = useTranslations('common');
+  const tt = useTranslations('topbar');
+  const router = useRouter();
+  const locale = useLocale();
+  const { theme, setTheme } = useTheme();
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 1000);
-    const sync = () => setOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
+    const sync = () => setOnline(typeof navigator === 'undefined' || navigator.onLine);
     sync();
     window.addEventListener('online', sync);
     window.addEventListener('offline', sync);
     return () => {
-      clearInterval(id);
       window.removeEventListener('online', sync);
       window.removeEventListener('offline', sync);
     };
   }, []);
 
-  const time = now?.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) ?? '—';
-  const date = now?.toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) ?? '';
+  const userInitial = cashier.trim().slice(0, 2) || '؟';
+  const sessionLabel = session?.number ?? null;
+  const deviceLabel = session?.pos_device?.code || session?.pos_device?.name || null;
 
-  const tool = 'relative grid h-[34px] w-[34px] place-items-center rounded-lg border border-border bg-surface text-text hover:bg-background disabled:cursor-not-allowed disabled:opacity-50';
+  async function handleLogout() {
+    await logout();
+    router.replace('/login');
+  }
+
+  function toggleLanguage() {
+    const next = locale === 'ar' ? 'en' : 'ar';
+    document.cookie = `locale=${next};path=/;max-age=31536000`;
+    router.refresh();
+  }
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border bg-surface px-4">
-      <button className={tool} title={t('end_session')} onClick={onEndSession}>
-        <Power className="h-4 w-4" strokeWidth={1.8} />
-      </button>
-      <button className={tool} title={t('return_action')} onClick={onReturn} disabled={!session || !onReturn} aria-label={t('return_action')}>
-        <RotateCcw className="h-4 w-4" strokeWidth={1.8} />
-      </button>
-      <button className={tool} title={t('exchange_action')} onClick={onExchange} disabled={!session || !onExchange || exchangeDisabled} aria-label={t('exchange_action')}>
-        <Repeat2 className="h-4 w-4" strokeWidth={1.8} />
-      </button>
-      <button className={tool} title={t('printer')}>
-        <Printer className="h-4 w-4" strokeWidth={1.8} />
-        <StatusDot ok />
-      </button>
-      <button className={tool} title={t('barcode')}>
-        <Barcode className="h-4 w-4" strokeWidth={1.8} />
-        <StatusDot ok />
-      </button>
-      <button className={tool} title={t('internet')}>
-        <Wifi className="h-4 w-4" strokeWidth={1.8} />
-        <StatusDot ok={online} />
+    <header className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
+      <button
+        type="button"
+        onClick={() => router.push('/dashboard')}
+        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        aria-label={t('return_to_system')}
+      >
+        <RotateCcw className="h-4 w-4" strokeWidth={1.7} />
+        <span className="hidden xl:inline">{t('return_to_system')}</span>
       </button>
 
-      <div className="flex-1" />
-
-      <div className="text-center leading-tight">
-        <b className="num block text-[13px] font-bold text-text">{time}</b>
-        <span className="text-[11px] text-muted">{date}</span>
+      <div className="min-w-0 border-s border-border ps-2 sm:ps-3">
+        <div className="truncate text-sm font-semibold text-text">{t('pos_title')}</div>
+        <div className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
+          <Building2 className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} />
+          <span className="truncate">{branch}</span>
+          {deviceLabel && <><span aria-hidden>·</span><span className="num truncate">{deviceLabel}</span></>}
+        </div>
       </div>
 
-      <div className="flex-1" />
-
-      {session?.number && (
-        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs" title={t('session')}>
-          <Clock className="h-3.5 w-3.5 text-positive" strokeWidth={1.7} />
-          <span className="num">{session.number}</span>
-        </div>
-      )}
-      {warehouses.length > 0 && (
-        <label className="flex min-w-0 items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-xs">
-          <Building2 className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.7} />
-          <span className="sr-only">{t('warehouse')}</span>
-          <select
-            className="max-w-32 truncate bg-transparent text-xs text-text outline-none disabled:cursor-not-allowed disabled:text-muted"
-            value={warehouseId}
-            disabled={warehouseDisabled}
-            onChange={(event) => onWarehouseChange?.(event.target.value)}
-            aria-label={t('warehouse')}
-          >
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>
-            ))}
-          </select>
-        </label>
-      )}
-      <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs">
-        <Building2 className="h-3.5 w-3.5 text-muted" strokeWidth={1.7} />
-        <span>{branch}</span>
+      <div className="hidden min-w-0 items-center gap-1.5 text-xs md:flex">
+        <CircleDot className={'h-3.5 w-3.5 shrink-0 ' + (online ? 'text-positive' : 'text-negative')} strokeWidth={1.8} aria-hidden />
+        <span className={online ? 'text-text' : 'text-negative'}>{online ? t('connected') : t('offline')}</span>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="text-end text-[11px] text-muted">
-          {t('cashier')}
-          <b className="block text-[12.5px] font-semibold text-text">{cashier}</b>
+
+      {sessionLabel && (
+        <div className="hidden min-w-0 items-center gap-1.5 rounded-md bg-background px-2 py-1 text-xs text-muted lg:flex" title={t('session')}>
+          <span className="text-text">{t('session')}</span>
+          <span className="num truncate font-semibold text-text">{sessionLabel}</span>
         </div>
-        <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-xs font-bold text-white">
-          {cashier.slice(0, 2)}
-        </div>
+      )}
+
+      <div className="ms-auto flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onOpenRecentInvoices}
+          className="inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          aria-label={t('recent_pos_invoices')}
+        >
+          <ReceiptText className="h-4 w-4" strokeWidth={1.7} />
+          <span className="hidden 2xl:inline">{t('recent_pos_invoices')}</span>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenHeld}
+          className="relative inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          aria-label={t('held')}
+        >
+          <Archive className="h-4 w-4" strokeWidth={1.7} />
+          <span className="hidden xl:inline">{t('held')}</span>
+          {heldCount > 0 && <span className="num grid min-w-5 place-items-center rounded bg-primary px-1.5 py-0.5 text-[11px] font-bold text-white">{heldCount}</span>}
+        </button>
+
+        <button
+          type="button"
+          onClick={onManageSession}
+          className="hidden h-10 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:inline-flex"
+        >
+          <Power className="h-4 w-4" strokeWidth={1.7} />
+          <span>{t('manage_shift')}</span>
+        </button>
+
+        <Dropdown
+          align="end"
+          menuLabel={t('more_actions')}
+          triggerLabel={t('more_actions')}
+          triggerClassName="h-10 w-10 justify-center text-text hover:bg-primary-soft hover:text-primary"
+          mobilePopover
+          trigger={<MoreHorizontal className="h-5 w-5" strokeWidth={1.7} />}
+        >
+          <div className="border-b border-border px-2.5 py-2 lg:hidden">
+            <div className="text-sm font-semibold text-text">{t('pos_title')}</div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
+              <CircleDot className={'h-3.5 w-3.5 ' + (online ? 'text-positive' : 'text-negative')} strokeWidth={1.8} />
+              {online ? t('connected') : t('offline')}
+              {sessionLabel && <><span aria-hidden>·</span><span className="num">{sessionLabel}</span></>}
+            </div>
+          </div>
+          <div className="lg:hidden">
+            <DropdownItem icon={Power} onClick={onManageSession}>{t('manage_shift')}</DropdownItem>
+          </div>
+          {warehouses.length > 0 && (
+            <label className="mx-1 my-1.5 flex items-center gap-2 rounded px-2 py-2 text-sm text-text hover:bg-primary-soft">
+              <Warehouse className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
+              <span className="sr-only">{t('warehouse')}</span>
+              <select
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:text-muted"
+                value={warehouseId}
+                disabled={warehouseDisabled}
+                onChange={(event) => onWarehouseChange?.(event.target.value)}
+                aria-label={t('warehouse')}
+              >
+                {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>)}
+              </select>
+            </label>
+          )}
+          <div className="my-1 border-t border-border" />
+          <DropdownItem icon={RotateCcw} onClick={onReturn} disabled={!session}>{t('return_action')}</DropdownItem>
+          <DropdownItem icon={Repeat2} onClick={onExchange} disabled={!session || exchangeDisabled}>{t('exchange_action')}</DropdownItem>
+        </Dropdown>
+
+        <Dropdown
+          align="end"
+          menuLabel={tt('account')}
+          triggerLabel={tt('account')}
+          triggerClassName="h-10 min-w-10 justify-center gap-1.5 px-1.5 hover:bg-primary-soft"
+          mobilePopover
+          trigger={
+            <>
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-primary-soft text-xs font-bold text-primary">{userInitial}</span>
+              <span className="hidden max-w-28 truncate text-sm font-semibold text-text 2xl:inline">{cashier}</span>
+              <ChevronDown className="hidden h-3.5 w-3.5 text-muted 2xl:block" strokeWidth={1.7} />
+            </>
+          }
+        >
+          <div className="border-b border-border px-2.5 py-2">
+            <div className="truncate text-sm font-semibold text-text">{cashier}</div>
+            <div className="truncate text-xs text-muted">{branch}</div>
+          </div>
+          <DropdownItem icon={Languages} onClick={toggleLanguage}>{tc('languageToggle')}</DropdownItem>
+          <DropdownItem icon={theme === 'dark' ? Sun : Moon} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{tc('themeToggle')}</DropdownItem>
+          <div className="my-1 border-t border-border" />
+          <DropdownItem icon={Settings} href="/settings">{tt('settings')}</DropdownItem>
+          <DropdownItem icon={LogOut} tone="danger" onClick={handleLogout}>{tt('logout')}</DropdownItem>
+        </Dropdown>
       </div>
     </header>
   );
