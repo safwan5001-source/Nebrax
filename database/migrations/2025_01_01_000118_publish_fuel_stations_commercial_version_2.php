@@ -5,7 +5,6 @@ use App\Models\CommercialProductVersion;
 use App\Services\CommercialProductVersionService;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use LogicException;
 
 return new class extends Migration
 {
