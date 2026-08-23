@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\Branch;
+use App\Models\FuelInventoryCostState;
 use App\Models\FuelOperationalLedger;
 use App\Models\FuelStation;
 use App\Models\FuelStationConfigurationEvent;
@@ -13,6 +14,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Accounting\InventoryService;
+use App\Services\FuelCostBasisService;
 use App\Services\FuelQuantity;
 use App\Services\FuelReconciliationService;
 use App\Services\FuelStationMasterDataService;
@@ -86,6 +88,7 @@ class FuelReconciliationTest extends TestCase
     public function explicit_approval_of_a_surplus_uses_the_opposite_inventory_variance_direction(): void
     {
         $fixture = $this->fixture();
+        Product::findOrFail($fixture['product_id'])->update(['avg_cost' => 999]);
         $reading = $fixture['service']->recordReading([
             'fuel_station_id' => $fixture['station']->id,
             'fuel_tank_id' => $fixture['tank']->id,
@@ -109,6 +112,35 @@ class FuelReconciliationTest extends TestCase
         $lines = JournalLine::where('journal_entry_id', $approved->journal_entry_id)->get()->keyBy('account_id');
         $this->assertSame(100000, (int) $lines[$inventory->id]->debit);
         $this->assertSame(100000, (int) $lines[$variance->id]->credit);
+        $this->assertCount(2, $lines); // لا GRNI ولا دائن المورد في زيادة الجرد.
+        $this->assertSame(100000, (int) $approved->financial_variance_minor);
+        $state = FuelInventoryCostState::where('warehouse_id', $fixture['warehouse']->id)->firstOrFail();
+        $this->assertSame(110000, (int) $state->quantity_milliliters);
+        $this->assertSame(1100000, (int) $state->cost_pool_minor);
+    }
+
+    /** @test */
+    public function inventory_gain_from_zero_stock_requires_a_trusted_fuel_cost_basis(): void
+    {
+        $fixture = $this->fixture(assignWarehouse: true, openingQuantity: 0);
+        $reading = $fixture['service']->recordReading([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_tank_id' => $fixture['tank']->id,
+            'reading_type' => 'physical',
+            'quantity_liters' => '1.000',
+            'evidence_key' => 'physical-zero-gain-1',
+            'recorded_by' => $fixture['owner_id'],
+        ]);
+        $draft = $fixture['service']->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_tank_id' => $fixture['tank']->id,
+            'physical_reading_id' => $reading->id,
+            'created_by' => $fixture['owner_id'],
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('FUEL_GAIN_COST_BASIS_REQUIRED');
+        $fixture['service']->approve($draft, $fixture['owner_id']);
     }
 
     /** @test */
@@ -253,7 +285,7 @@ class FuelReconciliationTest extends TestCase
     }
 
     /** @return array{service: FuelReconciliationService, station: FuelStation, tank: FuelTank, warehouse: Warehouse|null, branch: Branch, product_id: string, owner_id: string} */
-    private function fixture(bool $assignWarehouse = true): array
+    private function fixture(bool $assignWarehouse = true, int $openingQuantity = 100000): array
     {
         $auth = $this->registerTenant();
         app(TenantContext::class)->set($auth['tenant_id']);
@@ -285,7 +317,14 @@ class FuelReconciliationTest extends TestCase
         ]);
         $product = Product::findOrFail($productId);
         if ($assignWarehouse) {
-            app(InventoryService::class)->applyReceipt($product, 100000, 10, ['warehouse_id' => $warehouse->id]);
+            $costBasis = app(FuelCostBasisService::class);
+            // مسار الاستلام الحقيقي يهيئ state صفرياً قبل تحديث رصيد المخزن.
+            $costBasis->assertReady($fuel, $warehouse);
+            if ($openingQuantity > 0) {
+                $openingMovement = app(InventoryService::class)->applyReceipt($product, $openingQuantity, 10, ['warehouse_id' => $warehouse->id]);
+                // fixture موثوق: يثبت cost basis صريحاً بدلاً من اشتقاقه من avg_cost أثناء الاختبار.
+                $costBasis->recordReceipt($fuel, $warehouse, $openingMovement, $openingQuantity, $openingQuantity * 10);
+            }
         }
         $ownerId = User::query()->value('id');
         $this->assertNotNull($ownerId);

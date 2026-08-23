@@ -18,6 +18,7 @@ class UpdateFuelStationSettingsRequest extends FormRequest
             'reconciliation_tolerance_basis_points' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000'],
             'inventory_variance_account_id' => ['sometimes', 'nullable', 'uuid'],
             'inventory_gain_account_id' => ['sometimes', 'nullable', 'uuid'],
+            'grni_account_id' => ['sometimes', 'nullable', 'uuid'],
             'reason' => ['nullable', 'string', 'max:1000'],
         ];
     }

@@ -7,6 +7,7 @@ use App\Models\Partner;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseLine;
+use App\Models\FuelSupplierInvoice;
 use App\Services\PrintTemplates\PrintTemplateService;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
@@ -304,6 +305,14 @@ class PurchaseService
             $purchase = Purchase::lockForUpdate()->findOrFail($purchase->id);
             if (! $purchase->isDraft()) {
                 throw new RuntimeException('لا يمكن ترحيل فاتورة مشتريات غير مسوّدة (draft).');
+            }
+
+            // ربط فاتورة شراء بمطالبة وقود يعني أن استلام المحطة سبقها بالفعل
+            // عبر Dr Inventory / Cr GRNI. ترحيل PurchaseService سيخلق نفس
+            // StockMovement و1140 مرة ثانية، لذا تتولى مطابقة Cycle 3 تسوية
+            // GRNI إلى المورد ولا يسمح بهذا المسار العام أن يتجاوزها.
+            if (FuelSupplierInvoice::where('purchase_id', $purchase->id)->exists()) {
+                throw new RuntimeException('فاتورة الشراء مرتبطة باستلام وقود وGRNI؛ لا يجوز ترحيلها عبر محرك المشتريات لأنه سيكرر المخزون.');
             }
 
             // الإجماليات مشتقة من السطور (مصدر الحقيقة) قبل توليد القيد.

@@ -128,11 +128,16 @@ class InventoryService
      * يُستخدم عندما يكون القيد جزءاً من عملية أكبر (مثل مرتجع المشتريات).
      * المتوسط لا يتغيّر عند الإخراج. يجب استدعاؤه ضمن معاملة الطرف المستدعي.
      */
-    public function applyIssue(Product $product, int $quantity, int $unitCost, array $meta = []): StockMovement
+    public function applyIssue(Product $product, int $quantity, int $unitCost, array $meta = [], ?int $totalCost = null): StockMovement
     {
         if ($quantity <= 0 || $unitCost < 0) {
             throw new RuntimeException('كمية الإخراج يجب أن تكون موجبة والتكلفة غير سالبة.');
         }
+        $lineValue = $totalCost ?? ($quantity * $unitCost);
+        if ($lineValue < 0) {
+            throw new RuntimeException('قيمة الإخراج لا تكون سالبة.');
+        }
+        $recordedUnit = $totalCost !== null ? intdiv($totalCost, $quantity) : $unitCost;
 
         $newQty      = $product->quantity_on_hand - $quantity;
         $warehouseId = $this->resolveWarehouseId($meta);
@@ -149,8 +154,8 @@ class InventoryService
             'branch_id'        => $this->branchOfWarehouse($warehouseId), // الحركة تتبع فرع المخزن
             'type'             => 'out',
             'quantity'         => $quantity,
-            'unit_cost'        => $unitCost,
-            'total_cost'       => $quantity * $unitCost,
+            'unit_cost'        => $recordedUnit,
+            'total_cost'       => $lineValue,
             'balance_quantity' => $newQty,
             'source_type'      => $meta['source_type'] ?? null,
             'source_id'        => $meta['source_id'] ?? null,
