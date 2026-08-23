@@ -474,7 +474,7 @@ class PosCheckoutTest extends TestCase
         $partnerId = $this->withToken($b['token'])->postJson('/api/partners', ['name' => 'عميل المستأجر ب', 'type' => 'customer'])['data']['id'];
         $foreignCash = $this->methodBySettlement($this->methods($a), 'cash');
 
-        $this->checkout($b['token'], $partnerId, $sessionId, [$this->tender($foreignCash, 11500)])->assertNotFound();
+        $this->checkout($b['token'], $partnerId, $sessionId, [$this->tender($foreignCash, 11500)])->assertUnprocessable();
         $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
         $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
     }

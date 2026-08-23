@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Invoice;
+use App\Models\PosSession;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -88,6 +89,10 @@ class PosRecentInvoicesTest extends TestCase
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $newer['id']);
         $this->withToken($auth['token'])->getJson('/api/pos/recent-invoices?limit=0')->assertUnprocessable();
         $this->withToken($auth['token'])->getJson('/api/pos/recent-invoices?limit=51')->assertUnprocessable();
+
+        // رقم جلسة الاختبار الثاني يحتاج تمييزاً صريحاً؛ قيد الرقم الحالي
+        // على مستوى المستأجر وليس الفرع، وهذا الاختبار لا يغيّر مولد الإنتاج.
+        PosSession::whereKey($session['id'])->update(['number' => 'POS-RECENT-MAIN-001']);
 
         $otherBranch = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع فواتير آخر'])
             ->assertCreated()['data']['id'];

@@ -389,6 +389,7 @@ class PosSessionTest extends TestCase
     public function cash_drawer_open_endpoint_does_not_expose_a_session_from_another_active_branch(): void
     {
         $auth = $this->registerTenant('drawer-branch', 'owner@drawer-branch.test');
+        $mainBranch = $this->withToken($auth['token'])->getJson('/api/branches')->assertOk()['data'][0]['id'];
         $branch = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع درج آخر'])
             ->assertCreated()['data']['id'];
         $headers = ['X-Branch-Id' => $branch];
@@ -402,7 +403,8 @@ class PosSessionTest extends TestCase
             'opening_balance' => 0, 'pos_device_id' => $device,
         ])->assertCreated()['data']['id'];
 
-        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$session}/cash-drawer/open")
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $mainBranch])
+            ->postJson("/api/pos-sessions/{$session}/cash-drawer/open")
             ->assertNotFound();
         $this->assertSame(0, PosSessionEvent::where('pos_session_id', $session)
             ->where('type', PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT)->count());
