@@ -15,6 +15,8 @@ use App\Models\TenantCommercialAssignment;
 use App\Services\CommercialAssignmentService;
 use App\Services\CommercialAssignmentLifecycleService;
 use App\Services\CommercialTrialService;
+use App\Services\CommercialAccessInspectorService;
+use App\Support\ApplicationOperationClass;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,6 +27,7 @@ class PlatformCommercialAssignmentController extends ApiController
         private CommercialAssignmentService $assignments,
         private CommercialAssignmentLifecycleService $lifecycle,
         private CommercialTrialService $trials,
+        private CommercialAccessInspectorService $inspector,
     ) {}
 
     public function index(Tenant $tenant): JsonResponse
@@ -80,6 +83,15 @@ class PlatformCommercialAssignmentController extends ApiController
         );
 
         return response()->json(['data' => $this->assignmentData($assignment)], $assignment->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function inspectAccess(Request $request, Tenant $tenant, string $capabilityKey): JsonResponse
+    {
+        $operation = ApplicationOperationClass::tryFrom((string) $request->query('operation', 'read'));
+        if ($operation === null) abort(422, 'Unknown operation class.');
+        $at = $request->query('at') === null ? null : CarbonImmutable::parse((string) $request->query('at'), 'UTC');
+
+        return response()->json(['data' => $this->inspector->inspect($tenant, $capabilityKey, $operation, $at)]);
     }
 
     public function startPlanTrial(CommercialTrialStoreRequest $request, Tenant $tenant): JsonResponse
