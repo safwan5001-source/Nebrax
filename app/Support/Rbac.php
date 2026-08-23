@@ -82,6 +82,7 @@ class Rbac
             'fuel_stations.view', 'fuel_stations.manage',
             'fuel.shift.view', 'fuel.shift.open', 'fuel.shift.close', 'fuel.shift.approve',
             'fuel.shift.correct', 'fuel.shift.cash_count', 'fuel.shift.cash_variance_review',
+            'fuel.sale.view', 'fuel.sale.create', 'fuel.sale.finalize', 'fuel.sale.collect', 'fuel.sale.price.manage',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
     ];

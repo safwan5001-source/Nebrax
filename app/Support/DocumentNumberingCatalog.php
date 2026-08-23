@@ -11,6 +11,7 @@ use App\Models\EmployeeCustody;
 use App\Models\EmployeeCustodySettlement;
 use App\Models\Expense;
 use App\Models\FuelShift;
+use App\Models\FuelSale;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\ManualJournal;
@@ -162,6 +163,11 @@ class DocumentNumberingCatalog
             'model'  => FuelShift::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'FSH']],
+        ],
+        'fuel_sale' => [
+            'model'  => FuelSale::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'FSL']],
         ],
         'journal_entry' => [
             'model'  => JournalEntry::class,

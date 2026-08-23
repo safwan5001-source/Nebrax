@@ -119,6 +119,27 @@ class ZatcaTest extends TestCase
     }
 
     /** @test */
+    public function a_fractional_invoice_line_keeps_its_exact_display_quantity_in_zatca_while_using_the_rounded_official_amount(): void
+    {
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [[
+                'description' => 'بنزين 95', 'unit' => 'L',
+                'quantity_numerator' => 1234, 'quantity_denominator' => 1000,
+                'unit_price' => 230, 'tax_rate' => 0,
+            ]]
+        );
+        $posted = app(InvoiceService::class)->post($invoice);
+
+        $line = $posted->lines()->sole();
+        $this->assertSame(284, $line->rounded_gross_minor);
+        $this->assertSame('283820', $line->pricing_numerator);
+        $this->assertStringContainsString('<cbc:InvoicedQuantity>1.234</cbc:InvoicedQuantity>', $posted->zatca_xml);
+        $this->assertStringContainsString('<cbc:PriceAmount currencyID="SAR">2.30</cbc:PriceAmount>', $posted->zatca_xml);
+        $this->assertStringContainsString('<cbc:LineExtensionAmount currencyID="SAR">2.84</cbc:LineExtensionAmount>', $posted->zatca_xml);
+    }
+
+    /** @test */
     public function stored_hash_is_the_sha256_of_the_stored_xml(): void
     {
         $posted = $this->postInvoice();

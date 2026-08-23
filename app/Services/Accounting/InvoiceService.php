@@ -53,7 +53,8 @@ class InvoiceService
         protected UnitConversion $units,
         protected PaymentService $payments,
         protected PrintTemplateService $printTemplates,
-        protected ClassificationService $classifications
+        protected ClassificationService $classifications,
+        protected InvoiceLinePrecision $linePrecision,
     ) {}
 
     /**
@@ -238,11 +239,16 @@ class InvoiceService
         $items = $invoice->lines->map(function (InvoiceLine $line) use ($invoice): array {
             // عند الأسعار المتضمّنة تُخزَّن line_discount صافيةً؛ نستعيد الخصم
             // الإجمالي من إجمالي السطر كي تعيد create() حساب الضريبة نفسها.
+            // السطر النسبي لا يستخدم quantity القديمة (تبقى 1 للتوافق)، بل gross
+            // المقرب الرسمي المحفوظ، وإلا تكرر فاتورة وقود بقيمة لتر واحد فقط.
+            $lineGross = $line->quantity_numerator !== null
+                ? (int) $line->rounded_gross_minor
+                : (int) $line->quantity * (int) $line->unit_price;
             $discount = $invoice->tax_inclusive
-                ? ((int) $line->quantity * (int) $line->unit_price) - (int) $line->line_total
+                ? $lineGross - (int) $line->line_total
                 : (int) $line->line_discount;
 
-            return [
+            $item = [
                 'product_id' => $line->product_id,
                 'description' => $line->description,
                 'quantity' => $line->quantity,
@@ -262,6 +268,12 @@ class InvoiceService
                     ->values()
                     ->all(),
             ];
+            if ($line->quantity_numerator !== null) {
+                $item['quantity_numerator'] = $line->quantity_numerator;
+                $item['quantity_denominator'] = $line->quantity_denominator;
+            }
+
+            return $item;
         })->all();
 
         return $this->create($data, $items);
@@ -312,15 +324,28 @@ class InvoiceService
         $subtotal = $taxTotal = 0;
 
         foreach ($items as $item) {
-            $qty       = (int) ($item['quantity'] ?? 1);
             $unitPrice = (int) ($item['unit_price'] ?? 0);
             $rate      = (int) ($item['tax_rate'] ?? (int) Settings::get('sales', 'default_tax_rate'));
             $lineDisc  = (int) ($item['discount'] ?? 0);
 
             $product = ! empty($item['product_id']) ? Product::find($item['product_id']) : null;
+            $precision = $this->linePrecision->fromItem($item, $unitPrice);
 
-            // الوحدة تُحلّ وتُنسَخ على السطر لقطةً — لا تُحوَّل النقود، الكمية وحدها.
-            [$unitName, $unitFactor] = $this->units->resolve($product, $item['unit'] ?? null);
+            // السطر النسبي يحفظ مقدار العرض في البسط/المقام؛ تبقى quantity القديمة
+            // متوافقة مع السجلات القائمة ولا تُستعمل لحساب المال أو كمية ZATCA الجديدة.
+            if ($precision !== null) {
+                $qty = 1;
+                $unitName = $item['unit'] ?? null;
+                if (! is_string($unitName) || trim($unitName) === '') {
+                    throw new RuntimeException('السطر النسبي يحتاج اسم وحدة عرض صريحاً.');
+                }
+                $unitName = trim($unitName);
+                $unitFactor = 1;
+            } else {
+                $qty = (int) ($item['quantity'] ?? 1);
+                // الوحدة تُحلّ وتُنسَخ على السطر لقطةً — لا تُحوَّل النقود، الكمية وحدها.
+                [$unitName, $unitFactor] = $this->units->resolve($product, $item['unit'] ?? null);
+            }
 
             // والوصف يُنسَخ من اسم المنتج عند غيابه — لقطةً كالوحدة تماماً،
             // فتغيير اسم المنتج لاحقاً لا يعيد تفسير فاتورةٍ صدرت للعميل.
@@ -340,7 +365,9 @@ class InvoiceService
             $unitPriceBeforeTax = $inclusive
                 ? $unitPrice - $this->extractTax($unitPrice, $rate)
                 : $unitPrice;
-            $lineGross = $qty * $unitPrice;                    // إجمالي السطر قبل خصمه (متضمِّن أو غير متضمِّن حسب الوضع)
+            $lineGross = $precision !== null
+                ? $precision['rounded_gross_minor']
+                : $qty * $unitPrice;                    // إجمالي السطر قبل خصمه (متضمِّن أو غير متضمِّن حسب الوضع)
             if ($lineDisc < 0 || $lineDisc > $lineGross) {
                 throw new RuntimeException('خصم السطر لا يمكن أن يتجاوز إجمالي السطر.');
             }
@@ -391,6 +418,14 @@ class InvoiceService
                 'min_sale_price_override_reason' => $overrideReason,
                 'min_sale_price_overridden_by' => $overrideUserId,
                 'tax_rate'                 => $rate,
+                'quantity_numerator' => $precision['quantity_numerator'] ?? null,
+                'quantity_denominator' => $precision['quantity_denominator'] ?? null,
+                'pricing_numerator' => $precision['pricing_numerator'] ?? null,
+                'pricing_denominator' => $precision['pricing_denominator'] ?? null,
+                'rounded_gross_minor' => $precision['rounded_gross_minor'] ?? null,
+                'rounding_remainder_numerator' => $precision['rounding_remainder_numerator'] ?? null,
+                'rounding_remainder_denominator' => $precision['rounding_remainder_denominator'] ?? null,
+                'rounding_policy' => $precision['rounding_policy'] ?? null,
                 'line_subtotal' => $storedSubtotal,
                 'line_discount' => $storedDiscount,
                 'line_tax'      => $lineTax,
@@ -578,13 +613,14 @@ class InvoiceService
      *   دائن  2120 ضريبة المخرجات   15000
      * (للبيع الآجل يُستبدل 1110 بـ 1130 العملاء)
      */
-    public function post(Invoice $invoice): Invoice
+    /** @param (callable(Invoice): ?\App\Models\JournalEntry)|null $cogsResolver */
+    public function post(Invoice $invoice, ?callable $cogsResolver = null): Invoice
     {
         if (! $invoice->isDraft()) {
             throw new RuntimeException('لا يمكن ترحيل فاتورة غير مسوّدة (draft).');
         }
 
-        return DB::transaction(function () use ($invoice) {
+        return DB::transaction(function () use ($invoice, $cogsResolver) {
             // قفل الصف وإعادة فحص الحالة داخل المعاملة — يمنع الترحيل المزدوج المتزامن
             // (طلبان متوازيان يريان draft معاً ⇒ قيدان وخصم مخزون مرتان).
             $invoice = Invoice::lockForUpdate()->findOrFail($invoice->id);
@@ -696,8 +732,11 @@ class InvoiceService
                 'created_by'  => $invoice->created_by,
             ]);
 
-            // قيد تكلفة البضاعة المباعة للمنتجات المتابَعة مخزونياً (إن وُجدت)
-            $cogsEntry = $this->inventory->recordSaleCogs($invoice);
+            // المسار التقليدي يستعمل المتوسط العام. عمليات متخصصة كبيع الوقود
+            // تمرر resolver دقيقاً لكنها تبقى داخل معاملة الفاتورة ومحركها الرسمي.
+            $cogsEntry = $cogsResolver !== null
+                ? $cogsResolver($invoice)
+                : $this->inventory->recordSaleCogs($invoice);
 
             // توليد بيانات ZATCA (المرحلة 1+2) من الإجماليات النهائية المشتقة من السطور
             $invoice->subtotal   = $subtotal;

@@ -118,6 +118,40 @@ class ZatcaService
         return sprintf('%s%d.%02d', $sign, intdiv($minor, 100), $minor % 100);
     }
 
+    /** يعرض الكمية النسبية في UBL من دون تحويل عائم أو فقد دقة. */
+    private function lineQuantity(\App\Models\InvoiceLine $line): string
+    {
+        if ($line->quantity_numerator === null || $line->quantity_denominator === null) {
+            return (string) $line->quantity;
+        }
+
+        $numerator = (int) $line->quantity_numerator;
+        $denominator = (int) $line->quantity_denominator;
+        if ($numerator <= 0 || $denominator <= 0) {
+            throw new RuntimeException('كمية سطر الفاتورة النسبية غير صالحة لتمثيل ZATCA.');
+        }
+
+        $scale = 0;
+        $reduced = $denominator;
+        while ($reduced % 2 === 0) { $reduced = intdiv($reduced, 2); $scale++; }
+        while ($reduced % 5 === 0) { $reduced = intdiv($reduced, 5); $scale++; }
+        if ($reduced !== 1) {
+            throw new RuntimeException('مقام كمية سطر الفاتورة لا يمكن تمثيله عشرياً بدقة في ZATCA.');
+        }
+
+        $scale = max($scale, 3);
+        $factor = 1;
+        for ($i = 0; $i < $scale; $i++) { $factor *= 10; }
+        if ($factor % $denominator !== 0 || $numerator > intdiv(PHP_INT_MAX, intdiv($factor, $denominator))) {
+            throw new RuntimeException('كمية سطر الفاتورة تتجاوز حد تمثيل ZATCA.');
+        }
+        $scaled = $numerator * intdiv($factor, $denominator);
+        $whole = intdiv($scaled, $factor);
+        $fraction = str_pad((string) ($scaled % $factor), $scale, '0', STR_PAD_LEFT);
+
+        return rtrim(rtrim("{$whole}.{$fraction}", '0'), '.');
+    }
+
     /**
      * بناء مستند UBL 2.1 مبسّط للفاتورة (تمثيل بنيوي — غير مُتحقَّق مقابل XSD ZATCA).
      */
@@ -131,7 +165,7 @@ class ZatcaService
             $linesXml .= <<<LINE
   <cac:InvoiceLine>
     <cbc:ID>{$e($i + 1)}</cbc:ID>
-    <cbc:InvoicedQuantity>{$e($line->quantity)}</cbc:InvoicedQuantity>
+    <cbc:InvoicedQuantity>{$e($this->lineQuantity($line))}</cbc:InvoicedQuantity>
     <cbc:LineExtensionAmount currencyID="SAR">{$e($amt($line->line_subtotal))}</cbc:LineExtensionAmount>
     <cac:Item><cbc:Name>{$e($line->description ?? '-')}</cbc:Name></cac:Item>
     <cac:Price><cbc:PriceAmount currencyID="SAR">{$e($amt($line->unit_price))}</cbc:PriceAmount></cac:Price>

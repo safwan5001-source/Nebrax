@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Models\FuelStation;
+use App\Models\PaymentMethod;
+use App\Models\Tenant;
 use App\Models\FuelStationConfigurationEvent;
 use App\Models\FuelStationSettingOverride;
 use App\Models\User;
@@ -27,9 +29,17 @@ class FuelStationSettingsService
     /** @return array<string, mixed> */
     public function forTenant(): array
     {
-        $this->requireTenantContext();
+        $tenant = $this->tenant();
+        $settings = Settings::group(self::GROUP, $tenant);
 
-        return Settings::group(self::GROUP);
+        // قرار Cycle 5: السعودية تبدأ بسعر مضخة شامل للضريبة، من دون تحويل
+        // Fuel Stations إلى ميزة سعودية فقط. البلد غير السعودي أو المجهول لا
+        // يكتسب وضعاً صامتاً؛ يحسمه fuelPriceTaxMode() عند أي بيع رسمي.
+        if ($settings['fuel_price_tax_mode'] === '') {
+            $settings['fuel_price_tax_mode'] = $this->saudiDefaultFuelPriceTaxMode($tenant) ?? '';
+        }
+
+        return $settings;
     }
 
     /** @return array<string, mixed> */
@@ -44,6 +54,11 @@ class FuelStationSettingsService
             ->get();
 
         foreach ($overrides as $override) {
+            // قرار VAT لسعر الوقود محصور بالمستأجر ثم المحطة؛ لا يختلف باختلاف
+            // terminal في المضخة، حتى لو وُجد override جهاز تاريخي خاطئ.
+            if ($override->setting_key === 'fuel_price_tax_mode' && $override->device_key !== '') {
+                continue;
+            }
             $settings[$override->setting_key] = $override->value;
         }
 
@@ -55,6 +70,21 @@ class FuelStationSettingsService
         $this->assertKnownKey($key);
 
         return $this->forStation($station, $deviceKey)[$key];
+    }
+
+    /**
+     * وضع الضريبة هو قرار واحد للخدمة، لا تخمّنه الواجهة ولا خدمة التسعير.
+     * تعاد قيمة محطة صريحة إن وجدت؛ وإلا إعداد المستأجر؛ وإلا افتراض السعودية
+     * من onboarding؛ وخارج ذلك يفشل finalization قبل إنشاء مستند رسمي.
+     */
+    public function fuelPriceTaxMode(FuelStation $station): string
+    {
+        $mode = $this->get($station, 'fuel_price_tax_mode');
+        if (! in_array($mode, ['tax_inclusive', 'tax_exclusive'], true)) {
+            throw new RuntimeException('يلزم تعيين نمط ضريبة سعر الوقود للمستأجر أو المحطة قبل إنهاء البيع الرسمي.');
+        }
+
+        return $mode;
     }
 
     /** @param array<string, mixed> $values @return array<string, mixed> */
@@ -161,6 +191,9 @@ class FuelStationSettingsService
 
     public function putDevice(FuelStation $station, string $deviceKey, string $key, mixed $value, ?User $actor = null, ?string $reason = null): FuelStationSettingOverride
     {
+        if ($key === 'fuel_price_tax_mode') {
+            throw new RuntimeException('نمط ضريبة سعر الوقود لا يقبل override على مستوى الجهاز؛ استخدم المستأجر أو المحطة.');
+        }
         if (trim($deviceKey) === '') {
             throw new RuntimeException('معرّف الجهاز مطلوب لإعداد override على مستوى الجهاز.');
         }
@@ -240,10 +273,33 @@ class FuelStationSettingsService
             'shift_closing_tank_reading_required', 'shift_mandatory_staff_assignment',
             'shift_mandatory_cash_count', 'shift_supervisor_approval_required',
             'shift_allow_close_with_pending_cash_variance', 'shift_allow_close_with_unresolved_operational_variance',
+            'fuel_sales_allow_deferred_payment',
         ];
         if (in_array($key, $shiftBooleanKeys, true)) {
             if (! is_bool($value)) {
                 throw new RuntimeException('سياسة الشفت يجب أن تكون قيمة منطقية صريحة.');
+            }
+
+            return;
+        }
+
+        if ($key === 'fuel_price_tax_mode') {
+            if (! is_string($value) || ! in_array($value, ['tax_inclusive', 'tax_exclusive'], true)) {
+                throw new RuntimeException('نمط ضريبة سعر الوقود يجب أن يكون tax_inclusive أو tax_exclusive.');
+            }
+
+            return;
+        }
+
+        if ($key === 'fuel_sales_allowed_payment_method_ids') {
+            if (! is_array($value) || ! array_is_list($value) || count($value) !== count(array_unique($value))) {
+                throw new RuntimeException('قائمة طرق دفع الوقود يجب أن تكون قائمة معرفات فريدة.');
+            }
+            foreach ($value as $paymentMethodId) {
+                if (! is_string($paymentMethodId) || trim($paymentMethodId) === ''
+                    || ! PaymentMethod::whereKey($paymentMethodId)->where('is_active', true)->exists()) {
+                    throw new RuntimeException('قائمة طرق دفع الوقود تتضمن طريقة غير موجودة أو معطلة.');
+                }
             }
 
             return;
@@ -305,6 +361,22 @@ class FuelStationSettingsService
         if (! app(TenantContext::class)->has()) {
             throw new RuntimeException('إعدادات محطات الوقود تتطلب سياق مستأجر موثوقاً.');
         }
+    }
+
+    private function tenant(): Tenant
+    {
+        $this->requireTenantContext();
+
+        return Tenant::findOrFail(app(TenantContext::class)->id());
+    }
+
+    private function saudiDefaultFuelPriceTaxMode(Tenant $tenant): ?string
+    {
+        $country = strtolower(trim((string) $tenant->country));
+
+        return in_array($country, ['sa', 'ksa', 'saudi arabia', 'kingdom of saudi arabia', 'السعودية', 'المملكة العربية السعودية'], true)
+            ? 'tax_inclusive'
+            : null;
     }
 
     private function assertStationTenant(FuelStation $station): void
