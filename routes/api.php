@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FuelStationMasterDataController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
+use App\Http\Controllers\Api\FuelShiftController;
 use App\Http\Controllers\Api\FuelReconciliationController;
 use App\Http\Controllers\Api\FuelSupplyReceivingController;
 use App\Http\Controllers\Api\FinancialControlAlertController;
@@ -521,6 +522,19 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('fuel-stations/supplier-invoices/{id}', [FuelSupplyReceivingController::class, 'showInvoice'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
         Route::post('fuel-stations/supplier-invoices', [FuelSupplyReceivingController::class, 'storeInvoice'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
         Route::post('fuel-stations/supplier-invoices/{id}/matches', [FuelSupplyReceivingController::class, 'matchInvoice'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        // Cycle 4 — حقائق الشفت والـforecourt التشغيلية فقط؛ لا FuelSale/Payment/Invoice/ZATCA أو قيد تلقائي.
+        Route::get('fuel-stations/shifts', [FuelShiftController::class, 'index'])->middleware([$perm('fuel.shift.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/shifts/{id}', [FuelShiftController::class, 'show'])->middleware([$perm('fuel.shift.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/shifts/open', [FuelShiftController::class, 'open'])->middleware([$perm('fuel.shift.open'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/shifts/{id}/staff', [FuelShiftController::class, 'assignStaff'])->middleware([$perm('fuel.shift.open'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/shifts/{id}/meter-readings', [FuelShiftController::class, 'recordMeter'])->middleware([$perm('fuel.shift.open'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/shifts/{id}/tank-readings', [FuelShiftController::class, 'recordTank'])->middleware([$perm('fuel.shift.open'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/shifts/{id}/cash-movements', [FuelShiftController::class, 'recordCashMovement'])->middleware([$perm('fuel.shift.cash_count'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/shifts/{id}/close', [FuelShiftController::class, 'close'])->middleware([$perm('fuel.shift.close'), $perm('fuel.shift.cash_count'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/shifts/{id}/approve', [FuelShiftController::class, 'approve'])->middleware([$perm('fuel.shift.approve'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/shifts/{id}/cash-variance/review', [FuelShiftController::class, 'reviewCashVariance'])->middleware([$perm('fuel.shift.cash_variance_review'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::post('fuel-stations/shifts/{id}/corrections', [FuelShiftController::class, 'requestCorrection'])->middleware([$perm('fuel.shift.correct'), $commercialApp('fuel_stations.core', 'write')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));

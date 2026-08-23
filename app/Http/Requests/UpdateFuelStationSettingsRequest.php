@@ -19,6 +19,18 @@ class UpdateFuelStationSettingsRequest extends FormRequest
             'inventory_variance_account_id' => ['sometimes', 'nullable', 'uuid'],
             'inventory_gain_account_id' => ['sometimes', 'nullable', 'uuid'],
             'grni_account_id' => ['sometimes', 'nullable', 'uuid'],
+            'shift_opening_meter_reading_required' => ['sometimes', 'nullable', 'boolean'],
+            'shift_closing_meter_reading_required' => ['sometimes', 'nullable', 'boolean'],
+            'shift_opening_tank_reading_required' => ['sometimes', 'nullable', 'boolean'],
+            'shift_closing_tank_reading_required' => ['sometimes', 'nullable', 'boolean'],
+            'shift_opening_cash_float_required' => ['sometimes', 'nullable', 'boolean'],
+            'shift_mandatory_staff_assignment' => ['sometimes', 'nullable', 'boolean'],
+            'shift_mandatory_cash_count' => ['sometimes', 'nullable', 'boolean'],
+            'shift_supervisor_approval_required' => ['sometimes', 'nullable', 'boolean'],
+            'shift_allow_close_with_pending_cash_variance' => ['sometimes', 'nullable', 'boolean'],
+            'shift_allow_close_with_unresolved_operational_variance' => ['sometimes', 'nullable', 'boolean'],
+            'shift_meter_tolerance_milliliters' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'shift_tank_tolerance_milliliters' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'reason' => ['nullable', 'string', 'max:1000'],
         ];
     }

@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\EmployeeCustody;
 use App\Models\EmployeeCustodySettlement;
 use App\Models\Expense;
+use App\Models\FuelShift;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\ManualJournal;
@@ -156,6 +157,11 @@ class DocumentNumberingCatalog
             'model'  => PosSession::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'POS']],
+        ],
+        'fuel_shift' => [
+            'model'  => FuelShift::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'FSH']],
         ],
         'journal_entry' => [
             'model'  => JournalEntry::class,
