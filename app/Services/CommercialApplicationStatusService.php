@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CommercialProductVersionCapability;
 use App\Models\Tenant;
 use App\Models\TenantApplicationEntitlement;
+use App\Models\TenantCommercialAssignment;
 use App\Support\ApplicationCatalog;
 use App\Support\EntitlementSourceType;
 use App\Support\TenantApplicationEntitlementDecision;
@@ -28,9 +29,20 @@ class CommercialApplicationStatusService
             ->where('starts_at', '<=', $at)
             ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', $at))
             ->where(fn ($query) => $query->whereNull('revoked_at')->orWhere('revoked_at', '>', $at))
-            ->get(['capability_key', 'source_type']);
+            ->get(['capability_key', 'source_type', 'ends_at', 'grant_group_id']);
         $sourcesByCapability = $activeGrants->groupBy('capability_key')
             ->map(fn ($grants) => $grants->pluck('source_type')->unique()->values()->all());
+        $assignments = TenantCommercialAssignment::query()
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('id', $activeGrants->pluck('grant_group_id')->filter()->unique())
+            ->get(['id', 'scheduled_cancellation_at'])
+            ->keyBy('id');
+        $expiredTrials = TenantApplicationEntitlement::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('source_type', EntitlementSourceType::TRIAL->value)
+            ->where('ends_at', '<=', $at)
+            ->pluck('capability_key')
+            ->flip();
         $offeredCapabilities = CommercialProductVersionCapability::query()
             ->whereHas('productVersion', fn ($query) => $query->whereNotNull('published_at')->whereNull('retired_at'))
             ->pluck('capability_key')
@@ -44,10 +56,20 @@ class CommercialApplicationStatusService
                 ? 'not_applicable'
                 : ($this->dependenciesSatisfied($tenant, $application['dependencies'], $at) ? 'satisfied' : 'missing');
 
+            $trialGrant = $activeGrants->first(fn (TenantApplicationEntitlement $grant) => $grant->capability_key === $key && $grant->source_type === EntitlementSourceType::TRIAL->value);
+            $scheduledCancellation = $activeGrants
+                ->filter(fn (TenantApplicationEntitlement $grant) => $grant->capability_key === $key && $grant->grant_group_id !== null)
+                ->map(fn (TenantApplicationEntitlement $grant) => $assignments->get($grant->grant_group_id)?->scheduled_cancellation_at)
+                ->filter()
+                ->sort()
+                ->first();
             $result[$key] = [
                 'commercial' => [
                     'availability' => $availability,
                     'source_count' => count($sources),
+                    'trial_until' => $trialGrant?->ends_at?->toIso8601String(),
+                    'cancels_at' => $scheduledCancellation?->toIso8601String(),
+                    'expired' => $availability === 'not_available' && $expiredTrials->has($key),
                 ],
                 'effective_access' => $this->resolver->resolve($tenant, $key, $at)->value,
                 'dependency_status' => $dependencyStatus,

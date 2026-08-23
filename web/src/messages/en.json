@@ -4674,6 +4674,7 @@
     "securityNotice": "This information is descriptive. The server, permissions, and dependencies remain the authority for access decisions.",
     "columns": { "name": "Application", "group": "Group", "commercial": "Commercial", "access": "Effective access", "operational": "Operational", "dependencies": "Dependencies", "actions": "Actions" },
     "commercial": { "included": "Included", "addon": "Add-on", "trial": "Trial", "not_available": "Not available" },
+    "commercialDetails": { "trialUntil": "Trial until {date}", "cancelsAt": "Cancels at period end: {date}", "expired": "Expired" },
     "access": { "full": "Full", "read_only": "Read-only", "denied": "Denied" },
     "dependencies": { "satisfied": "Satisfied", "missing": "Missing", "notApplicable": "None" },
     "actions": { "addToPlan": "Add to plan", "startTrial": "Start trial", "viewHistory": "View history", "unavailable": "Unavailable" },

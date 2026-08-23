@@ -4674,6 +4674,7 @@
     "securityNotice": "البيانات المعروضة توضيحية؛ قرارات الوصول الفعلية تظل محكومة بالخادم والصلاحيات والاعتماديات.",
     "columns": { "name": "التطبيق", "group": "المجموعة", "commercial": "تجاري", "access": "الوصول الفعال", "operational": "تشغيلي", "dependencies": "الاعتماديات", "actions": "إجراءات" },
     "commercial": { "included": "مشمول", "addon": "إضافة", "trial": "تجريبي", "not_available": "غير متاح" },
+    "commercialDetails": { "trialUntil": "تجربة حتى {date}", "cancelsAt": "ينتهي مع الفترة في {date}", "expired": "منتهية" },
     "access": { "full": "كامل", "read_only": "قراءة فقط", "denied": "مرفوض" },
     "dependencies": { "satisfied": "مستوفاة", "missing": "غير مستوفاة", "notApplicable": "لا يوجد" },
     "actions": { "addToPlan": "إضافة إلى الباقة", "startTrial": "بدء التجربة", "viewHistory": "عرض السجل", "unavailable": "غير متاح" },
