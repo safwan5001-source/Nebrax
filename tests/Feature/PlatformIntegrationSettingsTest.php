@@ -74,9 +74,9 @@ class PlatformIntegrationSettingsTest extends TestCase
             'secret_access_key' => 'secret-5678',
         ])->assertOk();
 
-        $this->withToken($token)->putJson('/api/platform/integrations/document_storage', $base + [
+        $this->withToken($token)->putJson('/api/platform/integrations/document_storage', array_replace($base, [
             'bucket' => 'private-next',
-        ])->assertOk();
+        ]))->assertOk();
 
         $configuration = PlatformIntegrationSetting::where('integration_key', 'document_storage')
             ->firstOrFail()->configuration;
