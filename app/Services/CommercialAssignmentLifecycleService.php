@@ -6,6 +6,7 @@ use App\Models\PlatformAdministrator;
 use App\Models\Tenant;
 use App\Models\TenantCommercialAssignment;
 use App\Models\TenantCommercialAssignmentEvent;
+use App\Models\TenantApplicationEntitlement;
 use App\Support\EntitlementAccessMode;
 use App\Support\TenantApplicationEntitlementDecision;
 use App\Tenancy\TenantContext;
@@ -33,6 +34,7 @@ class CommercialAssignmentLifecycleService
             ->where('tenant_id', $tenant->id)
             ->first();
         if ($assignment === null) return null;
+        if (! $this->hasValidVersionRelation($assignment)) return TenantApplicationEntitlementDecision::DENIED;
 
         $at = CarbonImmutable::instance($evaluationTime)->utc();
         if ($assignment->status !== TenantCommercialAssignment::STATUS_ACTIVE || $this->shouldEnd($assignment, $at)) {
@@ -126,6 +128,17 @@ class CommercialAssignmentLifecycleService
         });
     }
 
+    private function hasValidVersionRelation(TenantCommercialAssignment $assignment): bool
+    {
+        return match ($assignment->source_type) {
+            TenantCommercialAssignment::SOURCE_PLAN => $assignment->commercial_plan_version_id !== null && $assignment->planVersion()->exists(),
+            TenantCommercialAssignment::SOURCE_ADDON => $assignment->commercial_product_version_id !== null && $assignment->productVersion()->exists(),
+            TenantCommercialAssignment::SOURCE_TRIAL => ($assignment->commercial_plan_version_id !== null && $assignment->planVersion()->exists())
+                || ($assignment->commercial_product_version_id !== null && $assignment->productVersion()->exists()),
+            default => false,
+        };
+    }
+
     private function shouldEnd(TenantCommercialAssignment $assignment, CarbonImmutable $at): bool
     {
         return ($assignment->scheduled_cancellation_at !== null && CarbonImmutable::instance($assignment->scheduled_cancellation_at)->lessThanOrEqualTo($at))
@@ -156,6 +169,14 @@ class CommercialAssignmentLifecycleService
 
     private function end(TenantCommercialAssignment $assignment, ?PlatformAdministrator $administrator, CarbonImmutable $at, ?string $reason): TenantCommercialAssignment
     {
+        $grants = TenantApplicationEntitlement::query()
+            ->where('tenant_id', $assignment->tenant_id)
+            ->where('grant_group_id', $assignment->id)
+            ->whereNull('revoked_at')
+            ->get(['capability_key', 'source_type', 'access_mode']);
+        foreach ($grants as $grant) {
+            app(EntitlementObservabilityService::class)->record('ENTITLEMENT_SOURCE_EXPIRED', $assignment->tenant_id, $grant->capability_key, $grant->source_type, $grant->access_mode, 'commercial_assignment_ended');
+        }
         $this->grants->revokeGrantGroup($assignment->tenant, $assignment->id, $administrator?->id, $at);
         $assignment->forceFill([
             'status' => 'ended',

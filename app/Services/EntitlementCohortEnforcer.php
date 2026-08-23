@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Tenant;
 use App\Support\ApplicationAccessLevel;
 use App\Support\ApplicationAccessResult;
+use App\Support\ApplicationAccessReason;
 use App\Support\ApplicationOperationClass;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -22,6 +23,7 @@ final class EntitlementCohortEnforcer
         private EntitlementRolloutPolicy $rollout,
         private ApplicationAccessDecision $decisions,
         private TenantContext $tenantContext,
+        private EntitlementObservabilityService $observability,
     ) {}
 
     public function enforce(Request $request, string $capabilityKey, ApplicationOperationClass $operation): void
@@ -30,6 +32,7 @@ final class EntitlementCohortEnforcer
             return;
         }
 
+        $startedAt = hrtime(true);
         try {
             $tenantId = $this->tenantContext->id();
             if ($tenantId === null) {
@@ -39,7 +42,9 @@ final class EntitlementCohortEnforcer
             $tenant = Tenant::query()->findOrFail($tenantId);
             $decision = $this->decisions->decide($tenant, $capabilityKey, $operation, null, CarbonImmutable::now('UTC'));
         } catch (Throwable $exception) {
+            $latency = (int) ((hrtime(true) - $startedAt) / 1_000_000);
             $this->logFailure($request, $capabilityKey, $operation, 'evaluation_failure', null, null);
+            $this->observability->record('ENTITLEMENT_ACCESS_DENIED', $this->tenantContext->id() ?? 'unknown', $capabilityKey, null, 'denied', 'evaluation_failure', $operation, $latency, $request);
             abort(403, 'هذه القدرة غير متاحة لهذه المؤسسة.');
         }
 
@@ -48,7 +53,10 @@ final class EntitlementCohortEnforcer
             return;
         }
 
+        $latency = (int) ((hrtime(true) - $startedAt) / 1_000_000);
         $this->logFailure($request, $capabilityKey, $operation, 'denied', $decision, $this->tenantContext->id());
+        $event = $decision->reason === ApplicationAccessReason::ENTITLEMENT_READ_ONLY ? 'ENTITLEMENT_READ_ONLY_BLOCK' : 'ENTITLEMENT_ACCESS_DENIED';
+        $this->observability->record($event, $this->tenantContext->id() ?? 'unknown', $capabilityKey, null, $decision->level->value, $decision->reason->value, $operation, $latency, $request);
         abort(403, 'هذه القدرة غير متاحة لهذه المؤسسة.');
     }
 

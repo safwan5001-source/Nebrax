@@ -144,6 +144,29 @@ class EntitlementFoundationTest extends TestCase
     }
 
     /** @test */
+    public function resolver_fails_closed_for_an_assignment_scoped_grant_with_a_missing_assignment_relation(): void
+    {
+        $at = CarbonImmutable::parse('2026-08-22 12:00:00', 'UTC');
+        $this->grants->grant(
+            $this->tenant,
+            'sales.invoicing',
+            EntitlementAccessMode::FULL,
+            EntitlementSourceType::PLAN,
+            $at,
+            null,
+            'commercial-plan-version',
+            '00000000-0000-4000-8000-000000000123',
+            '00000000-0000-4000-8000-000000000456',
+            'COMMERCIAL_PLAN_VERSION',
+            'corrupt assignment reference',
+            null,
+            ['commercial_assignment_id' => '00000000-0000-4000-8000-000000000456'],
+        );
+
+        $this->assertDecision(TenantApplicationEntitlementDecision::DENIED, 'sales.invoicing', $at);
+    }
+
+    /** @test */
     public function tenant_scope_prevents_cross_tenant_visibility_and_resolution(): void
     {
         $at = CarbonImmutable::parse('2026-08-22', 'UTC');

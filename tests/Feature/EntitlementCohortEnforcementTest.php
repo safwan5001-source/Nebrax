@@ -7,12 +7,15 @@ use App\Models\Purchase;
 use App\Models\Tenant;
 use App\Services\ApplicationAccessDecision;
 use App\Services\EntitlementRolloutPolicy;
+use App\Services\EntitlementCohortEnforcer;
 use App\Support\ApplicationAccessReason;
 use App\Support\ApplicationAccessResult;
+use App\Support\ApplicationOperationClass;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class EntitlementCohortEnforcementTest extends TestCase
@@ -87,6 +90,13 @@ class EntitlementCohortEnforcementTest extends TestCase
                 && ! array_key_exists('request_body', $context)
                 && ! str_contains(json_encode($context), 'private');
         });
+        Log::shouldHaveReceived('info')->once()->withArgs(fn ($message, $context) => $message === 'ENTITLEMENT_ACCESS_DENIED'
+            && $context['tenant_id'] === $auth['tenant_id']
+            && $context['capability_key'] === 'sales.pos'
+            && $context['reason'] === 'NOT_ENTITLED'
+            && $context['operation_class'] === 'read'
+            && $context['correlation_id'] === 'cohort-request-1'
+            && array_key_exists('evaluation_latency_ms', $context));
     }
 
     public function test_enforce_cohort_allows_new_allowed_decision(): void
@@ -103,12 +113,20 @@ class EntitlementCohortEnforcementTest extends TestCase
         $auth = $this->registerTenant('cohort-read-only', 'owner@cohort-read-only.test');
         config(['entitlements.mode' => 'enforce_cohort', 'entitlements.enforce_tenants' => $auth['tenant_id']]);
         $this->bindDecision(ApplicationAccessResult::readOnly(ApplicationAccessReason::ENTITLEMENT_READ_ONLY));
+        Log::spy();
 
-        $this->withToken($auth['token'])->getJson('/api/pos-sessions')->assertOk();
-        $this->withToken($auth['token'])->postJson('/api/employees', [
-            'employee_no' => 'ENT-COHORT-1',
-            'name' => 'موظف cohort',
-        ])->assertStatus(403);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        try {
+            app(EntitlementCohortEnforcer::class)->enforce(request()->duplicate([], [], [], [], [], ['REQUEST_METHOD' => 'POST']), 'sales.pos', ApplicationOperationClass::WRITE);
+            $this->fail('The cohort enforcer must fail closed for a READ_ONLY write.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+        Log::shouldHaveReceived('info')->once()->withArgs(fn ($message, $context) => $message === 'ENTITLEMENT_READ_ONLY_BLOCK'
+            && $context['tenant_id'] === $auth['tenant_id']
+            && $context['capability_key'] === 'sales.pos'
+            && $context['reason'] === 'ENTITLEMENT_READ_ONLY'
+            && $context['operation_class'] === 'write');
     }
 
     public function test_enforce_cohort_applies_to_purchase_credit_note_operation_after_source_ownership_resolution(): void
@@ -146,6 +164,10 @@ class EntitlementCohortEnforcementTest extends TestCase
         Log::shouldHaveReceived('warning')->once()->withArgs(fn ($message, $context) => $message === 'ENTITLEMENT_COHORT_ENFORCEMENT'
             && $context['event'] === 'evaluation_failure'
             && ! array_key_exists('message', $context));
+        Log::shouldHaveReceived('info')->once()->withArgs(fn ($message, $context) => $message === 'ENTITLEMENT_ACCESS_DENIED'
+            && $context['tenant_id'] === $cohort['tenant_id']
+            && $context['reason'] === 'evaluation_failure'
+            && $context['operation_class'] === 'read');
 
         $nonCohort = $this->registerTenant('outside-exception', 'owner@outside-exception.test');
         config(['entitlements.enforce_tenants' => $cohort['tenant_id']]);
