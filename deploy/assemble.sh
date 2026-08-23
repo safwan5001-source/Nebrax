@@ -33,6 +33,8 @@ cp -r "$CORE_DIR/app/Models/"*.php               app/Models/
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php      app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/"*.php               app/Services/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
+mkdir -p app/Services/DocumentCenter
+cp -r "$CORE_DIR/app/Services/DocumentCenter/"*.php app/Services/DocumentCenter/
 cp -r "$CORE_DIR/app/Services/Pos/"*.php         app/Services/Pos/
 cp -r "$CORE_DIR/app/Services/Pos/Hardware/"*.php app/Services/Pos/Hardware/
 cp -r "$CORE_DIR/app/Services/Reporting/"*.php   app/Services/Reporting/
