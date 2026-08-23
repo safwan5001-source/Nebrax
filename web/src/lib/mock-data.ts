@@ -1021,7 +1021,21 @@ export const mockSalesConfig: Record<string, unknown> = {
   einvoice: { enabled: true, phase: '2', vat_number: '310122393500003' },
   designs: { template: 'classic', theme: 'blue', show_logo: true, logo: '', logo_height: 56, sections: [], accent_color: '#1E40AF', footer_text: 'شكراً لتعاملكم معنا', terms_text: 'السداد خلال 30 يوماً من تاريخ الفاتورة.' },
   orders: { auto_convert: false, require_approval: true, prefix: 'SO' },
-  pos: { default_customer: 'عميل نقدي (POS)', print_receipt: true, allow_discount: true, receipt_footer: 'شكراً لزيارتكم' },
+  pos: {
+    default_customer: 'عميل نقدي (POS)',
+    print_receipt: true,
+    receipt_paper_size: 'thermal_80',
+    allow_discount: true,
+    receipt_footer: 'شكراً لزيارتكم',
+    enabled_payment_method_ids: [],
+    payment_methods_mode: 'all_active',
+    default_payment_method_id: 'pm-method-cash',
+    allow_deferred_payment: true,
+    show_product_images: true,
+    cash_drawer_enabled: false,
+    cash_drawer_driver: 'unavailable',
+    cash_drawer_auto_open_after_cash: false,
+  },
 };
 
 export const mockBranches = [
@@ -1785,6 +1799,29 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const salesConfigMatch = clean.match(/^\/sales-config\/([^/]+)$/);
   if (salesConfigMatch) return resolve({ data: mockSalesConfig[salesConfigMatch[1]] ?? [] });
   if (clean === '/users') return resolve({ data: mockUsers });
+  if (clean === '/pos/products') {
+    return resolve({
+      data: mockProducts.filter((product) => product.is_active).map((product) => ({
+        id: product.id,
+        sku: product.sku,
+        barcode: product.barcode,
+        name: product.name,
+        sale_price: product.sale_price,
+        pos_units: [{ name: product.unit, factor: 1, price: product.sale_price }],
+        pos_barcodes: product.barcode
+          ? [{ code: product.barcode, unit_name: product.unit, default_quantity: 1 }]
+          : [],
+        pos_image: null,
+        category_id: null,
+        category: product.category,
+        tax_rate: product.tax_rate,
+        type: product.type,
+        track_inventory: product.track_inventory,
+        quantity_on_hand: product.quantity_on_hand,
+        is_active: product.is_active,
+      })),
+    });
+  }
   if (clean === '/products') return resolve({ data: mockProducts });
   if (clean === '/branches') return resolve({ data: mockBranches, main_branch_id: mockBranchSettings.main_branch_id });
   if (clean === '/warehouses') return resolve({ data: mockWarehouses });
@@ -1805,6 +1842,24 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: b });
   }
   if (clean === '/pos-sessions') return resolve({ data: mockPosSessions });
+  if (clean === '/pos/recent-invoices') {
+    return resolve({
+      data: mockInvoices
+        .filter((invoice) => invoice.status === 'posted')
+        .slice(0, 5)
+        .map((invoice) => ({
+          id: invoice.id,
+          number: invoice.number,
+          invoice_date: invoice.invoice_date,
+          created_at: `${invoice.invoice_date}T10:00:00`,
+          customer_name: mockPartners.find((partner) => partner.id === invoice.partner_id)?.name ?? null,
+          total: invoice.total,
+          payment_status: invoice.payment_status,
+          payment_methods: invoice.payment_type === 'cash' ? ['نقدي'] : [],
+          status: invoice.status,
+        })),
+    });
+  }
   const posReportMatch = clean.match(/^\/pos-sessions\/([^/]+)\/report$/);
   if (posReportMatch) {
     const s = mockPosSessions.find((x) => x.id === posReportMatch[1]) ?? mockPosSessions[0];

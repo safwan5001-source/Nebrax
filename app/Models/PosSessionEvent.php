@@ -19,6 +19,7 @@ class PosSessionEvent extends BaseModel
     public const TYPE_EXCHANGE_RECORDED = 'exchange_recorded';
     public const TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT = 'closing_difference_requires_acknowledgement';
     public const TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED = 'closing_difference_acknowledged';
+    public const TYPE_CASH_DRAWER_OPEN_ATTEMPT = 'cash_drawer_open_attempt';
 
     public const TYPES = [
         self::TYPE_CASH_IN_RECORDED,
@@ -27,6 +28,7 @@ class PosSessionEvent extends BaseModel
         self::TYPE_EXCHANGE_RECORDED,
         self::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT,
         self::TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED,
+        self::TYPE_CASH_DRAWER_OPEN_ATTEMPT,
     ];
 
     public $timestamps = false;

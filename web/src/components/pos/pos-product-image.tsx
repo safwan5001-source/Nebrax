@@ -15,14 +15,18 @@ export function PosProductImage({ path, alt }: { path: string | null | undefined
       setUrl(null);
       return undefined;
     }
-    void fetchImageUrl(path).then((value) => {
-      if (!live) {
-        if (value) URL.revokeObjectURL(value);
-        return;
-      }
-      objectUrl = value;
-      setUrl(value);
-    });
+    void fetchImageUrl(path)
+      .then((value) => {
+        if (!live) {
+          if (value) URL.revokeObjectURL(value);
+          return;
+        }
+        objectUrl = value;
+        setUrl(value);
+      })
+      .catch(() => {
+        if (live) setUrl(null);
+      });
     return () => {
       live = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -32,7 +36,7 @@ export function PosProductImage({ path, alt }: { path: string | null | undefined
   if (!url) {
     return (
       <span className="grid h-full w-full place-items-center bg-background text-muted" aria-hidden>
-        <ImageIcon className="h-6 w-6" strokeWidth={1.5} />
+        <ImageIcon className="h-5 w-5" strokeWidth={1.5} />
       </span>
     );
   }

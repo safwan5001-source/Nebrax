@@ -57,7 +57,7 @@ jobs:
       #  الـ CI هنا** برسالة تقول أين يُضاف.
       - name: حارس قائمة النسخ
         run: |
-          ALLOWED="app/Models app/Models/Concerns app/Services app/Services/Accounting \
+          ALLOWED="app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/Pos app/Services/Pos/Hardware \
                    app/Services/Reporting app/Services/PrintTemplates app/Support app/Tenancy \
                    app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Providers \
@@ -99,7 +99,7 @@ jobs:
         run: |
           CORE="$GITHUB_WORKSPACE"
           cd "$APP_DIR"
-          mkdir -p app/Services app/Services/Accounting app/Services/Reporting app/Services/PrintTemplates app/Support \
+          mkdir -p app/Services app/Services/Accounting app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
                    app/Models/Concerns tests/Feature routes
@@ -108,6 +108,8 @@ jobs:
           cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
           cp -r "$CORE/app/Services/"*.php                app/Services/ 2>/dev/null || true
           cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
+          cp -r "$CORE/app/Services/Pos/"*.php            app/Services/Pos/
+          cp -r "$CORE/app/Services/Pos/Hardware/"*.php   app/Services/Pos/Hardware/
           cp -r "$CORE/app/Services/Reporting/"*.php      app/Services/Reporting/
           cp -r "$CORE/app/Services/PrintTemplates/"*.php app/Services/PrintTemplates/
           cp -r "$CORE/app/Support/"*.php                 app/Support/

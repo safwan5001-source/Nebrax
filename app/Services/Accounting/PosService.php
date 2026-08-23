@@ -7,6 +7,7 @@ use App\Models\PaymentMethod;
 use App\Models\PriceList;
 use App\Models\Product;
 use App\Support\PosSettings;
+use App\Services\Pos\CashDrawerService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -29,6 +30,7 @@ class PosService
         protected PosSessionService $sessions,
         protected CashBankAccountService $cashBankAccounts,
         protected PosCustomerPriceListResolver $customerPriceLists,
+        protected CashDrawerService $cashDrawer,
     ) {}
 
     /**
@@ -41,7 +43,8 @@ class PosService
             throw new RuntimeException('البيع يجب أن يحتوي على سطر واحد على الأقل.');
         }
 
-        return DB::transaction(function () use ($data) {
+        $drawerAttempt = null;
+        $invoice = DB::transaction(function () use ($data, &$drawerAttempt) {
             // تُقفل الجلسة وتتحقق قبل إنشاء أي مستند: لا بيع يُلحق بورديّة مغلقة
             // أو بكاشير/فرع آخر، ويظل القفل قائماً حتى اكتمال الفاتورة وسنداتها.
             $session = $this->sessions->requireOpenForCheckout(
@@ -60,6 +63,7 @@ class PosService
             // تضمن تهيئة المؤسسة الجديدة كتالوجاً تشغيلياً واحداً فقط، ولا تعيد
             // أي وسيلة حذفها مالكها بعد وجود الكتالوج.
             $this->cashBankAccounts->bootstrapDefaults();
+            $this->assertPosPaymentMethodsAvailable();
             $tenders = $this->normalizedTenders($data['tenders'] ?? []);
             $methods = $this->configuredPaymentMethods($tenders);
 
@@ -124,8 +128,26 @@ class PosService
                 throw new RuntimeException('الدفع الآجل غير مفعّل في إعدادات نقطة البيع، ويجب سداد كامل الإجمالي.');
             }
 
+            // تجمع نية فتح الدرج فقط داخل المعاملة. التنفيذ الفعلي يقع بعد commit
+            // كي لا يستطيع عطل موصل مادي عكس الفاتورة أو سندات القبض المكتملة.
+            $drawer = PosSettings::group();
+            $hasCashTender = collect($tenders)->contains(fn (array $tender) => ($methods[$tender['payment_method_id']]->settlement_type ?? null) === 'cash');
+            if (($drawer['cash_drawer_enabled'] ?? false)
+                && ($drawer['cash_drawer_auto_open_after_cash'] ?? false)
+                && $hasCashTender) {
+                $drawerAttempt = [$session, $data['actor'] ?? null, $invoice];
+            }
+
             return $invoice->fresh(['lines']);
         });
+
+        if ($drawerAttempt !== null) {
+            [$session, $actor, $drawerInvoice] = $drawerAttempt;
+            // خدمة الجهاز تحوّل كل عطل إلى نتيجة وسجل تدقيق؛ لا يعاد رميه لمسار البيع.
+            $this->cashDrawer->openAfterCashPayment($session, $actor, $drawerInvoice);
+        }
+
+        return $invoice;
     }
 
     /** يرفض المنتج المصنّف خارج سياسة POS، مع إبقاء السطر الوصفي بلا منتج مشروعاً. */
@@ -238,8 +260,12 @@ class PosService
     /** يختار أقدم وسيلة نشطة من نوع التسوية التاريخي، مع تفضيل الافتراضي إن وُجد. */
     private function legacyPaymentMethodId(string $settlementType): string
     {
-        $method = PaymentMethod::where('settlement_type', $settlementType)
-            ->where('is_active', true)
+        $query = PaymentMethod::where('settlement_type', $settlementType)
+            ->where('is_active', true);
+        if (PosSettings::paymentMethodsMode() === PosSettings::PAYMENT_METHODS_ONLY) {
+            $query->whereIn('id', PosSettings::enabledPaymentMethodIds());
+        }
+        $method = $query
             ->orderByDesc('is_default')
             ->orderBy('created_at')
             ->first();
@@ -248,6 +274,23 @@ class PosService
         }
 
         return $method->id;
+    }
+
+    /** يرفض البيع قبل إنشاء الفاتورة إن أوقف المالك التحصيل أو لم يبقَ اختيار صالح. */
+    private function assertPosPaymentMethodsAvailable(): void
+    {
+        $mode = PosSettings::paymentMethodsMode();
+        if ($mode === PosSettings::PAYMENT_METHODS_NONE) {
+            throw new RuntimeException('لا توجد طرق دفع مفعلة لنقطة البيع.');
+        }
+
+        $query = PaymentMethod::where('is_active', true);
+        if ($mode === PosSettings::PAYMENT_METHODS_ONLY) {
+            $query->whereIn('id', PosSettings::enabledPaymentMethodIds());
+        }
+        if (! $query->exists()) {
+            throw new RuntimeException('لا توجد طرق دفع مفعلة لنقطة البيع.');
+        }
     }
 
     /** يفرض النشاط وإعداد POS قبل إصدار الفاتورة، فلا ينتج أي مستند عند مخالفة السياسة. */

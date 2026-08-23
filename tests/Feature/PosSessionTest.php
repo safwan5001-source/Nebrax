@@ -357,6 +357,60 @@ class PosSessionTest extends TestCase
     }
 
     /** @test */
+    public function cash_drawer_open_endpoint_requires_the_dedicated_permission_and_audits_the_unsupported_attempt(): void
+    {
+        $auth = $this->registerTenant('drawer-contract', 'owner@drawer-contract.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->openSession($auth);
+        $staff = $this->tokenForRole($auth['tenant_id'], 'staff', 'drawer-staff@drawer-contract.test');
+
+        $this->withToken($staff)->postJson("/api/pos-sessions/{$id}/cash-drawer/open", [
+            'reason' => 'محاولة بلا صلاحية',
+        ])->assertForbidden();
+        $this->assertSame(0, PosSessionEvent::where('pos_session_id', $id)
+            ->where('type', PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT)->count());
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/cash-drawer/open", [
+            'reason' => 'اختبار عقد الموصل غير المهيأ',
+        ])->assertStatus(409)
+            ->assertJsonPath('data.status', 'unsupported')
+            ->assertJsonPath('data.error_code', 'cash_drawer_driver_unavailable');
+
+        $event = PosSessionEvent::where('pos_session_id', $id)
+            ->where('type', PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT)->sole();
+        $this->assertSame('manual', $event->payload['mode']);
+        $this->assertSame('unsupported', $event->payload['status']);
+        $this->assertSame('cash_drawer_driver_unavailable', $event->payload['error_code']);
+        $this->expectException(\LogicException::class);
+        $event->update(['type' => 'tampered']);
+    }
+
+    /** @test */
+    public function cash_drawer_open_endpoint_does_not_expose_a_session_from_another_active_branch(): void
+    {
+        $auth = $this->registerTenant('drawer-branch', 'owner@drawer-branch.test');
+        $mainBranch = $this->withToken($auth['token'])->getJson('/api/branches')->assertOk()['data'][0]['id'];
+        $branch = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع درج آخر'])
+            ->assertCreated()['data']['id'];
+        $headers = ['X-Branch-Id' => $branch];
+        $warehouse = $this->withToken($auth['token'])->withHeaders($headers)->postJson('/api/warehouses', [
+            'name' => 'مخزن درج الفرع', 'code' => 'DRAWER-BRANCH-W', 'branch_id' => $branch, 'is_active' => true,
+        ])->assertCreated()['data']['id'];
+        $device = $this->withToken($auth['token'])->withHeaders($headers)->postJson('/api/pos-devices', [
+            'name' => 'كاشير درج الفرع', 'code' => 'DRAWER-BRANCH', 'warehouse_id' => $warehouse, 'is_active' => true,
+        ])->assertCreated()['data']['id'];
+        $session = $this->withToken($auth['token'])->withHeaders($headers)->postJson('/api/pos-sessions/open', [
+            'opening_balance' => 0, 'pos_device_id' => $device,
+        ])->assertCreated()['data']['id'];
+
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $mainBranch])
+            ->postJson("/api/pos-sessions/{$session}/cash-drawer/open")
+            ->assertNotFound();
+        $this->assertSame(0, PosSessionEvent::where('pos_session_id', $session)
+            ->where('type', PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT)->count());
+    }
+
+    /** @test */
     public function sessions_and_devices_are_tenant_isolated(): void
     {
         $a = $this->registerTenant('acme', 'owner@acme.test');

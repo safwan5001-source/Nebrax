@@ -38,7 +38,7 @@ export function cartHasUnsavedData(cart: PosActiveCart): boolean {
   return cart.items.length > 0 || cart.customer !== null || cart.note.trim().length > 0;
 }
 
-function parseStored(value: string): { carts: PosActiveCart[]; activeId: string } | null {
+export function parseStoredPosActiveCarts(value: string): { carts: PosActiveCart[]; activeId: string } | null {
   try {
     const parsed = JSON.parse(value) as { carts?: unknown; activeId?: unknown };
     if (!Array.isArray(parsed.carts) || parsed.carts.length === 0 || typeof parsed.activeId !== 'string') return null;
@@ -57,6 +57,22 @@ function parseStored(value: string): { carts: PosActiveCart[]; activeId: string 
   }
 }
 
+/** تضمن أن استعادة عملية معلّقة لا تنسخ السلة نفسها عند النقر المتكرر. */
+export function appendPosActiveCart(carts: PosActiveCart[], cart: PosActiveCart): PosActiveCart[] {
+  return carts.some((current) => current.id === cart.id) ? carts : [...carts, cart];
+}
+
+/** إغلاق سلة لا يترك شاشة بلا سلة؛ آخر سلة تُستبدل بمسودة جديدة مستقلة. */
+export function closePosActiveCart(carts: PosActiveCart[], activeId: string, idToClose: string, defaultTaxInclusive: boolean): { carts: PosActiveCart[]; activeId: string } {
+  const remaining = carts.filter((cart) => cart.id !== idToClose);
+  if (remaining.length > 0) {
+    return { carts: remaining, activeId: idToClose === activeId ? remaining[0].id : activeId };
+  }
+
+  const fresh = createPosActiveCart(1, defaultTaxInclusive);
+  return { carts: [fresh], activeId: fresh.id };
+}
+
 /**
  * السلات النشطة مسودات واجهية فقط. تحفظ كل سلة بصورة مستقلة ولا تُصبح مصدراً
  * مالياً؛ يبقى الخادم حارس السعر والمخزون والدفع عند checkout أو التعليق.
@@ -70,7 +86,7 @@ export function usePosActiveCarts({ storageKey, defaultTaxInclusive }: { storage
   useEffect(() => {
     if (!storageKey || loadedKeyRef.current === storageKey) return;
     const stored = localStorage.getItem(storageKey);
-    const parsed = stored ? parseStored(stored) : null;
+    const parsed = stored ? parseStoredPosActiveCarts(stored) : null;
     if (parsed) {
       setCarts(parsed.carts);
       setActiveCartId(parsed.activeId);
@@ -106,7 +122,7 @@ export function usePosActiveCarts({ storageKey, defaultTaxInclusive }: { storage
   }, []);
 
   const openCart = useCallback((cart: PosActiveCart) => {
-    setCarts((current) => [...current, cart]);
+    setCarts((current) => appendPosActiveCart(current, cart));
     setActiveCartId(cart.id);
   }, []);
 
@@ -118,15 +134,9 @@ export function usePosActiveCarts({ storageKey, defaultTaxInclusive }: { storage
   }, [carts, defaultTaxInclusive]);
 
   const closeCart = useCallback((idToClose: string) => {
-    const remaining = carts.filter((cart) => cart.id !== idToClose);
-    if (remaining.length > 0) {
-      setCarts(remaining);
-      if (idToClose === activeCartId) setActiveCartId(remaining[0].id);
-      return;
-    }
-    const fresh = createPosActiveCart(1, defaultTaxInclusive);
-    setCarts([fresh]);
-    setActiveCartId(fresh.id);
+    const next = closePosActiveCart(carts, activeCartId, idToClose, defaultTaxInclusive);
+    setCarts(next.carts);
+    setActiveCartId(next.activeId);
   }, [activeCartId, carts, defaultTaxInclusive]);
 
   return {

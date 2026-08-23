@@ -25,6 +25,9 @@ final class PosSettings
     public const PRODUCT_CATEGORY_VISIBILITY_EXCEPT = 'except';
     public const RECEIPT_PAPER_THERMAL_58 = 'thermal_58';
     public const RECEIPT_PAPER_THERMAL_80 = 'thermal_80';
+    public const PAYMENT_METHODS_ALL_ACTIVE = 'all_active';
+    public const PAYMENT_METHODS_ONLY = 'only';
+    public const PAYMENT_METHODS_NONE = 'none';
 
     private const DEFAULTS = [
         'default_customer'   => 'عميل نقدي (POS)',
@@ -37,6 +40,9 @@ final class PosSettings
         // قائمة فارغة تعني «كل الوسائل النشطة»: لا تتغير شاشة POS للمستأجر
         // القائم عند ترقية المرحلة قبل أن يختار تقييداً صريحاً.
         'enabled_payment_method_ids' => [],
+        // «الكل» و«المحدد» و«لا شيء» حالات مختلفة صراحةً؛ لا تجعل قائمة فارغة
+        // غامضة بين التوافق التاريخي ومنع التحصيل في محطة POS.
+        'payment_methods_mode' => self::PAYMENT_METHODS_ALL_ACTIVE,
         // اختيار عرضي للواجهة؛ تظل صلاحية الطريقة وتفعيلها مفروضة في الخدمة.
         'default_payment_method_id' => null,
         // قائمة السعر الافتراضية للعميل تُطبّق افتراضياً؛ الكاشير والخدمة يعيدان
@@ -63,6 +69,11 @@ final class PosSettings
         // صور الكتالوج تفضيل عرض خاص بنقطة البيع فقط؛ يبقى مفعّلاً افتراضياً
         // حتى تتوافق المنشآت القائمة مع عرض صور المنتجات عند توافرها.
         'show_product_images' => true,
+        // لا يوجد موصل أجهزة في النشر الحالي؛ تبقى إعدادات العقد مرئية وقابلة
+        // للقراءة، لكن لا يمكن تحويلها إلى فتح مادي قبل تسجيل Driver مدعوم.
+        'cash_drawer_enabled' => false,
+        'cash_drawer_driver' => 'unavailable',
+        'cash_drawer_auto_open_after_cash' => false,
     ];
 
     /** جميع إعدادات POS، مدموجة فوق الافتراضات المعتمدة. */
@@ -70,6 +81,13 @@ final class PosSettings
     {
         $tenant ??= self::tenant();
         $stored = $tenant?->settings['sales_config']['pos'] ?? [];
+        // التوافق مع الإعدادات القديمة: قائمة فارغة كانت تعني كل الطرق النشطة،
+        // وغير الفارغة كانت تعني تقييد POS بالمعرفات المحفوظة.
+        if (! array_key_exists('payment_methods_mode', $stored)) {
+            $stored['payment_methods_mode'] = empty($stored['enabled_payment_method_ids'])
+                ? self::PAYMENT_METHODS_ALL_ACTIVE
+                : self::PAYMENT_METHODS_ONLY;
+        }
 
         return array_merge(self::DEFAULTS, array_intersect_key($stored, self::DEFAULTS));
     }
@@ -85,12 +103,24 @@ final class PosSettings
         return array_values(array_unique(array_filter($ids, fn (mixed $id) => is_string($id) && $id !== '')));
     }
 
-    /** لا تتجاوز واجهة الكاشير الوسائل التي قيّدها المالك، مع توافق القائمة الفارغة. */
+    /** وضع إتاحة التحصيل في POS؛ القيمة غير المعروفة تعود للتوافق الآمن مع الكل النشط. */
+    public static function paymentMethodsMode(?Tenant $tenant = null): string
+    {
+        $mode = self::group($tenant)['payment_methods_mode'];
+
+        return in_array($mode, [self::PAYMENT_METHODS_ALL_ACTIVE, self::PAYMENT_METHODS_ONLY, self::PAYMENT_METHODS_NONE], true)
+            ? $mode
+            : self::PAYMENT_METHODS_ALL_ACTIVE;
+    }
+
+    /** لا تتجاوز واجهة الكاشير الوسائل التي قيّدها المالك، مع تمييز «لا شيء» صراحةً. */
     public static function allowsPaymentMethod(string $paymentMethodId, ?Tenant $tenant = null): bool
     {
-        $enabled = self::enabledPaymentMethodIds($tenant);
-
-        return $enabled === [] || in_array($paymentMethodId, $enabled, true);
+        return match (self::paymentMethodsMode($tenant)) {
+            self::PAYMENT_METHODS_NONE => false,
+            self::PAYMENT_METHODS_ONLY => in_array($paymentMethodId, self::enabledPaymentMethodIds($tenant), true),
+            default => true,
+        };
     }
 
     /** المعرّف الافتراضي المفضّل للعرض؛ قد يعود null إن لم يحدد المالك وسيلة. */

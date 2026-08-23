@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, Banknote, CalendarClock, Check, Landmark, Printer, User } from 'lucide-react';
+import { ArrowRight, Banknote, CalendarClock, Check, Landmark, User } from 'lucide-react';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
 export interface PaymentSummaryItem { name: string; qty: number; unitPrice: string; lineTotal: number }
@@ -72,8 +72,8 @@ export function PosPayment({
   const changeMinor = Math.max(0, paidMinor - totalMinor);
   const canConfirm = totalMinor > 0
     && !paymentMethodsLoadError
-    && (allowDeferredPayment || paidMinor >= totalMinor)
-    && (paymentMethods.length > 0 || allowDeferredPayment);
+    && paymentMethods.length > 0
+    && (allowDeferredPayment || paidMinor >= totalMinor);
   const quick = [totalMinor / 100, 50, 100, 200, 500];
   const selectedMethod = paymentMethods.find((method) => method.id === selectedMethodId) ?? null;
 
@@ -222,11 +222,7 @@ export function PosPayment({
         </main>
       </div>
 
-      <footer className="flex shrink-0 gap-3 border-t border-border bg-surface p-4">
-        <button className="flex items-center gap-2 rounded-xl border border-border px-5 py-3 text-[13.5px] font-semibold text-text hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40">
-          <Printer className="h-4 w-4" strokeWidth={1.8} />
-          {t('preprint')}
-        </button>
+      <footer className="flex shrink-0 border-t border-border bg-surface p-4">
         <button
           onClick={() => onConfirm(tenderPayload())}
           disabled={!canConfirm || paying || paymentMethodsLoading}

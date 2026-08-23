@@ -63,6 +63,7 @@ class SalesConfigTest extends TestCase
         $this->withToken($token)->getJson('/api/sales-config/pos')
             ->assertOk()
             ->assertJsonPath('data.enabled_payment_method_ids', [])
+            ->assertJsonPath('data.payment_methods_mode', 'all_active')
             ->assertJsonPath('data.default_payment_method_id', null)
             ->assertJsonPath('data.receipt_paper_size', 'thermal_80')
             ->assertJsonPath('data.apply_customer_price_list', true)
@@ -80,6 +81,7 @@ class SalesConfigTest extends TestCase
             ],
         ])->assertOk()
             ->assertJsonPath('data.enabled_payment_method_ids.0', $cash['id'])
+            ->assertJsonPath('data.payment_methods_mode', 'only')
             ->assertJsonPath('data.default_payment_method_id', $cash['id'])
             ->assertJsonPath('data.receipt_paper_size', 'thermal_58')
             ->assertJsonPath('data.apply_customer_price_list', false)
@@ -89,11 +91,71 @@ class SalesConfigTest extends TestCase
         $this->withToken($token)->getJson('/api/sales-config/pos')
             ->assertOk()
             ->assertJsonPath('data.enabled_payment_method_ids.1', $bank['id'])
+            ->assertJsonPath('data.payment_methods_mode', 'only')
             ->assertJsonPath('data.default_payment_method_id', $cash['id'])
             ->assertJsonPath('data.receipt_paper_size', 'thermal_58')
             ->assertJsonPath('data.apply_customer_price_list', false)
             ->assertJsonPath('data.allow_unit_price_override', true)
             ->assertJsonPath('data.allow_deferred_payment', false);
+    }
+
+    /** @test */
+    public function pos_payment_modes_allow_an_explicitly_empty_set_and_reject_foreign_or_inconsistent_defaults(): void
+    {
+        ['token' => $token] = $this->registerTenant('payment-modes', 'owner@payment-modes.test');
+        $cash = collect($this->withToken($token)->getJson('/api/payment-methods')->assertOk()['data'])
+            ->firstWhere('settlement_type', 'cash');
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => [
+                'payment_methods_mode' => 'none',
+                'enabled_payment_method_ids' => [],
+                'default_payment_method_id' => null,
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.payment_methods_mode', 'none')
+            ->assertJsonPath('data.enabled_payment_method_ids', [])
+            ->assertJsonPath('data.default_payment_method_id', null);
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => [
+                'payment_methods_mode' => 'none',
+                'default_payment_method_id' => $cash['id'],
+            ],
+        ])->assertUnprocessable();
+
+        ['token' => $otherToken] = $this->registerTenant('foreign-payment-mode', 'owner@foreign-payment-mode.test');
+        $foreignCash = collect($this->withToken($otherToken)->getJson('/api/payment-methods')->assertOk()['data'])
+            ->firstWhere('settlement_type', 'cash');
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => [
+                'payment_methods_mode' => 'only',
+                'enabled_payment_method_ids' => [$foreignCash['id']],
+                'default_payment_method_id' => null,
+            ],
+        ])->assertUnprocessable();
+    }
+
+    /** @test */
+    public function pos_cash_drawer_settings_remain_read_only_until_a_supported_connector_is_commissioned(): void
+    {
+        ['token' => $token] = $this->registerTenant('drawer-settings', 'owner@drawer-settings.test');
+
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.cash_drawer_enabled', false)
+            ->assertJsonPath('data.cash_drawer_driver', 'unavailable')
+            ->assertJsonPath('data.cash_drawer_auto_open_after_cash', false);
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['cash_drawer_enabled' => true],
+        ])->assertUnprocessable();
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['cash_drawer_driver' => 'escpos'],
+        ])->assertUnprocessable();
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['cash_drawer_auto_open_after_cash' => true],
+        ])->assertUnprocessable();
     }
 
     /** @test */
