@@ -22,6 +22,7 @@ use App\Support\TenantApplicationEntitlementDecision;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class CommercialAssignmentLifecycleTest extends TestCase
@@ -116,7 +117,16 @@ class CommercialAssignmentLifecycleTest extends TestCase
 
         $this->assertSame(TenantApplicationEntitlementDecision::FULL, app(TenantApplicationEntitlementResolver::class)->resolve($tenant, 'hr.employees', $scheduled->subSecond()));
         $this->assertSame(TenantApplicationEntitlementDecision::DENIED, app(TenantApplicationEntitlementResolver::class)->resolve($tenant, 'hr.employees', $scheduled));
+        Log::spy();
         $lifecycle->reconcile($assignment, null, $scheduled);
+        Log::shouldHaveReceived('info')->withArgs(fn ($message, $context) => $message === 'ENTITLEMENT_SOURCE_EXPIRED'
+            && $context['tenant_id'] === $tenant->id
+            && $context['capability_key'] === 'hr.employees'
+            && $context['reason'] === 'commercial_assignment_ended')->once();
+        Log::shouldHaveReceived('info')->withArgs(fn ($message, $context) => $message === 'COMMERCIAL_ASSIGNMENT_REVOKED'
+            && $context['tenant_id'] === $tenant->id
+            && $context['capability_key'] === 'hr.employees'
+            && $context['reason'] === 'grant_group_revoked')->once();
 
         $this->assertSame('ended', $assignment->fresh()->status);
         $this->assertDatabaseHas('tenant_commercial_assignment_events', ['tenant_commercial_assignment_id' => $assignment->id, 'action' => TenantCommercialAssignmentEvent::ACTION_CANCELLATION_SCHEDULED]);

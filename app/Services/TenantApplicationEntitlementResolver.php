@@ -27,10 +27,13 @@ class TenantApplicationEntitlementResolver
                 ->where('starts_at', '<=', $at)
                 ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', $at))
                 ->where(fn ($query) => $query->whereNull('revoked_at')->orWhere('revoked_at', '>', $at))
-                ->get(['access_mode', 'grant_group_id']);
+                ->get(['access_mode', 'grant_group_id', 'metadata']);
 
             $effectiveModes = $grants->map(function (TenantApplicationEntitlement $grant) use ($tenant, $at): string {
                 $lifecycle = $this->commercialLifecycle->accessForGrant($tenant, $grant->grant_group_id, $at);
+                if (is_array($grant->metadata) && array_key_exists('commercial_assignment_id', $grant->metadata) && $lifecycle === null) {
+                    return TenantApplicationEntitlementDecision::DENIED->value;
+                }
                 if ($lifecycle === TenantApplicationEntitlementDecision::DENIED) return TenantApplicationEntitlementDecision::DENIED->value;
                 if ($lifecycle === TenantApplicationEntitlementDecision::READ_ONLY) return EntitlementAccessMode::READ_ONLY->value;
 

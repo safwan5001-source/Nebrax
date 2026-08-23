@@ -53,7 +53,7 @@ class EntitlementGrantService
         ];
         $idempotencyKey = hash('sha256', json_encode($identity, JSON_THROW_ON_ERROR));
 
-        return TenantApplicationEntitlement::query()->firstOrCreate(
+        $grant = TenantApplicationEntitlement::query()->firstOrCreate(
             ['tenant_id' => $tenant->getKey(), 'idempotency_key' => $idempotencyKey],
             [
                 'capability_key' => $capabilityKey, 'access_mode' => $accessMode->value,
@@ -64,6 +64,18 @@ class EntitlementGrantService
                 'metadata' => $metadata,
             ],
         );
+        if (in_array($sourceType, [EntitlementSourceType::PLAN, EntitlementSourceType::ADDON, EntitlementSourceType::TRIAL], true)) {
+            app(EntitlementObservabilityService::class)->record(
+                'COMMERCIAL_ASSIGNMENT_APPLIED',
+                $tenant->getKey(),
+                $capabilityKey,
+                $sourceType->value,
+                $accessMode->value,
+                $grant->wasRecentlyCreated ? 'assignment_applied' : 'idempotent_replay',
+            );
+        }
+
+        return $grant;
     }
 
     public function revokeGrantGroup(
@@ -77,7 +89,12 @@ class EntitlementGrantService
             throw ValidationException::withMessages(['tenant' => 'The trusted tenant does not match the active tenant context.']);
         }
 
-        return TenantApplicationEntitlement::query()
+        $grants = TenantApplicationEntitlement::query()
+            ->where('tenant_id', $tenant->getKey())
+            ->where('grant_group_id', $grantGroupId)
+            ->whereNull('revoked_at')
+            ->get(['capability_key', 'source_type', 'access_mode']);
+        $revoked = TenantApplicationEntitlement::query()
             ->where('tenant_id', $tenant->getKey())
             ->where('grant_group_id', $grantGroupId)
             ->whereNull('revoked_at')
@@ -85,6 +102,11 @@ class EntitlementGrantService
                 'revoked_at' => CarbonImmutable::instance($revokedAt ?? now())->utc(),
                 'revoked_by_platform_administrator_id' => $revokedByPlatformAdministratorId,
             ]);
+        foreach ($grants as $grant) {
+            app(EntitlementObservabilityService::class)->record('COMMERCIAL_ASSIGNMENT_REVOKED', $tenant->getKey(), $grant->capability_key, $grant->source_type, $grant->access_mode, 'grant_group_revoked');
+        }
+
+        return $revoked;
     }
 
     public function revokeGrantGroupAccess(
@@ -99,7 +121,13 @@ class EntitlementGrantService
             throw ValidationException::withMessages(['tenant' => 'The trusted tenant does not match the active tenant context.']);
         }
 
-        return TenantApplicationEntitlement::query()
+        $grants = TenantApplicationEntitlement::query()
+            ->where('tenant_id', $tenant->getKey())
+            ->where('grant_group_id', $grantGroupId)
+            ->where('access_mode', $accessMode->value)
+            ->whereNull('revoked_at')
+            ->get(['capability_key', 'source_type', 'access_mode']);
+        $revoked = TenantApplicationEntitlement::query()
             ->where('tenant_id', $tenant->getKey())
             ->where('grant_group_id', $grantGroupId)
             ->where('access_mode', $accessMode->value)
@@ -108,6 +136,11 @@ class EntitlementGrantService
                 'revoked_at' => CarbonImmutable::instance($revokedAt ?? now())->utc(),
                 'revoked_by_platform_administrator_id' => $revokedByPlatformAdministratorId,
             ]);
+        foreach ($grants as $grant) {
+            app(EntitlementObservabilityService::class)->record('COMMERCIAL_ASSIGNMENT_REVOKED', $tenant->getKey(), $grant->capability_key, $grant->source_type, $grant->access_mode, 'access_mode_revoked');
+        }
+
+        return $revoked;
     }
 
     public function revokeSource(
@@ -123,7 +156,14 @@ class EntitlementGrantService
             throw ValidationException::withMessages(['tenant' => 'The trusted tenant does not match the active tenant context.']);
         }
 
-        return TenantApplicationEntitlement::query()
+        $grants = TenantApplicationEntitlement::query()
+            ->where('tenant_id', $tenant->getKey())
+            ->where('source_type', $sourceType->value)
+            ->where('source_reference_type', $sourceReferenceType)
+            ->where('source_reference_id', $sourceReferenceId)
+            ->whereNull('revoked_at')
+            ->get(['capability_key', 'source_type', 'access_mode']);
+        $revoked = TenantApplicationEntitlement::query()
             ->where('tenant_id', $tenant->getKey())
             ->where('source_type', $sourceType->value)
             ->where('source_reference_type', $sourceReferenceType)
@@ -133,5 +173,10 @@ class EntitlementGrantService
                 'revoked_at' => CarbonImmutable::instance($revokedAt ?? now())->utc(),
                 'revoked_by_platform_administrator_id' => $revokedByPlatformAdministratorId,
             ]);
+        foreach ($grants as $grant) {
+            app(EntitlementObservabilityService::class)->record('COMMERCIAL_ASSIGNMENT_REVOKED', $tenant->getKey(), $grant->capability_key, $grant->source_type, $grant->access_mode, 'source_revoked');
+        }
+
+        return $revoked;
     }
 }
