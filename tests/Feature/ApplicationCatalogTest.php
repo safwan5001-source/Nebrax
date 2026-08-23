@@ -59,6 +59,7 @@ class ApplicationCatalogTest extends TestCase
             'fuel_stations.avi',
             'fuel_stations.maintenance',
             'fuel_stations.integrations',
+            'document_center.core',
             'logistics.fleet',
             'logistics.shipping',
             'company.branches',
@@ -72,7 +73,7 @@ class ApplicationCatalogTest extends TestCase
         sort($expectedKeys);
 
         $this->assertSame($expectedKeys, $actualKeys);
-        $this->assertCount(43, ApplicationCatalog::all());
+        $this->assertCount(44, ApplicationCatalog::all());
         $this->assertSame([], ApplicationCatalog::validationErrors());
     }
 
@@ -84,10 +85,23 @@ class ApplicationCatalogTest extends TestCase
         $this->assertTrue(ApplicationCatalog::isActivatable('fuel_stations.core'));
         $this->assertTrue(ApplicationCatalog::isActivatable('fuel_stations.avi'));
         $this->assertTrue(ApplicationCatalog::isActivatable('fuel_stations.integrations'));
+        $this->assertTrue(ApplicationCatalog::isActivatable('document_center.core'));
         $this->assertFalse(ApplicationCatalog::isActivatable('accounting.cheques'));
         $this->assertFalse(ApplicationCatalog::isActivatable('fuel_stations.forecourt'));
         $this->assertFalse(ApplicationCatalog::isActivatable('operations.workflow'));
         $this->assertFalse(ApplicationCatalog::isActivatable('not.a.real.application'));
+    }
+
+    /** @test */
+    public function document_center_is_an_independent_optional_commercial_capability(): void
+    {
+        $application = ApplicationCatalog::find('document_center.core');
+
+        $this->assertSame('document_center', $application['group']);
+        $this->assertSame(ApplicationCatalog::MATURITY_BUILT, $application['maturity']);
+        $this->assertFalse($application['mandatory']);
+        $this->assertSame([], $application['dependencies']);
+        $this->assertContains('document_center', ApplicationCatalog::groups());
     }
 
     /** @test */

@@ -95,6 +95,10 @@ class Rbac
             // لا تمنح تشغيل محول أو أمراً خارجياً ولا ترث من إدارة المحطة العامة.
             'fuel.device.view', 'fuel.device.manage',
             'fuel.integration.view', 'fuel.integration.ingest', 'fuel.integration.retry',
+            // مركز المستندات: العرض والإدارة والمراجعة والإعداد سلطات مستقلة.
+            // لا ترثها الأدوار المقيدة من صلاحيات المستندات المحاسبية العامة.
+            'documents.center.view', 'documents.center.manage',
+            'documents.center.review', 'documents.center.settings',
             'fuel.credit.view', 'fuel.credit.manage',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',

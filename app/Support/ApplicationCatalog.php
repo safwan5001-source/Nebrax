@@ -293,6 +293,15 @@ final class ApplicationCatalog
             'dependencies' => ['fuel_stations.core'],
         ],
 
+        // مركز المستندات منتج تجاري اختياري مستقل. تكامله اللاحق مع خدمات
+        // المعاملات لا يجعل المبيعات أو المشتريات أو المصروفات اعتماداً تقنياً.
+        'document_center.core' => [
+            'group' => 'document_center',
+            'maturity' => self::MATURITY_BUILT,
+            'mandatory' => false,
+            'dependencies' => [],
+        ],
+
         // ───────────────────────── البنية والإضافات ─────────────────────────
         'company.branches' => [
             'group' => 'branches',
