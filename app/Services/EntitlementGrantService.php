@@ -87,6 +87,29 @@ class EntitlementGrantService
             ]);
     }
 
+    public function revokeGrantGroupAccess(
+        Tenant $tenant,
+        string $grantGroupId,
+        EntitlementAccessMode $accessMode,
+        ?string $revokedByPlatformAdministratorId = null,
+        ?DateTimeInterface $revokedAt = null,
+    ): int {
+        $context = app(TenantContext::class);
+        if ($context->has() && $context->id() !== $tenant->getKey()) {
+            throw ValidationException::withMessages(['tenant' => 'The trusted tenant does not match the active tenant context.']);
+        }
+
+        return TenantApplicationEntitlement::query()
+            ->where('tenant_id', $tenant->getKey())
+            ->where('grant_group_id', $grantGroupId)
+            ->where('access_mode', $accessMode->value)
+            ->whereNull('revoked_at')
+            ->update([
+                'revoked_at' => CarbonImmutable::instance($revokedAt ?? now())->utc(),
+                'revoked_by_platform_administrator_id' => $revokedByPlatformAdministratorId,
+            ]);
+    }
+
     public function revokeSource(
         Tenant $tenant,
         EntitlementSourceType $sourceType,

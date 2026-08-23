@@ -20,9 +20,16 @@ class TenantCommercialAssignment extends Model implements CompanyWide
     public const STATUS_CANCELLED = 'cancelled';
     public const STATUS_REVOKED = 'revoked';
 
+    public const LIFECYCLE_ACTIVE = 'active';
+    public const LIFECYCLE_GRACE_FULL = 'grace_full';
+    public const LIFECYCLE_GRACE_READ_ONLY = 'grace_read_only';
+    public const LIFECYCLE_ENDED_DENIED = 'ended_denied';
+    public const LIFECYCLE_SCHEDULED_CANCELLATION = 'scheduled_cancellation';
+    public const LIFECYCLE_REVOKED = 'revoked';
+
     protected $fillable = [
         'tenant_id', 'source_type', 'commercial_plan_version_id', 'commercial_product_version_id',
-        'status', 'starts_at', 'ends_at', 'cancelled_at', 'revoked_at',
+        'status', 'lifecycle_state', 'starts_at', 'ends_at', 'payment_failed_at', 'scheduled_cancellation_at', 'ended_at', 'cancelled_at', 'revoked_at',
         'assigned_by_platform_administrator_id', 'cancelled_by_platform_administrator_id',
         'revoked_by_platform_administrator_id', 'reason', 'metadata', 'idempotency_key',
     ];
@@ -34,6 +41,9 @@ class TenantCommercialAssignment extends Model implements CompanyWide
             'ends_at' => 'immutable_datetime',
             'cancelled_at' => 'immutable_datetime',
             'revoked_at' => 'immutable_datetime',
+            'payment_failed_at' => 'immutable_datetime',
+            'scheduled_cancellation_at' => 'immutable_datetime',
+            'ended_at' => 'immutable_datetime',
             'metadata' => 'array',
         ];
     }
@@ -42,7 +52,7 @@ class TenantCommercialAssignment extends Model implements CompanyWide
     {
         static::updating(function (self $assignment): void {
             $allowed = [
-                'status', 'ends_at', 'cancelled_at', 'revoked_at',
+                'status', 'lifecycle_state', 'ends_at', 'payment_failed_at', 'scheduled_cancellation_at', 'ended_at', 'cancelled_at', 'revoked_at',
                 'cancelled_by_platform_administrator_id', 'revoked_by_platform_administrator_id',
             ];
             if (array_diff(array_keys($assignment->getDirty()), $allowed) !== []) {

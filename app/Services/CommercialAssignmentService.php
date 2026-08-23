@@ -196,11 +196,13 @@ class CommercialAssignmentService
 
         return $this->withTenantContext($tenant, fn (): TenantCommercialAssignment => DB::transaction(function () use ($assignment, $administrator, $status, $eventAction, $reason): TenantCommercialAssignment {
             $at = now('UTC');
-            $updates = ['status' => $status];
+            $updates = ['status' => $status, 'ended_at' => $at];
             if ($status === TenantCommercialAssignment::STATUS_CANCELLED) {
+                $updates['lifecycle_state'] = TenantCommercialAssignment::LIFECYCLE_ENDED_DENIED;
                 $updates['cancelled_at'] = $at;
                 $updates['cancelled_by_platform_administrator_id'] = $administrator->id;
             } else {
+                $updates['lifecycle_state'] = TenantCommercialAssignment::LIFECYCLE_REVOKED;
                 $updates['revoked_at'] = $at;
                 $updates['revoked_by_platform_administrator_id'] = $administrator->id;
             }
