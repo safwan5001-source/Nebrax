@@ -14,13 +14,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
-import { formatRiyal, isValidRiyal, riyalToMinor } from '@/lib/money';
+import { litersToMilliliters } from '@/lib/fuel-quantity';
+import { isValidRiyal, minorToRiyal, riyalToMinor } from '@/lib/money';
 
 interface Station { id: string; name: string; code: string; status: string }
 interface Nozzle { id: string; nozzle_number: string; fuel_station_id: string; status: string }
 interface Shift { id: string; number: string; station_id: string; status: 'open' | 'closed' | 'approved' }
 interface Partner { id: string; name: string; type: string }
 interface PaymentMethod { id: string; name: string; settlement_type: 'cash' | 'bank'; is_active: boolean }
+interface AviAuthorization { id: string; fuel_station_id: string; fuel_nozzle_id: string; partner_id: string | null; decision: 'approved' | 'denied'; expires_at: string | null; fuel_sale_id: string | null }
 interface Sale {
   id: string; number: string; status: 'draft' | 'finalized'; fuel_station_id: string; fuel_nozzle_id: string; fuel_shift_id: string | null;
   partner_id: string | null; fuel_avi_authorization_id?: string | null; quantity_milliliters: number; quantity_liters: string; price_per_liter_minor: number | null; price_per_liter: string | null;
@@ -28,14 +30,6 @@ interface Sale {
   invoice_id: string | null; invoice_number?: string | null; invoice_tax_inclusive?: boolean | null; invoice_total_minor?: number | null; invoice_remaining_minor?: number | null;
   payment_status: 'unpaid' | 'partially_paid' | 'paid'; paid_minor: number; paid: string; finalized_at: string | null;
   payment_receipts?: Array<{ id: string; number: string | null; amount: string | null; status: string | null }>;
-}
-
-function litersToMilliliters(value: string): number | null {
-  if (!/^\d+(?:\.\d{1,3})?$/.test(value)) return null;
-  const [whole, fraction = ''] = value.split('.');
-  const normalized = `${whole}${fraction.padEnd(3, '0')}`;
-  const parsed = Number(normalized);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 export default function FuelSalesPage() {
@@ -47,6 +41,7 @@ export default function FuelSalesPage() {
   const [nozzles, setNozzles] = useState<Nozzle[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [aviAuthorizations, setAviAuthorizations] = useState<AviAuthorization[]>([]);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -70,14 +65,15 @@ export default function FuelSalesPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [salesResult, stationResult, nozzleResult, shiftResult, partnerResult] = await Promise.all([
+      const [salesResult, stationResult, nozzleResult, shiftResult, partnerResult, authorizationResult] = await Promise.all([
         api<{ data: Sale[] }>('/fuel-stations/sales'), api<{ data: Station[] }>('/fuel-stations/stations'),
         api<{ data: Nozzle[] }>('/fuel-stations/nozzles'), api<{ data: Shift[] }>('/fuel-stations/shifts?status=open'),
         api<{ data: Partner[] }>('/partners?type=customer'),
+        api<{ data: AviAuthorization[] }>('/fuel-stations/avi-rfid/authorizations').catch(() => ({ data: [] })),
       ]);
       setSales(salesResult.data); setStations(stationResult.data.filter((station) => station.status === 'active'));
       setNozzles(nozzleResult.data.filter((nozzle) => nozzle.status === 'active')); setShifts(shiftResult.data);
-      setPartners(partnerResult.data.filter((partner) => partner.type === 'customer')); setMethods([]);
+      setPartners(partnerResult.data.filter((partner) => partner.type === 'customer')); setAviAuthorizations(authorizationResult.data); setMethods([]);
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('loadFailed')); } finally { setLoading(false); }
   }, [tc]);
 
@@ -86,17 +82,18 @@ export default function FuelSalesPage() {
 
   const stationNozzles = useMemo(() => nozzles.filter((nozzle) => nozzle.fuel_station_id === stationId), [nozzles, stationId]);
   const stationShifts = useMemo(() => shifts.filter((shift) => shift.station_id === stationId), [shifts, stationId]);
+  const availableAuthorizations = useMemo(() => aviAuthorizations.filter((authorization) => authorization.decision === 'approved' && authorization.fuel_sale_id === null && authorization.fuel_station_id === stationId && authorization.fuel_nozzle_id === nozzleId && (!authorization.expires_at || new Date(authorization.expires_at) > new Date())), [aviAuthorizations, nozzleId, stationId]);
   const remainingMinor = paySale?.invoice_remaining_minor ?? 0;
 
   async function createDraft() {
     const quantity = litersToMilliliters(liters);
-    if (!stationId || !nozzleId || (!partnerId && !aviAuthorizationId.trim()) || !quantity) return;
+    if (!stationId || !nozzleId || (!partnerId && !aviAuthorizationId) || !quantity) return;
     setBusy(true); setError(null);
     try {
       await api('/fuel-stations/sales', { method: 'POST', body: {
         fuel_station_id: stationId, fuel_nozzle_id: nozzleId, fuel_shift_id: shiftId || null, partner_id: partnerId || null,
-        fuel_avi_authorization_id: aviAuthorizationId.trim() || null, quantity_milliliters: quantity, idempotency_key: crypto.randomUUID(),
-      }});
+        fuel_avi_authorization_id: aviAuthorizationId || null, quantity_milliliters: quantity, idempotency_key: crypto.randomUUID(),
+      } });
       success(t('draftCreated')); setDraftOpen(false); setStationId(''); setNozzleId(''); setShiftId(''); setPartnerId(''); setAviAuthorizationId(''); setLiters(''); await load();
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -108,14 +105,12 @@ export default function FuelSalesPage() {
   }
 
   const openPayment = useCallback(async (sale: Sale) => {
-    setPaySale(sale); setPaymentMethodId(''); setPaymentAmount(formatRiyal(String(sale.invoice_remaining_minor ?? 0)).replace(/[^0-9.]/g, '')); setMethods([]); setError(null);
+    setPaySale(sale); setPaymentMethodId(''); setPaymentAmount(minorToRiyal(sale.invoice_remaining_minor)); setMethods([]); setError(null);
     try {
       const result = await api<{ data: PaymentMethod[] }>(`/fuel-stations/stations/${sale.fuel_station_id}/sale-payment-methods`);
       setMethods(result.data);
       if (result.data.length === 0) setError(t('noPaymentMethodHint'));
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : tc('loadFailed'));
-    }
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('loadFailed')); }
   }, [t, tc]);
 
   async function collectPayment() {
@@ -124,7 +119,7 @@ export default function FuelSalesPage() {
     try {
       await api(`/fuel-stations/sales/${paySale.id}/payments`, { method: 'POST', body: {
         payment_method_id: paymentMethodId, amount_minor: riyalToMinor(paymentAmount), idempotency_key: crypto.randomUUID(),
-      }});
+      } });
       success(t('paymentCollected')); setPaySale(null); setPaymentMethodId(''); setPaymentAmount(''); await load();
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -151,9 +146,9 @@ export default function FuelSalesPage() {
     {error && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
     <DataTable columns={columns} data={sales} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="fuel-sales" />
 
-    <Dialog open={draftOpen} onClose={() => setDraftOpen(false)} title={t('draftTitle')}><form onSubmit={(event) => { event.preventDefault(); void createDraft(); }} className="space-y-3"><p className="rounded-md bg-primary-soft px-3 py-2 text-xs text-text">{t('draftHint')}</p><div className="grid gap-3 sm:grid-cols-2"><FieldSelect id="fuel-sale-station" label={t('station')} value={stationId} onChange={(value) => { setStationId(value); setNozzleId(''); setShiftId(''); }} disabled={busy} options={stations.map((station) => ({ value: station.id, label: `${station.name} · ${station.code}` }))} placeholder={t('selectStation')} /><FieldSelect id="fuel-sale-nozzle" label={t('nozzle')} value={nozzleId} onChange={setNozzleId} disabled={busy || !stationId} options={stationNozzles.map((nozzle) => ({ value: nozzle.id, label: nozzle.nozzle_number }))} placeholder={t('selectNozzle')} /></div><div className="grid gap-3 sm:grid-cols-2"><FieldSelect id="fuel-sale-shift" label={t('shift')} value={shiftId} onChange={setShiftId} disabled={busy || !stationId} options={stationShifts.map((shift) => ({ value: shift.id, label: shift.number }))} placeholder={t('noShift')} optional /><FieldSelect id="fuel-sale-partner" label={t('customer')} value={partnerId} onChange={setPartnerId} disabled={busy || !!aviAuthorizationId.trim()} options={partners.map((partner) => ({ value: partner.id, label: partner.name }))} placeholder={t('selectCustomer')} optional /></div><div className="space-y-1.5"><Label htmlFor="fuel-sale-avi-authorization">{t('aviAuthorization')}</Label><Input id="fuel-sale-avi-authorization" className="num" value={aviAuthorizationId} onChange={(event) => { setAviAuthorizationId(event.target.value); if (event.target.value.trim()) setPartnerId(''); }} disabled={busy} placeholder="UUID" /><p className="text-xs text-muted">{t('aviAuthorizationHint')}</p></div><div className="space-y-1.5"><Label htmlFor="fuel-sale-liters">{t('quantity')}</Label><Input id="fuel-sale-liters" className="num text-end" inputMode="decimal" value={liters} onChange={(event) => setLiters(event.target.value)} required /></div><p className="text-xs text-muted">{t('serverPriceHint')}</p><DialogActions busy={busy} disabled={!stationId || !nozzleId || (!partnerId && !aviAuthorizationId.trim()) || !litersToMilliliters(liters)} onCancel={() => setDraftOpen(false)} saveLabel={t('createDraft')} /></form></Dialog>
+    <Dialog open={draftOpen} onClose={() => setDraftOpen(false)} title={t('draftTitle')}><form onSubmit={(event) => { event.preventDefault(); void createDraft(); }} className="space-y-3"><p className="rounded-md bg-primary-soft px-3 py-2 text-xs text-text">{t('draftHint')}</p><div className="grid gap-3 sm:grid-cols-2"><FieldSelect id="fuel-sale-station" label={t('station')} value={stationId} onChange={(value) => { setStationId(value); setNozzleId(''); setShiftId(''); setAviAuthorizationId(''); }} disabled={busy} options={stations.map((station) => ({ value: station.id, label: `${station.name} · ${station.code}` }))} placeholder={t('selectStation')} /><FieldSelect id="fuel-sale-nozzle" label={t('nozzle')} value={nozzleId} onChange={(value) => { setNozzleId(value); setAviAuthorizationId(''); }} disabled={busy || !stationId} options={stationNozzles.map((nozzle) => ({ value: nozzle.id, label: nozzle.nozzle_number }))} placeholder={t('selectNozzle')} /></div><div className="grid gap-3 sm:grid-cols-2"><FieldSelect id="fuel-sale-shift" label={t('shift')} value={shiftId} onChange={setShiftId} disabled={busy || !stationId} options={stationShifts.map((shift) => ({ value: shift.id, label: shift.number }))} placeholder={t('noShift')} optional /><FieldSelect id="fuel-sale-partner" label={t('customer')} value={partnerId} onChange={setPartnerId} disabled={busy || !!aviAuthorizationId} options={partners.map((partner) => ({ value: partner.id, label: partner.name }))} placeholder={t('selectCustomer')} optional /></div><FieldSelect id="fuel-sale-avi-authorization" label={t('aviAuthorization')} value={aviAuthorizationId} onChange={(value) => { setAviAuthorizationId(value); if (value) setPartnerId(''); }} disabled={busy || !stationId || !nozzleId} options={availableAuthorizations.map((authorization) => ({ value: authorization.id, label: `${authorization.partner_id ? partners.find((partner) => partner.id === authorization.partner_id)?.name ?? t('authorizedCustomer') : t('smartAuthorization')} · ${t('authorized')}` }))} placeholder={availableAuthorizations.length ? t('selectAuthorization') : t('noAuthorizationAvailable')} optional /><p className="text-xs text-muted">{t('aviAuthorizationHint')}</p><div className="space-y-1.5"><Label htmlFor="fuel-sale-liters">{t('quantity')}</Label><Input id="fuel-sale-liters" className="num text-end" inputMode="decimal" value={liters} onChange={(event) => setLiters(event.target.value)} required /></div><p className="text-xs text-muted">{t('serverPriceHint')}</p><DialogActions busy={busy} disabled={!stationId || !nozzleId || (!partnerId && !aviAuthorizationId) || !litersToMilliliters(liters)} onCancel={() => setDraftOpen(false)} saveLabel={t('createDraft')} /></form></Dialog>
 
-    <Dialog open={!!paySale} onClose={() => setPaySale(null)} title={t('paymentTitle')}><form onSubmit={(event) => { event.preventDefault(); void collectPayment(); }} className="space-y-3"><p className="rounded-md bg-primary-soft px-3 py-2 text-xs text-text">{t('paymentHint', { number: paySale?.number ?? '—', amount: formatRiyal(String(remainingMinor)) })}</p><FieldSelect id="fuel-sale-method" label={t('paymentMethod')} value={paymentMethodId} onChange={setPaymentMethodId} disabled={busy} options={methods.map((method) => ({ value: method.id, label: `${method.name} · ${method.settlement_type === 'cash' ? t('cash') : t('bank')}` }))} placeholder={t('selectPaymentMethod')} /><div className="space-y-1.5"><Label htmlFor="fuel-sale-payment-amount">{t('amount')}</Label><Input id="fuel-sale-payment-amount" className="num text-end" inputMode="decimal" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} required /></div><p className="text-xs text-muted">{t('paymentSeparationHint')}</p><DialogActions busy={busy} disabled={!paymentMethodId || !isValidRiyal(paymentAmount)} onCancel={() => setPaySale(null)} saveLabel={t('collect')} /></form></Dialog>
+    <Dialog open={!!paySale} onClose={() => setPaySale(null)} title={t('paymentTitle')}><form onSubmit={(event) => { event.preventDefault(); void collectPayment(); }} className="space-y-3"><p className="rounded-md bg-primary-soft px-3 py-2 text-xs text-text">{t('paymentHint', { number: paySale?.number ?? '—', amount: minorToRiyal(remainingMinor) })}</p><FieldSelect id="fuel-sale-method" label={t('paymentMethod')} value={paymentMethodId} onChange={setPaymentMethodId} disabled={busy} options={methods.map((method) => ({ value: method.id, label: `${method.name} · ${method.settlement_type === 'cash' ? t('cash') : t('bank')}` }))} placeholder={t('selectPaymentMethod')} /><div className="space-y-1.5"><Label htmlFor="fuel-sale-payment-amount">{t('amount')}</Label><Input id="fuel-sale-payment-amount" className="num text-end" inputMode="decimal" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} required /></div><p className="text-xs text-muted">{t('paymentSeparationHint')}</p><DialogActions busy={busy} disabled={!paymentMethodId || !isValidRiyal(paymentAmount)} onCancel={() => setPaySale(null)} saveLabel={t('collect')} /></form></Dialog>
   </div>;
 }
 

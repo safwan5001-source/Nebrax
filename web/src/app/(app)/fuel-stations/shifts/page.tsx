@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
-import { formatRiyal, isNegative, isValidRiyal, riyalToMinor } from '@/lib/money';
+import { formatMinorRiyal, isNegative, isValidRiyal, riyalToMinor } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
 interface Station { id: string; name: string; code: string; status: string }
@@ -171,13 +171,13 @@ export default function FuelShiftsPage() {
     { id: 'station', header: t('station'), cell: ({ row }) => stationName(row.original.station_id) },
     { accessorKey: 'opened_at', header: t('openedAt'), cell: ({ row }) => <span className="num text-muted">{(row.original.opened_at ?? '').slice(0, 16).replace('T', ' ') || '—'}</span> },
     { accessorKey: 'operational_liters', header: t('operationalLiters'), cell: ({ row }) => <span className="num text-end">{row.original.operational_liters}</span> },
-    { accessorKey: 'cash_variance_minor', header: t('cashVariance'), cell: ({ row }) => row.original.cash_variance_minor === null ? <span className="text-muted">—</span> : <span className={cn('num', isNegative(String(row.original.cash_variance_minor)) && 'text-negative')}>{formatRiyal(String(row.original.cash_variance_minor))}</span> },
+    { accessorKey: 'cash_variance_minor', header: t('cashVariance'), cell: ({ row }) => row.original.cash_variance_minor === null ? <span className="text-muted">—</span> : <span className={cn('num', isNegative(String(row.original.cash_variance_minor)) && 'text-negative')}>{formatMinorRiyal(row.original.cash_variance_minor)}</span> },
     { id: 'status', header: t('status'), cell: ({ row }) => <Badge tone={row.original.status === 'open' ? 'warning' : row.original.cash_variance?.status === 'pending_review' ? 'warning' : 'positive'}>{statusLabel[row.original.status]}</Badge> },
     { id: 'actions', header: t('actions'), cell: ({ row }) => <div className="flex flex-wrap justify-end gap-1.5">
       <Button variant="ghost" size="sm" onClick={() => setAuditShift(row.original)} aria-label={t('audit')}><History className="h-3.5 w-3.5" strokeWidth={1.7} />{t('audit')}</Button>
       {row.original.status === 'open' && can('fuel.shift.open') && <Button variant="outline" size="sm" onClick={() => { setReadingShift(row.original); setReadingKind('meter'); setReadingStage('opening'); setAssetId(''); setReadingLiters(''); setError(null); }}><Gauge className="h-3.5 w-3.5" strokeWidth={1.7} />{t('recordReading')}</Button>}
       {row.original.status === 'open' && can('fuel.shift.cash_count') && <Button variant="outline" size="sm" onClick={() => { setCashShift(row.original); setMovementType('cash_in'); setMovementAmount(''); setMovementReason(''); setError(null); }}><WalletCards className="h-3.5 w-3.5" strokeWidth={1.7} />{t('cashMovement')}</Button>}
-      {row.original.status === 'open' && can('fuel.shift.close') && <Button variant="outline" size="sm" onClick={() => { setCloseShift(row.original); setCountedCash(''); setClosingNote(''); setError(null); }}><LockKeyhole className="h-3.5 w-3.5" strokeWidth={1.7} />{t('close')}</Button>}
+      {row.original.status === 'open' && can('fuel.shift.close') && can('fuel.shift.cash_count') && <Button variant="outline" size="sm" onClick={() => { setCloseShift(row.original); setCountedCash(''); setClosingNote(''); setError(null); }}><LockKeyhole className="h-3.5 w-3.5" strokeWidth={1.7} />{t('close')}</Button>}
       {row.original.cash_variance?.status === 'pending_review' && !row.original.cash_variance.reviewed_by && can('fuel.shift.cash_variance_review') && <Button variant="outline" size="sm" onClick={() => { setReviewShift(row.original); setReviewNote(''); setError(null); }}><ClipboardCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('reviewVariance')}</Button>}
       {row.original.status === 'closed' && can('fuel.shift.approve') && <Button variant="outline" size="sm" onClick={() => { setApproveShift(row.original); setApprovalNote(''); setError(null); }}><ClipboardCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('approve')}</Button>}
     </div> },
