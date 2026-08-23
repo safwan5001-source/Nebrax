@@ -28,6 +28,7 @@ class StorePosSaleRequest extends FormRequest
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
             'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات
             'items.*.minimum_price_override_reason' => ['nullable', 'string', 'min:3', 'max:500'],
+            'notes'               => ['nullable', 'string', 'max:2000'],
             'tenders'             => ['required', 'array', 'max:20'],
         ];
 

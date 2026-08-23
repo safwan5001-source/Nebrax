@@ -56,7 +56,14 @@ class PosController extends ApiController
 
         $products = PosSettings::constrainProductsByCategory(
             Product::query()->where('is_active', true)
-        )->with(['productCategory', 'productBrand', 'unitTemplate.units', 'alternateBarcodes'])
+        )->with([
+            'productCategory',
+            'productBrand',
+            'unitTemplate.units',
+            'alternateBarcodes',
+            // وسائط المنتج خاصة؛ نحمّلها فقط في كتالوج الكاشير لا في قوائم المنتجات العامة.
+            'media' => fn ($query) => $query->orderBy('sort_order')->orderByDesc('created_at'),
+        ])
             ->latest()
             ->get();
         $catalogUnits = $this->customerPriceLists->catalogUnitsFor($priceList, $products);
@@ -104,6 +111,56 @@ class PosController extends ApiController
         $invoice = $this->domain(fn () => $this->pos->checkout($data));
 
         return (new InvoiceResource($invoice->load('lines')))->response()->setStatusCode(201);
+    }
+
+    /**
+     * آخر فواتير POS المرحّلة في نطاق الفرع النشط. لا يخلط الاستعلام الفواتير
+     * العادية بفواتير الكاشير لأن `pos_session_id` شرط صريح، ولا يحمل السجل كاملاً
+     * إلى المتصفح قبل تطبيق الحد والترتيب.
+     */
+    public function recentInvoices(Request $request): JsonResponse
+    {
+        $limit = (int) ($request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ])['limit'] ?? 20);
+
+        $invoices = $this->scopeToActiveBranch(
+            Invoice::query()
+                ->with('partner:id,name')
+                ->whereNotNull('pos_session_id')
+                ->where('status', 'posted')
+                ->orderByDesc('invoice_date')
+                ->orderByDesc('created_at'),
+            $request,
+        )->limit($limit)->get();
+
+        $paymentsByInvoice = Payment::query()
+            ->whereIn('invoice_id', $invoices->pluck('id'))
+            ->where('status', 'posted')
+            ->where('direction', 'received')
+            ->orderBy('created_at')
+            ->get(['invoice_id', 'payment_method_name', 'method'])
+            ->groupBy('invoice_id');
+
+        return response()->json(['data' => $invoices->map(function (Invoice $invoice) use ($paymentsByInvoice) {
+            $methods = ($paymentsByInvoice->get($invoice->id) ?? collect())
+                ->map(fn (Payment $payment) => $payment->payment_method_name ?: $payment->method)
+                ->filter()
+                ->unique()
+                ->values();
+
+            return [
+                'id' => $invoice->id,
+                'number' => $invoice->number,
+                'invoice_date' => optional($invoice->invoice_date)->toDateString(),
+                'created_at' => optional($invoice->created_at)->toIso8601String(),
+                'customer_name' => $invoice->partner?->name,
+                'total' => Money::toRiyal((int) $invoice->total),
+                'payment_status' => $invoice->payment_status,
+                'payment_methods' => $methods,
+                'status' => $invoice->status,
+            ];
+        })->values()]);
     }
 
     /** يعرض مسودات الكاشير القابلة للاستئناف في الجلسة والمخزن المطابقين فقط. */
