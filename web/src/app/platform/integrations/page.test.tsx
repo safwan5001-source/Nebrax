@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { payloadFor } from './page';
+import { payloadFor } from './payload';
 
 const form = {
   enabled: true,
