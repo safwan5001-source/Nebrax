@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ContractManagementCard, type ContractSubscription } from '@/components/platform/contract-management-card';
+import { CommercialOperationsCard } from '@/components/platform/commercial-operations-card';
 import { ApiError } from '@/lib/api';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
@@ -234,6 +235,7 @@ export default function PlatformTenantDetailPage() {
             </Card>
 
             <ContractManagementCard tenantId={tenantId} subscriptions={tenant.subscriptions} onChanged={load} />
+            <CommercialOperationsCard tenantId={tenantId} />
 
             <p className="text-center text-xs text-muted">{t('auditNotice')}</p>
           </>
