@@ -7,10 +7,12 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import type { Warehouse } from '@/lib/warehouse';
 
@@ -80,6 +82,7 @@ export function CreateReturnDialog({
   const [restock, setRestock] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('return', { seriesKey: type, enabled: open });
 
     useEffect(() => {
     if (!open) return;
@@ -296,6 +299,7 @@ export function CreateReturnDialog({
     <Dialog open={open} onClose={onClose} title={t('title')} className="max-w-2xl">
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <NumberPreviewField id="return-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />
           {/* منتقي النوع يظهر فقط في الشاشة العامة؛ الشاشتان المتخصّصتان تثبّتانه. */}
           {!fixedType && (
             <div className="space-y-1.5">

@@ -16,6 +16,7 @@ import { api, ApiError } from '@/lib/api';
 interface Series {
   key: string;
   prefix: string | null;
+  suffix: string;
   next_number: string;
 }
 
@@ -48,7 +49,7 @@ export default function NumberingSettingsPage() {
 
   const [entities, setEntities] = useState<NumberingEntity[] | null>(null);
   const [selected, setSelected] = useState<string>('invoice');
-  const [prefix, setPrefix] = useState('');
+  const [formats, setFormats] = useState<Record<string, { prefix: string; suffix: string }>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   // تبديل النوع يعيد قراءة الحمولة، فيظهر هيكل التحميل بدل قيم النوع السابق.
@@ -74,9 +75,13 @@ export default function NumberingSettingsPage() {
     load().catch(() => {});
   }, []);
 
-  // البادئة المعروضة تتبع النوع المختار.
+  // كل سلسلة تحتفظ بمسودة مستقلة للبادئة واللاحقة عند تبديل نوع المستند.
   useEffect(() => {
-    if (current) setPrefix(current.prefix ?? '');
+    if (!current) return;
+    setFormats(Object.fromEntries(current.series.map((series) => [series.key, {
+      prefix: series.prefix ?? '',
+      suffix: series.suffix ?? '',
+    }])));
   }, [current]);
 
   async function onSelect(key: string) {
@@ -87,14 +92,21 @@ export default function NumberingSettingsPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!current?.editable_prefix) return;
+    if (!current) return;
     setSaving(true);
     setError(null);
     try {
-      await api('/numbering-settings', {
-        method: 'PUT',
-        body: { entity: current.key, prefix: prefix || null },
-      });
+      for (const series of current.series) {
+        await api('/numbering-settings', {
+          method: 'PUT',
+          body: {
+            entity: current.key,
+            series_key: series.key,
+            prefix: formats[series.key]?.prefix ?? '',
+            suffix: formats[series.key]?.suffix ?? '',
+          },
+        });
+      }
       await load();
       success(tc('updated'));
     } catch (err) {
@@ -154,36 +166,42 @@ export default function NumberingSettingsPage() {
               <Skeleton className="h-56 w-full" />
             ) : (
               <form onSubmit={submit} className="space-y-4">
-                {/* ═══ السلاسل وأرقامها التالية ═══ */}
-                <div className="space-y-1.5">
-                  <Label>{t('next_number')}</Label>
-                  <div className="divide-y divide-border rounded border border-border">
-                    {current.series.map((s) => (
-                      <div key={s.key} className="flex items-center justify-between px-3 py-2">
-                        <span className="text-sm text-muted">
-                          {current.series.length > 1 ? t(`series_${current.key}_${s.key}`) : t('series_default')}
+                {/* لكل سلسلة بادئة ولاحقة مستقلتان، وتُعرض معاينة الخادم معها. */}
+                <div className="space-y-3">
+                  <Label>{t('series_format')}</Label>
+                  {current.series.map((series) => (
+                    <div key={series.key} className="space-y-3 rounded-md border border-border p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-text">
+                          {current.series.length > 1 ? t(`series_${current.key}_${series.key}`) : t('series_default')}
                         </span>
-                        <span className="num text-sm font-medium text-text" dir="ltr">{s.next_number}</span>
+                        <span className="num text-sm font-semibold text-primary" dir="ltr">{series.next_number}</span>
                       </div>
-                    ))}
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted">{t('next_number_hint')}</p>
-                </div>
-
-                {/* ═══ البادئة — الحقل الوحيد القابل للتحرير ═══ */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="prefix">{t('prefix')}</Label>
-                  <Input
-                    id="prefix"
-                    dir="ltr"
-                    maxLength={10}
-                    value={prefix}
-                    disabled={!current.editable_prefix}
-                    onChange={(e) => setPrefix(e.target.value)}
-                  />
-                  <p className="text-xs leading-relaxed text-muted">
-                    {current.editable_prefix ? t('prefix_hint') : t('prefix_fixed')}
-                  </p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`prefix-${series.key}`}>{t('prefix')}</Label>
+                          <Input
+                            id={`prefix-${series.key}`}
+                            dir="ltr"
+                            maxLength={20}
+                            value={formats[series.key]?.prefix ?? ''}
+                            onChange={(event) => setFormats((currentFormats) => ({ ...currentFormats, [series.key]: { ...currentFormats[series.key], prefix: event.target.value } }))}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`suffix-${series.key}`}>{t('suffix')}</Label>
+                          <Input
+                            id={`suffix-${series.key}`}
+                            dir="ltr"
+                            maxLength={20}
+                            value={formats[series.key]?.suffix ?? ''}
+                            onChange={(event) => setFormats((currentFormats) => ({ ...currentFormats, [series.key]: { ...currentFormats[series.key], suffix: event.target.value } }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs leading-relaxed text-muted">{t('series_format_hint')}</p>
                 </div>
 
                 {/* ═══ معلومات للاطّلاع — ليست إعدادات ═══ */}
@@ -212,11 +230,9 @@ export default function NumberingSettingsPage() {
 
                 {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 
-                {current.editable_prefix && (
-                  <div className="flex justify-end pt-1">
-                    <Button type="submit" disabled={saving}>{tc('save')}</Button>
-                  </div>
-                )}
+                <div className="flex justify-end pt-1">
+                  <Button type="submit" disabled={saving}>{tc('save')}</Button>
+                </div>
               </form>
             )}
           </CardContent>

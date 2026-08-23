@@ -219,6 +219,9 @@ class Settings
         'numbering' => [
             'branch_prefix'    => '',
             'warehouse_prefix' => '',
+            'product_prefix'   => 'SKU',
+            // entity => series => ['prefix' => ?string, 'suffix' => ?string]
+            'document_series'  => [],
         ],
         /**
          * أساس إعدادات محطات الوقود. تظل سياسات التشغيل التفصيلية داخل دوراتها

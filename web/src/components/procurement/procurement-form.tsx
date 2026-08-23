@@ -8,9 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import { PROCUREMENT_ROUTE, REQUIRES_SUPPLIER, type ProcurementType } from '@/lib/procurement';
 
@@ -50,6 +52,7 @@ export function ProcurementForm({ type }: { type: ProcurementType }) {
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('procurement', { seriesKey: type, date });
 
   useEffect(() => {
     setDate(new Date().toISOString().slice(0, 10));
@@ -130,6 +133,7 @@ export function ProcurementForm({ type }: { type: ProcurementType }) {
         <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <NumberPreviewField id="procurement-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />
             {needsSupplier && (
               <div className="space-y-1.5">
                 <Label htmlFor="partner">{t('supplier')}</Label>

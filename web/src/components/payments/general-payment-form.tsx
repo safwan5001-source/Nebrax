@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { currentUser } from '@/lib/auth';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
@@ -52,6 +54,7 @@ export function GeneralPaymentForm() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<SubmitMode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('payment', { seriesKey: direction, date });
 
   const selectedMethod = methods.find((method) => method.id === paymentMethodId) ?? null;
   const selectedDocument = documents.find((document) => document.id === documentId) ?? null;
@@ -196,6 +199,7 @@ export function GeneralPaymentForm() {
           <Card>
             <CardHeader><CardTitle>{t('detail_title')}</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <NumberPreviewField id="payment-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />
               <div className="space-y-1.5"><Label htmlFor="general-payment-direction">{t('direction')}</Label><Select id="general-payment-direction" value={direction} onChange={(event) => { setDirection(event.target.value as Direction); setPartnerId(''); }}><option value="received">{t('received')}</option><option value="paid">{t('paid')}</option></Select></div>
               <div className="space-y-1.5"><Label htmlFor="general-payment-partner">{t('partner')}</Label><Select id="general-payment-partner" value={partnerId} onChange={(event) => setPartnerId(event.target.value)} required><option value="" disabled>{t('choose_partner')}</option>{eligiblePartners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</Select></div>
               <div className="space-y-1.5"><Label htmlFor="general-payment-document">{t('document')}</Label><Select id="general-payment-document" value={documentId} onChange={(event) => selectDocument(event.target.value)} disabled={!partnerId}><option value="">{t('on_account')}</option>{documents.map((document) => <option key={document.id} value={document.id}>{document.number} — {t('remaining')}: {formatRiyal(document.remaining)}</option>)}</Select></div>

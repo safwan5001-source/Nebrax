@@ -66,6 +66,24 @@ class WarehouseTest extends TestCase
     }
 
     /** @test */
+    public function it_previews_the_next_warehouse_code_without_allocating_it(): void
+    {
+        $auth = $this->registerTenant();
+
+        $this->withToken($auth['token'])->getJson('/api/warehouses/next-code')
+            ->assertOk()
+            ->assertJsonPath('data.code', '00002');
+
+        $this->withToken($auth['token'])->postJson('/api/warehouses', ['name' => 'مخزن الخبر'])
+            ->assertCreated()
+            ->assertJsonPath('data.code', '00002');
+
+        $this->withToken($auth['token'])->getJson('/api/warehouses/next-code')
+            ->assertOk()
+            ->assertJsonPath('data.code', '00003');
+    }
+
+    /** @test */
     public function purchasing_increases_the_warehouse_quantity_and_keeps_valuation_global(): void
     {
         $auth = $this->registerTenant();

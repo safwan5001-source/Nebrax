@@ -28,6 +28,12 @@ class BranchController extends ApiController
         return (new BranchResource(Branch::findOrFail($id)))->response();
     }
 
+    /** معاينة الكود التسلسلي التالي لعرضه في نموذج الإضافة دون حجزه. */
+    public function nextCode(): JsonResponse
+    {
+        return response()->json(['data' => ['code' => Branch::nextCode()]]);
+    }
+
     public function store(StoreBranchRequest $request): JsonResponse
     {
         $data = $request->validated();

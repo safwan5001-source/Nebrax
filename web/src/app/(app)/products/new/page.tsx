@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 
@@ -63,6 +64,7 @@ export default function NewProductPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [productImages, setProductImages] = useState<SelectedProductImage[]>([]);
+  const { number: suggestedSku } = useNumberPreview('product');
   const productImageUrls = useRef<string[]>([]);
 
   useEffect(() => {
@@ -204,7 +206,7 @@ export default function NewProductPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="sku">{t('sku')}</Label>
-                <Input id="sku" dir="ltr" value={sku} onChange={(e) => setSku(e.target.value)} />
+                <Input id="sku" dir="ltr" value={sku || suggestedSku} onChange={(e) => setSku(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="name_en">{t('name_en')}</Label>

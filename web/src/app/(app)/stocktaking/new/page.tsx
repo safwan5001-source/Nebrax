@@ -8,9 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 
 interface Warehouse { id: string; name: string }
 
@@ -27,6 +29,7 @@ export default function NewStocktakePage() {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('stocktake', { date });
 
   useEffect(() => {
     setDate(new Date().toISOString().slice(0, 10));
@@ -67,6 +70,7 @@ export default function NewStocktakePage() {
           <p className="text-sm text-muted">{t('open_hint')}</p>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <NumberPreviewField id="stocktake-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />
             <div className="space-y-1.5">
               <Label htmlFor="wh">{t('warehouse')}</Label>
               <Select id="wh" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} required>

@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 
@@ -127,6 +128,7 @@ export function ProductDialog({
   const [media, setMedia] = useState<ProductMedia[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const { number: suggestedSku } = useNumberPreview('product', { enabled: open && !product?.id });
   const mediaObjectUrls = useRef<string[]>([]);
 
   const revokeMediaObjectUrls = useCallback(() => {
@@ -273,7 +275,7 @@ export function ProductDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="sku">{t('sku')}</Label>
-            <Input id="sku" dir="ltr" value={form.sku} onChange={(e) => set('sku', e.target.value)} />
+            <Input id="sku" dir="ltr" value={form.sku || suggestedSku} onChange={(e) => set('sku', e.target.value)} />
           </div>
           <div className="col-span-2 space-y-1.5">
             <Label htmlFor="barcode">{t('barcode')}</Label>

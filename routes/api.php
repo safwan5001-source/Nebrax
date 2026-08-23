@@ -96,6 +96,7 @@ use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\TenantApplicationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UnitTemplateController;
+use App\Http\Controllers\Api\NumberPreviewController;
 use App\Http\Controllers\Api\NumberingSettingsController;
 use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Controllers\Api\ZatcaSettingsController;
@@ -352,6 +353,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // — بلا علاقة بميزة «المخزون» نفسها؛ حجبها يكسرها حتى في الحالة
         // الطبيعية (مخزن رئيسي واحد فقط). تفاصيل المخزن ورصيده محجوبان.
         Route::get('warehouses', [WarehouseController::class, 'index'])->middleware($perm('products.view'));
+        Route::get('warehouses/next-code', [WarehouseController::class, 'nextCode'])->middleware([$perm('products.manage'), $app('inventory.core')]);
         Route::get('warehouses/{id}', [WarehouseController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('warehouses/{id}/stock', [WarehouseController::class, 'stock'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('warehouses', [WarehouseController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);
@@ -365,6 +367,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // الحالة الطبيعية (فرع رئيسي واحد فقط). الإنفاذ على الإنشاء/التعديل
         // وحدهما، وهو ما يعكس فعلاً نية «تعطيل تعدد الفروع».
         Route::get('branches', [BranchController::class, 'index'])->middleware($perm('branches.view'));
+        Route::get('branches/next-code', [BranchController::class, 'nextCode'])->middleware([$perm('branches.manage'), $app('company.branches')]);
         Route::get('branch-settings', [BranchSettingsController::class, 'show'])->middleware($perm('branches.view'));
         Route::put('branch-settings', [BranchSettingsController::class, 'update'])->middleware([$perm('branches.manage'), $app('company.branches')]);
         Route::get('branches/{id}', [BranchController::class, 'show'])->middleware($perm('branches.view'));
@@ -845,6 +848,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('purchase-settings', [PurchaseSettingsController::class, 'update'])->middleware([$perm('company.manage'), $app('purchases.cycle')]);
 
         // إعدادات الترقيم المتسلسل — الموضع الواحد لسلاسل المستندات السبع عشرة
+        Route::get('number-preview', [NumberPreviewController::class, 'show']);
         Route::get('numbering-settings', [NumberingSettingsController::class, 'show'])->middleware($perm('invoices.view'));
         Route::put('numbering-settings', [NumberingSettingsController::class, 'update'])->middleware($perm('company.manage'));
 

@@ -8,12 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { PartnerDialog } from '@/components/partners/partner-dialog';
 import { ProductDialog } from '@/components/products/product-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 
@@ -47,6 +49,7 @@ export default function NewQuotePage() {
   const [saving, setSaving] = useState(false);
   const [newPartner, setNewPartner] = useState(false);
   const [newProductFor, setNewProductFor] = useState<string | null>(null);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('quote', { date });
 
   // **الموردون لا يُعرَض عليهم سعر.** كانت القائمة تُحمَّل بلا تصفية، فيظهر
   // المورّدون بين عملاء عرض السعر — والأسوأ أن أوّلهم كان يُختار تلقائياً.
@@ -162,6 +165,7 @@ export default function NewQuotePage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <NumberPreviewField id="quote-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />
             <div className="space-y-1.5">
               <Label htmlFor="partner">{t('partner')}</Label>
               <div className="flex items-center gap-2">

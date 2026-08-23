@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
 interface Partner { id: string; name: string; type: string }
@@ -35,6 +37,7 @@ export default function ReceiptVoucherFormPage() {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('payment', { seriesKey: 'received', date, enabled: !editId });
 
   const customers = useMemo(() => partners.filter((partner) => ['customer', 'both'].includes(partner.type)), [partners]);
 
@@ -124,6 +127,7 @@ export default function ReceiptVoucherFormPage() {
         <Card>
           <CardHeader><CardTitle>{t('detail_title')}</CardTitle></CardHeader>
           <CardContent className="grid gap-5 sm:grid-cols-2">
+            {!editId && <NumberPreviewField id="receipt-voucher-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />}
             <div className="space-y-2"><Label htmlFor="customer">{t('customer')}</Label><Select id="customer" value={partnerId} onChange={(event) => { setPartnerId(event.target.value); setInvoiceId(''); }} required><option value="" disabled>{t('choose_customer')}</option>{customers.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</Select></div>
             <div className="space-y-2"><Label htmlFor="date">{t('date')}</Label><Input id="date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required /></div>
             <div className="space-y-2"><Label htmlFor="method">{t('method')}</Label><Select id="method" value={method} onChange={(event) => setMethod(event.target.value)}><option value="cash">{t('cash')}</option><option value="bank">{t('bank')}</option></Select></div>

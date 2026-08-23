@@ -52,7 +52,7 @@ trait GeneratesDocumentNumbers
     }
 
     /**
-     * الرقم التسلسلي التالي في السلسلة: `PREFIX-YYYY-00001`.
+     * الرقم التسلسلي التالي في السلسلة: `PREFIX-YYYY-00001-SUFFIX`.
      *
      * @param  ?string  $prefix  بادئة السلسلة. `null` = بلا بادئة (أكواد الفروع والمخازن: `00001`).
      * @param  ?string  $date    تاريخ المستند — تُشتقّ منه سنة إعادة الضبط. `null` = سلسلة مستمرة بلا سنة (`EMP-00001`).
@@ -75,7 +75,11 @@ trait GeneratesDocumentNumbers
         // المِرساة تتبع نطاق السلسلة نفسه: قفلُ فرعٍ لا يُسلسِل سلسلةً مؤسسية.
         static::lockNumberingAnchor($branchId);
 
-        $series = static::numberSeries($prefix, $date);
+        // تنسيق السلسلة يُحل من الكتالوج المركزي؛ الخدمات القديمة تستمر بتمرير
+        // بادئتها الافتراضية، بينما تضيف الإعدادات بادئة/لاحقة مخصصة بأمان.
+        $format = DocumentNumberingCatalog::formatForModel(static::class, $prefix);
+        $series = static::numberSeries($format['prefix'], $date);
+        $suffix = static::numberSuffix($format['suffix']);
         $query  = static::query()->withoutGlobalScope(BranchScope::class);
 
         if ($branchNumbered) {
@@ -85,7 +89,7 @@ trait GeneratesDocumentNumbers
         }
 
         if ($series !== '') {
-            $query->where($column, 'like', $series . '%');
+            $query->where($column, 'like', $series . '%' . $suffix);
         }
 
         // الترتيب بالطول أولاً: الأرقام مصفَّرة بعرض ثابت، فيطابق الترتيب
@@ -95,11 +99,20 @@ trait GeneratesDocumentNumbers
             ->orderByDesc($column)
             ->value($column);
 
-        $sequence = $last === null
-            ? 0
-            : (int) preg_replace('/\D/', '', substr((string) $last, strlen($series)));
+        $sequence = 0;
+        if ($last !== null && preg_match('/^' . preg_quote($series, '/') . '(\d+)/', (string) $last, $matches) === 1) {
+            $sequence = (int) $matches[1];
+        }
 
-        return $series . str_pad((string) ($sequence + 1), 5, '0', STR_PAD_LEFT);
+        return $series . str_pad((string) ($sequence + 1), 5, '0', STR_PAD_LEFT) . $suffix;
+    }
+
+    /** لاحقة الرقم؛ تُفصل بشرطة تلقائياً إن أُدخلت. */
+    protected static function numberSuffix(?string $suffix): string
+    {
+        $suffix = trim((string) $suffix, '-');
+
+        return $suffix === '' ? '' : '-' . $suffix;
     }
 
     /** بادئة السلسلة كاملةً بفواصلها: `INV-2026-` · `EMP-` · `` (فارغة). */

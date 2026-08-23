@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { type CustodyCashBankAccount, type CustodyEmployee, type EmployeeCustody, type EmployeeCustodyMethod } from '@/lib/employee-custody';
 import { riyalToMinor } from '@/lib/money';
 
@@ -34,6 +36,7 @@ export default function EmployeeCustodyFormPage() {
   const [number, setNumber] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('employee_custody', { date: custodyDate, enabled: !editId });
 
   const activeEmployees = useMemo(() => employees.filter((employee) => employee.is_active), [employees]);
   const availableAccounts = useMemo(
@@ -133,6 +136,7 @@ export default function EmployeeCustodyFormPage() {
         <Card>
           <CardHeader><CardTitle>{t('detailTitle')}</CardTitle></CardHeader>
           <CardContent className="grid gap-5 sm:grid-cols-2">
+            {!editId && <NumberPreviewField id="employee-custody-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />}
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="employee">{t('employee')}</Label>
               <Select id="employee" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} required>

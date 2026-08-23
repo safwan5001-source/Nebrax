@@ -8,12 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { PartnerDialog } from '@/components/partners/partner-dialog';
 import { ProductDialog } from '@/components/products/product-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { cn } from '@/lib/utils';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import type { Warehouse } from '@/lib/warehouse';
@@ -135,6 +137,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [newPartner, setNewPartner] = useState(false);
   // السطر الذي فُتحت من منتقيه نافذة «منتج جديد» — ليُختار فيه فور الحفظ.
   const [newProductFor, setNewProductFor] = useState<string | null>(null);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('invoice', { date, enabled: !editId });
 
   const selectPartner = useCallback((nextPartnerId: string, availablePartners = partners) => {
     setPartnerId(nextPartnerId);
@@ -609,10 +612,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
             <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('meta_section')}</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label>{t('invoice_number')}</Label>
-                  <div className="flex h-9 items-center rounded border border-border bg-background px-3 text-sm text-muted">{t('auto_number')}</div>
-                </div>
+                {!editId && <NumberPreviewField id="invoice-number" label={t('invoice_number')} number={suggestedNumber} loading={loadingNumber} />}
                 <div className="space-y-1.5">
                   <Label htmlFor="date">{t('invoice_date')}</Label>
                   <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => changeDate(e.target.value)} />

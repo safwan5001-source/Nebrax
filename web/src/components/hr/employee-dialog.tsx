@@ -7,10 +7,12 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { AccessScopeFields, type AccessScope } from '@/components/users/access-scope-fields';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-dialog';
 import type { Shift } from './shift-dialog';
@@ -163,6 +165,7 @@ export function EmployeeDialog({
   const [employmentTypes, setEmploymentTypes] = useState<OrgOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { number: suggestedEmployeeNo, loading: loadingEmployeeNo } = useNumberPreview('employee', { enabled: open && !employee?.id });
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -357,6 +360,7 @@ export function EmployeeDialog({
   return (
     <Dialog open={open} onClose={onClose} title={dialogTitle}>
       <form onSubmit={submit} className="space-y-3">
+        {!employee?.id && <NumberPreviewField id="employee-number" label={t('employee_no')} number={suggestedEmployeeNo} loading={loadingEmployeeNo} />}
         <div className="space-y-1.5">
           <Label htmlFor="name">{t('emp_name')}</Label>
           <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} required />

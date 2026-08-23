@@ -58,6 +58,24 @@ class BranchTest extends TestCase
     }
 
     /** @test */
+    public function it_previews_the_next_branch_code_without_allocating_it(): void
+    {
+        $auth = $this->registerTenant();
+
+        $this->withToken($auth['token'])->getJson('/api/branches/next-code')
+            ->assertOk()
+            ->assertJsonPath('data.code', '00002');
+
+        $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])
+            ->assertCreated()
+            ->assertJsonPath('data.code', '00002');
+
+        $this->withToken($auth['token'])->getJson('/api/branches/next-code')
+            ->assertOk()
+            ->assertJsonPath('data.code', '00003');
+    }
+
+    /** @test */
     public function it_rejects_a_duplicate_code_and_updates_a_branch(): void
     {
         $auth = $this->registerTenant();

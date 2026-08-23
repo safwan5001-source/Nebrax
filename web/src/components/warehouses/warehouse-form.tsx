@@ -39,12 +39,28 @@ export function WarehouseForm({ warehouseId }: { warehouseId?: string }) {
   const [loading, setLoading] = useState(!!warehouseId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestedCode, setSuggestedCode] = useState<string | null>(null);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
     api<{ data: Branch[] }>('/branches').then((r) => setBranches(r.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (warehouseId) return;
+    let active = true;
+
+    api<{ data: { code: string } }>('/warehouses/next-code')
+      .then((r) => {
+        if (!active) return;
+        setSuggestedCode(r.data.code);
+        setForm((current) => current.code === '' ? { ...current, code: r.data.code } : current);
+      })
+      .catch(() => {});
+
+    return () => { active = false; };
+  }, [warehouseId]);
 
   useEffect(() => {
     if (!warehouseId) return;
@@ -65,10 +81,12 @@ export function WarehouseForm({ warehouseId }: { warehouseId?: string }) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const code = form.code.trim();
     const body = {
       ...form,
-      code: form.code.trim() || undefined,     // يُولَّد تلقائياً حين يُترك فارغاً
-      branch_id: form.branch_id || null,        // لا فرع = مخزن مركزي
+      // الرقم الظاهر معاينة فقط؛ يترك للخادم تخصيص الرقم النهائي عند عدم تعديله.
+      code: !warehouseId && suggestedCode !== null && code === suggestedCode ? undefined : code || undefined,
+      branch_id: form.branch_id || null, // لا فرع = مخزن مركزي
     };
     try {
       if (warehouseId) await api(`/warehouses/${warehouseId}`, { method: 'PUT', body });
@@ -104,7 +122,7 @@ export function WarehouseForm({ warehouseId }: { warehouseId?: string }) {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="code">{t('code')}</Label>
-            <Input id="code" dir="ltr" className="num" value={form.code} placeholder={t('code_auto')} onChange={(e) => set('code', e.target.value)} />
+            <Input id="code" dir="ltr" className="num" value={form.code} inputMode="text" onChange={(e) => set('code', e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="branch">{tb('title')}</Label>

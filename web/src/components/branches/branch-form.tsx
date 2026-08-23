@@ -48,8 +48,24 @@ export function BranchForm({ branchId }: { branchId?: string }) {
   const [loading, setLoading] = useState(!!branchId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestedCode, setSuggestedCode] = useState<string | null>(null);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    if (branchId) return;
+    let active = true;
+
+    api<{ data: { code: string } }>('/branches/next-code')
+      .then((r) => {
+        if (!active) return;
+        setSuggestedCode(r.data.code);
+        setForm((current) => current.code === '' ? { ...current, code: r.data.code } : current);
+      })
+      .catch(() => {});
+
+    return () => { active = false; };
+  }, [branchId]);
 
   useEffect(() => {
     if (!branchId) return;
@@ -72,8 +88,12 @@ export function BranchForm({ branchId }: { branchId?: string }) {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    // الكود يُترك للخادم ليولّده تلقائياً حين يكون فارغاً.
-    const body = { ...form, code: form.code.trim() || undefined };
+    const code = form.code.trim();
+    // الرقم الظاهر معاينة فقط؛ يترك للخادم تخصيص الرقم النهائي عند عدم تعديله.
+    const body = {
+      ...form,
+      code: !branchId && suggestedCode !== null && code === suggestedCode ? undefined : code || undefined,
+    };
     try {
       if (branchId) await api(`/branches/${branchId}`, { method: 'PUT', body });
       else await api('/branches', { method: 'POST', body });
@@ -108,7 +128,7 @@ export function BranchForm({ branchId }: { branchId?: string }) {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="code">{t('code')}</Label>
-            <Input id="code" dir="ltr" className="num" value={form.code} placeholder={t('code_auto')} onChange={(e) => set('code', e.target.value)} />
+            <Input id="code" dir="ltr" className="num" value={form.code} inputMode="text" onChange={(e) => set('code', e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="phone">{t('phone')}</Label>

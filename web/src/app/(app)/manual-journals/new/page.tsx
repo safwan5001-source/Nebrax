@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
 interface Account { id: string; code: string; name: string; is_group: boolean; is_active: boolean }
@@ -59,6 +61,7 @@ export default function ManualJournalEditorPage() {
   const [lines, setLines] = useState<JournalLine[]>([emptyLine(), emptyLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('manual_journal', { date: entryDate, enabled: !editId });
 
   useEffect(() => {
     setEntryDate(new Date().toISOString().slice(0, 10));
@@ -160,6 +163,7 @@ export default function ManualJournalEditorPage() {
       <Card>
         <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {!editId && <NumberPreviewField id="manual-journal-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />}
           <div className="space-y-1.5">
             <Label htmlFor="entry-date">{t('entryDate')}</Label>
             <Input id="entry-date" type="date" dir="ltr" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} />

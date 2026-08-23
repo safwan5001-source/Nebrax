@@ -21,6 +21,7 @@ use App\Models\ManualJournal;
 use App\Models\Payment;
 use App\Models\PayrollRun;
 use App\Models\PosSession;
+use App\Models\Product;
 use App\Models\ProcurementDocument;
 use App\Models\Purchase;
 use App\Models\Quote;
@@ -76,6 +77,12 @@ class DocumentNumberingCatalog
      *  - `setting` مصدر البادئة إن كانت مضبوطة — وإلا فثابتٌ في الخدمة.
      */
     public const ENTITIES = [
+        'product' => [
+            'model'   => Product::class,
+            'yearly'  => false,
+            'setting' => ['group' => 'numbering', 'key' => 'product_prefix'],
+            'series'  => [['key' => 'default', 'prefix' => 'SKU']],
+        ],
         'invoice' => [
             'model'   => Invoice::class,
             'yearly'  => true,
@@ -232,13 +239,10 @@ class DocumentNumberingCatalog
         ],
     ];
 
-    /** الكيانات التي تُحرَّر بادئتها من الشاشة — وهي وحدها ما تقرؤه الخدمات من الإعدادات. */
+    /** كل أنواع المستندات تقبل الآن تنسيقاً مستقلاً لكل سلسلة. */
     public static function editableKeys(): array
     {
-        return array_keys(array_filter(
-            self::ENTITIES,
-            fn (array $entity) => isset($entity['setting'])
-        ));
+        return array_keys(self::ENTITIES);
     }
 
     /**
@@ -271,20 +275,109 @@ class DocumentNumberingCatalog
             'resets_yearly'   => $entity['yearly'],
             'format'          => self::FORMAT,
             'padding'         => self::PADDING,
-            'editable_prefix' => isset($entity['setting']),
+            'editable_prefix' => true,
             'prefix'          => $prefix,
-            'series'          => array_map(fn (array $series) => [
-                'key' => $series['key'],
-                // البادئة المضبوطة تُطبَّق على السلسلة الوحيدة للكيانات المضبوطة؛
-                // ومتعدّدةُ السلاسل ثوابتُها في خدمتها فتُعرَض كما هي.
-                'prefix' => isset($entity['setting']) ? $prefix : $series['prefix'],
-                // الرقم التالي من الطبقة نفسها — لا حساب موازٍ.
-                'next_number' => $model::nextDocumentNumber(
-                    isset($entity['setting']) ? $prefix : $series['prefix'],
-                    $date
-                ),
-            ], $entity['series']),
+            'series'          => array_map(function (array $series) use ($key, $model, $date) {
+                $format = self::seriesFormat($key, $series['key']);
+
+                return [
+                    'key'         => $series['key'],
+                    'prefix'      => $format['prefix'],
+                    'suffix'      => $format['suffix'],
+                    // تمرير بادئة السلسلة الأساسية فقط؛ المولد يطبق الصيغة المحفوظة.
+                    'next_number' => $model::nextDocumentNumber(self::defaultPrefix($key, $series), $date),
+                ];
+            }, $entity['series']),
         ];
+    }
+
+    /**
+     * معاينة الرقم التالي لكي يظهر في نموذج الإنشاء من دون حجزه أو نسخ قواعد التوليد.
+     *
+     * @return array{key:string,series_key:string,number:string}
+     */
+    public static function preview(string $key, ?string $seriesKey = null, ?string $date = null): array
+    {
+        if (! array_key_exists($key, self::ENTITIES)) {
+            throw new \InvalidArgumentException('كيان الترقيم غير معروف.');
+        }
+
+        $entity = self::ENTITIES[$key];
+        $seriesKey ??= $entity['series'][0]['key'];
+        $series = collect($entity['series'])->firstWhere('key', $seriesKey);
+
+        if ($series === null) {
+            throw new \InvalidArgumentException('سلسلة الترقيم غير صالحة لهذا الكيان.');
+        }
+
+        $prefix = isset($entity['setting']) ? self::effectivePrefix($key) : $series['prefix'];
+        $number = $entity['model']::nextDocumentNumber(
+            $prefix,
+            $entity['yearly'] ? ($date ?? now()->toDateString()) : null,
+        );
+
+        return ['key' => $key, 'series_key' => $seriesKey, 'number' => $number];
+    }
+
+    /**
+     * صيغة سلسلة محددة؛ حذف الإعداد يعيد البادئة الأصلية ولا يكتب تنسيقاً موازياً.
+     *
+     * @return array{prefix:?string,suffix:string}
+     */
+    public static function seriesFormat(string $key, string $seriesKey): array
+    {
+        $entity = self::ENTITIES[$key] ?? null;
+        $series = $entity ? collect($entity['series'])->firstWhere('key', $seriesKey) : null;
+        if ($entity === null || $series === null) {
+            throw new \InvalidArgumentException('سلسلة الترقيم غير صالحة.');
+        }
+
+        $stored = Settings::get('numbering', 'document_series');
+        $custom = is_array($stored) ? ($stored[$key][$seriesKey] ?? []) : [];
+        $fallback = self::defaultPrefix($key, $series);
+
+        return [
+            'prefix' => array_key_exists('prefix', $custom) ? (string) $custom['prefix'] : $fallback,
+            'suffix' => (string) ($custom['suffix'] ?? ''),
+        ];
+    }
+
+    /** الصيغة الفعالة التي يستدعيها مولد النموذج من أي خدمة قائمة. */
+    public static function formatForModel(string $model, ?string $fallbackPrefix): array
+    {
+        foreach (self::ENTITIES as $key => $entity) {
+            if ($entity['model'] !== $model) {
+                continue;
+            }
+
+            $series = collect($entity['series'])->first(fn (array $item) => self::defaultPrefix($key, $item) === $fallbackPrefix)
+                ?? $entity['series'][0];
+
+            return self::seriesFormat($key, $series['key']);
+        }
+
+        return ['prefix' => $fallbackPrefix, 'suffix' => ''];
+    }
+
+    /** حفظ تنسيق سلسلة واحدة فقط من دون لمس السلاسل أو الإعدادات الأخرى. */
+    public static function putSeriesFormat(string $key, string $seriesKey, ?string $prefix, ?string $suffix): array
+    {
+        self::seriesFormat($key, $seriesKey); // تحقق من النوع والسلسلة أولاً.
+        $all = Settings::get('numbering', 'document_series');
+        $all = is_array($all) ? $all : [];
+        $all[$key][$seriesKey] = [
+            'prefix' => trim((string) $prefix, '-'),
+            'suffix' => trim((string) $suffix, '-'),
+        ];
+        Settings::put('numbering', ['document_series' => $all]);
+
+        return self::seriesFormat($key, $seriesKey);
+    }
+
+    /** البادئة الأصلية التي ترسلها الخدمات الحالية إلى مولد الأرقام. */
+    private static function defaultPrefix(string $key, array $series): ?string
+    {
+        return isset(self::ENTITIES[$key]['setting']) ? self::effectivePrefix($key) : $series['prefix'];
     }
 
     /** كل الكيانات موصوفةً — حمولة الشاشة. */

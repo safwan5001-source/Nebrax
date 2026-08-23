@@ -26,6 +26,12 @@ class WarehouseController extends ApiController
         return (new WarehouseResource(Warehouse::findOrFail($id)))->response();
     }
 
+    /** معاينة الكود التسلسلي التالي لعرضه في نموذج الإضافة دون حجزه. */
+    public function nextCode(): JsonResponse
+    {
+        return response()->json(['data' => ['code' => Warehouse::nextCode()]]);
+    }
+
     public function store(StoreWarehouseRequest $request): JsonResponse
     {
         $data = $request->validated();

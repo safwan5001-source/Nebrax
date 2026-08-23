@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { PartnerDialog } from '@/components/partners/partner-dialog';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
@@ -51,6 +53,7 @@ export default function NewExpensePage() {
   const [categoryDescription, setCategoryDescription] = useState('');
   const [savingCategory, setSavingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('expense', { date, enabled: !editId });
 
   const loadPartners = useCallback(() => {
     api<{ data: Partner[] }>('/partners')
@@ -193,6 +196,7 @@ export default function NewExpensePage() {
             <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {!editId && <NumberPreviewField id="expense-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />}
                 <div className="space-y-1.5">
                   <Label htmlFor="amount">{t('amount')}</Label>
                   <div className="flex rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-primary/40">

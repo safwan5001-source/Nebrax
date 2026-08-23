@@ -8,9 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 
 interface Account {
@@ -41,6 +43,7 @@ export default function NewAssetPage() {
   const [date, setDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('asset', { date });
 
   useEffect(() => {
     setDate(new Date().toISOString().slice(0, 10));
@@ -104,7 +107,8 @@ export default function NewAssetPage() {
         <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
+            <NumberPreviewField id="asset-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />
+            <div className="space-y-1.5">
               <Label htmlFor="name">{t('name')}</Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>

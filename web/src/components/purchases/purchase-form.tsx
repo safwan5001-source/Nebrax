@@ -8,12 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPreviewField } from '@/components/ui/number-preview-field';
 import { Select } from '@/components/ui/select';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { useToast } from '@/components/ui/toast';
 import { PartnerDialog } from '@/components/partners/partner-dialog';
 import { ProductDialog } from '@/components/products/product-dialog';
 import { api, ApiError } from '@/lib/api';
+import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import type { Warehouse } from '@/lib/warehouse';
@@ -105,6 +107,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingDoc, setLoadingDoc] = useState(!!editId);
+  const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('purchase', { date, enabled: !editId });
 
   const loadPartners = useCallback(
     () => api<{ data: Partner[] }>('/partners')
@@ -386,6 +389,8 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                     <p className="text-xs text-muted">{t('warehouse_hint')}</p>
                   </div>
                 )}
+
+                {!editId && <NumberPreviewField id="purchase-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />}
 
                 <div className="space-y-1.5">
                   <Label htmlFor="date">{t('date')}</Label>

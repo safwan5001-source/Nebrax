@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Tenancy\BranchScoped;
 use App\Tenancy\BranchShareable;
 use App\Tenancy\BranchSharing;
+use App\Support\GeneratesDocumentNumbers;
 use Closure;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Product extends BaseModel implements BranchShareable
 {
     use BranchScoped;
+    use GeneratesDocumentNumbers;
     use SoftDeletes;
 
     protected $fillable = [
@@ -58,6 +60,18 @@ class Product extends BaseModel implements BranchShareable
         'avg_cost'         => 0,
         'is_active'        => true,
     ];
+
+    /** كود الصنف الداخلي هو SKU، وسلسلته مستمرة ولا تُعاد سنوياً. */
+    public static function documentNumberColumn(): string
+    {
+        return 'sku';
+    }
+
+    /** SKU مرجع كتالوج مؤسسي؛ لا يتفرع عداده مع عزل عرض المنتجات. */
+    protected static function isBranchNumbered(): bool
+    {
+        return false;
+    }
 
     public function isService(): bool
     {

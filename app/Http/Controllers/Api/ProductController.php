@@ -22,6 +22,7 @@ use App\Models\UnitTemplate;
 use App\Services\Accounting\InventoryService;
 use App\Services\ProductImportService;
 use App\Services\ProductLifecycleService;
+use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -109,6 +110,13 @@ class ProductController extends ApiController
         // فشل القيد يُرجع المنتج كله (لا منتج يتيم بلا قيده).
         $userId = $request->user()?->id;
         $product = $this->domain(fn () => DB::transaction(function () use ($data, $userId) {
+            // SKU هو كود الصنف الداخلي: إن لم يُحدده المستخدم يولّد الخادم الرقم
+            // التالي تحت القفل نفسه، فلا تتصادم عمليات الإنشاء المتزامنة.
+            if (blank($data['sku'] ?? null)) {
+                $prefix = (string) Settings::get('numbering', 'product_prefix');
+                $data['sku'] = Product::nextDocumentNumber($prefix !== '' ? $prefix : 'SKU');
+            }
+
             $product = Product::create($data); // initial_quantity ليست عموداً — يحرسها fillable
 
             // رصيد افتتاحي (قيد مدين 1140 / دائن 3130) عند تحديد كمية ابتدائية لمنتج متتبَّع.
