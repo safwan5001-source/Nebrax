@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Branch;
 use App\Models\CrmActivity;
 use App\Models\Employee;
+use App\Models\FuelStation;
 use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\PosSession;
@@ -32,7 +33,7 @@ class TenantApplicationTest extends TestCase
 
         $res = $this->withToken($auth['token'])->getJson('/api/applications')->assertOk();
 
-        $this->assertCount(36, $res['data']);
+        $this->assertCount(43, $res['data']);
         $this->assertTrue($res['data']['sales.invoicing']['enabled']);
         $this->assertTrue($res['data']['accounting.ledger']['enabled']);
         $this->assertFalse($res['data']['hr.employees']['enabled']);
@@ -133,6 +134,18 @@ class TenantApplicationTest extends TestCase
 
         $this->assertTrue($res['data']['enabled']);
         $this->assertSame('enabled', $res['data']['status']);
+    }
+
+    /** @test */
+    public function fuel_stations_foundation_suspends_when_a_station_exists(): void
+    {
+        $auth = $this->registerTenant(autoEnableApplications: false);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'fuel_stations.core'])->assertOk();
+        FuelStation::create(['code' => 'FS-SUSP-1', 'name' => 'محطة معلقة']);
+
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'fuel_stations.core'])
+            ->assertOk()->assertJsonPath('data.status', 'suspended');
     }
 
     /** @test */
@@ -278,6 +291,6 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function the_catalogue_and_service_agree_on_key_count(): void
     {
-        $this->assertCount(36, ApplicationCatalog::all());
+        $this->assertCount(43, ApplicationCatalog::all());
     }
 }

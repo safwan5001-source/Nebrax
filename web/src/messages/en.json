@@ -1894,7 +1894,8 @@
       "pos": "Point of Sale",
       "branches": "Branches",
       "purchases": "Purchases",
-      "finance": "Finance"
+      "finance": "Finance",
+      "fuelStations": "Fuel Stations"
     },
     "invoices": "Invoices & Quotes",
     "pos": "POS",
@@ -1987,7 +1988,8 @@
     "receiptVouchers": "Receipt Vouchers",
     "cashAndBank": "Cashboxes & Bank Accounts",
     "employeeCustodies": "Employee Custodies",
-    "financeSettings": "Finance Settings"
+    "financeSettings": "Finance Settings",
+    "fuelStationsWorkspace": "Stations Workspace"
   },
   "partnerProfile": {
     "back": "Back",
@@ -4706,7 +4708,8 @@
       "logistics": "Logistics",
       "branches": "Branches",
       "settings": "Settings",
-      "integrations": "Integrations"
+      "integrations": "Integrations",
+      "fuel_stations": "Fuel Stations"
     },
     "keys": {
       "sales_invoicing": "Invoices & Quotes",
@@ -4744,7 +4747,14 @@
       "company_branches": "Branches",
       "communications_sms": "SMS Messaging",
       "commerce_storefront": "Online Store",
-      "integration_mudad": "Mudad Integration"
+      "integration_mudad": "Mudad Integration",
+      "fuel_stations_core": "Stations Management Foundation",
+      "fuel_stations_inventory": "Fuel Inventory & Tanks",
+      "fuel_stations_forecourt": "Forecourt Operations & Shifts",
+      "fuel_stations_fleet": "Enterprise Customers & Fleets",
+      "fuel_stations_avi": "AVI/RFID Smart Refueling",
+      "fuel_stations_maintenance": "Maintenance & Safety",
+      "fuel_stations_integrations": "Station Device Integrations"
     }
   },
   "numberingSettings": {
@@ -5014,5 +5024,21 @@
     "item_delete_failed": "Could not delete the product price.",
     "invalid_price": "Enter a valid SAR price.",
     "choose_list": "Choose a price list to view its details, or create a new one."
+  },
+  "fuelStations": {
+    "eyebrow": "Fuel Stations Management",
+    "title": "Stations workspace",
+    "subtitle": "A shared commercial and operational foundation for inventory, shifts, forecourt operations, and integrations—without parallel engines.",
+    "status": "Foundation status",
+    "foundationReady": "Foundation ready",
+    "stations": "Registered stations",
+    "stationsHint": "Station, tank, and pump management is introduced in Cycle 1. This list confirms the operational ownership context only.",
+    "noStations": "No stations have been registered yet.",
+    "settings": "Foundation settings",
+    "deferred": "Planned capabilities",
+    "deferredHint": "These capabilities cannot be granted or enabled until their real scope is complete and tested.",
+    "loadFailed": "Unable to load the Fuel Stations workspace.",
+    "retry": "Try again",
+    "commercialGuard": "Access to this workspace is enforced on the server by commercial entitlement, application state, and role permissions."
   }
 }

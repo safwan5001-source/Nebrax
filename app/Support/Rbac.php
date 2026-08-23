@@ -75,6 +75,9 @@ class Rbac
             // اعتماد فرق درج POS سلطة إدارية مستقلة عن تنفيذ البيع اليومي.
             'pos.variance.approve',
             'apps.view', 'apps.manage',
+            // Fuel Stations: يمنحها المالك/المدير عبر `*`، ولا تُضاف للأدوار
+            // المقيدة تلقائياً؛ تُسند فقط عبر دور مخصص أو قرار مستأجر صريح.
+            'fuel_stations.view', 'fuel_stations.manage',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
     ];

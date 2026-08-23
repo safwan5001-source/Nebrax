@@ -7,6 +7,7 @@ use App\Models\CrmActivity;
 use App\Models\Employee;
 use App\Models\EmployeeCustody;
 use App\Models\Expense;
+use App\Models\FuelStation;
 use App\Models\Payment;
 use App\Models\PosSession;
 use App\Models\Purchase;
@@ -67,6 +68,9 @@ class TenantApplicationService
             'finance.operations' => fn () => Expense::query()->exists()
                 || Payment::query()->exists()
                 || EmployeeCustody::query()->exists(),
+            // حتى قبل Cycle 1، إنشاء محطة قرار تشغيلي لا ينبغي أن يختفي معه
+            // التاريخ عند إيقاف التطبيق؛ يصبح الوصول قراءة فقط مثل بقية المجالات.
+            'fuel_stations.core' => fn () => FuelStation::query()->exists(),
         ];
     }
 

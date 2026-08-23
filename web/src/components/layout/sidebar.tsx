@@ -55,6 +55,7 @@ import {
   Settings,
   WalletCards,
   ReceiptText,
+  Fuel,
   ChevronDown,
   ChevronLeft,
   ChevronsLeft,
@@ -221,6 +222,16 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
+    // الشريط إرشادي فقط؛ مسار Workspace محروس مستقلاً بالاستحقاق التجاري
+    // المركب وRBAC. appKey هنا يمنع إظهار رابط قدرة معطلة تشغيلياً.
+    title: 'fuelStations',
+    icon: Fuel,
+    appKey: 'fuel_stations.core',
+    items: [
+      { href: '/fuel-stations', icon: Fuel, key: 'fuelStationsWorkspace', built: true },
+    ],
+  },
+  {
     // الفروع — عنصر مستقلّ (إدارة/إضافة/إعدادات)، منفصل عن مبدّل الفرع النشط
     // في قائمة المستخدم بالشريط العلوي.
     title: 'branches',
@@ -248,17 +259,17 @@ const GROUPS: NavGroup[] = [
 ];
 
 /**
- * تجميع المجموعات الإحدى عشرة تحت عناوين خافتة.
+ * تجميع المجموعات الاثنتي عشرة تحت عناوين خافتة.
  *
- * أحد عشر عنواناً متتابعاً بلا فاصل تقرؤها العين قائمةً واحدة طويلة؛ والعنوان
+ * اثنا عشر عنواناً متتابعاً بلا فاصل تقرؤها العين قائمةً واحدة طويلة؛ والعنوان
  * الخافت يقسمها إلى أربع كتل تُمسَح بنظرة. **هو عنوان لا زرّ**: لا يُفتح ولا
  * يُطوى ولا يُنقر — وإلا صار مستوى ثالثاً في شجرة عمقُها اثنان يكفيان.
  *
- * التغطية كاملة بلا بقايا: ٣ + ٣ + ٣ + ٢ = ١١.
+ * التغطية كاملة بلا بقايا: ٣ + ٤ + ٣ + ٢ = ١٢.
  */
 const SUPER_GROUPS: { label: string; titles: string[] }[] = [
   { label: 'revenue', titles: ['sales', 'pos', 'customers'] },
-  { label: 'operations', titles: ['inventory', 'purchases', 'logistics'] },
+  { label: 'operations', titles: ['inventory', 'purchases', 'logistics', 'fuelStations'] },
   { label: 'finance', titles: ['accounting', 'finance', 'hr', 'operations'] },
   { label: 'admin', titles: ['branches', 'settings'] },
 ];
