@@ -82,4 +82,9 @@ class DocumentBatch extends BaseModel
     {
         return $this->hasMany(DocumentWorkflowEvent::class);
     }
+
+    public function files(): HasMany
+    {
+        return $this->hasMany(DocumentFile::class);
+    }
 }

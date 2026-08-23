@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\CustomerReportController;
 use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\DocumentIntakeController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeeCustodyController;
@@ -129,6 +130,8 @@ Route::pattern('assignment', $uuid);
 Route::pattern('productId', $uuid);
 Route::pattern('partnerId', $uuid);
 Route::pattern('accountId', $uuid);
+Route::pattern('batch', $uuid);
+Route::pattern('file', $uuid);
 
 // كل مسارات الـ API ترجع JSON موحّداً (بما فيها الأخطاء).
 Route::middleware(ForceJsonResponse::class)->group(function () {
@@ -204,6 +207,19 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // الموارد تتطلب اشتراكاً نشطاً
         Route::middleware(EnsureActiveSubscription::class)->group(function () use ($perm, $app, $commercialApp) {
+
+        // مركز المستندات — PR-2: استقبال يدوي خاص فقط، بلا OCR أو Queue أو إنشاء معاملات.
+        Route::post('document-batches', [DocumentIntakeController::class, 'storeBatch'])
+            ->middleware([$perm('documents.center.manage'), $commercialApp('document_center.core', 'write'), 'throttle:20,1']);
+        Route::post('document-batches/{batch}/files', [DocumentIntakeController::class, 'storeFile'])
+            ->middleware([$perm('documents.center.manage'), $commercialApp('document_center.core', 'write'), 'throttle:20,1']);
+        Route::post('document-batches/{batch}/complete', [DocumentIntakeController::class, 'complete'])
+            ->middleware([$perm('documents.center.manage'), $commercialApp('document_center.core', 'write'), 'throttle:20,1']);
+        Route::get('document-files/{file}/download-url', [DocumentIntakeController::class, 'downloadUrl'])
+            ->middleware([$perm('documents.center.view'), $commercialApp('document_center.core')]);
+        Route::get('document-files/{file}/download', [DocumentIntakeController::class, 'download'])
+            ->middleware([$perm('documents.center.view'), $commercialApp('document_center.core'), 'signed'])
+            ->name('document-files.download');
 
         // الأطراف
         Route::get('partners', [PartnerController::class, 'index'])->middleware($perm('partners.view'));

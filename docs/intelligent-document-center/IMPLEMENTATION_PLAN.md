@@ -18,6 +18,14 @@ Register the commercial capability and product, initial RBAC permissions, `Docum
 
 **Gate before implementation:** select object storage, residency, encryption, signed-access, retention, deletion, checksum, size/MIME controls, and quarantine contract. Add `document_files` and authenticated intake only after the gate. No extraction.
 
+**Implemented decision:** platform-managed Cloudflare R2 through an S3-compatible storage
+service; local private disk only for development/tests. This phase adds authenticated manual
+batch/file intake, immutable evidence metadata, streaming storage, SHA-256, magic-byte MIME
+checks, image/PDF safety limits, branch-scoped duplicate protection, pending/clean/infected/
+failed scan states, fail-closed quarantine, and short-lived signed downloads. Default
+retention is 365 days and remains configurable. No OCR, queue, worker, automatic scanner,
+public object URL, provider-secret API, purge endpoint, or transaction creation belongs here.
+
 ### PR-3 — Processing orchestration
 
 **Gate before implementation:** select queue/worker technology, deployment topology, idempotency, concurrency, retries, dead-letter handling, and observability. Add processing attempts/runs and worker orchestration without provider-specific extraction data.
