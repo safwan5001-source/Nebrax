@@ -17,6 +17,11 @@ class TenantCommercialAssignmentEvent extends Model implements CompanyWide
     public const ACTION_ASSIGNED = 'assigned';
     public const ACTION_CANCELLED = 'cancelled';
     public const ACTION_REVOKED = 'revoked';
+    public const ACTION_PAYMENT_FAILED = 'payment_failed';
+    public const ACTION_GRACE_FULL_STARTED = 'grace_full_started';
+    public const ACTION_GRACE_READ_ONLY_STARTED = 'grace_read_only_started';
+    public const ACTION_EXPIRED = 'expired';
+    public const ACTION_CANCELLATION_SCHEDULED = 'cancellation_scheduled';
 
     protected $fillable = [
         'tenant_commercial_assignment_id', 'tenant_id', 'platform_administrator_id',

@@ -24,8 +24,10 @@ class CommercialEntitlementMaterializationService
         ?string $grantGroupId = null,
         ?string $grantedByPlatformAdministratorId = null,
         array $assignmentMetadata = [],
+        bool $allowRetiredExistingSource = false,
+        EntitlementAccessMode $accessMode = EntitlementAccessMode::FULL,
     ): array {
-        $this->assertAvailablePlan($planVersion);
+        $this->assertAvailablePlan($planVersion, $allowRetiredExistingSource);
 
         return $this->grantCapabilities(
             $tenant,
@@ -40,6 +42,7 @@ class CommercialEntitlementMaterializationService
             'Commercial plan version',
             ['commercial_plan_version_id' => $planVersion->id, ...$assignmentMetadata],
             $grantedByPlatformAdministratorId,
+            $accessMode,
         );
     }
 
@@ -52,8 +55,10 @@ class CommercialEntitlementMaterializationService
         ?string $grantGroupId = null,
         ?string $grantedByPlatformAdministratorId = null,
         array $assignmentMetadata = [],
+        bool $allowRetiredExistingSource = false,
+        EntitlementAccessMode $accessMode = EntitlementAccessMode::FULL,
     ): array {
-        $this->assertAvailableProduct($productVersion);
+        $this->assertAvailableProduct($productVersion, $allowRetiredExistingSource);
 
         return $this->grantCapabilities(
             $tenant,
@@ -68,6 +73,7 @@ class CommercialEntitlementMaterializationService
             'Commercial product version',
             ['commercial_product_version_id' => $productVersion->id, ...$assignmentMetadata],
             $grantedByPlatformAdministratorId,
+            $accessMode,
         );
     }
 
@@ -112,22 +118,22 @@ class CommercialEntitlementMaterializationService
         return array_keys($capabilityKeys);
     }
 
-    private function assertAvailablePlan(CommercialPlanVersion $planVersion): void
+    private function assertAvailablePlan(CommercialPlanVersion $planVersion, bool $allowRetiredExistingSource = false): void
     {
         if ($planVersion->published_at === null) {
             throw ValidationException::withMessages(['plan_version' => 'Only published plan versions may be materialized.']);
         }
-        if ($planVersion->retired_at !== null) {
+        if (! $allowRetiredExistingSource && $planVersion->retired_at !== null) {
             throw ValidationException::withMessages(['plan_version' => 'Retired plan versions may not receive new commercial allocations.']);
         }
     }
 
-    private function assertAvailableProduct(CommercialProductVersion $productVersion): void
+    private function assertAvailableProduct(CommercialProductVersion $productVersion, bool $allowRetiredExistingSource = false): void
     {
         if ($productVersion->published_at === null) {
             throw ValidationException::withMessages(['product_version' => 'Only published product versions may be materialized.']);
         }
-        if ($productVersion->retired_at !== null) {
+        if (! $allowRetiredExistingSource && $productVersion->retired_at !== null) {
             throw ValidationException::withMessages(['product_version' => 'Retired product versions may not receive new commercial allocations.']);
         }
     }
@@ -150,13 +156,14 @@ class CommercialEntitlementMaterializationService
         string $reason,
         array $metadata,
         ?string $grantedByPlatformAdministratorId = null,
+        EntitlementAccessMode $accessMode = EntitlementAccessMode::FULL,
     ): array {
         $grants = [];
         foreach ($capabilityKeys as $capabilityKey) {
             $grants[] = $this->grants->grant(
                 $tenant,
                 $capabilityKey,
-                EntitlementAccessMode::FULL,
+                $accessMode,
                 $sourceType,
                 $startsAt,
                 $endsAt,
