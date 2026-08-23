@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, Fuel, Gauge, Settings2, ShieldCheck } from 'lucide-react';
@@ -66,6 +67,8 @@ export default function FuelStationsWorkspacePage() {
         <h1 className="mt-1 text-xl font-semibold text-text">{t('title')}</h1>
         <p className="mt-1 text-sm leading-relaxed text-muted">{t('subtitle')}</p>
       </header>
+
+      <div className="flex justify-end"><Link href="/fuel-stations/master-data"><Button>{t('manageMasterData')}</Button></Link></div>
 
       <section className="grid gap-3 md:grid-cols-3" aria-label={t('status')}>
         <Card>

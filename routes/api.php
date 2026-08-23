@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\FuelStationsWorkspaceController;
+use App\Http\Controllers\Api\FuelStationMasterDataController;
 use App\Http\Controllers\Api\FinancialControlAlertController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InventoryController;
@@ -461,6 +462,38 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.
         Route::get('fuel-stations/workspace', [FuelStationsWorkspaceController::class, 'index'])
             ->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+
+        // Cycle 1: بيانات مرجعية فقط. كل كتابة تمرّ بالخدمة التي تتحقق من تطابق
+        // المستأجر/المحطة/الفرع/الخزان/المضخة/المنتج، ولا تنشئ حركة أو قيداً.
+        Route::get('fuel-stations/stations', [FuelStationMasterDataController::class, 'indexStations'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/stations/{id}', [FuelStationMasterDataController::class, 'showStation'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/stations', [FuelStationMasterDataController::class, 'storeStation'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::put('fuel-stations/stations/{id}', [FuelStationMasterDataController::class, 'updateStation'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::delete('fuel-stations/stations/{id}', [FuelStationMasterDataController::class, 'destroyStation'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        Route::get('fuel-stations/products', [FuelStationMasterDataController::class, 'indexFuelProducts'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/products/{id}', [FuelStationMasterDataController::class, 'showFuelProduct'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/products', [FuelStationMasterDataController::class, 'storeFuelProduct'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::put('fuel-stations/products/{id}', [FuelStationMasterDataController::class, 'updateFuelProduct'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::delete('fuel-stations/products/{id}', [FuelStationMasterDataController::class, 'destroyFuelProduct'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        Route::get('fuel-stations/tanks', [FuelStationMasterDataController::class, 'indexTanks'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/tanks/{id}', [FuelStationMasterDataController::class, 'showTank'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/tanks', [FuelStationMasterDataController::class, 'storeTank'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::put('fuel-stations/tanks/{id}', [FuelStationMasterDataController::class, 'updateTank'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::delete('fuel-stations/tanks/{id}', [FuelStationMasterDataController::class, 'destroyTank'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        Route::get('fuel-stations/pumps', [FuelStationMasterDataController::class, 'indexPumps'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/pumps/{id}', [FuelStationMasterDataController::class, 'showPump'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/pumps', [FuelStationMasterDataController::class, 'storePump'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::put('fuel-stations/pumps/{id}', [FuelStationMasterDataController::class, 'updatePump'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::delete('fuel-stations/pumps/{id}', [FuelStationMasterDataController::class, 'destroyPump'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+
+        Route::get('fuel-stations/nozzles', [FuelStationMasterDataController::class, 'indexNozzles'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::get('fuel-stations/nozzles/{id}', [FuelStationMasterDataController::class, 'showNozzle'])->middleware([$perm('fuel_stations.view'), $commercialApp('fuel_stations.core')]);
+        Route::post('fuel-stations/nozzles', [FuelStationMasterDataController::class, 'storeNozzle'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::put('fuel-stations/nozzles/{id}', [FuelStationMasterDataController::class, 'updateNozzle'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
+        Route::delete('fuel-stations/nozzles/{id}', [FuelStationMasterDataController::class, 'destroyNozzle'])->middleware([$perm('fuel_stations.manage'), $commercialApp('fuel_stations.core', 'write')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));
