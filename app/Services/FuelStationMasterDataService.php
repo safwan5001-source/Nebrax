@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\Branch;
 use App\Models\FuelNozzle;
+use App\Models\FuelOperationalLedger;
 use App\Models\FuelProduct;
 use App\Models\FuelPump;
 use App\Models\FuelStation;
 use App\Models\FuelTank;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Tenancy\BranchScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +31,7 @@ class FuelStationMasterDataService
     {
         return DB::transaction(function () use ($data) {
             $branch = $this->branch($data['branch_id']);
-            $this->assertStationReferences($data);
+            $this->assertStationReferences($data, $branch->id);
             $this->assertStationCodeAvailable($data['code']);
 
             return FuelStation::create([
@@ -46,11 +48,15 @@ class FuelStationMasterDataService
             $station = FuelStation::lockForUpdate()->findOrFail($station->id);
             $next = $this->merged($station, $data, [...array_keys($this->stationAttributes($data)), 'branch_id']);
             $branch = $this->branch($next['branch_id']);
-            $this->assertStationReferences($next);
+            $this->assertStationReferences($next, $branch->id);
             $this->assertStationCodeAvailable($next['code'], $station->id);
 
             if ($branch->id !== $station->branch_id && ($station->tanks()->exists() || $station->pumps()->exists())) {
                 throw new RuntimeException('لا يمكن تغيير فرع محطة لها خزانات أو مضخات مسجلة. أنشئ محطة جديدة أو انقل البنية بتدفق مخصص.');
+            }
+
+            if ($next['warehouse_id'] !== $station->warehouse_id && FuelOperationalLedger::where('fuel_station_id', $station->id)->exists()) {
+                throw new RuntimeException('لا يمكن تغيير مخزن محطة لها دفتر وقود فعلي. يلزم workflow نقل مخزون صريح لحفظ التاريخ.');
             }
 
             $station->update([...$this->stationAttributes($next), 'branch_id' => $branch->id]);
@@ -259,6 +265,7 @@ class FuelStationMasterDataService
     private function stationAttributes(array $data): array
     {
         return [
+            'warehouse_id' => $data['warehouse_id'] ?? null,
             'code' => trim($data['code']),
             'name' => trim($data['name']),
             'country_code' => strtoupper($this->nullableTrim($data['country_code'] ?? null) ?? ''),
@@ -282,10 +289,16 @@ class FuelStationMasterDataService
     }
 
     /** @param array<string, mixed> $data */
-    private function assertStationReferences(array $data): void
+    private function assertStationReferences(array $data, string $branchId): void
     {
         if (! in_array($data['status'] ?? FuelStation::STATUS_ACTIVE, FuelStation::STATUSES, true)) {
             throw new RuntimeException('حالة المحطة غير صالحة.');
+        }
+        if (! empty($data['warehouse_id'])) {
+            $warehouse = Warehouse::whereKey($data['warehouse_id'])->first();
+            if (! $warehouse || ! $warehouse->is_active || ($warehouse->branch_id !== null && $warehouse->branch_id !== $branchId)) {
+                throw new RuntimeException('مخزن المحطة يجب أن يكون نشطاً ومملوكاً للمستأجر ومتوافقاً مع فرع المحطة.');
+            }
         }
         if (! empty($data['manager_id']) && ! User::whereKey($data['manager_id'])->exists()) {
             throw new RuntimeException('مدير المحطة لا ينتمي إلى المستأجر.');
@@ -454,7 +467,7 @@ class FuelStationMasterDataService
     /** @return list<string> */
     private function stationRelations(): array
     {
-        return ['branch', 'manager', 'defaultInventoryAccount', 'defaultRevenueAccount', 'defaultCogsAccount'];
+        return ['branch', 'warehouse', 'manager', 'defaultInventoryAccount', 'defaultRevenueAccount', 'defaultCogsAccount'];
     }
 
     private function assertStationCodeAvailable(string $code, ?string $exceptId = null): void

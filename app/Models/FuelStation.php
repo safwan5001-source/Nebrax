@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 /**
  * محطة وقود تنظيمية داخل المستأجر.
@@ -27,7 +28,7 @@ class FuelStation extends BaseModel implements CompanyWide
     ];
 
     protected $fillable = [
-        'tenant_id', 'branch_id', 'code', 'name', 'country_code', 'region', 'city', 'address',
+        'tenant_id', 'branch_id', 'warehouse_id', 'code', 'name', 'country_code', 'region', 'city', 'address',
         'latitude', 'longitude', 'manager_id', 'status', 'timezone', 'operating_day_starts_at',
         'operating_hours', 'license_number', 'license_expires_at', 'zatca_branch_reference',
         'default_inventory_account_id', 'default_revenue_account_id', 'default_cogs_account_id',
@@ -44,9 +45,23 @@ class FuelStation extends BaseModel implements CompanyWide
         'status' => self::STATUS_ACTIVE,
     ];
 
+    protected static function booted(): void
+    {
+        static::updating(function (self $station): void {
+            if ($station->isDirty('warehouse_id') && FuelOperationalLedger::where('fuel_station_id', $station->id)->exists()) {
+                throw new LogicException('لا يمكن تغيير مخزن محطة لها دفتر وقود فعلي. يلزم workflow نقل مخزون صريح لحفظ التاريخ.');
+            }
+        });
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     public function manager(): BelongsTo
