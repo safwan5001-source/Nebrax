@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FuelAviController;
 use App\Http\Controllers\Api\FuelStationMasterDataController;
+use App\Http\Controllers\Api\FuelStationDeviceController;
 use App\Http\Controllers\Api\FuelStationSettingsController;
 use App\Http\Controllers\Api\FuelFleetController;
 use App\Http\Controllers\Api\FuelShiftController;
@@ -576,6 +577,17 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('fuel-stations/avi-rfid/tags/{id}/replace', [FuelAviController::class, 'replaceTag'])->middleware([$perm('fuel.avi.manage'), $commercialApp('fuel_stations.avi', 'write')]);
         Route::get('fuel-stations/avi-rfid/authorizations', [FuelAviController::class, 'indexAuthorizations'])->middleware([$perm('fuel.avi.view'), $commercialApp('fuel_stations.avi')]);
         Route::post('fuel-stations/avi-rfid/authorizations', [FuelAviController::class, 'authorize'])->middleware([$perm('fuel.avi.authorize'), $commercialApp('fuel_stations.avi', 'write')]);
+
+        // Cycle 8: سجل الأجهزة، سجل الأدلة المعيارية، ومحاكاة الاختبار. لا توجد
+        // نقطة webhook عامة ولا اتصال مورد أو أمر مضخة في هذه الواجهات.
+        Route::get('fuel-stations/devices', [FuelStationDeviceController::class, 'index'])->middleware([$perm('fuel.device.view'), $commercialApp('fuel_stations.integrations')]);
+        Route::get('fuel-stations/devices/adapter-contracts', [FuelStationDeviceController::class, 'adapterContracts'])->middleware([$perm('fuel.device.view'), $commercialApp('fuel_stations.integrations')]);
+        Route::post('fuel-stations/devices', [FuelStationDeviceController::class, 'store'])->middleware([$perm('fuel.device.manage'), $commercialApp('fuel_stations.integrations', 'write')]);
+        Route::put('fuel-stations/devices/{id}', [FuelStationDeviceController::class, 'update'])->middleware([$perm('fuel.device.manage'), $commercialApp('fuel_stations.integrations', 'write')]);
+        Route::delete('fuel-stations/devices/{id}', [FuelStationDeviceController::class, 'destroy'])->middleware([$perm('fuel.device.manage'), $commercialApp('fuel_stations.integrations', 'write')]);
+        Route::get('fuel-stations/integration-events', [FuelStationDeviceController::class, 'indexEvents'])->middleware([$perm('fuel.integration.view'), $commercialApp('fuel_stations.integrations')]);
+        Route::post('fuel-stations/devices/{id}/simulate-event', [FuelStationDeviceController::class, 'simulate'])->middleware([$perm('fuel.integration.ingest'), $commercialApp('fuel_stations.integrations', 'write')]);
+        Route::post('fuel-stations/integration-events/{id}/retry', [FuelStationDeviceController::class, 'retry'])->middleware([$perm('fuel.integration.retry'), $commercialApp('fuel_stations.integrations', 'write')]);
 
         // المدفوعات
         Route::get('payments/collectors', [PaymentController::class, 'collectors'])->middleware($perm('payments.view'));
