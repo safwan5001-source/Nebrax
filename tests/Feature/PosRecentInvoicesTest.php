@@ -57,6 +57,7 @@ class PosRecentInvoicesTest extends TestCase
     {
         $auth = $this->registerTenant('recent-pos-scope', 'owner@recent-pos-scope.test');
         app(TenantContext::class)->set($auth['tenant_id']);
+        $mainBranch = $this->withToken($auth['token'])->getJson('/api/branches')->assertOk()['data'][0]['id'];
         $staff = $this->tokenForRole($auth['tenant_id'], 'staff', 'recent-pos-staff@test.local');
         $this->withToken($staff)->getJson('/api/pos/recent-invoices')->assertForbidden();
 
@@ -112,7 +113,8 @@ class PosRecentInvoicesTest extends TestCase
             'tenders' => ['cash' => 11500],
         ])->assertCreated()['data'];
 
-        $mainIds = collect($this->withToken($auth['token'])->getJson('/api/pos/recent-invoices?limit=20')->assertOk()['data'])
+        $mainIds = collect($this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $mainBranch])
+            ->getJson('/api/pos/recent-invoices?limit=20')->assertOk()['data'])
             ->pluck('id')->all();
         $this->assertNotContains($otherInvoice['id'], $mainIds);
         $this->assertContains($newer['id'], $mainIds);
