@@ -28,6 +28,8 @@ use RuntimeException;
  */
 class TenantApplicationService
 {
+    public function __construct(private CommercialApplicationStatusService $commercialStatus) {}
+
     /**
      * لحظة تفعيل الإنفاذ الفعلي. لا صف حالة = "معطّلة" منطقياً في `stateFor()`
      * منذ P1 — لكن لا مستأجر لمس `/applications` صراحة قبل اليوم، فتطبيق هذا
@@ -87,11 +89,13 @@ class TenantApplicationService
     /**
      * دمج الكتالوج الثابت مع حالة المستأجر الحالية.
      *
-     * @return array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,enabled:bool,status:string,changed_by:?string,changed_at:?string,reason:?string}>
+     * @return array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,enabled:bool,status:string,changed_by:?string,changed_at:?string,reason:?string,commercial:array{availability:string,source_count:int},effective_access:string,dependency_status:string}>
      */
     public function stateFor(): array
     {
         $rows = TenantApplicationState::query()->get()->keyBy('application_key');
+        $tenantId = app(TenantContext::class)->id();
+        $commercial = $tenantId === null ? [] : $this->commercialStatus->forTenant(Tenant::findOrFail($tenantId));
 
         $result = [];
         foreach (ApplicationCatalog::all() as $key => $application) {
@@ -104,6 +108,11 @@ class TenantApplicationService
                 'changed_by' => $row?->changed_by,
                 'changed_at' => $row?->updated_at?->toIso8601String(),
                 'reason' => $row?->reason,
+                ...($commercial[$key] ?? [
+                    'commercial' => ['availability' => 'not_available', 'source_count' => 0],
+                    'effective_access' => 'denied',
+                    'dependency_status' => 'not_applicable',
+                ]),
             ];
         }
 
