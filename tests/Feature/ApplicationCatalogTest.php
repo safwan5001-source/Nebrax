@@ -143,15 +143,17 @@ class ApplicationCatalogTest extends TestCase
     }
 
     /** @test */
-    public function fuel_station_foundation_avi_and_integrations_are_activatable_capabilities_in_their_product_family(): void
+    public function fuel_station_foundation_avi_integrations_and_maintenance_are_activatable_capabilities_in_their_product_family(): void
     {
         $this->assertSame('fuel_stations', ApplicationCatalog::find('fuel_stations.core')['group']);
         $this->assertSame(ApplicationCatalog::MATURITY_BUILT, ApplicationCatalog::find('fuel_stations.core')['maturity']);
         $this->assertSame(ApplicationCatalog::MATURITY_BUILT, ApplicationCatalog::find('fuel_stations.avi')['maturity']);
         $this->assertSame(ApplicationCatalog::MATURITY_BUILT, ApplicationCatalog::find('fuel_stations.integrations')['maturity']);
+        $this->assertSame(ApplicationCatalog::MATURITY_BUILT, ApplicationCatalog::find('fuel_stations.maintenance')['maturity']);
         $this->assertSame(['fuel_stations.core'], ApplicationCatalog::dependenciesFor('fuel_stations.avi'));
         $this->assertSame(['fuel_stations.core'], ApplicationCatalog::dependenciesFor('fuel_stations.integrations'));
-        foreach (['fuel_stations.inventory', 'fuel_stations.forecourt', 'fuel_stations.fleet', 'fuel_stations.maintenance'] as $key) {
+        $this->assertSame(['fuel_stations.core'], ApplicationCatalog::dependenciesFor('fuel_stations.maintenance'));
+        foreach (['fuel_stations.inventory', 'fuel_stations.forecourt', 'fuel_stations.fleet'] as $key) {
             $this->assertSame(ApplicationCatalog::MATURITY_COMING_SOON, ApplicationCatalog::find($key)['maturity']);
             $this->assertSame(['fuel_stations.core'], ApplicationCatalog::dependenciesFor($key));
         }

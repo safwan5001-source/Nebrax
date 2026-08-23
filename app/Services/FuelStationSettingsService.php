@@ -284,6 +284,8 @@ class FuelStationSettingsService
             'corporate_credit_enabled', 'require_active_contract', 'driver_required', 'vehicle_required', 'fuel_card_required',
             'avi_rfid_enabled', 'avi_driver_identity_required', 'avi_enforce_vehicle_tank_capacity',
             'device_simulated_ingress_enabled',
+            'maintenance_overdue_alerts_enabled', 'safety_inspection_overdue_alerts_enabled',
+            'fuel_station_alerts_enabled',
         ];
         if (in_array($key, $shiftBooleanKeys, true)) {
             if (! is_bool($value)) {
@@ -330,6 +332,8 @@ class FuelStationSettingsService
             'avi_denial_window_seconds', 'avi_repeated_denial_threshold', 'avi_authorization_ttl_seconds',
             'device_event_max_lateness_seconds', 'offline_event_retention_days', 'device_max_future_skew_seconds',
             'device_offline_after_seconds', 'device_max_retry_attempts',
+            'maintenance_default_calendar_interval_days', 'safety_permit_expiry_warning_days',
+            'reports_operational_cutoff_minutes',
         ];
         if (in_array($key, $nonNegativeIntegerKeys, true)) {
             if (! is_int($value) || $value < 0 || ($key === 'reconciliation_tolerance_basis_points' && $value > 1000000)) {
@@ -340,6 +344,15 @@ class FuelStationSettingsService
             }
             if (in_array($key, ['device_event_max_lateness_seconds', 'offline_event_retention_days', 'device_max_future_skew_seconds', 'device_offline_after_seconds', 'device_max_retry_attempts'], true) && $value <= 0) {
                 throw new RuntimeException('سياسات زمن الحدث وصحة الجهاز وإعادة المحاولة يجب أن تكون أعداداً صحيحة موجبة.');
+            }
+
+            return;
+        }
+
+        if (in_array($key, ['reports_volume_basis', 'reports_temperature_basis'], true)) {
+            $allowed = $key === 'reports_volume_basis' ? ['observed', 'standard'] : ['observed', 'normalized'];
+            if (! is_string($value) || ! in_array($value, $allowed, true)) {
+                throw new RuntimeException('أساس تقرير محطات الوقود غير صالح.');
             }
 
             return;

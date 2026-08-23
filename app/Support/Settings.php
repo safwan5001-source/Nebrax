@@ -289,6 +289,16 @@ class Settings
             // القائمة الفارغة تمنع التحصيل حتى يختار المستأجر طرقه النشطة صراحةً.
             'fuel_sales_allowed_payment_method_ids' => [],
             'fuel_sales_allow_deferred_payment' => false,
+            // Cycle 9: الصيانة والسلامة والتقارير تبقى سياسات قابلة للوراثة
+            // ولا تخلق قيداً أو أمراً لجهاز أو إجراءً خلفياً تلقائياً.
+            'maintenance_default_calendar_interval_days' => 30,
+            'maintenance_overdue_alerts_enabled' => true,
+            'safety_permit_expiry_warning_days' => 30,
+            'safety_inspection_overdue_alerts_enabled' => true,
+            'fuel_station_alerts_enabled' => true,
+            'reports_operational_cutoff_minutes' => 0,
+            'reports_volume_basis' => 'observed', // observed | standard
+            'reports_temperature_basis' => 'observed', // observed | normalized
         ],
     ];
 
