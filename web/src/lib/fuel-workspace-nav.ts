@@ -50,6 +50,10 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
       { href: '/fuel-stations/readiness', labelKey: 'readinessHealth', permissions: ['fuel.reports.view'], appKey: 'fuel_stations.maintenance' },
     ],
   },
+  {
+    labelKey: 'settings',
+    items: [{ href: '/fuel-stations/settings', labelKey: 'settings', permissions: ['fuel_stations.view'] }],
+  },
 ];
 
 export function visibleFuelWorkspaceGroups(permissions: string[], hiddenAppKeys: Set<string>): FuelWorkspaceNavGroup[] {
