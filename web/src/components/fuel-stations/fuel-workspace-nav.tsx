@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { cn } from '@/lib/utils';
 import { type FuelWorkspaceNavItem, visibleFuelWorkspaceGroups } from '@/lib/fuel-workspace-nav';
 
 const ICONS: Record<string, typeof Fuel> = {
@@ -32,7 +33,11 @@ const ICONS: Record<string, typeof Fuel> = {
   '/fuel-stations/readiness': ShieldCheck,
 };
 
-export function FuelWorkspaceNav() {
+/**
+ * قائمة Fuel المتخصصة. سياسة الإظهار فيها عرض فقط؛ يبقى الخادم مرجع الصلاحيات
+ * والتمكين، سواء عُرضت القائمة في الشريط الثابت أو درج الجوال.
+ */
+export function FuelWorkspaceNav({ onNavigate, className }: { onNavigate?: () => void; className?: string }) {
   const t = useTranslations('fuelWorkspaceNav');
   const pathname = usePathname();
   const [permissions, setPermissions] = useState<string[]>(() => currentUser()?.permissions ?? []);
@@ -60,53 +65,55 @@ export function FuelWorkspaceNav() {
   if (visibleGroups.length === 0) return null;
 
   return (
-    <nav aria-label={t('ariaLabel')} className="rounded-md border border-border bg-surface">
-      <div className="hidden divide-y divide-border lg:block">
-        {visibleGroups.map((group) => (
-          <div key={group.labelKey} className="grid grid-cols-[10rem_minmax(0,1fr)] gap-3 px-4 py-3">
-            <p className="pt-2 text-xs font-semibold tracking-wide text-muted">{t(group.labelKey)}</p>
-            <div className="flex flex-wrap gap-2">
-              {group.items.map((item) => <WorkspaceLink key={item.href} item={item} pathname={pathname} label={t(item.labelKey)} />)}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <details className="group lg:hidden">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-text marker:hidden">
-          <span>{t('workspaceNavigation')}</span>
-          <span className="text-xs font-normal text-muted group-open:hidden">{t('expand')}</span>
-          <span className="hidden text-xs font-normal text-muted group-open:inline">{t('collapse')}</span>
-        </summary>
-        <div className="border-t border-border px-3 py-3">
-          <div className="space-y-4">
-            {visibleGroups.map((group) => (
-              <section key={group.labelKey} aria-label={t(group.labelKey)}>
-                <p className="mb-2 px-1 text-xs font-semibold tracking-wide text-muted">{t(group.labelKey)}</p>
-                <div className="grid gap-1 sm:grid-cols-2">
-                  {group.items.map((item) => <WorkspaceLink key={item.href} item={item} pathname={pathname} label={t(item.labelKey)} />)}
-                </div>
-              </section>
+    <nav aria-label={t('ariaLabel')} className={cn('space-y-4', className)}>
+      {visibleGroups.map((group) => (
+        <section key={group.labelKey} aria-label={t(group.labelKey)}>
+          <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wide text-muted">{t(group.labelKey)}</p>
+          <div className="space-y-1">
+            {group.items.map((item) => (
+              <WorkspaceLink
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                label={t(item.labelKey)}
+                onNavigate={onNavigate}
+              />
             ))}
           </div>
-        </div>
-      </details>
+        </section>
+      ))}
     </nav>
   );
 }
 
-function WorkspaceLink({ item, pathname, label }: { item: FuelWorkspaceNavItem; pathname: string; label: string }) {
+function WorkspaceLink({
+  item,
+  pathname,
+  label,
+  onNavigate,
+}: {
+  item: FuelWorkspaceNavItem;
+  pathname: string;
+  label: string;
+  onNavigate?: () => void;
+}) {
   const Icon = ICONS[item.href] ?? Fuel;
-  const active = item.href === '/fuel-stations' ? pathname === item.href : pathname.startsWith(item.href);
+  const active = item.href === '/fuel-stations' ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
   return (
     <Link
       href={item.href}
       aria-current={active ? 'page' : undefined}
-      className={`inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${active ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-muted'}`}
+      onClick={onNavigate}
+      className={cn(
+        'relative flex min-h-11 items-center gap-3 rounded px-3 py-2 text-sm transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        active ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-primary-soft hover:text-primary',
+      )}
     >
-      <Icon aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.7} />
-      <span>{label}</span>
+      {active && <span aria-hidden className="absolute inset-y-2 start-0 w-0.5 rounded bg-primary" />}
+      <Icon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
+      <span className="truncate">{label}</span>
     </Link>
   );
 }

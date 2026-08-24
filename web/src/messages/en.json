@@ -5259,6 +5259,17 @@
     "shiftClosed": "Closed pending approval",
     "shiftApproved": "Approved and locked"
   },
+  "fuelWorkspaceShell": {
+    "title": "Fuel Stations",
+    "workspaceHome": "Fuel Stations home",
+    "workspaceContext": "Standalone operations workspace",
+    "operatingContext": "Operating context",
+    "loadingContext": "Loading branch",
+    "backToNebrax": "Back to Nebrax",
+    "openNavigation": "Open Fuel Stations navigation",
+    "closeNavigation": "Close Fuel Stations navigation",
+    "navigationTitle": "Fuel Stations navigation"
+  },
   "fuelWorkspaceNav": {
     "ariaLabel": "Fuel Stations workspace navigation",
     "workspaceNavigation": "Fuel Stations navigation",

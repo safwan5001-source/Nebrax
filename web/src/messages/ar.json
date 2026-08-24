@@ -5259,6 +5259,17 @@
     "shiftClosed": "مغلق بانتظار الاعتماد",
     "shiftApproved": "معتمد ومقفل"
   },
+  "fuelWorkspaceShell": {
+    "title": "محطات الوقود",
+    "workspaceHome": "الصفحة الرئيسية لمحطات الوقود",
+    "workspaceContext": "مساحة تشغيل مستقلة",
+    "operatingContext": "السياق التشغيلي",
+    "loadingContext": "جارٍ تحميل الفرع",
+    "backToNebrax": "العودة إلى نبراس",
+    "openNavigation": "فتح تنقل محطات الوقود",
+    "closeNavigation": "إغلاق تنقل محطات الوقود",
+    "navigationTitle": "تنقل محطات الوقود"
+  },
   "fuelWorkspaceNav": {
     "ariaLabel": "ملاحة مساحة عمل محطات الوقود",
     "workspaceNavigation": "ملاحة محطات الوقود",
