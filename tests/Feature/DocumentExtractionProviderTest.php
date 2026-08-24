@@ -149,6 +149,61 @@ class DocumentExtractionProviderTest extends TestCase
     }
 
     /** @test */
+    public function google_gemini_uses_a_secret_header_and_persists_normalized_evidence_without_a_secret_url(): void
+    {
+        $geminiKey = 'gemini-test-secret-not-in-url';
+        $setting = PlatformIntegrationSetting::query()->where('integration_key', 'document_ai')->firstOrFail();
+        $configuration = $setting->configuration;
+        $configuration['primary_provider'] = 'google_gemini';
+        $configuration['providers']['google_gemini'] = [
+            'enabled' => true,
+            'api_key' => $geminiKey,
+            'model' => 'gemini-test',
+            'connection_timeout_seconds' => 15,
+            'processing_timeout_seconds' => 90,
+            'max_attempts' => 1,
+            'allow_document_sending' => true,
+        ];
+        $setting->provider = 'google_gemini';
+        $setting->configuration = $configuration;
+        $setting->save();
+
+        $auth = $this->authorizedTenant('extraction-gemini');
+        $batch = $this->batchWithFile($auth['token']);
+        $this->withToken($auth['token'])->postJson("/api/document-batches/{$batch['id']}/complete")->assertOk();
+        $scanJob = $this->queuedScanJob();
+        $this->bindCleanScanner();
+        $scanJob->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentStorageService::class), app(DocumentSafetyScanner::class), app(DocumentFileScanService::class), app(PlatformIntegrationResolver::class), app(DocumentExtractionService::class));
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => ['parts' => [['text' => json_encode($this->providerPayload('purchase_invoice'), JSON_THROW_ON_ERROR)]]],
+                ]],
+                'usageMetadata' => ['promptTokenCount' => 77, 'candidatesTokenCount' => 19],
+            ]),
+        ]);
+        $this->queuedExtractionJob()->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentExtractionService::class));
+
+        $expectedUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent';
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) use ($geminiKey, $expectedUrl): bool {
+            return $request->url() === $expectedUrl
+                && $request->hasHeader('x-goog-api-key', $geminiKey)
+                && ! str_contains($request->url(), $geminiKey)
+                && parse_url($request->url(), PHP_URL_QUERY) === null;
+        });
+
+        $result = DocumentExtractionResult::firstOrFail();
+        $this->assertSame('document-schema-v1', $result->schema_version);
+        $this->assertSame('google_gemini', $result->provider_key);
+        $this->assertSame(10000, $result->normalized_payload['fields']['subtotal_minor']);
+        $this->assertDatabaseHas('document_provider_usage_events', ['provider_key' => 'google_gemini', 'input_tokens' => 77, 'output_tokens' => 19]);
+        $raw = (string) \Illuminate\Support\Facades\DB::table('platform_integration_settings')->where('integration_key', 'document_ai')->value('configuration');
+        $this->assertStringNotContainsString($geminiKey, $raw);
+        $this->assertStringNotContainsString($geminiKey, json_encode($result->normalized_payload, JSON_THROW_ON_ERROR));
+    }
+
+    /** @test */
     public function a_failed_primary_provider_uses_the_ordered_anthropic_fallback_with_safe_attempt_evidence(): void
     {
         $setting = PlatformIntegrationSetting::query()->where('integration_key', 'document_ai')->firstOrFail();

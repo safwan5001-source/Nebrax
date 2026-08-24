@@ -98,12 +98,13 @@ final class GoogleGeminiDocumentExtractionProvider implements DocumentExtraction
 
     private function endpoint(DocumentProviderConfiguration $configuration): string
     {
-        return self::BASE_ENDPOINT . '/' . rawurlencode($configuration->model) . ':generateContent?key=' . rawurlencode($configuration->apiKey);
+        return self::BASE_ENDPOINT . '/' . rawurlencode($configuration->model) . ':generateContent';
     }
 
     private function client(DocumentProviderConfiguration $configuration): \Illuminate\Http\Client\PendingRequest
     {
         return Http::acceptJson()
+            ->withHeaders(['x-goog-api-key' => $configuration->apiKey])
             ->connectTimeout($configuration->connectionTimeoutSeconds)
             ->timeout($configuration->processingTimeoutSeconds)
             ->retry(0, 0, throw: false);
