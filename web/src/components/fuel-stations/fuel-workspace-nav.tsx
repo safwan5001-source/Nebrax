@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
+  BellRing,
   Database,
   Fingerprint,
   Fuel,
@@ -30,7 +31,10 @@ const ICONS: Record<string, typeof Fuel> = {
   '/fuel-stations/corporate-contracts': Handshake,
   '/fuel-stations/avi-rfid': Fingerprint,
   '/fuel-stations/devices': Network,
-  '/fuel-stations/readiness': ShieldCheck,
+  '/fuel-stations/maintenance': Wrench,
+  '/fuel-stations/safety': ShieldCheck,
+  '/fuel-stations/alerts': BellRing,
+  '/fuel-stations/readiness': Gauge,
 };
 
 /**

@@ -5289,7 +5289,10 @@
     "devices": "الأجهزة",
     "deviceRegistry": "سجل الأجهزة",
     "maintenanceSafety": "الصيانة والسلامة",
-    "readinessHealth": "الجاهزية والصحة"
+    "maintenance": "الصيانة",
+    "safety": "السلامة والامتثال",
+    "alerts": "التنبيهات",
+    "readinessHealth": "ملخص الجاهزية"
   },
   "fuelStationsMasterData": {
     "title": "بيانات محطات الوقود",
@@ -5730,8 +5733,13 @@
   },
   "fuelStationsReadiness": {
     "eyebrow": "محطات الوقود · الجاهزية التشغيلية",
-    "title": "الصيانة والسلامة والتقارير",
-    "subtitle": "مركز تشغيلي موحد للصيانة، الامتثال، التنبيهات والتقارير الرسمية. لا ينفذ أوامر أجهزة ولا ينشئ قيداً أو مصروفاً أو حركة مخزون.",
+    "title": "ملخص الجاهزية والصحة",
+    "subtitle": "ملخص صحي تشغيلي من مصادر الحقيقة المتاحة. تُدار الصيانة والسلامة والتنبيهات في مساحاتها المتخصصة.",
+    "summaryTitle": "ملخص الجاهزية والصحة",
+    "summarySubtitle": "متابعة موجزة للورديات وأوامر العمل والتنبيهات وصحة الأجهزة، من دون إجراءات إنشاء أو انتقالات في هذه الصفحة.",
+    "healthScopeTitle": "حدود الملخص الصحي",
+    "healthScopeNotice": "تعرض هذه الصفحة مؤشرات صحة تشغيلية فقط. انتقل إلى الصيانة أو السلامة والامتثال أو التنبيهات لإدارة السجلات المصرح بها.",
+    "retry": "إعادة المحاولة",
     "notice": "المنصة البرمجية جاهزة ضمن النطاق الموثق. تكاملات موردي العتاد الفعلية — مثل بروتوكول المضخات أو ATG أو credentials — ما زالت مرحلة مستقبلية مستقلة.",
     "salesToday": "مبيعات اليوم",
     "litersToday": "لترات اليوم",
@@ -5800,8 +5808,31 @@
     "quantity": "الكمية (مل)",
     "expired": "منتهي",
     "hardwareDeferred": "تكامل العتاد الفعلي مؤجل"
-  }
-,
+  },
+  "fuelStationsMaintenance": {
+    "title": "صيانة محطات الوقود",
+    "subtitle": "إدارة جداول الصيانة الوقائية وأوامر العمل من الحقائق التشغيلية المراجعة فقط؛ التكلفة دليل تشغيلي وليست مصروفاً أو قيداً.",
+    "station": "المحطة", "status": "الحالة", "refresh": "تحديث", "retry": "إعادة المحاولة", "cancel": "إلغاء", "create": "إنشاء", "save": "حفظ",
+    "newSchedule": "جدول صيانة جديد", "newWorkOrder": "أمر عمل جديد", "workOrders": "أوامر العمل", "preventiveSchedules": "جداول الصيانة الوقائية", "emptyWorkOrders": "لا توجد أوامر عمل ضمن النطاق المحدد.", "emptySchedules": "لا توجد جداول صيانة ضمن النطاق المحدد.",
+    "asset": "الأصل", "assetStation": "محطة", "assetTank": "خزان", "assetPump": "مضخة", "assetNozzle": "فوهة", "assetDevice": "جهاز", "assetAccounting": "أصل محاسبي", "chooseStationFirst": "اختر المحطة أولاً لعرض أصولها المسموح بها.",
+    "titleField": "العنوان", "workType": "نوع العمل", "corrective": "تصحيحي", "preventive": "وقائي", "priority": "الأولوية", "assignee": "المسند إليه", "estimatedCost": "التكلفة المقدرة", "actualCost": "التكلفة الفعلية", "description": "الوصف", "cost": "التكلفة التشغيلية", "downtime": "مدة التوقف", "downtimeMinutes": "التوقف بالدقائق", "minutes": "دقيقة", "openedAt": "فتح في",
+    "scheduleName": "اسم الجدول", "scheduleType": "نوع الجدول", "calendar": "بالتقويم", "runtime": "بالاستخدام", "meter": "بالعداد", "intervalDays": "فاصل الأيام", "intervalLiters": "فاصل القياس باللتر", "instructions": "تعليمات الصيانة", "nextDue": "الاستحقاق القادم", "interval": "الفاصل", "daysValue": "{count} يوم",
+    "number": "الرقم", "actions": "إجراءات", "advance": "تحديث الحالة", "advanceWorkOrder": "تحديث حالة أمر العمل", "nextStatus": "الحالة التالية", "scheduledAt": "موعد الجدولة", "resolution": "الحل المنفذ", "rootCause": "السبب الجذري", "resolutionRequired": "أدخل الحل المنفذ قبل إكمال أمر العمل.", "intervalRequired": "أدخل فاصلاً صحيحاً موجباً لهذا الجدول.", "invalidCost": "أدخل تكلفة صحيحة بالريال.",
+    "workOrderCreated": "تم إنشاء أمر العمل.", "scheduleCreated": "تم إنشاء جدول الصيانة.", "statusUpdated": "تم تحديث حالة أمر العمل.", "loadFailed": "تعذر تحميل بيانات الصيانة.", "saveFailed": "تعذر حفظ بيانات الصيانة.",
+    "statuses": { "reported": "مبلّغ عنه", "triaged": "تم الفرز", "scheduled": "مجدول", "in_progress": "قيد التنفيذ", "completed": "مكتمل", "verified": "تم التحقق", "closed": "مغلق", "active": "نشط", "suspended": "معلّق", "low": "منخفض", "medium": "متوسط", "high": "عالٍ", "critical": "حرج" },
+    "scheduleTypes": { "calendar": "بالتقويم", "runtime": "بالاستخدام", "meter": "بالعداد" }
+  },
+  "fuelStationsSafety": {
+    "title": "السلامة والامتثال", "subtitle": "إدارة الفحوص والتصاريح والشهادات من دون خلطهما، مع إظهار النتائج والإجراءات التصحيحية الموثقة.", "station": "المحطة", "refresh": "تحديث", "retry": "إعادة المحاولة", "cancel": "إلغاء", "create": "إنشاء",
+    "inspections": "فحوصات السلامة", "permitsCertificates": "التصاريح والشهادات", "newInspection": "فحص سلامة جديد", "newPermit": "تصريح أو شهادة جديدة", "emptyInspections": "لا توجد فحوصات ضمن النطاق المحدد.", "emptyPermits": "لا توجد تصاريح أو شهادات ضمن النطاق المحدد.",
+    "inspectionType": "نوع الفحص", "scheduledAt": "موعد الفحص", "notes": "ملاحظات", "permitType": "نوع التصريح/الشهادة", "reference": "المرجع", "issuedOn": "تاريخ الإصدار", "expiresOn": "تاريخ الانتهاء", "status": "الحالة", "findings": "النتائج", "correctiveActions": "الإجراءات التصحيحية", "loadFailed": "تعذر تحميل بيانات السلامة والامتثال.", "saveFailed": "تعذر حفظ السجل.", "inspectionCreated": "تمت جدولة فحص السلامة.", "permitCreated": "تم إنشاء التصريح أو الشهادة.",
+    "statuses": { "scheduled": "مجدول", "performed": "منفذ", "verified": "تم التحقق", "closed": "مغلق", "active": "نشط", "expired": "منتهي", "revoked": "ملغى", "pass": "سليم", "fail": "فشل", "not_applicable": "لا ينطبق", "low": "منخفض", "medium": "متوسط", "high": "عالٍ", "critical": "حرج", "open": "مفتوح", "in_progress": "قيد التنفيذ", "completed": "مكتمل" }
+  },
+  "fuelStationsAlerts": {
+    "title": "تنبيهات محطات الوقود", "subtitle": "تنبيهات تشغيلية من المحرك القائم؛ لا تنشئ هذه الصفحة محركاً موازياً ولا تحل التنبيهات يدوياً.", "scan": "تحديث التنبيهات", "scanCompleted": "تم تحديث التنبيهات التشغيلية.", "filterScopeNotice": "يدعم العقد الحالي التصفية في الخادم حسب الحالة والخطورة فقط. تتحول التنبيهات المتقادمة إلى محلولة عند المسح وفق قواعد المحرك.", "status": "الحالة", "severity": "الخطورة", "refresh": "تحديث", "retry": "إعادة المحاولة", "alertList": "قائمة التنبيهات", "empty": "لا توجد تنبيهات ضمن النطاق المحدد.", "allStatuses": "كل الحالات", "allSeverities": "كل درجات الخطورة", "unassigned": "غير مسند", "rule": "قاعدة التنبيه", "assignedTo": "المسند إليه", "acknowledgedBy": "أقرّ المراجعة", "acknowledge": "إقرار المراجعة", "acknowledgeTitle": "إقرار مراجعة التنبيه", "acknowledgementNote": "ملاحظة المراجعة", "acknowledged": "تم إقرار مراجعة التنبيه.", "assign": "تعيين", "assignTitle": "تعيين تنبيه", "assignee": "المسند إليه", "assignmentReason": "سبب التعيين", "assigned": "تم تعيين التنبيه.", "cancel": "إلغاء", "saveFailed": "تعذر حفظ إجراء التنبيه.", "loadFailed": "تعذر تحميل التنبيهات.",
+    "statuses": { "active": "مفتوح", "acknowledged": "تمت مراجعته", "resolved": "تم حله", "critical": "حرج", "high": "عالٍ", "medium": "متوسط", "low": "منخفض" },
+    "rules": { "maintenanceOverdue": "صيانة وقائية مستحقة", "workOrderOverdue": "أمر صيانة متأخر", "correctiveActionOverdue": "إجراء تصحيحي متأخر", "permitExpiring": "تصريح أو شهادة تقترب من الانتهاء", "deviceSyncFailed": "فشل مزامنة جهاز المحطة", "deviceStale": "جهاز المحطة متأخر", "unknown": "تنبيه تشغيلي" }
+  },
   "platformIntegrations": {
     "eyebrow": "تكاملات منصة نبراكس",
     "title": "إعدادات مركز المستندات",
