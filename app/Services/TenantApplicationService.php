@@ -163,55 +163,69 @@ class TenantApplicationService
     }
 
     /**
-     * حالة قدرة واحدة لإنفاذ المسارات. بوابة التطبيق الرئيسي تسبق الإلزامية:
-     * تعطيل التطبيق يحجب كل فروعه حتى الفروع الإلزامية داخله، من دون تغيير
-     * صفوف تلك الفروع أو حذف بياناتها.
+     * حالة قدرة واحدة لإنفاذ المسارات. بوابة التطبيق الرئيسي تسبق حالة الفرع،
+     * كما أن تعطيل تطبيق تعتمد عليه قدرة في تطبيق آخر يحجب القدرة التابعة
+     * تشغيلياً من دون تغيير حالتها المحفوظة.
      */
     public function statusFor(string $key): string
     {
+        return $this->runtimeStatusFor($key, []);
+    }
+
+    /** @param array<string, true> $seen */
+    private function runtimeStatusFor(string $key, array $seen): string
+    {
+        if (isset($seen[$key])) {
+            return 'disabled';
+        }
+
         $application = ApplicationCatalog::find($key);
-
-        if ($application === null) {
+        if ($application === null || ! $this->isGroupEnabled($application['group'])) {
             return 'disabled';
         }
 
-        if (! $this->isGroupEnabled($application['group'])) {
-            return 'disabled';
-        }
+        $seen[$key] = true;
 
         if ($application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
-            return 'enabled';
+            $status = 'enabled';
+        } else {
+            $status = TenantApplicationState::query()->where('application_key', $key)->value('status');
+            if ($status === null) {
+                $status = $this->isGrandfatheredTenant() ? 'enabled' : 'disabled';
+            }
         }
 
-        $status = TenantApplicationState::query()->where('application_key', $key)->value('status');
-        if ($status !== null) {
-            return $status;
+        if ($status === 'disabled') {
+            return 'disabled';
         }
 
-        return $this->isGrandfatheredTenant() ? 'enabled' : 'disabled';
+        foreach (ApplicationCatalog::dependenciesFor($key) as $dependency) {
+            if ($this->runtimeStatusFor($dependency, $seen) !== 'enabled') {
+                return 'disabled';
+            }
+        }
+
+        return $status;
     }
 
     /**
-     * حالة الظهور للشريط الجانبي. عند تعطيل التطبيق الرئيسي نعيد false لكل
-     * قدرة مبنية في المجموعة، بما فيها الإلزامية التي كانت سابقاً تُحذف من
-     * الخريطة، حتى تختفي روابط التطبيق كاملة.
+     * حالة الظهور للشريط الجانبي. القدرة الإلزامية لا تحتاج قيمة true في
+     * الحالة العادية، لكننا نعيد false لها عندما يحجبها التطبيق الرئيسي أو
+     * اعتماد تشغيلي حتى تختفي روابط التطبيق كاملة.
      *
      * @return array<string, bool>
      */
     public function navVisibility(): array
     {
-        $rows = TenantApplicationState::query()->get()->keyBy('application_key');
-        $groupRows = TenantApplicationGroupState::query()->get()->keyBy('group_key');
-        $grandfathered = $this->isGrandfatheredTenant();
-
         $result = [];
+
         foreach (ApplicationCatalog::all() as $key => $application) {
             if ($application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
                 continue;
             }
 
-            $groupEnabled = $groupRows->get($application['group'])?->requested_enabled ?? true;
-            if (! $groupEnabled) {
+            $status = $this->statusFor($key);
+            if ($status === 'disabled') {
                 $result[$key] = false;
                 continue;
             }
@@ -220,9 +234,7 @@ class TenantApplicationService
                 continue;
             }
 
-            $row = $rows->get($key);
-            $status = $row?->status ?? ($grandfathered ? 'enabled' : 'disabled');
-            $result[$key] = $status !== 'disabled';
+            $result[$key] = true;
         }
 
         return $result;
@@ -279,14 +291,20 @@ class TenantApplicationService
     }
 
     /**
-     * تفعيل/تعطيل كل التطبيقات الرئيسية فقط. لا يمس حالات الفروع، ولهذا فإن
-     * إعادة التفعيل تستعيد التكوين الفرعي السابق بالكامل.
+     * تفعيل/تعطيل كل التطبيقات الرئيسية المبنية فقط. لا يمس حالات الفروع،
+     * ولذلك فإن إعادة التفعيل تستعيد التكوين الفرعي السابق بالكامل.
      *
      * @return array<string, array{enabled:bool}>
      */
     public function setAllGroups(bool $enabled, ?User $actor, ?string $reason = null): array
     {
-        foreach ($this->groupKeys() as $group) {
+        $groups = $this->groupStateFor();
+
+        foreach ($groups as $group => $state) {
+            if (! $state['manageable']) {
+                continue;
+            }
+
             $this->setGroupEnabled($group, $enabled, $actor, $reason);
         }
 
