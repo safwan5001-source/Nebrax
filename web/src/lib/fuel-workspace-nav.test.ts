@@ -11,6 +11,7 @@ describe('Fuel Workspace navigation presentation', () => {
 
     expect(visible).toContain('/fuel-stations');
     expect(visible).toContain('/fuel-stations/master-data');
+    expect(visible).toContain('/fuel-stations/settings');
     expect(visible).toContain('/fuel-stations/receiving');
     expect(visible).toContain('/fuel-stations/shifts');
     expect(visible).not.toContain('/fuel-stations/sales');
@@ -38,6 +39,6 @@ describe('Fuel Workspace navigation presentation', () => {
   });
 
   it('allows the server-authorized wildcard role to see every built workspace route', () => {
-    expect(routes(['*'])).toHaveLength(12);
+    expect(routes(['*'])).toHaveLength(13);
   });
 });

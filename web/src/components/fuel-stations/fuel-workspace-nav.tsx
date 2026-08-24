@@ -14,6 +14,7 @@ import {
   Network,
   ReceiptText,
   ShieldCheck,
+  Settings2,
   Truck,
   Wrench,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ const ICONS: Record<string, typeof Fuel> = {
   '/fuel-stations/safety': ShieldCheck,
   '/fuel-stations/alerts': BellRing,
   '/fuel-stations/readiness': Gauge,
+  '/fuel-stations/settings': Settings2,
 };
 
 /**
