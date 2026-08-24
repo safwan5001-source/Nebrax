@@ -400,9 +400,9 @@ export function Sidebar({
   const activeGroup = GROUPS.find((g) => g.items.some((it) => isActive(it.href)))?.title;
 
   // نمط Accordion حصري: مجموعة واحدة مفتوحة **كحدّ أقصى** — والطيّ اليدوي
-  // يجعلها صفراً. الافتراضي = مجموعة الصفحة الحالية (أو الأولى إن كان المسار
-  // خارج المجموعات كاللوحة). القيمة الفارغة تعني «الكلّ مطويّ».
-  const [openGroup, setOpenGroup] = useState<string>(activeGroup ?? GROUPS[0].title);
+  // يجعلها صفراً. الافتراضي = مجموعة الصفحة الحالية فقط؛ وعند مسار خارج
+  // المجموعات كاللوحة تبقى كلها مطوية. القيمة الفارغة تعني «الكلّ مطويّ».
+  const [openGroup, setOpenGroup] = useState<string>(activeGroup ?? '');
 
   // التنقّل لصفحة في مجموعة أخرى (رابط مباشر/بحث) يفتحها تلقائياً ويُغلق سواها.
   useEffect(() => {
