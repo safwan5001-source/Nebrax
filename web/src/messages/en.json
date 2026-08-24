@@ -5289,7 +5289,10 @@
     "devices": "Devices",
     "deviceRegistry": "Device registry",
     "maintenanceSafety": "Maintenance and safety",
-    "readinessHealth": "Readiness and health"
+    "maintenance": "Maintenance",
+    "safety": "Safety & compliance",
+    "alerts": "Alerts",
+    "readinessHealth": "Readiness summary"
   },
   "fuelStationsMasterData": {
     "title": "Fuel station master data",
@@ -5730,8 +5733,13 @@
   },
   "fuelStationsReadiness": {
     "eyebrow": "Fuel stations · operational readiness",
-    "title": "Maintenance, safety & reporting",
-    "subtitle": "A unified operational centre for maintenance, compliance, alerts, and official reports. It does not issue device commands or create a journal, expense, or inventory movement.",
+    "title": "Readiness & health summary",
+    "subtitle": "A concise operational-health summary from available sources of truth. Maintenance, safety, and alerts are managed in their dedicated workspaces.",
+    "summaryTitle": "Readiness & health summary",
+    "summarySubtitle": "A focused view of shifts, work orders, alerts, and device health with no creation or transition actions on this page.",
+    "healthScopeTitle": "Health-summary scope",
+    "healthScopeNotice": "This page presents operational-health indicators only. Open Maintenance, Safety & Compliance, or Alerts to manage authorized records.",
+    "retry": "Retry",
     "notice": "The software platform is ready within its documented scope. Physical hardware-vendor integration — such as pump/ATG protocols or credentials — remains a separate future phase.",
     "salesToday": "Sales today",
     "litersToday": "Litres today",
@@ -5800,8 +5808,31 @@
     "quantity": "Quantity (mL)",
     "expired": "Expired",
     "hardwareDeferred": "Physical hardware integration deferred"
-  }
-,
+  },
+  "fuelStationsMaintenance": {
+    "title": "Fuel stations maintenance",
+    "subtitle": "Manage preventive schedules and work orders from audited operational facts only; recorded cost is operational evidence, not an expense or journal entry.",
+    "station": "Station", "status": "Status", "refresh": "Refresh", "retry": "Retry", "cancel": "Cancel", "create": "Create", "save": "Save",
+    "newSchedule": "New maintenance schedule", "newWorkOrder": "New work order", "workOrders": "Work orders", "preventiveSchedules": "Preventive maintenance schedules", "emptyWorkOrders": "No work orders exist in the selected scope.", "emptySchedules": "No maintenance schedules exist in the selected scope.",
+    "asset": "Asset", "assetStation": "Station", "assetTank": "Tank", "assetPump": "Pump", "assetNozzle": "Nozzle", "assetDevice": "Device", "assetAccounting": "Accounting asset", "chooseStationFirst": "Select a station first to view its supported assets.",
+    "titleField": "Title", "workType": "Work type", "corrective": "Corrective", "preventive": "Preventive", "priority": "Priority", "assignee": "Assignee", "estimatedCost": "Estimated cost", "actualCost": "Actual cost", "description": "Description", "cost": "Operational cost", "downtime": "Downtime", "downtimeMinutes": "Downtime (minutes)", "minutes": "minutes", "openedAt": "Opened at",
+    "scheduleName": "Schedule name", "scheduleType": "Schedule type", "calendar": "Calendar", "runtime": "Runtime", "meter": "Meter", "intervalDays": "Interval days", "intervalLiters": "Meter interval (L)", "instructions": "Maintenance instructions", "nextDue": "Next due", "interval": "Interval", "daysValue": "{count} day(s)",
+    "number": "Number", "actions": "Actions", "advance": "Advance status", "advanceWorkOrder": "Advance work-order status", "nextStatus": "Next status", "scheduledAt": "Scheduled at", "resolution": "Resolution", "rootCause": "Root cause", "resolutionRequired": "Enter the resolution before completing a work order.", "intervalRequired": "Enter a valid positive interval for this schedule.", "invalidCost": "Enter a valid cost in riyals.",
+    "workOrderCreated": "Work order created.", "scheduleCreated": "Maintenance schedule created.", "statusUpdated": "Work-order status updated.", "loadFailed": "Unable to load maintenance data.", "saveFailed": "Unable to save maintenance data.",
+    "statuses": { "reported": "Reported", "triaged": "Triaged", "scheduled": "Scheduled", "in_progress": "In progress", "completed": "Completed", "verified": "Verified", "closed": "Closed", "active": "Active", "suspended": "Suspended", "low": "Low", "medium": "Medium", "high": "High", "critical": "Critical" },
+    "scheduleTypes": { "calendar": "Calendar", "runtime": "Runtime", "meter": "Meter" }
+  },
+  "fuelStationsSafety": {
+    "title": "Safety & compliance", "subtitle": "Manage inspections separately from permits and certificates, while surfacing recorded findings and corrective actions.", "station": "Station", "refresh": "Refresh", "retry": "Retry", "cancel": "Cancel", "create": "Create",
+    "inspections": "Safety inspections", "permitsCertificates": "Permits & certificates", "newInspection": "New safety inspection", "newPermit": "New permit or certificate", "emptyInspections": "No inspections exist in the selected scope.", "emptyPermits": "No permits or certificates exist in the selected scope.",
+    "inspectionType": "Inspection type", "scheduledAt": "Scheduled at", "notes": "Notes", "permitType": "Permit/certificate type", "reference": "Reference", "issuedOn": "Issued on", "expiresOn": "Expiry date", "status": "Status", "findings": "Findings", "correctiveActions": "Corrective actions", "loadFailed": "Unable to load safety and compliance data.", "saveFailed": "Unable to save this record.", "inspectionCreated": "Safety inspection scheduled.", "permitCreated": "Permit or certificate created.",
+    "statuses": { "scheduled": "Scheduled", "performed": "Performed", "verified": "Verified", "closed": "Closed", "active": "Active", "expired": "Expired", "revoked": "Revoked", "pass": "Pass", "fail": "Fail", "not_applicable": "Not applicable", "low": "Low", "medium": "Medium", "high": "High", "critical": "Critical", "open": "Open", "in_progress": "In progress", "completed": "Completed" }
+  },
+  "fuelStationsAlerts": {
+    "title": "Fuel-station alerts", "subtitle": "Operational alerts from the existing engine only; this page creates neither a parallel engine nor a manual resolution path.", "scan": "Refresh alerts", "scanCompleted": "Operational alerts refreshed.", "filterScopeNotice": "The current contract supports server-side filtering by status and severity only. Stale alerts are resolved by the engine during a scan.", "status": "Status", "severity": "Severity", "refresh": "Refresh", "retry": "Retry", "alertList": "Alert list", "empty": "No alerts exist in the selected scope.", "allStatuses": "All statuses", "allSeverities": "All severities", "unassigned": "Unassigned", "rule": "Alert rule", "assignedTo": "Assigned to", "acknowledgedBy": "Acknowledged by", "acknowledge": "Acknowledge", "acknowledgeTitle": "Acknowledge alert", "acknowledgementNote": "Acknowledgement note", "acknowledged": "Alert acknowledged.", "assign": "Assign", "assignTitle": "Assign alert", "assignee": "Assignee", "assignmentReason": "Assignment reason", "assigned": "Alert assigned.", "cancel": "Cancel", "saveFailed": "Unable to save alert action.", "loadFailed": "Unable to load alerts.",
+    "statuses": { "active": "Active", "acknowledged": "Acknowledged", "resolved": "Resolved", "critical": "Critical", "high": "High", "medium": "Medium", "low": "Low" },
+    "rules": { "maintenanceOverdue": "Preventive maintenance due", "workOrderOverdue": "Work order overdue", "correctiveActionOverdue": "Corrective action overdue", "permitExpiring": "Permit or certificate expiring", "deviceSyncFailed": "Station device synchronization failed", "deviceStale": "Station device is stale", "unknown": "Operational alert" }
+  },
   "platformIntegrations": {
     "eyebrow": "Nebrax platform integrations",
     "title": "Document Center settings",

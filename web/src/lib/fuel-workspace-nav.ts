@@ -43,7 +43,12 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
   },
   {
     labelKey: 'maintenanceSafety',
-    items: [{ href: '/fuel-stations/readiness', labelKey: 'readinessHealth', permissions: ['fuel.maintenance.view', 'fuel.safety.view', 'fuel.alerts.view', 'fuel.reports.view'], appKey: 'fuel_stations.maintenance' }],
+    items: [
+      { href: '/fuel-stations/maintenance', labelKey: 'maintenance', permissions: ['fuel.maintenance.view'], appKey: 'fuel_stations.maintenance' },
+      { href: '/fuel-stations/safety', labelKey: 'safety', permissions: ['fuel.safety.view'], appKey: 'fuel_stations.maintenance' },
+      { href: '/fuel-stations/alerts', labelKey: 'alerts', permissions: ['fuel.alerts.view'], appKey: 'fuel_stations.maintenance' },
+      { href: '/fuel-stations/readiness', labelKey: 'readinessHealth', permissions: ['fuel.reports.view'], appKey: 'fuel_stations.maintenance' },
+    ],
   },
 ];
 
