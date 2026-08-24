@@ -23,6 +23,10 @@ export type FilterOperator =
 export interface FilterOption {
   value: string;
   label: string;
+  /** Optional secondary line shown in searchable entity pickers (e.g. VAT, SKU, category path). */
+  sub?: string;
+  /** Optional side hint shown in searchable entity pickers (e.g. phone, barcode). */
+  hint?: string;
 }
 
 export interface FilterDefinition {
@@ -33,6 +37,10 @@ export interface FilterDefinition {
   operators?: FilterOperator[];
   options?: FilterOption[];
   placeholder?: string;
+  /** Search placeholder used by entity pickers. */
+  searchPlaceholder?: string;
+  /** Empty-state text used by entity pickers. */
+  emptyText?: string;
 }
 
 export type FilterScalar = string | number | boolean;
