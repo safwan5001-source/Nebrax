@@ -4857,7 +4857,17 @@
     "commercialDetails": { "trialUntil": "Trial until {date}", "cancelsAt": "Cancels at period end: {date}", "expired": "Expired" },
     "access": { "full": "Full", "read_only": "Read-only", "denied": "Denied" },
     "dependencies": { "satisfied": "Satisfied", "missing": "Missing", "notApplicable": "None" },
-    "actions": { "addToPlan": "Add to plan", "startTrial": "Start trial", "viewHistory": "View history", "unavailable": "Unavailable" },
+    "actions": {
+      "addToPlan": "Add to plan",
+      "startTrial": "Start trial",
+      "viewHistory": "View history",
+      "unavailable": "Unavailable",
+      "blocked": {
+        "access_denied": "Activation is unavailable because effective access is denied.",
+        "read_only": "Activation is unavailable because access is read-only.",
+        "dependencies_missing": "Enable the required dependencies before activating this application."
+      }
+    },
     "groups": {
       "sales": "Sales",
       "pos": "Point of Sale",

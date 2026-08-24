@@ -4857,7 +4857,17 @@
     "commercialDetails": { "trialUntil": "تجربة حتى {date}", "cancelsAt": "ينتهي مع الفترة في {date}", "expired": "منتهية" },
     "access": { "full": "كامل", "read_only": "قراءة فقط", "denied": "مرفوض" },
     "dependencies": { "satisfied": "مستوفاة", "missing": "غير مستوفاة", "notApplicable": "لا يوجد" },
-    "actions": { "addToPlan": "إضافة إلى الباقة", "startTrial": "بدء التجربة", "viewHistory": "عرض السجل", "unavailable": "غير متاح" },
+    "actions": {
+      "addToPlan": "إضافة إلى الباقة",
+      "startTrial": "بدء التجربة",
+      "viewHistory": "عرض السجل",
+      "unavailable": "غير متاح",
+      "blocked": {
+        "access_denied": "لا يمكن التفعيل لأن الوصول الفعّال مرفوض.",
+        "read_only": "لا يمكن التفعيل لأن الوصول المتاح للقراءة فقط.",
+        "dependencies_missing": "فعّل الاعتماديات المطلوبة قبل تفعيل هذا التطبيق."
+      }
+    },
     "groups": {
       "sales": "المبيعات",
       "pos": "نقاط البيع",
