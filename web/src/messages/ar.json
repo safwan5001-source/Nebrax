@@ -1568,6 +1568,7 @@
     "note": "الملاحظة",
     "note_placeholder": "اكتب ملاحظة داخلية مرتبطة بالفاتورة…",
     "attachments": "المرفقات",
+    "no_attachments": "لا توجد مرفقات لهذه الفاتورة.",
     "attachment_limit": "حتى 10 ملفات، 10 ميغابايت للملف",
     "remove_attachment": "إزالة المرفق",
     "save_note": "حفظ الملاحظة",

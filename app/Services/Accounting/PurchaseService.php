@@ -101,6 +101,43 @@ class PurchaseService
     }
 
     /**
+     * إنشاء نسخة مسودة: تنسخ البيانات التجارية والسطور فقط، بلا مرفقات أو
+     * مدفوعات أو قيود أو حركات، وبـرقم وتاريخ جديدين يصلحان للمراجعة والتعديل.
+     */
+    public function duplicate(Purchase $source, ?string $createdBy): Purchase
+    {
+        $source->loadMissing('lines');
+
+        return $this->create([
+            'partner_id'          => $source->partner_id,
+            'warehouse_id'        => $source->warehouse_id,
+            'cost_center_id'      => $source->cost_center_id,
+            'payment_type'        => $source->payment_type,
+            'purchase_date'       => now()->toDateString(),
+            'due_date'            => null,
+            'supplier_invoice_no' => null,
+            'tax_inclusive'       => $source->tax_inclusive,
+            'discount'            => $source->discount,
+            'shipping'            => $source->shipping,
+            'adjustment'          => $source->adjustment,
+            'paid_on_post'        => 0,
+            'payment_method'      => $source->payment_method,
+            'received_status'     => 'pending',
+            'received_date'       => null,
+            'notes'               => $source->notes,
+            'created_by'          => $createdBy,
+        ], $source->lines->map(fn (PurchaseLine $line) => [
+            'product_id' => $line->product_id,
+            'description' => $line->description,
+            'quantity'    => $line->quantity,
+            'unit'        => $line->unit_name,
+            'unit_price'  => $line->unit_price,
+            'discount'    => $line->line_discount,
+            'tax_rate'    => $line->tax_rate,
+        ])->all());
+    }
+
+    /**
      * يكتب السطور ويشتقّ إجماليات الرأس منها — **مصدر الحقيقة هو السطور**.
      *
      * مشتركة بين الإنشاء والتعديل: نسختان كانتا ستنحرفان، فتُحسب الضريبة عند

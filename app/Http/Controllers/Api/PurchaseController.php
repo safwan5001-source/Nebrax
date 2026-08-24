@@ -179,6 +179,15 @@ class PurchaseController extends ApiController
         return (new PurchaseResource($updated->load('lines')))->response();
     }
 
+    /** تنشئ نسخة مسودة برقم جديد بلا مرفقات أو مدفوعات أو أثر محاسبي أو مخزني. */
+    public function duplicate(Request $request, string $id): JsonResponse
+    {
+        $purchase = $this->visiblePurchase($request, $id);
+        $copy = $this->domain(fn () => $this->purchases->duplicate($purchase, $request->user()?->id));
+
+        return (new PurchaseResource($copy->load(['lines', 'attachments'])))->response()->setStatusCode(201);
+    }
+
     /** تعديل تحليلي محدود؛ لا يفتح تعديل مبلغ أو بنود أو قيد شراء مرحّل. */
     public function updateClassification(UpdateDocumentClassificationRequest $request, string $id): JsonResponse
     {

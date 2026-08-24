@@ -1568,6 +1568,7 @@
     "note": "Note",
     "note_placeholder": "Write an internal note linked to this invoice…",
     "attachments": "Attachments",
+    "no_attachments": "There are no attachments for this invoice.",
     "attachment_limit": "Up to 10 files, 10 MB each",
     "remove_attachment": "Remove attachment",
     "save_note": "Save note",

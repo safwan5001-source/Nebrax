@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
-  ArrowRight, BookOpen, Boxes, CheckCircle2, ChevronDown, Download, FileSpreadsheet,
+  ArrowRight, BookOpen, Boxes, CheckCircle2, ChevronDown, Copy, Download, FileSpreadsheet, FileText,
   LayoutTemplate, MoreVertical, Pencil, Printer, RotateCcw, Share2, Trash2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +21,7 @@ import type { Party, DocLine } from '@/components/documents/tax-document';
 import { PurchaseDocument } from '@/components/purchases/purchase-document';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
 import { RevisionLog } from '@/components/documents/revision-log';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, downloadFile, fetchImageUrl } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { useCompany } from '@/lib/company';
 import { exportXlsx } from '@/lib/xlsx';
@@ -49,6 +49,13 @@ interface FrozenPrintTemplateRevision {
     signature?: string;
   };
   document_types: string[];
+}
+
+interface PurchaseAttachment {
+  id: string;
+  original_name: string;
+  mime_type: string | null;
+  size: number;
 }
 
 interface Purchase {
@@ -79,6 +86,7 @@ interface Purchase {
   pdf_template_revision?: FrozenPrintTemplateRevision | null;
   thermal_template_revision_id?: string | null;
   thermal_template_revision?: FrozenPrintTemplateRevision | null;
+  attachments: PurchaseAttachment[];
 }
 
 interface PurchasePayment {
@@ -168,6 +176,8 @@ export default function PurchaseDetailPage() {
   const [bankText, setBankText] = useState<string | null>(null);
   const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
+  const [duplicating, setDuplicating] = useState(false);
 
   const isDraft = purchase?.status === 'draft';
   const isPosted = purchase?.status === 'posted';
@@ -181,6 +191,13 @@ export default function PurchaseDetailPage() {
     api<{ data: Purchase }>(`/purchases/${id}`)
       .then(async (response) => {
         setPurchase(response.data);
+        const previews = await Promise.all((response.data.attachments ?? [])
+          .filter((attachment) => attachment.mime_type?.startsWith('image/'))
+          .map(async (attachment) => [attachment.id, await fetchImageUrl(`/purchases/${id}/attachments/${attachment.id}/download`)] as const));
+        setAttachmentUrls((current) => {
+          Object.values(current).forEach((url) => URL.revokeObjectURL(url));
+          return Object.fromEntries(previews.filter(([, url]) => url !== null) as [string, string][]);
+        });
         const branchQuery = response.data.branch_id ? `&branch_id=${encodeURIComponent(response.data.branch_id)}` : '';
         const [partner, live, paymentRelations, inventoryRelations, accountingRelations] = await Promise.allSettled([
           api<{ data: Party }>(`/partners/${response.data.partner_id}`),
@@ -355,6 +372,20 @@ export default function PurchaseDetailPage() {
     }
   }
 
+  async function handleDuplicate() {
+    if (!purchase) return;
+    setDuplicating(true);
+    try {
+      const response = await api<{ data: { id: string } }>(`/purchases/${purchase.id}/duplicate`, { method: 'POST' });
+      success(t('duplicate_success'));
+      router.push(`/purchases/${response.data.id}/edit`);
+    } catch (error) {
+      errorToast(error instanceof ApiError ? error.message : t('action_failed'));
+    } finally {
+      setDuplicating(false);
+    }
+  }
+
   async function confirmAction() {
     if (!pendingAction || !purchase) return;
     setActioning(true);
@@ -379,6 +410,7 @@ export default function PurchaseDetailPage() {
   const workControls = isDraft ? <Button size="sm" onClick={() => setPendingAction('post')} disabled={actioning}><CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />{t('post')}</Button> : null;
   const purchaseActions = <>
     {isDraft && <DropdownItem icon={Pencil} href={`/purchases/${purchase.id}/edit`}>{tp('edit')}</DropdownItem>}
+    <DropdownItem icon={Copy} onClick={handleDuplicate}>{duplicating ? t('duplicating') : t('duplicate')}</DropdownItem>
     {canPay && <DropdownItem icon={RotateCcw} href={`/purchases/${purchase.id}/payments/new`}>{t('add_payment')}</DropdownItem>}
     {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
     <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
@@ -406,6 +438,8 @@ export default function PurchaseDetailPage() {
     <Card><CardHeader className="flex-row items-center justify-between gap-3 p-0"><button type="button" onClick={() => setDetailsOpen((value) => !value)} aria-expanded={detailsOpen} aria-controls="purchase-details-content" className="flex min-w-0 flex-1 items-center justify-between gap-3 px-5 py-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"><CardTitle>{t('details')}</CardTitle><ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${detailsOpen ? 'rotate-180 text-primary' : ''}`} strokeWidth={2} /></button></CardHeader>{detailsOpen && <CardContent id="purchase-details-content"><dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">{info.map(([key, value]) => <div key={key}><dt className="text-xs text-muted">{key}</dt><dd className="mt-1 text-text">{value}</dd></div>)}</dl></CardContent>}</Card>
 
     <Card><CardHeader className="p-0"><button type="button" onClick={() => setFinancialOpen((value) => !value)} aria-expanded={financialOpen} aria-controls="purchase-financial-content" className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"><CardTitle>{t('financial_summary')}</CardTitle><ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${financialOpen ? 'rotate-180 text-primary' : ''}`} strokeWidth={2} /></button></CardHeader>{financialOpen && <CardContent id="purchase-financial-content"><dl className="divide-y divide-border">{financialSummary.map(([label, value, strong]) => <div key={label} className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0"><dt className={strong ? 'font-medium text-text' : 'text-sm text-muted'}>{label}</dt><dd className={`num ${strong ? 'text-base font-semibold text-text' : 'text-sm text-text'}`}>{formatRiyal(value)}</dd></div>)}</dl></CardContent>}</Card>
+
+    <Card><CardHeader><CardTitle>{t('attachments')}</CardTitle></CardHeader><CardContent>{purchase.attachments.length === 0 ? <p className="text-sm text-muted">{t('no_attachments')}</p> : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{purchase.attachments.map((attachment) => { const previewUrl = attachmentUrls[attachment.id]; return <article key={attachment.id} className="overflow-hidden rounded border border-border bg-background"><button type="button" className="block w-full bg-muted/30 text-start" onClick={() => previewUrl && window.open(previewUrl, '_blank', 'noopener,noreferrer')} disabled={!previewUrl} aria-label={attachment.original_name}>{previewUrl ? <img src={previewUrl} alt={attachment.original_name} className="h-40 w-full object-contain" /> : <div className="flex h-40 items-center justify-center"><FileText className="h-10 w-10 text-muted" strokeWidth={1.5} /></div>}</button><div className="flex items-center justify-between gap-2 border-t border-border p-3"><span className="min-w-0 truncate text-sm text-text" title={attachment.original_name}>{attachment.original_name}</span><Button variant="outline" size="sm" onClick={() => downloadFile(`/purchases/${id}/attachments/${attachment.id}/download`, attachment.original_name).catch((error) => errorToast(error instanceof ApiError ? error.message : t('action_failed')))}><Download className="h-4 w-4" strokeWidth={1.7} />{t('download_attachment')}</Button></div></article>; })}</div>}</CardContent></Card>
 
     <section aria-label={t('relations')}>{relationsUnavailable && <p className="mb-3 rounded border border-border bg-muted/40 px-3 py-2 text-sm text-text">{t('relations_unavailable')}</p>}<Card className="hidden lg:block"><CardHeader><CardTitle>{t('relations')}</CardTitle></CardHeader><Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as RelationSection)} />{relationSection && <CardContent className="p-0"><TabPanel id={relationSection}>{relationContent}</TabPanel></CardContent>}</Card><div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => toggleRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => toggleRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => toggleRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div></section>
 

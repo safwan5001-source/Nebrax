@@ -677,6 +677,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('purchases', [PurchaseController::class, 'store'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
         Route::put('purchases/{id}/classification', [PurchaseController::class, 'updateClassification'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
         Route::put('purchases/{id}', [PurchaseController::class, 'update'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);    // مسوّدة فقط
+        Route::post('purchases/{id}/duplicate', [PurchaseController::class, 'duplicate'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
         Route::delete('purchases/{id}', [PurchaseController::class, 'destroy'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]); // مسوّدة فقط
         Route::post('purchases/{id}/post', [PurchaseController::class, 'post'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
 
