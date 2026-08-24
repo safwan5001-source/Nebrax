@@ -132,10 +132,9 @@ class ApplicationGroupControlsTest extends TestCase
             'reason' => 'إيقاف مؤقت',
         ]);
 
-        $this->withToken($auth['token'])->getJson('/api/applications')
-            ->assertOk()
-            ->assertJsonPath('groups.customers.enabled', false)
-            ->assertJsonPath('data.crm.customers.group_enabled', false);
+        $index = $this->withToken($auth['token'])->getJson('/api/applications')->assertOk();
+        $index->assertJsonPath('groups.customers.enabled', false);
+        $this->assertFalse($index->json('data')['crm.customers']['group_enabled']);
 
         $this->withToken($auth['token'])->postJson('/api/applications/enable', [
             'scope' => 'all_groups',
