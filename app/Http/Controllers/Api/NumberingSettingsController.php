@@ -34,9 +34,11 @@ class NumberingSettingsController extends ApiController
     {
         $data = $request->validated();
 
+        $seriesKey = $data['series_key'] ?? DocumentNumberingCatalog::defaultSeriesKey($data['entity']);
+
         DocumentNumberingCatalog::putSeriesFormat(
             $data['entity'],
-            $data['series_key'],
+            $seriesKey,
             $data['prefix'] ?? null,
             $data['suffix'] ?? null,
         );
