@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   BellRing,
+  ChartNoAxesCombined,
   Database,
   Fingerprint,
   Fuel,
@@ -36,6 +37,7 @@ const ICONS: Record<string, typeof Fuel> = {
   '/fuel-stations/safety': ShieldCheck,
   '/fuel-stations/alerts': BellRing,
   '/fuel-stations/readiness': Gauge,
+  '/fuel-stations/reports': ChartNoAxesCombined,
   '/fuel-stations/settings': Settings2,
 };
 
