@@ -2,6 +2,7 @@
 
 import { SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { Select } from '@/components/ui/select';
 import type { ActiveFilter, FilterDefinition } from '@/lib/data-explorer/types';
 
@@ -27,6 +28,37 @@ export function QuickFilters({
 
         const active = filters.find((filter) => filter.key === definition.key);
         const value = active && !Array.isArray(active.value) ? String(active.value) : '';
+
+        if (definition.kind === 'entity') {
+          const options: ComboOption[] = definition.options.map((option) => ({
+            value: option.value,
+            label: option.label,
+            sub: option.sub,
+            hint: option.hint,
+          }));
+
+          return (
+            <Combobox
+              key={definition.key}
+              value={value}
+              onChange={(nextValue) =>
+                onChange({
+                  key: definition.key,
+                  operator: 'eq',
+                  value: nextValue,
+                  label: definition.label,
+                })
+              }
+              options={options}
+              placeholder={definition.label}
+              clearLabel={definition.label}
+              searchPlaceholder={definition.searchPlaceholder ?? `ابحث في ${definition.label}`}
+              emptyText={definition.emptyText ?? 'لا توجد نتائج مطابقة'}
+              aria-label={definition.label}
+              className="min-w-40 sm:min-w-48"
+            />
+          );
+        }
 
         return (
           <Select
