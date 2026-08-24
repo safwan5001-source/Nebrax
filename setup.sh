@@ -31,9 +31,11 @@ echo "▶ 4/6  دمج ملفات النواة وطبقة الـ API..."
 # نسخ النماذج والخدمات والـ migrations فوق المشروع
 cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
-mkdir -p app/Models/Concerns app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
+mkdir -p app/Contracts app/Models/Concerns app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
          app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature routes
+cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
+cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php app/Jobs/DocumentCenter/
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/"*.php            app/Services/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
@@ -60,6 +62,9 @@ cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/
 # تسجيل TenancyServiceProvider (حاسم للعزل) إن لم يكن مسجلاً
 if ! grep -q "TenancyServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
+fi
+if ! grep -q "DocumentCenterServiceProvider" bootstrap/providers.php; then
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\DocumentCenterServiceProvider::class,|" bootstrap/providers.php
 fi
 
 # حذف users migration الافتراضية (لدينا واحدة خاصة بالمستأجرين)

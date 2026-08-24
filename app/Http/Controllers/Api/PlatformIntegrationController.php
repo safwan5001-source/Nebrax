@@ -6,6 +6,7 @@ use App\Http\Requests\UpdatePlatformIntegrationRequest;
 use App\Models\PlatformAdministrator;
 use App\Services\PlatformIntegrationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PlatformIntegrationController extends ApiController
 {
@@ -26,8 +27,11 @@ class PlatformIntegrationController extends ApiController
         return response()->json(['data' => $service->overview()]);
     }
 
-    public function test(string $integration, PlatformIntegrationService $service): JsonResponse
+    public function test(Request $request, string $integration, PlatformIntegrationService $service): JsonResponse
     {
-        return response()->json(['data' => $service->test($integration)]);
+        /** @var PlatformAdministrator $administrator */
+        $administrator = $request->user();
+
+        return response()->json(['data' => $service->test($administrator, $integration, $request->string('provider')->toString() ?: null)]);
     }
 }

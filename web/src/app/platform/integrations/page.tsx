@@ -1,8 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { DISPLAY_LOCALE } from '@/lib/formatting';
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,6 +18,7 @@ import {
   TestTube2,
   XCircle,
 } from 'lucide-react';
+import { DISPLAY_LOCALE } from '@/lib/formatting';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,8 +27,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
-import { payloadFor, type IntegrationFormState, type IntegrationKey } from './payload';
+import {
+  AI_PROVIDER_KEYS,
+  emptyAiProvider,
+  emptyDocumentAiForm,
+  payloadFor,
+  type AiProviderKey,
+  type AiProviderFormState,
+  type DocumentAiFormState,
+  type IntegrationFormState,
+  type IntegrationKey,
+} from './payload';
 
+type CoreIntegrationKey = Exclude<IntegrationKey, 'document_ai'>;
 type Translate = (key: any, values?: any) => string;
 
 interface IntegrationSummary {
@@ -37,7 +47,7 @@ interface IntegrationSummary {
   provider: string | null;
   enabled: boolean;
   configured: boolean;
-  configuration: Record<string, unknown>;
+  configuration: Record<string, any>;
   configured_at: string | null;
 }
 
@@ -58,9 +68,7 @@ interface OverviewResponse {
   };
 }
 
-type FormState = IntegrationFormState;
-
-const emptyForm: FormState = {
+const emptyForm: IntegrationFormState = {
   enabled: false,
   provider: '',
   endpoint: '',
@@ -83,16 +91,16 @@ export default function PlatformIntegrationsPage() {
   const t = useTranslations('platformIntegrations');
   const router = useRouter();
   const [overview, setOverview] = useState<OverviewResponse['data'] | null>(null);
-  const [forms, setForms] = useState<Record<IntegrationKey, FormState>>({
+  const [forms, setForms] = useState<Record<CoreIntegrationKey, IntegrationFormState>>({
     document_storage: { ...emptyForm, provider: 'r2' },
     malware_scanner: { ...emptyForm, provider: 'clamav_tcp' },
     document_processing: { ...emptyForm, provider: 'redis' },
-    document_ai: { ...emptyForm, provider: 'openai' },
   });
+  const [aiForm, setAiForm] = useState<DocumentAiFormState>(emptyDocumentAiForm());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<IntegrationKey | null>(null);
-  const [testing, setTesting] = useState<IntegrationKey | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -101,7 +109,9 @@ export default function PlatformIntegrationsPage() {
     try {
       const response = await platformApi<OverviewResponse>('/platform/integrations');
       setOverview(response.data);
-      setForms((current) => hydrateForms(current, response.data.integrations));
+      setForms((current) => hydrateCoreForms(current, response.data.integrations));
+      const ai = response.data.integrations.find((item) => item.key === 'document_ai');
+      setAiForm(hydrateAiForm(ai));
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : t('loadFailed'));
     } finally {
@@ -122,11 +132,22 @@ export default function PlatformIntegrationsPage() {
     [overview],
   );
 
-  function update(key: IntegrationKey, field: keyof FormState, value: string | boolean) {
+  function update(key: CoreIntegrationKey, field: keyof IntegrationFormState, value: string | boolean) {
     setForms((current) => ({ ...current, [key]: { ...current[key], [field]: value } }));
   }
 
-  async function save(key: IntegrationKey) {
+  function updateAi(field: keyof Omit<DocumentAiFormState, 'providers'>, value: string | boolean | AiProviderKey[]) {
+    setAiForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateProvider(provider: AiProviderKey, field: keyof DocumentAiFormState['providers'][AiProviderKey], value: string | boolean) {
+    setAiForm((current) => ({
+      ...current,
+      providers: { ...current.providers, [provider]: { ...current.providers[provider], [field]: value } },
+    }));
+  }
+
+  async function save(key: CoreIntegrationKey) {
     setBusy(key);
     setNotice(null);
     try {
@@ -135,7 +156,7 @@ export default function PlatformIntegrationsPage() {
         body: payloadFor(key, forms[key]),
       });
       setOverview(response.data);
-      setForms((current) => hydrateForms(current, response.data.integrations));
+      setForms((current) => hydrateCoreForms(current, response.data.integrations));
       setNotice({ ok: true, message: t('saved') });
     } catch (reason) {
       setNotice({ ok: false, message: reason instanceof ApiError ? reason.message : t('saveFailed') });
@@ -144,12 +165,45 @@ export default function PlatformIntegrationsPage() {
     }
   }
 
-  async function testConnection(key: IntegrationKey) {
+  async function saveAi() {
+    setBusy('document_ai');
+    setNotice(null);
+    try {
+      const response = await platformApi<OverviewResponse>('/platform/integrations/document_ai', {
+        method: 'PUT',
+        body: payloadFor('document_ai', aiForm),
+      });
+      setOverview(response.data);
+      setAiForm(hydrateAiForm(response.data.integrations.find((item) => item.key === 'document_ai')));
+      setNotice({ ok: true, message: t('saved') });
+    } catch (reason) {
+      setNotice({ ok: false, message: reason instanceof ApiError ? reason.message : t('saveFailed') });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function testConnection(key: CoreIntegrationKey) {
     setTesting(key);
     setNotice(null);
     try {
-      const response = await platformApi<{ data: { ok: boolean; message: string } }>(`/platform/integrations/${key}/test`, {
+      const response = await platformApi<{ data: { ok: boolean; message: string } }>(`/platform/integrations/${key}/test`, { method: 'POST' });
+      setNotice(response.data);
+      await load();
+    } catch (reason) {
+      setNotice({ ok: false, message: reason instanceof ApiError ? reason.message : t('testFailed') });
+    } finally {
+      setTesting(null);
+    }
+  }
+
+  async function testAiProvider(provider: AiProviderKey) {
+    setTesting(`ai:${provider}`);
+    setNotice(null);
+    try {
+      const response = await platformApi<{ data: { ok: boolean; message: string } }>('/platform/integrations/document_ai/test', {
         method: 'POST',
+        body: { provider },
       });
       setNotice(response.data);
       await load();
@@ -177,220 +231,111 @@ export default function PlatformIntegrationsPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm"><Link href='/platform'>
-              <ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
-              {t('back')}
-            </Link></Button>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
-              {t('refresh')}
-            </Button>
+            <Button asChild variant="outline" size="sm"><Link href="/platform"><ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('back')}</Link></Button>
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />{t('refresh')}</Button>
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
-        {notice && (
-          <div className="flex items-start gap-2 rounded-lg border border-border bg-surface p-3 text-sm" role="status">
-            {notice.ok
-              ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-positive" strokeWidth={1.7} aria-hidden="true" />
-              : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-negative" strokeWidth={1.7} aria-hidden="true" />}
-            <span className="text-text">{notice.message}</span>
+        {notice && <Notice notice={notice} />}
+        {error ? <Card><CardContent className="flex items-center justify-between gap-4 p-5"><p className="text-sm text-negative" role="alert">{error}</p><Button variant="outline" onClick={load}>{t('retry')}</Button></CardContent></Card> : <>
+          {overview && <RuntimeCard runtime={overview.runtime} t={t} />}
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            <SettingsCard title={t('storageTitle')} description={t('storageDescription')} icon={Database} enabled={forms.document_storage.enabled} configuredAt={summaries.document_storage?.configured_at} onEnabled={(value) => update('document_storage', 'enabled', value)} actions={<CardActions name="document_storage" busy={busy} testing={testing} save={() => save('document_storage')} test={() => testConnection('document_storage')} t={t} />}>
+              <Field label={t('provider')}><Select value={forms.document_storage.provider} onChange={(value) => update('document_storage', 'provider', value)} options={[["r2", 'Cloudflare R2'], ['s3', 'Amazon S3'], ['s3_compatible', 'S3 Compatible']]} /></Field>
+              <Field label={t('endpoint')}><Input value={forms.document_storage.endpoint} onChange={(event) => update('document_storage', 'endpoint', event.target.value)} dir="ltr" /></Field>
+              <Field label={t('bucket')}><Input value={forms.document_storage.bucket} onChange={(event) => update('document_storage', 'bucket', event.target.value)} dir="ltr" /></Field>
+              <Field label={t('region')}><Input value={forms.document_storage.region} onChange={(event) => update('document_storage', 'region', event.target.value)} dir="ltr" /></Field>
+              <SecretField label={t('accessKey')} masked={String(summaries.document_storage?.configuration.access_key_id_masked ?? '')} value={forms.document_storage.access_key_id} onChange={(value) => update('document_storage', 'access_key_id', value)} />
+              <SecretField label={t('secretKey')} masked={String(summaries.document_storage?.configuration.secret_access_key_masked ?? '')} value={forms.document_storage.secret_access_key} onChange={(value) => update('document_storage', 'secret_access_key', value)} />
+              <AdminPasswordField value={forms.document_storage.current_password} onChange={(value) => update('document_storage', 'current_password', value)} />
+            </SettingsCard>
+
+            <SettingsCard title={t('scannerTitle')} description={t('scannerDescription')} icon={ShieldCheck} enabled={forms.malware_scanner.enabled} configuredAt={summaries.malware_scanner?.configured_at} onEnabled={(value) => update('malware_scanner', 'enabled', value)} actions={<CardActions name="malware_scanner" busy={busy} testing={testing} save={() => save('malware_scanner')} test={() => testConnection('malware_scanner')} t={t} />}>
+              <Field label={t('provider')}><Select value={forms.malware_scanner.provider} onChange={(value) => update('malware_scanner', 'provider', value)} options={[["clamav_tcp", 'ClamAV TCP']]} /></Field>
+              <Field label={t('host')}><Input value={forms.malware_scanner.host} onChange={(event) => update('malware_scanner', 'host', event.target.value)} dir="ltr" /></Field>
+              <Field label={t('port')}><Input type="number" value={forms.malware_scanner.port} onChange={(event) => update('malware_scanner', 'port', event.target.value)} dir="ltr" /></Field>
+              <Field label={t('timeout')}><Input type="number" value={forms.malware_scanner.timeout_seconds} onChange={(event) => update('malware_scanner', 'timeout_seconds', event.target.value)} dir="ltr" /></Field>
+              <AdminPasswordField value={forms.malware_scanner.current_password} onChange={(value) => update('malware_scanner', 'current_password', value)} />
+            </SettingsCard>
+
+            <SettingsCard title={t('processingTitle')} description={t('processingDescription')} icon={ServerCog} enabled={forms.document_processing.enabled} configuredAt={summaries.document_processing?.configured_at} onEnabled={(value) => update('document_processing', 'enabled', value)} actions={<CardActions name="document_processing" busy={busy} testing={testing} save={() => save('document_processing')} test={() => testConnection('document_processing')} t={t} />}>
+              <Field label={t('maxAttempts')}><Input type="number" min={1} max={5} value={forms.document_processing.max_attempts} onChange={(event) => update('document_processing', 'max_attempts', event.target.value)} dir="ltr" /></Field>
+              <Field label={t('timeout')}><Input type="number" min={10} max={120} value={forms.document_processing.timeout_seconds} onChange={(event) => update('document_processing', 'timeout_seconds', event.target.value)} dir="ltr" /></Field>
+              <Field label={t('backoff')}><Input value={forms.document_processing.backoff_seconds} onChange={(event) => update('document_processing', 'backoff_seconds', event.target.value)} dir="ltr" placeholder="30,120,300" /></Field>
+              <AdminPasswordField value={forms.document_processing.current_password} onChange={(value) => update('document_processing', 'current_password', value)} />
+            </SettingsCard>
           </div>
-        )}
 
-        {error ? (
-          <Card><CardContent className="flex items-center justify-between gap-4 p-5">
-            <p className="text-sm text-negative" role="alert">{error}</p>
-            <Button variant="outline" onClick={load}>{t('retry')}</Button>
-          </CardContent></Card>
-        ) : (
-          <>
-            {overview && <RuntimeCard runtime={overview.runtime} t={t} />}
+          <section aria-labelledby="ai-provider-settings" className="space-y-5">
+            <div><p className="text-xs font-semibold text-primary">{t('aiEyebrow')}</p><h2 id="ai-provider-settings" className="mt-1 text-lg font-semibold text-text">{t('aiTitle')}</h2><p className="mt-1 text-sm text-muted">{t('aiDescription')}</p></div>
+            <DisabledNotice t={t} />
+            <Card>
+              <CardHeader><div className="flex items-start gap-3"><Bot className="mt-0.5 h-5 w-5 text-muted" strokeWidth={1.7} aria-hidden="true" /><div><CardTitle>{t('aiEngineTitle')}</CardTitle><p className="mt-1 text-sm leading-relaxed text-muted">{t('aiEngineDescription')}</p></div></div></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <ToggleField label={t('aiEngineEnabled')} checked={aiForm.enabled} onChange={(value) => updateAi('enabled', value)} />
+                  <Field label={t('primaryProvider')}><Select value={aiForm.primary_provider} onChange={(value) => updateAi('primary_provider', value as AiProviderKey | '')} options={[["", t('noProvider')] as [string, string], ...AI_PROVIDER_KEYS.map((provider): [string, string] => [provider, providerLabel(provider, t)])]} /></Field>
+                  <ToggleField label={t('fallbackEnabled')} checked={aiForm.fallback_enabled} onChange={(value) => updateAi('fallback_enabled', value)} />
+                  <Field label={t('fallbackFirst')}><Select value={aiForm.fallback_providers[0] ?? ''} onChange={(value) => updateAi('fallback_providers', replaceFallback(aiForm.fallback_providers, 0, value as AiProviderKey | ''))} options={[["", t('noProvider')] as [string, string], ...AI_PROVIDER_KEYS.map((provider): [string, string] => [provider, providerLabel(provider, t)])]} /></Field>
+                  <Field label={t('fallbackSecond')}><Select value={aiForm.fallback_providers[1] ?? ''} onChange={(value) => updateAi('fallback_providers', replaceFallback(aiForm.fallback_providers, 1, value as AiProviderKey | ''))} options={[["", t('noProvider')] as [string, string], ...AI_PROVIDER_KEYS.map((provider): [string, string] => [provider, providerLabel(provider, t)])]} /></Field>
+                  <Field label={t('confidenceThreshold')}><Input type="number" min={0} max={100} value={aiForm.confidence_threshold_percent} onChange={(event) => updateAi('confidence_threshold_percent', event.target.value)} dir="ltr" /></Field>
+                  <Field label={t('defaultLanguage')}><Input value={aiForm.default_language} onChange={(event) => updateAi('default_language', event.target.value)} dir="ltr" /></Field>
+                  <Field label={t('maxFiles')}><Input type="number" min={1} max={100} value={aiForm.max_files_per_batch} onChange={(event) => updateAi('max_files_per_batch', event.target.value)} dir="ltr" /></Field>
+                  <Field label={t('maxPages')}><Input type="number" min={1} max={1000} value={aiForm.max_pages_per_file} onChange={(event) => updateAi('max_pages_per_file', event.target.value)} dir="ltr" /></Field>
+                  <Field label={t('maxFileSize')}><Input type="number" min={1} max={52428800} value={aiForm.max_file_size_bytes} onChange={(event) => updateAi('max_file_size_bytes', event.target.value)} dir="ltr" /></Field>
+                  <ToggleField label={t('testMode')} checked={aiForm.test_mode} onChange={(value) => updateAi('test_mode', value)} />
+                  <AdminPasswordField value={aiForm.current_password} onChange={(value) => updateAi('current_password', value)} />
+                </div>
+                <div className="flex justify-end border-t border-border pt-4"><Button size="sm" onClick={saveAi} disabled={busy !== null || testing !== null}>{busy === 'document_ai' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t('save')}</Button></div>
+              </CardContent>
+            </Card>
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-              <SettingsCard
-                title={t('storageTitle')}
-                description={t('storageDescription')}
-                icon={Database}
-                enabled={forms.document_storage.enabled}
-                configuredAt={summaries.document_storage?.configured_at}
-                onEnabled={(value) => update('document_storage', 'enabled', value)}
-                actions={<CardActions integration="document_storage" busy={busy} testing={testing} save={save} test={testConnection} t={t} />}
-              >
-                <Field label={t('provider')}><Select value={forms.document_storage.provider} onChange={(value) => update('document_storage', 'provider', value)} options={[['r2', 'Cloudflare R2'], ['s3', 'Amazon S3'], ['s3_compatible', 'S3 Compatible']]} /></Field>
-                <Field label={t('endpoint')}><Input value={forms.document_storage.endpoint} onChange={(e) => update('document_storage', 'endpoint', e.target.value)} dir="ltr" /></Field>
-                <Field label={t('bucket')}><Input value={forms.document_storage.bucket} onChange={(e) => update('document_storage', 'bucket', e.target.value)} dir="ltr" /></Field>
-                <Field label={t('region')}><Input value={forms.document_storage.region} onChange={(e) => update('document_storage', 'region', e.target.value)} dir="ltr" /></Field>
-                <SecretField label={t('accessKey')} masked={String(summaries.document_storage?.configuration.access_key_id_masked ?? '')} value={forms.document_storage.access_key_id} onChange={(value) => update('document_storage', 'access_key_id', value)} />
-                <SecretField label={t('secretKey')} masked={String(summaries.document_storage?.configuration.secret_access_key_masked ?? '')} value={forms.document_storage.secret_access_key} onChange={(value) => update('document_storage', 'secret_access_key', value)} />
-                <AdminPasswordField value={forms.document_storage.current_password} onChange={(value) => update('document_storage', 'current_password', value)} />
-              </SettingsCard>
-
-              <SettingsCard
-                title={t('scannerTitle')}
-                description={t('scannerDescription')}
-                icon={ShieldCheck}
-                enabled={forms.malware_scanner.enabled}
-                configuredAt={summaries.malware_scanner?.configured_at}
-                onEnabled={(value) => update('malware_scanner', 'enabled', value)}
-                actions={<CardActions integration="malware_scanner" busy={busy} testing={testing} save={save} test={testConnection} t={t} />}
-              >
-                <Field label={t('provider')}><Select value={forms.malware_scanner.provider} onChange={(value) => update('malware_scanner', 'provider', value)} options={[['clamav_tcp', 'ClamAV TCP']]} /></Field>
-                <Field label={t('host')}><Input value={forms.malware_scanner.host} onChange={(e) => update('malware_scanner', 'host', e.target.value)} dir="ltr" /></Field>
-                <Field label={t('port')}><Input type="number" value={forms.malware_scanner.port} onChange={(e) => update('malware_scanner', 'port', e.target.value)} dir="ltr" /></Field>
-                <Field label={t('timeout')}><Input type="number" value={forms.malware_scanner.timeout_seconds} onChange={(e) => update('malware_scanner', 'timeout_seconds', e.target.value)} dir="ltr" /></Field>
-                <AdminPasswordField value={forms.malware_scanner.current_password} onChange={(value) => update('malware_scanner', 'current_password', value)} />
-              </SettingsCard>
-
-              <SettingsCard
-                title={t('processingTitle')}
-                description={t('processingDescription')}
-                icon={ServerCog}
-                enabled={forms.document_processing.enabled}
-                configuredAt={summaries.document_processing?.configured_at}
-                onEnabled={(value) => update('document_processing', 'enabled', value)}
-                actions={<CardActions integration="document_processing" busy={busy} testing={testing} save={save} test={testConnection} t={t} />}
-              >
-                <Field label={t('maxAttempts')}><Input type="number" min={1} max={5} value={forms.document_processing.max_attempts} onChange={(e) => update('document_processing', 'max_attempts', e.target.value)} dir="ltr" /></Field>
-                <Field label={t('timeout')}><Input type="number" min={10} max={120} value={forms.document_processing.timeout_seconds} onChange={(e) => update('document_processing', 'timeout_seconds', e.target.value)} dir="ltr" /></Field>
-                <Field label={t('backoff')}><Input value={forms.document_processing.backoff_seconds} onChange={(e) => update('document_processing', 'backoff_seconds', e.target.value)} dir="ltr" placeholder="30,120,300" /></Field>
-                <AdminPasswordField value={forms.document_processing.current_password} onChange={(value) => update('document_processing', 'current_password', value)} />
-              </SettingsCard>
-
-              <SettingsCard
-                title={t('aiTitle')}
-                description={t('aiDescription')}
-                icon={Bot}
-                enabled={forms.document_ai.enabled}
-                configuredAt={summaries.document_ai?.configured_at}
-                onEnabled={(value) => update('document_ai', 'enabled', value)}
-                actions={<CardActions integration="document_ai" busy={busy} testing={testing} save={save} test={testConnection} t={t} disableTest />}
-              >
-                <div className="rounded-lg border border-border bg-primary-soft p-3 text-xs leading-relaxed text-text">{t('aiDeferred')}</div>
-                <Field label={t('provider')}><Input value={forms.document_ai.provider} onChange={(e) => update('document_ai', 'provider', e.target.value)} dir="ltr" /></Field>
-                <Field label={t('endpoint')}><Input value={forms.document_ai.endpoint} onChange={(e) => update('document_ai', 'endpoint', e.target.value)} dir="ltr" /></Field>
-                <Field label={t('model')}><Input value={forms.document_ai.model} onChange={(e) => update('document_ai', 'model', e.target.value)} dir="ltr" /></Field>
-                <SecretField label={t('apiKey')} masked={String(summaries.document_ai?.configuration.api_key_masked ?? '')} value={forms.document_ai.api_key} onChange={(value) => update('document_ai', 'api_key', value)} />
-                <AdminPasswordField value={forms.document_ai.current_password} onChange={(value) => update('document_ai', 'current_password', value)} />
-              </SettingsCard>
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+              {AI_PROVIDER_KEYS.map((provider) => <AiProviderCard key={provider} provider={provider} form={aiForm.providers[provider]} configuration={summaries.document_ai?.configuration.providers?.[provider] ?? {}} engineEnabled={aiForm.enabled} busy={busy} testing={testing} update={(field, value) => updateProvider(provider, field, value)} test={() => testAiProvider(provider)} t={t} />)}
             </div>
-          </>
-        )}
+          </section>
+        </>}
       </div>
     </main>
   );
 }
 
+function DisabledNotice({ t }: { t: Translate }) {
+  return <div className="rounded-lg border border-warning/40 bg-surface p-4 text-sm leading-relaxed text-text" role="note">{t('aiDisabledNotice')}</div>;
+}
+
+function Notice({ notice }: { notice: { ok: boolean; message: string } }) {
+  return <div className="flex items-start gap-2 rounded-lg border border-border bg-surface p-3 text-sm" role="status" aria-atomic="true">{notice.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-positive" strokeWidth={1.7} aria-hidden="true" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-negative" strokeWidth={1.7} aria-hidden="true" />}<span className="text-text">{notice.message}</span></div>;
+}
+
 function RuntimeCard({ runtime, t }: { runtime: RuntimeSummary; t: Translate }) {
   const online = runtime.worker_status === 'online';
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <div><CardTitle>{t('runtimeTitle')}</CardTitle><p className="mt-1 text-sm text-muted">{t('runtimeDescription')}</p></div>
-        <span className="flex items-center gap-1.5 text-xs text-text">
-          {online ? <CheckCircle2 className="h-4 w-4 text-positive" /> : <XCircle className="h-4 w-4 text-negative" />}
-          {online ? t('online') : t('offline')}
-        </span>
-      </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-4 border-t border-border pt-4 sm:grid-cols-5">
-        <Metric label={t('queueDriver')} value={runtime.queue_connection} />
-        <Metric label={t('queued')} value={runtime.queued_runs} />
-        <Metric label={t('running')} value={runtime.running_runs} />
-        <Metric label={t('failed')} value={runtime.failed_runs} />
-        <Metric label={t('lastHeartbeat')} value={runtime.worker_last_seen_at ? new Date(runtime.worker_last_seen_at).toLocaleString(DISPLAY_LOCALE) : t('never')} />
-      </CardContent>
-    </Card>
-  );
+  return <Card><CardHeader className="flex flex-row items-center justify-between gap-4"><div><CardTitle>{t('runtimeTitle')}</CardTitle><p className="mt-1 text-sm text-muted">{t('runtimeDescription')}</p></div><span className="flex items-center gap-1.5 text-xs text-text">{online ? <CheckCircle2 className="h-4 w-4 text-positive" /> : <XCircle className="h-4 w-4 text-negative" />}{online ? t('online') : t('offline')}</span></CardHeader><CardContent className="grid grid-cols-2 gap-4 border-t border-border pt-4 sm:grid-cols-5"><Metric label={t('queueDriver')} value={runtime.queue_connection} /><Metric label={t('queued')} value={runtime.queued_runs} /><Metric label={t('running')} value={runtime.running_runs} /><Metric label={t('failed')} value={runtime.failed_runs} /><Metric label={t('lastHeartbeat')} value={runtime.worker_last_seen_at ? new Date(runtime.worker_last_seen_at).toLocaleString(DISPLAY_LOCALE) : t('never')} /></CardContent></Card>;
 }
 
-function SettingsCard({ title, description, icon: Icon, enabled, configuredAt, onEnabled, actions, children }: {
-  title: string; description: string; icon: typeof Database; enabled: boolean; configuredAt?: string | null;
-  onEnabled: (value: boolean) => void; actions: ReactNode; children: ReactNode;
-}) {
+function SettingsCard({ title, description, icon: Icon, enabled, configuredAt, onEnabled, actions, children }: { title: string; description: string; icon: typeof Database; enabled: boolean; configuredAt?: string | null; onEnabled: (value: boolean) => void; actions: ReactNode; children: ReactNode }) {
   const t = useTranslations('platformIntegrations');
-  return (
-    <Card className="flex h-full flex-col">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3"><Icon className="mt-0.5 h-5 w-5 text-muted" strokeWidth={1.7} /><div><CardTitle>{title}</CardTitle><p className="mt-1 text-sm leading-relaxed text-muted">{description}</p></div></div>
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-text">
-            <input type="checkbox" checked={enabled} onChange={(e) => onEnabled(e.target.checked)} className="h-4 w-4 accent-primary" />
-            {enabled ? t('enabled') : t('disabled')}
-          </label>
-        </div>
-        {configuredAt && <p className="mt-2 text-xs text-muted">{t('configuredAt', { date: new Date(configuredAt).toLocaleString(DISPLAY_LOCALE) })}</p>}
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
-        <div className="mt-auto flex flex-wrap justify-end gap-2 border-t border-border pt-4">{actions}</div>
-      </CardContent>
-    </Card>
-  );
+  return <Card className="flex h-full flex-col"><CardHeader><div className="flex items-start justify-between gap-4"><div className="flex items-start gap-3"><Icon className="mt-0.5 h-5 w-5 text-muted" strokeWidth={1.7} aria-hidden="true" /><div><CardTitle>{title}</CardTitle><p className="mt-1 text-sm leading-relaxed text-muted">{description}</p></div></div><label className="flex cursor-pointer items-center gap-2 text-xs text-text"><input type="checkbox" checked={enabled} onChange={(event) => onEnabled(event.target.checked)} className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" />{enabled ? t('enabled') : t('disabled')}</label></div>{configuredAt && <p className="mt-2 text-xs text-muted">{t('configuredAt', { date: new Date(configuredAt).toLocaleString(DISPLAY_LOCALE) })}</p>}</CardHeader><CardContent className="flex flex-1 flex-col gap-4"><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div><div className="mt-auto flex flex-wrap justify-end gap-2 border-t border-border pt-4">{actions}</div></CardContent></Card>;
 }
 
-function CardActions({ integration, busy, testing, save, test, t, disableTest = false }: {
-  integration: IntegrationKey; busy: IntegrationKey | null; testing: IntegrationKey | null;
-  save: (key: IntegrationKey) => void; test: (key: IntegrationKey) => void;
-  t: Translate; disableTest?: boolean;
-}) {
-  return <>
-    <Button variant="outline" size="sm" onClick={() => test(integration)} disabled={disableTest || testing !== null || busy !== null}>
-      {testing === integration ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t('test')}
-    </Button>
-    <Button size="sm" onClick={() => save(integration)} disabled={busy !== null || testing !== null}>
-      {busy === integration ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t('save')}
-    </Button>
-  </>;
+function AiProviderCard({ provider, form, configuration, engineEnabled, busy, testing, update, test, t }: { provider: AiProviderKey; form: DocumentAiFormState['providers'][AiProviderKey]; configuration: Record<string, any>; engineEnabled: boolean; busy: string | null; testing: string | null; update: (field: keyof AiProviderFormState, value: string | boolean) => void; test: () => void; t: Translate }) {
+  const testedAt = typeof configuration.last_tested_at === 'string' ? new Date(configuration.last_tested_at).toLocaleString(DISPLAY_LOCALE) : null;
+  const testStatus = String(configuration.last_test_status ?? 'not_tested');
+  return <Card className="flex h-full flex-col"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>{providerLabel(provider, t)}</CardTitle><p className="mt-1 text-sm text-muted">{t('aiProviderDescription')}</p></div><label className="flex cursor-pointer items-center gap-2 text-xs text-text"><input type="checkbox" checked={form.enabled} onChange={(event) => update('enabled', event.target.checked)} className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" />{form.enabled ? t('enabled') : t('disabled')}</label></div><p className="mt-2 text-xs text-muted">{t('lastTest')}: {testStatus === 'passed' ? t('testPassed') : testStatus === 'failed' ? t('testFailedStatus') : t('notTested')}{testedAt ? ` · ${testedAt}` : ''}</p></CardHeader><CardContent className="flex flex-1 flex-col gap-4"><div className="space-y-4"><Field label={t('model')}><Input value={form.model} onChange={(event) => update('model', event.target.value)} dir="ltr" /></Field><SecretField label={t('apiKey')} masked={String(configuration.api_key_masked ?? '')} value={form.api_key} onChange={(value) => update('api_key', value)} /><ToggleField label={t('clearApiKey')} checked={form.clear_api_key} onChange={(value) => update('clear_api_key', value)} /><ToggleField label={t('allowDocumentSending')} checked={form.allow_document_sending} onChange={(value) => update('allow_document_sending', value)} /><Field label={t('connectionTimeout')}><Input type="number" min={5} max={60} value={form.connection_timeout_seconds} onChange={(event) => update('connection_timeout_seconds', event.target.value)} dir="ltr" /></Field><Field label={t('processingTimeout')}><Input type="number" min={15} max={180} value={form.processing_timeout_seconds} onChange={(event) => update('processing_timeout_seconds', event.target.value)} dir="ltr" /></Field><Field label={t('maxAttempts')}><Input type="number" min={1} max={5} value={form.max_attempts} onChange={(event) => update('max_attempts', event.target.value)} dir="ltr" /></Field><Field label={t('monthlyOperationLimit')}><Input type="number" min={1} value={form.monthly_operation_limit} onChange={(event) => update('monthly_operation_limit', event.target.value)} dir="ltr" /></Field><Field label={t('monthlyPageLimit')}><Input type="number" min={1} value={form.monthly_page_limit} onChange={(event) => update('monthly_page_limit', event.target.value)} dir="ltr" /></Field><Field label={t('dataRegion')}><Input value={form.data_region} onChange={(event) => update('data_region', event.target.value)} dir="ltr" /></Field><Field label={t('retentionPolicy')}><Input value={form.retention_policy} onChange={(event) => update('retention_policy', event.target.value)} /></Field></div><div className="mt-auto flex justify-end border-t border-border pt-4"><Button variant="outline" size="sm" onClick={test} title={!engineEnabled ? t('testUnavailable') : undefined} disabled={!engineEnabled || busy !== null || testing !== null}>{testing === `ai:${provider}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t('test')}</Button></div></CardContent></Card>;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
-}
+function CardActions({ name, busy, testing, save, test, t }: { name: string; busy: string | null; testing: string | null; save: () => void; test: () => void; t: Translate }) { return <><Button variant="outline" size="sm" onClick={test} disabled={testing !== null || busy !== null}>{testing === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t('test')}</Button><Button size="sm" onClick={save} disabled={busy !== null || testing !== null}>{busy === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t('save')}</Button></>; }
+function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>; }
+function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 text-sm text-text"><span>{label}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" /></label>; }
+function SecretField({ label, masked, value, onChange }: { label: string; masked: string; value: string; onChange: (value: string) => void }) { const t = useTranslations('platformIntegrations'); return <Field label={label}><Input type="password" autoComplete="new-password" value={value} onChange={(event) => onChange(event.target.value)} dir="ltr" placeholder={masked || t('secretPlaceholder')} /><p className="text-xs text-muted">{t('secretHelp')}</p></Field>; }
+function AdminPasswordField({ value, onChange }: { value: string; onChange: (value: string) => void }) { const t = useTranslations('platformIntegrations'); return <Field label={t('currentPassword')}><Input type="password" autoComplete="current-password" value={value} onChange={(event) => onChange(event.target.value)} /><p className="text-xs text-muted">{t('currentPasswordHelp')}</p></Field>; }
+function Select({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<[string, string]> }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">{options.map(([optionValue, label]) => <option key={optionValue} value={optionValue}>{label}</option>)}</select>; }
+function Metric({ label, value }: { label: string; value: string | number }) { return <div><p className="text-xs text-muted">{label}</p><p className="num mt-1 break-all text-sm font-semibold text-text">{value}</p></div>; }
 
-function SecretField({ label, masked, value, onChange }: { label: string; masked: string; value: string; onChange: (value: string) => void }) {
-  const t = useTranslations('platformIntegrations');
-  return <Field label={label}><Input type="password" autoComplete="new-password" value={value} onChange={(e) => onChange(e.target.value)} dir="ltr" placeholder={masked || t('secretPlaceholder')} /><p className="text-xs text-muted">{t('secretHelp')}</p></Field>;
-}
-
-function AdminPasswordField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const t = useTranslations('platformIntegrations');
-  return <Field label={t('currentPassword')}><Input type="password" autoComplete="current-password" value={value} onChange={(e) => onChange(e.target.value)} /><p className="text-xs text-muted">{t('currentPasswordHelp')}</p></Field>;
-}
-
-function Select({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<[string, string]> }) {
-  return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none focus:ring-2 focus:ring-primary">
-    {options.map(([optionValue, label]) => <option key={optionValue} value={optionValue}>{label}</option>)}
-  </select>;
-}
-
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return <div><p className="text-xs text-muted">{label}</p><p className="num mt-1 break-all text-sm font-semibold text-text">{value}</p></div>;
-}
-
-function hydrateForms(current: Record<IntegrationKey, FormState>, integrations: IntegrationSummary[]): Record<IntegrationKey, FormState> {
-  const next = { ...current };
-  for (const item of integrations) {
-    const configuration = item.configuration;
-    next[item.key] = {
-      ...current[item.key],
-      enabled: item.enabled,
-      provider: item.provider ?? current[item.key].provider,
-      endpoint: String(configuration.endpoint ?? ''),
-      bucket: String(configuration.bucket ?? ''),
-      region: String(configuration.region ?? current[item.key].region),
-      access_key_id: '',
-      secret_access_key: '',
-      use_path_style_endpoint: Boolean(configuration.use_path_style_endpoint ?? true),
-      host: String(configuration.host ?? ''),
-      port: String(configuration.port ?? current[item.key].port),
-      timeout_seconds: String(configuration.timeout_seconds ?? current[item.key].timeout_seconds),
-      max_attempts: String(configuration.max_attempts ?? current[item.key].max_attempts),
-      backoff_seconds: Array.isArray(configuration.backoff_seconds) ? configuration.backoff_seconds.join(',') : current[item.key].backoff_seconds,
-      model: String(configuration.model ?? ''),
-      api_key: '',
-      current_password: '',
-    };
-  }
-  return next;
-}
+function hydrateCoreForms(current: Record<CoreIntegrationKey, IntegrationFormState>, integrations: IntegrationSummary[]): Record<CoreIntegrationKey, IntegrationFormState> { const next = { ...current }; for (const item of integrations.filter((candidate): candidate is IntegrationSummary & { key: CoreIntegrationKey } => candidate.key !== 'document_ai')) { const configuration = item.configuration; next[item.key] = { ...current[item.key], enabled: item.enabled, provider: item.provider ?? current[item.key].provider, endpoint: String(configuration.endpoint ?? ''), bucket: String(configuration.bucket ?? ''), region: String(configuration.region ?? current[item.key].region), access_key_id: '', secret_access_key: '', use_path_style_endpoint: Boolean(configuration.use_path_style_endpoint ?? true), host: String(configuration.host ?? ''), port: String(configuration.port ?? current[item.key].port), timeout_seconds: String(configuration.timeout_seconds ?? current[item.key].timeout_seconds), max_attempts: String(configuration.max_attempts ?? current[item.key].max_attempts), backoff_seconds: Array.isArray(configuration.backoff_seconds) ? configuration.backoff_seconds.join(',') : current[item.key].backoff_seconds, model: '', api_key: '', current_password: '' }; } return next; }
+function hydrateAiForm(summary?: IntegrationSummary): DocumentAiFormState { const initial = emptyDocumentAiForm(); const configuration = summary?.configuration ?? {}; const providers = configuration.providers ?? {}; return { ...initial, enabled: Boolean(summary?.enabled ?? configuration.engine_enabled ?? false), primary_provider: isAiProvider(configuration.primary_provider) ? configuration.primary_provider : '', fallback_enabled: Boolean(configuration.fallback_enabled ?? false), fallback_providers: Array.isArray(configuration.fallback_providers) ? configuration.fallback_providers.filter(isAiProvider).slice(0, 2) : [], confidence_threshold_percent: String(configuration.confidence_threshold_percent ?? initial.confidence_threshold_percent), default_language: String(configuration.default_language ?? initial.default_language), max_files_per_batch: String(configuration.max_files_per_batch ?? initial.max_files_per_batch), max_pages_per_file: String(configuration.max_pages_per_file ?? initial.max_pages_per_file), max_file_size_bytes: String(configuration.max_file_size_bytes ?? initial.max_file_size_bytes), test_mode: Boolean(configuration.test_mode ?? false), providers: Object.fromEntries(AI_PROVIDER_KEYS.map((provider) => { const item = providers[provider] ?? {}; return [provider, { ...emptyAiProvider(), enabled: Boolean(item.enabled ?? false), model: String(item.model ?? ''), connection_timeout_seconds: String(item.connection_timeout_seconds ?? 15), processing_timeout_seconds: String(item.processing_timeout_seconds ?? 90), max_attempts: String(item.max_attempts ?? 2), allow_document_sending: Boolean(item.allow_document_sending ?? false), monthly_operation_limit: item.monthly_operation_limit ? String(item.monthly_operation_limit) : '', monthly_page_limit: item.monthly_page_limit ? String(item.monthly_page_limit) : '', data_region: String(item.data_region ?? ''), retention_policy: String(item.retention_policy ?? '') }]; })) as Record<AiProviderKey, DocumentAiFormState['providers'][AiProviderKey]>, current_password: '' }; }
+function replaceFallback(current: AiProviderKey[], index: number, value: AiProviderKey | ''): AiProviderKey[] { const next = [...current]; if (value === '') next.splice(index, 1); else next[index] = value; return next.filter((provider, position, providers) => providers.indexOf(provider) === position).slice(0, 2); }
+function isAiProvider(value: unknown): value is AiProviderKey { return typeof value === 'string' && AI_PROVIDER_KEYS.includes(value as AiProviderKey); }
+function providerLabel(provider: AiProviderKey, t: Translate): string { return t(provider === 'openai' ? 'providerOpenai' : provider === 'anthropic' ? 'providerAnthropic' : 'providerGoogleGemini'); }

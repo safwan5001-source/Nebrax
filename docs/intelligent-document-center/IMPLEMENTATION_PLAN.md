@@ -34,7 +34,7 @@ The platform administration console owns encrypted operational settings for priv
 
 ### PR-4 — Extraction provider
 
-**Gate before implementation:** approve provider, processing region, contractual/data-protection terms, retention, credentials, and failover. Add the provider adapter, company-wide provider settings with explicit branch overrides, extraction results/fields/lines, and usage/cost events. Never store raw provider errors in user-safe fields.
+**Status: implemented — foundation only.** The platform console now holds encrypted, masked, server-side-only profiles for OpenAI, Anthropic Claude, and Google Gemini. The extraction engine and every provider are disabled by default. In addition, PR-4 fixes a code-level external-provider network gate to `false`: saved profiles, connection-test requests, queue workers, and adapters cannot send a document or make a real provider call in any deployment until a later, separately approved activation phase deliberately changes that code. Primary and ordered fallback providers are configurable; all adapter output normalizes to the versioned `document-schema-v1` evidence contract; and append-only attempts and usage events remain isolated from financial data. Raw provider payloads, credentials, and raw provider error text are never stored in user-safe fields. Provider selection, processing region, data-protection terms, retention policy, credentials, and failover remain explicit operator-owned configuration decisions; no vendor, region, retention posture, paid Render resource, durable storage migration, or worker activation is imposed automatically.
 
 ### PR-5 — Matching and issues
 

@@ -124,6 +124,17 @@ class DocumentProcessingService
         );
     }
 
+    public function failedExtraction(DocumentProcessingRun $run, string $code, string $safeMessage): void
+    {
+        $this->finish(
+            $run,
+            DocumentProcessingStatus::FAILED,
+            mb_substr($code, 0, 64),
+            mb_substr($safeMessage, 0, 500),
+            null,
+        );
+    }
+
     private function finish(
         DocumentProcessingRun $run,
         DocumentProcessingStatus $status,
