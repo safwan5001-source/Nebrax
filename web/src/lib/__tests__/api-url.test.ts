@@ -12,6 +12,11 @@ describe('resolveApiUrl', () => {
       .toBe('https://api.example.com/api/products/pr2/media/m1/download');
   });
 
+  it('removes copied whitespace before deciding whether the API prefix exists', () => {
+    expect(resolveApiUrl('/api/products/pr2/media/m1/download', 'https://api.example.com/api\n\n'))
+      .toBe('https://api.example.com/api/products/pr2/media/m1/download');
+  });
+
   it('keeps absolute download URLs unchanged', () => {
     expect(resolveApiUrl('https://cdn.example.com/product.jpg', 'https://api.example.com/api'))
       .toBe('https://cdn.example.com/product.jpg');

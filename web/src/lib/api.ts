@@ -7,8 +7,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 export function resolveApiUrl(path: string, baseUrl = BASE_URL): string {
   if (/^https?:\/\//i.test(path)) return path;
 
-  const base = baseUrl.replace(/\/+$/, '');
-  let relativePath = path.replace(/^\/+/, '');
+  // تتجنب trim() تحوّل قيمة بيئة منسوخة مع سطر جديد إلى مسار `/api/api/...` في الإنتاج.
+  const base = baseUrl.trim().replace(/\/+$/, '');
+  let relativePath = path.trim().replace(/^\/+/, '');
 
   // Laravel media links are returned as `/api/...`, while NEXT_PUBLIC_API_URL
   // already ends with `/api`. Avoid producing `/api/api/...`.
