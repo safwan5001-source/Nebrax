@@ -227,16 +227,10 @@ const GROUPS: NavGroup[] = [
     title: 'fuelStations',
     icon: Fuel,
     appKey: 'fuel_stations.core',
+    // مدخل واحد للمساحة المتخصصة؛ الملاحة التشغيلية التفصيلية داخل Fuel Workspace.
+    // تبقى حالة التطبيق هنا للعرض فقط، بينما كل API محروس مستقلاً في الخلفية.
     items: [
       { href: '/fuel-stations', icon: Fuel, key: 'fuelStationsWorkspace', built: true },
-      { href: '/fuel-stations/sales', icon: Receipt, key: 'fuelStationsSales', built: true },
-      { href: '/fuel-stations/shifts', icon: Clock, key: 'fuelStationsShifts', built: true },
-      { href: '/fuel-stations/receiving', icon: Truck, key: 'fuelStationsReceiving', built: true },
-      { href: '/fuel-stations/master-data', icon: MapPin, key: 'fuelStationsMasterData', built: true },
-      { href: '/fuel-stations/corporate-contracts', icon: Handshake, key: 'fuelStationsCorporate', built: true },
-      { href: '/fuel-stations/avi-rfid', icon: Fingerprint, key: 'fuelStationsAvi', built: true, appKey: 'fuel_stations.avi' },
-      { href: '/fuel-stations/devices', icon: Network, key: 'fuelStationsDevices', built: true, appKey: 'fuel_stations.integrations' },
-      { href: '/fuel-stations/readiness', icon: Wrench, key: 'fuelStationsReadiness', built: true, appKey: 'fuel_stations.maintenance' },
     ],
   },
   {
