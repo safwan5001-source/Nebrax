@@ -38,7 +38,12 @@ interface Invoice {
   status: string;
   payment_status: string;
 }
-interface Partner { id: string; name: string }
+interface Partner {
+  id: string;
+  name: string;
+  phone?: string | null;
+  vat_number?: string | null;
+}
 interface PaginationMeta {
   current_page: number;
   last_page: number;
@@ -94,10 +99,15 @@ export default function InvoicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
-  const [partners, setPartners] = useState<Record<string, string>>({});
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [toDelete, setToDelete] = useState<Invoice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [view, setView] = useState<BranchView>('current');
+
+  const partnerNames = useMemo(
+    () => Object.fromEntries(partners.map((partner) => [partner.id, partner.name])),
+    [partners]
+  );
 
   const definitions = useMemo<FilterDefinition[]>(() => [
     {
@@ -118,7 +128,14 @@ export default function InvoicesPage() {
     },
     {
       key: 'partner_id', label: t('partner'), kind: 'entity', quick: true,
-      options: Object.entries(partners).map(([value, label]) => ({ value, label })),
+      searchPlaceholder: 'ابحث بالاسم، الهاتف أو الرقم التعريفي',
+      emptyText: 'لا يوجد عميل مطابق',
+      options: partners.map((partner) => ({
+        value: partner.id,
+        label: partner.name,
+        sub: partner.vat_number ?? partner.id,
+        hint: partner.phone ?? undefined,
+      })),
     },
     { key: 'invoice_date', label: t('date'), kind: 'dateRange' },
     { key: 'due_date', label: 'تاريخ الاستحقاق', kind: 'dateRange' },
@@ -150,7 +167,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     api<{ data: Partner[] }>('/partners')
-      .then((response) => setPartners(Object.fromEntries(response.data.map((partner) => [partner.id, partner.name]))))
+      .then((response) => setPartners(response.data))
       .catch(() => undefined);
   }, []);
 
@@ -229,8 +246,8 @@ export default function InvoicesPage() {
     },
     {
       id: 'partner', header: t('partner'), enableSorting: false,
-      accessorFn: (row) => partners[row.partner_id] ?? '—',
-      cell: ({ row }) => partners[row.original.partner_id] ?? '—',
+      accessorFn: (row) => partnerNames[row.partner_id] ?? '—',
+      cell: ({ row }) => partnerNames[row.original.partner_id] ?? '—',
     },
     {
       accessorKey: 'invoice_date', header: t('date'), enableSorting: false,
@@ -272,7 +289,7 @@ export default function InvoicesPage() {
         );
       },
     },
-  ], [partners, router, t, ts]);
+  ], [partnerNames, router, t, ts]);
 
   return (
     <div className="space-y-4">
