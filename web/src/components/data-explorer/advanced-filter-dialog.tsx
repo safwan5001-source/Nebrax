@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -60,7 +61,40 @@ export function AdvancedFilterDialog({
         {definitions.map((definition) => {
           const active = byKey.get(definition.key);
 
-          if ((definition.kind === 'select' || definition.kind === 'multiSelect' || definition.kind === 'entity') && definition.options?.length) {
+          if (definition.kind === 'entity' && definition.options?.length) {
+            const options: ComboOption[] = definition.options.map((option) => ({
+              value: option.value,
+              label: option.label,
+              sub: option.sub,
+              hint: option.hint,
+            }));
+
+            return (
+              <label key={definition.key} className="block space-y-1.5">
+                <span className="text-xs font-medium text-muted">{definition.label}</span>
+                <Combobox
+                  value={filterValue(active)}
+                  onChange={(value) => {
+                    setFilter(
+                      value
+                        ? { key: definition.key, operator: 'eq', value, label: definition.label }
+                        : null,
+                      definition.key
+                    );
+                  }}
+                  options={options}
+                  placeholder="الكل"
+                  clearLabel="الكل"
+                  searchPlaceholder={definition.searchPlaceholder ?? `ابحث في ${definition.label}`}
+                  emptyText={definition.emptyText ?? 'لا توجد نتائج مطابقة'}
+                  className="w-full"
+                  aria-label={definition.label}
+                />
+              </label>
+            );
+          }
+
+          if ((definition.kind === 'select' || definition.kind === 'multiSelect') && definition.options?.length) {
             return (
               <label key={definition.key} className="block space-y-1.5">
                 <span className="text-xs font-medium text-muted">{definition.label}</span>
