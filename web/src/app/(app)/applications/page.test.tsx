@@ -140,7 +140,7 @@ describe('ApplicationsPage operational actions', () => {
     render(<ApplicationsPage />);
     await screen.findByRole('heading', { name: 'Fuel trial' });
 
-    expect(screen.getByRole('button', { name: /All/ })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'All' }).length).toBeGreaterThan(0);
     const group = screen.getByRole('heading', { name: 'Fuel Stations' }).closest('section');
     if (!group) throw new Error('Expected Fuel Stations group');
     expect(within(group).getByRole('button', { name: 'Enable' })).toBeTruthy();
