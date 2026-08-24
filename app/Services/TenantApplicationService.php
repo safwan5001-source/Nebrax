@@ -14,6 +14,8 @@ use App\Models\Purchase;
 use App\Models\StockMovement;
 use App\Models\Tenant;
 use App\Models\TenantApplicationEvent;
+use App\Models\TenantApplicationGroupEvent;
+use App\Models\TenantApplicationGroupState;
 use App\Models\TenantApplicationState;
 use App\Models\User;
 use App\Support\ApplicationCatalog;
@@ -23,39 +25,17 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * قرار كل مستأجر بتفعيل/إيقاف قدرة من ApplicationCatalog، مع فحص الاعتماديات
- * والإلزامية وسجل تدقيق. الإنفاذ الفعلي على المسارات والشريط الجانبي يقرأ
- * `statusFor()`/`navVisibility()` وحدهما (`EnsureApplicationActive`).
+ * قرار كل مستأجر بتفعيل/تعطيل تطبيق رئيسي وقدراته الفرعية مع فحص الاعتماديات
+ * والإلزامية وسجل تدقيق. حالة التطبيق الرئيسي مستقلة عن حالات الفروع، ولذلك
+ * تعطيله يحجب التطبيق كله من دون تغيير اختيارات الفروع المحفوظة.
  */
 class TenantApplicationService
 {
     public function __construct(private CommercialApplicationStatusService $commercialStatus) {}
 
-    /**
-     * لحظة تفعيل الإنفاذ الفعلي. لا صف حالة = "معطّلة" منطقياً في `stateFor()`
-     * منذ P1 — لكن لا مستأجر لمس `/applications` صراحة قبل اليوم، فتطبيق هذا
-     * الافتراض على الإنفاذ الفعلي (حجب المسار/إخفاء الشريط) يحجب استخداماً
-     * حياً قائماً بلا إشعار. المستأجرون المسجَّلون قبل هذا التاريخ يُعامَلون
-     * كمفعّلين فعلياً ما داموا لم يوقفوا القدرة صراحة (صفّ موجود يبقى الحقيقة
-     * دوماً)؛ المستأجرون الجدد بعده يبدؤون بالافتراضي الحقيقي: معطّلة حتى
-     * تُفعَّل صراحة. قرار مالك صريح — لا يغطّي `stateFor()`/لوحة `/applications`
-     * عمداً: تبقى تعرض الحالة المخزَّنة الحرفية كما صُمِّمت واختُبرت في P1/P2.
-     */
     private const ENFORCEMENT_CUTOVER_AT = '2026-08-21 00:00:00';
 
-
-    /**
-     * "هل توجد بيانات تشغيلية حقيقية؟" لكل قدرة قابلة للإيقاف — تحوّل الإيقاف
-     * إلى `suspended` (قراءة فقط) بدل `disabled` الكاملة. القدرات الإلزامية
-     * الثلاث لا تحتاج فحصاً (لا تُوقَف بتاتاً). `compliance.zatca` مستثناة
-     * عمداً: لا نموذج مستقل لبياناتها، فحقولها أعمدة على `Invoice` نفسها
-     * (ملك `sales.invoicing` الإلزامية) — تعليقها لا يجمّد شيئاً مستقلاً.
-     * `company.branches`: الفرع الرئيسي يُزرع تلقائياً لكل مستأجر عند
-     * التسجيل، فـ`Branch::exists()` الخام سيكون صحيحاً دوماً ويُبطل الفحص —
-     * يُفحص وجود فرع غير رئيسي تحديداً.
-     *
-     * @return array<string, Closure(): bool>
-     */
+    /** @return array<string, Closure(): bool> */
     private function dataChecks(): array
     {
         return [
@@ -68,8 +48,6 @@ class TenantApplicationService
             'finance.operations' => fn () => Expense::query()->exists()
                 || Payment::query()->exists()
                 || EmployeeCustody::query()->exists(),
-            // حتى قبل Cycle 1، إنشاء محطة قرار تشغيلي لا ينبغي أن يختفي معه
-            // التاريخ عند إيقاف التطبيق؛ يصبح الوصول قراءة فقط مثل بقية المجالات.
             'fuel_stations.core' => fn () => FuelStation::query()->exists(),
         ];
     }
@@ -81,33 +59,94 @@ class TenantApplicationService
         return $check !== null && $check();
     }
 
-    /**
-     * دليل بيانات التشغيل الموثوق نفسه المستخدم عند تعليق التطبيق. المستدعي
-     * يظل مسؤولاً عن اختيار TenantContext الصحيح قبل الاستعلام.
-     */
     public function hasOperationalEvidence(string $key): bool
     {
         return $this->hasOperationalData($key);
     }
 
+    /** @return list<string> */
+    public function groupKeys(): array
+    {
+        return array_values(array_unique(array_map(
+            fn (array $application) => $application['group'],
+            ApplicationCatalog::all(),
+        )));
+    }
+
+    private function groupExists(string $group): bool
+    {
+        return in_array($group, $this->groupKeys(), true);
+    }
+
+    /** غياب صف المجموعة يعني مفعّلة، حفاظاً على السلوك السابق للنشر. */
+    public function isGroupEnabled(string $group): bool
+    {
+        if (! $this->groupExists($group)) {
+            return false;
+        }
+
+        $value = TenantApplicationGroupState::query()
+            ->where('group_key', $group)
+            ->value('requested_enabled');
+
+        return $value === null ? true : (bool) $value;
+    }
+
+    /**
+     * @return array<string, array{key:string,enabled:bool,manageable:bool,changed_by:?string,changed_at:?string,reason:?string,capabilities:list<string>}>
+     */
+    public function groupStateFor(): array
+    {
+        $rows = TenantApplicationGroupState::query()->get()->keyBy('group_key');
+        $catalog = ApplicationCatalog::all();
+        $result = [];
+
+        foreach ($this->groupKeys() as $group) {
+            $row = $rows->get($group);
+            $capabilities = array_keys(array_filter(
+                $catalog,
+                fn (array $application) => $application['group'] === $group,
+            ));
+            $manageable = count(array_filter(
+                $capabilities,
+                fn (string $key) => ApplicationCatalog::find($key)['maturity'] === ApplicationCatalog::MATURITY_BUILT,
+            )) > 0;
+
+            $result[$group] = [
+                'key' => $group,
+                'enabled' => $row?->requested_enabled ?? true,
+                'manageable' => $manageable,
+                'changed_by' => $row?->changed_by,
+                'changed_at' => $row?->updated_at?->toIso8601String(),
+                'reason' => $row?->reason,
+                'capabilities' => $capabilities,
+            ];
+        }
+
+        return $result;
+    }
+
     /**
      * دمج الكتالوج الثابت مع حالة المستأجر الحالية.
      *
-     * @return array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,enabled:bool,status:string,changed_by:?string,changed_at:?string,reason:?string,commercial:array{availability:string,source_count:int},effective_access:string,dependency_status:string}>
+     * @return array<string, array<string, mixed>>
      */
     public function stateFor(): array
     {
         $rows = TenantApplicationState::query()->get()->keyBy('application_key');
+        $groupRows = TenantApplicationGroupState::query()->get()->keyBy('group_key');
         $tenantId = app(TenantContext::class)->id();
         $commercial = $tenantId === null ? [] : $this->commercialStatus->forTenant(Tenant::findOrFail($tenantId));
 
         $result = [];
         foreach (ApplicationCatalog::all() as $key => $application) {
             $row = $rows->get($key);
+            $groupRow = $groupRows->get($application['group']);
 
             $result[$key] = [
                 ...$application,
                 'enabled' => $this->isEnabled($key, $application, $rows),
+                'group_enabled' => $groupRow?->requested_enabled ?? true,
                 'status' => $row?->status ?? 'disabled',
                 'changed_by' => $row?->changed_by,
                 'changed_at' => $row?->updated_at?->toIso8601String(),
@@ -124,66 +163,83 @@ class TenantApplicationService
     }
 
     /**
-     * حالة قدرة واحدة — لإنفاذ `EnsureApplicationActive` على مساراتها، بمعزل عن
-     * حساب `stateFor()` الكامل لكل الكتالوج. القدرات الإلزامية وغير المبنية
-     * لا تُمرَّر هنا أصلاً (لا مسار مُنفَذ عليها)، فتُعامَل كمفعّلة دوماً لو
-     * استُدعيت بالخطأ — لا حجب لقدرة لا يملك المستأجر خياراً بإيقافها.
+     * حالة قدرة واحدة لإنفاذ المسارات. بوابة التطبيق الرئيسي تسبق حالة الفرع،
+     * كما أن تعطيل تطبيق تعتمد عليه قدرة في تطبيق آخر يحجب القدرة التابعة
+     * تشغيلياً من دون تغيير حالتها المحفوظة.
      */
     public function statusFor(string $key): string
     {
-        $application = ApplicationCatalog::find($key);
+        return $this->runtimeStatusFor($key, []);
+    }
 
-        // المفتاح غير المعروف ليس قدرةً إلزامية ولا غير مبنية؛ منحه وصولاً
-        // فعّالاً يجعل أي خطأ إملائي في App Guard تجاوزاً صامتاً للإنفاذ.
-        if ($application === null) {
+    /** @param array<string, true> $seen */
+    private function runtimeStatusFor(string $key, array $seen): string
+    {
+        if (isset($seen[$key])) {
             return 'disabled';
         }
 
+        $application = ApplicationCatalog::find($key);
+        if ($application === null || ! $this->isGroupEnabled($application['group'])) {
+            return 'disabled';
+        }
+
+        $seen[$key] = true;
+
         if ($application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
-            return 'enabled';
+            $status = 'enabled';
+        } else {
+            $status = TenantApplicationState::query()->where('application_key', $key)->value('status');
+            if ($status === null) {
+                $status = $this->isGrandfatheredTenant() ? 'enabled' : 'disabled';
+            }
         }
 
-        $status = TenantApplicationState::query()->where('application_key', $key)->value('status');
-        if ($status !== null) {
-            return $status;
+        if ($status === 'disabled') {
+            return 'disabled';
         }
 
-        return $this->isGrandfatheredTenant() ? 'enabled' : 'disabled';
+        foreach (ApplicationCatalog::dependenciesFor($key) as $dependency) {
+            if ($this->runtimeStatusFor($dependency, $seen) !== 'enabled') {
+                return 'disabled';
+            }
+        }
+
+        return $status;
     }
 
     /**
-     * أي قدرات قابلة للإيقاف (غير إلزامية، مبنية) **مرئية** اليوم لهذا المستأجر —
-     * تغذّي الشريط الجانبي وحده، لا صلاحيات ولا إنفاذ مسار. `enabled` و`suspended`
-     * كلاهما مرئي (المعلّقة تبقى قراءة فقط، فروابطها/تقاريرها تبقى متاحة)؛
-     * `disabled` وحدها تُخفي عناصر الشريط المرتبطة بالمفتاح.
+     * حالة الظهور للشريط الجانبي. القدرة الإلزامية لا تحتاج قيمة true في
+     * الحالة العادية، لكننا نعيد false لها عندما يحجبها التطبيق الرئيسي أو
+     * اعتماد تشغيلي حتى تختفي روابط التطبيق كاملة.
      *
      * @return array<string, bool>
      */
     public function navVisibility(): array
     {
-        $rows = TenantApplicationState::query()->get()->keyBy('application_key');
-        $grandfathered = $this->isGrandfatheredTenant();
-
         $result = [];
+
         foreach (ApplicationCatalog::all() as $key => $application) {
-            if ($application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+            if ($application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
                 continue;
             }
 
-            $row = $rows->get($key);
-            $status = $row?->status ?? ($grandfathered ? 'enabled' : 'disabled');
-            $result[$key] = $status !== 'disabled';
+            $status = $this->statusFor($key);
+            if ($status === 'disabled') {
+                $result[$key] = false;
+                continue;
+            }
+
+            if ($application['mandatory']) {
+                continue;
+            }
+
+            $result[$key] = true;
         }
 
         return $result;
     }
 
-    /**
-     * سُجِّل المستأجر قبل لحظة تفعيل الإنفاذ الفعلي؟ راجع تعليق
-     * `ENFORCEMENT_CUTOVER_AT` أعلاه — يحدّد افتراض القدرات التي لم يقرر
-     * المستأجر بشأنها صراحة بعد (لا صفّ `TenantApplicationState`) في
-     * `statusFor()`/`navVisibility()` فقط.
-     */
     private function isGrandfatheredTenant(): bool
     {
         $tenantId = app(TenantContext::class)->id();
@@ -196,10 +252,131 @@ class TenantApplicationService
         return $tenant === null || $this->isLegacyTenant($tenant);
     }
 
-    /** Uses the same cutover contract as legacy route reachability. */
     public function isLegacyTenant(Tenant $tenant): bool
     {
         return $tenant->created_at === null || $tenant->created_at->lt(self::ENFORCEMENT_CUTOVER_AT);
+    }
+
+    public function enableGroup(string $group, ?User $actor, ?string $reason = null): TenantApplicationGroupState
+    {
+        return $this->setGroupEnabled($group, true, $actor, $reason);
+    }
+
+    public function disableGroup(string $group, ?User $actor, ?string $reason = null): TenantApplicationGroupState
+    {
+        return $this->setGroupEnabled($group, false, $actor, $reason);
+    }
+
+    private function setGroupEnabled(string $group, bool $enabled, ?User $actor, ?string $reason): TenantApplicationGroupState
+    {
+        if (! $this->groupExists($group)) {
+            throw new RuntimeException('مفتاح تطبيق رئيسي غير معروف.');
+        }
+
+        return DB::transaction(function () use ($group, $enabled, $actor, $reason) {
+            $state = TenantApplicationGroupState::updateOrCreate(
+                ['group_key' => $group],
+                ['requested_enabled' => $enabled, 'changed_by' => $actor?->id, 'reason' => $reason],
+            );
+
+            TenantApplicationGroupEvent::create([
+                'group_key' => $group,
+                'action' => $enabled ? 'enabled' : 'disabled',
+                'changed_by' => $actor?->id,
+                'reason' => $reason,
+            ]);
+
+            return $state;
+        });
+    }
+
+    /**
+     * تفعيل/تعطيل كل التطبيقات الرئيسية المبنية فقط. لا يمس حالات الفروع،
+     * ولذلك فإن إعادة التفعيل تستعيد التكوين الفرعي السابق بالكامل.
+     *
+     * @return array<string, array{enabled:bool}>
+     */
+    public function setAllGroups(bool $enabled, ?User $actor, ?string $reason = null): array
+    {
+        $groups = $this->groupStateFor();
+
+        foreach ($groups as $group => $state) {
+            if (! $state['manageable']) {
+                continue;
+            }
+
+            $this->setGroupEnabled($group, $enabled, $actor, $reason);
+        }
+
+        return array_map(
+            fn (array $state) => ['enabled' => $state['enabled']],
+            $this->groupStateFor(),
+        );
+    }
+
+    /**
+     * تفعيل/تعطيل كل القدرات الفرعية القابلة للإدارة داخل تطبيق واحد. القدرات
+     * غير المبنية والإلزامية لا تُغيّر، والقدرة غير المتاحة تجارياً لا تُمنح
+     * عبر التفعيل الجماعي. أي قدرة يمنعها اعتماد تشغيلي تُعاد ضمن skipped.
+     *
+     * @return array{changed:list<string>,skipped:array<string,string>}
+     */
+    public function setGroupCapabilities(string $group, bool $enabled, ?User $actor, ?string $reason = null): array
+    {
+        if (! $this->groupExists($group)) {
+            throw new RuntimeException('مفتاح تطبيق رئيسي غير معروف.');
+        }
+
+        $states = $this->stateFor();
+        $keys = array_values(array_filter(
+            array_keys($states),
+            fn (string $key) => $states[$key]['group'] === $group
+                && $states[$key]['maturity'] === ApplicationCatalog::MATURITY_BUILT
+                && ! $states[$key]['mandatory'],
+        ));
+
+        usort($keys, function (string $left, string $right) use ($enabled): int {
+            $leftDepth = $this->dependencyDepth($left);
+            $rightDepth = $this->dependencyDepth($right);
+
+            return $enabled ? $leftDepth <=> $rightDepth : $rightDepth <=> $leftDepth;
+        });
+
+        $changed = [];
+        $skipped = [];
+        foreach ($keys as $key) {
+            if ($enabled && ($states[$key]['effective_access'] ?? 'denied') === 'denied') {
+                $skipped[$key] = 'غير متاح ضمن الاستحقاق التجاري الحالي.';
+                continue;
+            }
+
+            try {
+                $enabled ? $this->enable($key, $actor, $reason) : $this->disable($key, $actor, $reason);
+                $changed[] = $key;
+            } catch (RuntimeException $exception) {
+                $skipped[$key] = $exception->getMessage();
+            }
+        }
+
+        return ['changed' => $changed, 'skipped' => $skipped];
+    }
+
+    private function dependencyDepth(string $key, array $seen = []): int
+    {
+        if (isset($seen[$key])) {
+            return 0;
+        }
+
+        $seen[$key] = true;
+        $dependencies = ApplicationCatalog::dependenciesFor($key);
+        if ($dependencies === []) {
+            return 0;
+        }
+
+        return 1 + max(array_map(
+            fn (string $dependency) => $this->dependencyDepth($dependency, $seen),
+            $dependencies,
+        ));
     }
 
     public function enable(string $key, ?User $actor, ?string $reason = null): TenantApplicationState
@@ -247,7 +424,7 @@ class TenantApplicationService
         }
 
         if ($application['mandatory']) {
-            throw new RuntimeException('هذه القدرة إلزامية ولا يمكن إيقافها.');
+            throw new RuntimeException('هذه القدرة إلزامية ولا يمكن تعطيلها.');
         }
 
         $rows = TenantApplicationState::query()->get()->keyBy('application_key');
@@ -262,9 +439,6 @@ class TenantApplicationService
             throw new RuntimeException('توابع مفعّلة تعتمد على هذه القدرة: ' . implode('، ', $dependents));
         }
 
-        // بيانات حقيقية موجودة → قراءة فقط بدل إيقاف كامل، فلا تُفقَد إمكانية
-        // مراجعة السجل التاريخي. القدرة الإلزامية والاعتماد المفعّل يُرفضان
-        // أعلاه قبل الوصول هنا؛ هذا القرار الثالث ينجح دوماً بحالة مختلفة.
         $status = $this->hasOperationalData($key) ? 'suspended' : 'disabled';
 
         return DB::transaction(function () use ($key, $actor, $reason, $status) {
@@ -285,11 +459,6 @@ class TenantApplicationService
     }
 
     /**
-     * منطق نقي معزول عن قاعدة البيانات وبيانات الكتالوج الحقيقية عمداً — يبقى
-     * قابلاً للاختبار المباشر حتى لو لم يوجد اليوم مساران حقيقيان في الكتالوج
-     * ينتجان مساراً إيجابياً هنا (كل اعتماديات القدرات غير الإلزامية اليوم
-     * تنتهي عند قدرة إلزامية، فيُحجب الإيقاف بفحص `mandatory` أولاً).
-     *
      * @param  array<string, array{dependencies:list<string>}>  $catalog
      * @param  list<string>  $enabledKeys
      * @return list<string>
