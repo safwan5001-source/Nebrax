@@ -117,9 +117,9 @@ export default function ExpensesPage() {
           const busy = acting === expense.id || posting === expense.id;
           return (
             <div className="flex justify-end gap-1">
-              <Link href={`/expenses/${expense.id}`}><Button size="icon" variant="ghost" aria-label={t('view')}><Eye className="h-4 w-4" strokeWidth={1.7} /></Button></Link>
+              <Button asChild size="icon" variant="ghost" aria-label={t('view')}><Link href={`/expenses/${expense.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
               {isDraft ? (
-                <Link href={`/expenses/new?edit=${expense.id}`}><Button size="icon" variant="ghost" aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button></Link>
+                <Button asChild size="icon" variant="ghost" aria-label={t('edit')}><Link href={`/expenses/new?edit=${expense.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
               ) : <Button size="icon" variant="ghost" disabled title={t('draft_action_only')} aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button>}
               <Button size="icon" variant="ghost" disabled={busy} onClick={() => duplicateExpense(expense.id)} aria-label={t('duplicate')}><Copy className="h-4 w-4" strokeWidth={1.7} /></Button>
               <Button size="icon" variant="ghost" disabled={!isDraft || busy} title={!isDraft ? t('draft_action_only') : undefined} onClick={() => deleteExpense(expense.id)} aria-label={t('delete')}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} /></Button>
@@ -139,12 +139,10 @@ export default function ExpensesPage() {
         {/* نطاق العرض ظاهر في الشاشة نفسها — لا مخفيّاً في الإعدادات. */}
         <BranchViewToggle value={view} onChange={setView} />
         <div className="flex items-center gap-2">
-          <Link href="/expenses/categories">
-            <Button variant="outline">
+          <Button asChild variant="outline"><Link href="/expenses/categories">
               <Settings2 className="h-4 w-4" strokeWidth={1.8} />
               {t('manage_categories')}
-            </Button>
-          </Link>
+            </Link></Button>
           <Link href="/expenses/new">
             <Button>
               <Plus className="h-4 w-4" strokeWidth={1.8} />

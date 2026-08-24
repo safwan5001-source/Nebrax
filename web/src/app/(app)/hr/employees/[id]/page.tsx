@@ -670,9 +670,9 @@ export default function EmployeeProfilePage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/hr')} aria-label={tc('back')}>
+        <Button asChild variant="ghost" size="icon" aria-label={tc('back')}><Link href='/hr'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <div className="min-w-0">
           <div className="text-xs text-muted">
             {t('employees')} {employee.employee_no && <span className="num">#{employee.employee_no}</span>}

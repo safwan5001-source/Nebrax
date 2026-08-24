@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -192,9 +193,9 @@ export default function PosDevicesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/pos/settings')} aria-label={t('back_to_settings')}>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back_to_settings')}><Link href='/pos/settings'>
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
+          </Link></Button>
           <div>
             <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
             <p className="mt-1 text-sm text-muted">{t('subtitle')}</p>

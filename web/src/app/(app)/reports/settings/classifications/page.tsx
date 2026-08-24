@@ -76,7 +76,7 @@ export default function ClassificationPolicyPage() {
     <form onSubmit={save} className="mx-auto max-w-3xl space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/reports"><Button type="button" variant="ghost" size="icon" aria-label={t('backToReports')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button></Link>
+          <Button asChild type="button" variant="ghost" size="icon" aria-label={t('backToReports')}><Link href="/reports"><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
           <div><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 text-sm text-muted">{t('subtitle')}</p></div>
         </div>
         <Button disabled={saving}><Save className="h-4 w-4" strokeWidth={1.7} />{saving ? t('saving') : t('save')}</Button>

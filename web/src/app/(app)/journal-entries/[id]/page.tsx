@@ -72,8 +72,8 @@ export default function JournalEntryDetailsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3"><Button variant="ghost" size="icon" onClick={() => router.push('/journal-entries')} aria-label={t('back')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button><div><div className="flex items-center gap-2"><h1 className="num text-xl font-semibold text-text">{entry.number}</h1><Badge tone={entry.entry_kind === 'automatic' ? 'positive' : entry.entry_kind === 'reversal' ? 'negative' : 'muted'}>{t(entry.entry_kind)}</Badge></div><p className="mt-1 text-sm text-muted">{entry.entry_date} · {entry.description || t('noDescription')}</p></div></div>
-        <div className="flex flex-wrap gap-2">{source && <Link href={source}><Button variant="outline"><ExternalLink className="h-4 w-4" strokeWidth={1.7} />{t('viewSource')}</Button></Link>}{manualSource && <Link href={source}><Button>{t('openManual')}</Button></Link>}</div>
+        <div className="flex items-start gap-3"><Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/journal-entries'><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button><div><div className="flex items-center gap-2"><h1 className="num text-xl font-semibold text-text">{entry.number}</h1><Badge tone={entry.entry_kind === 'automatic' ? 'positive' : entry.entry_kind === 'reversal' ? 'negative' : 'muted'}>{t(entry.entry_kind)}</Badge></div><p className="mt-1 text-sm text-muted">{entry.entry_date} · {entry.description || t('noDescription')}</p></div></div>
+        <div className="flex flex-wrap gap-2">{source && <Button asChild variant="outline"><Link href={source}><ExternalLink className="h-4 w-4" strokeWidth={1.7} />{t('viewSource')}</Link></Button>}{manualSource && <Link href={source}><Button>{t('openManual')}</Button></Link>}</div>
       </div>
 
       <Card>

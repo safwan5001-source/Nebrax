@@ -87,11 +87,9 @@ export default function ProductImportPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/products">
-          <Button variant="ghost" size="icon" aria-label={t('back')}>
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href="/products">
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
-        </Link>
+          </Link></Button>
         <div>
           <h1 className="text-xl font-semibold text-text">{t('import_title')}</h1>
           <p className="mt-1 text-sm text-muted">{t('import_subtitle')}</p>

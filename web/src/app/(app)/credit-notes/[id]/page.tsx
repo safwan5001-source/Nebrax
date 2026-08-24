@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -173,9 +174,9 @@ export default function CreditNoteDetailPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/credit-notes')} aria-label={t('back')}>
+        <Button asChild variant="ghost" size="icon" className="no-print" aria-label={t('back')}><Link href='/credit-notes'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="num text-xl font-semibold text-text">{note.number}</h1>
         <Badge tone={statusTone[note.status] ?? 'muted'}>{t(note.status)}</Badge>
         <div className="no-print ms-auto flex flex-wrap gap-2">

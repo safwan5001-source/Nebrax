@@ -491,9 +491,9 @@ export default function PartnerProfilePage() {
     <div className="space-y-4">
       {/* ① شريط الحالة */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/partners')} aria-label={t('back')}>
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/partners'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <div className="min-w-0">
           <div className="text-xs text-muted">
             {tp('title')} {partner.code && <span className="num">#{partner.code}</span>}

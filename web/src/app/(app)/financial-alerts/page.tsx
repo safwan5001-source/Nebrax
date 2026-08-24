@@ -130,7 +130,7 @@ export default function FinancialAlertsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{t('subtitle')}</p></div>
-        <div className="flex flex-wrap items-center gap-2"><Link href="/finance-settings/financial-alerts"><Button variant="outline"><Settings2 className="h-4 w-4" strokeWidth={1.7} />{t('configure')}</Button></Link><Button disabled={running || enabled === false} onClick={runCheck}><Play className="h-4 w-4" strokeWidth={1.7} />{running ? t('runningCheck') : t('runCheck')}</Button></div>
+        <div className="flex flex-wrap items-center gap-2"><Button asChild variant="outline"><Link href="/finance-settings/financial-alerts"><Settings2 className="h-4 w-4" strokeWidth={1.7} />{t('configure')}</Link></Button><Button disabled={running || enabled === false} onClick={runCheck}><Play className="h-4 w-4" strokeWidth={1.7} />{running ? t('runningCheck') : t('runCheck')}</Button></div>
       </div>
 
       {enabled === false && <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-warning/30 bg-warning/10 p-3 text-sm text-text"><p>{t('alertsDisabled')}</p><Link href="/finance-settings/financial-alerts" className="font-medium text-primary hover:underline">{t('configure')}</Link></div>}

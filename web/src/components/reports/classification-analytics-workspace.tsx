@@ -85,9 +85,7 @@ export function ClassificationAnalyticsWorkspace() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/reports" className="inline-flex rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-            <Button variant="ghost" size="icon" aria-label={t('backToReports')}><ArrowRight className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} /></Button>
-          </Link>
+          <Button asChild variant="ghost" size="icon" aria-label={t('backToReports')}><Link href="/reports" className="inline-flex rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><ArrowRight className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} /></Link></Button>
           <div><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 text-sm text-muted">{t('subtitle')}</p></div>
         </div>
         <Button variant="outline" onClick={exportCsv} disabled={!report || report.data.length === 0}><Download className="h-4 w-4" strokeWidth={1.7} />{t('exportCsv')}</Button>

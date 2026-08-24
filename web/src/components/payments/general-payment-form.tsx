@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -188,7 +189,7 @@ export function GeneralPaymentForm() {
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/payments')} aria-label={t('back')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/payments'><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
           <div><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 text-sm text-muted">{t('subtitle')}</p></div>
         </div>
         <span className="rounded-md bg-muted px-3 py-1.5 text-sm text-muted">{t('draft')}</span>
@@ -221,7 +222,7 @@ export function GeneralPaymentForm() {
       </div>
 
       {error && <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error}</p>}
-      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={() => router.push('/payments')} disabled={saving !== null}>{t('back')}</Button><Button type="button" variant="outline" onClick={() => submit('draft')} disabled={saving !== null}>{saving === 'draft' ? t('save_draft') : t('save_draft')}</Button><Button type="button" onClick={() => submit('post')} disabled={saving !== null}>{saving === 'post' ? t('posting') : t('confirm')}</Button></div>
+      <div className="flex flex-wrap justify-end gap-2">{saving ? <Button type="button" variant="outline" disabled>{t('back')}</Button> : <Button asChild variant="outline"><Link href="/payments">{t('back')}</Link></Button>}<Button type="button" variant="outline" onClick={() => submit('draft')} disabled={saving !== null}>{saving === 'draft' ? t('save_draft') : t('save_draft')}</Button><Button type="button" onClick={() => submit('post')} disabled={saving !== null}>{saving === 'post' ? t('posting') : t('confirm')}</Button></div>
     </div>
   );
 }

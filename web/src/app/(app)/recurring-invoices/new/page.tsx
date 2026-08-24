@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -105,9 +106,9 @@ export default function NewRecurringPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/recurring-invoices')} aria-label={t('back')}>
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/recurring-invoices'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
       </div>
 

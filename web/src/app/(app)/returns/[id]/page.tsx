@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -117,9 +118,9 @@ export default function ReturnDetailPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/returns')} aria-label={t('back')}>
+        <Button asChild variant="ghost" size="icon" className="no-print" aria-label={t('back')}><Link href='/returns'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="num text-xl font-semibold text-text">{doc.number}</h1>
         <Badge tone={doc.type === 'sales' ? 'neutral' : 'warning'}>{tr(doc.type)}</Badge>
         <Badge tone={statusTone[doc.status] ?? 'muted'}>{ts(doc.status)}</Badge>

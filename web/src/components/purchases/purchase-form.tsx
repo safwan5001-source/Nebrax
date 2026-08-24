@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -390,12 +391,12 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/purchases')} aria-label={tf('back')}>
+        <Button asChild variant="ghost" size="icon" aria-label={tf('back')}><Link href='/purchases'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="text-xl font-semibold text-text">{editId ? t('edit_title') : t('new_title')}</h1>
         <div className="ms-auto flex items-center gap-2">
-          <Button variant="ghost" onClick={() => router.push('/purchases')}>{tf('cancel')}</Button>
+          <Button asChild variant="ghost"><Link href='/purchases'>{tf('cancel')}</Link></Button>
           <Button variant="outline" disabled={!canSave} onClick={() => submit(false)}>{t('save_draft')}</Button>
           <Button disabled={!canSave} onClick={() => submit(true)}>{t('save_post')}</Button>
         </div>

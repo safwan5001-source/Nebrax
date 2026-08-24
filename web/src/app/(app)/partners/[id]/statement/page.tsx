@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 /**
  * أسلوب «دفتر التحليل»: كشف الحساب يعرض نطاقه وأرصدته وحركاته على الشاشة أولاً؛
  * المستند الورقي يبقى معاينة مستقلة عند الطلب ولا يزاحم القراءة اليومية.
@@ -212,10 +213,10 @@ export default function PartnerStatementPage() {
   if (loadError || !statement || !partner) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => router.push(`/partners/${id}`)}>
+        <Button asChild variant="ghost" size="sm"><Link href={`/partners/${id}`}>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
           {t('back_to_customer')}
-        </Button>
+        </Link></Button>
         <div className="border border-border bg-surface p-10 text-center">
           <p className="text-sm text-negative">{t('load_error')}</p>
           <Button variant="outline" className="mt-3" onClick={() => void load()}>
@@ -230,9 +231,9 @@ export default function PartnerStatementPage() {
   return (
     <div className="space-y-5">
       <div className="no-print flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push(`/partners/${id}`)} aria-label={t('back_to_customer')}>
+        <Button asChild variant="ghost" size="icon" className="no-print" aria-label={t('back_to_customer')}><Link href={`/partners/${id}`}>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
       </div>
 
       <ReportScreenHeader title={t('title')} description={partner.name} scope={scope} actions={actions} actionsLabel={t('report_actions')} />

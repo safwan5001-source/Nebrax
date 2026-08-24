@@ -1,4 +1,6 @@
 'use client';
+
+import Link from 'next/link';
 import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -91,9 +93,9 @@ export function PosRecentInvoicesDialog({ open, onClose }: { open: boolean; onCl
             </div>
             <div className="flex shrink-0 flex-col items-end gap-2">
               <span className="num font-bold text-text">{formatRiyal(invoice.total)}</span>
-              <Button type="button" variant="ghost" size="sm" onClick={() => router.push(`/invoices/${invoice.id}`)}>
+              <Button asChild type="button" variant="ghost" size="sm"><Link href={`/invoices/${invoice.id}`}>
                 {t('view_invoice')}
-              </Button>
+              </Link></Button>
             </div>
           </article>
         ))}

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -75,14 +76,13 @@ export default function PlatformTenantsPage() {
         accessorKey: 'name',
         header: t('name'),
         cell: ({ row }) => (
-          <button
-            type="button"
-            onClick={() => router.push(`/platform/tenants/${row.original.id}`)}
+          <Link
+            href={`/platform/tenants/${row.original.id}`}
             className="text-start font-medium text-primary hover:underline"
           >
             {row.original.name}
             <span className="ms-1.5 text-xs text-muted">({row.original.slug})</span>
-          </button>
+          </Link>
         ),
       },
       {
@@ -163,10 +163,10 @@ export default function PlatformTenantsPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => router.push('/platform')}>
+            <Button asChild variant="outline" size="sm"><Link href='/platform'>
               <ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('back')}
-            </Button>
+            </Link></Button>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
             </Button>

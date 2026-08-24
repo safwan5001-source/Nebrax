@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -1209,7 +1210,7 @@ export default function PosPage() {
           </div>
           {sessionError && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{sessionError}</p>}
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => router.push('/dashboard')}>{t('leave')}</Button>
+            <Button asChild type="button" variant="outline"><Link href='/dashboard'>{t('leave')}</Link></Button>
             <Button type="submit" disabled={sessionBusy || !deviceId}>{ts('open')}</Button>
           </div>
         </form>

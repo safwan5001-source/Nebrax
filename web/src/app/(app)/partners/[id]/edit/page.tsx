@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -79,12 +80,12 @@ export default function EditPartnerPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push(`/partners/${id}`)} aria-label={t('back')}>
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href={`/partners/${id}`}>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="truncate text-xl font-semibold text-text">{t('edit_title')}</h1>
         <div className="ms-auto flex items-center gap-2">
-          <Button variant="ghost" onClick={() => router.push(`/partners/${id}`)}>{t('cancel')}</Button>
+          <Button asChild variant="ghost"><Link href={`/partners/${id}`}>{t('cancel')}</Link></Button>
           <Button disabled={saving || !form.name.trim()} onClick={submit}>{t('save')}</Button>
         </div>
       </div>

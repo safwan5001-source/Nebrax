@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -213,9 +214,9 @@ export function DocumentPaymentForm({ documentId, documentKind }: DocumentPaymen
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push(config.detailPath(document.id))} aria-label={t('back')}>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href={config.detailPath(document.id)}>
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
+          </Link></Button>
           <div>
             <h1 className="text-xl font-semibold text-text">{t('document_payment_title')}</h1>
             <p className="mt-1 text-sm text-muted">{t('document_payment_subtitle')}</p>
@@ -312,7 +313,11 @@ export function DocumentPaymentForm({ documentId, documentKind }: DocumentPaymen
 
       {error && <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => router.push(config.detailPath(document.id))} disabled={saving !== null}>{t('back')}</Button>
+        {saving ? (
+          <Button type="button" variant="outline" disabled>{t('back')}</Button>
+        ) : (
+          <Button asChild variant="outline"><Link href={config.detailPath(document.id)}>{t('back')}</Link></Button>
+        )}
         <Button type="button" variant="outline" onClick={() => submit('draft')} disabled={saving !== null}>{saving === 'draft' ? t('save_draft') : t('save_draft')}</Button>
         <Button type="button" onClick={() => submit('post')} disabled={saving !== null}>{saving === 'post' ? t('posting') : t('confirm_document_payment')}</Button>
       </div>

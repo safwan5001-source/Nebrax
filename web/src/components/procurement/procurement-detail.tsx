@@ -226,9 +226,9 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push(route)} aria-label={t('back')}>
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href={route}>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="num text-xl font-semibold text-text">{doc.number}</h1>
         <Badge tone={statusTone(doc.status)}>{t(`status_${doc.status}`)}</Badge>
         {doc.print_issued_at && <Badge tone="neutral">{t('issued')}</Badge>}

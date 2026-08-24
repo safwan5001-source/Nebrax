@@ -479,6 +479,7 @@ export function Sidebar({
         <nav className={cn('flex-1 overflow-y-auto py-3', mini ? 'lg:px-2' : 'px-2')}>
           <Link
             href="/dashboard"
+            aria-current={isActive('/dashboard') ? 'page' : undefined}
             onClick={onClose}
             title={mini ? t('dashboard') : undefined}
             className={cn(
@@ -569,6 +570,7 @@ export function Sidebar({
                         <Link
                           key={item.key}
                           href={item.href}
+                          aria-current={active ? 'page' : undefined}
                           onClick={onClose}
                           className={cn(
                             // الفرع أصغر وأخفت من أبيه — والنشِط يتميّز باللون
@@ -624,6 +626,7 @@ export function Sidebar({
                 key={item.key}
                 href={item.href}
                 role="menuitem"
+                aria-current={active ? 'page' : undefined}
                 onClick={() => setFlyout(null)}
                 className={cn(
                   'flex items-center gap-2 rounded px-2.5 py-1.5 text-sm',

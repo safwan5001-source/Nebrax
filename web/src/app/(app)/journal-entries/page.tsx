@@ -199,7 +199,7 @@ export default function JournalEntriesPage() {
     { id: 'actions', header: t('actions'), cell: ({ row }) => {
       const entry = row.original;
       const source = sourcePath(entry.source_type, entry.source_id);
-      return <div className="flex justify-end gap-1"><Link href={`/journal-entries/${entry.id}`}><Button size="icon" variant="ghost" aria-label={t('view')}><Eye className="h-4 w-4" strokeWidth={1.7} /></Button></Link>{source && <Link href={source}><Button size="icon" variant="ghost" aria-label={t('viewSource')}><LinkIcon className="h-4 w-4" strokeWidth={1.7} /></Button></Link>}</div>;
+      return <div className="flex justify-end gap-1"><Button asChild size="icon" variant="ghost" aria-label={t('view')}><Link href={`/journal-entries/${entry.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link></Button>{source && <Button asChild size="icon" variant="ghost" aria-label={t('viewSource')}><Link href={source}><LinkIcon className="h-4 w-4" strokeWidth={1.7} /></Link></Button>}</div>;
     } },
   ], [t]);
 
@@ -207,7 +207,7 @@ export default function JournalEntriesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 text-sm text-muted">{t('subtitle')}</p></div>
-        <div className="flex flex-wrap items-center gap-2"><BranchViewToggle value={view} onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }} /><Link href="/manual-journals"><Button variant="outline">{t('drafts')}</Button></Link><Link href="/manual-journals/new"><Button><FilePlus className="h-4 w-4" strokeWidth={1.8} />{t('newManual')}</Button></Link></div>
+        <div className="flex flex-wrap items-center gap-2"><BranchViewToggle value={view} onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }} /><Button asChild variant="outline"><Link href="/manual-journals">{t('drafts')}</Link></Button><Link href="/manual-journals/new"><Button><FilePlus className="h-4 w-4" strokeWidth={1.8} />{t('newManual')}</Button></Link></div>
       </div>
 
       <DataExplorerToolbar

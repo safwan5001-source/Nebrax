@@ -69,16 +69,12 @@ export default function WarehousesPage() {
         header: '',
         cell: ({ row }) => (
           <div className="flex items-center justify-end gap-1">
-            <Link href={`/warehouses/${row.original.id}/stock`}>
-              <Button variant="ghost" size="icon" aria-label={t('stock')}>
+            <Button asChild variant="ghost" size="icon" aria-label={t('stock')}><Link href={`/warehouses/${row.original.id}/stock`}>
                 <Boxes className="h-4 w-4" strokeWidth={1.7} />
-              </Button>
-            </Link>
-            <Link href={`/warehouses/${row.original.id}`}>
-              <Button variant="ghost" size="icon" aria-label={t('edit_title')}>
+              </Link></Button>
+            <Button asChild variant="ghost" size="icon" aria-label={t('edit_title')}><Link href={`/warehouses/${row.original.id}`}>
                 <Pencil className="h-4 w-4" strokeWidth={1.7} />
-              </Button>
-            </Link>
+              </Link></Button>
           </div>
         ),
       },

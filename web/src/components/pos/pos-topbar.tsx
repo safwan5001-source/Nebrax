@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
@@ -93,15 +94,14 @@ export function PosTopbar({
 
   return (
     <header className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
-      <button
-        type="button"
-        onClick={() => router.push('/dashboard')}
+      <Link
+        href="/dashboard"
         className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         aria-label={t('return_to_system')}
       >
         <RotateCcw className="h-4 w-4" strokeWidth={1.7} />
         <span className="hidden xl:inline">{t('return_to_system')}</span>
-      </button>
+      </Link>
 
       <div className="min-w-0 border-s border-border ps-2 sm:ps-3">
         <div className="truncate text-sm font-semibold text-text">{t('pos_title')}</div>

@@ -25,11 +25,29 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  /** يعرض الابن الوحيد (مثل next/link) بالهيئة نفسها، من دون زر متداخل داخل رابط. */
+  asChild?: boolean;
+}
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
-    <button ref={ref} className={cn(buttonVariants({ variant, size }), className)} {...props} />
-  )
+export const Button = React.forwardRef<HTMLElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
+    const classes = cn(buttonVariants({ variant, size }), className);
+
+    if (asChild) {
+      const child = React.Children.only(children) as React.ReactElement<{ className?: string }>;
+      return React.cloneElement(child, {
+        ...props,
+        ref,
+        className: cn(classes, child.props.className),
+      } as React.Attributes & { className: string });
+    }
+
+    return (
+      <button ref={ref as React.Ref<HTMLButtonElement>} className={classes} {...props}>
+        {children}
+      </button>
+    );
+  }
 );
 Button.displayName = 'Button';

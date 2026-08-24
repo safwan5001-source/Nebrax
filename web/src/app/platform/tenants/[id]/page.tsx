@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -154,10 +155,10 @@ export default function PlatformTenantDetailPage() {
               {tenant && <p className="mt-1 text-sm text-muted">{tenant.slug}</p>}
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.push('/platform/tenants')}>
+          <Button asChild variant="outline" size="sm"><Link href='/platform/tenants'>
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
             {t('back')}
-          </Button>
+          </Link></Button>
         </div>
       </header>
 

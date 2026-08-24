@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -219,9 +220,9 @@ export default function QuoteDetailPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/quotes')} aria-label={t('back')}>
+        <Button asChild variant="ghost" size="icon" className="no-print" aria-label={t('back')}><Link href='/quotes'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="num text-xl font-semibold text-text">{quote.number}</h1>
         <Badge tone={statusTone[quote.status] ?? 'muted'}>{t(quote.status)}</Badge>
         {quote.print_issued_at && <Badge tone="neutral">{t('issued')}</Badge>}
@@ -238,10 +239,10 @@ export default function QuoteDetailPage() {
             </Button>
           )}
           {quote.converted_invoice_id ? (
-            <Button variant="outline" size="sm" onClick={() => router.push(`/invoices/${quote.converted_invoice_id}`)}>
+            <Button asChild variant="outline" size="sm"><Link href={`/invoices/${quote.converted_invoice_id}`}>
               <FileCheck className="h-4 w-4" strokeWidth={1.7} />
               {t('view_invoice')}
-            </Button>
+            </Link></Button>
           ) : (
             <Button size="sm" disabled={converting} onClick={convert}>
               <FileCheck className="h-4 w-4" strokeWidth={1.7} />
