@@ -185,12 +185,10 @@ export default function FuelStationsWorkspacePage() {
                           {devices.length ? ` · ${degraded ? t('degradedDeviceCount', { count: degraded }) : t('devicesHealthy', { count: devices.length })}` : ''}
                         </p>
                       </div>
-                      <Link href="/fuel-stations/master-data" className="w-full md:w-auto">
-                        <Button className="w-full md:w-auto" size="sm" variant="outline">
+                      <Button asChild className="w-full md:w-auto" size="sm" variant="outline"><Link href="/fuel-stations/master-data" className="w-full md:w-auto">
                           {t('viewStation')}
                           <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" strokeWidth={1.7} />
-                        </Button>
-                      </Link>
+                        </Link></Button>
                     </article>
                   );
                 })}
@@ -208,12 +206,10 @@ export default function FuelStationsWorkspacePage() {
             {quickActions.length ? (
               <div className="flex flex-col gap-2">
                 {quickActions.map((action, index) => (
-                  <Link key={action.href} href={action.href}>
-                    <Button className="w-full justify-between" variant={index === 0 ? 'primary' : 'outline'}>
+                  <Button asChild key={action.href} className="w-full justify-between" variant={index === 0 ? 'primary' : 'outline'}><Link href={action.href}>
                       {action.label}
                       <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" strokeWidth={1.7} />
-                    </Button>
-                  </Link>
+                    </Link></Button>
                 ))}
               </div>
             ) : <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted">{t('noQuickActions')}</p>}
@@ -239,7 +235,7 @@ function LoadError({ message, onRetry, retryLabel }: { message: string; onRetry:
 }
 
 function EmptyStations({ t }: { t: ReturnType<typeof useTranslations> }) {
-  return <div className="rounded-md border border-dashed border-border px-4 py-10 text-center"><p className="text-sm text-muted">{t('noStations')}</p><Link className="mt-3 inline-flex" href="/fuel-stations/master-data"><Button size="sm" variant="outline">{t('quickStations')}<ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" /></Button></Link></div>;
+  return <div className="rounded-md border border-dashed border-border px-4 py-10 text-center"><p className="text-sm text-muted">{t('noStations')}</p><Button asChild size="sm" variant="outline"><Link className="mt-3 inline-flex" href="/fuel-stations/master-data">{t('quickStations')}<ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" /></Link></Button></div>;
 }
 
 function stationStatusLabel(t: ReturnType<typeof useTranslations>, status: string) {

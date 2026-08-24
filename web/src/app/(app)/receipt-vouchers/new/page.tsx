@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -117,7 +118,7 @@ export default function ReceiptVoucherFormPage() {
     <div className="mx-auto max-w-4xl space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/receipt-vouchers')} aria-label={t('back')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/receipt-vouchers'><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
           <div><h1 className="text-xl font-semibold text-text">{t(editId ? 'edit_title' : 'new_title')}</h1><p className="mt-1 text-sm text-muted">{t('subtitle')}</p></div>
         </div>
         <span className="rounded-md bg-muted px-3 py-1.5 text-sm text-muted">{t('draft')}</span>
@@ -138,7 +139,7 @@ export default function ReceiptVoucherFormPage() {
           </CardContent>
         </Card>
         {error && <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error}</p>}
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => router.push('/receipt-vouchers')}>{t('back')}</Button><Button type="submit" disabled={saving || !partnerId}>{saving ? t('save_draft') : t('save_draft')}</Button></div>
+        <div className="flex justify-end gap-2"><Button asChild type="button" variant="outline"><Link href='/receipt-vouchers'>{t('back')}</Link></Button><Button type="submit" disabled={saving || !partnerId}>{saving ? t('save_draft') : t('save_draft')}</Button></div>
       </form>
     </div>
   );

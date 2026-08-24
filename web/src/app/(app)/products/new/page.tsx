@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -183,12 +184,12 @@ export default function NewProductPage() {
     <div className="space-y-5">
       {/* شريط الإجراءات */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/products')} aria-label={t('back')}>
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/products'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
         <div className="ms-auto flex items-center gap-2">
-          <Button variant="ghost" onClick={() => router.push('/products')}>{t('cancel')}</Button>
+          <Button asChild variant="ghost"><Link href='/products'>{t('cancel')}</Link></Button>
           <Button disabled={saving || !name.trim()} onClick={submit}>{t('save')}</Button>
         </div>
       </div>

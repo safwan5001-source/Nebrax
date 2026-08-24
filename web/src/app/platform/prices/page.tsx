@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -93,7 +94,7 @@ export default function PlatformPricesPage() {
             <Tag className="mt-0.5 h-6 w-6 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
             <div><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 text-sm text-muted">{t('subtitle')}</p></div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.push('/platform')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('back')}</Button>
+          <Button asChild variant="outline" size="sm"><Link href='/platform'><ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('back')}</Link></Button>
         </div>
       </header>
 

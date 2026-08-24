@@ -41,11 +41,9 @@ export default function WarehouseStockPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Link href="/warehouses">
-          <Button variant="ghost" size="icon" aria-label={t('title')}>
+        <Button asChild variant="ghost" size="icon" aria-label={t('title')}><Link href="/warehouses">
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
-        </Link>
+          </Link></Button>
         <div>
           <h1 className="text-xl font-semibold text-text">{t('stock')}</h1>
           <p className="text-sm text-muted">{warehouse?.name ?? '—'}</p>

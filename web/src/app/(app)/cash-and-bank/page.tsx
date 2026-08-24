@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Building2, Eye, Landmark, MoreHorizontal, Pencil, Plus, Trash2, Wallet } from 'lucide-react';
@@ -18,7 +17,6 @@ import { formatRiyal } from '@/lib/money';
 export default function CashAndBankPage() {
   const t = useTranslations('cashBank');
   const tc = useTranslations('common');
-  const router = useRouter();
   const { success, error: toastError } = useToast();
   const [items, setItems] = useState<CashBankAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,17 +76,17 @@ export default function CashAndBankPage() {
     { id: 'actions', header: '', cell: ({ row }) => {
       const item = row.original; const busy = acting === item.id;
       return <div className="flex justify-end gap-1">
-        <Link href={`/cash-and-bank/${item.id}`}><Button size="icon" variant="ghost" aria-label={t('view')}><Eye className="h-4 w-4" strokeWidth={1.7} /></Button></Link>
-        <Link href={`/cash-and-bank/new?edit=${item.id}`}><Button size="icon" variant="ghost" aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button></Link>
+        <Button asChild size="icon" variant="ghost" aria-label={t('view')}><Link href={`/cash-and-bank/${item.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
+        <Button asChild size="icon" variant="ghost" aria-label={t('edit')}><Link href={`/cash-and-bank/new?edit=${item.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
         <Dropdown align="end" menuLabel={t('actions')} triggerClassName="h-9 w-9 justify-center rounded border border-border bg-surface text-text hover:bg-primary-soft" trigger={<MoreHorizontal className="h-4 w-4" strokeWidth={1.7} />}>
-          <DropdownItem icon={Building2} onClick={() => router.push(`/cash-and-bank/transfer?source=${item.id}`)}>{t('transfer')}</DropdownItem>
+          <DropdownItem icon={Building2} href={`/cash-and-bank/transfer?source=${item.id}`}>{t('transfer')}</DropdownItem>
           {!item.is_main && item.is_active && <DropdownItem icon={Building2} onClick={() => makeMain(item)}>{t('make_main')}</DropdownItem>}
           {item.is_active && <DropdownItem icon={Building2} onClick={() => deactivate(item)} disabled={busy}>{t('deactivate')}</DropdownItem>}
           <DropdownItem icon={Trash2} onClick={() => remove(item)} disabled={busy} tone="danger">{t('delete')}</DropdownItem>
         </Dropdown>
       </div>;
     } },
-  ], [acting, deactivate, makeMain, remove, router, t]);
+  ], [acting, deactivate, makeMain, remove, t]);
 
   return <div className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3">

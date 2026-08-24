@@ -129,7 +129,7 @@ export default function ManualJournalDetailsPage() {
     <div className="mx-auto max-w-7xl space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/manual-journals')} aria-label={t('back')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/manual-journals'><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
           <div>
             <div className="flex flex-wrap items-center gap-2"><h1 className="num text-xl font-semibold text-text">{journal.number}</h1><Badge tone={statusTone[journal.status] ?? 'muted'}>{t(journal.status)}</Badge></div>
             <p className="mt-1 text-sm text-muted">{journal.entry_date} · {journal.description || t('noDescription')}</p>
@@ -137,7 +137,7 @@ export default function ManualJournalDetailsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" disabled={acting} onClick={duplicate}><Copy className="h-4 w-4" strokeWidth={1.7} />{t('duplicate')}</Button>
-          {isDraft && <><Link href={`/manual-journals/new?edit=${journal.id}`}><Button variant="outline"><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Button></Link><Button variant="outline" disabled={acting} onClick={remove}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />{t('delete')}</Button><Button disabled={acting} onClick={post}>{acting ? t('saving') : t('post')}</Button></>}
+          {isDraft && <><Button asChild variant="outline"><Link href={`/manual-journals/new?edit=${journal.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Link></Button><Button variant="outline" disabled={acting} onClick={remove}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />{t('delete')}</Button><Button disabled={acting} onClick={post}>{acting ? t('saving') : t('post')}</Button></>}
           {isPosted && <Button variant="outline" disabled={acting} onClick={() => { setReason(''); setReverseDate(journal.entry_date); setReverseOpen(true); }}><RotateCcw className="h-4 w-4" strokeWidth={1.7} />{t('reverse')}</Button>}
         </div>
       </div>

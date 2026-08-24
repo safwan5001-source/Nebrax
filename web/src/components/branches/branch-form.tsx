@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -113,9 +114,9 @@ export function BranchForm({ branchId }: { branchId?: string }) {
   return (
     <form onSubmit={submit} className="space-y-5">
       <div className="flex items-center gap-3">
-        <Button type="button" variant="ghost" size="icon" onClick={() => router.push('/branches')} aria-label={tc('back')}>
+        <Button asChild type="button" variant="ghost" size="icon" aria-label={tc('back')}><Link href='/branches'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="text-xl font-semibold text-text">{branchId ? t('edit_title') : t('new_title')}</h1>
       </div>
 

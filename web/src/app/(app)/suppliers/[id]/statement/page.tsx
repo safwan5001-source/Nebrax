@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 /**
  * أسلوب «دفتر التحليل»: كشف المورد يعرض نطاقه ورصيده وحركاته في واجهة عمل
  * متجاوبة؛ تُفتح معاينة المستند الورقي فقط عند طلب المستخدم.
@@ -182,7 +183,7 @@ export default function SupplierStatementPage() {
   if (loadError || !statement || !supplier) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/suppliers')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} />{t('back_to_supplier')}</Button>
+        <Button asChild variant="ghost" size="sm"><Link href='/suppliers'><ArrowRight className="h-4 w-4" strokeWidth={1.7} />{t('back_to_supplier')}</Link></Button>
         <div className="border border-border bg-surface p-10 text-center"><p className="text-sm text-negative">{t('load_error')}</p><Button variant="outline" className="mt-3" onClick={() => void load()}><RefreshCw className="h-4 w-4" strokeWidth={1.7} />{t('retry')}</Button></div>
       </div>
     );
@@ -191,7 +192,7 @@ export default function SupplierStatementPage() {
   return (
     <div className="space-y-5">
       <div className="no-print flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="no-print" onClick={() => router.push('/suppliers')} aria-label={t('back_to_supplier')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button>
+        <Button asChild variant="ghost" size="icon" className="no-print" aria-label={t('back_to_supplier')}><Link href='/suppliers'><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
       </div>
 
       <ReportScreenHeader title={t('title')} description={supplier.name} scope={scope} actions={actions} actionsLabel={t('report_actions')} />

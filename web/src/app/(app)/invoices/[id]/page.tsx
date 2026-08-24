@@ -560,9 +560,9 @@ export default function InvoiceDetailPage() {
       <header className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2">
-            <Button variant="ghost" size="icon" className="no-print shrink-0" onClick={() => router.push('/invoices')} aria-label={t('back')}>
+            <Button asChild variant="ghost" size="icon" className="no-print shrink-0" aria-label={t('back')}><Link href='/invoices'>
               <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-            </Button>
+            </Link></Button>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="num text-xl font-semibold text-text">{invoice.number}</h1>

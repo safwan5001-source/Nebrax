@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -115,18 +116,18 @@ export default function PlatformDashboardPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="max-w-48 truncate text-xs text-muted">{t('signedInAs', { name: administrator.name })}</span>
-            <Button variant="outline" size="sm" onClick={() => router.push('/platform/tenants')}>
+            <Button asChild variant="outline" size="sm"><Link href='/platform/tenants'>
               <Users2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('manageTenants')}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => router.push('/platform/prices')}>
+            </Link></Button>
+            <Button asChild variant="outline" size="sm"><Link href='/platform/prices'>
               <Tag className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('managePrices')}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => router.push('/platform/integrations')}>
+            </Link></Button>
+            <Button asChild variant="outline" size="sm"><Link href='/platform/integrations'>
               <ServerCog className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('manageIntegrations')}
-            </Button>
+            </Link></Button>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
               {t('refresh')}

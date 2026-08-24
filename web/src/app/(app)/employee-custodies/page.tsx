@@ -112,19 +112,21 @@ export default function EmployeeCustodiesPage() {
         const busy = acting === custody.id;
         return (
           <div className="flex justify-end gap-1">
-            <Link href={`/employee-custodies/${custody.id}`}>
-              <Button size="icon" variant="ghost" aria-label={t('view')}><Eye className="h-4 w-4" strokeWidth={1.7} /></Button>
-            </Link>
+            <Button asChild size="icon" variant="ghost" aria-label={t('view')}><Link href={`/employee-custodies/${custody.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
             {draft ? (
-              <Link href={`/employee-custodies/new?edit=${custody.id}`}>
-                <Button size="icon" variant="ghost" aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button>
-              </Link>
+              <Button asChild size="icon" variant="ghost" aria-label={t('edit')}><Link href={`/employee-custodies/new?edit=${custody.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
             ) : (
               <Button size="icon" variant="ghost" disabled title={t('draftActionOnly')} aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button>
             )}
             <Button size="icon" variant="ghost" disabled={busy} onClick={() => duplicate(custody.id)} aria-label={t('duplicate')}><Copy className="h-4 w-4" strokeWidth={1.7} /></Button>
             <span title={draft ? t('settlementDraftOnly') : custody.is_settled ? t('settlementNoRemaining') : undefined}>
-              <Button size="sm" variant="outline" disabled={draft || custody.is_settled || busy} onClick={() => router.push(`/employee-custodies/${custody.id}?settlement=1`)} aria-label={t('addSettlement')}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('addSettlement')}</Button>
+              {draft || custody.is_settled || busy ? (
+                <Button size="sm" variant="outline" disabled aria-label={t('addSettlement')}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('addSettlement')}</Button>
+              ) : (
+                <Button asChild size="sm" variant="outline" aria-label={t('addSettlement')}>
+                  <Link href={`/employee-custodies/${custody.id}?settlement=1`}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('addSettlement')}</Link>
+                </Button>
+              )}
             </span>
             <Button size="icon" variant="ghost" disabled={!draft || busy} title={!draft ? t('draftActionOnly') : undefined} onClick={() => remove(custody.id)} aria-label={t('delete')}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} /></Button>
             {draft && <Button size="sm" variant="outline" disabled={busy} onClick={() => post(custody.id)}>{t('post')}</Button>}
@@ -143,7 +145,7 @@ export default function EmployeeCustodiesPage() {
         </div>
         <div className="flex items-center gap-2">
           <BranchViewToggle value={view} onChange={setView} />
-          <Link href="/employee-custodies/new"><Button><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create')}</Button></Link>
+          <Button asChild><Link href="/employee-custodies/new"><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create')}</Link></Button>
         </div>
       </div>
       <DataTable columns={columns} data={data} loading={loading} searchPlaceholder={t('search')} emptyLabel={t('empty')} exportName="employee-custodies" />

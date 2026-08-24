@@ -208,7 +208,7 @@ export default function ProductProfilePage() {
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-center gap-3">
-        <Link href="/products"><Button variant="ghost" size="icon" aria-label={t('back')}><ArrowRight className="h-4 w-4" /></Button></Link>
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href="/products"><ArrowRight className="h-4 w-4" /></Link></Button>
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted">{t('profile_title')}</p>
           <h1 className="truncate text-xl font-semibold text-text">{product.name}</h1>

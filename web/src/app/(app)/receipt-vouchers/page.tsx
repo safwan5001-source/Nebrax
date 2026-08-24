@@ -215,8 +215,8 @@ export default function ReceiptVouchersPage() {
     { id: 'actions', header: t('actions'), cell: ({ row }) => {
       const voucher = row.original; const draft = voucher.status === 'draft'; const busy = acting === voucher.id;
       return <div className="flex justify-end gap-1">
-        <Link href={`/receipt-vouchers/${voucher.id}`}><Button size="icon" variant="ghost" aria-label={t('view')}><Eye className="h-4 w-4" strokeWidth={1.7} /></Button></Link>
-        {draft ? <Link href={`/receipt-vouchers/new?edit=${voucher.id}`}><Button size="icon" variant="ghost" aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button></Link> : <Button size="icon" variant="ghost" disabled title={t('draft_action_only')} aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button>}
+        <Button asChild size="icon" variant="ghost" aria-label={t('view')}><Link href={`/receipt-vouchers/${voucher.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
+        {draft ? <Button asChild size="icon" variant="ghost" aria-label={t('edit')}><Link href={`/receipt-vouchers/new?edit=${voucher.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link></Button> : <Button size="icon" variant="ghost" disabled title={t('draft_action_only')} aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button>}
         <Button size="icon" variant="ghost" disabled={busy} onClick={() => duplicate(voucher.id)} aria-label={t('duplicate')}><Copy className="h-4 w-4" strokeWidth={1.7} /></Button>
         <Button size="icon" variant="ghost" disabled={!draft || busy} title={!draft ? t('draft_action_only') : undefined} onClick={() => remove(voucher.id)} aria-label={t('delete')}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} /></Button>
         {draft && <Button size="sm" variant="outline" disabled={busy} onClick={() => post(voucher.id)}>{t('post')}</Button>}

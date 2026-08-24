@@ -75,7 +75,7 @@ export default function CashBankFormPage() {
 
   return <form onSubmit={submit} className="mx-auto max-w-3xl space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-3"><Link href="/cash-and-bank"><Button type="button" variant="ghost" size="icon" aria-label={t('back')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button></Link><div><h1 className="text-xl font-semibold text-text">{editId ? t('edit_title', { name: form.name }) : t(type === 'bank' ? 'new_bank' : 'new_cash')}</h1><p className="mt-1 text-sm text-muted">{t('subtitle')}</p></div></div>
+      <div className="flex items-center gap-3"><Button asChild type="button" variant="ghost" size="icon" aria-label={t('back')}><Link href="/cash-and-bank"><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button><div><h1 className="text-xl font-semibold text-text">{editId ? t('edit_title', { name: form.name }) : t(type === 'bank' ? 'new_bank' : 'new_cash')}</h1><p className="mt-1 text-sm text-muted">{t('subtitle')}</p></div></div>
       <Button disabled={saving}><Save className="h-4 w-4" strokeWidth={1.7} />{t('save')}</Button>
     </div>
 

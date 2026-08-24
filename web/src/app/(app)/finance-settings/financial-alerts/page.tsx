@@ -76,7 +76,7 @@ export default function FinancialAlertSettingsPage() {
     <form onSubmit={save} className="mx-auto max-w-3xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/finance-settings"><Button type="button" variant="ghost" size="icon" aria-label={t('backToFinanceSettings')}><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Button></Link>
+          <Button asChild type="button" variant="ghost" size="icon" aria-label={t('backToFinanceSettings')}><Link href="/finance-settings"><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
           <div><h1 className="text-xl font-semibold text-text">{t('settingsTitle')}</h1><p className="mt-1 text-sm text-muted">{t('settingsSubtitle')}</p></div>
         </div>
         <Button disabled={saving}><Save className="h-4 w-4" strokeWidth={1.7} />{saving ? t('savingSettings') : t('saveSettings')}</Button>
@@ -104,7 +104,7 @@ export default function FinancialAlertSettingsPage() {
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-3 py-5">
           <div><p className="font-medium text-text">{t('reviewTitle')}</p><p className="mt-1 text-sm text-muted">{t('reviewHint')}</p></div>
-          <Link href="/financial-alerts"><Button type="button" variant="outline">{t('openAlerts')}</Button></Link>
+          <Button asChild type="button" variant="outline"><Link href="/financial-alerts">{t('openAlerts')}</Link></Button>
         </CardContent>
       </Card>
     </form>

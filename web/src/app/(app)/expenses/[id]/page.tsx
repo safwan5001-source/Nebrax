@@ -150,7 +150,7 @@ export default function ExpenseDetailPage() {
     return (
       <div className="mx-auto max-w-5xl space-y-4">
         <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error ?? t('expense_not_found')}</p>
-        <Link href="/expenses"><Button variant="outline">{t('back')}</Button></Link>
+        <Button asChild variant="outline"><Link href="/expenses">{t('back')}</Link></Button>
       </div>
     );
   }
@@ -174,9 +174,7 @@ export default function ExpenseDetailPage() {
         {t('prints')}
       </Button>
       {expense.status === 'draft' ? (
-        <Link className={mobile ? 'shrink-0' : undefined} href={`/expenses/new?edit=${expense.id}`}>
-          <Button variant="outline"><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Button>
-        </Link>
+        <Button asChild variant="outline"><Link className={mobile ? 'shrink-0' : undefined} href={`/expenses/new?edit=${expense.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Link></Button>
       ) : null}
       <Button className={mobile ? 'shrink-0' : undefined} variant="outline" disabled={acting || posting} onClick={duplicateExpense}>
         <Copy className="h-4 w-4" strokeWidth={1.7} />
@@ -253,9 +251,9 @@ export default function ExpenseDetailPage() {
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/expenses')} aria-label={t('back')}>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/expenses'>
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
+          </Link></Button>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-semibold text-text">{t('expense_document', { number: expense.number })}</h1>

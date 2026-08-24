@@ -132,7 +132,7 @@ export default function ReceiptVoucherDetailPage() {
     return (
       <div className="mx-auto max-w-5xl space-y-4">
         <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error ?? t('load_failed')}</p>
-        <Link href="/receipt-vouchers"><Button variant="outline">{t('back')}</Button></Link>
+        <Button asChild variant="outline"><Link href="/receipt-vouchers">{t('back')}</Link></Button>
       </div>
     );
   }
@@ -155,9 +155,7 @@ export default function ReceiptVoucherDetailPage() {
         {t('prints')}
       </Button>
       {voucher.status === 'draft' && (
-        <Link className={mobile ? 'shrink-0' : undefined} href={`/receipt-vouchers/new?edit=${voucher.id}`}>
-          <Button variant="outline"><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Button>
-        </Link>
+        <Button asChild variant="outline"><Link className={mobile ? 'shrink-0' : undefined} href={`/receipt-vouchers/new?edit=${voucher.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Link></Button>
       )}
       <Button className={mobile ? 'shrink-0' : undefined} variant="outline" disabled={acting} onClick={duplicate}>
         <Copy className="h-4 w-4" strokeWidth={1.7} />
@@ -234,9 +232,9 @@ export default function ReceiptVoucherDetailPage() {
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/receipt-vouchers')} aria-label={t('back')}>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/receipt-vouchers'>
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
+          </Link></Button>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-semibold text-text">{t('receipt_document', { number: voucher.number })}</h1>

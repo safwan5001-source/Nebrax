@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -121,9 +122,9 @@ export default function EmployeeCustodyFormPage() {
     <div className="mx-auto max-w-4xl space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/employee-custodies')} aria-label={t('back')}>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/employee-custodies'>
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
+          </Link></Button>
           <div>
             <h1 className="text-xl font-semibold text-text">{editId ? t('editTitle', { number: number ?? '' }) : t('newTitle')}</h1>
             <p className="mt-1 text-sm text-muted">{t('subtitle')}</p>
@@ -194,7 +195,7 @@ export default function EmployeeCustodyFormPage() {
 
         {error && <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error}</p>}
         <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.push('/employee-custodies')}>{t('back')}</Button>
+          <Button asChild type="button" variant="outline"><Link href='/employee-custodies'>{t('back')}</Link></Button>
           <Button type="submit" disabled={saving || !employeeId || !cashAccountId || activeEmployees.length === 0 || availableAccounts.length === 0}>{t('saveDraft')}</Button>
         </div>
       </form>

@@ -266,12 +266,18 @@ export default function PurchasesPage() {
         const isDraft = purchase.status === 'draft';
         return (
           <div className="flex items-center justify-end gap-0.5">
-            <Button variant="ghost" size="icon" aria-label={t('view')} onClick={() => router.push(`/purchases/${purchase.id}`)}>
+            <Button asChild variant="ghost" size="icon" aria-label={t('view')}><Link href={`/purchases/${purchase.id}`}>
               <Eye className="h-4 w-4" strokeWidth={1.7} />
-            </Button>
-            <Button variant="ghost" size="icon" aria-label={t('edit')} disabled={!isDraft} title={isDraft ? t('edit') : t('posted_locked')} onClick={() => router.push(`/purchases/${purchase.id}/edit`)}>
-              <Pencil className="h-4 w-4" strokeWidth={1.7} />
-            </Button>
+            </Link></Button>
+            {isDraft ? (
+              <Button asChild variant="ghost" size="icon" aria-label={t('edit')} title={t('edit')}>
+                <Link href={`/purchases/${purchase.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" aria-label={t('edit')} disabled title={t('posted_locked')}>
+                <Pencil className="h-4 w-4" strokeWidth={1.7} />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" aria-label={t('delete')} disabled={!isDraft} title={isDraft ? t('delete') : t('posted_locked')} onClick={() => setToDelete(purchase)}>
               <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
             </Button>
@@ -301,10 +307,10 @@ export default function PurchasesPage() {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
         <BranchViewToggle value={view} onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }} />
-        <Button className="ms-auto" onClick={() => router.push('/purchases/new')}>
+        <Button asChild className="ms-auto"><Link href='/purchases/new'>
           <Plus className="h-4 w-4" strokeWidth={1.8} />
           {t('create')}
-        </Button>
+        </Link></Button>
       </div>
 
       <div className="rounded border border-border bg-surface p-3 sm:p-4">

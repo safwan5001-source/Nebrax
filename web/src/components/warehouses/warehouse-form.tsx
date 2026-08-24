@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -107,9 +108,9 @@ export function WarehouseForm({ warehouseId }: { warehouseId?: string }) {
   return (
     <form onSubmit={submit} className="space-y-5">
       <div className="flex items-center gap-3">
-        <Button type="button" variant="ghost" size="icon" onClick={() => router.push('/warehouses')} aria-label={tc('back')}>
+        <Button asChild type="button" variant="ghost" size="icon" aria-label={tc('back')}><Link href='/warehouses'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        </Link></Button>
         <h1 className="text-xl font-semibold text-text">{warehouseId ? t('edit_title') : t('new_title')}</h1>
       </div>
 

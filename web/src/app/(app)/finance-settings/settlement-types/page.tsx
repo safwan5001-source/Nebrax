@@ -130,11 +130,9 @@ export default function SettlementTypesPage() {
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/finance-settings">
-            <Button variant="ghost" size="icon" aria-label={t('backToFinanceSettings')}>
+          <Button asChild variant="ghost" size="icon" aria-label={t('backToFinanceSettings')}><Link href="/finance-settings">
               <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-            </Button>
-          </Link>
+            </Link></Button>
           <div>
             <h1 className="text-xl font-semibold text-text">{t('settlementTypesTitle')}</h1>
             <p className="mt-1 text-sm text-muted">{t('settlementTypesSubtitle')}</p>

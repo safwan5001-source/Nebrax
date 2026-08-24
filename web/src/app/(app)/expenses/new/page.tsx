@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -179,9 +180,9 @@ export default function NewExpensePage() {
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/expenses')} aria-label={t('back')}>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/expenses'>
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
+          </Link></Button>
           <div>
             <h1 className="text-xl font-semibold text-text">{t(editId ? 'edit_title' : 'new_title')}</h1>
             <p className="mt-1 text-sm text-muted">{t('number_generated')}</p>
@@ -318,7 +319,7 @@ export default function NewExpensePage() {
             <div className="flex justify-between gap-4 border-t border-border pt-3"><span className="font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal((amountMinor + taxMinor) / 100)}</span></div>
             {error && <p className="rounded-md bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
             <Button className="w-full" disabled={saving || !accountId} onClick={submit}>{saving ? t('saving') : t('save_draft')}</Button>
-            <Button className="w-full" variant="outline" onClick={() => router.push('/expenses')}>{t('cancel')}</Button>
+            <Button asChild className="w-full" variant="outline"><Link href='/expenses'>{t('cancel')}</Link></Button>
           </CardContent>
         </Card>
       </div>

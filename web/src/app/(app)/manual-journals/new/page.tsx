@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -149,9 +150,9 @@ export default function ManualJournalEditorPage() {
     <div className="mx-auto max-w-7xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/manual-journals')} aria-label={t('back')}>
+          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/manual-journals'>
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
+          </Link></Button>
           <div>
             <h1 className="text-xl font-semibold text-text">{t(editId ? 'editTitle' : 'newTitle')}</h1>
             <p className="mt-1 text-sm text-muted">{t('draftHint')}</p>
@@ -209,7 +210,7 @@ export default function ManualJournalEditorPage() {
 
       {error && <p className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="outline" onClick={() => router.push('/manual-journals')}>{t('cancel')}</Button>
+        <Button asChild variant="outline"><Link href='/manual-journals'>{t('cancel')}</Link></Button>
         <Button disabled={saving} onClick={submit}>{saving ? t('saving') : t('saveDraft')}</Button>
       </div>
     </div>

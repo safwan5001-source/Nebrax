@@ -1,4 +1,6 @@
 'use client';
+
+import Link from 'next/link';
 import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -175,10 +177,10 @@ export default function PlatformIntegrationsPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => router.push('/platform')}>
+            <Button asChild variant="outline" size="sm"><Link href='/platform'>
               <ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('back')}
-            </Button>
+            </Link></Button>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
               {t('refresh')}

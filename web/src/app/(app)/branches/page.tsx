@@ -55,11 +55,9 @@ export default function BranchesPage() {
         id: 'actions',
         header: '',
         cell: ({ row }) => (
-          <Link href={`/branches/${row.original.id}`}>
-            <Button variant="ghost" size="icon" aria-label={t('edit_title')}>
+          <Button asChild variant="ghost" size="icon" aria-label={t('edit_title')}><Link href={`/branches/${row.original.id}`}>
               <Pencil className="h-4 w-4" strokeWidth={1.7} />
-            </Button>
-          </Link>
+            </Link></Button>
         ),
       },
     ],
@@ -71,12 +69,10 @@ export default function BranchesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
         <div className="flex items-center gap-2">
-          <Link href="/branches/settings">
-            <Button variant="outline">
+          <Button asChild variant="outline"><Link href="/branches/settings">
               <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
               {t('settings_title')}
-            </Button>
-          </Link>
+            </Link></Button>
           <Link href="/branches/new">
             <Button>
               <Plus className="h-4 w-4" strokeWidth={1.8} />
