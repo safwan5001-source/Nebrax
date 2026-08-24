@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Product;
 use App\Models\ProductMedia;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -12,6 +13,13 @@ class ProductBarcodeAndMediaTest extends TestCase
 {
     use RefreshDatabase;
     use InteractsWithApi;
+
+    private function fakeDocumentStorage(): void
+    {
+        config()->set('document_center.storage.driver', 'local');
+        config()->set('document_center.storage.disk', 'local');
+        Storage::fake('local');
+    }
 
     private function product(string $token, array $overrides = []): array
     {
@@ -57,7 +65,7 @@ class ProductBarcodeAndMediaTest extends TestCase
     /** @test */
     public function product_images_are_private_and_individually_deletable(): void
     {
-        Storage::fake('local');
+        $this->fakeDocumentStorage();
         $auth = $this->registerTenant();
         $product = $this->product($auth['token']);
 
@@ -71,7 +79,11 @@ class ProductBarcodeAndMediaTest extends TestCase
 
         $response->assertJsonCount(2, 'data');
         $media = $response['data'][0];
-        $path = ProductMedia::findOrFail($media['id'])->path;
+        $storedMedia = ProductMedia::findOrFail($media['id']);
+        $storedProduct = Product::findOrFail($product['id']);
+        $this->assertSame('document', $storedMedia->disk);
+        $this->assertStringStartsWith("product-media/{$storedProduct->tenant_id}/{$product['id']}/", $storedMedia->path);
+        $path = $storedMedia->path;
         Storage::disk('local')->assertExists($path);
 
         $this->withToken($auth['token'])

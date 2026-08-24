@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CreditNoteLine;
+use App\Services\DocumentCenter\DocumentStorageService;
 use App\Models\InvoiceLine;
 use App\Models\ProcurementLine;
 use App\Models\Product;
@@ -28,6 +29,10 @@ use RuntimeException;
  */
 class ProductLifecycleService
 {
+    public function __construct(private readonly DocumentStorageService $documentStorage)
+    {
+    }
+
     /**
      * سجلات تمنع حذف المنتج؛ الحذف الناعم لبند مستخدم يجعل إعادة استعمال SKU أو
      * الباركود تضلل المستخدم وتترك مرجعاً تاريخياً باسم كتالوجي جديد.
@@ -112,6 +117,16 @@ class ProductLifecycleService
         });
 
         foreach ($media as $item) {
+            if ($item->disk === 'document') {
+                try {
+                    $this->documentStorage->delete($this->documentStorage->profile(), $item->path);
+                } catch (RuntimeException $exception) {
+                    report($exception);
+                }
+
+                continue;
+            }
+
             Storage::disk($item->disk)->delete($item->path);
         }
     }

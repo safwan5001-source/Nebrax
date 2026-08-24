@@ -21,9 +21,12 @@ Docker تُجمّع التطبيق الكامل وقت البناء عبر `depl
    - `APP_KEY` = الناتج من الخطوة 1.
    - `FRONTEND_URL` = نطاق الواجهة على Vercel (مثل `https://nibras.vercel.app`).
      (يمكن إضافة أكثر من نطاق مفصولاً بفواصل.)
-4. **Apply** — يبني Render الصورة، يُرحّل القاعدة تلقائياً عند الإقلاع، ويعطيك
+4. اضبط أيضاً بيانات تخزين الكائنات الخاص المتوافقة مع S3/R2 والمعلّمة `sync:false`:
+   - `DOCUMENT_STORAGE_KEY` و`DOCUMENT_STORAGE_SECRET` و`DOCUMENT_STORAGE_BUCKET` و`DOCUMENT_STORAGE_ENDPOINT`.
+   - يبقى `DOCUMENT_STORAGE_DRIVER=s3` كما هو في الـ Blueprint. لا تحفظ صور المنتجات على قرص Render المحلي لأنه مؤقت وقد يُمسح عند إعادة البناء أو الاستبدال.
+5. **Apply** — يبني Render الصورة، يُرحّل القاعدة تلقائياً عند الإقلاع، ويعطيك
    عنواناً مثل `https://nibras-api.onrender.com`.
-5. تحقّق من الصحّة:
+6. تحقّق من الصحّة:
    ```bash
    curl https://nibras-api.onrender.com/api/health   # {"status":"ok"}
    ```
@@ -80,6 +83,9 @@ SELECT migration FROM migrations ORDER BY id DESC LIMIT 5;
 | `FRONTEND_URL` | يدوي | نطاق الواجهة (CORS) |
 | `DB_*` | من قاعدة Render | مربوطة تلقائياً في `render.yaml` |
 | `APP_ENV`/`APP_DEBUG` | افتراضي | production / false |
+| `DOCUMENT_STORAGE_DRIVER` | `render.yaml` | `s3` في الإنتاج لتخزين صور المنتجات والمرفقات |
+| `DOCUMENT_STORAGE_KEY` / `DOCUMENT_STORAGE_SECRET` | يدوي | مفاتيح تخزين الكائنات، تبقى خاصة |
+| `DOCUMENT_STORAGE_BUCKET` / `DOCUMENT_STORAGE_ENDPOINT` | يدوي | الحاوية ونقطة النهاية الخاصة بـ S3/R2 |
 
 ## منصّات بديلة
 
