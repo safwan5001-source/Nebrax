@@ -32,7 +32,84 @@ class PurchaseController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        return PurchaseResource::collection($this->scopeToActiveBranch(Purchase::with('lines')->latest(), $request)->get())->response();
+        $filters = $request->validate([
+            'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'status' => ['sometimes', 'nullable', 'in:draft,posted,cancelled'],
+            'payment_status' => ['sometimes', 'nullable', 'in:unpaid,partial,paid'],
+            'partner_id' => ['sometimes', 'nullable', 'uuid'],
+            'classification_id' => ['sometimes', 'nullable', 'uuid'],
+            'date_from' => ['sometimes', 'nullable', 'date'],
+            'date_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:date_from'],
+            'due_from' => ['sometimes', 'nullable', 'date'],
+            'due_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:due_from'],
+            'total_gte' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'total_lte' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'remaining_gte' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'remaining_lte' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'sort' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'per_page' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:100'],
+        ]);
+
+        $query = $this->scopeToActiveBranch(
+            Purchase::with(['lines', 'classification']),
+            $request,
+        );
+
+        if ($search = trim((string) ($filters['search'] ?? ''))) {
+            $escaped = addcslashes($search, '%_\\');
+            $query->where(function ($builder) use ($escaped) {
+                $builder
+                    ->where('number', 'like', "%{$escaped}%")
+                    ->orWhere('supplier_invoice_no', 'like', "%{$escaped}%")
+                    ->orWhereHas('partner', function ($partner) use ($escaped) {
+                        $partner
+                            ->where('name', 'like', "%{$escaped}%")
+                            ->orWhere('phone', 'like', "%{$escaped}%")
+                            ->orWhere('vat_number', 'like', "%{$escaped}%");
+                    });
+            });
+        }
+
+        foreach (['status', 'payment_status', 'partner_id', 'classification_id'] as $key) {
+            if (! empty($filters[$key])) {
+                $query->where($key, $filters[$key]);
+            }
+        }
+
+        if (! empty($filters['date_from'])) $query->whereDate('purchase_date', '>=', $filters['date_from']);
+        if (! empty($filters['date_to'])) $query->whereDate('purchase_date', '<=', $filters['date_to']);
+        if (! empty($filters['due_from'])) $query->whereDate('due_date', '>=', $filters['due_from']);
+        if (! empty($filters['due_to'])) $query->whereDate('due_date', '<=', $filters['due_to']);
+
+        if (isset($filters['total_gte'])) $query->where('total', '>=', $this->moneyFilterToMinor((string) $filters['total_gte']));
+        if (isset($filters['total_lte'])) $query->where('total', '<=', $this->moneyFilterToMinor((string) $filters['total_lte']));
+        if (isset($filters['remaining_gte'])) {
+            $query->whereRaw('(total - paid_amount) >= ?', [$this->moneyFilterToMinor((string) $filters['remaining_gte'])]);
+        }
+        if (isset($filters['remaining_lte'])) {
+            $query->whereRaw('(total - paid_amount) <= ?', [$this->moneyFilterToMinor((string) $filters['remaining_lte'])]);
+        }
+
+        $sort = (string) ($filters['sort'] ?? '-purchase_date');
+        $direction = str_starts_with($sort, '-') ? 'desc' : 'asc';
+        $field = ltrim($sort, '-');
+        $sortable = ['number', 'purchase_date', 'due_date', 'total', 'created_at'];
+
+        if ($field === 'remaining') {
+            $query->orderByRaw("(total - paid_amount) {$direction}");
+        } elseif (in_array($field, $sortable, true)) {
+            $query->orderBy($field, $direction);
+        } else {
+            $query->orderByDesc('purchase_date');
+        }
+        $query->orderByDesc('id');
+
+        if (isset($filters['per_page'])) {
+            return PurchaseResource::collection($query->paginate((int) $filters['per_page'])->withQueryString())->response();
+        }
+
+        // توافق رجعي: الاستدعاءات القديمة التي لا تطلب pagination تستمر بالقائمة المعتادة.
+        return PurchaseResource::collection($query->get())->response();
     }
 
     public function store(StorePurchaseRequest $request): JsonResponse
@@ -255,5 +332,14 @@ class PurchaseController extends ApiController
     private function visiblePurchase(Request $request, string $id): Purchase
     {
         return $this->scopeToActiveBranch(Purchase::query(), $request)->findOrFail($id);
+    }
+
+    private function moneyFilterToMinor(string $value): int
+    {
+        $normalized = trim($value);
+        [$whole, $fraction] = array_pad(explode('.', $normalized, 2), 2, '');
+        $fraction = substr(str_pad(preg_replace('/\D/', '', $fraction) ?? '', 2, '0'), 0, 2);
+
+        return ((int) $whole * 100) + (int) $fraction;
     }
 }
