@@ -20,6 +20,7 @@ use App\Models\Partner;
 use App\Models\ProductCategory;
 use App\Models\UnitTemplate;
 use App\Services\Accounting\InventoryService;
+use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\ProductImportService;
 use App\Services\ProductLifecycleService;
 use App\Support\Settings;
@@ -27,11 +28,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use RuntimeException;
 
 class ProductController extends ApiController
 {
     public function __construct(
         protected InventoryService $inventory,
+        protected DocumentStorageService $documentStorage,
         protected ProductImportService $imports,
         protected ProductLifecycleService $lifecycle,
     ) {}
@@ -219,16 +223,31 @@ class ProductController extends ApiController
         $start = (int) ($product->media()->max('sort_order') ?? -1) + 1;
 
         foreach ($files as $offset => $file) {
-            $path = $file->store("products/{$product->id}/media", 'local');
-            $product->media()->create([
-                'disk' => 'local',
-                'path' => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
-                'sort_order' => $start + $offset,
-                'uploaded_by' => $request->user()?->id,
-            ]);
+            $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin');
+            $path = "product-media/{$product->tenant_id}/{$product->id}/" . Str::uuid() . ".{$extension}";
+            $profile = $this->documentStorage->profile();
+            $stream = fopen($file->getRealPath(), 'rb');
+
+            try {
+                $this->documentStorage->put($profile, $path, $stream);
+                $product->media()->create([
+                    // "document" يعني تخزيناً دائماً خاصاً عبر S3/R2، لا قرص حاوية Render المؤقت.
+                    'disk' => 'document',
+                    'path' => $path,
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                    'sort_order' => $start + $offset,
+                    'uploaded_by' => $request->user()?->id,
+                ]);
+            } catch (RuntimeException $exception) {
+                // لا نسجل مرفقاً يشير إلى كائن لم يكتب؛ تبقى الرسالة قابلة للتشخيص دون كشف السر.
+                abort(503, 'تعذّر حفظ صورة المنتج. تحقق من إعداد تخزين الملفات الدائم ثم أعد المحاولة.');
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+            }
         }
 
         return ProductMediaResource::collection($product->media()->orderBy('sort_order')->get())
@@ -239,6 +258,22 @@ class ProductController extends ApiController
     {
         $product = Product::findOrFail($id);
         $media = $product->media()->whereKey($mediaId)->firstOrFail();
+        if ($media->disk === 'document') {
+            try {
+                $stream = $this->documentStorage->readStream($this->documentStorage->profile(), $media->path);
+            } catch (RuntimeException $exception) {
+                abort(404, 'ملف الوسيط غير موجود.');
+            }
+
+            return response()->streamDownload(function () use ($stream): void {
+                fpassthru($stream);
+                fclose($stream);
+            }, $media->original_name, [
+                'Content-Type' => $media->mime_type ?? 'application/octet-stream',
+            ]);
+        }
+
+        // توافق قراءة فقط مع السجلات القديمة التي كتبت إلى القرص المحلي قبل هذا الإصلاح.
         $disk = Storage::disk($media->disk);
         if (! $disk->exists($media->path)) {
             abort(404, 'ملف الوسيط غير موجود.');
@@ -255,8 +290,16 @@ class ProductController extends ApiController
         $media = $product->media()->whereKey($mediaId)->firstOrFail();
         $disk = $media->disk;
         $path = $media->path;
+        if ($disk === 'document') {
+            try {
+                $this->documentStorage->delete($this->documentStorage->profile(), $path);
+            } catch (RuntimeException $exception) {
+                abort(503, 'تعذّر حذف ملف الوسيط من التخزين الدائم. أعد المحاولة.');
+            }
+        } else {
+            Storage::disk($disk)->delete($path);
+        }
         $media->delete();
-        Storage::disk($disk)->delete($path);
 
         return response()->json(['message' => 'تم حذف الوسيط.']);
     }
