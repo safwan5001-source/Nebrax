@@ -9,6 +9,10 @@ use App\Models\Branch;
 use App\Models\DocumentBatch;
 use App\Models\DocumentExtractionResult;
 use App\Models\DocumentProviderAttempt;
+use App\Models\Partner;
+use App\Models\Product;
+use App\Services\DocumentCenter\DocumentMatchingContext;
+use App\Services\DocumentCenter\DocumentMatchingService;
 use App\Models\PlatformIntegrationSetting;
 use App\Models\Tenant;
 use App\Services\DocumentCenter\DocumentExtractionService;
@@ -278,6 +282,45 @@ class DocumentExtractionProviderTest extends TestCase
                 ],
             ],
         ]);
+    }
+
+    /** @test */
+    public function documentMatchingNormalizedEvidenceIsValidatedIdempotentlyWithoutCreatingBusinessRecords(): void
+    {
+        $auth = $this->authorizedTenant('matching-validation');
+        Partner::create(['type' => 'supplier', 'name' => 'مورد تجريبي', 'vat_number' => '310000000000003', 'is_active' => true]);
+        Product::create(['name' => 'خدمة اختبار', 'sku' => 'SERVICE-42', 'barcode' => '998877', 'unit' => 'piece', 'is_active' => true]);
+        $batch = $this->batchWithFile($auth['token']);
+        $this->withToken($auth['token'])->postJson("/api/document-batches/{$batch['id']}/complete")->assertOk();
+        $this->bindCleanScanner();
+        $this->queuedScanJob()->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentStorageService::class), app(DocumentSafetyScanner::class), app(DocumentFileScanService::class), app(PlatformIntegrationResolver::class), app(DocumentExtractionService::class));
+
+        $payload = $this->providerPayload('purchase_invoice');
+        $payload['fields']['price_includes_tax'] = false;
+        $payload['lines'] = [[
+            'description' => 'خدمة اختبار', 'sku' => 'SERVICE-42', 'barcode' => '998877', 'unit' => 'piece', 'quantity' => '1',
+            'unit_price_minor' => 10000, 'discount_minor' => 0, 'tax_amount_minor' => 1500, 'total_minor' => 11500, 'tax_rate' => '15',
+        ]];
+        $payload['fields']['subtotal_minor'] = 10000;
+        $payload['fields']['tax_amount_minor'] = 1500;
+        $payload['fields']['total_amount_minor'] = 11500;
+        Http::fake(['api.openai.com/*' => Http::response(['output_text' => json_encode($payload, JSON_THROW_ON_ERROR), 'usage' => ['input_tokens' => 11, 'output_tokens' => 7]])]);
+        $this->queuedExtractionJob()->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentExtractionService::class));
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        app(BranchContext::class)->set($auth['branch_id']);
+        $result = DocumentExtractionResult::firstOrFail();
+        $service = app(DocumentMatchingService::class);
+        $context = new DocumentMatchingContext($auth['tenant_id'], $auth['branch_id'], 'purchase_invoice');
+        $service->match($result, $context);
+        $service->match($result, $context);
+
+        $this->assertDatabaseCount('document_match_results', 3);
+        $this->assertDatabaseHas('document_match_results', ['document_extraction_result_id' => $result->id, 'subject_type' => 'counterparty', 'status' => 'suggested']);
+        $this->assertDatabaseHas('document_match_candidates', ['strategy' => 'exact_tax_id', 'score_basis_points' => 10000]);
+        $this->assertDatabaseMissing('invoices', ['tenant_id' => $auth['tenant_id']]);
+        $this->assertDatabaseMissing('purchases', ['tenant_id' => $auth['tenant_id']]);
+        $this->assertDatabaseMissing('journal_entries', ['tenant_id' => $auth['tenant_id']]);
     }
 
     private function bindCleanScanner(): void
