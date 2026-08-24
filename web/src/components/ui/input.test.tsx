@@ -1,8 +1,10 @@
 /* @vitest-environment jsdom */
 import * as React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatGregorianDate, Input, normalizeGregorianDate } from './input';
+
+afterEach(cleanup);
 
 describe('Gregorian date formatting', () => {
   it('normalizes ISO and Arabic day/month/year input to an ISO Gregorian value', () => {
@@ -41,8 +43,20 @@ describe('Input date field', () => {
     expect(changedValue).toBe('2026-08-25');
   });
 
-  it('opens a Gregorian calendar and returns the selected ISO date to the form', () => {
-    cleanup();
+  it('opens a Gregorian calendar with today, navigation, Saturday-first weekdays and footer actions', () => {
+    const view = render(<Input aria-label="تاريخ الفاتورة" type="date" value="2026-08-24" onChange={vi.fn()} />);
+
+    fireEvent.click(view.getByRole('button', { name: 'فتح التقويم الميلادي' }));
+    expect(view.getByRole('dialog', { name: 'التقويم الميلادي' })).toBeTruthy();
+    expect(view.getByRole('button', { name: 'اليوم' })).toBeTruthy();
+    expect(view.getByRole('button', { name: 'الشهر السابق' })).toBeTruthy();
+    expect(view.getByRole('button', { name: 'الشهر التالي' })).toBeTruthy();
+    expect(view.getByTitle('السبت')).toBeTruthy();
+    expect(view.getByRole('button', { name: 'مسح' })).toBeTruthy();
+    expect(view.getByRole('button', { name: 'إغلاق' })).toBeTruthy();
+  });
+
+  it('returns the selected ISO date to the form and supports clearing the value', () => {
     let changedValue = '';
     const onChange = vi.fn((event: React.ChangeEvent<HTMLInputElement>) => {
       changedValue = event.currentTarget.value;
@@ -50,26 +64,26 @@ describe('Input date field', () => {
     const view = render(<Input aria-label="تاريخ الفاتورة" type="date" value="2026-08-24" onChange={onChange} />);
 
     fireEvent.click(view.getByRole('button', { name: 'فتح التقويم الميلادي' }));
-    expect(view.getByRole('dialog', { name: 'التقويم الميلادي' })).toBeTruthy();
-    expect(view.getByText('أغسطس 2026')).toBeTruthy();
-
     fireEvent.click(view.getByRole('button', { name: 'اختيار 2026-08-25' }));
     expect(changedValue).toBe('2026-08-25');
-    expect(view.queryByRole('dialog', { name: 'التقويم الميلادي' })).toBeNull();
+
+    fireEvent.click(view.getByRole('button', { name: 'فتح التقويم الميلادي' }));
+    fireEvent.click(view.getByRole('button', { name: 'مسح' }));
+    expect(changedValue).toBe('');
   });
 
-  it('shows month and year controls after clicking the calendar heading', () => {
-    cleanup();
+  it('opens independent month and year lists from their headings', () => {
     const view = render(<Input aria-label="تاريخ الفاتورة" type="date" value="2026-08-24" onChange={vi.fn()} />);
 
     fireEvent.click(view.getByRole('button', { name: 'فتح التقويم الميلادي' }));
-    fireEvent.click(view.getByRole('button', { name: 'اختيار الشهر والسنة' }));
-
-    expect((view.getByRole('combobox', { name: 'اختيار السنة' }) as HTMLSelectElement).value).toBe('2026');
+    fireEvent.click(view.getByRole('button', { name: 'اختيار الشهر' }));
     expect(view.getByRole('button', { name: 'اختيار سبتمبر' })).toBeTruthy();
-
     fireEvent.click(view.getByRole('button', { name: 'اختيار سبتمبر' }));
-    expect(view.getByRole('button', { name: 'اختيار الشهر والسنة' }).getAttribute('aria-expanded')).toBe('false');
-    expect(view.getByText('سبتمبر 2026')).toBeTruthy();
+    expect(view.getByText('سبتمبر')).toBeTruthy();
+
+    fireEvent.click(view.getByRole('button', { name: 'اختيار السنة' }));
+    expect(view.getByRole('button', { name: 'اختيار السنة 2027' })).toBeTruthy();
+    fireEvent.click(view.getByRole('button', { name: 'اختيار السنة 2027' }));
+    expect(view.getByText('2027')).toBeTruthy();
   });
 });

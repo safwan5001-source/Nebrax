@@ -5,7 +5,17 @@ import { cn } from '@/lib/utils';
 
 const EASTERN_ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
-const WEEKDAY_LABELS = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'];
+const WEEKDAY_LABELS = [
+  { short: 'سبت', full: 'السبت' },
+  { short: 'أحد', full: 'الأحد' },
+  { short: 'اثنين', full: 'الاثنين' },
+  { short: 'ثلاثاء', full: 'الثلاثاء' },
+  { short: 'أربعاء', full: 'الأربعاء' },
+  { short: 'خميس', full: 'الخميس' },
+  { short: 'جمعة', full: 'الجمعة' },
+] as const;
+
+type PickerMode = 'month' | 'year' | null;
 
 /**
  * Converts a user-entered date to the ISO calendar value required by the API.
@@ -63,6 +73,10 @@ function isOutOfRange(value: string, min?: string | number, max?: string | numbe
   return Boolean((minValue && value < minValue) || (maxValue && value > maxValue));
 }
 
+function monthName(year: number, monthIndex: number, style: 'long' | 'short' = 'long') {
+  return new Intl.DateTimeFormat(ARABIC_DISPLAY_LOCALE, { month: style }).format(new Date(year, monthIndex, 1));
+}
+
 type GregorianDateInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'>;
 
 const GregorianDateInput = React.forwardRef<HTMLInputElement, GregorianDateInputProps>(
@@ -70,7 +84,7 @@ const GregorianDateInput = React.forwardRef<HTMLInputElement, GregorianDateInput
     const containerRef = React.useRef<HTMLDivElement>(null);
     const inputRef = React.useRef<HTMLInputElement>(null);
     const [open, setOpen] = React.useState(false);
-    const [monthMenuOpen, setMonthMenuOpen] = React.useState(false);
+    const [pickerMode, setPickerMode] = React.useState<PickerMode>(null);
     const normalizedValue = typeof value === 'string' ? normalizeGregorianDate(value) : value;
     const normalizedDefaultValue = typeof defaultValue === 'string' ? normalizeGregorianDate(defaultValue) : defaultValue;
     const displayValue = typeof normalizedValue === 'string' ? formatGregorianDate(normalizedValue) : normalizedValue;
@@ -108,16 +122,29 @@ const GregorianDateInput = React.forwardRef<HTMLInputElement, GregorianDateInput
       if (!input) return;
       setNativeInputValue(input, nextValue);
       input.dispatchEvent(new Event('input', { bubbles: true }));
+      setPickerMode(null);
       setOpen(false);
       input.focus();
+    };
+
+    const closeCalendar = () => {
+      setPickerMode(null);
+      setOpen(false);
+      inputRef.current?.focus();
+    };
+
+    const jumpToToday = () => {
+      setViewDate(new Date());
+      setPickerMode(null);
     };
 
     const year = viewDate.getFullYear();
     const monthIndex = viewDate.getMonth();
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const firstWeekday = new Date(year, monthIndex, 1).getDay();
+    const firstWeekday = (new Date(year, monthIndex, 1).getDay() + 1) % 7;
     const selectedIso = selectedDate ? formatIsoDate(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()) : null;
-    const monthLabel = new Intl.DateTimeFormat(ARABIC_DISPLAY_LOCALE, { month: 'long', year: 'numeric' }).format(viewDate);
+    const title = `${monthName(year, monthIndex)} ${year}`;
+    const yearOptions = Array.from({ length: 12 }, (_, index) => year - 5 + index);
 
     return (
       <div ref={containerRef} className="relative">
@@ -155,7 +182,7 @@ const GregorianDateInput = React.forwardRef<HTMLInputElement, GregorianDateInput
           disabled={disabled}
           onClick={() => {
             setViewDate(selectedDate ?? new Date());
-            setMonthMenuOpen(false);
+            setPickerMode(null);
             setOpen((current) => !current);
           }}
           className="absolute right-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded text-muted transition-colors hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
@@ -163,49 +190,42 @@ const GregorianDateInput = React.forwardRef<HTMLInputElement, GregorianDateInput
           <CalendarDays className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
         </button>
         {open && (
-          <div id={calendarId} role="dialog" aria-label="التقويم الميلادي" className="absolute z-50 mt-1 w-72 rounded-lg border border-border bg-surface p-3 shadow-xl" dir="rtl">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <button type="button" aria-label="الشهر التالي" onClick={() => setViewDate(new Date(year, monthIndex + 1, 1))} className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          <div id={calendarId} role="dialog" aria-label="التقويم الميلادي" className="absolute right-0 z-50 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface p-4 shadow-2xl" dir="rtl">
+            <div className="mb-5 flex items-center justify-between" dir="ltr">
+              <button type="button" aria-label="الشهر السابق" onClick={() => { setViewDate(new Date(year, monthIndex - 1, 1)); setPickerMode(null); }} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
               </button>
-              <button
-                type="button"
-                aria-label="اختيار الشهر والسنة"
-                aria-expanded={monthMenuOpen}
-                onClick={() => setMonthMenuOpen((current) => !current)}
-                className="num inline-flex h-8 items-center gap-1 rounded px-2 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              >
-                {monthLabel}
-                <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', monthMenuOpen && 'rotate-180')} aria-hidden="true" />
-              </button>
-              <button type="button" aria-label="الشهر السابق" onClick={() => setViewDate(new Date(year, monthIndex - 1, 1))} className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              <button type="button" onClick={jumpToToday} className="h-9 rounded-full bg-primary-soft px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">اليوم</button>
+              <button type="button" aria-label="الشهر التالي" onClick={() => { setViewDate(new Date(year, monthIndex + 1, 1)); setPickerMode(null); }} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                <ChevronRight className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
-            {monthMenuOpen ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2 rounded border border-border bg-background p-1.5">
-                  <button type="button" aria-label="السنة التالية" onClick={() => setViewDate(new Date(year + 1, monthIndex, 1))} className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <label className="sr-only" htmlFor={`${calendarId}-year`}>اختيار السنة</label>
-                  <select id={`${calendarId}-year`} aria-label="اختيار السنة" value={year} onChange={(event) => setViewDate(new Date(Number(event.target.value), monthIndex, 1))} className="num h-7 rounded border-0 bg-transparent px-2 text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                    {Array.from({ length: 31 }, (_, index) => year - 15 + index).map((optionYear) => <option key={optionYear} value={optionYear}>{optionYear}</option>)}
-                  </select>
-                  <button type="button" aria-label="السنة السابقة" onClick={() => setViewDate(new Date(year - 1, monthIndex, 1))} className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-3 gap-1">
-                  {Array.from({ length: 12 }, (_, index) => {
-                    const label = new Intl.DateTimeFormat(ARABIC_DISPLAY_LOCALE, { month: 'short' }).format(new Date(year, index, 1));
-                    return <button key={label} type="button" aria-label={`اختيار ${label}`} aria-pressed={index === monthIndex} onClick={() => { setViewDate(new Date(year, index, 1)); setMonthMenuOpen(false); }} className={cn('h-9 rounded px-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', index === monthIndex ? 'bg-primary text-primary-foreground' : 'text-text hover:bg-primary-soft hover:text-primary')}>{label}</button>;
-                  })}
-                </div>
+
+            <div className="mb-4 flex items-center justify-center gap-3">
+              <button type="button" aria-label="اختيار الشهر" aria-expanded={pickerMode === 'month'} onClick={() => setPickerMode((current) => current === 'month' ? null : 'month')} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xl font-semibold text-primary transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                {monthName(year, monthIndex)}
+                <ChevronDown className={cn('h-4 w-4 transition-transform', pickerMode === 'month' && 'rotate-180')} aria-hidden="true" />
+              </button>
+              <button type="button" aria-label="اختيار السنة" aria-expanded={pickerMode === 'year'} onClick={() => setPickerMode((current) => current === 'year' ? null : 'year')} className="num inline-flex items-center gap-1 rounded px-2 py-1 text-xl font-semibold text-primary transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                {year}
+                <ChevronDown className={cn('h-4 w-4 transition-transform', pickerMode === 'year' && 'rotate-180')} aria-hidden="true" />
+              </button>
+            </div>
+
+            {pickerMode === 'month' ? (
+              <div className="grid grid-cols-3 gap-2 pb-2">
+                {Array.from({ length: 12 }, (_, index) => {
+                  const label = monthName(year, index, 'short');
+                  return <button key={label} type="button" aria-label={`اختيار ${label}`} aria-pressed={index === monthIndex} onClick={() => { setViewDate(new Date(year, index, 1)); setPickerMode(null); }} className={cn('h-10 rounded-lg px-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', index === monthIndex ? 'bg-primary text-primary-foreground' : 'text-text hover:bg-primary-soft hover:text-primary')}>{label}</button>;
+                })}
+              </div>
+            ) : pickerMode === 'year' ? (
+              <div className="grid grid-cols-3 gap-2 pb-2">
+                {yearOptions.map((optionYear) => <button key={optionYear} type="button" aria-label={`اختيار السنة ${optionYear}`} aria-pressed={optionYear === year} onClick={() => { setViewDate(new Date(optionYear, monthIndex, 1)); setPickerMode(null); }} className={cn('num h-10 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', optionYear === year ? 'bg-primary text-primary-foreground' : 'text-text hover:bg-primary-soft hover:text-primary')}>{optionYear}</button>)}
               </div>
             ) : (
-              <div className="grid grid-cols-7 gap-1 text-center" dir="ltr">
-                {WEEKDAY_LABELS.map((label) => <span key={label} className="py-1 text-xs font-medium text-muted">{label}</span>)}
+              <div className="grid grid-cols-7 gap-y-1 text-center" dir="rtl">
+                {WEEKDAY_LABELS.map((weekday) => <span key={weekday.short} title={weekday.full} className="pb-2 text-xs font-semibold text-muted">{weekday.short}</span>)}
                 {Array.from({ length: firstWeekday }, (_, index) => <span key={`empty-${index}`} aria-hidden="true" />)}
                 {Array.from({ length: daysInMonth }, (_, index) => {
                   const day = index + 1;
@@ -221,8 +241,8 @@ const GregorianDateInput = React.forwardRef<HTMLInputElement, GregorianDateInput
                       disabled={unavailable}
                       onClick={() => commitDate(iso)}
                       className={cn(
-                        'num h-8 rounded text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-                        selected ? 'bg-primary text-primary-foreground' : 'text-text hover:bg-primary-soft hover:text-primary',
+                        'num mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full text-base transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                        selected ? 'bg-primary text-primary-foreground shadow-sm' : 'text-text hover:bg-primary-soft hover:text-primary',
                         unavailable && 'cursor-not-allowed opacity-35 hover:bg-transparent hover:text-text'
                       )}
                     >
@@ -232,6 +252,11 @@ const GregorianDateInput = React.forwardRef<HTMLInputElement, GregorianDateInput
                 })}
               </div>
             )}
+
+            <div className="mt-4 flex items-center justify-end gap-3 border-t border-border pt-3">
+              <button type="button" onClick={closeCalendar} className="h-9 rounded-md px-4 text-sm font-semibold text-muted transition-colors hover:bg-background hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">إغلاق</button>
+              <button type="button" disabled={!selectedDate} onClick={() => commitDate('')} className="h-9 rounded-md bg-negative px-4 text-sm font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-negative/40 disabled:cursor-not-allowed disabled:opacity-40">مسح</button>
+            </div>
           </div>
         )}
       </div>
