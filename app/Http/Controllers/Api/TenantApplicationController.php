@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Requests\ToggleApplicationGroupRequest;
 use App\Http\Requests\ToggleApplicationRequest;
 use App\Services\TenantApplicationService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 /** إدارة التطبيقات الرئيسية وقدراتها الفرعية مع بقاء الاستحقاق وRBAC منفصلين. */
 class TenantApplicationController extends ApiController
@@ -32,81 +30,67 @@ class TenantApplicationController extends ApiController
 
     public function enable(ToggleApplicationRequest $request): JsonResponse
     {
-        $key = $request->validated('application_key');
-        $this->domain(fn () => $this->applications->enable($key, $request->user(), $request->validated('reason')));
-
-        return response()->json(['data' => $this->applications->stateFor()[$key]]);
+        return $this->toggle($request, true);
     }
 
     public function disable(ToggleApplicationRequest $request): JsonResponse
     {
+        return $this->toggle($request, false);
+    }
+
+    private function toggle(ToggleApplicationRequest $request, bool $enabled): JsonResponse
+    {
+        $scope = $request->validated('scope') ?? 'capability';
+        $reason = $request->validated('reason');
+        $actor = $request->user();
+
+        if ($scope === 'all_groups') {
+            $data = $this->domain(fn () => $this->applications->setAllGroups($enabled, $actor, $reason));
+
+            return response()->json([
+                'data' => $data,
+                'applications' => $this->applications->stateFor(),
+                'groups' => $this->applications->groupStateFor(),
+            ]);
+        }
+
+        if ($scope === 'group') {
+            $group = $request->validated('group_key');
+            $this->domain(fn () => $enabled
+                ? $this->applications->enableGroup($group, $actor, $reason)
+                : $this->applications->disableGroup($group, $actor, $reason));
+
+            return response()->json([
+                'data' => $this->applications->groupStateFor()[$group],
+                'applications' => $this->applications->stateFor(),
+                'groups' => $this->applications->groupStateFor(),
+            ]);
+        }
+
+        if ($scope === 'group_capabilities') {
+            $group = $request->validated('group_key');
+            $data = $this->domain(fn () => $this->applications->setGroupCapabilities(
+                $group,
+                $enabled,
+                $actor,
+                $reason,
+            ));
+
+            return response()->json([
+                'data' => $data,
+                'applications' => $this->applications->stateFor(),
+                'groups' => $this->applications->groupStateFor(),
+            ]);
+        }
+
         $key = $request->validated('application_key');
-        $this->domain(fn () => $this->applications->disable($key, $request->user(), $request->validated('reason')));
-
-        return response()->json(['data' => $this->applications->stateFor()[$key]]);
-    }
-
-    public function enableGroup(ToggleApplicationGroupRequest $request): JsonResponse
-    {
-        $group = $request->validated('group_key');
-        $this->domain(fn () => $this->applications->enableGroup($group, $request->user(), $request->validated('reason')));
-
-        return response()->json(['data' => $this->applications->groupStateFor()[$group]]);
-    }
-
-    public function disableGroup(ToggleApplicationGroupRequest $request): JsonResponse
-    {
-        $group = $request->validated('group_key');
-        $this->domain(fn () => $this->applications->disableGroup($group, $request->user(), $request->validated('reason')));
-
-        return response()->json(['data' => $this->applications->groupStateFor()[$group]]);
-    }
-
-    public function enableAllGroups(Request $request): JsonResponse
-    {
-        $validated = $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
-        $data = $this->domain(fn () => $this->applications->setAllGroups(true, $request->user(), $validated['reason'] ?? null));
-
-        return response()->json(['data' => $data]);
-    }
-
-    public function disableAllGroups(Request $request): JsonResponse
-    {
-        $validated = $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
-        $data = $this->domain(fn () => $this->applications->setAllGroups(false, $request->user(), $validated['reason'] ?? null));
-
-        return response()->json(['data' => $data]);
-    }
-
-    public function enableGroupCapabilities(ToggleApplicationGroupRequest $request): JsonResponse
-    {
-        $group = $request->validated('group_key');
-        $data = $this->domain(fn () => $this->applications->setGroupCapabilities(
-            $group,
-            true,
-            $request->user(),
-            $request->validated('reason'),
-        ));
+        $this->domain(fn () => $enabled
+            ? $this->applications->enable($key, $actor, $reason)
+            : $this->applications->disable($key, $actor, $reason));
 
         return response()->json([
-            'data' => $data,
-            'applications' => $this->applications->stateFor(),
-        ]);
-    }
-
-    public function disableGroupCapabilities(ToggleApplicationGroupRequest $request): JsonResponse
-    {
-        $group = $request->validated('group_key');
-        $data = $this->domain(fn () => $this->applications->setGroupCapabilities(
-            $group,
-            false,
-            $request->user(),
-            $request->validated('reason'),
-        ));
-
-        return response()->json([
-            'data' => $data,
-            'applications' => $this->applications->stateFor(),
+            'data' => $this->applications->stateFor()[$key],
+            'groups' => $this->applications->groupStateFor(),
         ]);
     }
 }
