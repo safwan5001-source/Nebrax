@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatMillilitersAsLiters, litersToMilliliters } from '@/lib/fuel-quantity';
+import { asRecordArray, asStringArray, normalizeAviRfidAuthorization, normalizeAviRfidAuthorizations, type AviRfidAuthorization } from '@/lib/fuel-avi-rfid';
 
 interface Partner { id: string; name: string; type: string }
 interface Contract { id: string; number: string; partner_id: string; status: string }
@@ -27,11 +28,10 @@ interface Tag {
   id: string; public_identifier: string; identity_type: string; partner_id: string; corporate_fuel_contract_id: string;
   fuel_fleet_vehicle_id: string | null; fuel_fleet_driver_id: string | null; status: string; effective_from: string; effective_until: string | null;
 }
-interface Authorization {
-  id: string; fuel_station_id: string; fuel_nozzle_id: string; vehicle_identity_tag_id: string | null; driver_identity_tag_id: string | null;
-  partner_id: string | null; fuel_fleet_vehicle_id: string | null; quantity_milliliters: number; decision: 'approved' | 'denied';
-  reason_code: string | null; suspicion_signals: string[]; authorized_at: string; expires_at: string | null; fuel_sale_id: string | null;
-}
+type Authorization = AviRfidAuthorization;
+type ApiListResponse = { data?: unknown };
+type ApiAuthorizationResponse = { data?: unknown };
+type ApiCurrentUserResponse = { user?: { permissions?: unknown } | null };
 
 const TYPES = ['vehicle_rfid', 'driver_card', 'vehicle_qr', 'driver_qr', 'vehicle_pin', 'driver_pin'] as const;
 const VEHICLE_TYPES = new Set<string>(['vehicle_rfid', 'vehicle_qr', 'vehicle_pin']);
@@ -65,19 +65,19 @@ export default function FuelAviRfidPage() {
     setLoading(true); setError(null);
     try {
       const [tagResult, authorizationResult, partnerResult, contractResult, vehicleResult, driverResult, stationResult, nozzleResult] = await Promise.all([
-        api<{ data: Tag[] }>('/fuel-stations/avi-rfid/tags'), api<{ data: Authorization[] }>('/fuel-stations/avi-rfid/authorizations'),
-        api<{ data: Partner[] }>('/partners?type=customer'), api<{ data: Contract[] }>('/fuel-stations/corporate-contracts'),
-        api<{ data: Vehicle[] }>('/fuel-stations/fleet/vehicles'), api<{ data: Driver[] }>('/fuel-stations/fleet/drivers'),
-        api<{ data: Station[] }>('/fuel-stations/stations'), api<{ data: Nozzle[] }>('/fuel-stations/nozzles'),
+        api<ApiListResponse>('/fuel-stations/avi-rfid/tags'), api<ApiListResponse>('/fuel-stations/avi-rfid/authorizations'),
+        api<ApiListResponse>('/partners?type=customer'), api<ApiListResponse>('/fuel-stations/corporate-contracts'),
+        api<ApiListResponse>('/fuel-stations/fleet/vehicles'), api<ApiListResponse>('/fuel-stations/fleet/drivers'),
+        api<ApiListResponse>('/fuel-stations/stations'), api<ApiListResponse>('/fuel-stations/nozzles'),
       ]);
-      setTags(tagResult.data); setAuthorizations(authorizationResult.data); setPartners(partnerResult.data.filter((partner) => partner.type === 'customer'));
-      setContracts(contractResult.data); setVehicles(vehicleResult.data); setDrivers(driverResult.data);
-      setStations(stationResult.data.filter((station) => station.status === 'active')); setNozzles(nozzleResult.data.filter((nozzle) => nozzle.status === 'active'));
+      setTags(asRecordArray<Tag>(tagResult?.data)); setAuthorizations(normalizeAviRfidAuthorizations(authorizationResult?.data)); setPartners(asRecordArray<Partner>(partnerResult?.data).filter((partner) => partner.type === 'customer'));
+      setContracts(asRecordArray<Contract>(contractResult?.data)); setVehicles(asRecordArray<Vehicle>(vehicleResult?.data)); setDrivers(asRecordArray<Driver>(driverResult?.data));
+      setStations(asRecordArray<Station>(stationResult?.data).filter((station) => station.status === 'active')); setNozzles(asRecordArray<Nozzle>(nozzleResult?.data).filter((nozzle) => nozzle.status === 'active'));
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('loadFailed')); } finally { setLoading(false); }
   }, [tc]);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { const user = currentUser(); if (user?.permissions) setPermissions(user.permissions); else api<{ user: { permissions?: string[] } }>('/me').then((result) => setPermissions(result.user.permissions ?? [])).catch(() => {}); }, []);
+  useEffect(() => { const user = currentUser(); if (user?.permissions) setPermissions(asStringArray(user.permissions)); else api<ApiCurrentUserResponse>('/me').then((result) => setPermissions(asStringArray(result?.user?.permissions))).catch(() => {}); }, []);
 
   const partnerContracts = useMemo(() => contracts.filter((contract) => contract.partner_id === tagPartnerId && contract.status === 'active'), [contracts, tagPartnerId]);
   const targetIsVehicle = VEHICLE_TYPES.has(tagType);
@@ -106,11 +106,11 @@ export default function FuelAviRfidPage() {
     if (!stationId || !nozzleId || !requested || (!vehicleCredential.trim() && !driverCredential.trim())) return;
     setBusy(true); setError(null);
     try {
-      const result = await api<{ data: Authorization }>('/fuel-stations/avi-rfid/authorizations', { method: 'POST', body: {
+      const result = await api<ApiAuthorizationResponse>('/fuel-stations/avi-rfid/authorizations', { method: 'POST', body: {
         fuel_station_id: stationId, fuel_nozzle_id: nozzleId, vehicle_credential: vehicleCredential || null, driver_credential: driverCredential || null,
         quantity_milliliters: requested, idempotency_key: crypto.randomUUID(),
       }});
-      setLastDecision(result.data); success(t('decisionRecorded')); await load();
+      setLastDecision(normalizeAviRfidAuthorization(result?.data)); success(t('decisionRecorded')); await load();
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : tc('saveFailed')); } finally { setBusy(false); }
   }
 
