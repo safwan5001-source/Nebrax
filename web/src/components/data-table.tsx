@@ -26,9 +26,20 @@ interface DataTableProps<T> {
   exportName?: string;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  showToolbar?: boolean;
 }
 
-export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyLabel, exportName, searchValue, onSearchChange }: DataTableProps<T>) {
+export function DataTable<T>({
+  columns,
+  data,
+  loading,
+  searchPlaceholder,
+  emptyLabel,
+  exportName,
+  searchValue,
+  onSearchChange,
+  showToolbar = true,
+}: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [internalGlobalFilter, setInternalGlobalFilter] = useState('');
   const globalFilter = searchValue ?? internalGlobalFilter;
@@ -67,26 +78,28 @@ export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyL
 
   return (
     <div className="rounded border border-border bg-surface">
-      <div className="flex items-center gap-2 border-b border-border p-3">
-        <Search className="h-4 w-4 text-muted" strokeWidth={1.6} />
-        <input
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          className="ms-auto"
-          onClick={exportCsv}
-          disabled={loading || data.length === 0}
-          title="تصدير CSV"
-        >
-          <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
-          CSV
-        </Button>
-      </div>
+      {showToolbar ? (
+        <div className="flex items-center gap-2 border-b border-border p-3">
+          <Search className="h-4 w-4 text-muted" strokeWidth={1.6} />
+          <input
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="ms-auto"
+            onClick={exportCsv}
+            disabled={loading || data.length === 0}
+            title="تصدير CSV"
+          >
+            <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
+            CSV
+          </Button>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="space-y-2 p-4">
@@ -101,14 +114,13 @@ export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyL
         </div>
       ) : (
         <>
-          {/* جدول كامل على الشاشات المتوسطة فأكبر */}
           <div className="hidden md:block">
             <Table>
               <THead>
                 {table.getHeaderGroups().map((hg) => (
                   <TR key={hg.id}>
                     {hg.headers.map((header) => {
-                      const sorted = header.column.getIsSorted(); // false | 'asc' | 'desc'
+                      const sorted = header.column.getIsSorted();
                       const SortIcon = sorted === 'asc' ? ArrowUp : sorted === 'desc' ? ArrowDown : ChevronsUpDown;
                       return (
                         <TH
@@ -154,7 +166,6 @@ export function DataTable<T>({ columns, data, loading, searchPlaceholder, emptyL
             </Table>
           </div>
 
-          {/* بطاقات على الجوال (مبدأ التخطيط #6) */}
           <ul className="divide-y divide-border md:hidden">
             {rows.map((row) => (
               <li key={row.id} className="flex flex-col gap-1.5 p-3.5">
