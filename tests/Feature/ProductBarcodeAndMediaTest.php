@@ -97,7 +97,7 @@ class ProductBarcodeAndMediaTest extends TestCase
     }
 
     /** @test */
-    public function pos_catalog_exposes_the_first_product_image_through_an_authenticated_download_url(): void
+    public function pos_catalog_images_are_available_to_cashiers_without_product_management_access(): void
     {
         Storage::fake('local');
         $auth = $this->registerTenant('pos-product-image', 'owner@pos-product-image.test');
@@ -106,15 +106,23 @@ class ProductBarcodeAndMediaTest extends TestCase
         $media = $this->withToken($auth['token'])->postJson("/api/products/{$withImage['id']}/media", [
             'media' => [UploadedFile::fake()->image('pos-card.jpg', 640, 480)],
         ])->assertCreated()['data'][0];
+        $cashierRole = $this->withToken($auth['token'])->postJson('/api/roles', [
+            'name' => 'كاشير POS',
+            'permissions' => ['invoices.manage'],
+        ])->assertCreated()['data'];
+        $cashierToken = $this->tokenForRole($auth['tenant_id'], $cashierRole['slug'], 'cashier@pos-product-image.test');
 
-        $catalog = $this->withToken($auth['token'])->getJson('/api/pos/products')->assertOk()['data'];
+        $catalog = $this->withToken($cashierToken)->getJson('/api/pos/products')->assertOk()['data'];
         $imaged = collect($catalog)->firstWhere('id', $withImage['id']);
         $plain = collect($catalog)->firstWhere('id', $withoutImage['id']);
-        $expectedUrl = "/api/products/{$withImage['id']}/media/{$media['id']}/download";
+        $expectedUrl = "/api/pos/products/{$withImage['id']}/media/{$media['id']}/download";
 
         $this->assertSame($expectedUrl, $imaged['pos_image']['download_url']);
         $this->assertNull($plain['pos_image']);
-        $this->withToken($auth['token'])->get($expectedUrl)->assertOk();
+        $this->withToken($cashierToken)->get($expectedUrl)->assertOk();
+        $this->withToken($cashierToken)
+            ->get("/api/products/{$withImage['id']}/media/{$media['id']}/download")
+            ->assertForbidden();
     }
 
     /** @test */

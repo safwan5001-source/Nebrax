@@ -23,6 +23,7 @@ use App\Services\Accounting\InventoryService;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\ProductImportService;
 use App\Services\ProductLifecycleService;
+use App\Support\PosSettings;
 use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -257,6 +258,30 @@ class ProductController extends ApiController
     {
         $product = Product::findOrFail($id);
         $media = $product->media()->whereKey($mediaId)->firstOrFail();
+
+        return $this->streamMedia($media);
+    }
+
+    /**
+     * صورة بطاقة POS لا تُحمّل من مسار إدارة المنتجات: الكاشير يملك تنفيذ البيع
+     * لا تصفح المخزون كله. نعيد التحقق من عقد الكتالوج (نشط + تصنيف مسموح)
+     * قبل بث صورة خاصة، فلا يتحول الرابط إلى منفذ لتجاوز سياسة الكتالوج.
+     */
+    public function downloadPosMedia(string $id, string $mediaId)
+    {
+        $product = PosSettings::constrainProductsByCategory(
+            Product::query()->where('is_active', true)
+        )->findOrFail($id);
+        $media = $product->media()
+            ->whereKey($mediaId)
+            ->where('mime_type', 'like', 'image/%')
+            ->firstOrFail();
+
+        return $this->streamMedia($media);
+    }
+
+    private function streamMedia(ProductMedia $media)
+    {
         if ($media->disk === 'document') {
             try {
                 $stream = $this->documentStorage->readStream($this->documentStorage->profile(), $media->path);

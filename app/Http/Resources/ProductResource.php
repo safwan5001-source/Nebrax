@@ -59,7 +59,7 @@ class ProductResource extends JsonResource
                 $media = $this->media->first(fn ($item) => str_starts_with((string) $item->mime_type, 'image/'));
 
                 return $media ? [
-                    'download_url' => "/api/products/{$this->id}/media/{$media->id}/download",
+                    'download_url' => "/api/pos/products/{$this->id}/media/{$media->id}/download",
                 ] : null;
             }),
             'reorder_level'    => $this->reorder_level,
