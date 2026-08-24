@@ -1,5 +1,8 @@
-// الـ API يعيد المبالغ بالريال كنص ("1150.00"). نعرضها بفواصل آلاف + رمز ﷼.
+// الـ API يعيد المبالغ بالريال كنص ("1150.00"). نعرضها بفواصل آلاف + رمز الريال السعودي الرسمي.
 // (التحويل من الهللات يتم في طبقة الـ API؛ هنا تنسيق العرض فقط.)
+// U+20C1 SAUDI RIYAL SIGN — الرمز الرسمي المشفّر في Unicode 17.0.
+export const SAUDI_RIYAL_SYMBOL = '\u20C1';
+
 const formatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -7,12 +10,12 @@ const formatter = new Intl.NumberFormat('en-US', {
 
 export function formatRiyal(value: string | number | null | undefined): string {
   const n = Number(value ?? 0);
-  if (!Number.isFinite(n)) return '—'; // لا نعرض "NaN ﷼" عند قيمة شاذة
-  return `${formatter.format(n)} ﷼`;
+  if (!Number.isFinite(n)) return '—'; // لا نعرض قيمة عملة عند مدخل شاذ
+  return `${formatter.format(n)} ${SAUDI_RIYAL_SYMBOL}`;
 }
 
 // تنسيق مختصر بلا أصفار عشرية زائدة (للأرقام العنوانية كمؤشرات اللوحة):
-// 482500 → "482,500 ﷼"، 1150.50 → "1,150.50 ﷼". الجداول والفواتير تبقى بفاصلتين.
+// 482500 → "482,500 𞸁"، 1150.50 → "1,150.50 𞸁". الجداول والفواتير تبقى بفاصلتين.
 const shortFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
@@ -20,13 +23,13 @@ const shortFormatter = new Intl.NumberFormat('en-US', {
 
 export function formatRiyalShort(value: string | number | null | undefined): string {
   const n = Number(value ?? 0);
-  return `${shortFormatter.format(n)} ﷼`;
+  return `${shortFormatter.format(n)} ${SAUDI_RIYAL_SYMBOL}`;
 }
 
 /**
  * رقمٌ مختصر **بلا رمز العملة** — للبطاقات التي تعرض الوحدة بحجم أصغر
- * بجانب الرقم (كما في مرجع لوحة التحكم). استعمال `formatRiyalShort` هناك
- * كان يُنتج «﷼ ريال» مكرّرة.
+ * بجانب الرقم. عند الحاجة إلى عملة، يجب أن تكون الوحدة هي
+ * `SAUDI_RIYAL_SYMBOL` فقط، لا «ريال» ولا «ر.س» ولا `SAR` ولا الرمز القديم `﷼`.
  */
 export function formatNumberShort(value: string | number | null | undefined): string {
   return shortFormatter.format(Number(value ?? 0));
