@@ -1,6 +1,7 @@
 'use client';
 import { DISPLAY_LOCALE } from '@/lib/formatting';
 
+import * as React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Boxes, CircleAlert, Clock3, LayoutGrid, ShieldCheck } from 'lucide-react';
@@ -14,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { currentUser } from '@/lib/auth';
 import { api, ApiError } from '@/lib/api';
+import { resolveApplicationManagementAction } from '@/lib/application-management-actions';
 
 type CommercialAvailability = 'included' | 'addon' | 'trial' | 'not_available';
 type EffectiveAccess = 'full' | 'read_only' | 'denied';
@@ -176,16 +178,19 @@ export default function ApplicationsPage() {
   }
 
   function actionsCell(app: ApplicationEntry) {
-    const commercial = commercialFor(app);
-    const access = accessFor(app);
-    if (app.mandatory || app.maturity !== 'built') return <span className="text-xs text-muted">{t('actions.unavailable')}</span>;
-    if (commercial === 'included' && app.status === 'disabled') return <Button size="sm" variant="outline" onClick={() => openDialog(app, 'enable')}>{t('enable')}</Button>;
-    if (access === 'read_only') return <Button size="sm" variant="outline" disabled>{t('actions.viewHistory')}</Button>;
-    if (commercial === 'addon') return <Button size="sm" variant="outline" disabled>{t('actions.addToPlan')}</Button>;
-    if (commercial === 'trial') return <Button size="sm" variant="outline" disabled>{t('actions.startTrial')}</Button>;
-    return app.enabled
-      ? <Button size="sm" variant="outline" onClick={() => openDialog(app, 'disable')}>{t('disable')}</Button>
-      : <Button size="sm" variant="outline" onClick={() => openDialog(app, 'enable')}>{t('enable')}</Button>;
+    const action = resolveApplicationManagementAction({
+      maturity: app.maturity,
+      mandatory: app.mandatory,
+      effectiveAccess: accessFor(app),
+      status: app.status,
+      dependencyStatus: dependencyFor(app),
+    });
+
+    if (action.kind === 'enable') return <Button size="sm" variant="outline" onClick={() => openDialog(app, 'enable')}>{t('enable')}</Button>;
+    if (action.kind === 'disable') return <Button size="sm" variant="outline" onClick={() => openDialog(app, 'disable')}>{t('disable')}</Button>;
+    if (action.kind === 'unavailable') return <span className="text-xs text-muted">{t('actions.unavailable')}</span>;
+
+    return <div className="space-y-1"><Button size="sm" variant="outline" disabled>{t('enable')}</Button><p className="max-w-48 text-xs leading-relaxed text-muted">{t(`actions.blocked.${action.reason}`)}</p></div>;
   }
 
   if (!canManage) {
