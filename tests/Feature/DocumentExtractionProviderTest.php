@@ -311,10 +311,21 @@ class DocumentExtractionProviderTest extends TestCase
         app(BranchContext::class)->set($auth['branch_id']);
         $result = DocumentExtractionResult::firstOrFail();
         $service = app(DocumentMatchingService::class);
-        $context = new DocumentMatchingContext($auth['tenant_id'], $auth['branch_id'], 'purchase_invoice');
-        $service->match($result, $context);
-        $service->match($result, $context);
+        try {
+            $service->match($result, new DocumentMatchingContext($auth['tenant_id'], $auth['branch_id'], 'sales_invoice'));
+            $this->fail('A mismatched document type must be rejected before persisting matching evidence.');
+        } catch (\LogicException) {
+            $this->assertDatabaseCount('document_match_results', 0);
+            $this->assertDatabaseCount('document_issues', 0);
+        }
 
+        $context = new DocumentMatchingContext($auth['tenant_id'], $auth['branch_id'], 'purchase_invoice');
+        $firstReport = $service->match($result, $context);
+        $secondReport = $service->match($result, $context);
+
+        $this->assertCount(3, $firstReport->results);
+        $this->assertCount(3, $secondReport->results);
+        $this->assertSame($firstReport->results[0]['matched_id'], $secondReport->results[0]['matched_id']);
         $this->assertDatabaseCount('document_match_results', 3);
         $this->assertDatabaseHas('document_match_results', ['document_extraction_result_id' => $result->id, 'subject_type' => 'counterparty', 'status' => 'suggested']);
         $this->assertDatabaseHas('document_match_candidates', ['strategy' => 'exact_tax_id', 'score_basis_points' => 10000]);
