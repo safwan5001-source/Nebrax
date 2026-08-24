@@ -17,13 +17,10 @@ Docker تُجمّع التطبيق الكامل وقت البناء عبر `depl
    ```
 2. **Render Dashboard → New → Blueprint** واربط مستودع `safwan5001-source/Nebrax`.
    يكتشف Render ملف `render.yaml` ويعرض الخدمة + القاعدة.
-3. اضبط المتغيّرات المعلّمة `sync:false` على خدمة `nibras-api`:
+3. اضبط المتغيّرين المعلّمين `sync:false` على خدمة `nibras-api`:
    - `APP_KEY` = الناتج من الخطوة 1.
    - `FRONTEND_URL` = نطاق الواجهة على Vercel (مثل `https://nibras.vercel.app`).
      (يمكن إضافة أكثر من نطاق مفصولاً بفواصل.)
-   - **تخزين الوسائط الدائم**: اضبط `DOCUMENT_STORAGE_KEY` و`DOCUMENT_STORAGE_SECRET` و`DOCUMENT_STORAGE_BUCKET` و`DOCUMENT_STORAGE_ENDPOINT` لمخزن متوافق مع S3، مثل Cloudflare R2 أو Amazon S3. اترك `DOCUMENT_STORAGE_DRIVER=s3` و`DOCUMENT_STORAGE_REGION=auto` و`DOCUMENT_STORAGE_PATH_STYLE=true` كما في Blueprint عند استخدام R2.
-
-     > لا يصلح قرص حاوية Render لصور المنتجات أو أي مرفقات: يُعاد إنشاؤه عند النشر أو إعادة التشغيل. صور المنتجات تُكتب إلى هذا المخزن الخاص الدائم وتُقرأ عبر API محمي بعد تهيئته.
 4. **Apply** — يبني Render الصورة، يُرحّل القاعدة تلقائياً عند الإقلاع، ويعطيك
    عنواناً مثل `https://nibras-api.onrender.com`.
 5. تحقّق من الصحّة:
@@ -83,9 +80,6 @@ SELECT migration FROM migrations ORDER BY id DESC LIMIT 5;
 | `FRONTEND_URL` | يدوي | نطاق الواجهة (CORS) |
 | `DB_*` | من قاعدة Render | مربوطة تلقائياً في `render.yaml` |
 | `APP_ENV`/`APP_DEBUG` | افتراضي | production / false |
-| `DOCUMENT_STORAGE_KEY` / `DOCUMENT_STORAGE_SECRET` | مزوّد S3 أو R2 | مفتاحان خاصان لتخزين وسائط المنتجات والمستندات |
-| `DOCUMENT_STORAGE_BUCKET` / `DOCUMENT_STORAGE_ENDPOINT` | مزوّد S3 أو R2 | اسم الحاوية ونقطة النهاية المتوافقة مع S3 |
-| `DOCUMENT_STORAGE_DRIVER` / `DOCUMENT_STORAGE_REGION` / `DOCUMENT_STORAGE_PATH_STYLE` | Blueprint | اتركها `s3` و`auto` و`true` عند استخدام Cloudflare R2 |
 
 ## منصّات بديلة
 
