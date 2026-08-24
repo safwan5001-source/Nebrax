@@ -1,4 +1,5 @@
 'use client';
+import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -99,7 +100,7 @@ export function RevisionLog({
                     <Badge tone={tone[entry.action]}>{t(`action_${entry.action}`)}</Badge>
                     <span className="text-sm text-text">{entry.user_name ?? t('system')}</span>
                     <span className="num text-xs text-muted">
-                      {new Date(entry.created_at).toLocaleString('ar-SA')}
+                      {new Date(entry.created_at).toLocaleString(ARABIC_DISPLAY_LOCALE)}
                     </span>
                   </div>
 

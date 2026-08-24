@@ -1,4 +1,5 @@
 'use client';
+import { displayLocale } from '@/lib/formatting';
 
 /**
  * أسلوب «دفتر التحليل»: يسبق نطاق التقرير وملخصه الجدول، وتتبدل صفوف المبيعات
@@ -114,8 +115,8 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
 
   useEffect(() => load(), [load]);
 
-  const count = useMemo(() => new Intl.NumberFormat(locale).format.bind(new Intl.NumberFormat(locale)), [locale]);
-  const percentage = useCallback((basisPoints?: number) => new Intl.NumberFormat(locale, {
+  const count = useMemo(() => new Intl.NumberFormat(displayLocale(locale)).format.bind(new Intl.NumberFormat(displayLocale(locale))), [locale]);
+  const percentage = useCallback((basisPoints?: number) => new Intl.NumberFormat(displayLocale(locale), {
     style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2,
   }).format((basisPoints ?? 0) / 10000), [locale]);
 

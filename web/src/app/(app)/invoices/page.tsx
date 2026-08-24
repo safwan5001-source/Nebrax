@@ -1,4 +1,5 @@
 'use client';
+import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -346,7 +347,7 @@ export default function InvoicesPage() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted">صفحة {meta.current_page.toLocaleString('ar-SA')} من {meta.last_page.toLocaleString('ar-SA')}</p>
+        <p className="text-xs text-muted">صفحة {meta.current_page.toLocaleString(ARABIC_DISPLAY_LOCALE)} من {meta.last_page.toLocaleString(ARABIC_DISPLAY_LOCALE)}</p>
         <div className="flex items-center gap-2">
           <Select
             value={String(explorer.perPage ?? 25)}

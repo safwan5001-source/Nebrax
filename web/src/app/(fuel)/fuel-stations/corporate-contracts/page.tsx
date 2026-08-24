@@ -1,4 +1,5 @@
 'use client';
+import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -75,7 +76,7 @@ export default function CorporateFuelContractsPage() {
     { accessorKey: 'status', header: t('status'), cell: ({ row }) => <Badge tone={STATUS_TONE[row.original.status]}>{statusLabel(row.original.status)}</Badge> },
     { accessorKey: 'credit_limit_minor', header: t('creditLimit'), cell: ({ row }) => <span className="num text-end">{formatMinorRiyal(row.original.credit_limit_minor)}</span> },
     { accessorKey: 'payment_terms_days', header: t('paymentTerms'), cell: ({ row }) => <span>{t('days', { count: row.original.payment_terms_days })}</span> },
-    { accessorKey: 'effective_from', header: t('effectiveFrom'), cell: ({ row }) => <span className="num">{new Date(row.original.effective_from).toLocaleDateString()}</span> },
+    { accessorKey: 'effective_from', header: t('effectiveFrom'), cell: ({ row }) => <span className="num">{new Date(row.original.effective_from).toLocaleDateString(DISPLAY_LOCALE)}</span> },
     { id: 'actions', header: t('actions'), cell: ({ row }) => <div className="flex flex-wrap justify-end gap-1.5">
       {row.original.status === 'draft' && can('fuel.contract.activate') && <Button size="sm" disabled={busy} onClick={() => void transition(row.original, 'activate')}><CheckCircle2 className="h-3.5 w-3.5" />{t('activate')}</Button>}
       {row.original.status === 'active' && can('fuel.contract.suspend') && <Button size="sm" variant="outline" disabled={busy} onClick={() => void transition(row.original, 'suspend')}><PauseCircle className="h-3.5 w-3.5" />{t('suspend')}</Button>}

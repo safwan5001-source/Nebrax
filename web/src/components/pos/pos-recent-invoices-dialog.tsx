@@ -1,4 +1,5 @@
 'use client';
+import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -49,7 +50,7 @@ export function PosRecentInvoicesDialog({ open, onClose }: { open: boolean; onCl
   function dateLabel(invoice: RecentPosInvoice) {
     const value = invoice.created_at ?? invoice.invoice_date;
     if (!value) return '—';
-    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: invoice.created_at ? 'short' : undefined }).format(new Date(value));
+    return new Intl.DateTimeFormat(DISPLAY_LOCALE, { dateStyle: 'medium', timeStyle: invoice.created_at ? 'short' : undefined }).format(new Date(value));
   }
 
   return (

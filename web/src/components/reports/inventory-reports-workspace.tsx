@@ -1,4 +1,5 @@
 'use client';
+import { displayLocale } from '@/lib/formatting';
 
 /**
  * تقارير المخزون: لقطة قيمة عالمية، كميات مخازن، سجل حركات، أذون وجرد مرحّل.
@@ -131,7 +132,7 @@ export function InventoryReportsWorkspace({ view }: { view: InventoryReportView 
 
   useEffect(() => load(), [load]);
 
-  const count = useMemo(() => new Intl.NumberFormat(locale).format.bind(new Intl.NumberFormat(locale)), [locale]);
+  const count = useMemo(() => new Intl.NumberFormat(displayLocale(locale)).format.bind(new Intl.NumberFormat(displayLocale(locale))), [locale]);
   const historical = view === 'movements' || view === 'operations' || view === 'stocktakes';
   const text = (value: string | null | undefined) => value || '—';
   const signed = (value: number | undefined) => {

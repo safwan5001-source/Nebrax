@@ -1,4 +1,5 @@
 'use client';
+import { displayLocale } from '@/lib/formatting';
 
 import { useMemo } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -38,7 +39,7 @@ function humanDate(value: string, locale: string): string {
   const parsed = new Date(`${value}T12:00:00`);
   return Number.isNaN(parsed.valueOf())
     ? value
-    : new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-GB', {
+    : new Intl.DateTimeFormat(displayLocale(locale), {
         day: '2-digit', month: 'short', year: 'numeric',
       }).format(parsed);
 }
@@ -77,7 +78,7 @@ export function PartnerStatementDocument({
     ? t('all_branches')
     : t('branches_selected', { count: filters.branchIds.length });
 
-  const generatedAt = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-GB', {
+  const generatedAt = new Intl.DateTimeFormat(displayLocale(locale), {
     dateStyle: 'medium', timeStyle: 'short',
   }).format(new Date());
 

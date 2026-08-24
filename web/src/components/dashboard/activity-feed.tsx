@@ -1,4 +1,5 @@
 'use client';
+import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -64,7 +65,7 @@ export function ActivityFeed({ limit = 6 }: { limit?: number }) {
                 {r.user_name && <span className="text-muted"> — {r.user_name}</span>}
               </p>
               <p className="num mt-0.5 text-[11.5px] text-muted">
-                {new Date(r.created_at).toLocaleString('ar-SA')}
+                {new Date(r.created_at).toLocaleString(ARABIC_DISPLAY_LOCALE)}
               </p>
             </div>
           </li>

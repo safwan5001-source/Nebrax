@@ -1,4 +1,5 @@
 import type { CurrencyCode } from '../types';
+import { displayLocale } from '@/lib/formatting';
 import { getCurrency, type CurrencyConfig } from '../constants/currencies';
 
 /**
@@ -13,7 +14,7 @@ export function formatMoney(minor: number, currency: CurrencyCode | CurrencyConf
   if (!Number.isFinite(n)) return '—';
 
   const value = n / 10 ** cfg.precision;
-  const body = new Intl.NumberFormat(cfg.locale, {
+  const body = new Intl.NumberFormat(displayLocale(cfg.locale), {
     minimumFractionDigits: cfg.precision,
     maximumFractionDigits: cfg.precision,
   }).format(value);

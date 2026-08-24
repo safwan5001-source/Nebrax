@@ -1,3 +1,4 @@
+import { displayLocale } from '@/lib/formatting';
 function normalizedDecimal(input: string | number): string {
   return String(input)
     .trim()
@@ -35,7 +36,7 @@ export function formatLiters(value: string | number | null | undefined, locale?:
   const liters = Number(value ?? 0);
   if (!Number.isFinite(liters)) return '—';
 
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(liters)} L`;
+  return `${new Intl.NumberFormat(displayLocale(locale), { maximumFractionDigits: 3 }).format(liters)} L`;
 }
 
 export function formatMillilitersAsLiters(value: string | number | null | undefined, locale?: string): string {

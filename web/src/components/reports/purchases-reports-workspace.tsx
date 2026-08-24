@@ -1,4 +1,5 @@
 'use client';
+import { displayLocale } from '@/lib/formatting';
 
 /**
  * أسلوب «دفتر التحليل»: نطاق مشتريات واضح وملخص مالي قبل التفاصيل، مع بطاقات
@@ -107,7 +108,7 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
 
   useEffect(() => load(), [load]);
 
-  const count = useMemo(() => new Intl.NumberFormat(locale).format.bind(new Intl.NumberFormat(locale)), [locale]);
+  const count = useMemo(() => new Intl.NumberFormat(displayLocale(locale)).format.bind(new Intl.NumberFormat(displayLocale(locale))), [locale]);
   const rowLabel = useCallback((row: PurchaseRow) => row.label ?? (view === 'product' ? t('manualItem') : t('unassigned')), [view, t]);
 
   const doc = useMemo<ReportDoc | null>(() => {

@@ -1,4 +1,5 @@
 'use client';
+import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -295,7 +296,7 @@ function RuntimeCard({ runtime, t }: { runtime: RuntimeSummary; t: Translate }) 
         <Metric label={t('queued')} value={runtime.queued_runs} />
         <Metric label={t('running')} value={runtime.running_runs} />
         <Metric label={t('failed')} value={runtime.failed_runs} />
-        <Metric label={t('lastHeartbeat')} value={runtime.worker_last_seen_at ? new Date(runtime.worker_last_seen_at).toLocaleString() : t('never')} />
+        <Metric label={t('lastHeartbeat')} value={runtime.worker_last_seen_at ? new Date(runtime.worker_last_seen_at).toLocaleString(DISPLAY_LOCALE) : t('never')} />
       </CardContent>
     </Card>
   );
@@ -316,7 +317,7 @@ function SettingsCard({ title, description, icon: Icon, enabled, configuredAt, o
             {enabled ? t('enabled') : t('disabled')}
           </label>
         </div>
-        {configuredAt && <p className="mt-2 text-xs text-muted">{t('configuredAt', { date: new Date(configuredAt).toLocaleString() })}</p>}
+        {configuredAt && <p className="mt-2 text-xs text-muted">{t('configuredAt', { date: new Date(configuredAt).toLocaleString(DISPLAY_LOCALE) })}</p>}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>

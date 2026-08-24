@@ -1,3 +1,4 @@
+import { displayLocale } from '@/lib/formatting';
 import type { Company } from '@/lib/company';
 import type { PartnerStatementData, StatementFilters } from '@/components/partners/partner-statement-document';
 
@@ -84,7 +85,7 @@ function formatDate(value: string, locale: string): string {
   if (!value) return '—';
   const date = new Date(`${value}T12:00:00`);
   if (Number.isNaN(date.valueOf())) return value;
-  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-GB', {
+  return new Intl.DateTimeFormat(displayLocale(locale), {
     day: '2-digit', month: 'short', year: 'numeric',
   }).format(date);
 }

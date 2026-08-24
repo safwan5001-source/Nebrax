@@ -1,4 +1,5 @@
 'use client';
+import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -149,7 +150,7 @@ export default function ApplicationsPage() {
   function commercialDetail(app: ApplicationEntry) {
     const commercial = app.commercial;
     if (!commercial) return null;
-    const date = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
+    const date = (value: string) => new Intl.DateTimeFormat(DISPLAY_LOCALE, { dateStyle: 'medium' }).format(new Date(value));
     if (commercial.trial_until) return <p className="mt-1 text-xs text-muted">{t('commercialDetails.trialUntil', { date: date(commercial.trial_until) })}</p>;
     if (commercial.cancels_at) return <p className="mt-1 text-xs text-muted">{t('commercialDetails.cancelsAt', { date: date(commercial.cancels_at) })}</p>;
     if (commercial.expired) return <p className="mt-1 text-xs text-muted">{t('commercialDetails.expired')}</p>;

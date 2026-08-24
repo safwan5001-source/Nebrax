@@ -1,4 +1,5 @@
 'use client';
+import { displayLocale } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -158,7 +159,7 @@ function statusLabel(value: string, t: ReturnType<typeof useTranslations>) { ret
 function scheduleTypeLabel(value: string, t: ReturnType<typeof useTranslations>) { return t(`scheduleTypes.${value}`); }
 function workStatuses(t: ReturnType<typeof useTranslations>) { return ['reported', 'triaged', 'scheduled', 'in_progress', 'completed', 'verified', 'closed'].map((value) => ({ value, label: statusLabel(value, t) })); }
 function priorityOptions(t: ReturnType<typeof useTranslations>) { return ['low', 'medium', 'high', 'critical'].map((value) => ({ value, label: statusLabel(value, t) })); }
-function date(value: string | null | undefined, locale: string) { return value ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—'; }
+function date(value: string | null | undefined, locale: string) { return value ? new Intl.DateTimeFormat(displayLocale(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—'; }
 function integer(value: string) { return value.trim() === '' ? undefined : Number.parseInt(value, 10); }
 function minor(value: string) { if (value.trim() === '') return undefined; const result = riyalToMinor(value); return Number.isFinite(result) ? result : undefined; }
 function compact<T extends Record<string, unknown>>(value: T): T { return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== '' && item !== undefined)) as T; }

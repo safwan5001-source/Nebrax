@@ -1,4 +1,5 @@
 'use client';
+import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -252,5 +253,5 @@ function shiftStatusLabel(t: ReturnType<typeof useTranslations>, status: string)
 }
 
 function formatDate(value: string | null) {
-  return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
+  return value ? new Intl.DateTimeFormat(DISPLAY_LOCALE, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
 }

@@ -1,4 +1,5 @@
 'use client';
+import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
@@ -313,7 +314,7 @@ export default function ProductProfilePage() {
           <Card>
             <CardHeader><CardTitle>{t('activity')}</CardTitle></CardHeader>
             <CardContent>
-              {activities.length === 0 ? <p className="text-sm text-muted">{t('no_activity')}</p> : <ol className="space-y-3 border-s border-border ps-4">{activities.map((activity) => <li key={activity.id} className="relative"><span aria-hidden className="absolute -start-[1.35rem] top-1.5 h-2.5 w-2.5 rounded-full bg-primary" /><p className="font-medium text-text">{activity.action}</p><p className="text-xs text-muted">{t('activity_by', { name: activity.user?.name ?? t('activity_unknown_user') })}{activity.created_at ? ` · ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(activity.created_at))}` : ''}</p></li>)}</ol>}
+              {activities.length === 0 ? <p className="text-sm text-muted">{t('no_activity')}</p> : <ol className="space-y-3 border-s border-border ps-4">{activities.map((activity) => <li key={activity.id} className="relative"><span aria-hidden className="absolute -start-[1.35rem] top-1.5 h-2.5 w-2.5 rounded-full bg-primary" /><p className="font-medium text-text">{activity.action}</p><p className="text-xs text-muted">{t('activity_by', { name: activity.user?.name ?? t('activity_unknown_user') })}{activity.created_at ? ` · ${new Intl.DateTimeFormat(DISPLAY_LOCALE, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(activity.created_at))}` : ''}</p></li>)}</ol>}
             </CardContent>
           </Card>
         </TabPanel>

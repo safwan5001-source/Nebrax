@@ -1,4 +1,5 @@
 'use client';
+import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { ActiveFilterChips } from './active-filter-chips';
 import { QuickFilters } from './quick-filters';
@@ -57,8 +58,8 @@ export function DataExplorerToolbar({
         {typeof resultCount === 'number' ? (
           <p className="ms-auto text-xs text-muted" aria-live="polite">
             {typeof totalCount === 'number' && totalCount !== resultCount
-              ? `${resultCount.toLocaleString('ar-SA')} من أصل ${totalCount.toLocaleString('ar-SA')}`
-              : `${resultCount.toLocaleString('ar-SA')} نتيجة`}
+              ? `${resultCount.toLocaleString(ARABIC_DISPLAY_LOCALE)} من أصل ${totalCount.toLocaleString(ARABIC_DISPLAY_LOCALE)}`
+              : `${resultCount.toLocaleString(ARABIC_DISPLAY_LOCALE)} نتيجة`}
           </p>
         ) : null}
       </div>

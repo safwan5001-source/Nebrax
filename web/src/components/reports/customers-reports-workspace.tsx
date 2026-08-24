@@ -1,4 +1,5 @@
 'use client';
+import { displayLocale } from '@/lib/formatting';
 
 /**
  * دفتر تحليل العملاء: لا يخلط مصادره. المبيعات والذمم من فواتير بيع مرحّلة،
@@ -109,7 +110,7 @@ export function CustomersReportsWorkspace({ view }: { view: CustomerReportView }
 
   useEffect(() => load(), [load]);
 
-  const count = useMemo(() => new Intl.NumberFormat(locale).format.bind(new Intl.NumberFormat(locale)), [locale]);
+  const count = useMemo(() => new Intl.NumberFormat(displayLocale(locale)).format.bind(new Intl.NumberFormat(displayLocale(locale))), [locale]);
   const rowLabel = useCallback((row: CustomerRow) => row.label ?? t('customer'), [t]);
 
   const doc = useMemo<ReportDoc | null>(() => {

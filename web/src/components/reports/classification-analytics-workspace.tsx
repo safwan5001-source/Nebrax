@@ -1,4 +1,5 @@
 'use client';
+import { displayLocale } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -65,7 +66,7 @@ export function ClassificationAnalyticsWorkspace() {
   }, [filters.scope]);
 
   const options = useMemo<ComboOption[]>(() => classifications.map((item) => ({ value: item.id, label: item.name })), [classifications]);
-  const count = useMemo(() => new Intl.NumberFormat(locale).format.bind(new Intl.NumberFormat(locale)), [locale]);
+  const count = useMemo(() => new Intl.NumberFormat(displayLocale(locale)).format.bind(new Intl.NumberFormat(displayLocale(locale))), [locale]);
   const displayAmount = useCallback((amount: string) => formatRiyal(amount), []);
 
   function setScope(scope: ClassificationScope) {
