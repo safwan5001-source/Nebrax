@@ -5,6 +5,7 @@ namespace App\Jobs\DocumentCenter;
 use App\Contracts\DocumentSafetyScanner;
 use App\Models\DocumentFile;
 use App\Models\DocumentProcessingRun;
+use App\Services\DocumentCenter\DocumentExtractionService;
 use App\Services\DocumentCenter\DocumentFileScanService;
 use App\Services\DocumentCenter\DocumentProcessingService;
 use App\Services\DocumentCenter\DocumentStorageService;
@@ -65,6 +66,7 @@ class ScanDocumentFile implements ShouldBeUnique, ShouldQueue
         DocumentSafetyScanner $scanner,
         DocumentFileScanService $scanDecisions,
         PlatformIntegrationResolver $settings,
+        ?DocumentExtractionService $extraction = null,
     ): void {
         $tenant->forget();
         $branch->forget();
@@ -85,7 +87,10 @@ class ScanDocumentFile implements ShouldBeUnique, ShouldQueue
                 fclose($stream);
             }
 
-            $scanDecisions->record($file, $decision, $scanner->providerName());
+            $scannedFile = $scanDecisions->record($file, $decision, $scanner->providerName());
+            if ($decision === DocumentScanStatus::CLEAN && $extraction !== null) {
+                $extraction->queueExtractions($scannedFile->batch);
+            }
             $processing->succeeded($run);
         } catch (Throwable $exception) {
             $run = DocumentProcessingRun::query()->whereKey($this->processingRunId)->first();

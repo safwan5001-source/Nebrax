@@ -17,6 +17,11 @@ return [
         'use_path_style_endpoint' => filter_var(env('DOCUMENT_STORAGE_PATH_STYLE', true), FILTER_VALIDATE_BOOL),
     ],
 
+    'ai' => [
+        // PR-4 تأسيسي فقط: يمنع هذا الحارس أي اتصال خارجي حتى اعتماد مرحلة تشغيل لاحقة صراحةً.
+        'provider_network_enabled' => false,
+    ],
+
     'intake' => [
         'max_file_kilobytes' => (int) env('DOCUMENT_MAX_FILE_KB', 20480),
         'max_files_per_batch' => (int) env('DOCUMENT_MAX_FILES_PER_BATCH', 10),

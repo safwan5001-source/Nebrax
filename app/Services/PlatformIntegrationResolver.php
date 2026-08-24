@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PlatformIntegrationSetting;
+use App\Services\DocumentCenter\DocumentExtractionPolicy;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -54,6 +55,13 @@ class PlatformIntegrationResolver
             'timeout_seconds' => max(10, min(120, (int) ($configuration['timeout_seconds'] ?? 90))),
             'backoff_seconds' => $this->backoff($configuration['backoff_seconds'] ?? [30, 120, 300]),
         ];
+    }
+
+    public function documentExtractionPolicy(): DocumentExtractionPolicy
+    {
+        $configuration = $this->activeConfiguration('document_ai');
+
+        return $configuration === [] ? DocumentExtractionPolicy::disabled() : new DocumentExtractionPolicy($configuration);
     }
 
     /** @return list<int> */
