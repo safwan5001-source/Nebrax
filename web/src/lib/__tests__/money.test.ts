@@ -1,21 +1,41 @@
 import { describe, it, expect } from 'vitest';
-import { formatRiyal, riyalToMinor, isNegative, extractInclusiveTax } from '../money';
+import {
+  SAUDI_RIYAL_SYMBOL,
+  formatRiyal,
+  formatRiyalShort,
+  riyalToMinor,
+  isNegative,
+  extractInclusiveTax,
+} from '../money';
 
-describe('formatRiyal — العرض من الريال إلى نص بفواصل + ﷼', () => {
+describe('formatRiyal — العرض برمز الريال السعودي الرسمي U+20C1', () => {
+  it('يثبّت الرمز الرسمي ولا يستخدم الرمز القديم أو اختصارات نصية', () => {
+    expect(SAUDI_RIYAL_SYMBOL).toBe('\u20C1');
+    expect(SAUDI_RIYAL_SYMBOL.codePointAt(0)).toBe(0x20c1);
+
+    for (const formatted of [formatRiyal(1150), formatRiyalShort(1150)]) {
+      expect(formatted).toContain(SAUDI_RIYAL_SYMBOL);
+      expect(formatted).not.toContain('﷼');
+      expect(formatted).not.toContain('ر.س');
+      expect(formatted).not.toContain('SAR');
+      expect(formatted).not.toContain('ريال');
+    }
+  });
+
   it('ينسّق نصاً وعدداً بفاصلتين', () => {
-    expect(formatRiyal('1150.00')).toBe('1,150.00 ﷼');
-    expect(formatRiyal(1150)).toBe('1,150.00 ﷼');
-    expect(formatRiyal(0)).toBe('0.00 ﷼');
-    expect(formatRiyal(1234567.5)).toBe('1,234,567.50 ﷼');
+    expect(formatRiyal('1150.00')).toBe(`1,150.00 ${SAUDI_RIYAL_SYMBOL}`);
+    expect(formatRiyal(1150)).toBe(`1,150.00 ${SAUDI_RIYAL_SYMBOL}`);
+    expect(formatRiyal(0)).toBe(`0.00 ${SAUDI_RIYAL_SYMBOL}`);
+    expect(formatRiyal(1234567.5)).toBe(`1,234,567.50 ${SAUDI_RIYAL_SYMBOL}`);
   });
 
   it('يحافظ على إشارة السالب', () => {
-    expect(formatRiyal('-115.00')).toBe('-115.00 ﷼');
+    expect(formatRiyal('-115.00')).toBe(`-115.00 ${SAUDI_RIYAL_SYMBOL}`);
   });
 
   it('يتعامل مع null/undefined كصفر', () => {
-    expect(formatRiyal(null)).toBe('0.00 ﷼');
-    expect(formatRiyal(undefined)).toBe('0.00 ﷼');
+    expect(formatRiyal(null)).toBe(`0.00 ${SAUDI_RIYAL_SYMBOL}`);
+    expect(formatRiyal(undefined)).toBe(`0.00 ${SAUDI_RIYAL_SYMBOL}`);
   });
 });
 
