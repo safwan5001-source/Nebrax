@@ -9,7 +9,6 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     title: 'Application Management',
     subtitle: 'Application controls',
     experienceTitle: 'Applications',
-    experienceSubtitle: 'Operational controls',
     allTab: 'All',
     noAccess: 'No access',
     loadFailed: 'Load failed',
@@ -24,21 +23,14 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     emptyTitle: 'No applications',
     securityNotice: 'Security notice',
     'columns.name': 'Application',
-    'columns.group': 'Group',
-    'columns.commercial': 'Commercial',
-    'columns.access': 'Effective access',
-    'columns.operational': 'Operational',
     'columns.dependencies': 'Dependencies',
-    'columns.actions': 'Actions',
     'commercial.trial': 'Trial',
     'commercial.addon': 'Add-on',
     'commercial.included': 'Included',
-    'access.full': 'Full',
-    'access.denied': 'Denied',
-    'dependencies.notApplicable': 'None',
-    'dependencies.missing': 'Missing',
+    'commercial.not_available': 'Not available',
     'actions.unavailable': 'Unavailable',
     'actions.blocked.access_denied': 'Activation is unavailable because effective access is denied.',
+    'actions.blocked.read_only': 'Application is read only.',
     'actions.blocked.dependencies_missing': 'Enable the required dependencies before activating this application.',
   };
   const translator = Object.assign((key: string) => strings[key] ?? key, {
@@ -61,20 +53,22 @@ vi.mock('next-intl', () => ({ useTranslations: () => translate }));
 vi.mock('@/lib/auth', () => ({ currentUser }));
 vi.mock('@/lib/api', () => ({ api, ApiError: class ApiError extends Error {} }));
 vi.mock('lucide-react', () => ({
-  Boxes: () => <span />, CircleAlert: () => <span />, Clock3: () => <span />, LayoutGrid: () => <span />, ShieldCheck: () => <span />,
+  CircleAlert: () => <span />,
+  Clock3: () => <span />,
+  LayoutGrid: () => <span />,
+  LockKeyhole: () => <span />,
+  Search: () => <span />,
+  ShieldCheck: () => <span />,
 }));
 vi.mock('@/components/ui/button', () => ({ Button: ({ children, ...props }: any) => <button {...props}>{children}</button> }));
 vi.mock('@/components/ui/badge', () => ({ Badge: ({ children }: any) => <span>{children}</span> }));
 vi.mock('@/components/ui/card', () => ({
   Card: ({ children }: any) => <section>{children}</section>,
   CardContent: ({ children }: any) => <div>{children}</div>,
-  CardHeader: ({ children }: any) => <header>{children}</header>,
-  CardTitle: ({ children }: any) => <h2>{children}</h2>,
 }));
 vi.mock('@/components/ui/dialog', () => ({ Dialog: () => null }));
 vi.mock('@/components/ui/label', () => ({ Label: ({ children }: any) => <label>{children}</label> }));
 vi.mock('@/components/ui/textarea', () => ({ Textarea: (props: any) => <textarea {...props} /> }));
-vi.mock('@/components/ui/tabs', () => ({ Tabs: () => null }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
 
 const app = (key: string, availability: 'trial' | 'addon' | 'included', overrides = {}) => ({
@@ -94,10 +88,11 @@ const app = (key: string, availability: 'trial' | 'addon' | 'included', override
   ...overrides,
 });
 
-function rowFor(label: string) {
-  const labelInTable = screen.getAllByText(label).find((element) => element.closest('tr'));
-  if (!labelInTable) throw new Error(`Expected a table row for ${label}`);
-  return labelInTable.closest('tr') as HTMLTableRowElement;
+function cardFor(label: string) {
+  const heading = screen.getByRole('heading', { name: label });
+  const card = heading.closest('article');
+  if (!card) throw new Error(`Expected an application card for ${label}`);
+  return card;
 }
 
 describe('ApplicationsPage operational actions', () => {
@@ -117,23 +112,38 @@ describe('ApplicationsPage operational actions', () => {
     } });
   });
 
-  it('enables disabled built applications with full access regardless of trial, add-on, or included commercial metadata', async () => {
-    await render(<ApplicationsPage />);
-    await screen.findAllByText('Fuel trial');
+  it('offers an accessible activation switch for eligible built applications regardless of commercial metadata', async () => {
+    render(<ApplicationsPage />);
+    await screen.findByRole('heading', { name: 'Fuel trial' });
 
     for (const label of ['Fuel trial', 'Fuel add-on', 'Fuel included']) {
-      expect((within(rowFor(label)).getByRole('button', { name: 'Enable' }) as HTMLButtonElement).disabled).toBe(false);
+      const control = within(cardFor(label)).getByRole('switch', { name: `Enable ${label}` }) as HTMLButtonElement;
+      expect(control.disabled).toBe(false);
+      expect(control.getAttribute('aria-checked')).toBe('false');
     }
   });
 
-  it('keeps denied access unavailable and explains dependency blocks without offering activation', async () => {
-    await render(<ApplicationsPage />);
-    await screen.findAllByText('Fuel denied');
+  it('keeps denied access and missing dependencies blocked while explaining why', async () => {
+    render(<ApplicationsPage />);
+    await screen.findByRole('heading', { name: 'Fuel denied' });
 
-    expect((within(rowFor('Fuel denied')).getByRole('button', { name: 'Enable' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(within(rowFor('Fuel denied')).getByText('Activation is unavailable because effective access is denied.')).toBeTruthy();
+    const denied = within(cardFor('Fuel denied'));
+    expect((denied.getByRole('switch', { name: 'Enable Fuel denied' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(denied.getByText('Activation is unavailable because effective access is denied.')).toBeTruthy();
 
-    expect((within(rowFor('Fuel dependency')).getByRole('button', { name: 'Enable' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(within(rowFor('Fuel dependency')).getByText('Enable the required dependencies before activating this application.')).toBeTruthy();
+    const dependency = within(cardFor('Fuel dependency'));
+    expect((dependency.getByRole('switch', { name: 'Enable Fuel dependency' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(dependency.getByText('Enable the required dependencies before activating this application.')).toBeTruthy();
+  });
+
+  it('renders compact status controls and group-level bulk actions', async () => {
+    render(<ApplicationsPage />);
+    await screen.findByRole('heading', { name: 'Fuel trial' });
+
+    expect(screen.getAllByRole('button', { name: 'All' }).length).toBeGreaterThan(0);
+    const group = screen.getByRole('heading', { name: 'Fuel Stations' }).closest('section');
+    if (!group) throw new Error('Expected Fuel Stations group');
+    expect(within(group).getByRole('button', { name: 'Enable' })).toBeTruthy();
+    expect(within(group).getByRole('button', { name: 'Disable' })).toBeTruthy();
   });
 });
