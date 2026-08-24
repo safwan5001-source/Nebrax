@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,16 +36,20 @@ export default function NewStockPermitPage() {
   const tf = useTranslations('invoiceForm');
   const tc = useTranslations('common');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { success } = useToast();
+  const requestedType = searchParams.get('type');
+  const requestedProductId = searchParams.get('product') ?? '';
+  const initialType: PermitType = requestedType === 'receipt' || requestedType === 'transfer' || requestedType === 'issue' ? requestedType : 'issue';
 
-  const [type, setType] = useState<PermitType>('issue');
+  const [type, setType] = useState<PermitType>(initialType);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
   const [targetId, setTargetId] = useState('');
   const [date, setDate] = useState('');
   const [reason, setReason] = useState('');
-  const [lines, setLines] = useState<Line[]>([newLine()]);
+  const [lines, setLines] = useState<Line[]>(() => [{ ...newLine(), productId: requestedProductId }]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('stock_permit', { seriesKey: type, date });
