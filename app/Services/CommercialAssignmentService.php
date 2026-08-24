@@ -169,7 +169,9 @@ class CommercialAssignmentService
             ->exists();
 
         if ($hasRecordedTrial) {
-            $preview['conflicts'][] = 'A trial for this commercial version has already been recorded for this tenant.';
+            // التجربة المسجلة assignment نشط، لذلك يلتقطها فحص التداخل العام أيضاً.
+            // نحافظ على سبب واحد دلالي: التجربة لا تتكرر حتى إن تطابقت نافذتها زمنياً.
+            $preview['conflicts'] = ['A trial for this commercial version has already been recorded for this tenant.'];
         }
         $preview['trial_duration_days'] = $durationDays;
 
