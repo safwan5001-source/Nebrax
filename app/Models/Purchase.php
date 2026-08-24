@@ -62,6 +62,12 @@ class Purchase extends BaseModel
         return $this->hasMany(PurchaseLine::class);
     }
 
+    /** مرفقات فاتورة المورد الخاصة؛ تتبع المستند ولا تنشئ أثراً مستقلاً. */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(PurchaseAttachment::class);
+    }
+
     /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {

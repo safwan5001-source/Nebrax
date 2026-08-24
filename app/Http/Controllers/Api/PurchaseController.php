@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\StorePurchaseAttachmentsRequest;
 use App\Http\Requests\StorePurchaseRequest;
 use App\Http\Requests\UpdateDocumentClassificationRequest;
 use App\Http\Resources\PurchaseResource;
@@ -10,6 +11,7 @@ use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Purchase;
+use App\Models\PurchaseAttachment;
 use App\Models\StockMovement;
 use App\Services\Accounting\PurchaseRelationsService;
 use App\Services\Accounting\PurchaseService;
@@ -17,6 +19,8 @@ use App\Services\ClassificationService;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PurchaseController extends ApiController
 {
@@ -49,7 +53,57 @@ class PurchaseController extends ApiController
 
     public function show(Request $request, string $id): JsonResponse
     {
-        return (new PurchaseResource($this->visiblePurchase($request, $id)->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
+        return (new PurchaseResource($this->visiblePurchase($request, $id)->load(['lines', 'attachments', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
+    }
+
+    /** قائمة مرفقات فاتورة المورد ضمن نطاق الفرع المسموح. */
+    public function indexAttachments(Request $request, string $id): JsonResponse
+    {
+        $purchase = $this->visiblePurchase($request, $id);
+
+        return response()->json(['data' => $this->attachmentPayload($purchase)]);
+    }
+
+    /** تُرفع المرفقات بعد إنشاء الفاتورة كي ترتبط بمعرف مصدر موثوق فقط. */
+    public function storeAttachments(StorePurchaseAttachmentsRequest $request, string $id): JsonResponse
+    {
+        $purchase = $this->visiblePurchase($request, $id);
+        $this->persistAttachments($request, $purchase);
+
+        return response()->json(['data' => $this->attachmentPayload($purchase)], 201);
+    }
+
+    /** تنزيل خاص بعد إثبات أن المرفق يعود لفاتورة مرئية للمستخدم. */
+    public function downloadAttachment(Request $request, string $id, string $attachmentId): StreamedResponse
+    {
+        $purchase = $this->visiblePurchase($request, $id);
+        $attachment = $purchase->attachments()->whereKey($attachmentId)->firstOrFail();
+        $disk = Storage::disk($attachment->disk);
+
+        if (! $disk->exists($attachment->path)) {
+            abort(404, 'ملف المرفق غير موجود.');
+        }
+
+        return $disk->download($attachment->path, $attachment->original_name, [
+            'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
+        ]);
+    }
+
+    /** حذف مرفق مسودة فقط، مع تنظيف الملف الخاص من القرص. */
+    public function destroyAttachment(Request $request, string $id, string $attachmentId): JsonResponse
+    {
+        $purchase = $this->visiblePurchase($request, $id);
+        if (! $purchase->isDraft()) {
+            abort(422, 'لا يمكن حذف مرفق من فاتورة مشتريات مرحّلة.');
+        }
+
+        $attachment = $purchase->attachments()->whereKey($attachmentId)->firstOrFail();
+        $disk = $attachment->disk;
+        $path = $attachment->path;
+        $attachment->delete();
+        Storage::disk($disk)->delete($path);
+
+        return response()->json(['message' => 'تم حذف المرفق.']);
     }
 
     /** سندات الصرف المرتبطة بالشراء للقراءة؛ التخصيص لا مبلغ السند الكلي هو المعروض. */
@@ -142,7 +196,12 @@ class PurchaseController extends ApiController
     public function destroy(string $id): JsonResponse
     {
         $purchase = Purchase::findOrFail($id);
+        $attachments = $purchase->attachments()->get();
         $this->domain(fn () => $this->purchases->deleteDraft($purchase));
+
+        foreach ($attachments as $attachment) {
+            Storage::disk($attachment->disk)->delete($attachment->path);
+        }
 
         return response()->json(['message' => 'تم الحذف.']);
     }
@@ -154,6 +213,34 @@ class PurchaseController extends ApiController
         $posted = $this->domain(fn () => $this->purchases->post($purchase));
 
         return (new PurchaseResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
+    }
+
+    /** @return array<int, array{id: string, original_name: string, mime_type: string|null, size: int, created_at: string|null}> */
+    private function attachmentPayload(Purchase $purchase): array
+    {
+        return $purchase->attachments()->latest()->get()->map(fn (PurchaseAttachment $attachment) => [
+            'id' => $attachment->id,
+            'original_name' => $attachment->original_name,
+            'mime_type' => $attachment->mime_type,
+            'size' => (int) $attachment->size,
+            'created_at' => optional($attachment->created_at)->toIso8601String(),
+        ])->all();
+    }
+
+    private function persistAttachments(StorePurchaseAttachmentsRequest $request, Purchase $purchase): void
+    {
+        foreach ($request->file('attachments', []) as $file) {
+            $path = $file->store("purchases/{$purchase->id}", 'local');
+
+            $purchase->attachments()->create([
+                'disk' => 'local',
+                'path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+                'uploaded_by' => $request->user()?->id,
+            ]);
+        }
     }
 
     private function visiblePurchase(Request $request, string $id): Purchase

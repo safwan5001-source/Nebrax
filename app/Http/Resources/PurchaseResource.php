@@ -48,6 +48,13 @@ class PurchaseResource extends JsonResource
             'thermal_template_revision_id' => $this->thermal_template_revision_id,
             'thermal_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('thermalTemplateRevision')),
             'remaining'           => Money::toRiyal($this->remaining()),
+            'attachments'         => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn ($attachment) => [
+                'id' => $attachment->id,
+                'original_name' => $attachment->original_name,
+                'mime_type' => $attachment->mime_type,
+                'size' => (int) $attachment->size,
+                'created_at' => optional($attachment->created_at)->toIso8601String(),
+            ])->values()),
             'lines'               => InvoiceLineResource::collection($this->whenLoaded('lines')),
         ];
     }

@@ -1714,6 +1714,32 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     if (productMediaItem && m === 'DELETE') {
       return deleteDemoProductMedia(productMediaItem[1], productMediaItem[2]).then(() => ({ message: 'تم حذف الوسيط.' }) as T);
     }
+    const purchaseAttachmentCollection = clean.match(/^\/purchases\/([^/]+)\/attachments$/);
+    if (purchaseAttachmentCollection && m === 'POST') {
+      const purchaseId = purchaseAttachmentCollection[1];
+      const store = (globalThis as typeof globalThis & { __nebraxPurchaseAttachments?: Record<string, Array<{ id: string; original_name: string; mime_type: string | null; size: number; created_at: string }>> }).__nebraxPurchaseAttachments ?? {};
+      (globalThis as typeof globalThis & { __nebraxPurchaseAttachments?: typeof store }).__nebraxPurchaseAttachments = store;
+      const form = typeof FormData !== 'undefined' && body instanceof FormData ? body : null;
+      const files = form ? form.getAll('attachments[]').filter((item): item is File => typeof File !== 'undefined' && item instanceof File) : [];
+      const created = files.map((file, index) => ({
+        id: `demo-purchase-attachment-${Date.now()}-${index}`,
+        original_name: file.name,
+        mime_type: file.type || null,
+        size: file.size,
+        created_at: new Date().toISOString(),
+      }));
+      store[purchaseId] = [...(store[purchaseId] ?? []), ...created];
+      return resolve({ data: store[purchaseId] });
+    }
+    const purchaseAttachmentDelete = clean.match(/^\/purchases\/([^/]+)\/attachments\/([^/]+)$/);
+    if (purchaseAttachmentDelete && m === 'DELETE') {
+      const purchaseId = purchaseAttachmentDelete[1];
+      const attachmentId = purchaseAttachmentDelete[2];
+      const state = globalThis as typeof globalThis & { __nebraxPurchaseAttachments?: Record<string, Array<{ id: string }>> };
+      state.__nebraxPurchaseAttachments ??= {};
+      state.__nebraxPurchaseAttachments[purchaseId] = (state.__nebraxPurchaseAttachments[purchaseId] ?? []).filter((attachment) => attachment.id !== attachmentId);
+      return resolve({ message: 'deleted' });
+    }
     if (clean === '/print-templates') {
       const template = createMockPrintTemplate((body ?? {}) as { name?: string; document_types?: unknown; definition?: unknown });
       mockPrintTemplates.unshift(template);
@@ -1983,6 +2009,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: pt ? mockProcurement.filter((d) => d.type === pt) : mockProcurement });
   }
   if (clean === '/recurring-invoices') return resolve({ data: mockRecurring });
+  const purchaseAttachmentCollection = clean.match(/^\/purchases\/([^/]+)\/attachments$/);
+  if (purchaseAttachmentCollection) {
+    const store = (globalThis as typeof globalThis & { __nebraxPurchaseAttachments?: Record<string, Array<{ id: string; original_name: string; mime_type: string | null; size: number; created_at: string }>> }).__nebraxPurchaseAttachments ?? {};
+    (globalThis as typeof globalThis & { __nebraxPurchaseAttachments?: typeof store }).__nebraxPurchaseAttachments = store;
+    return resolve({ data: store[purchaseAttachmentCollection[1]] ?? [] });
+  }
   if (clean === '/purchases') return resolve({ data: mockPurchases });
   if (clean === '/returns') {
     const rtype = new URLSearchParams(path.split('?')[1] ?? '').get('type');

@@ -667,6 +667,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // المشتريات
         Route::get('purchases', [PurchaseController::class, 'index'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
         Route::get('purchases/{id}', [PurchaseController::class, 'show'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
+        Route::get('purchases/{id}/attachments', [PurchaseController::class, 'indexAttachments'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
+        Route::post('purchases/{id}/attachments', [PurchaseController::class, 'storeAttachments'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::get('purchases/{id}/attachments/{attachmentId}/download', [PurchaseController::class, 'downloadAttachment'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
+        Route::delete('purchases/{id}/attachments/{attachmentId}', [PurchaseController::class, 'destroyAttachment'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
         Route::get('purchases/{id}/payments', [PurchaseController::class, 'payments'])->middleware([$perm('payments.view'), $app('purchases.cycle')]);
         Route::get('purchases/{id}/accounting', [PurchaseController::class, 'accounting'])->middleware([$perm('reports.view'), $app('purchases.cycle')]);
         Route::get('purchases/{id}/inventory', [PurchaseController::class, 'inventory'])->middleware([$perm('products.view'), $app('purchases.cycle')]);

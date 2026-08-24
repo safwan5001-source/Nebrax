@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Plus, Trash2, Users, Package, FileText, Paperclip, Percent, Truck, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Plus, Trash2, Users, Package, FileText, Paperclip, Percent, Truck, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,8 @@ interface ApiLine {
   product_id: string | null; description: string | null; quantity: number;
   unit_name: string | null; unit_price: string; tax_rate: number; line_discount?: string;
 }
+interface StoredAttachment { id: string; original_name: string; mime_type: string | null; size: number; created_at?: string | null }
+
 interface ApiPurchase {
   partner_id: string; warehouse_id: string | null; cost_center_id: string | null; payment_type: string;
   purchase_date: string | null; supplier_invoice_no: string | null;
@@ -39,6 +41,7 @@ interface ApiPurchase {
   discount?: string; shipping?: string; adjustment?: string;
   paid_on_post?: string; payment_method?: string;
   received_status?: string; received_date?: string | null;
+  attachments?: StoredAttachment[];
 }
 
 interface Line {
@@ -76,7 +79,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const tf = useTranslations('invoiceForm');
   const tc = useTranslations('common');
   const router = useRouter();
-  const { success } = useToast();
+  const { success, error: showError } = useToast();
 
   const [partners, setPartners] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -107,6 +110,10 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingDoc, setLoadingDoc] = useState(!!editId);
+  const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [storedAttachments, setStoredAttachments] = useState<StoredAttachment[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('purchase', { date, enabled: !editId });
 
   const loadPartners = useCallback(
@@ -160,6 +167,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
         setPayMethod(d.payment_method ?? 'cash');
         setReceivedStatus(d.received_status ?? 'received');
         setReceivedDate(d.received_date ?? '');
+        setStoredAttachments(d.attachments ?? []);
         setLines(
           d.lines.length
             ? d.lines.map((l) => ({
@@ -206,6 +214,58 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const addLine = () => setLines((ls) => [...ls, newLine()]);
   const removeLine = (key: string) =>
     setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : [newLine()]));
+
+  function selectAttachments(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (files.length === 0) return;
+    if (pendingAttachments.length + files.length > 10) {
+      setError(t('attachments_limit'));
+      return;
+    }
+    const allowed = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'image/jpeg', 'image/png', 'image/gif', 'application/zip'];
+    if (files.some((file) => !allowed.includes(file.type) || file.size > 10 * 1024 * 1024)) {
+      setError(t('attachments_invalid'));
+      return;
+    }
+    setPendingAttachments((current) => [...current, ...files]);
+  }
+
+  function removePendingAttachment(index: number) {
+    setPendingAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  async function uploadAttachments(purchaseId: string): Promise<boolean> {
+    if (pendingAttachments.length === 0) return true;
+    setUploadingAttachments(true);
+    try {
+      const body = new FormData();
+      pendingAttachments.forEach((file) => body.append('attachments[]', file));
+      const result = await api<{ data: StoredAttachment[] }>(`/purchases/${purchaseId}/attachments`, { method: 'POST', body });
+      setStoredAttachments(result.data);
+      setPendingAttachments([]);
+      return true;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : t('attachments_upload_failed');
+      setError(message);
+      showError(message);
+      return false;
+    } finally {
+      setUploadingAttachments(false);
+    }
+  }
+
+  async function removeStoredAttachment(attachmentId: string) {
+    if (!editId) return;
+    try {
+      await api(`/purchases/${editId}/attachments/${attachmentId}`, { method: 'DELETE' });
+      setStoredAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : t('attachments_delete_failed');
+      setError(message);
+      showError(message);
+    }
+  }
 
   /** اختيار المنتج يملأ التكلفة والضريبة، ويُصفّر الوحدة (قالب المنتج تغيّر). */
   function pickProduct(key: string, productId: string) {
@@ -313,6 +373,10 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
       const id = editId
         ? (await api<{ data: { id: string } }>(`/purchases/${editId}`, { method: 'PUT', body })).data.id
         : (await api<{ data: { id: string } }>('/purchases', { method: 'POST', body })).data.id;
+      if (!await uploadAttachments(id)) {
+        setSaving(false);
+        return;
+      }
       if (post) await api(`/purchases/${id}/post`, { method: 'POST' });
       success(tc(editId ? 'updated' : 'created'));
       router.push('/purchases');
@@ -655,7 +719,71 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
             </CardContent>
           </Card>
 
-          <SoonSection icon={Paperclip} title={t('s_attachments')} hint={t('s_attachments_hint')} soon={t('soon')} />
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('s_attachments')}
+                </CardTitle>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{t('s_attachments_hint')}</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" disabled={uploadingAttachments} onClick={() => attachmentInputRef.current?.click()}>
+                <Paperclip className="h-4 w-4" strokeWidth={1.7} />{t('select_attachments')}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                ref={attachmentInputRef}
+                id="purchase-attachments"
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.zip"
+                onChange={selectAttachments}
+                className="sr-only"
+              />
+
+              {pendingAttachments.length === 0 && storedAttachments.length === 0 ? (
+                <button type="button" className="flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded border border-dashed border-border bg-muted/15 text-sm text-muted hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => attachmentInputRef.current?.click()}>
+                  <Paperclip className="h-5 w-5" strokeWidth={1.6} aria-hidden />
+                  <span>{t('attachments_empty')}</span>
+                </button>
+              ) : null}
+
+              {pendingAttachments.length > 0 && (
+                <div className="space-y-2" aria-label={t('attachments_pending')}>
+                  <p className="text-xs font-medium text-text">{t('attachments_pending')}</p>
+                  <ul className="space-y-1.5">
+                    {pendingAttachments.map((file, index) => (
+                      <li key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center gap-2 rounded border border-border px-2.5 py-2 text-sm">
+                        <Paperclip className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+                        <span className="min-w-0 flex-1 truncate" title={file.name}>{file.name}</span>
+                        <span className="num shrink-0 text-xs text-muted">{(file.size / (1024 * 1024)).toFixed(1)} MB</span>
+                        <Button type="button" variant="ghost" size="icon" aria-label={`${t('remove_attachment')}: ${file.name}`} disabled={saving || uploadingAttachments} onClick={() => removePendingAttachment(index)}><Trash2 className="h-4 w-4 text-negative" /></Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {storedAttachments.length > 0 && (
+                <div className="space-y-2" aria-label={t('attachments_uploaded')}>
+                  <p className="text-xs font-medium text-text">{t('attachments_uploaded')}</p>
+                  <ul className="space-y-1.5">
+                    {storedAttachments.map((attachment) => (
+                      <li key={attachment.id} className="flex items-center gap-2 rounded border border-border bg-muted/10 px-2.5 py-2 text-sm">
+                        <Paperclip className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                        <span className="min-w-0 flex-1 truncate" title={attachment.original_name}>{attachment.original_name}</span>
+                        <span className="num shrink-0 text-xs text-muted">{(attachment.size / (1024 * 1024)).toFixed(1)} MB</span>
+                        <Button type="button" variant="ghost" size="icon" aria-label={`${t('remove_attachment')}: ${attachment.original_name}`} disabled={saving || uploadingAttachments} onClick={() => void removeStoredAttachment(attachment.id)}><Trash2 className="h-4 w-4 text-negative" /></Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {uploadingAttachments && <p className="text-xs text-muted">{t('attachments_uploading')}</p>}
+            </CardContent>
+          </Card>
 
           {/* ═══ الملاحظات ═══ */}
           <Card>
@@ -763,23 +891,5 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-muted">{label}</span>
       <span className="num text-text">{value}</span>
     </div>
-  );
-}
-
-/** قسم معروف الموضع ولم يُبنَ بعد — يُعرَض ولا يَعِد. */
-function SoonSection({
-  icon: Icon, title, hint, soon,
-}: { icon: LucideIcon; title: string; hint: string; soon: string }) {
-  return (
-    <Card className="opacity-70">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted" strokeWidth={1.8} />
-          <span className="text-muted">{title}</span>
-          <span className="rounded bg-border px-1.5 py-0.5 text-[10px] font-normal text-muted">{soon}</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent><p className="text-xs leading-relaxed text-muted">{hint}</p></CardContent>
-    </Card>
   );
 }
