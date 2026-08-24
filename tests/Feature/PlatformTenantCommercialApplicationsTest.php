@@ -118,7 +118,9 @@ class PlatformTenantCommercialApplicationsTest extends TestCase
         $this->withToken($platform['token'])
             ->postJson("/api/platform/tenants/{$tenant['tenant_id']}/commercial-assignments/preview", $payload)
             ->assertOk()
-            ->assertJsonCount(1, 'data.conflicts');
+            ->assertJsonCount(1, 'data.conflicts')
+            ->assertJsonPath('data.conflicts.0', 'A trial for this commercial version has already been recorded for this tenant.');
+        $this->assertSame(1, TenantCommercialAssignment::count());
     }
 
     /** @test */
