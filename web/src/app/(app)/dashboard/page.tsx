@@ -26,7 +26,7 @@ import { Registers } from '@/components/dashboard/registers';
 import { ReportFilters, EMPTY_FILTERS, filtersToQuery, type ReportFilterState } from '@/components/reports/report-filters';
 import { api } from '@/lib/api';
 import { barPercent, dailySeries, expenseTone, netIncome, toNumber } from '@/lib/dashboard';
-import { formatNumberShort, formatRiyal, formatRiyalShort } from '@/lib/money';
+import { SAUDI_RIYAL_SYMBOL, formatNumberShort, formatRiyal, formatRiyalShort } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
 interface IncomeStatement { total_revenue: string; total_expense: string; net_income: string }
@@ -154,7 +154,7 @@ export default function DashboardPage() {
         <KpiCard
           label={t('cash')}
           value={formatNumberShort(cash)}
-          unit={t('currency')}
+          unit={SAUDI_RIYAL_SYMBOL}
           icon={Wallet}
           trend={spark.cash}
           trendLabel={t('spark_label')}
@@ -165,7 +165,7 @@ export default function DashboardPage() {
         <KpiCard
           label={t('receivables')}
           value={formatNumberShort(receivables)}
-          unit={t('currency')}
+          unit={SAUDI_RIYAL_SYMBOL}
           icon={Users}
           trend={spark.receivable}
           trendLabel={t('spark_label')}
@@ -179,7 +179,7 @@ export default function DashboardPage() {
         <KpiCard
           label={t('financial_performance')}
           value={formatNumberShort(revenue)}
-          unit={t('currency')}
+          unit={SAUDI_RIYAL_SYMBOL}
           icon={TrendingUp}
           tone="positive"
           trend={spark.sales}
@@ -199,7 +199,7 @@ export default function DashboardPage() {
           <KpiCard
             label={t('inventory_value')}
             value={formatNumberShort(inventoryValue)}
-            unit={t('currency')}
+            unit={SAUDI_RIYAL_SYMBOL}
             icon={Package}
             sub={{ label: t('inventory_note_short'), value: '', tone: 'muted' }}
             loading={loading}
@@ -241,7 +241,7 @@ export default function DashboardPage() {
               ) : (
                 <p className="num mt-1.5 text-[28px] font-bold leading-tight text-text">
                   {formatNumberShort(inventoryValue)}{' '}
-                  <span className="text-[13px] font-medium text-muted">{t('currency')}</span>
+                  <span className="text-[13px] font-medium text-muted">{SAUDI_RIYAL_SYMBOL}</span>
                 </p>
               )}
             </div>
