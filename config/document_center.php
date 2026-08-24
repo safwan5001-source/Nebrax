@@ -2,8 +2,11 @@
 
 return [
     'storage' => [
+        // التخزين الدائم (S3/R2) مؤجل حالياً. عند false يبقى كل ما يمر عبر
+        // DocumentStorageService على القرص المحلي حتى لو وُجد إعداد تكامل محفوظ.
+        'persistent_enabled' => filter_var(env('DOCUMENT_DURABLE_STORAGE_ENABLED', false), FILTER_VALIDATE_BOOL),
         'profile' => 'platform',
-        'driver' => env('DOCUMENT_STORAGE_DRIVER', env('APP_ENV') === 'production' ? 's3' : 'local'),
+        'driver' => env('DOCUMENT_STORAGE_DRIVER', 'local'),
         'disk' => env('DOCUMENT_STORAGE_DISK', 'local'),
         'key' => env('DOCUMENT_STORAGE_KEY'),
         'secret' => env('DOCUMENT_STORAGE_SECRET'),

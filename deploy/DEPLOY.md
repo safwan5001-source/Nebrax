@@ -21,9 +21,14 @@ Docker تُجمّع التطبيق الكامل وقت البناء عبر `depl
    - `APP_KEY` = الناتج من الخطوة 1.
    - `FRONTEND_URL` = نطاق الواجهة على Vercel (مثل `https://nibras.vercel.app`).
      (يمكن إضافة أكثر من نطاق مفصولاً بفواصل.)
-4. اضبط أيضاً بيانات تخزين الكائنات الخاص المتوافقة مع S3/R2 والمعلّمة `sync:false`:
-   - `DOCUMENT_STORAGE_KEY` و`DOCUMENT_STORAGE_SECRET` و`DOCUMENT_STORAGE_BUCKET` و`DOCUMENT_STORAGE_ENDPOINT`.
-   - يبقى `DOCUMENT_STORAGE_DRIVER=s3` كما هو في الـ Blueprint. لا تحفظ صور المنتجات على قرص Render المحلي لأنه مؤقت وقد يُمسح عند إعادة البناء أو الاستبدال.
+4. **التخزين الحالي:** التخزين الدائم S3/R2 مؤجل بقرار المشروع. يبقى
+   `DOCUMENT_DURABLE_STORAGE_ENABLED=false` و`DOCUMENT_STORAGE_DRIVER=local`، ولا يلزم
+   إدخال مفاتيح أو Bucket أو Endpoint حالياً. كل الملفات التي تمر عبر طبقة التخزين
+   تستخدم القرص المحلي كما في السلوك السابق.
+
+   > تنبيه تشغيلي: قرص حاوية Render المحلي مؤقت وقد يفقد الملفات عند إعادة البناء أو
+   > استبدال الحاوية. هذه مخاطرة مؤقتة مقبولة خلال مرحلة التطوير، وسيُعاد تفعيل التخزين
+   > الدائم لاحقاً عندما يصبح المشروع مستعداً لذلك.
 5. **Apply** — يبني Render الصورة، يُرحّل القاعدة تلقائياً عند الإقلاع، ويعطيك
    عنواناً مثل `https://nibras-api.onrender.com`.
 6. تحقّق من الصحّة:
@@ -83,9 +88,16 @@ SELECT migration FROM migrations ORDER BY id DESC LIMIT 5;
 | `FRONTEND_URL` | يدوي | نطاق الواجهة (CORS) |
 | `DB_*` | من قاعدة Render | مربوطة تلقائياً في `render.yaml` |
 | `APP_ENV`/`APP_DEBUG` | افتراضي | production / false |
-| `DOCUMENT_STORAGE_DRIVER` | `render.yaml` | `s3` في الإنتاج لتخزين صور المنتجات والمرفقات |
-| `DOCUMENT_STORAGE_KEY` / `DOCUMENT_STORAGE_SECRET` | يدوي | مفاتيح تخزين الكائنات، تبقى خاصة |
-| `DOCUMENT_STORAGE_BUCKET` / `DOCUMENT_STORAGE_ENDPOINT` | يدوي | الحاوية ونقطة النهاية الخاصة بـ S3/R2 |
+| `DOCUMENT_DURABLE_STORAGE_ENABLED` | `render.yaml` | `false` حالياً؛ قفل مركزي يمنع تفعيل S3/R2 |
+| `DOCUMENT_STORAGE_DRIVER` | `render.yaml` | `local` حالياً |
+| `DOCUMENT_STORAGE_DISK` | `render.yaml` | `local` حالياً |
+
+## التخزين الدائم — مؤجل
+
+بنية S3/R2 وإعداد التكامل تبقى في الكود للمستقبل، لكنها لا تدخل المسار التشغيلي ما دام
+`DOCUMENT_DURABLE_STORAGE_ENABLED=false`. عند العودة لهذه المرحلة يجب تنفيذ خطة تفعيل
+مقصودة تشمل إعداد المخزن، الأسرار، الاختبارات، وسياسة ترحيل الملفات قبل تحويل القفل إلى
+`true`.
 
 ## منصّات بديلة
 

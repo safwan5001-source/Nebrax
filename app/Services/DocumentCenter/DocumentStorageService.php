@@ -119,6 +119,15 @@ class DocumentStorageService
             'use_path_style_endpoint' => (bool) config('document_center.storage.use_path_style_endpoint', true),
         ];
 
+        // قرار تشغيلي مؤقت: التخزين الدائم مؤجل لكل النظام.
+        // وجود إعداد R2/S3 محفوظ في منصة الإدارة لا يفعّله ما لم يُفتح هذا القفل صراحةً.
+        if (! (bool) config('document_center.storage.persistent_enabled', false)) {
+            return array_replace($base, [
+                'driver' => 'local',
+                'disk' => (string) config('document_center.storage.disk', 'local'),
+            ]);
+        }
+
         $platform = $this->integrations->activeConfiguration('document_storage');
         if ($platform === []) {
             return $base;

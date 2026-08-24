@@ -27,20 +27,13 @@ services:
         value: production
       - key: APP_DEBUG
         value: "false"
+      # التخزين الدائم (S3/R2) مؤجل حالياً. كل وسائط/مستندات النظام تستخدم local.
+      - key: DOCUMENT_DURABLE_STORAGE_ENABLED
+        value: "false"
       - key: DOCUMENT_STORAGE_DRIVER
-        value: s3
-      - key: DOCUMENT_STORAGE_KEY
-        sync: false
-      - key: DOCUMENT_STORAGE_SECRET
-        sync: false
-      - key: DOCUMENT_STORAGE_BUCKET
-        sync: false
-      - key: DOCUMENT_STORAGE_ENDPOINT
-        sync: false
-      - key: DOCUMENT_STORAGE_REGION
-        value: auto
-      - key: DOCUMENT_STORAGE_PATH_STYLE
-        value: "true"
+        value: local
+      - key: DOCUMENT_STORAGE_DISK
+        value: local
       - key: DOCUMENT_RETENTION_DAYS
         value: "365"
       - key: DB_CONNECTION
