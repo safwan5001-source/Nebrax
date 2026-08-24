@@ -245,6 +245,30 @@ class DocumentNumberingCatalog
         return array_keys(self::ENTITIES);
     }
 
+    /** السلسلة الوحيدة/الأولى المعتمدة للكيان؛ هي عقد التوافق لطلبات PUT القديمة. */
+    public static function defaultSeriesKey(string $key): string
+    {
+        $entity = self::ENTITIES[$key] ?? null;
+        if ($entity === null) {
+            throw new \InvalidArgumentException('كيان الترقيم غير معروف.');
+        }
+
+        return $entity['series'][0]['key'];
+    }
+
+    /** الكيان متعدد السلاسل لا يقبل تخمين السلسلة عند التعديل. */
+    public static function requiresExplicitSeriesKey(string $key): bool
+    {
+        return count(self::ENTITIES[$key]['series'] ?? []) > 1;
+    }
+
+    /** تحقق أن السلسلة المطلوبة تخص الكيان نفسه، لا أنها مجرد مفتاح صحيح شكلياً. */
+    public static function hasSeries(string $key, string $seriesKey): bool
+    {
+        return isset(self::ENTITIES[$key])
+            && collect(self::ENTITIES[$key]['series'])->contains('key', $seriesKey);
+    }
+
     /**
      * أصناف النماذج المرقَّمة **بالفرع** — أي ما يحمل رقماً قد يتكرّر بين فرعين.
      *
@@ -266,8 +290,12 @@ class DocumentNumberingCatalog
     {
         $entity = self::ENTITIES[$key];
         $model  = $entity['model'];
-        $date   = $entity['yearly'] ? now()->toDateString() : null;
-        $prefix = self::effectivePrefix($key);
+        $date = $entity['yearly'] ? now()->toDateString() : null;
+        // يبقى حقل prefix متوافقاً مع عميل PUT القديم للكيان ذي السلسلة الواحدة؛
+        // أما متعدد السلاسل فيظل مصدره الموثوق مصفوفة series.
+        $prefix = count($entity['series']) === 1
+            ? self::seriesFormat($key, self::defaultSeriesKey($key))['prefix']
+            : self::effectivePrefix($key);
 
         return [
             'key'             => $key,
@@ -303,7 +331,7 @@ class DocumentNumberingCatalog
         }
 
         $entity = self::ENTITIES[$key];
-        $seriesKey ??= $entity['series'][0]['key'];
+        $seriesKey ??= self::defaultSeriesKey($key);
         $series = collect($entity['series'])->firstWhere('key', $seriesKey);
 
         if ($series === null) {
@@ -337,7 +365,7 @@ class DocumentNumberingCatalog
         $fallback = self::defaultPrefix($key, $series);
 
         return [
-            'prefix' => array_key_exists('prefix', $custom) ? (string) $custom['prefix'] : $fallback,
+            'prefix' => array_key_exists('prefix', $custom) && (string) $custom['prefix'] !== '' ? (string) $custom['prefix'] : $fallback,
             'suffix' => (string) ($custom['suffix'] ?? ''),
         ];
     }

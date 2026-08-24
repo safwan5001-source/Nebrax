@@ -97,16 +97,18 @@ class FuelStationsFoundationTest extends TestCase
         ]);
         $service = app(FuelStationIntegrationEventService::class);
         $identity = new FuelStationDeviceIdentity($station->id, 'atg-01', 'generic-atg', 'tank-console-01');
-        $event = new FuelStationNormalizedEvent('evt-001', FuelStationEventType::ATG_READING_RECORDED, CarbonImmutable::parse('2026-08-23 00:00:00Z'), ['reading' => ['volume_liters' => 1200, 'temperature' => 27]], 42, 'corr-001');
+        $occurredAt = CarbonImmutable::now('UTC')->subSecond();
+        $event = new FuelStationNormalizedEvent('evt-001', FuelStationEventType::ATG_READING_RECORDED, $occurredAt, ['reading' => ['volume_liters' => 1200, 'temperature' => 27]], 42, 'corr-001');
 
         $accepted = $service->accept($identity, $event);
-        $replayed = $service->accept($identity, new FuelStationNormalizedEvent('evt-001', FuelStationEventType::ATG_READING_RECORDED, CarbonImmutable::parse('2026-08-23 00:00:00Z'), ['reading' => ['temperature' => 27, 'volume_liters' => 1200]], 42, 'corr-001'));
+        $replayed = $service->accept($identity, new FuelStationNormalizedEvent('evt-001', FuelStationEventType::ATG_READING_RECORDED, $occurredAt, ['reading' => ['temperature' => 27, 'volume_liters' => 1200]], 42, 'corr-001'));
 
         $this->assertSame($accepted->id, $replayed->id);
         $this->assertSame(1, FuelStationIntegrationEvent::query()->count());
 
         $this->expectException(RuntimeException::class);
-        $service->accept($identity, new FuelStationNormalizedEvent('evt-002', FuelStationEventType::ATG_READING_RECORDED, CarbonImmutable::parse('2026-08-23 00:01:00Z'), ['reading' => ['volume_liters' => 1201]], 42));
+        $this->expectExceptionMessage('تسلسل جهاز الساحة استُخدم مسبقاً لحدث مختلف.');
+        $service->accept($identity, new FuelStationNormalizedEvent('evt-002', FuelStationEventType::ATG_READING_RECORDED, $occurredAt, ['reading' => ['volume_liters' => 1201]], 42));
     }
 
     private function grantFoundation(string $tenantId): void

@@ -69,7 +69,7 @@ class NumberingSettingsTest extends TestCase
             'وكل مدخل هناك يجب أن يقابل نموذجاً يستعمل الطبقة فعلاً.',
         ]));
 
-        $this->assertCount(26, $catalogued);
+        $this->assertCount(count(DocumentNumberingCatalog::ENTITIES), $catalogued);
     }
 
     /** عدّاد ZATCA ليس رقم مستند — فلا يظهر في هذه الشاشة إطلاقاً. @test */
@@ -137,7 +137,7 @@ class NumberingSettingsTest extends TestCase
         $this->assertSame('numeric', $res['meta']['format']);
         $this->assertSame(5, $res['meta']['padding']);
         $this->assertSame(
-            ['invoice', 'purchase', 'quote', 'branch', 'warehouse'],
+            DocumentNumberingCatalog::editableKeys(),
             $res['meta']['editable_keys']
         );
     }
@@ -167,7 +167,7 @@ class NumberingSettingsTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'FTR'])
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'series_key' => 'default', 'prefix' => 'FTR'])
             ->assertOk()->assertJsonPath('data.prefix', 'FTR');
 
         $customer = $this->withToken($auth['token'])->postJson('/api/partners', [
@@ -183,22 +183,60 @@ class NumberingSettingsTest extends TestCase
     }
 
     /**
-     * الكيانات ذات البادئة الثابتة تُرفض صراحةً.
-     *
-     * القبول الصامت أسوأ من الرفض: يحفظ المستخدم بادئةً ويراها محفوظة، ثم
-     * يصدر المستند بالبادئة القديمة — فيظنّ العطل في الترقيم لا في الإعداد.
+     * عقد PUT السابق يبقى للكيان ذي السلسلة الوحيدة: غياب المفتاح لا يخلق
+     * تخميناً، بل يحل `default` المحددة في الكتالوج نفسه.
      *
      * @test
      */
-    public function a_hardcoded_prefix_entity_is_rejected_not_silently_ignored(): void
+    public function a_legacy_single_series_update_resolves_the_catalog_default(): void
     {
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'journal_entry', 'prefix' => 'QYD'])
-            ->assertStatus(422)->assertJsonValidationErrors('entity');
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'LEG'])
+            ->assertOk()->assertJsonPath('data.prefix', 'LEG');
 
-        $this->assertSame('JE', $this->entity($auth['token'], 'journal_entry')['series'][0]['prefix']);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame('LEG', DocumentNumberingCatalog::formatForModel(\App\Models\Invoice::class, 'INV')['prefix']);
+    }
+
+    /** السلسلة المتعددة لا تسمح بتخمينٍ قد يضبط مساراً غير مقصود. @test */
+    public function a_multi_series_entity_requires_its_explicit_valid_series_key(): void
+    {
+        $auth = $this->registerTenant();
+
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'payment', 'prefix' => 'REC'])
+            ->assertStatus(422)->assertJsonValidationErrors('series_key');
+
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'payment', 'series_key' => 'sales', 'prefix' => 'REC'])
+            ->assertStatus(422)->assertJsonValidationErrors('series_key');
+
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'payment', 'series_key' => 'received', 'prefix' => 'RECPT'])
+            ->assertOk()->assertJsonPath('data.series.0.prefix', 'RECPT');
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame('RECPT', DocumentNumberingCatalog::formatForModel(\App\Models\Payment::class, 'REC')['prefix']);
+    }
+
+    /**
+     * كل كيان مرقّم يقبل ضبط السلسلة المعلنة له؛ لا تبقى البادئات الثابتة
+     * مقبولة شكلياً ثم متجاهلة عند التوليد.
+     *
+     * @test
+     */
+    public function a_previously_hardcoded_entity_uses_its_explicit_series_format(): void
+    {
+        $auth = $this->registerTenant();
+
+        $this->withToken($auth['token'])
+            ->putJson('/api/numbering-settings', ['entity' => 'journal_entry', 'series_key' => 'default', 'prefix' => 'QYD'])
+            ->assertOk()->assertJsonPath('data.series.0.prefix', 'QYD');
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame('QYD', DocumentNumberingCatalog::formatForModel(\App\Models\JournalEntry::class, 'JE')['prefix']);
     }
 
     /**
@@ -212,7 +250,7 @@ class NumberingSettingsTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'quote', 'prefix' => 'OFR'])
+            ->putJson('/api/numbering-settings', ['entity' => 'quote', 'series_key' => 'default', 'prefix' => 'OFR'])
             ->assertOk()->assertJsonPath('data.prefix', 'OFR');
 
         $customer = $this->withToken($auth['token'])->postJson('/api/partners', [
@@ -238,12 +276,12 @@ class NumberingSettingsTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'quote', 'prefix' => 'OFR'])->assertOk();
+            ->putJson('/api/numbering-settings', ['entity' => 'quote', 'series_key' => 'default', 'prefix' => 'OFR'])->assertOk();
 
         $this->assertSame('INV', $this->entity($auth['token'], 'invoice')['prefix']);
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'FTR'])->assertOk();
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'series_key' => 'default', 'prefix' => 'FTR'])->assertOk();
 
         $this->assertSame('OFR', $this->entity($auth['token'], 'quote')['prefix']);
     }
@@ -264,11 +302,11 @@ class NumberingSettingsTest extends TestCase
         $this->assertSame('00002', $branch['code']); // 00001 هو الفرع الرئيسي المُنشأ بالتسجيل
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'branch', 'prefix' => 'BR'])
+            ->putJson('/api/numbering-settings', ['entity' => 'branch', 'series_key' => 'default', 'prefix' => 'BR'])
             ->assertOk()->assertJsonPath('data.prefix', 'BR');
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'warehouse', 'prefix' => 'WH'])->assertOk();
+            ->putJson('/api/numbering-settings', ['entity' => 'warehouse', 'series_key' => 'default', 'prefix' => 'WH'])->assertOk();
 
         $next = $this->withToken($auth['token'])
             ->postJson('/api/branches', ['name' => 'ببادئة'])->assertCreated()['data'];
@@ -286,7 +324,7 @@ class NumberingSettingsTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'فاتورة!'])
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'series_key' => 'default', 'prefix' => 'فاتورة!'])
             ->assertStatus(422)->assertJsonValidationErrors('prefix');
     }
 
@@ -296,28 +334,30 @@ class NumberingSettingsTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'FTR'])->assertOk();
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'series_key' => 'default', 'prefix' => 'FTR'])->assertOk();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => null])
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'series_key' => 'default', 'prefix' => null])
             ->assertOk()->assertJsonPath('data.prefix', 'INV');
     }
 
     /**
-     * الكتابة تذهب إلى المفتاح الذي تقرؤه الخدمة أصلاً — لا مخزن مواز.
+     * الكتابة تذهب إلى مخزن السلاسل الذي تقرؤه طبقة الترقيم نفسها — لا إلى
+     * مفتاح بادئة قديم أو مسار مواز.
      *
      * @test
      */
-    public function the_prefix_is_written_where_the_service_already_reads_it(): void
+    public function the_series_format_is_written_where_the_numbering_layer_reads_it(): void
     {
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])
-            ->putJson('/api/numbering-settings', ['entity' => 'purchase', 'prefix' => 'SHR'])->assertOk();
+            ->putJson('/api/numbering-settings', ['entity' => 'purchase', 'series_key' => 'default', 'prefix' => 'SHR'])->assertOk();
 
         app(TenantContext::class)->set($auth['tenant_id']);
 
-        $this->assertSame('SHR', \App\Support\Settings::get('purchases', 'purchase_prefix'));
+        $this->assertSame('SHR', \App\Support\Settings::get('numbering', 'document_series')['purchase']['default']['prefix']);
+        $this->assertSame('SHR', DocumentNumberingCatalog::formatForModel(\App\Models\Purchase::class, 'BILL')['prefix']);
     }
 
     /** التحرير محكوم بصلاحية إدارة المؤسسة. @test */
@@ -327,7 +367,7 @@ class NumberingSettingsTest extends TestCase
         $staff = $this->tokenForRole($auth['tenant_id'], 'staff', 'staff@acme.test');
 
         $this->withToken($staff)
-            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'prefix' => 'XXX'])
+            ->putJson('/api/numbering-settings', ['entity' => 'invoice', 'series_key' => 'default', 'prefix' => 'XXX'])
             ->assertForbidden();
     }
 }
