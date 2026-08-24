@@ -6,6 +6,8 @@ import { useBranches } from '@/lib/branch';
 import type { BranchView } from '@/lib/branch-view';
 import { cn } from '@/lib/utils';
 
+export type { BranchView } from '@/lib/branch-view';
+
 /**
  * مبدّل نطاق القائمة: **الفرع النشط** (الافتراضي) ↔ **كل الفروع**.
  *
