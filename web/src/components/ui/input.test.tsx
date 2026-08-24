@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Input, normalizeGregorianDate } from './input';
 
@@ -17,7 +17,7 @@ describe('normalizeGregorianDate', () => {
 });
 
 describe('Input date field', () => {
-  it('uses a stable left-to-right text field instead of the browser-localized native date control', () => {
+  it('uses a stable left-to-right Gregorian text field instead of the browser-localized native date control', () => {
     let changedValue = '';
     const onChange = vi.fn((event: React.ChangeEvent<HTMLInputElement>) => {
       changedValue = event.currentTarget.value;
@@ -32,5 +32,22 @@ describe('Input date field', () => {
 
     fireEvent.change(input, { target: { value: '24/08/2026' } });
     expect(changedValue).toBe('2026-08-24');
+  });
+
+  it('opens a Gregorian calendar and returns the selected ISO date to the form', () => {
+    cleanup();
+    let changedValue = '';
+    const onChange = vi.fn((event: React.ChangeEvent<HTMLInputElement>) => {
+      changedValue = event.currentTarget.value;
+    });
+    const view = render(<Input aria-label="تاريخ الفاتورة" type="date" value="2026-08-24" onChange={onChange} />);
+
+    fireEvent.click(view.getByRole('button', { name: 'فتح التقويم الميلادي' }));
+    expect(view.getByRole('dialog', { name: 'التقويم الميلادي' })).toBeTruthy();
+    expect(view.getByText('أغسطس 2026')).toBeTruthy();
+
+    fireEvent.click(view.getByRole('button', { name: 'اختيار 2026-08-25' }));
+    expect(changedValue).toBe('2026-08-25');
+    expect(view.queryByRole('dialog', { name: 'التقويم الميلادي' })).toBeNull();
   });
 });
