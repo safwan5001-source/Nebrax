@@ -14,10 +14,10 @@ import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
+import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
 
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
-interface UnitTemplate { id: string; name: string; base_unit: string }
 interface SelectedProductImage { file: File; previewUrl: string }
 
 const MAX_PRODUCT_IMAGES = 8;
@@ -37,7 +37,7 @@ export default function NewProductPage() {
   const [type, setType] = useState('good');
   const [unit, setUnit] = useState('');
   const [unitTemplateId, setUnitTemplateId] = useState('');
-  const [templates, setTemplates] = useState<UnitTemplate[]>([]);
+  const [templates, setTemplates] = useState<ProductUnitTemplate[]>([]);
   const [salePrice, setSalePrice] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [taxRate, setTaxRate] = useState('15');
@@ -72,7 +72,7 @@ export default function NewProductPage() {
     api<{ data: Partner[] }>('/partners')
       .then((r) => setSuppliers(r.data.filter((p) => p.type === 'supplier' || p.type === 'both')))
       .catch(() => {});
-    api<{ data: UnitTemplate[] }>('/unit-templates').then((r) => setTemplates(r.data)).catch(() => {});
+    api<{ data: ProductUnitTemplate[] }>('/unit-templates').then((r) => setTemplates(r.data)).catch(() => {});
     api<{ data: Account[] }>('/accounts')
       .then((r) => {
         const leaf = r.data.filter((a) => !a.is_group);
@@ -88,8 +88,7 @@ export default function NewProductPage() {
 
   function selectUnitTemplate(templateId: string) {
     setUnitTemplateId(templateId);
-    const template = templates.find((item) => item.id === templateId);
-    if (template) setUnit(template.base_unit);
+    setUnit((currentUnit) => productUnitForTemplate(templateId, templates, currentUnit));
   }
 
   function selectProductImages(event: ChangeEvent<HTMLInputElement>) {

@@ -14,6 +14,7 @@ import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
+import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
 
 export interface Product {
   id: string;
@@ -123,7 +124,7 @@ export function ProductDialog({
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [categories, setCategories] = useState<Listed[]>([]);
   const [brands, setBrands] = useState<Listed[]>([]);
-  const [templates, setTemplates] = useState<Listed[]>([]);
+  const [templates, setTemplates] = useState<ProductUnitTemplate[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [media, setMedia] = useState<ProductMedia[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
@@ -160,7 +161,7 @@ export function ProductDialog({
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
     api<{ data: Listed[] }>('/product-categories').then((r) => setCategories(r.data)).catch(() => {});
     api<{ data: Listed[] }>('/brands').then((r) => setBrands(r.data)).catch(() => {});
-    api<{ data: Listed[] }>('/unit-templates').then((r) => setTemplates(r.data)).catch(() => {});
+    api<{ data: ProductUnitTemplate[] }>('/unit-templates').then((r) => setTemplates(r.data)).catch(() => {});
     api<{ data: Acct[] }>('/accounts')
       .then((r) => {
         const leaf = r.data.filter((a) => !a.is_group);
@@ -176,6 +177,14 @@ export function ProductDialog({
   const [saving, setSaving] = useState(false);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  function selectUnitTemplate(templateId: string) {
+    setForm((current) => ({
+      ...current,
+      unit_template_id: templateId,
+      unit: productUnitForTemplate(templateId, templates, current.unit),
+    }));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -293,11 +302,11 @@ export function ProductDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="unit">{t('unit')}</Label>
-            <Input id="unit" value={form.unit} onChange={(e) => set('unit', e.target.value)} />
+            <Input id="unit" value={form.unit} onChange={(e) => set('unit', e.target.value)} readOnly={Boolean(form.unit_template_id)} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="unit-template">{t('unit_template')}</Label>
-            <Select id="unit-template" value={form.unit_template_id} onChange={(e) => set('unit_template_id', e.target.value)}>
+            <Select id="unit-template" value={form.unit_template_id} onChange={(e) => selectUnitTemplate(e.target.value)}>
               <option value="">{t('no_unit_template')}</option>
               {templates.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </Select>
