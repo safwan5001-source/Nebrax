@@ -68,6 +68,7 @@ import { useCompany } from '@/lib/company';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { canViewDocumentCenter } from '@/lib/document-review-access';
 
 interface NavItem {
   href: string;
@@ -328,7 +329,7 @@ export function Sidebar({
   }, []);
 
   const user = currentUser();
-  const canViewDocuments = user?.permissions?.includes('documents.center.view') ?? ['owner', 'admin'].includes(user?.role ?? '');
+  const canViewDocuments = canViewDocumentCenter(user?.permissions, user?.role);
   const groupHidden = (group: NavGroup) => Boolean(group.appKey && hiddenAppKeys.has(group.appKey));
   const visibleItems = (group: NavGroup) =>
     group.items.filter((item) => (!item.appKey || !hiddenAppKeys.has(item.appKey)) && (item.key !== 'documentCenter' || canViewDocuments));
