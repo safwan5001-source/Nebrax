@@ -230,8 +230,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('document-batches', [DocumentReviewController::class, 'index'])->middleware([$perm('documents.center.view'), $commercialApp('document_center.core')]);
         Route::get('document-batches/{batch}/review', [DocumentReviewController::class, 'review'])->middleware([$perm('documents.center.view'), $commercialApp('document_center.core')]);
         Route::post('document-batches/{batch}/review-changes', [DocumentReviewController::class, 'change'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
-        Route::post('document-match-results/{match}/decision', [DocumentReviewController::class, 'decide'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
-        Route::post('document-issues/{issue}/decision', [DocumentReviewController::class, 'issue'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-batches/{batch}/assign-reviewer', [DocumentReviewController::class, 'assign'])->middleware([$perm('documents.center.manage'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-match-results/{match}/confirm', [DocumentReviewController::class, 'confirm'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-match-results/{match}/reject', [DocumentReviewController::class, 'reject'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-issues/{issue}/resolve', [DocumentReviewController::class, 'resolve'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-issues/{issue}/reopen', [DocumentReviewController::class, 'reopen'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
         Route::post('document-batches/{batch}/complete-review', [DocumentReviewController::class, 'complete'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
 
         // الأطراف

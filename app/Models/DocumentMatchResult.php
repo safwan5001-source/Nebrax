@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchScoped;
 use App\Tenancy\TenantContext;
+use App\Services\DocumentCenter\DocumentReviewMutationGate;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
@@ -59,6 +60,7 @@ class DocumentMatchResult extends BaseModel
                 throw new LogicException('Document match result identity is immutable.');
             }
             if ($result->isDirty(['status', 'confirmed_by', 'confirmed_at'])) {
+                DocumentReviewMutationGate::assertOpen();
                 $allowed = ['status', 'confirmed_by', 'confirmed_at', 'updated_at'];
                 if (array_diff(array_keys($result->getDirty()), $allowed) !== []) {
                     throw new LogicException('PR-6 may only mutate reviewed match decision fields.');

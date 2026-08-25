@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchScoped;
 use App\Tenancy\TenantContext;
+use App\Services\DocumentCenter\DocumentReviewMutationGate;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
@@ -56,6 +57,7 @@ class DocumentIssue extends BaseModel
                 throw new LogicException('Document issue identity is immutable.');
             }
             if ($issue->isDirty(['status', 'resolved_by', 'resolved_at'])) {
+                DocumentReviewMutationGate::assertOpen();
                 $allowed = ['status', 'resolved_by', 'resolved_at', 'updated_at'];
                 if (array_diff(array_keys($issue->getDirty()), $allowed) !== []) {
                     throw new LogicException('PR-6 may only mutate reviewed issue decision fields.');

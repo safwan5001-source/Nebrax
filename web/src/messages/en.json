@@ -5969,6 +5969,18 @@
     "blocking": "Blocking",
     "warning": "Warning",
     "noPreview": "File preview is unavailable in the current bootstrap mode.",
-    "version": "Version {version}"
+    "version": "Version {version}",
+    "edit": "Edit",
+    "confirm": "Confirm",
+    "reject": "Reject",
+    "resolve": "Resolve issue",
+    "reopen": "Reopen",
+    "reason": "Decision reason",
+    "save": "Save correction",
+    "stale": "Another reviewer changed this batch. Reload its current state and try again.",
+    "saveFailed": "Unable to save the review decision.",
+    "assign": "Assign reviewer",
+    "unassigned": "Unassigned",
+    "document": "Document"
   }
 }
