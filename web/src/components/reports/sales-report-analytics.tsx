@@ -34,9 +34,11 @@ export function SalesReportAnalytics({
   emptyLabel: string;
   unassignedLabel: string;
 }) {
+  // نرتب نسخة الرسم المشتقة فقط؛ يبقى ترتيب report.data وجدول التقرير كما أعادهما المصدر.
   const rankedRows = rows
     .map((row) => ({ label: row.label || unassignedLabel, amount: Number(row.amount ?? 0) }))
     .filter((row) => Number.isFinite(row.amount) && row.amount > 0)
+    .sort((left, right) => right.amount - left.amount)
     .slice(0, 6);
 
   return (

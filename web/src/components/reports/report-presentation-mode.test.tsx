@@ -27,22 +27,30 @@ describe('SalesReportAnalytics', () => {
     unassignedLabel: 'Unassigned',
   };
 
-  it('renders a categorical bar analysis from the same rows and caps the dense mobile-safe ranking at six', () => {
-    const { container } = render(<SalesReportAnalytics {...props} rows={[
-      { key: '1', label: 'Customer one', amount: '100.00' },
-      { key: '2', label: 'Customer two', amount: '90.00' },
-      { key: '3', label: 'Customer three', amount: '80.00' },
-      { key: '4', label: 'Customer four', amount: '70.00' },
-      { key: '5', label: 'Customer five', amount: '60.00' },
-      { key: '6', label: 'Customer six', amount: '50.00' },
-      { key: '7', label: 'Customer seven', amount: '40.00' },
-    ]} />);
+  it.each(['customer', 'product', 'salesperson'] as const)('derives a descending top-six ranking from unordered %s rows without mutating the source', (view) => {
+    const rows = [
+      { key: 'low-early', label: 'Low early', amount: '10.00' },
+      { key: 'top-3', label: 'Third highest', amount: '70.00' },
+      { key: 'top-1', label: 'Highest', amount: '100.00' },
+      { key: 'below-cutoff', label: 'Below cutoff', amount: '20.00' },
+      { key: 'top-6', label: 'Sixth highest', amount: '40.00' },
+      { key: 'top-2', label: 'Second highest', amount: '80.00' },
+      { key: 'top-5', label: 'Fifth highest', amount: '50.00' },
+      { key: 'top-4', label: 'Fourth highest', amount: '60.00' },
+    ];
+    const sourceOrder = rows.map((row) => row.label);
+    const { container } = render(<SalesReportAnalytics {...props} view={view} rows={rows} />);
 
     expect(screen.getByText('Top customers by sales')).toBeTruthy();
-    expect(screen.getByText('Customer one')).toBeTruthy();
-    expect(screen.getByText('Customer six')).toBeTruthy();
-    expect(screen.queryByText('Customer seven')).toBeNull();
-    expect(container.querySelector('[data-testid="sales-analytics-customer"]')).toBeTruthy();
+    expect(screen.getByText('Highest')).toBeTruthy();
+    expect(screen.getByText('Sixth highest')).toBeTruthy();
+    expect(screen.queryByText('Low early')).toBeNull();
+    expect(screen.queryByText('Below cutoff')).toBeNull();
+    expect(Array.from(container.querySelectorAll('li span:first-child')).map((element) => element.textContent)).toEqual([
+      'Highest', 'Second highest', 'Third highest', 'Fourth highest', 'Fifth highest', 'Sixth highest',
+    ]);
+    expect(rows.map((row) => row.label)).toEqual(sourceOrder);
+    expect(container.querySelector(`[data-testid="sales-analytics-${view}"]`)).toBeTruthy();
   });
 
   it('uses an explicit empty state instead of rendering a decorative chart without meaningful data', () => {
