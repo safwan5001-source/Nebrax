@@ -2,6 +2,7 @@
 // لأن التحويل من الهللات يتم في طبقة موارد الـ backend. لا يُستخدم أي float في حساب مالي حقيقي هنا.
 
 import { DEMO_USER } from './demo';
+import { handleDocumentReviewDemo } from './document-review-demo';
 import {
   deleteDemoProductMedia,
   demoId,
@@ -1690,6 +1691,13 @@ function createMockPrintTemplate(input: { name?: string; document_types?: unknow
 }
 
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
+  const reviewResponse = handleDocumentReviewDemo(path, method.toUpperCase(), body);
+  if (reviewResponse.handled) {
+    return 'error' in reviewResponse
+      ? Promise.reject(reviewResponse.error)
+      : resolve(reviewResponse.response as T);
+  }
+
   const clean = path.split('?')[0];
   const m = method.toUpperCase();
 

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, hasApiStatus } from '@/lib/api';
 
 type Props = {
   open: boolean;
@@ -31,7 +31,7 @@ export function ReviewCommandDialog({ open, onClose, title, confirmLabel, endpoi
       await api(endpoint, { method: 'POST', body: { ...payload, expected_version: expectedVersion, reason: reason.trim() } });
       setReason(''); onSuccess(); onClose();
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 409 ? staleMessage : err instanceof ApiError ? err.message : labels.failed);
+      setError(hasApiStatus(err, 409) ? staleMessage : err instanceof ApiError ? err.message : labels.failed);
     } finally { setSaving(false); }
   }
 

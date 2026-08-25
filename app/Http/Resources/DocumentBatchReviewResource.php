@@ -18,7 +18,9 @@ class DocumentBatchReviewResource extends JsonResource
             'files_count' => (int) ($this->files_count ?? 0),
             'blocking_issues_count' => (int) ($this->blocking_issues_count ?? 0),
             'warning_issues_count' => (int) ($this->warning_issues_count ?? 0),
-            'review_assigned_to' => $this->review_assigned_to,
+            'reviewer' => $this->reviewer
+                ? ['id' => $this->reviewer->id, 'name' => $this->reviewer->name]
+                : null,
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

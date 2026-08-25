@@ -30,6 +30,16 @@ export class ApiError extends Error {
   }
 }
 
+/** يتعرف على أخطاء HTTP الفعلية وعلى محاكي المعاينة من دون كشف جسم الاستجابة. */
+export function hasApiStatus(exception: unknown, status: number): boolean {
+  return exception instanceof ApiError
+    ? exception.status === status
+    : typeof exception === 'object'
+      && exception !== null
+      && 'status' in exception
+      && (exception as { status?: unknown }).status === status;
+}
+
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('token');

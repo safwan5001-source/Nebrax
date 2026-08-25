@@ -7,21 +7,28 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class DocumentReviewResource extends JsonResource
 {
+    /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
+        $batch = $this['batch'];
+
         return [
             'batch' => [
-                'id' => $this['batch']->id,
-                'document_type' => $this['batch']->document_type,
-                'source_type' => $this['batch']->source_type,
-                'status' => $this['batch']->status->value,
-                'version' => $this['batch']->version,
-                'review_assigned_to' => $this['batch']->review_assigned_to,
+                'id' => $batch->id,
+                'document_type' => $batch->document_type,
+                'source_type' => $batch->source_type,
+                'status' => $batch->status->value,
+                'version' => $batch->version,
+                'reviewer' => $batch->reviewer
+                    ? ['id' => $batch->reviewer->id, 'name' => $batch->reviewer->name]
+                    : null,
             ],
-            'reviewed' => $this['reviewed'],
+            'fields' => $this['fields'],
+            'files' => $this['files'],
             'matches' => $this['matches'],
             'issues' => $this['issues'],
             'history' => $this['history'],
+            'capabilities' => $this['capabilities'],
         ];
     }
 }
