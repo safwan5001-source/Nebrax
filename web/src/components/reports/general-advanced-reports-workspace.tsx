@@ -86,6 +86,11 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
 
   const load = useCallback(() => {
     const generation = ++requestGeneration.current;
+    // عند تغيير نطاق التدفق، لا يجوز أن تبقى نتيجة generation سابق ظاهرةً إذا فشل current الجديد.
+    if (tab === 'cashflow') {
+      setCashFlow(null);
+      setComparisonCashFlow(null);
+    }
     setFailed(false);
     setComparisonFailed(false);
     setComparisonLoading(false);
@@ -419,7 +424,8 @@ function comparativeValues(current: string, comparison: string): FinancialStatem
 
 export function CashFlowTable({ cashFlow, comparisonCashFlow, loading, g, t, emptyLabel }: { cashFlow: CashFlow | null; comparisonCashFlow: CashFlow | null; loading: boolean; g: ReturnType<typeof useTranslations>; t: ReturnType<typeof useTranslations>; emptyLabel: string }) {
   const sections: Array<[keyof Pick<CashFlow, 'operating' | 'investing' | 'financing'>, string]> = [['operating', g('operating')], ['investing', g('investing')], ['financing', g('financing')]];
-  if (loading || !cashFlow) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
+  if (loading) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
+  if (!cashFlow) return <Card><CardContent><p className="py-8 text-center text-sm text-muted">{emptyLabel}</p></CardContent></Card>;
 
   const statementSections: FinancialStatementSection[] = sections.map(([key, label]) => {
     const section = cashFlow[key];

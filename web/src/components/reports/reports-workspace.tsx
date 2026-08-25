@@ -133,6 +133,15 @@ export function ReportsWorkspace({
 
   const load = useCallback(() => {
     const generation = ++requestGeneration.current;
+    // التقرير المعروض يجب أن ينتمي دائماً إلى نطاق هذا الجيل؛ لا تبقِ نتيجة نطاق سابق
+    // أثناء الطلب أو بعد فشل current لهذا النطاق.
+    if (tab === 'income') {
+      setIncome(null);
+      setComparisonIncome(null);
+    } else if (tab === 'balance') {
+      setBalance(null);
+      setComparisonBalance(null);
+    }
     setLoading(true);
     setComparisonLoading(false);
     setComparisonFailed(false);
@@ -188,8 +197,8 @@ export function ReportsWorkspace({
     }
 
     if (tab === 'trial') api<TrialBalance>(`/reports/trial-balance${q}`).then((value) => requestGeneration.current === generation && setTrial(value)).finally(complete);
-    else if (tab === 'income') api<IncomeStatement>(`/reports/income-statement${q}`).then((value) => requestGeneration.current === generation && setIncome(value)).finally(complete);
-    else if (tab === 'balance') api<BalanceSheet>(`/reports/balance-sheet${filtersToQuery({ ...filters, from: '' })}`).then((value) => requestGeneration.current === generation && setBalance(value)).finally(complete);
+    else if (tab === 'income') api<IncomeStatement>(`/reports/income-statement${q}`).then((value) => requestGeneration.current === generation && setIncome(value)).catch(() => {}).finally(complete);
+    else if (tab === 'balance') api<BalanceSheet>(`/reports/balance-sheet${filtersToQuery({ ...filters, from: '' })}`).then((value) => requestGeneration.current === generation && setBalance(value)).catch(() => {}).finally(complete);
     else if (tab === 'costcenter') api<Profitability>(`/reports/cost-center-profitability${q}`).then((value) => requestGeneration.current === generation && setCc(value)).finally(complete);
     else api<Aging>(`/reports/aging/${agingType}${filtersToQuery({ ...filters, from: '', to: '' })}`).then((value) => requestGeneration.current === generation && setAging(value)).finally(complete);
   }, [agingType, comparisonScope, filters, tab]);
@@ -587,8 +596,10 @@ export function ReportsWorkspace({
             )}
           </CardHeader>
           <CardContent>
-            {loading || !income ? (
+            {loading ? (
               <Skeleton className="h-40 w-full" />
+            ) : !income ? (
+              <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
             ) : (
               <StructuredFinancialStatement
                 descriptionLabel={t('account')}
@@ -641,8 +652,10 @@ export function ReportsWorkspace({
             )}
           </CardHeader>
           <CardContent>
-            {loading || !balance ? (
+            {loading ? (
               <Skeleton className="h-40 w-full" />
+            ) : !balance ? (
+              <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
             ) : (
               <>
                 <StructuredFinancialStatement
