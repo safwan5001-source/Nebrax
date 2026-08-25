@@ -4148,6 +4148,20 @@
       "totalPurchases": "Total purchases",
       "outstanding": "Outstanding balance",
       "details": "Report details",
+      "presentationMode": "Presentation mode",
+      "summary": "Summary",
+      "detail": "Detail",
+      "detailUnavailableTitle": "Document detail is unavailable for this source",
+      "detailUnavailableDescription": "The current report source returns purchase aggregates only. Purchase documents are not shown because their scope and filters cannot be matched safely to this summary.",
+      "analytics": {
+        "description": "Top results from the current filters and the same summary source.",
+        "titles": {
+          "supplier": "Top suppliers by purchases",
+          "product": "Top products by purchases",
+          "classification": "Top purchase invoice classifications by purchases",
+          "employee": "Top invoice creators by purchases"
+        }
+      },
       "sourcePostedPurchases": "Posted purchase invoices",
       "sourceSupplierPayments": "Posted supplier payment vouchers",
       "manualItem": "Descriptive item",

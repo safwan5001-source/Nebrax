@@ -6,7 +6,7 @@ import { displayLocale } from '@/lib/formatting';
  * للجوال وجدول كامل لسطح المكتب، ومعاينة مستند اختيارية لا تتقدم على التحليل.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Download, FileText, Printer, Share2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -26,6 +26,8 @@ import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
 import { ReportMetricGrid, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
 import { ReportResultsTable } from '@/components/reports/report-results-table';
+import { ReportPresentationModeControl, type ReportPresentationMode } from '@/components/reports/report-presentation-mode';
+import { ReportRankedAnalytics, type ReportRankedAnalyticsRow } from '@/components/reports/report-ranked-analytics';
 
 export type PurchaseReportView = 'period' | 'supplier' | 'product' | 'classification' | 'employee' | 'balances' | 'payments';
 
@@ -88,22 +90,35 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
   const company = useCompany();
   const { success, error: errorToast } = useToast();
   const [filters, setFilters] = useState<PurchaseReportFilterState>(EMPTY_PURCHASE_REPORT_FILTERS);
+  // presentation-only: لا يغيّر Saved Views أو export أو عقد التقرير.
+  const [presentationMode, setPresentationMode] = useState<ReportPresentationMode>('summary');
   const [report, setReport] = useState<PurchaseReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const requestGeneration = useRef(0);
 
   const load = useCallback(() => {
+    const generation = ++requestGeneration.current;
     setLoading(true);
     setFailed(false);
+    // لا تبق نتائج نطاق سابق مرئية إذا أخفق الطلب الحالي.
+    setReport(null);
     api<PurchaseReportResponse>(`/reports/purchases${filtersToQuery(view, filters)}`)
       .then((response) => {
+        if (generation !== requestGeneration.current) return;
         if (!response?.totals || !Array.isArray(response.data)) throw new Error('invalid-purchase-report-response');
         setReport(response);
       })
-      .catch(() => setFailed(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (generation !== requestGeneration.current) return;
+        setReport(null);
+        setFailed(true);
+      })
+      .finally(() => {
+        if (generation === requestGeneration.current) setLoading(false);
+      });
   }, [view, filters]);
 
   useEffect(() => load(), [load]);
@@ -219,6 +234,9 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
     return `${branchScope} · ${periodScope}`;
   }, [filters.branchIds, filters.from, filters.to, tr]);
 
+  const analyticsView = view === 'supplier' || view === 'product' || view === 'classification' || view === 'employee' ? view : null;
+  const supportsPresentationModes = analyticsView !== null;
+
   const actions = [
     { id: 'csv', label: tr('csv'), icon: Download, onSelect: exportCsv, disabled: !doc || !!busy },
     { id: 'pdf', label: busy === 'pdf' ? tPrint('generating') : tr('pdf'), icon: Download, onSelect: () => void downloadPdf(), disabled: !doc || !!busy, busy: busy === 'pdf' },
@@ -239,6 +257,18 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
 
       <PurchaseReportFilters view={view} value={filters} onChange={setFilters} />
 
+      {supportsPresentationModes && (
+        <div className="no-print flex justify-start">
+          <ReportPresentationModeControl
+            value={presentationMode}
+            onChange={setPresentationMode}
+            label={t('presentationMode')}
+            summaryLabel={t('summary')}
+            detailLabel={t('detail')}
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)}</div>
       ) : failed ? (
@@ -247,24 +277,44 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
         <>
           <ReportMetricGrid metrics={summary} />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{t('details')}</CardTitle><Badge tone="neutral">{t(view === 'payments' ? 'sourceSupplierPayments' : 'sourcePostedPurchases')}</Badge></CardHeader>
-            <CardContent>
-              {!doc || doc.rows.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
-              ) : (
-                <ReportResultsTable
-                  columns={doc.columns}
-                  rows={doc.rows}
-                  totalRow={doc.totalRow}
-                  emptyText={t('empty')}
-                  primaryIndex={0}
-                  rowHrefs={rowHrefs}
-                  reportKey={`purchases:${view}`}
-                />
-              )}
-            </CardContent>
-          </Card>
+          {analyticsView && presentationMode === 'summary' && (
+            <ReportRankedAnalytics
+              analyticsKey={`purchases-${analyticsView}`}
+              testId={`purchases-analytics-${analyticsView}`}
+              rows={(report?.data ?? []) as ReportRankedAnalyticsRow[]}
+              loading={loading}
+              title={t(`analytics.titles.${analyticsView}`)}
+              description={t('analytics.description')}
+              emptyLabel={t('empty')}
+              unassignedLabel={t('unassigned')}
+            />
+          )}
+
+          {supportsPresentationModes && presentationMode === 'detail' ? (
+            <Card data-testid="purchases-detail-unavailable">
+              <CardHeader><CardTitle>{t('detailUnavailableTitle')}</CardTitle></CardHeader>
+              <CardContent><p className="text-sm leading-6 text-muted">{t('detailUnavailableDescription')}</p></CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{supportsPresentationModes ? t('summary') : t('details')}</CardTitle><Badge tone="neutral">{t(view === 'payments' ? 'sourceSupplierPayments' : 'sourcePostedPurchases')}</Badge></CardHeader>
+              <CardContent>
+                {!doc || doc.rows.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
+                ) : (
+                  <ReportResultsTable
+                    columns={doc.columns}
+                    rows={doc.rows}
+                    totalRow={doc.totalRow}
+                    emptyText={t('empty')}
+                    primaryIndex={0}
+                    rowHrefs={rowHrefs}
+                    reportKey={`purchases:${view}`}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {doc && showPreview && (
             <Card>

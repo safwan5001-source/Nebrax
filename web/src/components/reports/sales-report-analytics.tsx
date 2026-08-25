@@ -1,22 +1,14 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { RankedBars } from '@/components/charts/area-line';
-import { formatRiyal } from '@/lib/money';
+import {
+  ReportRankedAnalytics,
+  type ReportRankedAnalyticsRow,
+} from '@/components/reports/report-ranked-analytics';
 
 export type SalesAnalyticsView = 'customer' | 'product' | 'salesperson';
+export type SalesAnalyticsRow = ReportRankedAnalyticsRow;
 
-export interface SalesAnalyticsRow {
-  key: string | null;
-  label: string | null;
-  amount?: string;
-}
-
-/**
- * تحليل تصنيفي واحد متعمد: صفوف report.data نفسها هي مصدر الرسم والجدول، لذلك لا
- * يوجد طلب إضافي ولا احتمال أن يختلف الرسم عن نطاق المرشحات أو إجماليات الملخص.
- */
+/** توافق Phase 4A: يبقى عقد المبيعات ثابتاً بينما يستخدم ranked renderer المشترك. */
 export function SalesReportAnalytics({
   view,
   rows,
@@ -34,28 +26,16 @@ export function SalesReportAnalytics({
   emptyLabel: string;
   unassignedLabel: string;
 }) {
-  // نرتب نسخة الرسم المشتقة فقط؛ يبقى ترتيب report.data وجدول التقرير كما أعادهما المصدر.
-  const rankedRows = rows
-    .map((row) => ({ label: row.label || unassignedLabel, amount: Number(row.amount ?? 0) }))
-    .filter((row) => Number.isFinite(row.amount) && row.amount > 0)
-    .sort((left, right) => right.amount - left.amount)
-    .slice(0, 6);
-
   return (
-    <Card className="no-print" data-testid={`sales-analytics-${view}`}>
-      <CardHeader className="space-y-1 pb-3">
-        <CardTitle className="text-sm">{title}</CardTitle>
-        <p className="text-xs leading-5 text-muted">{description}</p>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <Skeleton className="h-40 w-full" />
-        ) : rankedRows.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted">{emptyLabel}</p>
-        ) : (
-          <RankedBars rows={rankedRows} format={(amount) => formatRiyal(String(amount))} emptyLabel={emptyLabel} />
-        )}
-      </CardContent>
-    </Card>
+    <ReportRankedAnalytics
+      analyticsKey={view}
+      rows={rows}
+      loading={loading}
+      title={title}
+      description={description}
+      emptyLabel={emptyLabel}
+      unassignedLabel={unassignedLabel}
+      testId={`sales-analytics-${view}`}
+    />
   );
 }
