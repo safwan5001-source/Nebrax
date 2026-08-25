@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 const closers = new Set<() => void>();
 
 const DropdownCtx = createContext<{ open: boolean; close: () => void }>({ open: false, close: () => {} });
+type DropdownChildren = React.ReactNode | ((state: { open: boolean; close: () => void }) => React.ReactNode);
 
 export function Dropdown({
   trigger,
@@ -22,15 +23,17 @@ export function Dropdown({
   triggerLabel,
   triggerClassName,
   menuClassName,
+  popupRole = 'menu',
   mobilePopover = false,
 }: {
   trigger: React.ReactNode;
-  children: React.ReactNode;
+  children: DropdownChildren;
   align?: 'start' | 'end';
   menuLabel?: string;
   triggerLabel?: string;
   triggerClassName?: string;
   menuClassName?: string;
+  popupRole?: 'menu' | 'dialog';
   /** قائمة الجوال تُثبت تحت زرها وتُقاس داخل النافذة بدل أن تتحول إلى ورقة سفلية. */
   mobilePopover?: boolean;
 }) {
@@ -113,7 +116,7 @@ export function Dropdown({
         ref={triggerRef}
         type="button"
         onClick={toggle}
-        aria-haspopup="menu"
+        aria-haspopup={popupRole}
         aria-label={triggerLabel}
         aria-expanded={open}
         className={cn(
@@ -127,7 +130,7 @@ export function Dropdown({
       {/* القائمة تبقى في DOM لانتقال ناعم؛ تُخفى من التفاعل/الوصول عند الإغلاق. */}
       <div
         ref={menuRef}
-        role="menu"
+        role={popupRole}
         aria-label={menuLabel}
         aria-hidden={!open}
         style={mobilePopover ? (mobilePopoverPosition ?? { top: 12, left: 12 }) : undefined}
@@ -143,7 +146,7 @@ export function Dropdown({
           menuClassName
         )}
       >
-        <DropdownCtx.Provider value={{ open, close }}>{children}</DropdownCtx.Provider>
+        <DropdownCtx.Provider value={{ open, close }}>{typeof children === 'function' ? children({ open, close }) : children}</DropdownCtx.Provider>
       </div>
     </div>
   );

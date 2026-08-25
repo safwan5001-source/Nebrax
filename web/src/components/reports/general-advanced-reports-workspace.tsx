@@ -218,13 +218,13 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
 
 function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: boolean; g: ReturnType<typeof useTranslations> }) {
   const locale = useLocale();
-  const defaultViewState = useMemo<ReportTableViewState>(() => ({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25 }), []);
+  const defaultViewState = useMemo<ReportTableViewState>(() => ({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25, columnOrder: [], columnSizing: {} }), []);
   const savedViews = useSavedReportViews('general:account-ledger', defaultViewState);
   if (loading || !ledger) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
   const columns = [
-    { id: 'date', label: g('date'), hideable: false },
-    { id: 'number', label: g('entryNumber') },
-    { id: 'description', label: g('description') },
+    { id: 'date', label: g('date'), hideable: false, size: 132, minSize: 112, maxSize: 180 },
+    { id: 'number', label: g('entryNumber'), size: 144, minSize: 120, maxSize: 220 },
+    { id: 'description', label: g('description'), size: 320, minSize: 180, maxSize: 520, wrap: true },
     { id: 'debit', label: g('debit'), align: 'end' as const, numeric: true },
     { id: 'credit', label: g('credit'), align: 'end' as const, numeric: true },
     { id: 'balance', label: g('balance'), align: 'end' as const, numeric: true },
@@ -260,6 +260,7 @@ function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: b
           viewState={savedViews.viewState}
           onViewStateChange={savedViews.setViewState}
           toolbarAddon={savedViews.loaded ? <ReportSavedViewsMenu controller={savedViews} locale={locale} /> : undefined}
+          resizeDirection={locale.toLowerCase().startsWith('ar') ? 'rtl' : 'ltr'}
         />
       </div>
     </CardContent>

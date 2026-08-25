@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
-  Columns3,
   Rows3,
   Search,
 } from 'lucide-react';
@@ -18,6 +17,8 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   type ColumnDef,
+  type ColumnOrderState,
+  type ColumnSizingState,
   type SortingState,
   type VisibilityState,
   useReactTable,
@@ -26,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { ReportColumnLayoutMenu } from '@/components/reports/report-column-layout-menu';
 
 export type ReportCellTone = 'positive' | 'negative' | 'neutral';
 
@@ -42,6 +44,11 @@ export interface ReportDataColumn {
   sortable?: boolean;
   hideable?: boolean;
   cellTone?: (value: string, row: string[], rowIndex: number) => ReportCellTone;
+  size?: number;
+  minSize?: number;
+  maxSize?: number;
+  resizable?: boolean;
+  wrap?: boolean;
 }
 
 export interface ReportDataTableLabels {
@@ -59,6 +66,10 @@ export interface ReportDataTableLabels {
   next: string;
   noResults: string;
   openDetails: string;
+  moveColumn: string;
+  moveUp: string;
+  moveDown: string;
+  resizeColumn: string;
 }
 
 export interface ReportTableViewState {
@@ -66,6 +77,8 @@ export interface ReportTableViewState {
   sorting: SortingState;
   density: 'comfortable' | 'compact';
   pageSize: number;
+  columnOrder: ColumnOrderState;
+  columnSizing: ColumnSizingState;
 }
 
 export interface ReportDataTableProps {
@@ -82,6 +95,7 @@ export interface ReportDataTableProps {
   viewState?: ReportTableViewState;
   onViewStateChange?: (state: ReportTableViewState) => void;
   toolbarAddon?: React.ReactNode;
+  resizeDirection?: 'ltr' | 'rtl';
 }
 
 interface DataRow {
@@ -144,6 +158,24 @@ function compactSearchValue(value: string) {
   return normalizeSearchValue(value).replace(/[\s,،]/g, '');
 }
 
+function normalizeColumnOrder(order: ColumnOrderState, columns: ReportDataColumn[]): ColumnOrderState {
+  const knownIds = new Set(columns.map((column) => column.id));
+  const seen = new Set<string>();
+  const validOrder = order.filter((id) => knownIds.has(id) && !seen.has(id) && (seen.add(id), true));
+  return [...validOrder, ...columns.map((column) => column.id).filter((id) => !seen.has(id))];
+}
+
+function normalizeColumnSizing(sizing: ColumnSizingState, columns: ReportDataColumn[]): ColumnSizingState {
+  return columns.reduce<ColumnSizingState>((next, column) => {
+    const size = sizing[column.id];
+    if (typeof size !== 'number' || !Number.isFinite(size)) return next;
+    const min = column.minSize ?? (column.numeric ? 120 : 112);
+    const max = column.maxSize ?? (column.numeric ? 260 : 520);
+    next[column.id] = Math.min(max, Math.max(min, size));
+    return next;
+  }, {});
+}
+
 export function defaultReportTableLabels(locale: string): ReportDataTableLabels {
   const ar = locale.toLowerCase().startsWith('ar');
   return ar
@@ -162,6 +194,10 @@ export function defaultReportTableLabels(locale: string): ReportDataTableLabels 
         next: 'التالي',
         noResults: 'لا توجد نتائج مطابقة للبحث.',
         openDetails: 'عرض التفاصيل',
+        moveColumn: 'تحريك العمود',
+        moveUp: 'تحريك لأعلى',
+        moveDown: 'تحريك لأسفل',
+        resizeColumn: 'تغيير عرض العمود',
       }
     : {
         search: 'Search results',
@@ -178,6 +214,10 @@ export function defaultReportTableLabels(locale: string): ReportDataTableLabels 
         next: 'Next',
         noResults: 'No results match your search.',
         openDetails: 'View details',
+        moveColumn: 'Move column',
+        moveUp: 'Move up',
+        moveDown: 'Move down',
+        resizeColumn: 'Resize column',
       };
 }
 
@@ -195,18 +235,22 @@ export function ReportDataTable({
   viewState: controlledViewState,
   onViewStateChange,
   toolbarAddon,
+  resizeDirection = 'rtl',
 }: ReportDataTableProps) {
   const defaultViewState = useMemo<ReportTableViewState>(() => ({
     columnVisibility: {},
     sorting: [],
     density: initialDensity,
     pageSize: initialPageSize,
+    columnOrder: [],
+    columnSizing: {},
   }), [initialDensity, initialPageSize]);
   const [uncontrolledViewState, setUncontrolledViewState] = useState<ReportTableViewState>(defaultViewState);
   const [globalFilter, setGlobalFilter] = useState('');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: initialPageSize });
-  const [columnsOpen, setColumnsOpen] = useState(false);
   const activeViewState = controlledViewState ?? uncontrolledViewState;
+  const normalizedColumnOrder = useMemo(() => normalizeColumnOrder(activeViewState.columnOrder, columns), [activeViewState.columnOrder, columns]);
+  const normalizedColumnSizing = useMemo(() => normalizeColumnSizing(activeViewState.columnSizing, columns), [activeViewState.columnSizing, columns]);
 
   useEffect(() => {
     if (!controlledViewState) setUncontrolledViewState(defaultViewState);
@@ -235,6 +279,10 @@ export function ReportDataTable({
       header: column.label,
       enableSorting: column.sortable !== false,
       enableHiding: column.hideable !== false,
+      enableResizing: column.resizable !== false,
+      size: column.size ?? (column.numeric ? 144 : 200),
+      minSize: column.minSize ?? (column.numeric ? 120 : 112),
+      maxSize: column.maxSize ?? (column.numeric ? 260 : 520),
       sortingFn: (rowA, rowB) => compareValues(
         String(rowA.getValue(column.id) ?? ''),
         String(rowB.getValue(column.id) ?? '')
@@ -246,11 +294,15 @@ export function ReportDataTable({
   const table = useReactTable({
     data,
     columns: tableColumns,
-    state: { sorting: activeViewState.sorting, globalFilter, columnVisibility: activeViewState.columnVisibility, pagination },
+    state: { sorting: activeViewState.sorting, globalFilter, columnVisibility: activeViewState.columnVisibility, columnOrder: normalizedColumnOrder, columnSizing: normalizedColumnSizing, pagination },
     onSortingChange: (updater) => updateViewState((current) => ({ ...current, sorting: functionalUpdate(updater, current.sorting) })),
     onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: (updater) => updateViewState((current) => ({ ...current, columnVisibility: functionalUpdate(updater, current.columnVisibility) })),
+    onColumnOrderChange: (updater) => updateViewState((current) => ({ ...current, columnOrder: normalizeColumnOrder(functionalUpdate(updater, normalizedColumnOrder), columns) })),
+    onColumnSizingChange: (updater) => updateViewState((current) => ({ ...current, columnSizing: normalizeColumnSizing(functionalUpdate(updater, normalizedColumnSizing), columns) })),
     onPaginationChange: setPagination,
+    columnResizeMode: 'onChange',
+    columnResizeDirection: resizeDirection,
     globalFilterFn: (row, _columnId, filterValue) => {
       const query = normalizeSearchValue(String(filterValue ?? '').trim());
       if (!query) return true;
@@ -280,6 +332,10 @@ export function ReportDataTable({
   }, [controlledViewState, table]);
 
   const visibleColumns = table.getVisibleLeafColumns();
+  const layoutItems = table.getAllLeafColumns().map((column) => {
+    const definition = columns.find((item) => item.id === column.id);
+    return { id: column.id, label: definition?.label ?? column.id, visible: column.getIsVisible(), canHide: column.getCanHide() };
+  });
   const filteredCount = table.getFilteredRowModel().rows.length;
   const pageCount = Math.max(table.getPageCount(), 1);
   const pageNumber = Math.min(table.getState().pagination.pageIndex + 1, pageCount);
@@ -302,33 +358,12 @@ export function ReportDataTable({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Button variant="outline" size="sm" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((open) => !open)}>
-              <Columns3 className="h-4 w-4" strokeWidth={1.7} />
-              {labels.columns}
-            </Button>
-            {columnsOpen && (
-              <div className="absolute end-0 z-30 mt-2 min-w-52 rounded border border-border bg-surface p-2 shadow-sm">
-                <div className="space-y-1">
-                  {table.getAllLeafColumns().map((column) => {
-                    const definition = columns.find((item) => item.id === column.id);
-                    if (!definition || !column.getCanHide()) return null;
-                    return (
-                      <label key={column.id} className="flex min-h-9 cursor-pointer items-center gap-2 rounded px-2 text-sm text-text hover:bg-primary-soft/50">
-                        <input
-                          type="checkbox"
-                          checked={column.getIsVisible()}
-                          onChange={column.getToggleVisibilityHandler()}
-                          className="h-4 w-4 accent-primary"
-                        />
-                        <span>{definition.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <ReportColumnLayoutMenu
+            items={layoutItems}
+            labels={{ columns: labels.columns, moveColumn: labels.moveColumn, moveUp: labels.moveUp, moveDown: labels.moveDown }}
+            onReorder={(columnOrder) => updateViewState((current) => ({ ...current, columnOrder: normalizeColumnOrder(columnOrder, columns) }))}
+            onVisibilityChange={(id, visible) => updateViewState((current) => ({ ...current, columnVisibility: { ...current.columnVisibility, [id]: visible } }))}
+          />
 
           <label className="inline-flex items-center gap-2 rounded border border-border bg-surface px-2.5 py-1.5 text-sm text-text">
             <Rows3 className="h-4 w-4 text-muted" strokeWidth={1.7} aria-hidden />
@@ -344,7 +379,7 @@ export function ReportDataTable({
 
       <div className="overflow-hidden rounded border border-border bg-surface">
         <div className="max-h-[62vh] overflow-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="min-w-full border-collapse text-sm" style={{ minWidth: table.getTotalSize(), tableLayout: 'fixed' }}>
             <thead className="sticky top-0 z-10 border-b border-border bg-surface text-muted">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
@@ -357,17 +392,19 @@ export function ReportDataTable({
                         scope="col"
                         aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
                         className={cn(
-                          'whitespace-nowrap px-3 text-start text-xs font-semibold',
+                          'relative whitespace-nowrap px-3 text-start text-xs font-semibold',
                           activeViewState.density === 'compact' ? 'py-2' : 'py-3',
                           definition?.align === 'end' && 'text-end'
                         )}
+                        style={{ width: header.getSize() }}
                       >
                         {header.isPlaceholder ? null : header.column.getCanSort() ? (
                           <button
                             type="button"
                             className={cn(
                               'inline-flex max-w-full items-center gap-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-                              definition?.align === 'end' && 'ms-auto'
+                              definition?.align === 'end' && 'ms-auto',
+                              header.column.getCanResize() && 'me-2'
                             )}
                             onClick={header.column.getToggleSortingHandler()}
                           >
@@ -376,6 +413,17 @@ export function ReportDataTable({
                           </button>
                         ) : (
                           flexRender(header.column.columnDef.header, header.getContext())
+                        )}
+                        {header.column.getCanResize() && (
+                          <button
+                            type="button"
+                            aria-label={`${labels.resizeColumn}: ${definition?.label ?? header.column.id}`}
+                            onMouseDown={header.getResizeHandler()}
+                            onTouchStart={header.getResizeHandler()}
+                            className={cn('absolute inset-y-0 -end-1 z-10 w-3 cursor-col-resize touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', header.column.getIsResizing() && 'bg-primary/20')}
+                          >
+                            <span className="absolute inset-y-2 start-1/2 w-px -translate-x-1/2 bg-border" aria-hidden />
+                          </button>
                         )}
                       </th>
                     );
@@ -409,12 +457,13 @@ export function ReportDataTable({
                           tone === 'positive' && 'text-positive',
                           tone === 'negative' && 'text-negative'
                         )}
+                        style={{ width: cell.column.getSize() }}
                       >
                         {canOpenDetails ? (
-                          <Link href={rowAction.href} prefetch={false} className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                          <Link href={rowAction.href} prefetch={false} className="block truncate font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" title={value || '—'}>
                             {value || '—'}
                           </Link>
-                        ) : (value || '—')}
+                        ) : <span className={cn('block', definition?.numeric ? 'whitespace-nowrap' : definition?.wrap ? 'whitespace-normal break-words' : 'truncate')} title={value || '—'}>{value || '—'}</span>}
                       </td>
                     );
                   })}
@@ -440,8 +489,9 @@ export function ReportDataTable({
                           tone === 'positive' && 'text-positive',
                           tone === 'negative' && 'text-negative'
                         )}
+                        style={{ width: column.getSize() }}
                       >
-                        {value}
+                        <span className={cn('block', definition?.numeric ? 'whitespace-nowrap' : 'truncate')} title={value}>{value}</span>
                       </td>
                     );
                   })}

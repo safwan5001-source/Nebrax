@@ -10,7 +10,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const defaultState: ReportTableViewState = { columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25 };
+const defaultState: ReportTableViewState = { columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25, columnOrder: [], columnSizing: {} };
 
 function SavedViewsHarness({ reportKey, locale = 'en' }: { reportKey: string; locale?: 'en' | 'ar' }) {
   const defaults = useMemo(() => defaultState, []);
@@ -18,7 +18,7 @@ function SavedViewsHarness({ reportKey, locale = 'en' }: { reportKey: string; lo
   return (
     <>
       <output data-testid="state">{JSON.stringify(controller.viewState)}</output>
-      <button type="button" onClick={() => controller.setViewState({ columnVisibility: { 'column-2': false }, sorting: [{ id: 'column-1', desc: true }], density: 'comfortable', pageSize: 50 })}>Modify table</button>
+      <button type="button" onClick={() => controller.setViewState({ columnVisibility: { 'column-2': false }, sorting: [{ id: 'column-1', desc: true }], density: 'comfortable', pageSize: 50, columnOrder: ['column-2', 'column-1'], columnSizing: { 'column-1': 220, 'column-2': 180 } })}>Modify table</button>
       {controller.loaded && <ReportSavedViewsMenu controller={controller} locale={locale} />}
     </>
   );
@@ -29,6 +29,42 @@ describe('Saved report views persistence', () => {
     expect(parseStoredSavedReportViews('{not-json', 'sales:customer')).toBeNull();
     expect(parseStoredSavedReportViews(JSON.stringify({ version: 99, reportKey: 'sales:customer', views: [] }), 'sales:customer')).toBeNull();
     expect(parseStoredSavedReportViews(JSON.stringify({ version: 1, reportKey: 'sales:customer', views: [{ version: 1, id: 'bad', name: 'Bad', reportKey: 'sales:customer', state: { columnVisibility: {}, sorting: [], density: 'wide', pageSize: 25 }, createdAt: 'now', updatedAt: 'now' }] }), 'sales:customer')).toBeNull();
+  });
+
+  it('migrates version 1 saved views that lack column layout fields without data loss', () => {
+    const legacy = JSON.stringify({
+      version: 1,
+      reportKey: 'sales:customer',
+      views: [{
+        version: 1,
+        id: 'legacy',
+        name: 'Legacy view',
+        reportKey: 'sales:customer',
+        state: { columnVisibility: { 'column-2': false }, sorting: [{ id: 'column-1', desc: false }], density: 'compact', pageSize: 25 },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      }],
+    });
+
+    expect(parseStoredSavedReportViews(legacy, 'sales:customer')?.[0]?.state).toMatchObject({ columnOrder: [], columnSizing: {}, pageSize: 25 });
+  });
+
+  it('rejects corrupted saved column layout safely', () => {
+    const corrupt = JSON.stringify({
+      version: 1,
+      reportKey: 'sales:customer',
+      views: [{
+        version: 1,
+        id: 'corrupt',
+        name: 'Corrupt view',
+        reportKey: 'sales:customer',
+        state: { columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25, columnOrder: ['column-1', 2], columnSizing: { 'column-1': -10 } },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      }],
+    });
+
+    expect(parseStoredSavedReportViews(corrupt, 'sales:customer')).toBeNull();
   });
 
   it('creates, applies, renames, and deletes a saved table-only view with validation', async () => {
@@ -49,7 +85,10 @@ describe('Saved report views persistence', () => {
     await user.click(screen.getByRole('button', { name: 'Views' }));
     expect(screen.getByRole('menuitem', { name: 'Management review' })).toBeTruthy();
     await user.click(screen.getByRole('menuitem', { name: 'Default view' }));
-    expect(screen.getByTestId('state').textContent).toContain('compact');
+    const defaultStateText = screen.getByTestId('state').textContent ?? '';
+    expect(defaultStateText).toContain('compact');
+    expect(defaultStateText).toContain('"columnOrder":[]');
+    expect(defaultStateText).toContain('"columnSizing":{}');
 
     await user.click(screen.getByRole('button', { name: 'Views' }));
     await user.click(screen.getByRole('menuitem', { name: 'Management review' }));
@@ -58,6 +97,8 @@ describe('Saved report views persistence', () => {
     expect(restoredState).toContain('"column-2":false');
     expect(restoredState).toContain('"column-1"');
     expect(restoredState).toContain('"pageSize":50');
+    expect(restoredState).toContain('"columnOrder":["column-2","column-1"]');
+    expect(restoredState).toContain('"columnSizing":{"column-1":220,"column-2":180}');
 
     await user.click(screen.getByRole('button', { name: 'Views' }));
     await user.click(screen.getByRole('menuitem', { name: 'Rename view: Management review' }));

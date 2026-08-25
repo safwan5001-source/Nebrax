@@ -34,7 +34,7 @@ export function ReportResultsTable({
 }: ReportResultsTableProps) {
   const locale = useLocale();
   const labels = defaultReportTableLabels(locale);
-  const defaultViewState = useMemo<ReportTableViewState>(() => ({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25 }), []);
+  const defaultViewState = useMemo<ReportTableViewState>(() => ({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25, columnOrder: [], columnSizing: {} }), []);
   const savedViews = useSavedReportViews(reportKey, defaultViewState);
   const rowActions = rowHrefs?.map((href) => href ? { href, label: labels.openDetails } : null);
   const dataColumns: ReportDataColumn[] = columns.map((column, index) => ({
@@ -72,6 +72,7 @@ export function ReportResultsTable({
           viewState={reportKey ? savedViews.viewState : undefined}
           onViewStateChange={reportKey ? savedViews.setViewState : undefined}
           toolbarAddon={reportKey && savedViews.loaded ? <ReportSavedViewsMenu controller={savedViews} locale={locale} /> : undefined}
+          resizeDirection={locale.toLowerCase().startsWith('ar') ? 'rtl' : 'ltr'}
         />
       </div>
     </>
