@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignDocumentReviewerRequest;
 use App\Http\Requests\CompleteDocumentReviewRequest;
+use App\Http\Requests\CreateDocumentPurchaseDraftRequest;
 use App\Http\Requests\ConfirmDocumentMatchRequest;
 use App\Http\Requests\DocumentIssueActionRequest;
 use App\Http\Requests\RejectDocumentMatchRequest;
@@ -21,6 +22,7 @@ use App\Models\DocumentMatchResult;
 use App\Models\DocumentReviewAction;
 use App\Models\User;
 use App\Services\DocumentCenter\DocumentReviewService;
+use App\Services\DocumentCenter\PurchaseDocumentDraftBuilder;
 use App\Services\DocumentCenter\ReviewedDocumentProjector;
 use App\Support\DocumentScanStatus;
 use Illuminate\Http\JsonResponse;
@@ -80,7 +82,7 @@ class DocumentReviewController extends Controller
 
     public function review(Request $request, DocumentBatch $batch): DocumentReviewResource
     {
-        $batch->load(['files', 'reviewer:id,name']);
+        $batch->load(['files', 'reviewer:id,name', 'transactionLinks.purchase']);
         $result = $this->resultFor($batch);
         $original = $result->normalized_payload;
         $reviewed = app(ReviewedDocumentProjector::class)->project($result);
@@ -92,6 +94,7 @@ class DocumentReviewController extends Controller
             'matches' => $this->matches($result),
             'issues' => $this->issues($result),
             'history' => $this->history($batch),
+            'purchase_draft' => $this->purchaseDraft($batch),
             'capabilities' => $this->capabilities($request->user()),
         ]);
     }
@@ -171,6 +174,28 @@ class DocumentReviewController extends Controller
         );
 
         return response()->json(['data' => ['id' => $action->id]]);
+    }
+
+    public function createPurchaseDraft(CreateDocumentPurchaseDraftRequest $request, DocumentBatch $batch): JsonResponse
+    {
+        $draft = app(PurchaseDocumentDraftBuilder::class)->build(
+            $batch,
+            $request->integer('expected_version'),
+            $request->string('reason')->toString(),
+            $request->validated('warehouse_id'),
+            $request->validated('cost_center_id'),
+            $request->user()?->id,
+        );
+
+        return response()->json(['data' => [
+            'document_batch_id' => $batch->id,
+            'transaction_type' => 'purchase',
+            'purchase_id' => $draft['purchase_id'],
+            'purchase_number' => $draft['purchase_number'],
+            'status' => $draft['status'],
+            'url' => '/purchases/'.$draft['purchase_id'],
+            'idempotent_replay' => $draft['idempotent_replay'],
+        ]], $draft['idempotent_replay'] ? 200 : 201);
     }
 
     public function revalidateFinancial(RevalidateDocumentFinancialRequest $request, DocumentBatch $batch): JsonResponse
@@ -329,6 +354,24 @@ class DocumentReviewController extends Controller
             'view' => $user?->hasPermission('documents.center.view') ?? false,
             'review' => $user?->hasPermission('documents.center.review') ?? false,
             'manage' => $user?->hasPermission('documents.center.manage') ?? false,
+            'build_draft' => $user?->hasPermission('documents.center.build_draft') ?? false,
+        ];
+    }
+
+    /** @return array<string, string>|null */
+    private function purchaseDraft(DocumentBatch $batch): ?array
+    {
+        $link = $batch->transactionLinks->firstWhere('transaction_type', 'purchase');
+        $purchase = $link?->purchase;
+        if ($link === null || $purchase === null || $purchase->status !== 'draft') {
+            return null;
+        }
+
+        return [
+            'purchase_id' => $purchase->id,
+            'purchase_number' => $purchase->number,
+            'status' => $purchase->status,
+            'url' => '/purchases/'.$purchase->id,
         ];
     }
 

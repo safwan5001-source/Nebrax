@@ -46,7 +46,11 @@ Add authenticated read and review endpoints with tenant/branch context, independ
 
 ### PR-7 — TransactionDraftBuilder
 
-Add the sole transaction boundary. Map reviewed data and call the existing invoice, purchase, or expense domain service to create a draft. Do not call `post()`, write transaction/journal tables, or move inventory. Store transaction links here, with idempotency and audit evidence.
+**Status: implemented — purchase-invoice draft only.** `PurchaseDocumentDraftBuilder` is the sole purchase transaction boundary. From a locked, reviewed `purchase_invoice` in `ready_for_draft`, it resolves server-trusted confirmed supplier/product/unit matches and calls `PurchaseService::create()` to create exactly one `draft` Purchase. It explicitly sets `received_status = pending` and `paid_on_post = 0`; it never calls `post()`, writes transaction/journal tables directly, moves inventory, pays, approves, or creates master data.
+
+The builder uses an outer database transaction and `DocumentWorkflowService` transitions (`ready_for_draft → creating_draft → draft_created`). `document_transaction_links` is immutable and unique per tenant/branch/batch/type; a valid existing link yields the original draft as an idempotent replay. Amounts are integer minor units, currencies are SAR-only until a separately approved conversion policy exists, and quantities must be positive integers no greater than 1,000,000. Invalid data, stale versions, missing readiness, inaccessible/invalid master data, or a financial-total mismatch roll back without a Purchase, link, or completed workflow transition.
+
+The protected create endpoint requires both the write entitlement for `document_center.core` and `documents.center.build_draft`. The review UI presents the CTA only when that capability, document type, workflow state, and no-existing-link conditions all hold. It presents a safe purchase number/link after completion. The ordinary Purchase create form links reviewers to ready document batches; it does not import browser-controlled financial data. See [ADR-007](ADR-007-PURCHASE-DRAFT-BUILDER.md).
 
 ### PR-8 — General delivery-note domain
 

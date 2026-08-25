@@ -28,6 +28,7 @@ class DocumentReviewResource extends JsonResource
             'matches' => $this['matches'],
             'issues' => $this['issues'],
             'history' => $this['history'],
+            'purchase_draft' => $this['purchase_draft'],
             'capabilities' => $this['capabilities'],
         ];
     }

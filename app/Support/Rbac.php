@@ -98,7 +98,7 @@ class Rbac
             // مركز المستندات: العرض والإدارة والمراجعة والإعداد سلطات مستقلة.
             // لا ترثها الأدوار المقيدة من صلاحيات المستندات المحاسبية العامة.
             'documents.center.view', 'documents.center.manage',
-            'documents.center.review', 'documents.center.settings',
+            'documents.center.review', 'documents.center.settings', 'documents.center.build_draft',
             // Cycle 9: الصيانة والسلامة والتقارير والتنبيهات سلطات تشغيلية
             // مستقلة؛ لا تمنحها إدارة المحطة أو التصفح العام ضمنياً.
             'fuel.maintenance.view', 'fuel.maintenance.manage', 'fuel.maintenance.transition',
