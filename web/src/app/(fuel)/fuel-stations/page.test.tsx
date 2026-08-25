@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import FuelStationsWorkspacePage from './page';
 
-const { api, currentUser, translate } = vi.hoisted(() => {
+const { api, currentUser, translate, locale, literUnit } = vi.hoisted(() => {
   const strings: Record<string, string> = {
     eyebrow: 'Fuel stations',
     commandCenterTitle: 'Fuel command centre',
@@ -24,12 +24,18 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     statusUnknown: 'Unknown',
     noRecentShift: 'No recent shift',
     viewStation: 'View station',
+    litersToday: 'Liters today',
   };
-  const translator = Object.assign((key: string) => strings[key] ?? key, { raw: () => ({}) });
-  return { api: vi.fn(), currentUser: vi.fn(), translate: translator };
+  const literUnit = { current: 'L' };
+  const locale = { current: 'en' };
+  const translator = Object.assign(
+    (key: string) => (key === 'literUnit' ? literUnit.current : strings[key] ?? key),
+    { raw: () => ({}) }
+  );
+  return { api: vi.fn(), currentUser: vi.fn(), translate: translator, locale, literUnit };
 });
 
-vi.mock('next-intl', () => ({ useTranslations: () => translate, useLocale: () => 'en' }));
+vi.mock('next-intl', () => ({ useTranslations: () => translate, useLocale: () => locale.current }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }));
@@ -51,9 +57,21 @@ const station = {
   status: 'active', timezone: 'Asia/Riyadh', operating_day_starts_at: '06:00',
 };
 
+const dashboard = {
+  sales_today_minor: 128455075,
+  liters_today_milliliters: 84250000,
+  gross_margin_minor: 18422050,
+  open_shifts: 4,
+  open_work_orders: 2,
+  active_alerts: 1,
+  degraded_devices: 3,
+  data_boundary: 'branch',
+};
+
 function respondWith(workspacePayload: unknown) {
   api.mockImplementation((path: string) => {
     if (path === '/fuel-stations/workspace') return Promise.resolve(workspacePayload);
+    if (path === '/fuel-stations/dashboard') return Promise.resolve({ data: dashboard });
     return Promise.resolve({ data: [] });
   });
 }
@@ -64,6 +82,8 @@ describe('FuelStationsWorkspacePage workspace payload', () => {
   beforeEach(() => {
     currentUser.mockReturnValue({ role: 'owner', permissions: ['*'] });
     api.mockReset();
+    locale.current = 'en';
+    literUnit.current = 'L';
   });
 
   it('renders the command centre for a well-formed workspace', async () => {
@@ -90,6 +110,28 @@ describe('FuelStationsWorkspacePage workspace payload', () => {
     render(<FuelStationsWorkspacePage />);
 
     expect((await screen.findByRole('alert')).textContent).toBe('Could not load the fuel workspace');
+  });
+
+  it('names the liters metric once, in English', async () => {
+    locale.current = 'en';
+    literUnit.current = 'L';
+    respondWith({ data: { stations: [station] } });
+    render(<FuelStationsWorkspacePage />);
+
+    const metric = await screen.findByText(/84,250/);
+    expect(metric.textContent).toBe('84,250 L');
+  });
+
+  it('names the liters metric once, in Arabic', async () => {
+    locale.current = 'ar';
+    literUnit.current = 'لتر';
+    respondWith({ data: { stations: [station] } });
+    render(<FuelStationsWorkspacePage />);
+
+    const metric = await screen.findByText(/84,250/);
+    // كانت الوحدة تُلحَق مرتين فتظهر «84,250 L لتر».
+    expect(metric.textContent).toBe('84,250 لتر');
+    expect(metric.textContent).not.toContain('L');
   });
 
   it('keeps the page header visible on the failure path so the user is not stranded', async () => {

@@ -3,7 +3,7 @@ import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, Fuel, RefreshCw } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState, PageHeader, type PageAction } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +72,7 @@ function readWorkspace(payload: unknown): Workspace | null {
 
 export default function FuelStationsWorkspacePage() {
   const t = useTranslations('fuelStations');
+  const locale = useLocale();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [summary, setSummary] = useState<Summary>({ dashboard: null, devices: [], shifts: [], summaryUnavailable: false });
   const [permissions, setPermissions] = useState<string[] | null>(() => currentUser()?.permissions ?? null);
@@ -182,7 +183,7 @@ export default function FuelStationsWorkspacePage() {
 
   const metrics = summary.dashboard ? [
     { label: t('salesToday'), value: formatMinorRiyal(summary.dashboard.sales_today_minor) },
-    { label: t('litersToday'), value: `${formatMillilitersAsLiters(summary.dashboard.liters_today_milliliters)} ${t('literUnit')}` },
+    { label: t('litersToday'), value: formatMillilitersAsLiters(summary.dashboard.liters_today_milliliters, locale, t('literUnit')) },
     { label: t('grossMargin'), value: formatMinorRiyal(summary.dashboard.gross_margin_minor) },
     { label: t('openShifts'), value: String(summary.dashboard.open_shifts) },
     { label: t('openWorkOrders'), value: String(summary.dashboard.open_work_orders) },

@@ -31,16 +31,31 @@ export function millilitersToLiters(value: string | number | null | undefined): 
   return `${negative ? '-' : ''}${whole}${fraction ? `.${fraction}` : ''}`;
 }
 
-/** صيغة عرض تشغيلية موحّدة للكميات باللتر. */
-export function formatLiters(value: string | number | null | undefined, locale?: string): string {
+/**
+ * صيغة عرض تشغيلية موحّدة للكميات باللتر: الرقم بلغة الواجهة، والوحدة كما
+ * تمرّرها الشاشة من ترجمتها (`fuelStations.literUnit`).
+ *
+ * تمرير الوحدة — لا بناؤها هنا — يبقي الوحدة مصدرَها واحداً: من يعرض الرقم هو
+ * من يسمّي وحدته، فلا تُلحَق مرتين ولا تحتاج هذه الدالّة إلى سياق ترجمة.
+ * الافتراض `L` يحفظ سلوك الشاشات التي لم تمرّر وحدةً بعد كما هو حرفياً.
+ */
+export function formatLiters(
+  value: string | number | null | undefined,
+  locale?: string,
+  unit: string = 'L'
+): string {
   const liters = Number(value ?? 0);
   if (!Number.isFinite(liters)) return '—';
 
-  return `${new Intl.NumberFormat(displayLocale(locale), { maximumFractionDigits: 3 }).format(liters)} L`;
+  return `${new Intl.NumberFormat(displayLocale(locale), { maximumFractionDigits: 3 }).format(liters)} ${unit}`;
 }
 
-export function formatMillilitersAsLiters(value: string | number | null | undefined, locale?: string): string {
+export function formatMillilitersAsLiters(
+  value: string | number | null | undefined,
+  locale?: string,
+  unit?: string
+): string {
   const liters = millilitersToLiters(value);
 
-  return liters === '' ? '—' : formatLiters(liters, locale);
+  return liters === '' ? '—' : formatLiters(liters, locale, unit);
 }
