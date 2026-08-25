@@ -61,7 +61,7 @@ class DocumentMatchResult extends BaseModel
             }
             if ($result->isDirty(['status', 'confirmed_by', 'confirmed_at'])) {
                 DocumentReviewMutationGate::assertOpen();
-                $allowed = ['status', 'confirmed_by', 'confirmed_at', 'updated_at'];
+                $allowed = ['status', 'matched_type', 'matched_id', 'confirmed_by', 'confirmed_at', 'updated_at'];
                 if (array_diff(array_keys($result->getDirty()), $allowed) !== []) {
                     throw new LogicException('PR-6 may only mutate reviewed match decision fields.');
                 }
