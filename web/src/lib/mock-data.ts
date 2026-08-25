@@ -891,12 +891,57 @@ export const mockCashBankAccounts = [
 ];
 
 export const mockPayments = [
-  { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
-  { id: 'pm-50', number: 'PMT-2026-0050', partner_id: 'p2', direction: 'received', method: 'cash', payment_date: '2026-06-22', amount: '6325.00' },
-  { id: 'pm-49', number: 'PMT-2026-0049', partner_id: 'p7', direction: 'paid', method: 'bank', payment_date: '2026-06-20', amount: '6900.00' },
-  { id: 'pm-48', number: 'PMT-2026-0048', partner_id: 'p5', direction: 'received', method: 'bank', payment_date: '2026-06-18', amount: '21275.00' },
-  { id: 'pm-47', number: 'PMT-2026-0047', partner_id: 'p8', direction: 'paid', method: 'cash', payment_date: '2026-06-12', amount: '3450.00' },
-  { id: 'pm-46', number: 'PMT-2026-0046', partner_id: 'p6', direction: 'received', method: 'bank', payment_date: '2026-06-08', amount: '4600.00' },
+  // `status` و`partner_name` مطلوبان في وضع المعاينة: `/receipt-vouchers` و`/supplier-payments`
+  // يقرآن `t(status)` مباشرة على سطر القائمة (كما يفعل الخادم الحقيقي)، وسندات
+  // القبض تعرض `partner_name` كما تُعيده الحمولة بلا حلّ عميل من طرف العميل.
+  { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', partner_name: 'مؤسسة الخليج للتجارة', direction: 'received', method: 'bank', status: 'posted', payment_date: '2026-06-24', amount: '5750.00' },
+  { id: 'pm-50', number: 'PMT-2026-0050', partner_id: 'p2', partner_name: 'شركة الواحة للمقاولات', direction: 'received', method: 'cash', status: 'posted', payment_date: '2026-06-22', amount: '6325.00' },
+  { id: 'pm-49', number: 'PMT-2026-0049', partner_id: 'p7', partner_name: 'شركة الجزيرة للتوريدات الصناعية', direction: 'paid', method: 'bank', status: 'posted', payment_date: '2026-06-20', amount: '6900.00' },
+  { id: 'pm-48', number: 'PMT-2026-0048', partner_id: 'p5', partner_name: 'شركة البحر الأحمر اللوجستية', direction: 'received', method: 'bank', status: 'draft', payment_date: '2026-06-18', amount: '21275.00' },
+  { id: 'pm-47', number: 'PMT-2026-0047', partner_id: 'p8', partner_name: 'مصنع الرياض للتغليف', direction: 'paid', method: 'cash', status: 'posted', payment_date: '2026-06-12', amount: '3450.00' },
+  { id: 'pm-46', number: 'PMT-2026-0046', partner_id: 'p6', partner_name: 'مؤسسة الفيصل للأجهزة', direction: 'received', method: 'bank', status: 'posted', payment_date: '2026-06-08', amount: '4600.00' },
+];
+
+/**
+ * ─────────────────────────── القيود اليومية (`/journal-entries`) ───────────────────────────
+ * سجلّ `GET /journal-entries` الفعلي — لا علاقة له بـ`mockJournalEntries` أعلاه
+ * (تلك حمولة تقرير مختلفة الشكل لِـ`/reports/journal-entries`). تغطّي العيّنة
+ * الأنواع الثلاثة الفعلية (`automatic`, `manual`, `reversal`) وثلاثة مصادر آلية
+ * مختلفة، بمراجع ومبالغ تطابق مستنداتها في بيانات المعاينة نفسها: فاتورة
+ * INV-2026-0118 (5,750.00 شامل الضريبة)، فاتورة مشتريات PUR-2026-0042
+ * (6,900.00)، ومصروف EXP-2026-00004 (13,800.00).
+ */
+const mockJournalEntriesList = [
+  {
+    id: 'je-6', number: 'JE-2026-0006', entry_date: '2026-06-25', status: 'posted',
+    entry_kind: 'automatic', source_type: 'App\\Models\\Expense', source_id: 'exp-4',
+    description: 'ترحيل مصروف EXP-2026-00004 — إيجار المعرض', total: '13800.00',
+  },
+  {
+    id: 'je-5', number: 'JE-2026-0005', entry_date: '2026-06-24', status: 'posted',
+    entry_kind: 'automatic', source_type: 'App\\Models\\Invoice', source_id: 'inv-118',
+    description: 'ترحيل فاتورة INV-2026-0118', total: '5750.00',
+  },
+  {
+    id: 'je-4', number: 'JE-2026-0004', entry_date: '2026-06-21', status: 'posted',
+    entry_kind: 'manual', source_type: null, source_id: null,
+    description: 'قيد إهلاك الأصول الثابتة — يونيو', total: '1800.00',
+  },
+  {
+    id: 'je-3', number: 'JE-2026-0003', entry_date: '2026-06-20', status: 'posted',
+    entry_kind: 'automatic', source_type: 'App\\Models\\Purchase', source_id: 'pu-42',
+    description: 'ترحيل فاتورة مشتريات PUR-2026-0042', total: '6900.00',
+  },
+  {
+    id: 'je-2', number: 'JE-2026-0002', entry_date: '2026-06-15', status: 'posted',
+    entry_kind: 'manual', source_type: null, source_id: null,
+    description: 'قيد تسوية عهدة نقدية — فرع الدمام', total: '2500.00',
+  },
+  {
+    id: 'je-1', number: 'JE-2026-0001', entry_date: '2026-06-16', status: 'posted',
+    entry_kind: 'reversal', source_type: null, source_id: null,
+    description: 'عكس القيد اليدوي JE-2026-0002 — تصحيح تصنيف الحساب', total: '2500.00',
+  },
 ];
 
 // ── الموارد البشرية ────────────────────────────────────────────────────────
@@ -2030,6 +2075,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   }
   if (clean === '/me') return resolve({ user: DEMO_USER, company: mockCompany });
   if (clean === '/applications') return resolve({ data: mockApplications });
+  if (clean === '/journal-entries') return resolve({ data: mockJournalEntriesList });
   if (clean === '/fuel-stations/workspace') return resolve({ data: { stations: mockFuelStations } });
   if (clean === '/fuel-stations/dashboard') return resolve({ data: mockFuelDashboard });
   if (clean === '/fuel-stations/devices') return resolve({ data: mockFuelDevices });

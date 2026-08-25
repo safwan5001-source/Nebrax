@@ -1,19 +1,17 @@
 'use client';
-import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
-import { DataExplorerToolbar } from '@/components/data-explorer/data-explorer-toolbar';
+import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { BranchViewToggle, type BranchView } from '@/components/ui/branch-view-toggle';
@@ -123,8 +121,8 @@ export default function PurchasesPage() {
     },
     {
       key: 'partner_id', label: t('supplier'), kind: 'entity', quick: true,
-      searchPlaceholder: 'ابحث باسم المورد، الهاتف أو الرقم التعريفي',
-      emptyText: 'لا يوجد مورد مطابق',
+      searchPlaceholder: t('supplier_search_placeholder'),
+      emptyText: t('supplier_search_empty'),
       options: partners.map((partner) => ({
         value: partner.id,
         label: partner.name,
@@ -133,15 +131,15 @@ export default function PurchasesPage() {
       })),
     },
     {
-      key: 'classification_id', label: 'التصنيف', kind: 'entity', quick: true,
-      searchPlaceholder: 'ابحث باسم التصنيف',
-      emptyText: 'لا يوجد تصنيف مطابق',
+      key: 'classification_id', label: t('classification'), kind: 'entity', quick: true,
+      searchPlaceholder: t('classification_search_placeholder'),
+      emptyText: t('classification_search_empty'),
       options: classifications.map((classification) => ({ value: classification.id, label: classification.name })),
     },
     { key: 'purchase_date', label: t('date'), kind: 'dateRange' },
-    { key: 'due_date', label: 'تاريخ الاستحقاق', kind: 'dateRange' },
+    { key: 'due_date', label: t('due_date'), kind: 'dateRange' },
     { key: 'total', label: t('total'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
-    { key: 'remaining', label: 'المتبقي', kind: 'money', operators: ['gte', 'lte', 'eq'] },
+    { key: 'remaining', label: t('remaining'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
   ], [classifications, partners, t, ts]);
 
   const labelledFilters = useMemo(
@@ -215,9 +213,9 @@ export default function PurchasesPage() {
           total: response.data.length,
         });
       })
-      .catch(() => setLoadError('تعذر تحميل فواتير المشتريات.'))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : t('load_error')))
       .finally(() => setLoading(false));
-  }, [explorer, view]);
+  }, [explorer, t, view]);
 
   useEffect(() => load(), [load]);
 
@@ -228,6 +226,51 @@ export default function PurchasesPage() {
       filters: isEmptyFilter(next) ? removeFilter(current.filters, next.key) : replaceFilter(current.filters, next),
     }));
   }
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await api(`/purchases/${toDelete.id}`, { method: 'DELETE' });
+      success(t('deleted'));
+      setToDelete(null);
+      load();
+    } catch (e) {
+      errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const rowActions = useCallback((purchase: Purchase) => {
+    const isDraft = purchase.status === 'draft';
+    return (
+      <>
+        <Button asChild variant="ghost" size="icon" aria-label={t('view')}>
+          <Link href={`/purchases/${purchase.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link>
+        </Button>
+        {isDraft ? (
+          <Button asChild variant="ghost" size="icon" aria-label={t('edit')} title={t('edit')}>
+            <Link href={`/purchases/${purchase.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
+          </Button>
+        ) : (
+          <Button variant="ghost" size="icon" aria-label={t('edit')} disabled title={t('posted_locked')}>
+            <Pencil className="h-4 w-4" strokeWidth={1.7} />
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('delete')}
+          disabled={!isDraft}
+          title={isDraft ? t('delete') : t('posted_locked')}
+          onClick={() => setToDelete(purchase)}
+        >
+          <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
+        </Button>
+      </>
+    );
+  }, [t]);
 
   const columns = useMemo<ColumnDef<Purchase, unknown>[]>(() => [
     {
@@ -248,7 +291,7 @@ export default function PurchasesPage() {
       cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.total)}</div>,
     },
     {
-      accessorKey: 'remaining', header: 'المتبقي', enableSorting: false,
+      accessorKey: 'remaining', header: t('remaining'), enableSorting: false,
       cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.remaining ?? '0.00')}</div>,
     },
     {
@@ -261,125 +304,98 @@ export default function PurchasesPage() {
     },
     {
       id: 'actions', header: '', enableSorting: false,
-      cell: ({ row }) => {
-        const purchase = row.original;
-        const isDraft = purchase.status === 'draft';
-        return (
-          <div className="flex items-center justify-end gap-0.5">
-            <Button asChild variant="ghost" size="icon" aria-label={t('view')}><Link href={`/purchases/${purchase.id}`}>
-              <Eye className="h-4 w-4" strokeWidth={1.7} />
-            </Link></Button>
-            {isDraft ? (
-              <Button asChild variant="ghost" size="icon" aria-label={t('edit')} title={t('edit')}>
-                <Link href={`/purchases/${purchase.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
-              </Button>
-            ) : (
-              <Button variant="ghost" size="icon" aria-label={t('edit')} disabled title={t('posted_locked')}>
-                <Pencil className="h-4 w-4" strokeWidth={1.7} />
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" aria-label={t('delete')} disabled={!isDraft} title={isDraft ? t('delete') : t('posted_locked')} onClick={() => setToDelete(purchase)}>
-              <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
-            </Button>
-          </div>
-        );
-      },
+      cell: ({ row }) => <div className="flex items-center justify-end gap-0.5">{rowActions(row.original)}</div>,
     },
-  ], [partnerNames, router, t, ts]);
+  ], [partnerNames, rowActions, t, ts]);
 
-  async function confirmDelete() {
-    if (!toDelete) return;
-    setDeleting(true);
-    try {
-      await api(`/purchases/${toDelete.id}`, { method: 'DELETE' });
-      success(t('deleted'));
-      setToDelete(null);
-      load();
-    } catch (e) {
-      errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
-    } finally {
-      setDeleting(false);
-    }
-  }
+  const sortOptions: SortOption[] = [
+    { value: '-purchase_date', label: t('sort_date_desc') },
+    { value: 'purchase_date', label: t('sort_date_asc') },
+    { value: '-due_date', label: t('sort_due_desc') },
+    { value: 'due_date', label: t('sort_due_asc') },
+    { value: '-total', label: t('sort_total_desc') },
+    { value: 'total', label: t('sort_total_asc') },
+    { value: '-remaining', label: t('sort_remaining_desc') },
+    { value: 'remaining', label: t('sort_remaining_asc') },
+    { value: 'number', label: t('number') },
+  ];
+
+  const headerActions: PageAction[] = [
+    { key: 'create', label: t('create'), icon: Plus, href: '/purchases/new', variant: 'primary' },
+  ];
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <BranchViewToggle value={view} onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }} />
-        <Button asChild className="ms-auto"><Link href='/purchases/new'>
-          <Plus className="h-4 w-4" strokeWidth={1.8} />
-          {t('create')}
-        </Link></Button>
-      </div>
+      <PageHeader
+        title={t('title')}
+        context={
+          <BranchViewToggle
+            value={view}
+            onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }}
+          />
+        }
+        actions={headerActions}
+      />
 
-      <div className="rounded border border-border bg-surface p-3 sm:p-4">
-        <DataExplorerToolbar
-          search={searchInput}
-          onSearchChange={setSearchInput}
-          searchPlaceholder="ابحث برقم فاتورة الشراء، رقم فاتورة المورد، اسم المورد، الهاتف أو الرقم التعريفي"
-          definitions={definitions}
-          filters={labelledFilters}
-          onFilterChange={updateFilter}
-          onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
-          onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
-          onOpenAdvanced={() => setAdvancedOpen(true)}
-          resultCount={meta.total}
-        />
+      <ListToolbar
+        search={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder={t('search_placeholder')}
+        searchLabel={t('title')}
+        definitions={definitions}
+        filters={labelledFilters}
+        onFilterChange={updateFilter}
+        onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
+        onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
+        onOpenAdvanced={() => setAdvancedOpen(true)}
+        sort={{
+          value: explorer.sort ?? '-purchase_date',
+          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+          options: sortOptions,
+        }}
+        resultCount={meta.total}
+      />
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <span className="text-xs text-muted">ترتيب حسب</span>
-          <Select
-            value={explorer.sort ?? '-purchase_date'}
-            onChange={(event) => setExplorer((current) => ({ ...current, page: 1, sort: event.target.value }))}
-            className="h-9 min-w-44 bg-surface text-sm"
-            aria-label="ترتيب فواتير المشتريات"
-          >
-            <option value="-purchase_date">الأحدث أولًا</option>
-            <option value="purchase_date">الأقدم أولًا</option>
-            <option value="-due_date">الاستحقاق الأبعد</option>
-            <option value="due_date">الاستحقاق الأقرب</option>
-            <option value="-total">الإجمالي: الأعلى</option>
-            <option value="total">الإجمالي: الأقل</option>
-            <option value="-remaining">المتبقي: الأعلى</option>
-            <option value="remaining">المتبقي: الأقل</option>
-            <option value="number">رقم الفاتورة</option>
-          </Select>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={data}
+        loading={loading}
+        error={loadError}
+        onRetry={load}
+        retryLabel={tc('retry')}
+        emptyLabel={t('empty')}
+        exportName="purchases"
+        showToolbar={false}
+        mobileRecord={(purchase) => ({
+          title: (
+            <Link href={`/purchases/${purchase.id}`} className="num text-primary hover:underline">
+              {purchase.number}
+            </Link>
+          ),
+          subtitle: partnerNames[purchase.partner_id] ?? '—',
+          amountLabel: t('total'),
+          amount: formatRiyal(purchase.total),
+          secondary: { label: t('remaining'), value: formatRiyal(purchase.remaining ?? '0.00') },
+          status: (
+            <>
+              <Badge tone={statusTone[purchase.status] ?? 'muted'}>{ts(purchase.status)}</Badge>
+              <Badge tone={payTone[purchase.payment_status] ?? 'muted'}>{ts(purchase.payment_status)}</Badge>
+            </>
+          ),
+          meta: purchase.purchase_date,
+          actions: rowActions(purchase),
+        })}
+      />
 
-      {loadError ? (
-        <div className="rounded border border-border bg-surface p-8 text-center">
-          <p className="text-sm text-negative">{loadError}</p>
-          <Button variant="outline" className="mt-3" onClick={load}>إعادة المحاولة</Button>
-        </div>
-      ) : (
-        <DataTable columns={columns} data={data} loading={loading} emptyLabel={t('empty')} exportName="purchases" showToolbar={false} />
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted">
-          صفحة {meta.current_page.toLocaleString(ARABIC_DISPLAY_LOCALE)} من {meta.last_page.toLocaleString(ARABIC_DISPLAY_LOCALE)}
-        </p>
-        <div className="flex items-center gap-2">
-          <Select
-            value={String(explorer.perPage ?? 25)}
-            onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))}
-            className="h-9 w-24 bg-surface text-sm"
-            aria-label="عدد النتائج في الصفحة"
-          >
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </Select>
-          <Button variant="outline" size="icon" aria-label="الصفحة السابقة" disabled={loading || meta.current_page <= 1} onClick={() => setExplorer((current) => ({ ...current, page: Math.max(1, (current.page ?? 1) - 1) }))}>
-            <ChevronRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
-          <Button variant="outline" size="icon" aria-label="الصفحة التالية" disabled={loading || meta.current_page >= meta.last_page} onClick={() => setExplorer((current) => ({ ...current, page: Math.min(meta.last_page, (current.page ?? 1) + 1) }))}>
-            <ChevronLeft className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
-        </div>
-      </div>
+      <Pagination
+        page={meta.current_page}
+        lastPage={meta.last_page}
+        perPage={explorer.perPage ?? 25}
+        total={meta.total}
+        disabled={loading}
+        onPageChange={(page) => setExplorer((current) => ({ ...current, page }))}
+        onPerPageChange={(perPage) => setExplorer((current) => ({ ...current, page: 1, perPage }))}
+      />
 
       <AdvancedFilterDialog
         open={advancedOpen}

@@ -134,7 +134,15 @@
     "debit": "Debit",
     "credit": "Credit",
     "totals": "Totals",
-    "reversalEntry": "Reversing entry linked to the original"
+    "reversalEntry": "Reversing entry linked to the original",
+    "filter_date_from": "Date — from",
+    "filter_date_to": "Date — to",
+    "filter_amount_min": "Amount — minimum",
+    "filter_amount_max": "Amount — maximum",
+    "sort_date_desc": "Newest first",
+    "sort_date_asc": "Oldest first",
+    "sort_amount_desc": "Amount: highest",
+    "sort_amount_asc": "Amount: lowest"
   },
   "financialAlerts": {
     "title": "Financial Control Alerts",
@@ -1210,6 +1218,15 @@
     "financial_summary": "Financial summary",
     "posted_immutable_note": "This expense is posted; the system preserves its entry and accounting trail without direct edits.",
     "draft_posting_note": "This is a draft. Review its data and attachments before posting and creating the accounting entry.",
+    "load_error": "Could not load expenses.",
+    "filter_date_from": "Date — from",
+    "filter_date_to": "Date — to",
+    "filter_amount_min": "Total — minimum",
+    "filter_amount_max": "Total — maximum",
+    "sort_date_desc": "Newest first",
+    "sort_date_asc": "Oldest first",
+    "sort_total_desc": "Amount: highest",
+    "sort_total_asc": "Amount: lowest",
     "method": {
       "cash": "Cash",
       "bank": "Bank transfer",
@@ -2345,7 +2362,12 @@
     "country": "Country",
     "edit_title": "Edit partner",
     "not_found": "Partner not found",
-    "opening_balance_locked": "The opening balance is recorded at creation and posts a journal entry — posted entries are never edited. Correct it with a reversing entry from account activity."
+    "opening_balance_locked": "The opening balance is recorded at creation and posts a journal entry — posted entries are never edited. Correct it with a reversing entry from account activity.",
+    "load_error": "Could not load customers.",
+    "present": "Present",
+    "absent": "Missing",
+    "sort_name_asc": "Name: A–Z",
+    "sort_name_desc": "Name: Z–A"
   },
   "paymentDetail": {
     "back": "Back",
@@ -2502,7 +2524,15 @@
     "confirm_document_payment": "Confirm collection",
     "confirm_document_payment_success": "Collection confirmed and receipt voucher posted.",
     "loading_document_payment": "Loading payment data…",
-    "load_document_payment_failed": "Unable to load invoice or collection data."
+    "load_document_payment_failed": "Unable to load invoice or collection data.",
+    "filter_date_from": "Date — from",
+    "filter_date_to": "Date — to",
+    "filter_amount_min": "Amount — minimum",
+    "filter_amount_max": "Amount — maximum",
+    "sort_date_desc": "Newest first",
+    "sort_date_asc": "Oldest first",
+    "sort_amount_desc": "Amount: highest",
+    "sort_amount_asc": "Amount: lowest"
   },
   "purchasePayments": {
     "back": "Back",
@@ -3385,7 +3415,24 @@
     "delete_title": "Delete purchase invoice draft",
     "delete_confirm": "This permanently deletes document",
     "edit_title": "Edit purchase invoice",
-    "hide_preview": "Hide preview"
+    "hide_preview": "Hide preview",
+    "due_date": "Due date",
+    "remaining": "Remaining",
+    "classification": "Classification",
+    "load_error": "Could not load purchase invoices.",
+    "search_placeholder": "Search by purchase number, supplier invoice number, supplier name, phone, or tax ID",
+    "supplier_search_placeholder": "Search by supplier name, phone, or tax ID",
+    "supplier_search_empty": "No matching supplier",
+    "classification_search_placeholder": "Search by classification name",
+    "classification_search_empty": "No matching classification",
+    "sort_date_desc": "Newest first",
+    "sort_date_asc": "Oldest first",
+    "sort_due_desc": "Due date: furthest",
+    "sort_due_asc": "Due date: nearest",
+    "sort_total_desc": "Total: highest",
+    "sort_total_asc": "Total: lowest",
+    "sort_remaining_desc": "Remaining: highest",
+    "sort_remaining_asc": "Remaining: lowest"
   },
   "quotes": {
     "title": "Quotes",
@@ -4422,7 +4469,16 @@
     "create": "New payment voucher",
     "search": "Search vouchers…",
     "empty": "No supplier payments",
-    "supplier": "Supplier"
+    "supplier": "Supplier",
+    "load_error": "Could not load supplier payments.",
+    "filter_date_from": "Date — from",
+    "filter_date_to": "Date — to",
+    "filter_amount_min": "Amount — minimum",
+    "filter_amount_max": "Amount — maximum",
+    "sort_date_desc": "Newest first",
+    "sort_date_asc": "Oldest first",
+    "sort_amount_desc": "Amount: highest",
+    "sort_amount_asc": "Amount: lowest"
   },
   "suppliers": {
     "title": "Suppliers",

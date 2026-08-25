@@ -5,13 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { ChevronLeft, ChevronRight, Copy, Eye, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
+import { Copy, Eye, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
-import { DataExplorerToolbar } from '@/components/data-explorer/data-explorer-toolbar';
 import { DataTable } from '@/components/data-table';
+import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
@@ -69,17 +68,19 @@ export default function ExpensesPage() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [data, setData] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [posting, setPosting] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [view, setView] = useState<BranchView>('current');
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     api<{ data: Expense[] }>(`/expenses${branchViewQuery(view)}`)
       .then((response) => setData(response.data))
-      .catch((err) => toastError(err instanceof ApiError ? err.message : tc('loadFailed')))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : t('load_error')))
       .finally(() => setLoading(false));
-  }, [tc, toastError, view]);
+  }, [t, view]);
 
   useEffect(() => load(), [load]);
 
@@ -157,10 +158,10 @@ export default function ExpensesPage() {
     { key: 'category_name', label: t('category'), kind: 'entity', quick: true, searchPlaceholder: t('search'), emptyText: t('empty'), options: categoryOptions },
     { key: 'vendor_name', label: t('vendor_name'), kind: 'entity', quick: true, searchPlaceholder: t('search'), emptyText: t('empty'), options: vendorOptions },
     { key: 'account_name', label: t('account'), kind: 'entity', searchPlaceholder: t('search'), emptyText: t('empty'), options: accountOptions },
-    { key: 'date_from', label: `${t('date')} — من`, kind: 'date' },
-    { key: 'date_to', label: `${t('date')} — إلى`, kind: 'date' },
-    { key: 'amount_min', label: `${t('total')} — الحد الأدنى`, kind: 'money' },
-    { key: 'amount_max', label: `${t('total')} — الحد الأعلى`, kind: 'money' },
+    { key: 'date_from', label: t('filter_date_from'), kind: 'date' },
+    { key: 'date_to', label: t('filter_date_to'), kind: 'date' },
+    { key: 'amount_min', label: t('filter_amount_min'), kind: 'money' },
+    { key: 'amount_max', label: t('filter_amount_max'), kind: 'money' },
   ], [accountOptions, categoryOptions, methodOptions, t, vendorOptions]);
 
   const labelledFilters = useMemo(() => explorer.filters.map((filter) => ({
@@ -239,6 +240,20 @@ export default function ExpensesPage() {
     }));
   }
 
+  const rowActions = useCallback((expense: Expense) => {
+    const isDraft = expense.status === 'draft';
+    const busy = acting === expense.id || posting === expense.id;
+    return (
+      <>
+        <Button asChild size="icon" variant="ghost" aria-label={t('view')}><Link href={`/expenses/${expense.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
+        {isDraft ? <Button asChild size="icon" variant="ghost" aria-label={t('edit')}><Link href={`/expenses/new?edit=${expense.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link></Button> : <Button size="icon" variant="ghost" disabled title={t('draft_action_only')} aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button>}
+        <Button size="icon" variant="ghost" disabled={busy} onClick={() => duplicateExpense(expense.id)} aria-label={t('duplicate')}><Copy className="h-4 w-4" strokeWidth={1.7} /></Button>
+        <Button size="icon" variant="ghost" disabled={!isDraft || busy} title={!isDraft ? t('draft_action_only') : undefined} onClick={() => deleteExpense(expense.id)} aria-label={t('delete')}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} /></Button>
+        {isDraft && <Button size="sm" variant="outline" disabled={busy} onClick={() => postExpense(expense.id)}>{t('post')}</Button>}
+      </>
+    );
+  }, [acting, deleteExpense, duplicateExpense, postExpense, posting, t]);
+
   const columns = useMemo<ColumnDef<Expense, unknown>[]>(() => [
     { accessorKey: 'number', header: t('number'), cell: ({ row }) => <Link href={`/expenses/${row.original.id}`} className="num font-medium text-primary hover:underline">{row.original.number}</Link> },
     { id: 'account', header: t('account'), accessorFn: (r) => r.account_name ?? '—', cell: ({ row }) => row.original.account_name ?? '—' },
@@ -251,71 +266,96 @@ export default function ExpensesPage() {
     {
       id: 'actions',
       header: t('actions'),
-      cell: ({ row }) => {
-        const expense = row.original;
-        const isDraft = expense.status === 'draft';
-        const busy = acting === expense.id || posting === expense.id;
-        return <div className="flex justify-end gap-1">
-          <Button asChild size="icon" variant="ghost" aria-label={t('view')}><Link href={`/expenses/${expense.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
-          {isDraft ? <Button asChild size="icon" variant="ghost" aria-label={t('edit')}><Link href={`/expenses/new?edit=${expense.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link></Button> : <Button size="icon" variant="ghost" disabled title={t('draft_action_only')} aria-label={t('edit')}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Button>}
-          <Button size="icon" variant="ghost" disabled={busy} onClick={() => duplicateExpense(expense.id)} aria-label={t('duplicate')}><Copy className="h-4 w-4" strokeWidth={1.7} /></Button>
-          <Button size="icon" variant="ghost" disabled={!isDraft || busy} title={!isDraft ? t('draft_action_only') : undefined} onClick={() => deleteExpense(expense.id)} aria-label={t('delete')}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} /></Button>
-          {isDraft && <Button size="sm" variant="outline" disabled={busy} onClick={() => postExpense(expense.id)}>{t('post')}</Button>}
-        </div>;
-      },
+      cell: ({ row }) => <div className="flex justify-end gap-1">{rowActions(row.original)}</div>,
     },
-  ], [acting, deleteExpense, duplicateExpense, postExpense, posting, t]);
+  ], [rowActions, t]);
 
-  return <div className="space-y-4">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-      <div className="flex flex-wrap items-center gap-2">
-        <BranchViewToggle value={view} onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }} />
-        <Button asChild variant="outline"><Link href="/expenses/categories"><Settings2 className="h-4 w-4" strokeWidth={1.8} />{t('manage_categories')}</Link></Button>
-        <Link href="/expenses/new"><Button><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create')}</Button></Link>
-      </div>
+  const sortOptions: SortOption[] = [
+    { value: '-expense_date', label: t('sort_date_desc') },
+    { value: 'expense_date', label: t('sort_date_asc') },
+    { value: 'number', label: t('number') },
+    { value: 'vendor_name', label: t('vendor_name') },
+    { value: 'category_name', label: t('category') },
+    { value: '-total', label: t('sort_total_desc') },
+    { value: 'total', label: t('sort_total_asc') },
+  ];
+
+  const headerActions: PageAction[] = [
+    { key: 'categories', label: t('manage_categories'), icon: Settings2, href: '/expenses/categories', variant: 'outline', emphasis: 'secondary' },
+    { key: 'create', label: t('create'), icon: Plus, href: '/expenses/new', variant: 'primary' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title={t('title')}
+        context={
+          <BranchViewToggle
+            value={view}
+            onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }}
+          />
+        }
+        actions={headerActions}
+      />
+
+      <ListToolbar
+        search={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder={`${t('search')} · ${t('number')} · ${t('vendor_name')}`}
+        searchLabel={t('title')}
+        definitions={definitions}
+        filters={labelledFilters}
+        onFilterChange={updateFilter}
+        onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
+        onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
+        onOpenAdvanced={() => setAdvancedOpen(true)}
+        sort={{
+          value: explorer.sort ?? '-expense_date',
+          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+          options: sortOptions,
+        }}
+        resultCount={sorted.length}
+        totalCount={data.length}
+      />
+
+      <DataTable
+        columns={columns}
+        data={pageData}
+        loading={loading}
+        error={loadError}
+        onRetry={load}
+        retryLabel={tc('retry')}
+        emptyLabel={t('empty')}
+        exportName="expenses"
+        showToolbar={false}
+        mobileRecord={(expense) => ({
+          title: (
+            <Link href={`/expenses/${expense.id}`} className="num text-primary hover:underline">
+              {expense.number}
+            </Link>
+          ),
+          // التصنيف أولى بالعرض، ثم الجهة، ثم حساب المصروف نفسه — فالسجلّ لا
+          // يخلو من طرفٍ مقابل ما دام للمصروف حساب، حتى إن لم يُصنَّف بعد.
+          subtitle: expense.category_name ?? expense.vendor_name ?? expense.account_name ?? undefined,
+          amountLabel: t('total'),
+          amount: formatRiyal(expense.total),
+          status: <Badge tone={statusTone[expense.status] ?? 'muted'}>{t(expense.status)}</Badge>,
+          meta: expense.expense_date,
+          actions: rowActions(expense),
+        })}
+      />
+
+      <Pagination
+        page={page}
+        lastPage={totalPages}
+        perPage={perPage}
+        total={sorted.length}
+        disabled={loading}
+        onPageChange={(next) => setExplorer((current) => ({ ...current, page: next }))}
+        onPerPageChange={(next) => setExplorer((current) => ({ ...current, page: 1, perPage: next }))}
+      />
+
+      <AdvancedFilterDialog open={advancedOpen} onClose={() => setAdvancedOpen(false)} definitions={definitions} filters={labelledFilters} onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))} />
     </div>
-
-    <DataExplorerToolbar
-      search={searchInput}
-      searchPlaceholder={`${t('search')} · ${t('number')} · ${t('vendor_name')}`}
-      onSearchChange={setSearchInput}
-      definitions={definitions}
-      filters={labelledFilters}
-      onFilterChange={updateFilter}
-      onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
-      onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
-      onOpenAdvanced={() => setAdvancedOpen(true)}
-      resultCount={sorted.length}
-      totalCount={data.length}
-    />
-
-    <div className="flex items-center justify-end gap-2">
-      <span className="text-xs text-muted">ترتيب حسب</span>
-      <Select value={explorer.sort ?? '-expense_date'} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, sort: event.target.value }))} className="h-9 min-w-44 bg-surface text-sm" aria-label="ترتيب المصروفات">
-        <option value="-expense_date">الأحدث أولًا</option>
-        <option value="expense_date">الأقدم أولًا</option>
-        <option value="number">رقم المصروف</option>
-        <option value="vendor_name">المورد</option>
-        <option value="category_name">التصنيف</option>
-        <option value="-total">المبلغ: الأعلى</option>
-        <option value="total">المبلغ: الأقل</option>
-      </Select>
-    </div>
-
-    <DataTable columns={columns} data={pageData} loading={loading} emptyLabel={t('empty')} exportName="expenses" showToolbar={false} />
-
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-muted">{sorted.length.toLocaleString('ar-SA')} مصروف · صفحة {page.toLocaleString('ar-SA')} من {totalPages.toLocaleString('ar-SA')}</p>
-      <div className="flex items-center gap-2">
-        <Select value={String(perPage)} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))} className="h-9 w-24 bg-surface text-sm" aria-label="عدد النتائج في الصفحة">
-          <option value="25">25</option><option value="50">50</option><option value="100">100</option>
-        </Select>
-        <Button variant="outline" size="icon" aria-label="الصفحة السابقة" disabled={loading || page <= 1} onClick={() => setExplorer((current) => ({ ...current, page: Math.max(1, page - 1) }))}><ChevronRight className="h-4 w-4" /></Button>
-        <Button variant="outline" size="icon" aria-label="الصفحة التالية" disabled={loading || page >= totalPages} onClick={() => setExplorer((current) => ({ ...current, page: Math.min(totalPages, page + 1) }))}><ChevronLeft className="h-4 w-4" /></Button>
-      </div>
-    </div>
-
-    <AdvancedFilterDialog open={advancedOpen} onClose={() => setAdvancedOpen(false)} definitions={definitions} filters={labelledFilters} onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))} />
-  </div>;
+  );
 }

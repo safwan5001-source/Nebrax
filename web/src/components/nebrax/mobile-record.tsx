@@ -14,6 +14,12 @@ export interface MobileRecord {
   title: React.ReactNode;
   /** الطرف المقابل: العميل، المورد، التصنيف… */
   subtitle?: React.ReactNode;
+  /**
+   * سطر عنوان مختصر تحت الطرف المقابل مباشرة — مدينة، فرع… نصٌّ لا يحمل معنىً
+   * رقمياً، فيُعرض بخطّ النص العادي لا Mono (بخلاف `meta` المخصَّص للتاريخ
+   * والمراجع). اختياريٌّ بالكامل ولا يغيّر عرض أي صفحة لا تمرّره.
+   */
+  caption?: React.ReactNode;
   /** المبلغ أو المؤشّر الأهم، ويُعرض بخط Mono ومحاذاة النهاية. */
   amount?: React.ReactNode;
   amountLabel?: React.ReactNode;
@@ -37,6 +43,9 @@ export function MobileRecordItem({ record, className }: { record: MobileRecord; 
           <div className="truncate text-sm font-medium text-text">{record.title}</div>
           {record.subtitle != null ? (
             <div className="mt-0.5 truncate text-sm text-muted">{record.subtitle}</div>
+          ) : null}
+          {record.caption != null ? (
+            <div className="mt-0.5 truncate text-xs text-muted/80">{record.caption}</div>
           ) : null}
         </div>
 

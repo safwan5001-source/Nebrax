@@ -134,7 +134,15 @@
     "debit": "مدين",
     "credit": "دائن",
     "totals": "الإجماليات",
-    "reversalEntry": "قيد عكسي مرتبط بالأصل"
+    "reversalEntry": "قيد عكسي مرتبط بالأصل",
+    "filter_date_from": "التاريخ — من",
+    "filter_date_to": "التاريخ — إلى",
+    "filter_amount_min": "المبلغ — الحد الأدنى",
+    "filter_amount_max": "المبلغ — الحد الأعلى",
+    "sort_date_desc": "الأحدث أولًا",
+    "sort_date_asc": "الأقدم أولًا",
+    "sort_amount_desc": "المبلغ: الأعلى",
+    "sort_amount_asc": "المبلغ: الأقل"
   },
   "financialAlerts": {
     "title": "تنبيهات الرقابة المالية",
@@ -1210,6 +1218,15 @@
     "financial_summary": "الملخص المالي",
     "posted_immutable_note": "هذا المصروف مرحّل؛ يحافظ النظام على القيد والأثر المحاسبي دون تعديل مباشر.",
     "draft_posting_note": "هذه مسودة. راجع البيانات والمرفقات قبل الترحيل وإنشاء القيد المحاسبي.",
+    "load_error": "تعذّر تحميل المصروفات.",
+    "filter_date_from": "التاريخ — من",
+    "filter_date_to": "التاريخ — إلى",
+    "filter_amount_min": "الإجمالي — الحد الأدنى",
+    "filter_amount_max": "الإجمالي — الحد الأعلى",
+    "sort_date_desc": "الأحدث أولًا",
+    "sort_date_asc": "الأقدم أولًا",
+    "sort_total_desc": "المبلغ: الأعلى",
+    "sort_total_asc": "المبلغ: الأقل",
     "method": {
       "cash": "نقداً",
       "bank": "تحويل بنكي",
@@ -2345,7 +2362,12 @@
     "country": "البلد",
     "edit_title": "تعديل بيانات الطرف",
     "not_found": "لم يُعثر على هذا الطرف",
-    "opening_balance_locked": "الرصيد الافتتاحي يُسجَّل عند الإنشاء ويولّد قيداً مرحّلاً — والقيود بعد الترحيل لا تُعدَّل. لتصحيحه استخدم قيداً عكسياً من حركة الحساب."
+    "opening_balance_locked": "الرصيد الافتتاحي يُسجَّل عند الإنشاء ويولّد قيداً مرحّلاً — والقيود بعد الترحيل لا تُعدَّل. لتصحيحه استخدم قيداً عكسياً من حركة الحساب.",
+    "load_error": "تعذّر تحميل العملاء.",
+    "present": "يوجد",
+    "absent": "غير موجود",
+    "sort_name_asc": "الاسم: أ–ي",
+    "sort_name_desc": "الاسم: ي–أ"
   },
   "paymentDetail": {
     "back": "رجوع",
@@ -2502,7 +2524,15 @@
     "confirm_document_payment": "تأكيد التحصيل",
     "confirm_document_payment_success": "تم تأكيد التحصيل وترحيل سند القبض.",
     "loading_document_payment": "جارٍ تحميل بيانات الدفعة…",
-    "load_document_payment_failed": "تعذّر تحميل بيانات الفاتورة أو التحصيل."
+    "load_document_payment_failed": "تعذّر تحميل بيانات الفاتورة أو التحصيل.",
+    "filter_date_from": "التاريخ — من",
+    "filter_date_to": "التاريخ — إلى",
+    "filter_amount_min": "المبلغ — الحد الأدنى",
+    "filter_amount_max": "المبلغ — الحد الأعلى",
+    "sort_date_desc": "الأحدث أولًا",
+    "sort_date_asc": "الأقدم أولًا",
+    "sort_amount_desc": "المبلغ: الأعلى",
+    "sort_amount_asc": "المبلغ: الأقل"
   },
   "purchasePayments": {
     "back": "رجوع",
@@ -3385,7 +3415,24 @@
     "delete_title": "حذف مسوّدة فاتورة شراء",
     "delete_confirm": "سيُحذف نهائياً مستند",
     "edit_title": "تعديل فاتورة الشراء",
-    "hide_preview": "إخفاء المعاينة"
+    "hide_preview": "إخفاء المعاينة",
+    "due_date": "تاريخ الاستحقاق",
+    "remaining": "المتبقي",
+    "classification": "التصنيف",
+    "load_error": "تعذّر تحميل فواتير المشتريات.",
+    "search_placeholder": "ابحث برقم فاتورة الشراء، رقم فاتورة المورد، اسم المورد، الهاتف أو الرقم التعريفي",
+    "supplier_search_placeholder": "ابحث باسم المورد، الهاتف أو الرقم التعريفي",
+    "supplier_search_empty": "لا يوجد مورد مطابق",
+    "classification_search_placeholder": "ابحث باسم التصنيف",
+    "classification_search_empty": "لا يوجد تصنيف مطابق",
+    "sort_date_desc": "الأحدث أولًا",
+    "sort_date_asc": "الأقدم أولًا",
+    "sort_due_desc": "الاستحقاق الأبعد",
+    "sort_due_asc": "الاستحقاق الأقرب",
+    "sort_total_desc": "الإجمالي: الأعلى",
+    "sort_total_asc": "الإجمالي: الأقل",
+    "sort_remaining_desc": "المتبقي: الأعلى",
+    "sort_remaining_asc": "المتبقي: الأقل"
   },
   "quotes": {
     "title": "عروض الأسعار",
@@ -4422,7 +4469,16 @@
     "create": "سند صرف",
     "search": "بحث في السندات…",
     "empty": "لا توجد مدفوعات موردين",
-    "supplier": "المورّد"
+    "supplier": "المورّد",
+    "load_error": "تعذّر تحميل مدفوعات الموردين.",
+    "filter_date_from": "التاريخ — من",
+    "filter_date_to": "التاريخ — إلى",
+    "filter_amount_min": "المبلغ — الحد الأدنى",
+    "filter_amount_max": "المبلغ — الحد الأعلى",
+    "sort_date_desc": "الأحدث أولًا",
+    "sort_date_asc": "الأقدم أولًا",
+    "sort_amount_desc": "المبلغ: الأعلى",
+    "sort_amount_asc": "المبلغ: الأقل"
   },
   "suppliers": {
     "title": "إدارة الموردين",
