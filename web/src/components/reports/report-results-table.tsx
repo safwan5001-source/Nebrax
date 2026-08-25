@@ -15,6 +15,7 @@ export interface ReportResultsTableProps {
   emptyText?: string;
   primaryIndex?: number;
   secondaryIndex?: number;
+  rowHrefs?: Array<string | null | undefined>;
 }
 
 export function ReportResultsTable({
@@ -24,8 +25,11 @@ export function ReportResultsTable({
   emptyText,
   primaryIndex = 0,
   secondaryIndex,
+  rowHrefs,
 }: ReportResultsTableProps) {
   const locale = useLocale();
+  const labels = defaultReportTableLabels(locale);
+  const rowActions = rowHrefs?.map((href) => href ? { href, label: labels.openDetails } : null);
   const dataColumns: ReportDataColumn[] = columns.map((column, index) => ({
     id: `column-${index}`,
     label: column.label,
@@ -45,6 +49,7 @@ export function ReportResultsTable({
           emptyText={emptyText}
           primaryIndex={primaryIndex}
           secondaryIndex={secondaryIndex}
+          rowActions={rowActions}
         />
       </div>
       <div className="hidden md:block">
@@ -52,8 +57,10 @@ export function ReportResultsTable({
           columns={dataColumns}
           rows={rows}
           totalRow={totalRow}
-          labels={defaultReportTableLabels(locale)}
+          labels={labels}
           emptyText={emptyText}
+          primaryColumnId={`column-${primaryIndex}`}
+          rowActions={rowActions}
         />
       </div>
     </>
