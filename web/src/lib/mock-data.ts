@@ -891,12 +891,15 @@ export const mockCashBankAccounts = [
 ];
 
 export const mockPayments = [
-  { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', direction: 'received', method: 'bank', payment_date: '2026-06-24', amount: '5750.00' },
-  { id: 'pm-50', number: 'PMT-2026-0050', partner_id: 'p2', direction: 'received', method: 'cash', payment_date: '2026-06-22', amount: '6325.00' },
-  { id: 'pm-49', number: 'PMT-2026-0049', partner_id: 'p7', direction: 'paid', method: 'bank', payment_date: '2026-06-20', amount: '6900.00' },
-  { id: 'pm-48', number: 'PMT-2026-0048', partner_id: 'p5', direction: 'received', method: 'bank', payment_date: '2026-06-18', amount: '21275.00' },
-  { id: 'pm-47', number: 'PMT-2026-0047', partner_id: 'p8', direction: 'paid', method: 'cash', payment_date: '2026-06-12', amount: '3450.00' },
-  { id: 'pm-46', number: 'PMT-2026-0046', partner_id: 'p6', direction: 'received', method: 'bank', payment_date: '2026-06-08', amount: '4600.00' },
+  // `status` و`partner_name` مطلوبان في وضع المعاينة: `/receipt-vouchers` و`/supplier-payments`
+  // يقرآن `t(status)` مباشرة على سطر القائمة (كما يفعل الخادم الحقيقي)، وسندات
+  // القبض تعرض `partner_name` كما تُعيده الحمولة بلا حلّ عميل من طرف العميل.
+  { id: 'pm-51', number: 'PMT-2026-0051', partner_id: 'p1', partner_name: 'مؤسسة الخليج للتجارة', direction: 'received', method: 'bank', status: 'posted', payment_date: '2026-06-24', amount: '5750.00' },
+  { id: 'pm-50', number: 'PMT-2026-0050', partner_id: 'p2', partner_name: 'شركة الواحة للمقاولات', direction: 'received', method: 'cash', status: 'posted', payment_date: '2026-06-22', amount: '6325.00' },
+  { id: 'pm-49', number: 'PMT-2026-0049', partner_id: 'p7', partner_name: 'شركة الجزيرة للتوريدات الصناعية', direction: 'paid', method: 'bank', status: 'posted', payment_date: '2026-06-20', amount: '6900.00' },
+  { id: 'pm-48', number: 'PMT-2026-0048', partner_id: 'p5', partner_name: 'شركة البحر الأحمر اللوجستية', direction: 'received', method: 'bank', status: 'draft', payment_date: '2026-06-18', amount: '21275.00' },
+  { id: 'pm-47', number: 'PMT-2026-0047', partner_id: 'p8', partner_name: 'مصنع الرياض للتغليف', direction: 'paid', method: 'cash', status: 'posted', payment_date: '2026-06-12', amount: '3450.00' },
+  { id: 'pm-46', number: 'PMT-2026-0046', partner_id: 'p6', partner_name: 'مؤسسة الفيصل للأجهزة', direction: 'received', method: 'bank', status: 'posted', payment_date: '2026-06-08', amount: '4600.00' },
 ];
 
 // ── الموارد البشرية ────────────────────────────────────────────────────────
