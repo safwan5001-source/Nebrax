@@ -20,6 +20,7 @@ import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
+import { cn } from '@/lib/utils';
 import type { Warehouse } from '@/lib/warehouse';
 
 interface Partner { id: string; name: string; type: string; phone?: string | null; vat_number?: string | null }
@@ -58,9 +59,54 @@ interface Line {
 }
 
 let lineSeq = 0;
+// الكمية تبدأ فارغة لا `1`: الواحد الافتراضي يمرّ دون أن يقرأه أحد، فتُحفظ
+// فاتورةٌ بكمية لم يقصدها المستخدم. الفراغ يوقف الحفظ ويطلب رقماً صريحاً.
 const newLine = (): Line => ({
-  key: `p${++lineSeq}`, productId: null, description: '', unit: '', qty: '1', price: '', disc: '', tax: '15',
+  key: `p${++lineSeq}`, productId: null, description: '', unit: '', qty: '', price: '', disc: '', tax: '15',
 });
+
+/**
+ * أعمدة سطر البند على الديسكتوب.
+ *
+ * مساراتٌ صريحة لا `grid-cols-12`: العمود الواحد من اثني عشر يساوي ≈٥٨px عند
+ * 768px، وهو أضيق من أن يُظهر «١٥» في خانة الضريبة كاملة. الحدّ الأدنى لكل
+ * مسار مقدَّرٌ بما يسع أطول قيمة متوقَّعة فيه، ومجموع الحدود الدنيا مع الفواصل
+ * ≈٦٨٠px فيتّسع في التابلت بلا تمرير أفقي، ثم تتمدّد بالنسب على الشاشات الأعرض.
+ */
+const LINE_GRID =
+  'md:grid-cols-[minmax(6.5rem,2.2fr)_minmax(5rem,1.5fr)_minmax(4.5rem,1fr)_minmax(9rem,1.4fr)_3.75rem_3.5rem_minmax(4.5rem,1fr)_2.25rem]';
+
+/**
+ * حقلٌ داخل سطر البند: تسميةٌ ظاهرة على الجوال ومخفيّةٌ على الديسكتوب حيث يغني
+ * عنها رأس الأعمدة. تبقى في الشجرة (`sr-only` لا `hidden`) فيسمع قارئ الشاشة
+ * اسم الحقل في المقاسين معاً.
+ */
+function LineField({
+  label, htmlFor, children,
+}: { label: string; htmlFor: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <Label htmlFor={htmlFor} className="mb-0.5 block text-[11px] font-medium text-muted md:sr-only md:mb-0">
+        {label}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * الكمية صالحة إذا كانت عدداً موجباً لا يقلّ عن واحد.
+ *
+ * الفراغ **ليس صفراً ولا واحداً** — هو غيابُ قرار، فيمنع الحفظ بدل أن يُترجَم
+ * إلى كميةٍ لم يكتبها أحد. الحدّ الأدنى واحد يطابق `min={1}` على الحقل ويجعل
+ * التقريب في `submit` بلا أثر.
+ */
+function hasValidQty(line: Line): boolean {
+  const raw = line.qty.trim();
+  if (raw === '') return false;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 1;
+}
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -319,9 +365,13 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   // **المنتج إلزامي على كل سطر.** بلا منتج لا يُعرَف أهي بضاعةٌ تُرسمَل مخزوناً
   // أم مصروفُ فترة، فتسقط كلّها في «5150 مصروفات عامة». والحفظ يُمنع هنا قبل
   // أن يرفضه الخادم — رسالةٌ عند الضغط أوضح من طلبٍ يعود بخطأ.
+  // والكمية كذلك مطلوبة على **كل** سطر لا على سطرٍ منها: `submit` يُسقط السطر
+  // بلا كمية صالحة من الحمولة، فالسماح بالحفظ حينها يحذف بنداً كتبه المستخدم
+  // بلا خبر. المنع هنا يجعل الحذف الصامت مستحيلاً.
   const canSave =
     !!partnerId && !saving && !loadingDoc &&
     lines.every((l) => !!l.productId) &&
+    lines.every(hasValidQty) &&
     lines.some((l) => lineGross(l) > 0);
 
   /** شروط الدفع بالأيام ⇒ تاريخ استحقاق. الفراغ يعني بلا استحقاق. */
@@ -552,15 +602,16 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
           </Button>
         </CardHeader>
         <CardContent className="space-y-2">
-          <div className="hidden grid-cols-12 gap-2 px-1 text-[11px] font-medium text-muted md:grid">
-            <div className="col-span-3">{t('item')}</div>
-            <div className="col-span-1">{t('description')}</div>
-            <div className="col-span-2 text-end">{t('unit_price')}</div>
-            <div className="col-span-2 text-end">{t('qty')}</div>
-            <div className="col-span-1 text-end">{t('line_discount')}</div>
-            <div className="col-span-1 text-end">{t('tax')}</div>
-            <div className="col-span-1 text-end">{t('line_total')}</div>
-            <div className="col-span-1" />
+          {/* رأس الأعمدة للديسكتوب وحده — على الجوال لكل حقلٍ تسميتُه. */}
+          <div className={cn('hidden gap-2 px-1 text-[11px] font-medium text-muted md:grid', LINE_GRID)}>
+            <div>{t('item')}</div>
+            <div>{t('description')}</div>
+            <div className="text-end">{t('unit_price')}</div>
+            <div className="text-end">{t('qty')}</div>
+            <div className="text-end">{t('line_discount')}</div>
+            <div className="text-end">{t('tax')}</div>
+            <div className="text-end">{t('line_total')}</div>
+            <div />
           </div>
 
           {lines.map((l) => {
@@ -569,65 +620,96 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
             const rate = Number(l.tax) || 0;
             const withTax = taxInclusive ? gross : gross + Math.round((gross * rate) / 100);
             return (
-              <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded-lg border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
-                <Combobox
-                  className="col-span-2 md:col-span-3"
-                  value={l.productId ?? ''}
-                  onChange={(v) => pickProduct(l.key, v)}
-                  options={productOptions}
-                  placeholder={t('pick_product')}
-                  searchPlaceholder={t('search_product')}
-                  emptyText={t('no_product_found')}
-                  footerLabel={t('new_product')}
-                  onFooterClick={() => setNewProductFor(l.key)}
-                  aria-label={t('item')}
-                />
-                <Input
-                  className="col-span-2 md:col-span-1" placeholder={t('description')}
-                  value={l.description}
-                  onChange={(e) => setLine(l.key, { description: e.target.value })}
-                />
-                <Input
-                  className="num text-end md:col-span-2" inputMode="decimal" placeholder={t('unit_price')}
-                  value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })}
-                />
-                {/* الكمية ووحدتها خلية واحدة — الوحدة تظهر فقط لمنتج بقالب. */}
-                <div className="col-span-2 flex items-center gap-1 md:col-span-2">
-                  <Input
-                    className="num flex-1 text-end" type="number" min={1}
-                    value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })}
+              <div
+                key={l.key}
+                className={cn(
+                  // الجوال: عمودٌ واحد بفواصل ٦px وحشوٍ ضيّق — كل حقلٍ كامل العرض
+                  // ومعه تسميتُه، والبطاقة مع ذلك تبقى قصيرة.
+                  'space-y-1.5 rounded-lg border border-border p-2',
+                  'md:items-center md:gap-2 md:space-y-0 md:rounded-none md:border-0 md:p-0 md:grid',
+                  LINE_GRID
+                )}
+              >
+                <LineField label={t('item')} htmlFor={`${l.key}-product`}>
+                  <Combobox
+                    id={`${l.key}-product`}
+                    value={l.productId ?? ''}
+                    onChange={(v) => pickProduct(l.key, v)}
+                    options={productOptions}
+                    placeholder={t('pick_product')}
+                    searchPlaceholder={t('search_product')}
+                    emptyText={t('no_product_found')}
+                    footerLabel={t('new_product')}
+                    onFooterClick={() => setNewProductFor(l.key)}
+                    aria-label={t('item')}
                   />
-                  {units.length >= 2 && (
-                    <Select
-                      className="w-24 shrink-0" value={l.unit} aria-label={t('unit')}
-                      onChange={(e) => setLine(l.key, { unit: e.target.value })}
-                    >
-                      {units.map((u) => (
-                        <option key={u.name} value={u.factor === 1 ? '' : u.name}>{u.name}</option>
-                      ))}
-                    </Select>
-                  )}
+                </LineField>
+
+                <LineField label={t('description')} htmlFor={`${l.key}-description`}>
+                  <Input
+                    id={`${l.key}-description`} placeholder={t('description')}
+                    value={l.description}
+                    onChange={(e) => setLine(l.key, { description: e.target.value })}
+                  />
+                </LineField>
+
+                <LineField label={t('unit_price')} htmlFor={`${l.key}-price`}>
+                  <Input
+                    id={`${l.key}-price`} className="num text-end" inputMode="decimal" dir="ltr" placeholder="0.00"
+                    value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })}
+                  />
+                </LineField>
+
+                {/* الوحدة تنزل تحت الكمية على الجوال فلا تضغط خانتها، وتعود
+                    بجانبها على الديسكتوب حيث للخليّة عرضٌ يكفيهما. */}
+                <LineField label={t('qty')} htmlFor={`${l.key}-qty`}>
+                  <div className="space-y-1.5 md:flex md:items-center md:gap-1 md:space-y-0">
+                    <Input
+                      id={`${l.key}-qty`} className="num text-end md:flex-1" type="number" min={1} dir="ltr"
+                      placeholder={t('qty')}
+                      value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })}
+                    />
+                    {units.length >= 2 && (
+                      <Select
+                        className="md:w-20 md:shrink-0" value={l.unit} aria-label={t('unit')}
+                        onChange={(e) => setLine(l.key, { unit: e.target.value })}
+                      >
+                        {units.map((u) => (
+                          <option key={u.name} value={u.factor === 1 ? '' : u.name}>{u.name}</option>
+                        ))}
+                      </Select>
+                    )}
+                  </div>
+                </LineField>
+
+                <LineField label={t('line_discount')} htmlFor={`${l.key}-discount`}>
+                  <Input
+                    id={`${l.key}-discount`} className="num text-end" inputMode="decimal" dir="ltr" placeholder="0"
+                    value={l.disc} onChange={(e) => setLine(l.key, { disc: e.target.value })}
+                  />
+                </LineField>
+
+                <LineField label={t('tax')} htmlFor={`${l.key}-tax`}>
+                  <Input
+                    id={`${l.key}-tax`} className="num text-end" type="number" min={0} max={100} dir="ltr"
+                    value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })}
+                  />
+                </LineField>
+
+                {/* على الجوال صفٌّ واحد مضغوط يجمع الإجمالي والحذف؛ و`md:contents`
+                    يذيب الغلاف على الديسكتوب فيعود كلٌّ خليّةً في الشبكة. */}
+                <div className="flex items-center justify-between gap-2 border-t border-border pt-1.5 md:contents md:border-0 md:pt-0">
+                  <div className="md:text-end">
+                    <span className="text-[11px] font-medium text-muted md:hidden">{t('line_total')}</span>{' '}
+                    <span className="num text-sm font-semibold text-text md:font-normal">{formatRiyal(withTax / 100)}</span>
+                  </div>
+                  <Button
+                    type="button" variant="ghost" size="icon" className="shrink-0 md:ms-auto"
+                    aria-label={t('remove_line')} onClick={() => removeLine(l.key)}
+                  >
+                    <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
+                  </Button>
                 </div>
-                {/* خليّتان بعرض ١/١٢ (≈٤٧px): الحشو الافتراضي px-3 يأكل ٢٤
-                    منها فيُقصّ «١٥» إلى «٥» — رقمُ ضريبةٍ خاطئ في عين
-                    القارئ. الحشو المضغوط يُظهر الرقمين كاملَين. */}
-                <Input
-                  className="num px-1.5 text-end md:col-span-1" inputMode="decimal" placeholder="0"
-                  value={l.disc} onChange={(e) => setLine(l.key, { disc: e.target.value })}
-                />
-                <Input
-                  className="num px-1.5 text-end md:col-span-1" type="number" min={0} max={100}
-                  value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })}
-                />
-                <div className="num col-span-1 text-end text-sm text-text md:col-span-1">
-                  {formatRiyal(withTax / 100)}
-                </div>
-                <Button
-                  type="button" variant="ghost" size="icon" className="col-span-1 ms-auto md:col-span-1"
-                  aria-label={t('remove_line')} onClick={() => removeLine(l.key)}
-                >
-                  <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
-                </Button>
               </div>
             );
           })}
@@ -636,6 +718,11 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
           {lines.some((l) => !l.productId) && (
             <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
               {t('product_required')}
+            </p>
+          )}
+          {lines.some((l) => !hasValidQty(l)) && (
+            <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+              {t('qty_required')}
             </p>
           )}
         </CardContent>
@@ -772,16 +859,14 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Paperclip className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('s_attachments')}
-            </CardTitle>
-            <p className="mt-1 text-xs leading-relaxed text-muted">{t('s_attachments_hint')}</p>
-          </div>
-          <Button type="button" variant="outline" size="sm" disabled={uploadingAttachments} onClick={() => attachmentInputRef.current?.click()}>
-            <Paperclip className="h-4 w-4" strokeWidth={1.7} />{t('select_attachments')}
-          </Button>
+        {/* لا زرّ اختيارٍ في الرأس: كان يستدعي نفس `attachmentInputRef` الذي
+            تستدعيه منطقة الرفع، فيَعِد بطريقتين مختلفتين للرفع ولا يوجد إلا
+            واحدة. مُشغِّلٌ واحد ظاهر في كل حالة. */}
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Paperclip className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('s_attachments')}
+          </CardTitle>
+          <p className="mt-1 text-xs leading-relaxed text-muted">{t('s_attachments_hint')}</p>
         </CardHeader>
         <CardContent className="space-y-3">
           <Input
@@ -797,9 +882,15 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
           />
 
           {pendingAttachments.length === 0 && storedAttachments.length === 0 ? (
-            <button type="button" className="flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded border border-dashed border-border bg-muted/15 text-sm text-muted hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => attachmentInputRef.current?.click()}>
-              <Paperclip className="h-5 w-5" strokeWidth={1.6} aria-hidden />
-              <span>{t('attachments_empty')}</span>
+            <button
+              type="button"
+              disabled={uploadingAttachments}
+              onClick={() => attachmentInputRef.current?.click()}
+              className="flex min-h-20 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-border bg-muted/15 px-3 py-3 text-center hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+            >
+              <Paperclip className="h-5 w-5 text-muted" strokeWidth={1.6} aria-hidden />
+              <span className="text-sm font-medium text-text">{t('attachments_empty')}</span>
+              <span className="text-xs text-muted">{t('attachments_empty_hint')}</span>
             </button>
           ) : null}
 
@@ -833,6 +924,18 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                 ))}
               </ul>
             </div>
+          )}
+
+          {/* بعد اختيار ملفات تحلّ إضافةٌ صغيرة محلّ منطقة الرفع الكبيرة: القائمة
+              صارت هي محتوى القسم، ومنطقةٌ متقطّعة تحتها تكرّر ما تفعله هذه. */}
+          {(pendingAttachments.length > 0 || storedAttachments.length > 0) && (
+            <Button
+              type="button" variant="outline" size="sm"
+              disabled={uploadingAttachments}
+              onClick={() => attachmentInputRef.current?.click()}
+            >
+              <Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden />{t('attachments_add_more')}
+            </Button>
           )}
 
           {uploadingAttachments && <p className="text-xs text-muted">{t('attachments_uploading')}</p>}
