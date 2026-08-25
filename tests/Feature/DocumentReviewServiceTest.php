@@ -220,7 +220,7 @@ class DocumentReviewServiceTest extends TestCase
         $candidate = DocumentMatchCandidate::create([
             'document_match_result_id' => $match->id,
             'candidate_type' => 'partner',
-            'candidate_id' => 'fixture-supplier',
+            'candidate_id' => $actor->id,
             'rank' => 1,
             'score_basis_points' => 9400,
             'strategy' => 'exact_name',
