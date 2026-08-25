@@ -56,7 +56,13 @@ class DocumentIssue extends BaseModel
                 throw new LogicException('Document issue identity is immutable.');
             }
             if ($issue->isDirty(['status', 'resolved_by', 'resolved_at'])) {
-                throw new LogicException('Issue resolution belongs to the PR-6 review workflow.');
+                $allowed = ['status', 'resolved_by', 'resolved_at', 'updated_at'];
+                if (array_diff(array_keys($issue->getDirty()), $allowed) !== []) {
+                    throw new LogicException('PR-6 may only mutate reviewed issue decision fields.');
+                }
+                if (! in_array($issue->status, ['open', 'resolved', 'reopened'], true)) {
+                    throw new LogicException('Document issue review status is invalid.');
+                }
             }
         });
 

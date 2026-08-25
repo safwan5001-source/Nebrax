@@ -204,6 +204,7 @@ const GROUPS: NavGroup[] = [
     title: 'operations',
     icon: Workflow,
     items: [
+      { href: '/documents', icon: FileText, key: 'documentCenter', built: true, appKey: 'document_center.core' },
       { href: '/work-orders', icon: Wrench, key: 'workOrders' },
       { href: '/workflow', icon: Workflow, key: 'workflow' },
       { href: '/bookings', icon: CalendarCheck, key: 'bookings' },

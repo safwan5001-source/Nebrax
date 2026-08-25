@@ -59,7 +59,13 @@ class DocumentMatchResult extends BaseModel
                 throw new LogicException('Document match result identity is immutable.');
             }
             if ($result->isDirty(['status', 'confirmed_by', 'confirmed_at'])) {
-                throw new LogicException('Match confirmation belongs to the PR-6 review workflow.');
+                $allowed = ['status', 'confirmed_by', 'confirmed_at', 'updated_at'];
+                if (array_diff(array_keys($result->getDirty()), $allowed) !== []) {
+                    throw new LogicException('PR-6 may only mutate reviewed match decision fields.');
+                }
+                if (! in_array($result->status, ['confirmed', 'rejected', 'suggested', 'unmatched'], true)) {
+                    throw new LogicException('Document match review status is invalid.');
+                }
             }
         });
 

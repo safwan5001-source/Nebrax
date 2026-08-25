@@ -40,31 +40,27 @@ The platform administration console owns encrypted operational settings for priv
 
 **Status: implemented — evidence foundation only.** PR-5 reads `document-schema-v1` encrypted extraction evidence and produces deterministic branch-scoped match results, ranked candidates, and open review issues. Counterparty matching is role-filtered and prefers normalized VAT ID; products prefer visible barcode then SKU then normalized description; units reuse `UnitConversion`; and financial validation uses integer minor units with explicit inclusive/exclusive tax logic and bounded rounding differences. Strong logical duplicates become blocking review issues, while weaker total/date matches remain warnings. No candidate is confirmed automatically, missing Partner/Product/Unit never creates master data, the batch remains in `needs_review`, and PR-5 creates no review API, review UI, transaction draft, posting, journal, or inventory effect. PR-6 owns human confirmation and review workspace behavior.
 
-### PR-6 — Review workspace API
+### PR-6 — Human review workspace
 
-Add real read/review endpoints with authentication, tenant context, branch context, independent RBAC, and commercial access middleware. Mutations delegate to the workflow service.
+Add authenticated read and review endpoints with tenant/branch context, independent RBAC, and commercial access middleware, together with the RTL-first review workspace and gated navigation. Original extraction evidence remains immutable; human edits are append-only overlays projected deterministically for review. Confirmation, rejection, issue state, and completion use locked domain services with an optimistic batch version; no direct status mutation or automatic approval is allowed. `ready_for_draft` means review completeness only and is reached through `DocumentWorkflowService`; it does not create a transaction draft.
 
-### PR-7 — Review workspace UI
-
-Build the RTL-first review UI with Nebrax design tokens and accessible states. Add navigation only when the page is usable. No direct status mutation or automatic approval.
-
-### PR-8 — TransactionDraftBuilder
+### PR-7 — TransactionDraftBuilder
 
 Add the sole transaction boundary. Map reviewed data and call the existing invoice, purchase, or expense domain service to create a draft. Do not call `post()`, write transaction/journal tables, or move inventory. Store transaction links here, with idempotency and audit evidence.
 
-### PR-9 — General delivery-note domain
+### PR-8 — General delivery-note domain
 
 Design and implement a reusable delivery-note domain outside the center before allowing several delivery notes to produce one sales-invoice draft. If that domain is not approved, this flow remains out of scope.
 
-### PR-10 — Channels and integrations
+### PR-9 — Channels and integrations
 
 Add approved external channel identities and vendor-neutral intake adapters. Apply replay protection and the same file/intake policies; do not embed channel credentials in operational rows.
 
-### PR-11 — Operations, usage, and governance
+### PR-10 — Operations, usage, and governance
 
 Complete dashboards, safe retry tools, usage/cost reporting, retention jobs, redaction, audit export, support diagnostics, and tenant-visible processing status without exposing secrets or provider payloads.
 
-### PR-12 — Hardening and rollout
+### PR-11 — Hardening and rollout
 
 Run security, isolation, recovery, performance, accessibility, and migration rehearsals. Roll out behind commercial assignment and application state, monitor fail-closed behavior, and document rollback/incident procedures.
 
