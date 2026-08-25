@@ -23,10 +23,11 @@ import { useToast } from '@/components/ui/toast';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
-import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader, type ReportMetric } from '@/components/reports/report-workspace-ui';
+import { ReportMetricGrid, ReportScreenHeader, type ReportMetric } from '@/components/reports/report-workspace-ui';
 import { CustomerAgingChart } from '@/components/reports/customer-aging-chart';
 import { ReportResultsTable } from '@/components/reports/report-results-table';
 import { reportCellToneFromValue } from '@/components/reports/report-data-table';
+import { StructuredFinancialStatement, type FinancialStatementSection } from '@/components/reports/structured-financial-statement';
 
 export type ReportTab = 'trial' | 'income' | 'balance' | 'costcenter' | 'aging';
 type Tab = ReportTab;
@@ -129,6 +130,58 @@ export function ReportsWorkspace({
   useEffect(() => {
     if (fixedAgingType) setAgingType(fixedAgingType);
   }, [fixedAgingType]);
+
+  const incomeStatementSections = useMemo<FinancialStatementSection[]>(() => {
+    if (!income) return [];
+    return [
+      {
+        id: 'revenues',
+        label: t('revenues'),
+        rows: [
+          ...(income.revenues.length > 0
+            ? income.revenues.map((row) => ({ id: `revenue-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
+            : [{ id: 'revenues-empty', kind: 'empty' as const, label: t('empty') }]),
+          { id: 'total-revenue', kind: 'subtotal' as const, label: t('total_revenue'), amount: income.total_revenue, tone: 'positive' as const },
+        ],
+      },
+      {
+        id: 'expenses',
+        label: t('expenses'),
+        rows: [
+          ...(income.expenses.length > 0
+            ? income.expenses.map((row) => ({ id: `expense-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
+            : [{ id: 'expenses-empty', kind: 'empty' as const, label: t('empty') }]),
+          { id: 'total-expense', kind: 'subtotal' as const, label: t('total_expense'), amount: income.total_expense, tone: 'negative' as const },
+        ],
+      },
+    ];
+  }, [income, t]);
+
+  const balanceSheetSections = useMemo<FinancialStatementSection[]>(() => {
+    if (!balance) return [];
+    const sectionRows = (id: string, rows: AmountRow[], totalId: string, totalLabel: string, totalAmount: string) => [
+      ...(rows.length > 0
+        ? rows.map((row) => ({ id: `${id}-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
+        : [{ id: `${id}-empty`, kind: 'empty' as const, label: t('empty') }]),
+      { id: totalId, kind: 'subtotal' as const, label: totalLabel, amount: totalAmount },
+    ];
+
+    return [
+      { id: 'assets', label: t('assets'), rows: sectionRows('asset', balance.assets, 'total-assets', t('total_assets'), balance.total_assets) },
+      { id: 'liabilities', label: t('liabilities'), rows: sectionRows('liability', balance.liabilities, 'total-liabilities', t('total_liabilities'), balance.total_liabilities) },
+      {
+        id: 'equity',
+        label: t('equity'),
+        rows: [
+          ...(balance.equity.length > 0
+            ? balance.equity.map((row) => ({ id: `equity-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
+            : [{ id: 'equity-empty', kind: 'empty' as const, label: t('empty') }]),
+          { id: 'net-income', kind: 'detail' as const, label: t('net_income'), amount: balance.net_income, level: 1 as const, tone: 'auto' as const },
+          { id: 'equity-and-income', kind: 'subtotal' as const, label: t('equity_and_income'), amount: balance.total_equity_and_income },
+        ],
+      },
+    ];
+  }, [balance, t]);
 
   // وصف التقرير الحالي (أعمدة + صفوف) لاستخدامه في PDF و CSV معاً.
   const doc = useMemo<ReportDoc | null>(() => {
@@ -423,67 +476,12 @@ export function ReportsWorkspace({
             {loading || !income ? (
               <Skeleton className="h-40 w-full" />
             ) : (
-              <>
-              <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={2} secondaryIndex={1} />
-              <Table className="hidden md:table">
-                <THead>
-                  <TR>
-                    <TH>{t('code')}</TH>
-                    <TH>{t('account')}</TH>
-                    <TH className="text-end">{t('amount')}</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  <TR className="bg-background">
-                    <TD colSpan={3} className="text-xs font-semibold text-muted">{t('revenues')}</TD>
-                  </TR>
-                  {income.revenues.length === 0 ? (
-                    <TR><TD colSpan={3} className="py-4 text-center text-muted">{t('empty')}</TD></TR>
-                  ) : (
-                    income.revenues.map((r) => (
-                      <TR key={`rev-${r.code}`}>
-                        <TD className="num">{r.code}</TD>
-                        <TD>{r.name}</TD>
-                        <TD className="num text-end">{formatRiyal(r.amount)}</TD>
-                      </TR>
-                    ))
-                  )}
-                  <TR className="font-semibold">
-                    <TD />
-                    <TD>{t('total_revenue')}</TD>
-                    <TD className="num text-end text-positive">{formatRiyal(income.total_revenue)}</TD>
-                  </TR>
-
-                  <TR className="bg-background">
-                    <TD colSpan={3} className="text-xs font-semibold text-muted">{t('expenses')}</TD>
-                  </TR>
-                  {income.expenses.length === 0 ? (
-                    <TR><TD colSpan={3} className="py-4 text-center text-muted">{t('empty')}</TD></TR>
-                  ) : (
-                    income.expenses.map((r) => (
-                      <TR key={`exp-${r.code}`}>
-                        <TD className="num">{r.code}</TD>
-                        <TD>{r.name}</TD>
-                        <TD className="num text-end">{formatRiyal(r.amount)}</TD>
-                      </TR>
-                    ))
-                  )}
-                  <TR className="font-semibold">
-                    <TD />
-                    <TD>{t('total_expense')}</TD>
-                    <TD className="num text-end text-negative">{formatRiyal(income.total_expense)}</TD>
-                  </TR>
-
-                  <TR className="border-t-2 border-border font-semibold">
-                    <TD />
-                    <TD>{t('net_income')}</TD>
-                    <TD className={'num text-end ' + (Number(income.net_income) < 0 ? 'text-negative' : 'text-positive')}>
-                      {formatRiyal(income.net_income)}
-                    </TD>
-                  </TR>
-                </TBody>
-              </Table>
-              </>
+              <StructuredFinancialStatement
+                descriptionLabel={t('account')}
+                amountLabel={t('amount')}
+                sections={incomeStatementSections}
+                grandTotal={{ id: 'net-income', kind: 'grand-total', label: t('net_income'), amount: income.net_income, tone: 'auto' }}
+              />
             )}
 
             {/* عند التصفية بفرع: ما لا يخصّ أي فرع يُكشَف صراحةً، فلا تبدو
@@ -530,54 +528,13 @@ export function ReportsWorkspace({
               <Skeleton className="h-40 w-full" />
             ) : (
               <>
-                <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={2} secondaryIndex={1} />
-                <Table className="hidden md:table">
-                  <THead>
-                    <TR>
-                      <TH>{t('code')}</TH>
-                      <TH>{t('account')}</TH>
-                      <TH className="text-end">{t('amount')}</TH>
-                    </TR>
-                  </THead>
-                  <TBody>
-                    <SheetSection label={t('assets')} rows={balance.assets} emptyLabel={t('empty')} />
-                    <TR className="font-semibold">
-                      <TD />
-                      <TD>{t('total_assets')}</TD>
-                      <TD className="num text-end">{formatRiyal(balance.total_assets)}</TD>
-                    </TR>
-
-                    <SheetSection label={t('liabilities')} rows={balance.liabilities} emptyLabel={t('empty')} />
-                    <TR className="font-semibold">
-                      <TD />
-                      <TD>{t('total_liabilities')}</TD>
-                      <TD className="num text-end">{formatRiyal(balance.total_liabilities)}</TD>
-                    </TR>
-
-                    <SheetSection label={t('equity')} rows={balance.equity} emptyLabel={t('empty')} />
-                    <TR>
-                      <TD />
-                      <TD className="text-muted">{t('net_income')}</TD>
-                      <TD className={'num text-end ' + (Number(balance.net_income) < 0 ? 'text-negative' : '')}>
-                        {formatRiyal(balance.net_income)}
-                      </TD>
-                    </TR>
-                    <TR className="font-semibold">
-                      <TD />
-                      <TD>{t('equity_and_income')}</TD>
-                      <TD className="num text-end">{formatRiyal(balance.total_equity_and_income)}</TD>
-                    </TR>
-
-                    {/* المعادلة المحاسبية صريحة في السطر الأخير: أصول = خصوم + حقوق ملكية. */}
-                    <TR className="border-t-2 border-border font-semibold">
-                      <TD />
-                      <TD>{`${t('total_assets')} = ${t('total_liabilities')} + ${t('equity_and_income')}`}</TD>
-                      <TD className="num text-end">
-                        {formatRiyal(balance.total_assets)}
-                      </TD>
-                    </TR>
-                  </TBody>
-                </Table>
+                <StructuredFinancialStatement
+                  descriptionLabel={t('account')}
+                  amountLabel={t('amount')}
+                  sections={balanceSheetSections}
+                  grandTotal={{ id: 'balance-total-assets', kind: 'grand-total', label: t('total_assets'), amount: balance.total_assets }}
+                  equation={{ id: 'balance-equation', kind: 'equation', label: `${t('total_assets')} = ${t('total_liabilities')} + ${t('equity_and_income')}`, amount: balance.total_assets }}
+                />
                 <p className="mt-3 text-[11px] leading-relaxed text-muted">{t('as_of_hint')}</p>
               </>
             )}
@@ -668,27 +625,5 @@ export function ReportsWorkspace({
         </Card>
       )}
     </div>
-  );
-}
-
-/** قسم في الميزانية: ترويسة ملوّنة بخلفية خفيفة ثم صفوف حساباته. */
-function SheetSection({ label, rows, emptyLabel }: { label: string; rows: AmountRow[]; emptyLabel: string }) {
-  return (
-    <>
-      <TR className="bg-background">
-        <TD colSpan={3} className="text-xs font-semibold text-muted">{label}</TD>
-      </TR>
-      {rows.length === 0 ? (
-        <TR><TD colSpan={3} className="py-4 text-center text-muted">{emptyLabel}</TD></TR>
-      ) : (
-        rows.map((r) => (
-          <TR key={`${label}-${r.code}`}>
-            <TD className="num">{r.code}</TD>
-            <TD>{r.name}</TD>
-            <TD className="num text-end">{formatRiyal(r.amount)}</TD>
-          </TR>
-        ))
-      )}
-    </>
   );
 }

@@ -15,6 +15,7 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { ReportFilters, EMPTY_FILTERS, filtersToQuery, type ReportFilterState } from '@/components/reports/report-filters';
 import { ReportDocument, type ReportColumn } from '@/components/reports/report-document';
 import { ReportMobileRows } from '@/components/reports/report-workspace-ui';
+import { StructuredFinancialStatement, type FinancialStatementSection } from '@/components/reports/structured-financial-statement';
 import { ReportDataTable, defaultReportTableLabels, type ReportTableViewState } from '@/components/reports/report-data-table';
 import { ReportSavedViewsMenu, useSavedReportViews } from '@/components/reports/report-saved-views';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
@@ -187,7 +188,7 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
     <Card><CardContent className="py-10 text-center text-sm text-muted">{g('selectAccount')}</CardContent></Card>
   ) : tab === 'ledger' ? <LedgerTable ledger={ledger} loading={loading} g={g} />
     : tab === 'journal' ? <JournalTable journal={journal} loading={loading} g={g} t={t} />
-    : tab === 'cashflow' ? <CashFlowTable cashFlow={cashFlow} loading={loading} g={g} />
+    : tab === 'cashflow' ? <CashFlowTable cashFlow={cashFlow} loading={loading} g={g} emptyLabel={t('empty')} />
     : <TaxCard tax={tax} loading={loading} g={g} />;
 
   return (
@@ -352,16 +353,48 @@ export function JournalTable({ journal, loading, g, t }: { journal: JournalRepor
   </CardContent></Card>;
 }
 
-function CashFlowTable({ cashFlow, loading, g }: { cashFlow: CashFlow | null; loading: boolean; g: ReturnType<typeof useTranslations> }) {
+export function CashFlowTable({ cashFlow, loading, g, emptyLabel }: { cashFlow: CashFlow | null; loading: boolean; g: ReturnType<typeof useTranslations>; emptyLabel: string }) {
   const sections: Array<[keyof Pick<CashFlow, 'operating' | 'investing' | 'financing'>, string]> = [['operating', g('operating')], ['investing', g('investing')], ['financing', g('financing')]];
   if (loading || !cashFlow) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
-  const columns = [{ label: g('date') }, { label: g('entryNumber') }, { label: g('description') }, { label: g('inflows'), align: 'end' as const }, { label: g('outflows'), align: 'end' as const }, { label: g('netCashFlow'), align: 'end' as const }];
-  const rows = sections.flatMap(([key, label]) => cashFlow[key].entries.map((entry) => [entry.date, entry.number, `${label} — ${entry.description}`, formatRiyal(entry.inflow), formatRiyal(entry.outflow), formatRiyal(entry.net)]));
-  return <Card><CardHeader className="flex flex-row items-center justify-between"><CardTitle>{g('cashFlow')}</CardTitle><Badge tone={Number(cashFlow.net_cash_flow) >= 0 ? 'positive' : 'negative'} className="num">{formatRiyal(cashFlow.net_cash_flow)}</Badge></CardHeader><CardContent><ReportMobileRows columns={columns} rows={rows} totalRow={['', '', g('netCashFlow'), '', '', formatRiyal(cashFlow.net_cash_flow)]} primaryIndex={2} secondaryIndex={0} /><Table className="hidden md:table"><THead><TR><TH>{g('date')}</TH><TH>{g('entryNumber')}</TH><TH>{g('description')}</TH><TH className="text-end">{g('inflows')}</TH><TH className="text-end">{g('outflows')}</TH><TH className="text-end">{g('netCashFlow')}</TH></TR></THead><TBody>{sections.map(([key, label]) => <CashSectionRows key={key} label={label} section={cashFlow[key]} g={g} />)}<TR className="border-t-2 border-border font-semibold"><TD colSpan={5}>{g('netCashFlow')}</TD><TD className="num text-end">{formatRiyal(cashFlow.net_cash_flow)}</TD></TR></TBody></Table></CardContent></Card>;
-}
 
-function CashSectionRows({ label, section, g }: { label: string; section: CashSection; g: ReturnType<typeof useTranslations> }) {
-  return <><TR className="bg-background"><TD colSpan={6} className="text-xs font-semibold text-muted">{label}</TD></TR>{section.entries.map((entry) => <TR key={`${label}-${entry.number}`}><TD className="num">{entry.date}</TD><TD className="num">{entry.number}</TD><TD>{entry.description}</TD><TD className="num text-end">{entry.inflow === '0.00' ? '—' : formatRiyal(entry.inflow)}</TD><TD className="num text-end">{entry.outflow === '0.00' ? '—' : formatRiyal(entry.outflow)}</TD><TD className="num text-end">{formatRiyal(entry.net)}</TD></TR>)}<TR className="font-medium"><TD colSpan={3}>{label}</TD><TD className="num text-end">{formatRiyal(section.inflows)}</TD><TD className="num text-end">{formatRiyal(section.outflows)}</TD><TD className="num text-end">{formatRiyal(section.net)}</TD></TR></>;
+  const statementSections: FinancialStatementSection[] = sections.map(([key, label]) => {
+    const section = cashFlow[key];
+    return {
+      id: key,
+      label,
+      rows: [
+        ...(section.entries.length > 0
+          ? section.entries.map((entry) => ({
+            id: `${key}-${entry.date}-${entry.number}`,
+            kind: 'detail' as const,
+            code: `${entry.date} · ${entry.number}`,
+            label: entry.description || entry.number,
+            amount: entry.net,
+            tone: 'auto' as const,
+          }))
+          : [{ id: `${key}-empty`, kind: 'empty' as const, label: emptyLabel }]),
+        { id: `${key}-net`, kind: 'subtotal' as const, label: `${label} — ${g('netCashFlow')}`, amount: section.net, tone: 'auto' as const },
+      ],
+    };
+  });
+
+  const netTone = Number(cashFlow.net_cash_flow) === 0 ? 'neutral' : Number(cashFlow.net_cash_flow) > 0 ? 'positive' : 'negative';
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>{g('cashFlow')}</CardTitle>
+        <Badge tone={netTone} className="num">{formatRiyal(cashFlow.net_cash_flow)}</Badge>
+      </CardHeader>
+      <CardContent>
+        <StructuredFinancialStatement
+          descriptionLabel={g('description')}
+          amountLabel={g('netCashFlow')}
+          sections={statementSections}
+          grandTotal={{ id: 'net-cash-flow', kind: 'grand-total', label: g('netCashFlow'), amount: cashFlow.net_cash_flow, tone: 'auto' }}
+        />
+      </CardContent>
+    </Card>
+  );
 }
 
 function TaxCard({ tax, loading, g }: { tax: TaxReport | null; loading: boolean; g: ReturnType<typeof useTranslations> }) {
