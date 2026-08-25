@@ -40,6 +40,8 @@ class DocumentReviewController extends Controller
             ->when($request->filled('reviewer_id'), fn ($query) => $query->where('review_assigned_to', $request->string('reviewer_id')->toString()))
             ->when($request->filled('from'), fn ($query) => $query->whereDate('created_at', '>=', $request->string('from')->toString()))
             ->when($request->filled('to'), fn ($query) => $query->whereDate('created_at', '<=', $request->string('to')->toString()))
+            ->when($request->boolean('has_blocking'), fn ($query) => $query->whereHas('issues', fn ($issues) => $issues->where('severity', 'blocking')->whereIn('status', ['open', 'reopened'])))
+            ->when($request->filled('search'), fn ($query) => $query->where(function ($nested) use ($request) { $term = $request->string('search')->toString(); $nested->where('id', 'like', "%{$term}%")->orWhere('document_type', 'like', "%{$term}%")->orWhere('source_type', 'like', "%{$term}%"); }))
             ->withCount(['files', 'issues as blocking_issues_count' => fn ($query) => $query->where('severity', 'blocking')->whereIn('status', ['open', 'reopened']), 'issues as warning_issues_count' => fn ($query) => $query->where('severity', 'warning')->whereIn('status', ['open', 'reopened'])])
             ->orderBy($sort, $direction)
             ->paginate(min(100, max(1, $request->integer('per_page', 25))));
@@ -57,7 +59,7 @@ class DocumentReviewController extends Controller
             'candidates' => $match->candidates->map(fn ($candidate) => ['id' => $candidate->id, 'candidate_type' => $candidate->candidate_type, 'candidate_id' => $candidate->candidate_id, 'score_basis_points' => $candidate->score_basis_points, 'strategy' => $candidate->strategy, 'is_active' => (bool) ($candidate->snapshot['is_active'] ?? true)]),
         ]);
         $issues = DocumentIssue::query()->where('document_extraction_result_id', $result->id)->get()->map(fn ($issue) => ['id' => $issue->id, 'code' => $issue->code, 'severity' => $issue->severity, 'status' => $issue->status, 'safe_message' => $issue->safe_message, 'subject_key' => $issue->subject_key]);
-        $history = DocumentReviewAction::query()->where('document_batch_id', $batch->id)->latest('occurred_at')->get()->map(fn ($action) => ['id' => $action->id, 'action' => $action->action, 'subject_type' => $action->subject_type, 'subject_id' => $action->subject_id, 'before' => $action->before, 'after' => $action->after, 'reason' => $action->reason, 'review_version' => $action->review_version, 'occurred_at' => $action->occurred_at?->toIso8601String()]);
+        $history = DocumentReviewAction::query()->where('document_batch_id', $batch->id)->with('actor:id,name')->latest('occurred_at')->get()->map(fn ($action) => ['id' => $action->id, 'action' => $action->action, 'subject_type' => $action->subject_type, 'subject_id' => $action->subject_id, 'before' => $action->before, 'after' => $action->after, 'reason' => $action->reason, 'review_version' => $action->review_version, 'actor' => $action->actor ? ['id' => $action->actor->id, 'name' => $action->actor->name] : null, 'occurred_at' => $action->occurred_at?->toIso8601String()]);
 
         return new DocumentReviewResource(['batch' => $batch, 'reviewed' => app(ReviewedDocumentProjector::class)->project($result), 'matches' => $matches, 'issues' => $issues, 'history' => $history]);
     }

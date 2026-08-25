@@ -16,29 +16,30 @@ type Props = {
   payload?: Record<string, unknown>;
   onSuccess: () => void;
   staleMessage: string;
+  labels: { reason: string; cancel: string; required: string; failed: string };
 };
 
-export function ReviewCommandDialog({ open, onClose, title, confirmLabel, endpoint, expectedVersion, payload = {}, onSuccess, staleMessage }: Props) {
+export function ReviewCommandDialog({ open, onClose, title, confirmLabel, endpoint, expectedVersion, payload = {}, onSuccess, staleMessage, labels }: Props) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit() {
-    if (!reason.trim()) { setError('reason_required'); return; }
+    if (!reason.trim()) { setError(labels.required); return; }
     setSaving(true); setError(null);
     try {
       await api(endpoint, { method: 'POST', body: { ...payload, expected_version: expectedVersion, reason: reason.trim() } });
       setReason(''); onSuccess(); onClose();
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 409 ? staleMessage : err instanceof ApiError ? err.message : 'save_failed');
+      setError(err instanceof ApiError && err.status === 409 ? staleMessage : err instanceof ApiError ? err.message : labels.failed);
     } finally { setSaving(false); }
   }
 
   return <Dialog open={open} onClose={onClose} title={title}>
     <div className="space-y-4">
-      <Textarea value={reason} onChange={(event) => setReason(event.target.value)} aria-label={title} placeholder="سبب القرار" />
+      <Textarea value={reason} onChange={(event) => setReason(event.target.value)} aria-label={title} placeholder={labels.reason} />
       {error && <p role="alert" className="text-sm text-negative">{error}</p>}
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>إلغاء</Button><Button type="button" disabled={saving} onClick={submit}>{confirmLabel}</Button></div>
+      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>{labels.cancel}</Button><Button type="button" disabled={saving} onClick={submit}>{confirmLabel}</Button></div>
     </div>
   </Dialog>;
 }

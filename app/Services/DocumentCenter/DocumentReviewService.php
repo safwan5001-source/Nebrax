@@ -88,7 +88,12 @@ final class DocumentReviewService
     {
         return DB::transaction(function () use ($batch, $reviewerId, $expectedVersion, $reason, $actorId): DocumentBatch {
             $batch = $this->lockedReviewBatch($batch, $expectedVersion);
-            if ($reviewerId !== null) User::query()->whereKey($reviewerId)->firstOrFail();
+            if ($reviewerId !== null) {
+                $reviewer = User::query()->where('tenant_id', $batch->tenant_id)->whereKey($reviewerId)->firstOrFail();
+                if (! $reviewer->is_active || ! $reviewer->canAccessBranch($batch->branch_id) || ! $reviewer->hasPermission('documents.center.review')) {
+                    throw ValidationException::withMessages(['reviewer_id' => 'The reviewer is not eligible for this document branch.']);
+                }
+            }
             $before = ['review_assigned_to' => $batch->review_assigned_to];
             DocumentReviewMutationGate::run(function () use ($batch, $reviewerId): void {
                 $batch->review_assigned_to = $reviewerId;
@@ -130,7 +135,7 @@ final class DocumentReviewService
         }, 3);
     }
 
-    private function lockedReviewBatch(DocumentBatch $batch, int $expectedVersion): DocumentBatch { $locked = DocumentBatch::query()->whereKey($batch->id)->lockForUpdate()->firstOrFail(); if ($locked->status !== DocumentWorkflowStatus::NEEDS_REVIEW || $locked->version !== $expectedVersion) throw ValidationException::withMessages(['version' => 'stale_review_version']); return $locked; }
+    private function lockedReviewBatch(DocumentBatch $batch, int $expectedVersion): DocumentBatch { $locked = DocumentBatch::query()->whereKey($batch->id)->lockForUpdate()->firstOrFail(); if ($locked->status !== DocumentWorkflowStatus::NEEDS_REVIEW || $locked->version !== $expectedVersion) throw new StaleDocumentReviewVersion(); return $locked; }
     private function lockedResult(DocumentExtractionResult $result, DocumentBatch $batch): DocumentExtractionResult { $locked = DocumentExtractionResult::query()->whereKey($result->id)->where('document_batch_id', $batch->id)->lockForUpdate()->firstOrFail(); return $locked; }
     private function bump(DocumentBatch $batch, int $expectedVersion): void { if (DocumentBatch::query()->whereKey($batch->id)->where('version', $expectedVersion)->update(['version' => $expectedVersion + 1, 'updated_at' => now('UTC')]) !== 1) throw new LogicException('Document review version update failed.'); $batch->version = $expectedVersion + 1; }
     private function valueType(string $key): string { foreach (self::EDITABLE as $pattern => $type) if (preg_match('/^'.str_replace(['.', '*'], ['\\.', '\\d+'], $pattern).'$/', $key)) return $type; throw ValidationException::withMessages(['target_key' => 'Review target is not editable.']); }

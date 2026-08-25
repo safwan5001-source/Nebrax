@@ -5977,6 +5977,9 @@
     "saveFailed": "تعذر حفظ قرار المراجعة.",
     "assign": "إسناد مراجع",
     "unassigned": "غير مسند",
-    "document": "المستند"
+    "document": "المستند",
+    "cancel": "إلغاء",
+    "reasonRequired": "سبب القرار مطلوب.",
+    "reasonPlaceholder": "اكتب سبب القرار"
   }
 }

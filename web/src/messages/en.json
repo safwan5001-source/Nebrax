@@ -5981,6 +5981,9 @@
     "saveFailed": "Unable to save the review decision.",
     "assign": "Assign reviewer",
     "unassigned": "Unassigned",
-    "document": "Document"
+    "document": "Document",
+    "cancel": "Cancel",
+    "reasonRequired": "A decision reason is required.",
+    "reasonPlaceholder": "Enter a decision reason"
   }
 }
