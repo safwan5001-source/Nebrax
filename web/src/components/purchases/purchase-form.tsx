@@ -396,6 +396,11 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
         </Link></Button>
         <h1 className="text-xl font-semibold text-text">{editId ? t('edit_title') : t('new_title')}</h1>
         <div className="ms-auto flex items-center gap-2">
+          {!editId && (
+            <Button asChild variant="outline">
+              <Link href="/documents?document_type=purchase_invoice&status=ready_for_draft">{t('import_from_document')}</Link>
+            </Button>
+          )}
           <Button asChild variant="ghost"><Link href='/purchases'>{tf('cancel')}</Link></Button>
           <Button variant="outline" disabled={!canSave} onClick={() => submit(false)}>{t('save_draft')}</Button>
           <Button disabled={!canSave} onClick={() => submit(true)}>{t('save_post')}</Button>

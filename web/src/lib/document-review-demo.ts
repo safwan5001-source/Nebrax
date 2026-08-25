@@ -9,6 +9,7 @@ type DemoField = {
 type DemoState = {
   version: number;
   status: string;
+  purchaseDraft: { purchase_id: string; purchase_number: string; status: string; url: string } | null;
   fields: DemoField[];
   matches: Array<{
     id: string;
@@ -56,6 +57,7 @@ function initialState(): DemoState {
   return {
     version: 7,
     status: 'needs_review',
+    purchaseDraft: null,
     fields: [
       { key: 'document_number', original: 'PI-2084', current: 'PI-2084', confidence_basis_points: 9800, page: 1 },
       { key: 'document_date', original: '2026-08-22', current: '2026-08-22', confidence_basis_points: 9500, page: 1 },
@@ -153,6 +155,7 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
   const changeMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/review-changes$/);
   const completeMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/complete-review$/);
   const revalidateMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/revalidate-financial$/);
+  const createDraftMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/create-purchase-draft$/);
 
   if (method === 'GET' && clean === '/document-batches') {
     const query = new URLSearchParams(path.split('?')[1] ?? '');
@@ -182,7 +185,7 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
       response: {
         data: {
           batch: {
-            id: reviewMatch[1], status: state.status, version: state.version,
+            id: reviewMatch[1], document_type: 'purchase_invoice', status: state.status, version: state.version,
             reviewer: { id: 'demo-reviewer', name: 'أحمد المراجع' },
           },
           fields: state.fields,
@@ -190,7 +193,8 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
           matches: state.matches,
           issues: state.issues,
           history: state.history,
-          capabilities: { view: true, review: true, manage: true },
+          purchase_draft: state.purchaseDraft,
+          capabilities: { view: true, review: true, manage: true, build_draft: true },
         },
       },
     };
@@ -264,6 +268,27 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
     state.version += 1;
     addHistory('financial_revalidated', String(requestBody.reason ?? ''), null, { status: taxIssue?.status ?? 'resolved' });
     return { handled: true, response: { data: { id: 'demo-financial-revalidation' } } };
+  }
+
+  if (method === 'POST' && createDraftMatch) {
+    if (state.purchaseDraft) {
+      return { handled: true, response: { data: { ...state.purchaseDraft, transaction_type: 'purchase', idempotent_replay: true } } };
+    }
+    if (!validVersion(requestBody)) return { handled: true, error: staleError() };
+    if (state.status !== 'ready_for_draft') return { handled: true, error: new Error('review_not_ready') };
+    if (!String(requestBody.reason ?? '').trim()) return { handled: true, error: new Error('reason_required') };
+
+    state.status = 'draft_created';
+    state.version += 1;
+    state.purchaseDraft = {
+      purchase_id: 'demo-purchase-draft-001',
+      purchase_number: 'PUR-DRAFT-2084',
+      status: 'draft',
+      url: '/purchases/demo-purchase-draft-001',
+    };
+    addHistory('purchase_draft_created', String(requestBody.reason), { status: 'ready_for_draft' }, { status: state.status, purchase_id: state.purchaseDraft.purchase_id });
+
+    return { handled: true, response: { data: { ...state.purchaseDraft, transaction_type: 'purchase', idempotent_replay: false } } };
   }
 
   if (method === 'POST' && completeMatch) {
