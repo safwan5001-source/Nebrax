@@ -5005,6 +5005,8 @@
     "loading": "Loading…",
     "noResults": "No results",
     "retry": "Try again",
+    "back": "Back",
+    "summary": "Summary",
     "exportCsv": "Export CSV",
     "resultsNavigation": "Results navigation",
     "perPage": "Results per page",

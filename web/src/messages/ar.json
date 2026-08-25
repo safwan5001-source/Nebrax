@@ -5005,6 +5005,8 @@
     "loading": "جارٍ التحميل…",
     "noResults": "لا توجد نتائج",
     "retry": "إعادة المحاولة",
+    "back": "رجوع",
+    "summary": "الملخّص",
     "exportCsv": "تصدير CSV",
     "resultsNavigation": "تنقّل النتائج",
     "perPage": "عدد النتائج في الصفحة",
