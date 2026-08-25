@@ -5,15 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { ChevronLeft, ChevronRight, Plus, Pencil } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
-import { DataExplorerToolbar } from '@/components/data-explorer/data-explorer-toolbar';
 import { DataTable } from '@/components/data-table';
-import { Button } from '@/components/ui/button';
+import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
-import { Select } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { PartnerDialog, type Partner } from '@/components/partners/partner-dialog';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 
@@ -40,6 +39,7 @@ export default function PartnersPage() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Partner | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -51,10 +51,12 @@ export default function PartnersPage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     api<{ data: Partner[] }>('/partners?type=customer')
       .then((response) => setData(response.data))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : tp('load_error')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [tp]);
 
   useEffect(() => load(), [load]);
 
@@ -82,8 +84,8 @@ export default function PartnersPage() {
       ],
     },
     { key: 'city', label: tp('city'), kind: 'entity', quick: true, searchPlaceholder: tp('search'), emptyText: tp('empty'), options: cityOptions },
-    { key: 'has_phone', label: tp('phone'), kind: 'select', options: [{ value: 'yes', label: 'يوجد' }, { value: 'no', label: 'غير موجود' }] },
-    { key: 'has_email', label: tp('email'), kind: 'select', options: [{ value: 'yes', label: 'يوجد' }, { value: 'no', label: 'غير موجود' }] },
+    { key: 'has_phone', label: tp('phone'), kind: 'select', options: [{ value: 'yes', label: tp('present') }, { value: 'no', label: tp('absent') }] },
+    { key: 'has_email', label: tp('email'), kind: 'select', options: [{ value: 'yes', label: tp('present') }, { value: 'no', label: tp('absent') }] },
   ], [cityOptions, tp]);
 
   const labelledFilters = useMemo(() => explorer.filters.map((filter) => ({
@@ -115,6 +117,13 @@ export default function PartnersPage() {
     });
   }, [data, explorer.filters, explorer.search]);
 
+  const sortOptions: SortOption[] = [
+    { value: 'name', label: tp('sort_name_asc') },
+    { value: '-name', label: tp('sort_name_desc') },
+    { value: 'city', label: tp('city') },
+    { value: 'phone', label: tp('phone') },
+  ];
+
   const sorted = useMemo(() => {
     const next = [...filtered];
     const sort = explorer.sort ?? 'name';
@@ -143,6 +152,12 @@ export default function PartnersPage() {
     }));
   }
 
+  const rowActions = useCallback((partner: Partner) => (
+    <Button variant="ghost" size="icon" aria-label={tp('edit')} onClick={() => { setEditing(partner); setDialogOpen(true); }}>
+      <Pencil className="h-4 w-4" strokeWidth={1.7} />
+    </Button>
+  ), [tp]);
+
   const columns = useMemo<ColumnDef<Partner, unknown>[]>(() => [
     {
       accessorKey: 'name',
@@ -157,60 +172,72 @@ export default function PartnersPage() {
     { accessorKey: 'city', header: tp('city'), cell: ({ row }) => row.original.city ?? '—' },
     { accessorKey: 'phone', header: tp('phone'), cell: ({ row }) => <span className="num text-muted">{row.original.phone ?? '—'}</span> },
     { accessorKey: 'email', header: tp('email'), cell: ({ row }) => <span className="num text-muted">{row.original.email ?? '—'}</span> },
-    {
-      id: 'actions', header: '', cell: ({ row }) => (
-        <Button variant="ghost" size="icon" aria-label={tp('edit')} onClick={() => { setEditing(row.original); setDialogOpen(true); }}>
-          <Pencil className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
-      ),
-    },
-  ], [tp]);
+    { id: 'actions', header: '', cell: ({ row }) => rowActions(row.original) },
+  ], [rowActions, tp]);
 
-  return <div className="space-y-4">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-xl font-semibold text-text">{tp('title')}</h1>
-      <Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{tp('add')}</Button>
+  const headerActions: PageAction[] = [
+    { key: 'add', label: tp('add'), icon: Plus, onClick: () => { setEditing(null); setDialogOpen(true); }, variant: 'primary' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <PageHeader title={tp('title')} actions={headerActions} />
+
+      <ListToolbar
+        search={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder={`${tp('search')} · ${tp('name')} · ${tp('phone')} · ${tp('email')}`}
+        searchLabel={tp('title')}
+        definitions={definitions}
+        filters={labelledFilters}
+        onFilterChange={updateFilter}
+        onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
+        onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
+        onOpenAdvanced={() => setAdvancedOpen(true)}
+        sort={{
+          value: explorer.sort ?? 'name',
+          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+          options: sortOptions,
+        }}
+        resultCount={sorted.length}
+        totalCount={data.length}
+      />
+
+      <DataTable
+        columns={columns}
+        data={pageData}
+        loading={loading}
+        error={loadError}
+        onRetry={load}
+        emptyLabel={tp('empty')}
+        exportName="partners"
+        showToolbar={false}
+        mobileRecord={(partner) => ({
+          title: (
+            <Link href={`/partners/${partner.id}`} className="text-primary hover:underline">
+              {partner.name}
+            </Link>
+          ),
+          subtitle: partner.phone ?? partner.email ?? partner.id,
+          status: <Badge tone="muted">{tp(partner.entity_type ?? 'commercial')}</Badge>,
+          meta: partner.city ?? undefined,
+          actions: rowActions(partner),
+        })}
+      />
+
+      <Pagination
+        page={page}
+        lastPage={totalPages}
+        perPage={perPage}
+        total={sorted.length}
+        disabled={loading}
+        onPageChange={(next) => setExplorer((current) => ({ ...current, page: next }))}
+        onPerPageChange={(next) => setExplorer((current) => ({ ...current, page: 1, perPage: next }))}
+      />
+
+      <AdvancedFilterDialog open={advancedOpen} onClose={() => setAdvancedOpen(false)} definitions={definitions} filters={labelledFilters} onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))} />
+
+      <PartnerDialog key={editing?.id ?? 'new'} open={dialogOpen} onClose={() => setDialogOpen(false)} onSaved={load} partner={editing} />
     </div>
-
-    <DataExplorerToolbar
-      search={searchInput}
-      searchPlaceholder={`${tp('search')} · ${tp('name')} · ${tp('phone')} · ${tp('email')}`}
-      onSearchChange={setSearchInput}
-      definitions={definitions}
-      filters={labelledFilters}
-      onFilterChange={updateFilter}
-      onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
-      onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
-      onOpenAdvanced={() => setAdvancedOpen(true)}
-      resultCount={sorted.length}
-      totalCount={data.length}
-    />
-
-    <div className="flex items-center justify-end gap-2">
-      <span className="text-xs text-muted">ترتيب حسب</span>
-      <Select value={explorer.sort ?? 'name'} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, sort: event.target.value }))} className="h-9 min-w-44 bg-surface text-sm" aria-label="ترتيب العملاء">
-        <option value="name">الاسم: أ–ي</option>
-        <option value="-name">الاسم: ي–أ</option>
-        <option value="city">المدينة</option>
-        <option value="phone">الهاتف</option>
-      </Select>
-    </div>
-
-    <DataTable columns={columns} data={pageData} loading={loading} emptyLabel={tp('empty')} exportName="partners" showToolbar={false} />
-
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-muted">{sorted.length.toLocaleString('ar-SA')} عميل · صفحة {page.toLocaleString('ar-SA')} من {totalPages.toLocaleString('ar-SA')}</p>
-      <div className="flex items-center gap-2">
-        <Select value={String(perPage)} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))} className="h-9 w-24 bg-surface text-sm" aria-label="عدد النتائج في الصفحة">
-          <option value="25">25</option><option value="50">50</option><option value="100">100</option>
-        </Select>
-        <Button variant="outline" size="icon" aria-label="الصفحة السابقة" disabled={loading || page <= 1} onClick={() => setExplorer((current) => ({ ...current, page: Math.max(1, page - 1) }))}><ChevronRight className="h-4 w-4" /></Button>
-        <Button variant="outline" size="icon" aria-label="الصفحة التالية" disabled={loading || page >= totalPages} onClick={() => setExplorer((current) => ({ ...current, page: Math.min(totalPages, page + 1) }))}><ChevronLeft className="h-4 w-4" /></Button>
-      </div>
-    </div>
-
-    <AdvancedFilterDialog open={advancedOpen} onClose={() => setAdvancedOpen(false)} definitions={definitions} filters={labelledFilters} onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))} />
-
-    <PartnerDialog key={editing?.id ?? 'new'} open={dialogOpen} onClose={() => setDialogOpen(false)} onSaved={load} partner={editing} />
-  </div>;
+  );
 }
