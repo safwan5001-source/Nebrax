@@ -91,6 +91,9 @@ test.describe('مسودة Expense في fixture واجهة محلي', () => {
 
     await expect(page.getByRole('heading', { name: 'مراجعة المستند' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'إنشاء مسودة مصروف' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'تعديل' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'إكمال المراجعة' })).toHaveCount(0);
+    await expect(page.getByText('أكمل المطابقات والمشكلات المانعة قبل إكمال المراجعة.')).toHaveCount(0);
     await page.getByRole('button', { name: 'إنشاء مسودة مصروف' }).click();
 
     await expect(page.getByRole('dialog', { name: 'إنشاء مسودة مصروف' })).toBeVisible();
@@ -102,7 +105,15 @@ test.describe('مسودة Expense في fixture واجهة محلي', () => {
     await page.getByRole('button', { name: 'إنشاء مسودة مصروف' }).last().click();
 
     await expect(page.getByRole('link', { name: /فتح مسودة المصروف EXP-DRAFT-0417/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'إنشاء مسودة مصروف' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'تعديل' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'تأكيد' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'رفض' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'حل المشكلة' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'إعادة فتح' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'إعادة التحقق المالي' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'إكمال المراجعة' })).toHaveCount(0);
+    await expect(page.getByText('أكمل المطابقات والمشكلات المانعة قبل إكمال المراجعة.')).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
   });
 });

@@ -7,6 +7,20 @@ export type LinkedTransaction = {
   url: string;
 };
 
+/** لا تقبل خدمة المراجعة أي طفرة خارج مرحلة المراجعة الفعلية. */
+export function isDocumentReviewMutable(status: string): boolean {
+  return status === 'needs_review';
+}
+
+export function canMutateDocumentReview(input: { canReview: boolean; status: string }): boolean {
+  return input.canReview && isDocumentReviewMutable(input.status);
+}
+
+/** يظهر تنبيه الجاهزية فقط عندما تكون المراجعة ما زالت مرحلةً قابلة للتعديل ومحصورةً بعائق. */
+export function shouldShowReviewReadinessBlocker(input: { isReviewMutable: boolean; canComplete: boolean }): boolean {
+  return input.isReviewMutable && !input.canComplete;
+}
+
 export function canViewDocumentCenter(permissions?: string[], role?: string): boolean {
   return permissions?.includes('documents.center.view') ?? ['owner', 'admin'].includes(role ?? '');
 }

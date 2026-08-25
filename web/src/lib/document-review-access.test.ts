@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   canBuildDocumentDraft,
   canBuildPurchaseDraft,
+  canMutateDocumentReview,
   canViewDocumentCenter,
+  isDocumentReviewMutable,
   linkedPurchasePresentation,
   linkedTransactionPresentation,
+  shouldShowReviewReadinessBlocker,
 } from './document-review-access';
 
 describe('Document Center sidebar access', () => {
@@ -12,6 +15,27 @@ describe('Document Center sidebar access', () => {
     expect(canViewDocumentCenter(['documents.center.view'], 'staff')).toBe(true);
     expect(canViewDocumentCenter([], 'staff')).toBe(false);
     expect(canViewDocumentCenter(undefined, 'owner')).toBe(true);
+  });
+});
+
+describe('Document review workflow mutability', () => {
+  it('allows review mutations only while the batch is in needs_review and the reviewer is authorized', () => {
+    expect(isDocumentReviewMutable('needs_review')).toBe(true);
+    expect(canMutateDocumentReview({ canReview: true, status: 'needs_review' })).toBe(true);
+    expect(canMutateDocumentReview({ canReview: false, status: 'needs_review' })).toBe(false);
+  });
+
+  it('keeps ready_for_draft and draft_created read-only even for a reviewer', () => {
+    expect(isDocumentReviewMutable('ready_for_draft')).toBe(false);
+    expect(isDocumentReviewMutable('draft_created')).toBe(false);
+    expect(canMutateDocumentReview({ canReview: true, status: 'ready_for_draft' })).toBe(false);
+    expect(canMutateDocumentReview({ canReview: true, status: 'draft_created' })).toBe(false);
+  });
+
+  it('shows the readiness blocker only for a mutable review that is not completable', () => {
+    expect(shouldShowReviewReadinessBlocker({ isReviewMutable: true, canComplete: false })).toBe(true);
+    expect(shouldShowReviewReadinessBlocker({ isReviewMutable: true, canComplete: true })).toBe(false);
+    expect(shouldShowReviewReadinessBlocker({ isReviewMutable: false, canComplete: false })).toBe(false);
   });
 });
 
