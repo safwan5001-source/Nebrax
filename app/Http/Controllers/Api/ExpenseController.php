@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StoreExpenseRequest;
 use App\Http\Resources\ExpenseResource;
+use App\Models\Account;
 use App\Models\CostCenter;
 use App\Models\Expense;
 use App\Models\ExpenseAttachment;
@@ -22,9 +23,78 @@ class ExpenseController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        return ExpenseResource::collection(
-            $this->scopeToActiveBranch(Expense::with(['account', 'category'])->withCount('documentTransactionLinks')->latest(), $request)->get()
-        )->response();
+        $filters = $request->validate([
+            'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'status' => ['sometimes', 'nullable', 'in:draft,posted,cancelled'],
+            'payment_method' => ['sometimes', 'nullable', 'string', 'max:60'],
+            'category_name' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'vendor_name' => ['sometimes', 'nullable', 'string', 'max:160'],
+            'account_name' => ['sometimes', 'nullable', 'string', 'max:160'],
+            'date_from' => ['sometimes', 'nullable', 'date'],
+            'date_to' => ['sometimes', 'nullable', 'date'],
+            'amount_min' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'amount_max' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'sort' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'per_page' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:100'],
+            'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
+        ]);
+
+        $query = $this->scopeToActiveBranch(
+            Expense::with(['account', 'category'])->withCount('documentTransactionLinks'),
+            $request
+        );
+
+        if (filled($filters['search'] ?? null)) {
+            $needle = addcslashes(trim((string) $filters['search']), '%_\\');
+            $like = "%{$needle}%";
+            $query->where(function ($search) use ($like): void {
+                $search->where('number', 'like', $like)
+                    ->orWhere('vendor_name', 'like', $like)
+                    ->orWhere('payment_method', 'like', $like)
+                    ->orWhere('description', 'like', $like)
+                    ->orWhereHas('account', fn ($account) => $account->where('name', 'like', $like)->orWhere('code', 'like', $like))
+                    ->orWhereHas('category', fn ($category) => $category->where('name', 'like', $like));
+            });
+        }
+
+        if (filled($filters['status'] ?? null)) $query->where('status', $filters['status']);
+        if (filled($filters['payment_method'] ?? null)) $query->where('payment_method', $filters['payment_method']);
+        if (filled($filters['vendor_name'] ?? null)) $query->where('vendor_name', $filters['vendor_name']);
+        if (filled($filters['category_name'] ?? null)) {
+            $query->whereHas('category', fn ($category) => $category->where('name', $filters['category_name']));
+        }
+        if (filled($filters['account_name'] ?? null)) {
+            $query->whereHas('account', fn ($account) => $account->where('name', $filters['account_name']));
+        }
+        if (filled($filters['date_from'] ?? null)) $query->whereDate('expense_date', '>=', $filters['date_from']);
+        if (filled($filters['date_to'] ?? null)) $query->whereDate('expense_date', '<=', $filters['date_to']);
+        if (filled($filters['amount_min'] ?? null)) $query->where('total', '>=', $this->moneyFilterToMinor((string) $filters['amount_min']));
+        if (filled($filters['amount_max'] ?? null)) $query->where('total', '<=', $this->moneyFilterToMinor((string) $filters['amount_max']));
+
+        $paginated = isset($filters['per_page']);
+        $sort = (string) ($filters['sort'] ?? '');
+        $direction = str_starts_with($sort, '-') ? 'desc' : 'asc';
+        $sortKey = ltrim($sort, '-');
+
+        if ($sortKey === 'account_name') {
+            $query->orderBy(Account::select('name')->whereColumn('accounts.id', 'expenses.account_id'), $direction)->orderByDesc('id');
+        } elseif ($sortKey === 'category_name') {
+            $query->orderBy(ExpenseCategory::select('name')->whereColumn('expense_categories.id', 'expenses.category_id'), $direction)->orderByDesc('id');
+        } elseif (in_array($sortKey, ['expense_date', 'number', 'vendor_name', 'total', 'created_at'], true) && $sort !== '') {
+            $query->orderBy($sortKey, $direction)->orderByDesc('id');
+        } elseif ($paginated) {
+            $query->orderByDesc('expense_date')->orderByDesc('id');
+        } else {
+            $query->latest();
+        }
+
+        if ($paginated) {
+            return ExpenseResource::collection(
+                $query->paginate((int) $filters['per_page'])->withQueryString()
+            )->response();
+        }
+
+        return ExpenseResource::collection($query->get())->response();
     }
 
     public function store(StoreExpenseRequest $request): JsonResponse
@@ -47,7 +117,6 @@ class ExpenseController extends ApiController
         ))->response();
     }
 
-    /** تعديل مسودة قائمة: لا يفتح أي مصروف مرحّل لتعديل البيانات أو المبلغ. */
     public function update(StoreExpenseRequest $request, string $id): JsonResponse
     {
         $expense = $this->visibleExpense($request, $id);
@@ -60,7 +129,6 @@ class ExpenseController extends ApiController
         return (new ExpenseResource($updated->load(['account', 'category', 'partner', 'costCenter', 'attachments'])->loadCount('documentTransactionLinks')))->response();
     }
 
-    /** ينشئ نسخة مسودة مستقلة بلا مرفقات إثبات، وبترقيم وتاريخ جديدين. */
     public function duplicate(Request $request, string $id): JsonResponse
     {
         $expense = $this->visibleExpense($request, $id);
@@ -69,16 +137,11 @@ class ExpenseController extends ApiController
         return (new ExpenseResource($copy->load(['account', 'category', 'partner', 'costCenter', 'attachments'])->loadCount('documentTransactionLinks')))->response()->setStatusCode(201);
     }
 
-    /** الحذف متاح للمسودة فقط؛ السند المرحّل جزء من سجل القيد ولا يُمحى. */
     public function destroy(Request $request, string $id): JsonResponse
     {
         $expense = $this->visibleExpense($request, $id);
-        if (! $expense->isDraft()) {
-            abort(422, 'لا يمكن حذف مصروف مرحّل أو ملغى.');
-        }
-        if ($expense->documentTransactionLinks()->exists()) {
-            abort(422, 'لا يمكن حذف مسودة مصروف مرتبطة بمستند مصدر.');
-        }
+        if (! $expense->isDraft()) abort(422, 'لا يمكن حذف مصروف مرحّل أو ملغى.');
+        if ($expense->documentTransactionLinks()->exists()) abort(422, 'لا يمكن حذف مسودة مصروف مرتبطة بمستند مصدر.');
 
         $attachments = $expense->attachments()->get();
         DB::transaction(function () use ($expense) {
@@ -86,9 +149,7 @@ class ExpenseController extends ApiController
             $expense->delete();
         });
 
-        foreach ($attachments as $attachment) {
-            Storage::disk($attachment->disk)->delete($attachment->path);
-        }
+        foreach ($attachments as $attachment) Storage::disk($attachment->disk)->delete($attachment->path);
 
         return response()->json(['message' => 'deleted']);
     }
@@ -101,40 +162,30 @@ class ExpenseController extends ApiController
         return (new ExpenseResource($posted->load(['account', 'category', 'partner', 'costCenter', 'attachments'])->loadCount('documentTransactionLinks')))->response();
     }
 
-    /** تنزيل مرفق خاص بعد إثبات أنه يعود للمصروف المرئي في الفرع النشط. */
     public function downloadAttachment(Request $request, string $id, string $attachmentId): StreamedResponse
     {
         $expense = $this->visibleExpense($request, $id);
         $attachment = $expense->attachments()->whereKey($attachmentId)->firstOrFail();
         $disk = Storage::disk($attachment->disk);
-
-        if (! $disk->exists($attachment->path)) {
-            abort(404, 'ملف المرفق غير موجود.');
-        }
+        if (! $disk->exists($attachment->path)) abort(404, 'ملف المرفق غير موجود.');
 
         return $disk->download($attachment->path, $attachment->original_name, [
             'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
         ]);
     }
 
-    /** المصروفات محاسبية بلا Scope عالمي؛ عرضها وتنفيذ الإجراء عليها يُصفّيان صراحةً بالفرع. */
     private function visibleExpense(Request $request, string $id): Expense
     {
         return $this->scopeToActiveBranch(Expense::query(), $request)->whereKey($id)->firstOrFail();
     }
 
-    /** المراجع يجب أن تكون مرئية في سياق الإنشاء/التعديل، لا مجرد موجودة في المستأجر. */
     private function assertReferences(array $data): void
     {
-        if (! empty($data['partner_id'])) {
-            Partner::findOrFail($data['partner_id']);
-        }
-
+        if (! empty($data['partner_id'])) Partner::findOrFail($data['partner_id']);
         $this->assertTenantOwned(CostCenter::class, $data['cost_center_id'] ?? null, 'مركز التكلفة');
         $this->assertActiveCategory($data['category_id'] ?? null);
     }
 
-    /** لا يقبل سند جديد تصنيفاً معطلاً أو مخفياً بعزل الفرع. */
     private function assertActiveCategory(?string $categoryId): void
     {
         if ($categoryId !== null && ! ExpenseCategory::whereKey($categoryId)->where('is_active', true)->exists()) {
@@ -142,24 +193,27 @@ class ExpenseController extends ApiController
         }
     }
 
-    /**
-     * تُحفَظ الملفات على قرص خاص وتُربط بمسودة المصروف. لا يُقبل من العميل
-     * مسار جاهز، فلا يستطيع ربط مستند بملف يخص مستأجراً أو مصروفاً آخر.
-     */
     private function storeAttachments(StoreExpenseRequest $request, Expense $expense): void
     {
         foreach ($request->file('attachments', []) as $file) {
             $path = $file->store("expenses/{$expense->id}", 'local');
-
             ExpenseAttachment::create([
-                'expense_id'    => $expense->id,
-                'disk'          => 'local',
-                'path'          => $path,
+                'expense_id' => $expense->id,
+                'disk' => 'local',
+                'path' => $path,
                 'original_name' => $file->getClientOriginalName(),
-                'mime_type'     => $file->getMimeType(),
-                'size'          => $file->getSize(),
-                'uploaded_by'   => $request->user()?->id,
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+                'uploaded_by' => $request->user()?->id,
             ]);
         }
+    }
+
+    private function moneyFilterToMinor(string $value): int
+    {
+        $normalized = trim($value);
+        [$whole, $fraction] = array_pad(explode('.', $normalized, 2), 2, '');
+        $fraction = substr(str_pad(preg_replace('/\D/', '', $fraction) ?? '', 2, '0'), 0, 2);
+        return ((int) $whole * 100) + (int) $fraction;
     }
 }
