@@ -38,7 +38,7 @@ The platform administration console owns encrypted operational settings for priv
 
 ### PR-5 — Matching and issues
 
-Add deterministic matching results, versioned rules and dictionaries, review issues, and explicit ambiguity handling. Missing Partner/Product/Unit creates a review issue, never master data.
+**Status: implemented — evidence foundation only.** PR-5 reads `document-schema-v1` encrypted extraction evidence and produces deterministic branch-scoped match results, ranked candidates, and open review issues. Counterparty matching is role-filtered and prefers normalized VAT ID; products prefer visible barcode then SKU then normalized description; units reuse `UnitConversion`; and financial validation uses integer minor units with explicit inclusive/exclusive tax logic and bounded rounding differences. Strong logical duplicates become blocking review issues, while weaker total/date matches remain warnings. No candidate is confirmed automatically, missing Partner/Product/Unit never creates master data, the batch remains in `needs_review`, and PR-5 creates no review API, review UI, transaction draft, posting, journal, or inventory effect. PR-6 owns human confirmation and review workspace behavior.
 
 ### PR-6 — Review workspace API
 
