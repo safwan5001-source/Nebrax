@@ -11,6 +11,7 @@ import { MoreHorizontal, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import type { ReportDataColumn } from '@/components/reports/report-data-table';
 
 export interface ReportAction {
   id: string;
@@ -30,6 +31,7 @@ export interface ReportMetric {
 export interface ReportColumnCell {
   label: string;
   align?: 'start' | 'end';
+  cellTone?: ReportDataColumn['cellTone'];
 }
 
 export function ReportScreenHeader({

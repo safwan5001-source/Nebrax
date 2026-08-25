@@ -14,6 +14,7 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { ReportFilters, EMPTY_FILTERS, filtersToQuery, type ReportFilterState } from '@/components/reports/report-filters';
 import { ReportDocument, type ReportColumn } from '@/components/reports/report-document';
 import { ReportMobileRows } from '@/components/reports/report-workspace-ui';
+import { ReportDataTable, defaultReportTableLabels } from '@/components/reports/report-data-table';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
@@ -214,7 +215,24 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
 }
 
 function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: boolean; g: ReturnType<typeof useTranslations> }) {
+  const locale = useLocale();
   if (loading || !ledger) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
+  const columns = [
+    { id: 'date', label: g('date') },
+    { id: 'number', label: g('entryNumber') },
+    { id: 'description', label: g('description') },
+    { id: 'debit', label: g('debit'), align: 'end' as const, numeric: true },
+    { id: 'credit', label: g('credit'), align: 'end' as const, numeric: true },
+    { id: 'balance', label: g('balance'), align: 'end' as const, numeric: true },
+  ];
+  const rows = ledger.rows.map((row) => [
+    row.date,
+    row.number,
+    row.description,
+    formatRiyal(row.debit),
+    formatRiyal(row.credit),
+    formatRiyal(row.balance),
+  ]);
   return <Card>
     <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{ledger.account.name}</CardTitle><Badge tone="neutral" className="num">{g('closingBalance')}: {formatRiyal(ledger.closing_balance)}</Badge></CardHeader>
     <CardContent>
@@ -223,16 +241,102 @@ function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: b
         {ledger.rows.length === 0 ? <p className="py-8 text-center text-sm text-muted">—</p> : ledger.rows.map((row) => <article key={`${row.number}-${row.date}`} className="rounded-xl border border-border bg-surface p-3"><div className="mb-2 flex items-start justify-between gap-3"><div><p className="num text-xs text-muted">{row.date}</p><p className="num mt-1 text-sm font-medium text-text">{row.number}</p></div><strong className="num text-sm">{formatRiyal(row.balance)}</strong></div><p className="mb-3 text-sm leading-5 text-text">{row.description}</p><dl className="grid grid-cols-2 gap-2 border-t border-border pt-2 text-xs"><div><dt className="text-muted">{g('debit')}</dt><dd className="num mt-1 font-medium">{formatRiyal(row.debit)}</dd></div><div><dt className="text-muted">{g('credit')}</dt><dd className="num mt-1 font-medium">{formatRiyal(row.credit)}</dd></div></dl></article>)}
         <div className="flex items-center justify-between gap-3 rounded-lg bg-background px-3 py-2.5 text-sm font-semibold"><span>{g('closingBalance')}</span><strong className="num">{formatRiyal(ledger.closing_balance)}</strong></div>
       </div>
-      <div className="hidden md:block"><Table><THead><TR><TH>{g('date')}</TH><TH>{g('entryNumber')}</TH><TH>{g('description')}</TH><TH className="text-end">{g('debit')}</TH><TH className="text-end">{g('credit')}</TH><TH className="text-end">{g('balance')}</TH></TR></THead><TBody><TR className="bg-background"><TD colSpan={5}>{g('openingBalance')}</TD><TD className="num text-end">{formatRiyal(ledger.opening_balance)}</TD></TR>{ledger.rows.length === 0 ? <TR><TD colSpan={6} className="py-8 text-center text-muted">—</TD></TR> : ledger.rows.map((row) => <TR key={`${row.number}-${row.date}`}><TD className="num">{row.date}</TD><TD className="num">{row.number}</TD><TD>{row.description}</TD><TD className="num text-end">{formatRiyal(row.debit)}</TD><TD className="num text-end">{formatRiyal(row.credit)}</TD><TD className="num text-end font-medium">{formatRiyal(row.balance)}</TD></TR>)}</TBody></Table></div>
+      <div className="hidden md:block">
+        <div className="mb-3 flex items-center justify-between gap-3 rounded border border-border bg-background px-3 py-2.5 text-sm">
+          <span className="text-muted">{g('openingBalance')}</span>
+          <strong className="num">{formatRiyal(ledger.opening_balance)}</strong>
+        </div>
+        <ReportDataTable
+          columns={columns}
+          rows={rows}
+          totalRow={['', '', g('closingBalance'), '', '', formatRiyal(ledger.closing_balance)]}
+          labels={defaultReportTableLabels(locale)}
+          emptyText="—"
+        />
+      </div>
     </CardContent>
   </Card>;
 }
 
-function JournalTable({ journal, loading, g, t }: { journal: JournalReport | null; loading: boolean; g: ReturnType<typeof useTranslations>; t: ReturnType<typeof useTranslations> }) {
+export function JournalTable({ journal, loading, g, t }: { journal: JournalReport | null; loading: boolean; g: ReturnType<typeof useTranslations>; t: ReturnType<typeof useTranslations> }) {
   if (loading || !journal) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
-  const columns = [{ label: g('date') }, { label: g('entryNumber') }, { label: g('description') }, { label: g('debit'), align: 'end' as const }, { label: g('credit'), align: 'end' as const }];
-  const rows = journal.rows.flatMap((entry) => entry.lines.map((line, index) => [index === 0 ? entry.date : '', index === 0 ? entry.number : '', `${line.account_code} — ${line.account_name}`, formatRiyal(line.debit), formatRiyal(line.credit)]));
-  return <Card><CardHeader><CardTitle>{g('journalEntries')}</CardTitle></CardHeader><CardContent>{journal.rows.length === 0 ? <p className="py-8 text-center text-sm text-muted">{t('empty')}</p> : <><ReportMobileRows columns={columns} rows={rows} totalRow={['', '', t('total'), formatRiyal(journal.total_debit), formatRiyal(journal.total_credit)]} primaryIndex={2} secondaryIndex={0} /><Table className="hidden md:table"><THead><TR><TH>{g('date')}</TH><TH>{g('entryNumber')}</TH><TH>{g('description')}</TH><TH className="text-end">{g('debit')}</TH><TH className="text-end">{g('credit')}</TH></TR></THead><TBody>{journal.rows.flatMap((entry) => entry.lines.map((line, index) => <TR key={`${entry.entry_id}-${line.account_id}`} className={index === 0 ? 'border-t-2 border-border' : ''}><TD className="num">{index === 0 ? entry.date : ''}</TD><TD className="num">{index === 0 ? entry.number : ''}</TD><TD>{line.account_code} — {line.account_name}</TD><TD className="num text-end">{formatRiyal(line.debit)}</TD><TD className="num text-end">{formatRiyal(line.credit)}</TD></TR>))}<TR className="font-semibold"><TD /><TD /><TD>{t('total')}</TD><TD className="num text-end">{formatRiyal(journal.total_debit)}</TD><TD className="num text-end">{formatRiyal(journal.total_credit)}</TD></TR></TBody></Table></>}</CardContent></Card>;
+  const totalDebit = formatRiyal(journal.total_debit);
+  const totalCredit = formatRiyal(journal.total_credit);
+
+  return <Card><CardHeader><CardTitle>{g('journalEntries')}</CardTitle></CardHeader><CardContent>
+    {journal.rows.length === 0 ? <p className="py-8 text-center text-sm text-muted">{t('empty')}</p> : <>
+      <div className="space-y-3 md:hidden">
+        {journal.rows.map((entry) => (
+          <article key={entry.entry_id} className="rounded border border-border bg-surface p-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="num text-xs text-muted">{entry.date}</p>
+                <p className="num mt-1 text-sm font-semibold text-text">{entry.number}</p>
+              </div>
+            </div>
+            {entry.description && <p className="mt-2 text-sm leading-5 text-text">{entry.description}</p>}
+            <div className="mt-3 divide-y divide-border border-y border-border">
+              {entry.lines.map((line, lineIndex) => (
+                <div key={`${entry.entry_id}-${line.account_id}-${lineIndex}`} className="py-3 first:pt-2 last:pb-2">
+                  <p className="text-sm font-medium text-text">{`${line.account_code ?? ''} — ${line.account_name ?? ''}`.trim() || '—'}</p>
+                  {line.description && <p className="mt-1 text-xs text-muted">{line.description}</p>}
+                  <dl className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                    <div><dt className="text-muted">{g('debit')}</dt><dd className="num mt-1 font-medium text-text">{formatRiyal(line.debit)}</dd></div>
+                    <div><dt className="text-muted">{g('credit')}</dt><dd className="num mt-1 font-medium text-text">{formatRiyal(line.credit)}</dd></div>
+                  </dl>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+        <article className="rounded border border-primary/25 bg-primary-soft p-3.5">
+          <p className="text-sm font-semibold text-text">{t('total')}</p>
+          <dl className="mt-3 grid grid-cols-2 gap-3 text-xs">
+            <div><dt className="text-muted">{g('debit')}</dt><dd className="num mt-1 font-semibold text-text">{totalDebit}</dd></div>
+            <div><dt className="text-muted">{g('credit')}</dt><dd className="num mt-1 font-semibold text-text">{totalCredit}</dd></div>
+          </dl>
+        </article>
+      </div>
+
+      <div className="hidden overflow-hidden rounded border border-border bg-surface md:block">
+        <div className="max-h-[62vh] overflow-auto">
+          <Table>
+            <THead className="sticky top-0 z-10 bg-surface">
+              <TR>
+                <TH scope="col">{g('date')}</TH>
+                <TH scope="col">{g('entryNumber')}</TH>
+                <TH scope="col">{g('description')}</TH>
+                <TH scope="col" className="text-end">{g('debit')}</TH>
+                <TH scope="col" className="text-end">{g('credit')}</TH>
+              </TR>
+            </THead>
+            {journal.rows.map((entry) => (
+              <TBody key={entry.entry_id} className="border-b-2 border-border last:border-0">
+                {entry.lines.map((line, lineIndex) => (
+                  <TR key={`${entry.entry_id}-${line.account_id}-${lineIndex}`}>
+                    <TD className="num align-top">{lineIndex === 0 ? entry.date : ''}</TD>
+                    <TD className="num align-top">{lineIndex === 0 ? entry.number : ''}</TD>
+                    <TD>{`${line.account_code ?? ''} — ${line.account_name ?? ''}`.trim() || '—'}{line.description && <p className="mt-1 text-xs text-muted">{line.description}</p>}</TD>
+                    <TD className="num text-end">{formatRiyal(line.debit)}</TD>
+                    <TD className="num text-end">{formatRiyal(line.credit)}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            ))}
+            <tfoot className="sticky bottom-0 border-t border-primary/20 bg-primary-soft font-semibold text-text">
+              <TR>
+                <TD />
+                <TD />
+                <TD>{t('total')}</TD>
+                <TD className="num text-end">{totalDebit}</TD>
+                <TD className="num text-end">{totalCredit}</TD>
+              </TR>
+            </tfoot>
+          </Table>
+        </div>
+      </div>
+    </>}
+  </CardContent></Card>;
 }
 
 function CashFlowTable({ cashFlow, loading, g }: { cashFlow: CashFlow | null; loading: boolean; g: ReturnType<typeof useTranslations> }) {
