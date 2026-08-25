@@ -3,8 +3,9 @@ import { DISPLAY_LOCALE } from '@/lib/formatting';
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { ArrowRight, CircleAlert, RefreshCw } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { ArrowRight, Fuel, RefreshCw } from 'lucide-react';
+import { EmptyState, ErrorState, LoadingState, PageHeader, type PageAction } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,8 +58,21 @@ function collectionRows<T>(value: Collection<T> | undefined): T[] {
   return Array.isArray(value) ? value : value?.data ?? [];
 }
 
+/**
+ * يقرأ حمولة `/fuel-stations/workspace` **بعد التحقق من شكلها**.
+ *
+ * العقد هو `{ data: { stations: [...] } }`. حمولةٌ بلا `stations` كانت تُخزَّن كما
+ * هي فينهار العرض عند أول `stations.filter` — استثناءٌ في `useMemo` يسقط الصفحة
+ * كلها لا قسماً منها. إعادة `null` هنا تحوّل ذلك إلى حالة خطأ صريحة.
+ */
+function readWorkspace(payload: unknown): Workspace | null {
+  const stations = (payload as { data?: { stations?: unknown } } | null)?.data?.stations;
+  return Array.isArray(stations) ? { stations: stations as Station[] } : null;
+}
+
 export default function FuelStationsWorkspacePage() {
   const t = useTranslations('fuelStations');
+  const locale = useLocale();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [summary, setSummary] = useState<Summary>({ dashboard: null, devices: [], shifts: [], summaryUnavailable: false });
   const [permissions, setPermissions] = useState<string[] | null>(() => currentUser()?.permissions ?? null);
@@ -76,8 +90,13 @@ export default function FuelStationsWorkspacePage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const workspaceResult = await api<{ data: Workspace }>('/fuel-stations/workspace');
-      setWorkspace(workspaceResult.data);
+      const workspaceResult = await api<unknown>('/fuel-stations/workspace');
+      const loadedWorkspace = readWorkspace(workspaceResult);
+      if (loadedWorkspace === null) {
+        setLoadError(t('loadFailed'));
+        return;
+      }
+      setWorkspace(loadedWorkspace);
 
       const allowed = permissions ?? [];
       const dashboardAllowed = canAccess(allowed, 'fuel.reports.view');
@@ -102,7 +121,7 @@ export default function FuelStationsWorkspacePage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const activeStations = useMemo(() => workspace?.stations.filter((station) => station.status === 'active').length ?? 0, [workspace]);
+  const activeStations = useMemo(() => workspace?.stations?.filter((station) => station.status === 'active').length ?? 0, [workspace]);
   const latestShiftByStation = useMemo(() => {
     const latest = new Map<string, Shift>();
     for (const shift of summary.shifts) {
@@ -122,12 +141,49 @@ export default function FuelStationsWorkspacePage() {
     return values.filter((action) => canAccess(permissions ?? [], action.permission));
   }, [permissions, t]);
 
-  if (loading && !workspace) return <WorkspaceSkeleton />;
-  if (loadError || !workspace) return <LoadError message={loadError ?? t('loadFailed')} onRetry={() => void load()} retryLabel={t('retry')} />;
+  const headerActions: PageAction[] = [
+    {
+      key: 'refresh',
+      label: t('refresh'),
+      icon: RefreshCw,
+      variant: 'outline',
+      emphasis: 'secondary',
+      disabled: loading,
+      onClick: () => void load(),
+    },
+  ];
+
+  const header = (
+    <PageHeader
+      eyebrow={t('eyebrow')}
+      title={t('commandCenterTitle')}
+      description={t('commandCenterSubtitle')}
+      actions={headerActions}
+    />
+  );
+
+  if (loading && !workspace) {
+    return (
+      <div className="space-y-5">
+        {header}
+        <LoadingState variant="metrics" rows={4} />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    );
+  }
+
+  if (loadError || !workspace) {
+    return (
+      <div className="space-y-5">
+        {header}
+        <ErrorState message={loadError ?? t('loadFailed')} onRetry={() => void load()} retryLabel={t('retry')} />
+      </div>
+    );
+  }
 
   const metrics = summary.dashboard ? [
     { label: t('salesToday'), value: formatMinorRiyal(summary.dashboard.sales_today_minor) },
-    { label: t('litersToday'), value: `${formatMillilitersAsLiters(summary.dashboard.liters_today_milliliters)} ${t('literUnit')}` },
+    { label: t('litersToday'), value: formatMillilitersAsLiters(summary.dashboard.liters_today_milliliters, locale, t('literUnit')) },
     { label: t('grossMargin'), value: formatMinorRiyal(summary.dashboard.gross_margin_minor) },
     { label: t('openShifts'), value: String(summary.dashboard.open_shifts) },
     { label: t('openWorkOrders'), value: String(summary.dashboard.open_work_orders) },
@@ -137,27 +193,17 @@ export default function FuelStationsWorkspacePage() {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-3xl">
-          <p className="text-xs font-semibold tracking-wide text-primary">{t('eyebrow')}</p>
-          <h1 className="mt-1 text-2xl font-semibold text-text">{t('commandCenterTitle')}</h1>
-          <p className="mt-1 text-sm leading-relaxed text-muted">{t('commandCenterSubtitle')}</p>
-        </div>
-        <Button variant="outline" onClick={() => void load()} disabled={loading}>
-          <RefreshCw className="h-4 w-4" strokeWidth={1.7} />
-          {t('refresh')}
-        </Button>
-      </header>
+      {header}
 
       {summary.dashboard ? (
-        <section aria-label={t('operationalSummary')} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section aria-label={t('operationalSummary')} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {metrics.map((metric) => <Metric key={metric.label} label={metric.label} value={metric.value} />)}
         </section>
       ) : summary.summaryUnavailable ? (
-        <p role="status" className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-muted">{t('summaryUnavailable')}</p>
+        <p role="status" className="rounded border border-border bg-surface px-4 py-3 text-sm text-muted">{t('summaryUnavailable')}</p>
       ) : null}
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
         <Card>
           <CardHeader>
             <CardTitle>{t('stations')}</CardTitle>
@@ -165,9 +211,22 @@ export default function FuelStationsWorkspacePage() {
           </CardHeader>
           <CardContent>
             {workspace.stations.length === 0 ? (
-              <EmptyStations t={t} />
+              <EmptyState
+                icon={Fuel}
+                surface="bare"
+                title={t('noStations')}
+                className="rounded border border-dashed border-border"
+                action={
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/fuel-stations/master-data">
+                      {t('quickStations')}
+                      <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" strokeWidth={1.7} />
+                    </Link>
+                  </Button>
+                }
+              />
             ) : (
-              <div className="divide-y divide-border rounded-md border border-border">
+              <div className="divide-y divide-border rounded border border-border">
                 {workspace.stations.map((station) => {
                   const devices = summary.devices.filter((device) => device.fuel_station_id === station.id);
                   const degraded = devices.filter((device) => device.health === 'degraded' || device.health === 'offline' || device.sync_status === 'failed').length;
@@ -180,7 +239,7 @@ export default function FuelStationsWorkspacePage() {
                           <Badge tone={stationTone[station.status] ?? 'neutral'}>{stationStatusLabel(t, station.status)}</Badge>
                         </div>
                         <p className="num mt-1 text-xs text-muted">{station.code}{station.timezone ? ` · ${station.timezone}` : ''}</p>
-                        <p className="mt-2 text-xs text-muted">
+                        <p className="mt-2 text-xs leading-relaxed text-muted">
                           {shift ? t('latestShift', { status: shiftStatusLabel(t, shift.status), at: formatDate(shift.opened_at) }) : t('noRecentShift')}
                           {devices.length ? ` · ${degraded ? t('degradedDeviceCount', { count: degraded }) : t('devicesHealthy', { count: devices.length })}` : ''}
                         </p>
@@ -212,30 +271,25 @@ export default function FuelStationsWorkspacePage() {
                     </Link></Button>
                 ))}
               </div>
-            ) : <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted">{t('noQuickActions')}</p>}
+            ) : <p className="rounded border border-dashed border-border px-4 py-8 text-center text-sm text-muted">{t('noQuickActions')}</p>}
           </CardContent>
         </Card>
       </section>
 
-      <p className="rounded-md border border-border bg-primary-soft px-4 py-3 text-sm leading-relaxed text-text">{t('operationalNotice')}</p>
+      <p className="rounded border border-border bg-primary-soft px-4 py-3 text-sm leading-relaxed text-text">{t('operationalNotice')}</p>
     </div>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <Card><CardContent className="py-4"><p className="text-xs text-muted">{label}</p><p className="num mt-2 text-xl font-semibold text-text">{value}</p></CardContent></Card>;
-}
-
-function WorkspaceSkeleton() {
-  return <div className="space-y-5" aria-busy="true"><Skeleton className="h-20 w-full max-w-2xl" /><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <Skeleton className="h-24" key={index} />)}</div><Skeleton className="h-72 w-full" /></div>;
-}
-
-function LoadError({ message, onRetry, retryLabel }: { message: string; onRetry: () => void; retryLabel: string }) {
-  return <Card><CardContent className="flex flex-col items-start gap-3 py-10"><CircleAlert className="h-6 w-6 text-negative" strokeWidth={1.7} /><p role="alert" className="text-sm text-negative">{message}</p><Button variant="outline" onClick={onRetry}>{retryLabel}</Button></CardContent></Card>;
-}
-
-function EmptyStations({ t }: { t: ReturnType<typeof useTranslations> }) {
-  return <div className="rounded-md border border-dashed border-border px-4 py-10 text-center"><p className="text-sm text-muted">{t('noStations')}</p><Button asChild size="sm" variant="outline"><Link className="mt-3 inline-flex" href="/fuel-stations/master-data">{t('quickStations')}<ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" /></Link></Button></div>;
+  return (
+    <Card>
+      <CardContent className="py-4">
+        <p className="truncate text-xs text-muted" title={label}>{label}</p>
+        <p className="num mt-2 break-words text-base font-semibold leading-tight text-text sm:text-xl">{value}</p>
+      </CardContent>
+    </Card>
+  );
 }
 
 function stationStatusLabel(t: ReturnType<typeof useTranslations>, status: string) {

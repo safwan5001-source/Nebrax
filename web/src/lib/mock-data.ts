@@ -1690,6 +1690,134 @@ function createMockPrintTemplate(input: { name?: string; document_types?: unknow
   };
 }
 
+/**
+ * ─────────────────────────── إدارة التطبيقات ───────────────────────────
+ * عيّنة تمثيلية من كتالوج `App\Support\ApplicationCatalog` بمفاتيحه الحقيقية،
+ * تغطّي كل حالة تعرضها الشاشة: إلزامية، مفعّلة، معطّلة، معلّقة (قراءة فقط)،
+ * «قريباً»، وصولٌ ممنوع، واعتماديةٌ ناقصة — ومعها أنواع الإتاحة التجارية.
+ *
+ * بياناتٌ للمعاينة فقط: لا تصف قرار مستأجرٍ حقيقي، ولا تُستشار خارج وضع المعاينة.
+ */
+type MockApplication = {
+  group: string;
+  maturity: 'built' | 'coming_soon' | 'retired';
+  mandatory: boolean;
+  dependencies: string[];
+  enabled: boolean;
+  status: 'enabled' | 'disabled' | 'suspended';
+  changed_by: string | null;
+  changed_at: string | null;
+  reason: string | null;
+  commercial: { availability: 'included' | 'addon' | 'trial' | 'not_available'; source_count: number };
+  effective_access: 'full' | 'read_only' | 'denied';
+  dependency_status: 'satisfied' | 'missing' | 'not_applicable';
+};
+
+function mockApplication(
+  group: string,
+  overrides: Partial<MockApplication> = {}
+): MockApplication {
+  return {
+    group,
+    maturity: 'built',
+    mandatory: false,
+    dependencies: [],
+    enabled: true,
+    status: 'enabled',
+    changed_by: null,
+    changed_at: null,
+    reason: null,
+    commercial: { availability: 'included', source_count: 1 },
+    effective_access: 'full',
+    dependency_status: 'not_applicable',
+    ...overrides,
+  };
+}
+
+const mockApplications: Record<string, MockApplication> = {
+  'sales.invoicing': mockApplication('sales', { mandatory: true }),
+  'sales.pos': mockApplication('pos', { dependencies: ['sales.invoicing'], dependency_status: 'satisfied' }),
+  'sales.promotions': mockApplication('sales', {
+    maturity: 'coming_soon', enabled: false, status: 'disabled',
+    dependencies: ['sales.invoicing'], dependency_status: 'satisfied',
+    commercial: { availability: 'not_available', source_count: 0 }, effective_access: 'denied',
+  }),
+  'compliance.zatca': mockApplication('settings', {
+    dependencies: ['sales.invoicing', 'accounting.ledger'], dependency_status: 'satisfied',
+  }),
+  'crm.customers': mockApplication('customers', { mandatory: true }),
+  'crm.follow_up': mockApplication('customers', {
+    dependencies: ['crm.customers'], dependency_status: 'satisfied',
+    commercial: { availability: 'trial', source_count: 1 },
+  }),
+  'crm.loyalty': mockApplication('customers', {
+    maturity: 'coming_soon', enabled: false, status: 'disabled',
+    dependencies: ['crm.customers', 'sales.invoicing'], dependency_status: 'satisfied',
+    commercial: { availability: 'not_available', source_count: 0 }, effective_access: 'denied',
+  }),
+  'inventory.core': mockApplication('inventory', {
+    enabled: false, status: 'suspended', effective_access: 'read_only',
+    reason: 'توجد حركات مخزنية مرحّلة، فالقدرة للقراءة فقط.',
+    commercial: { availability: 'addon', source_count: 1 },
+  }),
+  'purchases.cycle': mockApplication('purchases', {
+    enabled: false, status: 'disabled',
+    dependencies: ['accounting.ledger'], dependency_status: 'satisfied',
+    commercial: { availability: 'addon', source_count: 1 },
+  }),
+  'accounting.ledger': mockApplication('accounting', { mandatory: true }),
+  'finance.operations': mockApplication('finance', { commercial: { availability: 'addon', source_count: 2 } }),
+  'hr.employees': mockApplication('hr', { commercial: { availability: 'addon', source_count: 1 } }),
+  'hr.payroll': mockApplication('hr', {
+    enabled: false, status: 'disabled',
+    dependencies: ['hr.employees'], dependency_status: 'satisfied',
+    commercial: { availability: 'trial', source_count: 1 },
+  }),
+  'operations.work_orders': mockApplication('operations', {
+    maturity: 'coming_soon', enabled: false, status: 'disabled',
+    commercial: { availability: 'not_available', source_count: 0 }, effective_access: 'denied',
+  }),
+  'logistics.fleet': mockApplication('logistics', {
+    maturity: 'coming_soon', enabled: false, status: 'disabled',
+    commercial: { availability: 'not_available', source_count: 0 }, effective_access: 'denied',
+  }),
+  'fuel_stations.core': mockApplication('fuel_stations', { commercial: { availability: 'addon', source_count: 2 } }),
+  'fuel_stations.forecourt': mockApplication('fuel_stations', {
+    enabled: false, status: 'disabled',
+    dependencies: ['fuel_stations.core'], dependency_status: 'missing',
+    commercial: { availability: 'addon', source_count: 1 },
+  }),
+};
+
+/** ─────────────────────────── محطات الوقود ─────────────────────────── */
+const mockFuelStations = [
+  { id: 'fs-1', branch_id: null, code: 'ST-001', name: 'محطة نبراس الطموح — طريق الملك فهد', status: 'active', timezone: 'Asia/Riyadh', operating_day_starts_at: '06:00' },
+  { id: 'fs-2', branch_id: null, code: 'ST-002', name: 'محطة الجبيل الصناعية الثانية', status: 'maintenance', timezone: 'Asia/Riyadh', operating_day_starts_at: '06:00' },
+  { id: 'fs-3', branch_id: null, code: 'ST-003', name: 'محطة الظهران الجنوبية', status: 'inactive', timezone: 'Asia/Riyadh', operating_day_starts_at: '06:00' },
+];
+
+const mockFuelDashboard = {
+  sales_today_minor: 128455075,
+  liters_today_milliliters: 84250000,
+  gross_margin_minor: 18422050,
+  open_shifts: 4,
+  open_work_orders: 2,
+  active_alerts: 1,
+  degraded_devices: 3,
+  data_boundary: 'branch',
+};
+
+const mockFuelDevices = [
+  { id: 'fd-1', fuel_station_id: 'fs-1', health: 'degraded', sync_status: 'ok', last_seen_at: '2026-08-25T06:00:00Z' },
+  { id: 'fd-2', fuel_station_id: 'fs-1', health: 'healthy', sync_status: 'ok', last_seen_at: '2026-08-25T06:05:00Z' },
+  { id: 'fd-3', fuel_station_id: 'fs-2', health: 'healthy', sync_status: 'ok', last_seen_at: '2026-08-25T05:40:00Z' },
+];
+
+const mockFuelShifts = [
+  { id: 'fsh-1', fuel_station_id: 'fs-1', opened_at: '2026-08-25T05:00:00Z', status: 'open' },
+  { id: 'fsh-2', fuel_station_id: 'fs-2', opened_at: '2026-08-24T05:00:00Z', status: 'closed' },
+];
+
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const reviewResponse = handleDocumentReviewDemo(path, method.toUpperCase(), body);
   if (reviewResponse.handled) {
@@ -1901,6 +2029,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: template ?? null });
   }
   if (clean === '/me') return resolve({ user: DEMO_USER, company: mockCompany });
+  if (clean === '/applications') return resolve({ data: mockApplications });
+  if (clean === '/fuel-stations/workspace') return resolve({ data: { stations: mockFuelStations } });
+  if (clean === '/fuel-stations/dashboard') return resolve({ data: mockFuelDashboard });
+  if (clean === '/fuel-stations/devices') return resolve({ data: mockFuelDevices });
+  if (clean === '/fuel-stations/shifts') return resolve({ data: mockFuelShifts });
   if (clean === '/subscription') return resolve(mockSubscription);
   if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
   if (clean === '/customer-settings') return resolve({ data: mockCustomerSettings });

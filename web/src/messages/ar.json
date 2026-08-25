@@ -4935,6 +4935,23 @@
       "fuel_stations_integrations": "تكاملات أجهزة المحطة"
     }
   },
+  "nebrax": {
+    "search": "بحث",
+    "searchAndFilter": "أدوات البحث والفلترة",
+    "sortResults": "ترتيب النتائج",
+    "resultCount": "<num>{count}</num> نتيجة",
+    "filteredCount": "<num>{count}</num> من أصل <num>{total}</num>",
+    "moreActions": "إجراءات إضافية",
+    "loading": "جارٍ التحميل…",
+    "noResults": "لا توجد نتائج",
+    "retry": "إعادة المحاولة",
+    "exportCsv": "تصدير CSV",
+    "resultsNavigation": "تنقّل النتائج",
+    "perPage": "عدد النتائج في الصفحة",
+    "previousPage": "الصفحة السابقة",
+    "nextPage": "الصفحة التالية",
+    "pagePosition": "صفحة <num>{page}</num> من <num>{lastPage}</num>"
+  },
   "numberingSettings": {
     "title": "إعدادات الترقيم المتسلسل",
     "picker_title": "نوع المستند",

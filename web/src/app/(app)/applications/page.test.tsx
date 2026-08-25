@@ -52,14 +52,21 @@ const { api, currentUser, translate } = vi.hoisted(() => {
 vi.mock('next-intl', () => ({ useTranslations: () => translate }));
 vi.mock('@/lib/auth', () => ({ currentUser }));
 vi.mock('@/lib/api', () => ({ api, ApiError: class ApiError extends Error {} }));
-vi.mock('lucide-react', () => ({
-  CircleAlert: () => <span />,
-  Clock3: () => <span />,
-  LayoutGrid: () => <span />,
-  LockKeyhole: () => <span />,
-  Search: () => <span />,
-  ShieldCheck: () => <span />,
-}));
+// أي أيقونة تُستدعى من الصفحة أو من مكوّنات نبراكس المشتركة تُرجع عنصراً فارغاً،
+// فلا يكسر الاختبارَ استيرادُ أيقونة جديدة في مكوّن مشترك.
+vi.mock('lucide-react', () => {
+  const iconStub = () => <span />;
+  // أي أيقونة تُستدعى من الصفحة أو من مكوّنات نبراكس المشتركة تُرجع عنصراً فارغاً،
+  // فلا يكسر الاختبارَ استيرادُ أيقونة جديدة في مكوّن مشترك.
+  // `then` والرموز تُترك للسلوك الافتراضي؛ لولا ذلك لبدت الوحدة thenable فانتظرها المُحمِّل بلا نهاية.
+  return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
+    get: (target, name) =>
+      typeof name === 'symbol' || name === 'then' || name === '__esModule'
+        ? Reflect.get(target, name)
+        : iconStub,
+    has: () => true,
+  });
+});
 vi.mock('@/components/ui/button', () => ({ Button: ({ children, ...props }: any) => <button {...props}>{children}</button> }));
 vi.mock('@/components/ui/badge', () => ({ Badge: ({ children }: any) => <span>{children}</span> }));
 vi.mock('@/components/ui/card', () => ({
@@ -134,6 +141,25 @@ describe('ApplicationsPage operational actions', () => {
     const dependency = within(cardFor('Fuel dependency'));
     expect((dependency.getByRole('switch', { name: 'Enable Fuel dependency' }) as HTMLButtonElement).disabled).toBe(true);
     expect(dependency.getByText('Enable the required dependencies before activating this application.')).toBeTruthy();
+  });
+
+  it('treats a payload that is not a keyed application map as a load failure, not an empty catalogue', async () => {
+    // شكلٌ غير متوقّع (مصفوفة بدل خريطة مفاتيح) كان يمرّ عبر `Object.entries`
+    // فيُنتج صفر تطبيقات — فتبدو الشاشة «فارغة» بينما القراءة تعذّرت أصلاً.
+    api.mockResolvedValue({ data: [] });
+    render(<ApplicationsPage />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe('Load failed');
+    expect(screen.queryByText('No applications')).toBeNull();
+  });
+
+  it('still shows the empty state for a genuinely empty catalogue', async () => {
+    api.mockResolvedValue({ data: {} });
+    render(<ApplicationsPage />);
+
+    expect(await screen.findByText('No applications')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('renders compact status controls and group-level bulk actions', async () => {
