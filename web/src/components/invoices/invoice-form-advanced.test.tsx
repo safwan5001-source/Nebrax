@@ -13,8 +13,10 @@ const { api, push, replace, translate } = vi.hoisted(() => {
     new_partner: 'New', new_partner_title: 'New customer',
     invoice_number: 'Invoice number', invoice_date: 'Invoice date', payment_terms: 'Payment terms',
     days: 'days', due_date: 'Due date',
-    lines: 'Lines', add_line: 'Add line', item: 'Item', description: 'Description',
-    price: 'Price', qty: 'Qty', unit: 'Unit', line_discount_short: 'Discount', tax: 'Tax %',
+    lines: 'Lines', items_section: 'Items', add_line: 'Add line', item: 'Item', description: 'Description',
+    price: 'Unit price', qty: 'Qty', qty_placeholder: 'Quantity', unit: 'Unit',
+    qty_required: 'Every line needs a positive quantity.',
+    line_discount_short: 'Discount', tax: 'Tax %',
     total_with_vat: 'Total incl. VAT', remove_line: 'Remove line', manual: 'Manual entry',
     search_product: 'Search products…', no_product_found: 'No product found', new_product: 'New product',
     balance: 'Balance', items_hint: 'A line without a product still posts as revenue.',
@@ -161,7 +163,8 @@ describe('InvoiceForm — minimum sale price', () => {
     await firstQty();
 
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr2');
-    await waitFor(() => expect(lineField('Price').value).toBe('120.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('120.00'));
+    await userEvent.type(await firstQty(), '1');
 
     expect(screen.queryByText(/below the minimum/)).toBeNull();
   });
@@ -172,10 +175,11 @@ describe('InvoiceForm — minimum sale price', () => {
     await firstQty();
 
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr2');
-    await waitFor(() => expect(lineField('Price').value).toBe('120.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('120.00'));
+    await userEvent.type(await firstQty(), '1');
 
-    await userEvent.clear(lineField('Price'));
-    await userEvent.type(lineField('Price'), '80');
+    await userEvent.clear(lineField('Unit price'));
+    await userEvent.type(lineField('Unit price'), '80');
 
     expect(await screen.findByText(/below the minimum \(100\.00/)).toBeTruthy();
     // القاعدة لا تُخفى: الحقل مفتوح ولا يمكن طيّه ما دام السعر تحت الحدّ.
@@ -190,7 +194,8 @@ describe('InvoiceForm — minimum sale price', () => {
     await firstQty();
 
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr2');
-    await waitFor(() => expect(lineField('Price').value).toBe('120.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('120.00'));
+    await userEvent.type(await firstQty(), '1');
 
     await userEvent.click(screen.getAllByRole('button', { name: /Advanced line settings/ })[0]);
     expect(screen.getByLabelText('Override reason')).toBeTruthy();
@@ -202,9 +207,10 @@ describe('InvoiceForm — minimum sale price', () => {
     await firstQty();
 
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr2');
-    await waitFor(() => expect(lineField('Price').value).toBe('120.00'));
-    await userEvent.clear(lineField('Price'));
-    await userEvent.type(lineField('Price'), '80');
+    await waitFor(() => expect(lineField('Unit price').value).toBe('120.00'));
+    await userEvent.type(await firstQty(), '1');
+    await userEvent.clear(lineField('Unit price'));
+    await userEvent.type(lineField('Unit price'), '80');
     await userEvent.type(await screen.findByLabelText('Override reason'), 'Agreed with the owner');
     await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
@@ -230,7 +236,8 @@ describe('InvoiceForm — cost centre allocations', () => {
     render(<InvoiceForm />);
     await firstQty();
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
-    await waitFor(() => expect(lineField('Price').value).toBe('95.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
+    await userEvent.type(await firstQty(), '1');
     await userEvent.click(screen.getAllByRole('button', { name: /Advanced line settings/ })[0]);
   }
 
@@ -299,7 +306,9 @@ describe('InvoiceForm — paid already gate', () => {
     render(<InvoiceForm />);
     await firstQty();
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
-    await waitFor(() => expect(lineField('Price').value).toBe('95.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
+    // الكمية تبدأ فارغة الآن، وبلا كميةٍ صالحة لا يُتاح الحفظ.
+    await userEvent.type(await firstQty(), '1');
   }
 
   it('hides the payment fields from the accessibility tree while unchecked', async () => {
@@ -405,7 +414,8 @@ describe('InvoiceForm — API failure', () => {
     render(<InvoiceForm />);
     await firstQty();
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
-    await waitFor(() => expect(lineField('Price').value).toBe('95.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
+    await userEvent.type(await firstQty(), '1');
 
     await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 

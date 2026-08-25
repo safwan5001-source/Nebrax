@@ -13,8 +13,10 @@ const { api, push, replace, translate } = vi.hoisted(() => {
     new_partner: 'New', new_partner_title: 'New customer',
     invoice_number: 'Invoice number', invoice_date: 'Invoice date', payment_terms: 'Payment terms',
     days: 'days', due_date: 'Due date',
-    lines: 'Lines', add_line: 'Add line', item: 'Item', description: 'Description',
-    price: 'Price', qty: 'Qty', unit: 'Unit', line_discount_short: 'Discount', tax: 'Tax %',
+    lines: 'Lines', items_section: 'Items', add_line: 'Add line', item: 'Item', description: 'Description',
+    price: 'Unit price', qty: 'Qty', qty_placeholder: 'Quantity', unit: 'Unit',
+    qty_required: 'Every line needs a positive quantity.',
+    line_discount_short: 'Discount', tax: 'Tax %',
     total_with_vat: 'Total incl. VAT', remove_line: 'Remove line', manual: 'Manual entry',
     search_product: 'Search products…', no_product_found: 'No product found', new_product: 'New product',
     balance: 'Balance', items_hint: 'A line without a product still posts as revenue.',
@@ -147,6 +149,49 @@ function respond(overrides: Record<string, unknown> = {}, opts: { centers?: unkn
 const firstQty = async () => (await screen.findAllByLabelText('Qty'))[0] as HTMLInputElement;
 const lineField = (label: string) => screen.getAllByLabelText(label)[0] as HTMLInputElement;
 
+/** مساحتا الاسم المعنيّتان فقط — شجرة الرسائل الكاملة متداخلة ولا تُختزل إلى نصوص. */
+type LineMessages = {
+  invoiceForm: Record<string, string>;
+  purchaseForm: Record<string, string>;
+};
+
+async function messages(locale: 'ar' | 'en'): Promise<LineMessages> {
+  const loaded = locale === 'ar'
+    ? await import('@/messages/ar.json')
+    : await import('@/messages/en.json');
+  return loaded.default as unknown as LineMessages;
+}
+
+/**
+ * مصطلح القسم يُقاس على ملفّي الترجمة مباشرة: اختبار المكوّن يعرض القاموس الوهمي
+ * لا العربي، فلا يثبت وحده أن الشاشة تقول «البنود» كما تقول فاتورة الشراء.
+ */
+describe('sales line terminology matches purchases', () => {
+  it('names the section البنود and the action إضافة سطر, in both languages', async () => {
+    const ar = await messages('ar');
+    const en = await messages('en');
+
+    expect(ar.invoiceForm.items_section).toBe('البنود');
+    expect(ar.invoiceForm.items_section).toBe(ar.purchaseForm.items_section);
+    expect(ar.invoiceForm.add_line).toBe('إضافة سطر');
+    expect(ar.invoiceForm.add_line).toBe(ar.purchaseForm.add_line);
+
+    expect(en.invoiceForm.items_section).toBe('Items');
+    expect(en.invoiceForm.items_section).toBe(en.purchaseForm.items_section);
+    expect(en.invoiceForm.add_line).toBe(en.purchaseForm.add_line);
+  });
+
+  it('labels the sales line fields the same way purchases does', async () => {
+    const ar = await messages('ar');
+
+    expect(ar.invoiceForm.item).toBe(ar.purchaseForm.item);
+    expect(ar.invoiceForm.description).toBe(ar.purchaseForm.description);
+    expect(ar.invoiceForm.price).toBe(ar.purchaseForm.unit_price);
+    expect(ar.invoiceForm.qty).toBe(ar.purchaseForm.qty);
+    expect(ar.invoiceForm.tax).toBe(ar.purchaseForm.tax);
+  });
+});
+
 describe('InvoiceForm — create shell', () => {
   afterEach(cleanup);
   // `mockClear` لا `mockReset`: الأخيرة تمسح التنفيذ نفسه، فوعدٌ متأخّر من اختبارٍ
@@ -196,8 +241,8 @@ describe('InvoiceForm — create shell', () => {
     await firstQty();
 
     const text = container.textContent ?? '';
-    expect(text.indexOf('Lines')).toBeLessThan(text.indexOf('Invoice details') === -1 ? text.length : text.indexOf('Invoice details'));
-    expect(text.indexOf('Customer')).toBeLessThan(text.indexOf('Lines'));
+    expect(text.indexOf('Items')).toBeLessThan(text.indexOf('Invoice details') === -1 ? text.length : text.indexOf('Invoice details'));
+    expect(text.indexOf('Customer')).toBeLessThan(text.indexOf('Items'));
   });
 
   it('never renders the deprecated riyal glyph or a currency word', async () => {
@@ -275,17 +320,92 @@ describe('InvoiceForm — line behaviour', () => {
     render(<InvoiceForm />);
     await firstQty();
 
-    for (const label of ['Item', 'Description', 'Price', 'Qty', 'Discount', 'Tax %']) {
+    for (const label of ['Item', 'Description', 'Unit price', 'Qty', 'Discount', 'Tax %']) {
       const el = screen.getAllByLabelText(label)[0];
       expect(document.querySelector(`label[for="${el.id}"]`)).toBeTruthy();
     }
   });
 
-  it('defaults the quantity to 1, as the sales contract requires', async () => {
+  it('starts the first line with an empty quantity rather than a silent 1', async () => {
     respond();
     render(<InvoiceForm />);
 
-    expect((await firstQty()).value).toBe('1');
+    expect((await firstQty()).value).toBe('');
+  });
+
+  it('starts every added line empty too', async () => {
+    respond();
+    render(<InvoiceForm />);
+    await firstQty();
+
+    await userEvent.click(screen.getByRole('button', { name: /Add line/ }));
+
+    const quantities = screen.getAllByLabelText('Qty') as HTMLInputElement[];
+    expect(quantities.map((input) => input.value)).toEqual(['', '']);
+  });
+
+  it('blocks saving a line that has content but no quantity, and says why', async () => {
+    respond();
+    render(<InvoiceForm />);
+    await firstQty();
+
+    await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
+
+    expect(screen.getByText('Every line needs a positive quantity.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Save and post' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('lifts the block once a positive quantity is entered', async () => {
+    respond();
+    render(<InvoiceForm />);
+    await firstQty();
+
+    await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
+    await userEvent.type(await firstQty(), '3');
+
+    await waitFor(() => expect(
+      (screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled
+    ).toBe(false));
+    expect(screen.queryByText('Every line needs a positive quantity.')).toBeNull();
+  });
+
+  it('leaves an untouched blank line alone instead of demanding a quantity for it', async () => {
+    respond();
+    render(<InvoiceForm />);
+    await firstQty();
+
+    await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
+    await userEvent.type(await firstQty(), '2');
+    await userEvent.click(screen.getByRole('button', { name: /Add line/ }));
+
+    // سطرٌ ثانٍ لم يُمسّ: `submit` يُسقطه أصلاً، فلا يُمنع الحفظ بسببه.
+    expect(screen.queryByText('Every line needs a positive quantity.')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('shows the line total as text, never an editable field, next to an accessible delete', async () => {
+    respond();
+    render(<InvoiceForm />);
+    await firstQty();
+
+    expect(screen.queryByRole('textbox', { name: 'Total incl. VAT' })).toBeNull();
+    expect(screen.queryByRole('spinbutton', { name: 'Total incl. VAT' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Remove line' }).length).toBeGreaterThan(0);
+  });
+
+  it('gives the unit its own visible label when a product has more than one', async () => {
+    respond();
+    render(<InvoiceForm />);
+    await firstQty();
+
+    await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr2');
+    const unit = await screen.findByLabelText('Unit');
+    // تسميةٌ مرتبطة لا سمة `aria-label` وحدها.
+    expect(document.querySelector(`label[for="${unit.id}"]`)).toBeTruthy();
   });
 
   it('fills description, price and tax from the chosen product', async () => {
@@ -295,7 +415,7 @@ describe('InvoiceForm — line behaviour', () => {
 
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
 
-    await waitFor(() => expect(lineField('Price').value).toBe('95.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
     expect(lineField('Description').value).toBe('A4 paper carton');
     expect(lineField('Tax %').value).toBe('15');
   });
@@ -306,7 +426,7 @@ describe('InvoiceForm — line behaviour', () => {
     await firstQty();
 
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
-    await waitFor(() => expect(lineField('Price').value).toBe('95.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
     await userEvent.clear(await firstQty());
     await userEvent.type(await firstQty(), '2');
 
@@ -334,7 +454,7 @@ describe('InvoiceForm — line behaviour', () => {
     await firstQty();
 
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
-    await waitFor(() => expect(lineField('Price').value).toBe('95.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
     expect(screen.queryByLabelText('Unit')).toBeNull();
 
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr2');
@@ -368,7 +488,9 @@ describe('InvoiceForm — totals, saving and errors', () => {
     render(<InvoiceForm />);
     await firstQty();
     await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
-    await waitFor(() => expect(lineField('Price').value).toBe('95.00'));
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
+    // الكمية تبدأ فارغة الآن، وبلا كميةٍ صالحة لا يُتاح الحفظ.
+    await userEvent.type(await firstQty(), '1');
   }
 
   it('applies a header discount to the total', async () => {
@@ -385,7 +507,7 @@ describe('InvoiceForm — totals, saving and errors', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Tax mode'), '1');
 
-    expect(lineField('Price').value).toBe('95.00');
+    expect(lineField('Unit price').value).toBe('95.00');
     // متضمَّنة: تُستخرَج الضريبة من ٩٥ فيبقى الإجمالي ٩٥.٠٠
     await waitFor(() => expect(screen.getAllByText(/95\.00/).length).toBeGreaterThan(0));
   });
@@ -446,7 +568,7 @@ describe('InvoiceForm — edit mode', () => {
     render(<InvoiceForm editId="inv-1" />);
 
     await waitFor(async () => expect((await firstQty()).value).toBe('7'));
-    expect(lineField('Price').value).toBe('95.00');
+    expect(lineField('Unit price').value).toBe('95.00');
     expect((screen.getByRole('checkbox', { name: /Paid already/ }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText('Payment reference') as HTMLInputElement).value).toBe('CARD-7');
     expect(screen.getByRole('heading', { name: 'Edit invoice' })).toBeTruthy();
