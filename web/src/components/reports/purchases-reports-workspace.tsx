@@ -152,6 +152,13 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
     };
   }, [report, view, t, tr, count, rowLabel]);
 
+  const rowHrefs = useMemo(() => report?.data.map((row) => {
+    if (!row.key) return null;
+    if (view === 'supplier' || view === 'balances') return `/partners/${row.key}`;
+    if (view === 'product') return `/products/${row.key}`;
+    return null;
+  }), [report, view]);
+
   const summary = useMemo(() => {
     if (!report) return [] as { label: string; value: string; tone?: 'positive' | 'negative' }[];
     if (view === 'payments') return [
@@ -252,6 +259,7 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
                   totalRow={doc.totalRow}
                   emptyText={t('empty')}
                   primaryIndex={0}
+                  rowHrefs={rowHrefs}
                 />
               )}
             </CardContent>

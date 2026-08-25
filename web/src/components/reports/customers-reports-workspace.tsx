@@ -159,6 +159,11 @@ export function CustomersReportsWorkspace({ view }: { view: CustomerReportView }
     };
   }, [report, view, t, tr, count, rowLabel]);
 
+  const rowHrefs = useMemo(() => report?.data.map((row) => {
+    if (!row.key || view === 'payments') return null;
+    return `/partners/${row.key}`;
+  }), [report, view]);
+
   const summary = useMemo(() => {
     if (!report) return [] as { label: string; value: string; tone?: 'positive' | 'negative' }[];
     if (view === 'appointments') return [
@@ -270,6 +275,7 @@ export function CustomersReportsWorkspace({ view }: { view: CustomerReportView }
                   totalRow={doc.totalRow}
                   emptyText={t('empty')}
                   primaryIndex={0}
+                  rowHrefs={rowHrefs}
                 />
               )}
             </CardContent>

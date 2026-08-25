@@ -201,6 +201,14 @@ export function InventoryReportsWorkspace({ view }: { view: InventoryReportView 
     };
   }, [report, view, t, tr, count]);
 
+  const rowHrefs = useMemo(() => report?.data.map((row) => {
+    if (!row.key) return null;
+    if (view === 'value' || view === 'warehouses') return `/products/${row.key}`;
+    if (view === 'operations') return `/stock-permits/${row.key}`;
+    if (view === 'stocktakes') return `/stocktaking/${row.key}`;
+    return null;
+  }), [report, view]);
+
   const summary = useMemo(() => {
     if (!report) return [] as { label: string; value: string; tone?: 'positive' | 'negative' }[];
     if (view === 'value') return [
@@ -316,6 +324,7 @@ export function InventoryReportsWorkspace({ view }: { view: InventoryReportView 
                   totalRow={doc.totalRow}
                   emptyText={t('empty')}
                   primaryIndex={view === 'value' ? 1 : view === 'warehouses' ? 3 : view === 'movements' ? 2 : 1}
+                  rowHrefs={rowHrefs}
                 />
               )}
             </CardContent>

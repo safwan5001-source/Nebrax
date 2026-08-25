@@ -7,11 +7,12 @@
  */
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { MoreHorizontal, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import type { ReportDataColumn } from '@/components/reports/report-data-table';
+import type { ReportDataColumn, ReportRowAction } from '@/components/reports/report-data-table';
 
 export interface ReportAction {
   id: string;
@@ -150,6 +151,7 @@ export function ReportMobileRows({
   emptyText,
   primaryIndex = 0,
   secondaryIndex,
+  rowActions,
 }: {
   columns: ReportColumnCell[];
   rows: string[][];
@@ -157,10 +159,11 @@ export function ReportMobileRows({
   emptyText?: string;
   primaryIndex?: number;
   secondaryIndex?: number;
+  rowActions?: Array<ReportRowAction | null | undefined>;
 }) {
   const valueIndexes = columns.map((_, index) => index).filter((index) => index !== primaryIndex && index !== secondaryIndex);
 
-  const rowView = (row: string[], key: string, total = false) => (
+  const rowView = (row: string[], key: string, total = false, rowAction?: ReportRowAction | null) => (
     <article key={key} className={cn('rounded border border-border bg-surface p-3.5', total && 'border-primary/25 bg-primary-soft')}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -176,12 +179,17 @@ export function ReportMobileRows({
           </div>
         ))}
       </dl>
+      {!total && rowAction && (
+        <Link href={rowAction.href} prefetch={false} className="mt-4 inline-flex min-h-10 items-center text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          {rowAction.label}
+        </Link>
+      )}
     </article>
   );
 
   return (
     <div className="space-y-2 md:hidden">
-      {rows.length === 0 && emptyText ? <p className="rounded border border-dashed border-border px-4 py-8 text-center text-sm text-muted">{emptyText}</p> : rows.map((row, index) => rowView(row, `${row[primaryIndex]}-${index}`))}
+      {rows.length === 0 && emptyText ? <p className="rounded border border-dashed border-border px-4 py-8 text-center text-sm text-muted">{emptyText}</p> : rows.map((row, index) => rowView(row, `${row[primaryIndex]}-${index}`, false, rowActions?.[index]))}
       {totalRow && rowView(totalRow, 'report-total', true)}
     </div>
   );

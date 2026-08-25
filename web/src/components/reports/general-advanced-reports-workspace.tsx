@@ -3,6 +3,7 @@
 /** أسلوب «دفتر التحليل»: تفاصيل قابلة للقراءة أولاً، ومستند الطباعة إجراء اختياري. */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { Download, Eye, EyeOff, Printer, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -259,6 +260,7 @@ function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: b
 }
 
 export function JournalTable({ journal, loading, g, t }: { journal: JournalReport | null; loading: boolean; g: ReturnType<typeof useTranslations>; t: ReturnType<typeof useTranslations> }) {
+  const openDetailsLabel = defaultReportTableLabels(useLocale()).openDetails;
   if (loading || !journal) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
   const totalDebit = formatRiyal(journal.total_debit);
   const totalCredit = formatRiyal(journal.total_credit);
@@ -272,6 +274,9 @@ export function JournalTable({ journal, loading, g, t }: { journal: JournalRepor
               <div className="min-w-0">
                 <p className="num text-xs text-muted">{entry.date}</p>
                 <p className="num mt-1 text-sm font-semibold text-text">{entry.number}</p>
+                <Link href={`/journal-entries/${entry.entry_id}`} prefetch={false} className="mt-2 inline-flex min-h-10 items-center text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={`${openDetailsLabel}: ${entry.number}`}>
+                  {openDetailsLabel}
+                </Link>
               </div>
             </div>
             {entry.description && <p className="mt-2 text-sm leading-5 text-text">{entry.description}</p>}
@@ -315,7 +320,7 @@ export function JournalTable({ journal, loading, g, t }: { journal: JournalRepor
                 {entry.lines.map((line, lineIndex) => (
                   <TR key={`${entry.entry_id}-${line.account_id}-${lineIndex}`}>
                     <TD className="num align-top">{lineIndex === 0 ? entry.date : ''}</TD>
-                    <TD className="num align-top">{lineIndex === 0 ? entry.number : ''}</TD>
+                    <TD className="num align-top">{lineIndex === 0 ? <Link href={`/journal-entries/${entry.entry_id}`} prefetch={false} className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={`${openDetailsLabel}: ${entry.number}`}>{entry.number}</Link> : ''}</TD>
                     <TD>{`${line.account_code ?? ''} — ${line.account_name ?? ''}`.trim() || '—'}{line.description && <p className="mt-1 text-xs text-muted">{line.description}</p>}</TD>
                     <TD className="num text-end">{formatRiyal(line.debit)}</TD>
                     <TD className="num text-end">{formatRiyal(line.credit)}</TD>

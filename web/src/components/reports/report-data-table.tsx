@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   ChevronLeft,
   ChevronRight,
@@ -27,6 +28,11 @@ import { cn } from '@/lib/utils';
 
 export type ReportCellTone = 'positive' | 'negative' | 'neutral';
 
+export interface ReportRowAction {
+  href: string;
+  label: string;
+}
+
 export interface ReportDataColumn {
   id: string;
   label: string;
@@ -51,6 +57,7 @@ export interface ReportDataTableLabels {
   previous: string;
   next: string;
   noResults: string;
+  openDetails: string;
 }
 
 export interface ReportDataTableProps {
@@ -62,6 +69,8 @@ export interface ReportDataTableProps {
   initialPageSize?: number;
   initialDensity?: 'comfortable' | 'compact';
   className?: string;
+  primaryColumnId?: string;
+  rowActions?: Array<ReportRowAction | null | undefined>;
 }
 
 interface DataRow {
@@ -141,6 +150,7 @@ export function defaultReportTableLabels(locale: string): ReportDataTableLabels 
         previous: 'السابق',
         next: 'التالي',
         noResults: 'لا توجد نتائج مطابقة للبحث.',
+        openDetails: 'عرض التفاصيل',
       }
     : {
         search: 'Search results',
@@ -156,6 +166,7 @@ export function defaultReportTableLabels(locale: string): ReportDataTableLabels 
         previous: 'Previous',
         next: 'Next',
         noResults: 'No results match your search.',
+        openDetails: 'View details',
       };
 }
 
@@ -168,6 +179,8 @@ export function ReportDataTable({
   initialPageSize = 25,
   initialDensity = 'compact',
   className,
+  primaryColumnId,
+  rowActions,
 }: ReportDataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
@@ -344,6 +357,8 @@ export function ReportDataTable({
                     const definition = columns.find((column) => column.id === cell.column.id);
                     const value = String(cell.getValue() ?? '');
                     const tone = definition?.cellTone?.(value, row.original.values, row.original.rowIndex);
+                    const rowAction = rowActions?.[row.original.rowIndex];
+                    const canOpenDetails = cell.column.id === primaryColumnId && !!rowAction;
                     return (
                       <td
                         key={cell.id}
@@ -356,7 +371,11 @@ export function ReportDataTable({
                           tone === 'negative' && 'text-negative'
                         )}
                       >
-                        {value || '—'}
+                        {canOpenDetails ? (
+                          <Link href={rowAction.href} prefetch={false} className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                            {value || '—'}
+                          </Link>
+                        ) : (value || '—')}
                       </td>
                     );
                   })}
