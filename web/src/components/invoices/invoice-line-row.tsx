@@ -156,22 +156,31 @@ export function InvoiceLineRow({
           />
         </LineField>
 
-        {/* الوحدة تحت الكمية على الجوال فلا تضغط خانتها، وبجانبها من `lg`. */}
+        {/* الكمية تأخذ العرض كاملاً، والوحدة تنزل تحتها **بتسميتها الظاهرة** فلا
+            تضغط خانة الكمية ولا تُعرَّف بسمةٍ لا يراها المستخدم. ومن `lg` يذيب
+            `lg:contents` الغلاف فتعود الوحدة بجانب الكمية في الصفّ الكثيف،
+            وتسميتها إلى `sr-only` كبقية تسميات الصفّ. */}
         <LineField label={t('qty')} htmlFor={`${line.key}-qty`}>
           <div className="space-y-1.5 lg:flex lg:items-center lg:gap-1 lg:space-y-0">
             <Input
               id={`${line.key}-qty`} className="num text-end lg:flex-1" type="number" min={1} dir="ltr"
+              placeholder={t('qty_placeholder')}
               value={line.qty} onChange={(e) => onPatch({ qty: e.target.value })}
             />
             {units.length >= 2 && (
-              <Select
-                className="lg:w-20 lg:shrink-0" value={line.unit} aria-label={t('unit')}
-                onChange={(e) => onChangeUnit(e.target.value)}
-              >
-                {units.map((u) => (
-                  <option key={u.name} value={u.factor === 1 ? '' : u.name}>{u.name}</option>
-                ))}
-              </Select>
+              <div className="lg:contents">
+                <Label htmlFor={`${line.key}-unit`} className="mb-0.5 block text-[11px] font-medium text-muted lg:sr-only lg:mb-0">
+                  {t('unit')}
+                </Label>
+                <Select
+                  id={`${line.key}-unit`} className="lg:w-20 lg:shrink-0" value={line.unit}
+                  onChange={(e) => onChangeUnit(e.target.value)}
+                >
+                  {units.map((u) => (
+                    <option key={u.name} value={u.factor === 1 ? '' : u.name}>{u.name}</option>
+                  ))}
+                </Select>
+              </div>
             )}
           </div>
         </LineField>

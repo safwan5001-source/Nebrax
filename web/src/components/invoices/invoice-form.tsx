@@ -62,10 +62,31 @@ interface ApiInvoice {
 interface TaxDef { name: string; rate: number; inclusive: boolean }
 
 let lineSeq = 0;
+// الكمية تبدأ فارغة لا `1`، كما في فاتورة الشراء: الواحد الافتراضي يمرّ دون أن
+// يقرأه أحد فتُحفظ فاتورةٌ بكمية لم يقصدها المستخدم.
 const newLine = (): Line => ({
-  key: `l${++lineSeq}`, productId: null, description: '', qty: '1', price: '', tax: '15', disc: '', unit: '',
+  key: `l${++lineSeq}`, productId: null, description: '', qty: '', price: '', tax: '15', disc: '', unit: '',
   allocationKind: 'none', allocationInputMode: 'percent', allocations: [], minimumPriceOverrideReason: '',
 });
+
+/**
+ * سطرٌ لم يُمسّ بعد — لا منتج ولا وصف ولا سعر ولا خصم.
+ *
+ * سطر المبيعات يقبل وصفاً حرّاً بلا منتج، فلا يصلح شرط «منتج على كل سطر» الذي
+ * يحرس فاتورة الشراء. والسطر الفارغ تماماً يُسقطه `submit` أصلاً بلا ضرر، فلا
+ * يُمنع الحفظ بسببه — بخلاف سطرٍ كُتب فيه شيءٌ ثم تُركت كميتُه فارغة.
+ */
+function isUntouchedLine(line: Line): boolean {
+  return !line.productId && !line.description.trim() && !line.price.trim() && !line.disc.trim();
+}
+
+/** الكمية صالحة إذا كانت عدداً موجباً لا يقلّ عن واحد — يطابق `integer|min:1` في الخادم. */
+function hasValidQty(line: Line): boolean {
+  const raw = line.qty.trim();
+  if (raw === '') return false;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 1;
+}
 
 /** تحويل واجهة النسبة إلى نقاط أساس بلا تعويم: «60.25» ← 6025. */
 function percentToBasisPoints(value: string): number | null {
@@ -486,9 +507,13 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     };
   };
 
+  // سطرٌ كُتب فيه شيءٌ وكميتُه فارغة يُسقطه `submit` من الحمولة بلا خبر — أي
+  // يحذف بنداً كتبه المستخدم. المنع هنا يجعل ذلك الحذف الصامت مستحيلاً.
+  const missingQty = lines.some((line) => !isUntouchedLine(line) && !hasValidQty(line));
+
   const canSave = useMemo(
-    () => !!partnerId && !saving && !loadingDoc && !lines.some((line) => allocationError(line)),
-    [partnerId, saving, loadingDoc, lines, taxInclusive, t]
+    () => !!partnerId && !saving && !loadingDoc && !missingQty && !lines.some((line) => allocationError(line)),
+    [partnerId, saving, loadingDoc, missingQty, lines, taxInclusive, t]
   );
 
   async function submit(post: boolean) {
@@ -660,7 +685,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
 
       {/* ═══ ٢. البنود — منطقة العمل الأولى ═══ */}
       <FormSection
-        title={t('lines')}
+        title={t('items_section')}
         icon={ShoppingCart}
         action={
           <Button type="button" variant="outline" size="sm" onClick={addLine}>
@@ -713,6 +738,11 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         })}
 
         <p className="pt-1 text-xs leading-relaxed text-muted">{t('items_hint')}</p>
+        {missingQty && (
+          <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+            {t('qty_required')}
+          </p>
+        )}
       </FormSection>
 
       {/* ═══ ٣. التسويات التجارية ═══ */}
