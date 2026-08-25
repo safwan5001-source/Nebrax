@@ -23,7 +23,7 @@ class ExpenseController extends ApiController
     public function index(Request $request): JsonResponse
     {
         return ExpenseResource::collection(
-            $this->scopeToActiveBranch(Expense::with(['account', 'category'])->latest(), $request)->get()
+            $this->scopeToActiveBranch(Expense::with(['account', 'category'])->withCount('documentTransactionLinks')->latest(), $request)->get()
         )->response();
     }
 
@@ -35,13 +35,15 @@ class ExpenseController extends ApiController
         $expense = $this->domain(fn () => $this->expenses->create($data));
         $this->storeAttachments($request, $expense);
 
-        return (new ExpenseResource($expense->load(['account', 'category', 'attachments'])))->response()->setStatusCode(201);
+        return (new ExpenseResource($expense->load(['account', 'category', 'attachments'])->loadCount('documentTransactionLinks')))->response()->setStatusCode(201);
     }
 
     public function show(Request $request, string $id): JsonResponse
     {
         return (new ExpenseResource(
-            $this->visibleExpense($request, $id)->load(['account', 'category', 'partner', 'costCenter', 'attachments'])
+            $this->visibleExpense($request, $id)
+                ->load(['account', 'category', 'partner', 'costCenter', 'attachments', 'documentTransactionLinks.batch'])
+                ->loadCount('documentTransactionLinks')
         ))->response();
     }
 
@@ -55,7 +57,7 @@ class ExpenseController extends ApiController
         $updated = $this->domain(fn () => $this->expenses->update($expense, $data));
         $this->storeAttachments($request, $updated);
 
-        return (new ExpenseResource($updated->load(['account', 'category', 'partner', 'costCenter', 'attachments'])))->response();
+        return (new ExpenseResource($updated->load(['account', 'category', 'partner', 'costCenter', 'attachments'])->loadCount('documentTransactionLinks')))->response();
     }
 
     /** ينشئ نسخة مسودة مستقلة بلا مرفقات إثبات، وبترقيم وتاريخ جديدين. */
@@ -64,7 +66,7 @@ class ExpenseController extends ApiController
         $expense = $this->visibleExpense($request, $id);
         $copy = $this->domain(fn () => $this->expenses->duplicate($expense, $request->user()?->id));
 
-        return (new ExpenseResource($copy->load(['account', 'category', 'partner', 'costCenter', 'attachments'])))->response()->setStatusCode(201);
+        return (new ExpenseResource($copy->load(['account', 'category', 'partner', 'costCenter', 'attachments'])->loadCount('documentTransactionLinks')))->response()->setStatusCode(201);
     }
 
     /** الحذف متاح للمسودة فقط؛ السند المرحّل جزء من سجل القيد ولا يُمحى. */
@@ -73,6 +75,9 @@ class ExpenseController extends ApiController
         $expense = $this->visibleExpense($request, $id);
         if (! $expense->isDraft()) {
             abort(422, 'لا يمكن حذف مصروف مرحّل أو ملغى.');
+        }
+        if ($expense->documentTransactionLinks()->exists()) {
+            abort(422, 'لا يمكن حذف مسودة مصروف مرتبطة بمستند مصدر.');
         }
 
         $attachments = $expense->attachments()->get();
@@ -93,7 +98,7 @@ class ExpenseController extends ApiController
         $expense = $this->visibleExpense($request, $id);
         $posted = $this->domain(fn () => $this->expenses->post($expense));
 
-        return (new ExpenseResource($posted->load(['account', 'category', 'partner', 'costCenter', 'attachments'])))->response();
+        return (new ExpenseResource($posted->load(['account', 'category', 'partner', 'costCenter', 'attachments'])->loadCount('documentTransactionLinks')))->response();
     }
 
     /** تنزيل مرفق خاص بعد إثبات أنه يعود للمصروف المرئي في الفرع النشط. */

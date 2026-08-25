@@ -9,6 +9,7 @@ import { api, ApiError } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { ExpenseDraftDialog } from '@/components/document-center/expense-draft-dialog';
 import { ReviewCommandDialog } from '@/components/document-center/review-command-dialog';
 import { ReviewChangeDialog } from '@/components/document-center/review-change-dialog';
 import {
@@ -16,7 +17,14 @@ import {
   documentFieldTranslationKey,
   reviewHasVisibleBlocker,
 } from '@/lib/document-review';
-import { canBuildPurchaseDraft, linkedPurchasePresentation } from '@/lib/document-review-access';
+import {
+  canBuildDocumentDraft,
+  canMutateDocumentReview,
+  isDocumentReviewMutable,
+  linkedTransactionPresentation,
+  shouldShowReviewReadinessBlocker,
+  type LinkedTransaction,
+} from '@/lib/document-review-access';
 
 type ReviewFile = {
   id: string;
@@ -87,7 +95,8 @@ type Review = {
   matches: Match[];
   issues: Issue[];
   history: ReviewHistory[];
-  linked_purchase: { link_id: string; transaction_type: string; transaction_id: string; transaction_number: string; status: string; url: string } | null;
+  linked_transaction: LinkedTransaction | null;
+  linked_purchase: LinkedTransaction | null;
   capabilities: { view: boolean; review: boolean; manage: boolean; build_draft: boolean };
 };
 
@@ -95,6 +104,7 @@ type Command = {
   title: string;
   label: string;
   endpoint: string;
+  scope: 'review' | 'draft';
   payload?: Record<string, unknown>;
 } | null;
 
@@ -126,6 +136,7 @@ export default function DocumentReviewPage() {
   const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [command, setCommand] = useState<Command>(null);
+  const [expenseDraftOpen, setExpenseDraftOpen] = useState(false);
   const [edit, setEdit] = useState<ReviewField | null>(null);
   const [mobileSection, setMobileSection] = useState<MobileSection>('details');
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -177,12 +188,19 @@ export default function DocumentReviewPage() {
   }
 
   const canReview = review.capabilities.review;
-  const canComplete = canReview && review.batch.status === 'needs_review' && !hasVisibleBlocker;
-  const canBuildDraft = canBuildPurchaseDraft({
+  const isReviewMutable = isDocumentReviewMutable(review.batch.status);
+  const canMutateReview = canMutateDocumentReview({ canReview, status: review.batch.status });
+  const canComplete = canMutateReview && !hasVisibleBlocker;
+  const showReadinessBlocker = shouldShowReviewReadinessBlocker({
+    isReviewMutable,
+    canComplete,
+  });
+  const linkedTransaction = review.linked_transaction ?? review.linked_purchase;
+  const canBuildDraft = canBuildDocumentDraft({
     canBuildDraft: review.capabilities.build_draft,
     documentType: review.batch.document_type,
     status: review.batch.status,
-    hasLinkedPurchase: review.linked_purchase !== null,
+    hasLinkedTransaction: linkedTransaction !== null,
   });
   const activeFile = review.files.find((file) => file.download_available) ?? review.files[0];
   const sectionItems: Array<{ id: MobileSection; label: string }> = [
@@ -198,36 +216,47 @@ export default function DocumentReviewPage() {
         title: t('completeReview'),
         label: t('completeReview'),
         endpoint: `/document-batches/${id}/complete-review`,
-      })}
+        scope: 'review',
+        })}
     >
       <ShieldCheck className="h-4 w-4" aria-hidden="true" />
       {t('completeReview')}
     </Button>
   ) : null;
 
-  const linkedPurchaseState = review.linked_purchase ? linkedPurchasePresentation(review.linked_purchase.status) : null;
-  const draftButton = review.linked_purchase && linkedPurchaseState ? (
+  const linkedTransactionState = linkedTransaction ? linkedTransactionPresentation(linkedTransaction.status) : null;
+  const linkedActionLabel = linkedTransaction && linkedTransactionState
+    ? linkedTransaction.transaction_type === 'expense'
+      ? linkedTransactionState.action === 'posted'
+        ? t('openPostedExpense', { number: linkedTransaction.transaction_number })
+        : linkedTransactionState.action === 'cancelled'
+          ? t('openCancelledExpense', { number: linkedTransaction.transaction_number })
+          : t('openExpenseDraft', { number: linkedTransaction.transaction_number })
+      : linkedTransactionState.action === 'posted'
+        ? t('openPostedPurchase', { number: linkedTransaction.transaction_number })
+        : linkedTransactionState.action === 'cancelled'
+          ? t('openCancelledPurchase', { number: linkedTransaction.transaction_number })
+          : t('openPurchaseDraft', { number: linkedTransaction.transaction_number })
+    : null;
+  const draftButton = linkedTransaction && linkedTransactionState && linkedActionLabel ? (
     <div className="flex flex-wrap items-center gap-2">
       <Button asChild variant="outline">
-        <Link href={review.linked_purchase.url}>
-          {linkedPurchaseState.action === 'posted'
-            ? t('openPostedPurchase', { number: review.linked_purchase.transaction_number })
-            : linkedPurchaseState.action === 'cancelled'
-              ? t('openCancelledPurchase', { number: review.linked_purchase.transaction_number })
-              : t('openPurchaseDraft', { number: review.linked_purchase.transaction_number })}
-        </Link>
+        <Link href={linkedTransaction.url}>{linkedActionLabel}</Link>
       </Button>
-      <Badge tone={reviewTone(review.linked_purchase.status)}>{t(linkedPurchaseState.badge)}</Badge>
+      <Badge tone={reviewTone(linkedTransaction.status)}>{t(linkedTransactionState.badge)}</Badge>
     </div>
   ) : canBuildDraft ? (
     <Button
-      onClick={() => setCommand({
-        title: t('createPurchaseDraft'),
-        label: t('createPurchaseDraft'),
-        endpoint: `/document-batches/${id}/create-purchase-draft`,
-      })}
+      onClick={() => review.batch.document_type === 'expense'
+        ? setExpenseDraftOpen(true)
+        : setCommand({
+          title: t('createPurchaseDraft'),
+          label: t('createPurchaseDraft'),
+          endpoint: `/document-batches/${id}/create-purchase-draft`,
+          scope: 'draft',
+        })}
     >
-      {t('createPurchaseDraft')}
+      {review.batch.document_type === 'expense' ? t('createExpenseDraft') : t('createPurchaseDraft')}
     </Button>
   ) : null;
 
@@ -306,9 +335,11 @@ export default function DocumentReviewPage() {
                         {confidence !== null ? t('score', { score: confidence }) : '—'}
                         {field.page ? ` · ${t('page', { page: field.page })}` : ''}
                       </span>
-                      <Button size="sm" variant="outline" onClick={() => setEdit(field)} disabled={!canReview} title={!canReview ? t('notAllowed') : undefined}>
-                        {t('edit')}
-                      </Button>
+                      {canMutateReview && (
+                        <Button size="sm" variant="outline" onClick={() => setEdit(field)}>
+                          {t('edit')}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
@@ -352,39 +383,43 @@ export default function DocumentReviewPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge tone={candidate.is_active ? 'neutral' : 'muted'}>{t('score', { score: confidencePercentage(candidate.score_basis_points) ?? 0 })}</Badge>
-                          <Button
-                            size="sm"
-                            onClick={() => setCommand({
-                              title: t('confirm'),
-                              label: t('confirm'),
-                              endpoint: `/document-match-results/${match.id}/confirm`,
-                              payload: { candidate_id: candidate.id },
-                            })}
-                            disabled={!canReview || !candidate.is_active}
-                            title={!candidate.is_active ? t('inactiveCandidate') : !canReview ? t('notAllowed') : undefined}
-                          >
-                            {t('confirm')}
-                          </Button>
+                          {canMutateReview && (
+                            <Button
+                              size="sm"
+                              onClick={() => setCommand({
+                                title: t('confirm'),
+                                label: t('confirm'),
+                                endpoint: `/document-match-results/${match.id}/confirm`,
+                                scope: 'review',
+                                payload: { candidate_id: candidate.id },
+                              })}
+                              disabled={!candidate.is_active}
+                              title={!candidate.is_active ? t('inactiveCandidate') : undefined}
+                            >
+                              {t('confirm')}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCommand({
-                      title: t('reject'),
-                      label: t('reject'),
-                      endpoint: `/document-match-results/${match.id}/reject`,
-                    })}
-                    disabled={!canReview}
-                    title={!canReview ? t('notAllowed') : undefined}
-                  >
-                    {t('reject')}
-                  </Button>
-                </div>
+                {canMutateReview && (
+                  <div className="mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCommand({
+                        title: t('reject'),
+                        label: t('reject'),
+                        endpoint: `/document-match-results/${match.id}/reject`,
+                        scope: 'review',
+                      })}
+                    >
+                      {t('reject')}
+                    </Button>
+                  </div>
+                )}
               </article>
             ))}
           </div>
@@ -422,18 +457,19 @@ export default function DocumentReviewPage() {
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <Badge tone={reviewTone(issue.status)}>{t(issue.status as 'open' | 'resolved')}</Badge>
-                    <Button
-                      size="sm"
-                      onClick={() => setCommand({
-                        title: t(action),
-                        label: t(action),
-                        endpoint,
-                      })}
-                      disabled={!canReview}
-                      title={!canReview ? t('notAllowed') : undefined}
-                    >
-                      {t(action)}
-                    </Button>
+                    {canMutateReview && (
+                      <Button
+                        size="sm"
+                        onClick={() => setCommand({
+                          title: t(action),
+                          label: t(action),
+                          endpoint,
+                          scope: 'review',
+                        })}
+                      >
+                        {t(action)}
+                      </Button>
+                    )}
                   </div>
                 </article>
               );
@@ -485,7 +521,7 @@ export default function DocumentReviewPage() {
         <div className="hidden flex-wrap gap-2 md:flex">{draftButton}{completionButton}</div>
       </header>
 
-      {!canComplete && review.batch.status !== 'ready_for_draft' && (
+      {showReadinessBlocker && (
         <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">{!canReview ? t('notAllowed') : t('readinessBlocked')}</p>
       )}
 
@@ -521,7 +557,7 @@ export default function DocumentReviewPage() {
         <div className="flex gap-2">{draftButton}{completionButton}</div>
       </div>
 
-      {command && (
+      {command && (command.scope === 'draft' ? canBuildDraft : canMutateReview) && (
         <ReviewCommandDialog
           open
           onClose={() => setCommand(null)}
@@ -541,7 +577,39 @@ export default function DocumentReviewPage() {
         />
       )}
 
-      {edit && (
+      {expenseDraftOpen && (
+        <ExpenseDraftDialog
+          open
+          onClose={() => setExpenseDraftOpen(false)}
+          endpoint={`/document-batches/${id}/create-expense-draft`}
+          expectedVersion={review.batch.version}
+          onSuccess={() => void load()}
+          labels={{
+            title: t('createExpenseDraft'),
+            reason: t('reason'),
+            account: t('expenseAccount'),
+            category: t('expenseCategory'),
+            costCenter: t('expenseCostCenter'),
+            paymentMethod: t('expensePaymentMethod'),
+            chooseAccount: t('chooseExpenseAccount'),
+            noCategory: t('noExpenseCategory'),
+            noCostCenter: t('noExpenseCostCenter'),
+            cash: t('cash'),
+            bank: t('bank'),
+            credit: t('credit'),
+            cancel: t('cancel'),
+            create: t('createExpenseDraft'),
+            required: t('expenseDraftRequired'),
+            loadOptions: t('expenseDraftHint'),
+            optionsFailed: t('expenseOptionsFailed'),
+            retry: t('retry'),
+            failed: t('saveFailed'),
+            stale: t('stale'),
+          }}
+        />
+      )}
+
+      {edit && canMutateReview && (
         <ReviewChangeDialog
           open
           batchId={id}

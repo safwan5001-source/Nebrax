@@ -6,6 +6,7 @@ use App\Contracts\DraftBuildContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignDocumentReviewerRequest;
 use App\Http\Requests\CompleteDocumentReviewRequest;
+use App\Http\Requests\CreateDocumentExpenseDraftRequest;
 use App\Http\Requests\CreateDocumentPurchaseDraftRequest;
 use App\Http\Requests\ConfirmDocumentMatchRequest;
 use App\Http\Requests\DocumentIssueActionRequest;
@@ -23,6 +24,8 @@ use App\Models\DocumentMatchResult;
 use App\Models\DocumentReviewAction;
 use App\Models\User;
 use App\Services\DocumentCenter\DocumentReviewService;
+use App\Services\DocumentCenter\ExpenseDocumentDraftBuilder;
+use App\Services\DocumentCenter\ExpenseDraftBuildOptions;
 use App\Services\DocumentCenter\PurchaseDocumentDraftBuilder;
 use App\Services\DocumentCenter\PurchaseDraftBuildOptions;
 use App\Services\DocumentCenter\ReviewedDocumentProjector;
@@ -84,7 +87,7 @@ class DocumentReviewController extends Controller
 
     public function review(Request $request, DocumentBatch $batch): DocumentReviewResource
     {
-        $batch->load(['files', 'reviewer:id,name', 'transactionLinks.purchase']);
+        $batch->load(['files', 'reviewer:id,name', 'transactionLinks.purchase', 'transactionLinks.expense']);
         $result = $this->resultFor($batch);
         $original = $result->normalized_payload;
         $reviewed = app(ReviewedDocumentProjector::class)->project($result);
@@ -96,6 +99,8 @@ class DocumentReviewController extends Controller
             'matches' => $this->matches($result),
             'issues' => $this->issues($result),
             'history' => $this->history($batch),
+            'linked_transaction' => $this->linkedTransaction($batch),
+            // يبقى الحقل التوافقي لمسار Purchase إلى أن تستهلك الواجهة العقد العام بالكامل.
             'linked_purchase' => $this->linkedPurchase($batch),
             'capabilities' => $this->capabilities($request->user()),
         ]);
@@ -201,6 +206,35 @@ class DocumentReviewController extends Controller
             'transaction_number' => $draft->transactionNumber,
             'status' => $draft->status,
             'url' => '/purchases/'.$draft->transactionId,
+            'idempotent_replay' => $draft->idempotentReplay,
+        ]], $draft->idempotentReplay ? 200 : 201);
+    }
+
+    public function createExpenseDraft(CreateDocumentExpenseDraftRequest $request, DocumentBatch $batch): JsonResponse
+    {
+        $draft = app(ExpenseDocumentDraftBuilder::class)->build(
+            $batch,
+            new DraftBuildContext(
+                expectedVersion: $request->integer('expected_version'),
+                reason: $request->string('reason')->toString(),
+                actorId: $request->user()?->id,
+                options: new ExpenseDraftBuildOptions(
+                    accountId: $request->validated('account_id'),
+                    categoryId: $request->validated('category_id'),
+                    costCenterId: $request->validated('cost_center_id'),
+                    paymentMethod: $request->validated('payment_method'),
+                ),
+            ),
+        );
+
+        return response()->json(['data' => [
+            'document_batch_id' => $batch->id,
+            'link_id' => $draft->linkId,
+            'transaction_type' => $draft->transactionType,
+            'transaction_id' => $draft->transactionId,
+            'transaction_number' => $draft->transactionNumber,
+            'status' => $draft->status,
+            'url' => '/expenses/'.$draft->transactionId,
             'idempotent_replay' => $draft->idempotentReplay,
         ]], $draft->idempotentReplay ? 200 : 201);
     }
@@ -366,22 +400,35 @@ class DocumentReviewController extends Controller
     }
 
     /** @return array<string, string>|null */
-    private function linkedPurchase(DocumentBatch $batch): ?array
+    private function linkedTransaction(DocumentBatch $batch): ?array
     {
-        $link = $batch->transactionLinks->firstWhere('transaction_type', 'purchase');
-        $purchase = $link?->purchase;
-        if ($link === null || $purchase === null) {
+        $link = $batch->transactionLinks->firstWhere('transaction_type', $batch->document_type === 'expense' ? 'expense' : 'purchase');
+        if ($link === null) {
+            return null;
+        }
+        $transaction = $link->transaction_type === 'expense' ? $link->expense : $link->purchase;
+        if ($transaction === null) {
             return null;
         }
 
         return [
             'link_id' => $link->id,
             'transaction_type' => $link->transaction_type,
-            'transaction_id' => $purchase->id,
-            'transaction_number' => $purchase->number,
-            'status' => $purchase->status,
-            'url' => '/purchases/'.$purchase->id,
+            'transaction_id' => $transaction->id,
+            'transaction_number' => $transaction->number,
+            'status' => $transaction->status,
+            'url' => $link->transaction_type === 'expense' ? '/expenses/'.$transaction->id : '/purchases/'.$transaction->id,
         ];
+    }
+
+    /** @return array<string, string>|null توافق قراءة PR-7. */
+    private function linkedPurchase(DocumentBatch $batch): ?array
+    {
+        if ($batch->document_type !== 'purchase_invoice') {
+            return null;
+        }
+
+        return $this->linkedTransaction($batch);
     }
 
     private function resultFor(DocumentBatch $batch): DocumentExtractionResult

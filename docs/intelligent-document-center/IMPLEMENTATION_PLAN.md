@@ -52,19 +52,27 @@ The builder uses an outer database transaction and `DocumentWorkflowService` tra
 
 The protected create endpoint requires both the write entitlement for `document_center.core` and `documents.center.build_draft`. The review UI presents the CTA only when that capability, document type, workflow state, and no-existing-link conditions all hold. It presents the safe linked purchase number, URL, and current status after completion or posting, and hides review-completion controls outside the actual review state. The ordinary Purchase create form links reviewers to ready document batches; it does not import browser-controlled financial data. See [ADR-007](ADR-007-PURCHASE-DRAFT-BUILDER.md).
 
-### PR-8 — General delivery-note domain
+### PR-8 — Expense draft builder
+
+**Status: implemented — one draft Expense header only.** `ExpenseDocumentDraftBuilder` implements the neutral `TransactionDraftBuilder` contract and is the sole document-center boundary for reviewed `expense` evidence. From a locked current result in `ready_for_draft`, it accepts only the trusted review choices `account_id`, optional `category_id`/`cost_center_id`, and `payment_method`; it then calls `ExpenseService::create()` exactly once. The created Expense remains `draft`. It never calls `post()`, writes expense or journal tables directly, creates a payment, moves stock, or creates a Partner or other master record.
+
+The Expense amount is the explicit reviewed base minor-unit amount. SAR is the only accepted currency, all monetary values and tax rates are validated as bounded integers, and the derived amount/tax/total must reconcile with the reviewed evidence within the existing one-minor-unit tolerance. For a tax-inclusive document, `subtotal_minor` must already be an explicit reviewed base; the builder never reverses tax from a total or uses floating-point arithmetic. Extracted receipt lines remain evidence only and never become expense lines or products. Credit requires one current, confirmed, active visible supplier match; cash and bank create neither payment nor accounting effect.
+
+The new logical `transaction_type + transaction_id` link supports Purchase and Expense through a new migration that removes the purchase-only foreign key while preserving existing purchase links. Links and review audit records are immutable. The Expense link remains visible after normal posting or cancellation, replays idempotently, and protects a linked Expense draft from deletion. The protected endpoint requires both `document_center.core` write entitlement and `documents.center.build_draft`; the RTL-first review workspace uses the general `linked_transaction` projection and asks only for non-financial options. See [ADR-008](ADR-008-EXPENSE-DRAFT-BUILDER.md).
+
+### PR-9 — General delivery-note domain
 
 Design and implement a reusable delivery-note domain outside the center before allowing several delivery notes to produce one sales-invoice draft. If that domain is not approved, this flow remains out of scope.
 
-### PR-9 — Channels and integrations
+### PR-10 — Channels and integrations
 
 Add approved external channel identities and vendor-neutral intake adapters. Apply replay protection and the same file/intake policies; do not embed channel credentials in operational rows.
 
-### PR-10 — Operations, usage, and governance
+### PR-11 — Operations, usage, and governance
 
 Complete dashboards, safe retry tools, usage/cost reporting, retention jobs, redaction, audit export, support diagnostics, and tenant-visible processing status without exposing secrets or provider payloads.
 
-### PR-11 — Hardening and rollout
+### PR-12 — Hardening and rollout
 
 Run security, isolation, recovery, performance, accessibility, and migration rehearsals. Roll out behind commercial assignment and application state, monitor fail-closed behavior, and document rollback/incident procedures.
 

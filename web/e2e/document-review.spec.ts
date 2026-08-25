@@ -82,3 +82,38 @@ test.describe('مساحة مراجعة المستند في وضع المعاين
     await expect(page.getByText('تغيّرت الحزمة لدى مراجع آخر', { exact: false }).first()).toBeVisible();
   });
 });
+
+
+test.describe('مسودة Expense في fixture واجهة محلي', () => {
+  test('يعرض إجراء المسودة الجاهزة ثم يطلب الخيارات غير المالية ويربط المسودة في الواجهة', async ({ page }) => {
+    await enterDemo(page);
+    await page.goto('/documents/demo-batch-002', { waitUntil: 'networkidle' });
+
+    await expect(page.getByRole('heading', { name: 'مراجعة المستند' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'إنشاء مسودة مصروف' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'تعديل' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'إكمال المراجعة' })).toHaveCount(0);
+    await expect(page.getByText('أكمل المطابقات والمشكلات المانعة قبل إكمال المراجعة.')).toHaveCount(0);
+    await page.getByRole('button', { name: 'إنشاء مسودة مصروف' }).click();
+
+    await expect(page.getByRole('dialog', { name: 'إنشاء مسودة مصروف' })).toBeVisible();
+    await page.locator('#expense-draft-reason').fill('إنشاء مسودة مصروف من الدليل المراجع في fixture الواجهة.');
+    await page.locator('#expense-draft-account').selectOption('demo-expense-account-5130');
+    await page.locator('#expense-draft-category').selectOption('demo-expense-category-services');
+    await page.locator('#expense-draft-cost-center').selectOption('demo-expense-cost-center-admin');
+    await page.locator('#expense-draft-payment-method').selectOption('bank');
+    await page.getByRole('button', { name: 'إنشاء مسودة مصروف' }).last().click();
+
+    await expect(page.getByRole('link', { name: /فتح مسودة المصروف EXP-DRAFT-0417/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'إنشاء مسودة مصروف' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'تعديل' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'تأكيد' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'رفض' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'حل المشكلة' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'إعادة فتح' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'إعادة التحقق المالي' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'إكمال المراجعة' })).toHaveCount(0);
+    await expect(page.getByText('أكمل المطابقات والمشكلات المانعة قبل إكمال المراجعة.')).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+  });
+});

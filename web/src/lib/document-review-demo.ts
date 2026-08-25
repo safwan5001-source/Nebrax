@@ -47,6 +47,14 @@ type DemoState = {
   }>;
 };
 
+type ExpenseDemoState = {
+  version: number;
+  status: string;
+  linkedExpense: { link_id: string; transaction_type: 'expense'; transaction_id: string; transaction_number: string; status: string; url: string } | null;
+  fields: DemoField[];
+  history: DemoState['history'];
+};
+
 type HandlerResult = { handled: true; response: unknown } | { handled: true; error: Error } | { handled: false };
 
 function staleError(): Error & { status: number } {
@@ -121,7 +129,35 @@ function initialState(): DemoState {
   };
 }
 
+function initialExpenseState(): ExpenseDemoState {
+  return {
+    version: 3,
+    status: 'ready_for_draft',
+    linkedExpense: null,
+    fields: [
+      { key: 'issuer_name', original: 'مؤسسة أفق الخدمات', current: 'مؤسسة أفق الخدمات', confidence_basis_points: 9700, page: 1 },
+      { key: 'document_number', original: 'EXP-417', current: 'EXP-417', confidence_basis_points: 9500, page: 1 },
+      { key: 'document_date', original: '2026-08-24', current: '2026-08-24', confidence_basis_points: 9600, page: 1 },
+      { key: 'currency', original: 'SAR', current: 'SAR', confidence_basis_points: 9900, page: 1 },
+      { key: 'price_includes_tax', original: true, current: true, confidence_basis_points: 9400, page: 1 },
+      { key: 'subtotal_minor', original: 10000, current: 10000, confidence_basis_points: 9600, page: 1 },
+      { key: 'tax_amount_minor', original: 1500, current: 1500, confidence_basis_points: 9600, page: 1 },
+      { key: 'total_amount_minor', original: 11500, current: 11500, confidence_basis_points: 9600, page: 1 },
+    ],
+    history: [{
+      id: 'demo-expense-review-complete',
+      action: 'review_completed',
+      reason: 'مراجعة بشرية مكتملة في fixture المعاينة.',
+      before: { status: 'needs_review' },
+      after: { status: 'ready_for_draft' },
+      actor: { id: 'demo-reviewer', name: 'أحمد المراجع' },
+      occurred_at: '2026-08-25T10:15:00+03:00',
+    }],
+  };
+}
+
 let state = initialState();
+let expenseState = initialExpenseState();
 
 function completeReady(): boolean {
   return state.matches.every((match) => ['confirmed', 'rejected'].includes(match.status))
@@ -144,8 +180,13 @@ function validVersion(body: Record<string, unknown>): boolean {
   return Number(body.expected_version) === state.version;
 }
 
+function validExpenseVersion(body: Record<string, unknown>): boolean {
+  return Number(body.expected_version) === expenseState.version;
+}
+
 export function resetDocumentReviewDemo(): void {
   state = initialState();
+  expenseState = initialExpenseState();
 }
 
 export function handleDocumentReviewDemo(path: string, method: string, body?: unknown): HandlerResult {
@@ -156,6 +197,7 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
   const completeMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/complete-review$/);
   const revalidateMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/revalidate-financial$/);
   const createDraftMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/create-purchase-draft$/);
+  const createExpenseDraftMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/create-expense-draft$/);
 
   if (method === 'GET' && clean === '/document-batches') {
     const query = new URLSearchParams(path.split('?')[1] ?? '');
@@ -169,14 +211,49 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
         reviewer: { id: 'demo-reviewer', name: 'أحمد المراجع' },
       },
       {
-        id: 'demo-batch-002', document_type: 'expense', source_type: 'email', status: 'needs_review',
-        version: 2, created_at: '2026-08-24T11:15:00+03:00', files_count: 2,
-        blocking_issues_count: 0, warning_issues_count: 1,
-        reviewer: null,
+        id: 'demo-batch-002', document_type: 'expense', source_type: 'email', status: expenseState.status,
+        version: expenseState.version, created_at: '2026-08-24T11:15:00+03:00', files_count: 1,
+        blocking_issues_count: 0, warning_issues_count: 0,
+        reviewer: { id: 'demo-reviewer', name: 'أحمد المراجع' },
       },
     ].filter((batch) => !search || `${batch.id} ${batch.document_type} ${batch.source_type}`.toLowerCase().includes(search));
 
     return { handled: true, response: { data: all, meta: { current_page: 1, last_page: 1, total: all.length } } };
+  }
+
+  if (method === 'GET' && clean === '/accounts') {
+    return { handled: true, response: { data: [
+      { id: 'demo-expense-account-5130', code: '5130', name: 'مصروف الخدمات', type: 'expense', is_group: false },
+      { id: 'demo-expense-account-5190', code: '5190', name: 'مصروف المرافق', type: 'expense', is_group: false },
+    ] } };
+  }
+  if (method === 'GET' && clean === '/expense-categories') {
+    return { handled: true, response: { data: [{ id: 'demo-expense-category-services', name: 'خدمات', is_active: true }] } };
+  }
+  if (method === 'GET' && clean === '/cost-centers') {
+    return { handled: true, response: { data: [{ id: 'demo-expense-cost-center-admin', code: 'ADM', name: 'الإدارة', is_active: true }] } };
+  }
+
+  if (method === 'GET' && reviewMatch?.[1] === 'demo-batch-002') {
+    return {
+      handled: true,
+      response: {
+        data: {
+          batch: {
+            id: 'demo-batch-002', document_type: 'expense', status: expenseState.status, version: expenseState.version,
+            reviewer: { id: 'demo-reviewer', name: 'أحمد المراجع' },
+          },
+          fields: expenseState.fields,
+          files: [{ id: 'demo-file-002', original_name: 'expense-receipt-EXP-417.pdf', mime_type: 'application/pdf', page_count: 1, download_available: true }],
+          matches: [],
+          issues: [],
+          history: expenseState.history,
+          linked_transaction: expenseState.linkedExpense,
+          linked_purchase: null,
+          capabilities: { view: true, review: true, manage: true, build_draft: true },
+        },
+      },
+    };
   }
 
   if (method === 'GET' && reviewMatch) {
@@ -193,6 +270,7 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
           matches: state.matches,
           issues: state.issues,
           history: state.history,
+          linked_transaction: state.linkedPurchase,
           linked_purchase: state.linkedPurchase,
           capabilities: { view: true, review: true, manage: true, build_draft: true },
         },
@@ -200,7 +278,7 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
     };
   }
 
-  if (method === 'GET' && clean === '/document-files/demo-file-001/download-url') {
+  if (method === 'GET' && ['demo-file-001', 'demo-file-002'].some((fileId) => clean === `/document-files/${fileId}/download-url`)) {
     return { handled: true, response: { url: 'about:blank', expires_at: '2026-08-25T10:00:00+03:00' } };
   }
 
@@ -268,6 +346,39 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
     state.version += 1;
     addHistory('financial_revalidated', String(requestBody.reason ?? ''), null, { status: taxIssue?.status ?? 'resolved' });
     return { handled: true, response: { data: { id: 'demo-financial-revalidation' } } };
+  }
+
+  if (method === 'POST' && createExpenseDraftMatch?.[1] === 'demo-batch-002') {
+    if (expenseState.linkedExpense) {
+      return { handled: true, response: { data: { ...expenseState.linkedExpense, idempotent_replay: true } } };
+    }
+    if (!validExpenseVersion(requestBody)) return { handled: true, error: staleError() };
+    if (expenseState.status !== 'ready_for_draft') return { handled: true, error: new Error('review_not_ready') };
+    if (!String(requestBody.reason ?? '').trim() || !String(requestBody.account_id ?? '').trim()
+      || !['cash', 'bank', 'credit'].includes(String(requestBody.payment_method ?? ''))) {
+      return { handled: true, error: new Error('expense_draft_options_required') };
+    }
+
+    expenseState.status = 'draft_created';
+    expenseState.version += 1;
+    expenseState.linkedExpense = {
+      link_id: 'demo-link-expense-002',
+      transaction_type: 'expense',
+      transaction_id: 'demo-expense-draft-002',
+      transaction_number: 'EXP-DRAFT-0417',
+      status: 'draft',
+      url: '/expenses/demo-expense-draft-002',
+    };
+    expenseState.history.unshift({
+      id: `demo-expense-action-${expenseState.history.length + 1}`,
+      action: 'expense_draft_created',
+      reason: String(requestBody.reason),
+      before: { status: 'ready_for_draft' },
+      after: { status: expenseState.status, transaction_type: 'expense', transaction_id: expenseState.linkedExpense.transaction_id },
+      actor: { id: 'demo-user', name: 'مستخدم المعاينة' },
+      occurred_at: new Date().toISOString(),
+    });
+    return { handled: true, response: { data: { ...expenseState.linkedExpense, idempotent_replay: false } } };
   }
 
   if (method === 'POST' && createDraftMatch) {
