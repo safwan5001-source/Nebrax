@@ -93,13 +93,108 @@ class ProductController extends ApiController
         ]);
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        // التحميل المسبق للتصنيف والعلامة: المورد يقرأ اسميهما لكل صفّ، وبلا
-        // هذا السطر يصير استعلامان لكل منتج (N+1) في أكثر قائمة تُفتح.
-        return ProductResource::collection(
-            Product::with(['productCategory', 'productBrand', 'unitTemplate.units'])->latest()->get()
-        )->response();
+        $filters = $request->validate([
+            'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'category_id' => ['sometimes', 'nullable', 'uuid'],
+            'type' => ['sometimes', 'nullable', 'in:good,service'],
+            'is_active' => ['sometimes', 'nullable', 'boolean'],
+            'stock_state' => ['sometimes', 'nullable', 'in:tracked,not_tracked,out,low'],
+            'sale_price_gte' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'sale_price_lte' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'sale_price_eq' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'purchase_price_gte' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'purchase_price_lte' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'purchase_price_eq' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'sort' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'per_page' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:100'],
+            'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
+        ]);
+
+        // التحميل المسبق للتصنيف والعلامة وقالب الوحدات يمنع N+1، بينما
+        // الفلترة/الفرز/التقسيم تبقى في SQL كي لا يُنزّل المتصفح الكتالوج كله.
+        $query = Product::with(['productCategory', 'productBrand', 'unitTemplate.units']);
+
+        if (filled($filters['search'] ?? null)) {
+            $needle = addcslashes(trim((string) $filters['search']), '%_\\');
+            $like = "%{$needle}%";
+            $query->where(function ($search) use ($like): void {
+                $search
+                    ->where('name', 'like', $like)
+                    ->orWhere('name_en', 'like', $like)
+                    ->orWhere('sku', 'like', $like)
+                    ->orWhere('barcode', 'like', $like)
+                    ->orWhere('category', 'like', $like)
+                    ->orWhere('brand', 'like', $like)
+                    ->orWhereHas('productCategory', fn ($category) => $category->where('name', 'like', $like))
+                    ->orWhereHas('productBrand', fn ($brand) => $brand->where('name', 'like', $like));
+            });
+        }
+
+        if (filled($filters['category_id'] ?? null)) {
+            $query->where('category_id', $filters['category_id']);
+        }
+        if (filled($filters['type'] ?? null)) {
+            $query->where('type', $filters['type']);
+        }
+        if (array_key_exists('is_active', $filters) && $filters['is_active'] !== null && $filters['is_active'] !== '') {
+            $query->where('is_active', $request->boolean('is_active'));
+        }
+
+        if (filled($filters['stock_state'] ?? null)) {
+            match ($filters['stock_state']) {
+                'tracked' => $query->where('track_inventory', true),
+                'not_tracked' => $query->where('track_inventory', false),
+                'out' => $query->where('track_inventory', true)->where('quantity_on_hand', '<=', 0),
+                'low' => $query
+                    ->where('track_inventory', true)
+                    ->where('quantity_on_hand', '>', 0)
+                    ->where('reorder_level', '>', 0)
+                    ->whereColumn('quantity_on_hand', '<=', 'reorder_level'),
+                default => null,
+            };
+        }
+
+        foreach (['sale_price', 'purchase_price'] as $column) {
+            foreach (['gte' => '>=', 'lte' => '<=', 'eq' => '='] as $suffix => $operator) {
+                $key = "{$column}_{$suffix}";
+                if (filled($filters[$key] ?? null)) {
+                    $query->where($column, $operator, $this->moneyFilterToMinor((string) $filters[$key]));
+                }
+            }
+        }
+
+        $paginated = isset($filters['per_page']);
+        $sort = (string) ($filters['sort'] ?? '');
+        $direction = str_starts_with($sort, '-') ? 'desc' : 'asc';
+        $sortKey = ltrim($sort, '-');
+        $allowedSorts = [
+            'name' => 'name',
+            'sku' => 'sku',
+            'sale_price' => 'sale_price',
+            'purchase_price' => 'purchase_price',
+            'quantity_on_hand' => 'quantity_on_hand',
+            'created_at' => 'created_at',
+        ];
+
+        if ($sort !== '' && isset($allowedSorts[$sortKey])) {
+            $query->orderBy($allowedSorts[$sortKey], $direction)->orderByDesc('id');
+        } elseif ($paginated) {
+            // صفحة المنتجات تاريخياً تبدأ بالاسم؛ نبقي ذلك هو افتراض Data Explorer.
+            $query->orderBy('name')->orderByDesc('id');
+        } else {
+            // توافق خلفي مع كل مستهلك قديم لـ GET /products بلا pagination.
+            $query->latest();
+        }
+
+        if ($paginated) {
+            return ProductResource::collection(
+                $query->paginate((int) $filters['per_page'])->withQueryString()
+            )->response();
+        }
+
+        return ProductResource::collection($query->get())->response();
     }
 
     public function store(StoreProductRequest $request): JsonResponse
@@ -316,5 +411,14 @@ class ProductController extends ApiController
         $this->domain(fn () => $this->lifecycle->delete($product, $request->user()?->id));
 
         return response()->json(['message' => 'تم الحذف.']);
+    }
+
+    private function moneyFilterToMinor(string $value): int
+    {
+        $normalized = trim($value);
+        [$whole, $fraction] = array_pad(explode('.', $normalized, 2), 2, '');
+        $fraction = substr(str_pad(preg_replace('/\D/', '', $fraction) ?? '', 2, '0'), 0, 2);
+
+        return ((int) $whole * 100) + (int) $fraction;
     }
 }
