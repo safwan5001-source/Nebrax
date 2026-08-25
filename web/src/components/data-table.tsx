@@ -128,8 +128,10 @@ export function DataTable<T>({
         <EmptyState title={emptyLabel ?? 'لا توجد نتائج'} description={emptyDescription} action={emptyAction} surface="bare" />
       ) : (
         <>
+          {/* الجدول يمرّر أفقياً داخل حاويته (لا على مستوى الصفحة) بدل أن تنضغط
+              أعمدته: رأسٌ مكسور على سطرين وتاريخٌ ينقسم ليسا كثافةً بل ضوضاء. */}
           <div className="hidden md:block">
-            <Table>
+            <Table className="[&_th]:whitespace-nowrap">
               <THead>
                 {table.getHeaderGroups().map((hg) => (
                   <TR key={hg.id}>

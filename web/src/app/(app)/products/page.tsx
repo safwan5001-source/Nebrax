@@ -297,22 +297,30 @@ export default function ProductsPage() {
   }, [t, workingId]);
 
   const columns = useMemo<ColumnDef<Product, unknown>[]>(() => [
-    { accessorKey: 'sku', header: t('sku'), cell: ({ row }) => <span className="num text-muted">{row.original.sku ?? '—'}</span> },
-    { accessorKey: 'name', header: t('name'), cell: ({ row }) => <Link href={`/products/${row.original.id}`} className="font-medium text-primary hover:underline">{row.original.name}</Link> },
+    { accessorKey: 'sku', header: t('sku'), cell: ({ row }) => <span className="num whitespace-nowrap text-muted">{row.original.sku ?? '—'}</span> },
+    {
+      accessorKey: 'name', header: t('name'),
+      // كما في الفواتير: سطر واحد بحدٍّ أقصى، والنص كاملٌ في الـ DOM وفي `title`.
+      cell: ({ row }) => (
+        <Link href={`/products/${row.original.id}`} title={row.original.name} className="block max-w-64 truncate font-medium text-primary hover:underline">
+          {row.original.name}
+        </Link>
+      ),
+    },
     { accessorKey: 'type', header: t('type'), cell: ({ row }) => <Badge tone="muted">{t(row.original.type === 'service' ? 'service' : 'good')}</Badge> },
     {
       accessorKey: 'sale_price',
       header: `${t('sale_price')} · ${taxInclusive ? t('tax_incl_tag') : t('tax_excl_tag')}`,
-      cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.sale_price)}</div>,
+      cell: ({ row }) => <div className="num whitespace-nowrap text-end">{formatRiyal(row.original.sale_price)}</div>,
     },
-    { accessorKey: 'barcode', header: t('barcode'), cell: ({ row }) => <span className="num text-muted" dir="ltr">{row.original.barcode ?? '—'}</span> },
+    { accessorKey: 'barcode', header: t('barcode'), cell: ({ row }) => <span className="num whitespace-nowrap text-muted" dir="ltr">{row.original.barcode ?? '—'}</span> },
     ...(showStock
       ? [{
           id: 'stock',
           header: t('stock'),
           accessorFn: (row: Product) => (row.track_inventory ? row.quantity_on_hand : ''),
           cell: ({ row }: { row: { original: Product } }) => (
-            <div className="num text-end">{row.original.track_inventory ? row.original.quantity_on_hand : '—'}</div>
+            <div className="num whitespace-nowrap text-end">{row.original.track_inventory ? row.original.quantity_on_hand : '—'}</div>
           ),
         } as ColumnDef<Product, unknown>]
       : []),

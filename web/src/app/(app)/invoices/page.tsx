@@ -283,24 +283,29 @@ export default function InvoicesPage() {
   const columns = useMemo<ColumnDef<Invoice, unknown>[]>(() => [
     {
       accessorKey: 'number', header: t('number'), enableSorting: false,
-      cell: ({ row }) => <Link href={`/invoices/${row.original.id}`} className="num text-primary hover:underline">{row.original.number}</Link>,
+      cell: ({ row }) => <Link href={`/invoices/${row.original.id}`} className="num whitespace-nowrap text-primary hover:underline">{row.original.number}</Link>,
     },
     {
       id: 'partner', header: t('partner'), enableSorting: false,
       accessorFn: (row) => partnerNames[row.partner_id] ?? '—',
-      cell: ({ row }) => partnerNames[row.original.partner_id] ?? '—',
+      // اسم الطرف يُقصّ عند حدٍّ معقول بدل أن يكسر الصف إلى خمسة أسطر:
+      // النص كاملٌ في الـ DOM (فيقرأه القارئ الصوتي) وفي `title` عند التحويم.
+      cell: ({ row }) => {
+        const name = partnerNames[row.original.partner_id] ?? '—';
+        return <span className="block max-w-64 truncate" title={name}>{name}</span>;
+      },
     },
     {
       accessorKey: 'invoice_date', header: t('date'), enableSorting: false,
-      cell: ({ row }) => <span className="num text-muted">{row.original.invoice_date}</span>,
+      cell: ({ row }) => <span className="num whitespace-nowrap text-muted">{row.original.invoice_date}</span>,
     },
     {
       accessorKey: 'total', header: t('total'), enableSorting: false,
-      cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.total)}</div>,
+      cell: ({ row }) => <div className="num whitespace-nowrap text-end">{formatRiyal(row.original.total)}</div>,
     },
     {
       accessorKey: 'remaining', header: 'المتبقي', enableSorting: false,
-      cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.remaining)}</div>,
+      cell: ({ row }) => <div className="num whitespace-nowrap text-end">{formatRiyal(row.original.remaining)}</div>,
     },
     {
       accessorKey: 'status', header: t('status'), enableSorting: false,

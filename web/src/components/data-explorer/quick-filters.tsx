@@ -55,7 +55,7 @@ export function QuickFilters({
               searchPlaceholder={definition.searchPlaceholder ?? `ابحث في ${definition.label}`}
               emptyText={definition.emptyText ?? 'لا توجد نتائج مطابقة'}
               aria-label={definition.label}
-              className="min-w-40 sm:min-w-48"
+              className="w-auto min-w-40 max-w-full sm:min-w-48"
             />
           );
         }
@@ -73,7 +73,9 @@ export function QuickFilters({
               })
             }
             aria-label={definition.label}
-            className="h-9 min-w-32 bg-surface text-sm"
+            // `w-auto` يلغي `w-full` من أساس الحقل: الفلتر السريع عنصر في صفّ لا سطر
+            // كامل، وإلا احتلّ كل فلتر سطراً كاملاً حتى على 1440px فذهبت كثافة الصفحة.
+            className="h-9 w-auto min-w-32 max-w-full bg-surface text-sm"
           >
             <option value="">{definition.label}</option>
             {definition.options.map((option) => (

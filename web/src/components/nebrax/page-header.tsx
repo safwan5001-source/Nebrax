@@ -50,7 +50,7 @@ export function PageHeader({
       </div>
 
       {hasActions ? (
-        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:justify-end lg:w-auto">
           {actions && actions.length > 0 ? (
             <ActionGroup actions={actions} inlineLimit={inlineActionLimit} />
           ) : null}
