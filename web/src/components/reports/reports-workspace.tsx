@@ -25,6 +25,7 @@ import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
 import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader, type ReportMetric } from '@/components/reports/report-workspace-ui';
 import { CustomerAgingChart } from '@/components/reports/customer-aging-chart';
+import { ReportResultsTable } from '@/components/reports/report-results-table';
 
 export type ReportTab = 'trial' | 'income' | 'balance' | 'costcenter' | 'aging';
 type Tab = ReportTab;
@@ -393,35 +394,14 @@ export function ReportsWorkspace({
             {loading || !trial ? (
               <Skeleton className="h-40 w-full" />
             ) : (
-              <>
-              <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={1} secondaryIndex={0} />
-              <Table className="hidden md:table">
-                <THead>
-                  <TR>
-                    <TH>{t('code')}</TH>
-                    <TH>{t('account')}</TH>
-                    <TH className="text-end">{t('debit')}</TH>
-                    <TH className="text-end">{t('credit')}</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {trial.rows.map((r) => (
-                    <TR key={r.code}>
-                      <TD className="num">{r.code}</TD>
-                      <TD>{r.name}</TD>
-                      <TD className="num text-end">{r.debit !== '0.00' ? formatRiyal(r.debit) : '—'}</TD>
-                      <TD className="num text-end">{r.credit !== '0.00' ? formatRiyal(r.credit) : '—'}</TD>
-                    </TR>
-                  ))}
-                  <TR className="font-semibold">
-                    <TD />
-                      <TD>{t('total')}</TD>
-                      <TD className="num text-end">{formatRiyal(trial.total_debit)}</TD>
-                      <TD className="num text-end">{formatRiyal(trial.total_credit)}</TD>
-                    </TR>
-                  </TBody>
-              </Table>
-              </>
+              <ReportResultsTable
+                columns={doc?.columns ?? []}
+                rows={doc?.rows ?? []}
+                totalRow={doc?.totalRow}
+                emptyText={t('empty')}
+                primaryIndex={1}
+                secondaryIndex={0}
+              />
             )}
           </CardContent>
         </Card>
@@ -611,44 +591,14 @@ export function ReportsWorkspace({
             {loading || !cc ? (
               <Skeleton className="h-40 w-full" />
             ) : (
-              <>
-              <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={1} secondaryIndex={0} />
-              <Table className="hidden md:table">
-                <THead>
-                  <TR>
-                    <TH>{t('code')}</TH>
-                    <TH>{t('center')}</TH>
-                    <TH className="text-end">{t('revenue')}</TH>
-                    <TH className="text-end">{t('expense')}</TH>
-                    <TH className="text-end">{t('profit')}</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {cc.rows.length === 0 ? (
-                    <TR><TD colSpan={5} className="py-8 text-center text-muted">{t('empty')}</TD></TR>
-                  ) : (
-                    cc.rows.map((r) => (
-                      <TR key={r.cost_center_id}>
-                        <TD className="num">{r.code}</TD>
-                        <TD>{r.name}</TD>
-                        <TD className="num text-end">{formatRiyal(r.revenue)}</TD>
-                        <TD className="num text-end">{formatRiyal(r.expense)}</TD>
-                        <TD className={'num text-end font-medium ' + (Number(r.profit) < 0 ? 'text-negative' : Number(r.profit) > 0 ? 'text-positive' : '')}>{formatRiyal(r.profit)}</TD>
-                      </TR>
-                    ))
-                  )}
-                  {cc.rows.length > 0 && (
-                    <TR className="font-semibold">
-                      <TD />
-                      <TD>{t('total')}</TD>
-                      <TD className="num text-end">{formatRiyal(cc.total_revenue)}</TD>
-                      <TD className="num text-end">{formatRiyal(cc.total_expense)}</TD>
-                      <TD className="num text-end">{formatRiyal(cc.total_profit)}</TD>
-                    </TR>
-                  )}
-                </TBody>
-              </Table>
-              </>
+              <ReportResultsTable
+                columns={doc?.columns ?? []}
+                rows={doc?.rows ?? []}
+                totalRow={doc?.totalRow}
+                emptyText={t('empty')}
+                primaryIndex={1}
+                secondaryIndex={0}
+              />
             )}
           </CardContent>
         </Card>
@@ -679,51 +629,13 @@ export function ReportsWorkspace({
             {loading || !aging ? (
               <Skeleton className="h-40 w-full" />
             ) : (
-              <>
-              <ReportMobileRows columns={doc?.columns ?? []} rows={doc?.rows ?? []} totalRow={doc?.totalRow} primaryIndex={0} />
-              <Table className="hidden md:table">
-                <THead>
-                  <TR>
-                    <TH>{t('partner')}</TH>
-                    <TH className="text-end">{t('b0_30')}</TH>
-                    <TH className="text-end">{t('b31_60')}</TH>
-                    <TH className="text-end">{t('b61_90')}</TH>
-                    <TH className="text-end">{t('b90_plus')}</TH>
-                    <TH className="text-end">{t('total')}</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {aging.rows.length === 0 ? (
-                    <TR>
-                      <TD colSpan={6} className="py-8 text-center text-muted">
-                        {t('empty')}
-                      </TD>
-                    </TR>
-                  ) : (
-                    aging.rows.map((r) => (
-                      <TR key={r.partner_id}>
-                        <TD>{r.name}</TD>
-                        <TD className="num text-end">{formatRiyal(r.b0_30)}</TD>
-                        <TD className="num text-end">{formatRiyal(r.b31_60)}</TD>
-                        <TD className="num text-end">{formatRiyal(r.b61_90)}</TD>
-                        <TD className="num text-end">{formatRiyal(r.b90_plus)}</TD>
-                        <TD className="num text-end font-medium">{formatRiyal(r.total)}</TD>
-                      </TR>
-                    ))
-                  )}
-                  {aging.rows.length > 0 && (
-                    <TR className="font-semibold">
-                      <TD>{t('total')}</TD>
-                      <TD className="num text-end">{formatRiyal(aging.totals.b0_30)}</TD>
-                      <TD className="num text-end">{formatRiyal(aging.totals.b31_60)}</TD>
-                      <TD className="num text-end">{formatRiyal(aging.totals.b61_90)}</TD>
-                      <TD className="num text-end">{formatRiyal(aging.totals.b90_plus)}</TD>
-                      <TD className="num text-end">{formatRiyal(aging.totals.total)}</TD>
-                    </TR>
-                  )}
-                </TBody>
-              </Table>
-              </>
+              <ReportResultsTable
+                columns={doc?.columns ?? []}
+                rows={doc?.rows ?? []}
+                totalRow={doc?.totalRow}
+                emptyText={t('empty')}
+                primaryIndex={0}
+              />
             )}
           </CardContent>
         </Card>
