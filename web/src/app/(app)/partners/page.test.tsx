@@ -123,15 +123,39 @@ describe('PartnersPage', () => {
     expect(await screen.findByText('No partners')).toBeTruthy();
   });
 
-  it('orders the mobile record: name, then phone, then classification, then city', async () => {
+  it('orders the mobile record: name, then phone, then city, then classification', async () => {
     respondWith([basePartner]);
     render(<PartnersPage />);
 
     const record = await firstMobileRecord();
     const text = record.textContent ?? '';
     expect(text.indexOf('Al Tumooh Trading Co.')).toBeLessThan(text.indexOf('0555001122'));
-    expect(text.indexOf('0555001122')).toBeLessThan(text.indexOf('Commercial'));
-    expect(text.indexOf('Commercial')).toBeLessThan(text.indexOf('Dammam'));
+    expect(text.indexOf('0555001122')).toBeLessThan(text.indexOf('Dammam'));
+    expect(text.indexOf('Dammam')).toBeLessThan(text.indexOf('Commercial'));
+  });
+
+  it('shows the city as a compact address line directly under the phone — name, then phone, then city', async () => {
+    respondWith([basePartner]);
+    render(<PartnersPage />);
+
+    const record = await firstMobileRecord();
+    const name = within(record).getByText('Al Tumooh Trading Co.');
+    const phone = within(record).getByText('0555001122');
+    const city = within(record).getByText('Dammam');
+
+    const text = record.textContent ?? '';
+    expect(text.indexOf(name.textContent!)).toBeLessThan(text.indexOf(phone.textContent!));
+    expect(text.indexOf(phone.textContent!)).toBeLessThan(text.indexOf(city.textContent!));
+    // مدينة نصّية لا مرجعاً رقمياً، فلا تحمل خط Mono الذي يحمله سطر التاريخ/المرجع.
+    expect(city.className).not.toContain('num');
+  });
+
+  it('omits the city line when the partner has no city, without leaving a gap', async () => {
+    respondWith([{ ...basePartner, city: null }]);
+    render(<PartnersPage />);
+
+    const record = await firstMobileRecord();
+    expect(within(record).queryByText('Dammam')).toBeNull();
   });
 
   it('falls back to the partner id when there is no phone or email', async () => {

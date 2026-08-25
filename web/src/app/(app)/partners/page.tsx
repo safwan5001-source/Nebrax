@@ -219,8 +219,10 @@ export default function PartnersPage() {
             </Link>
           ),
           subtitle: partner.phone ?? partner.email ?? partner.id,
+          // المدينة سطر عنوان لا رقم مرجعي، فمكانها تحت الهاتف مباشرة لا خانة
+          // `meta` (المصمَّمة بخط Mono للتواريخ والمراجع) بجانب شارة النوع.
+          caption: partner.city ?? undefined,
           status: <Badge tone="muted">{tp(partner.entity_type ?? 'commercial')}</Badge>,
-          meta: partner.city ?? undefined,
           actions: rowActions(partner),
         })}
       />
