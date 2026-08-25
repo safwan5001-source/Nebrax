@@ -356,7 +356,37 @@ export const mockProducts: MockProduct[] = [
   product('pr6', 'SKU-006', 'طاولة اجتماعات', 'good', 'piece', 2300, 1500, true, 6, 1480),
   product('pr7', 'SKU-007', 'رخصة برنامج سنوية', 'service', 'license', 1500, 0, false, 0, 0),
   product('pr8', 'SKU-008', 'عقد صيانة شهري', 'service', 'service', 400, 0, false, 0, 0, false),
+  // ── عيّنتان للمراجعة البصرية في المعاينة ──────────────────────────────────
+  // منتج **بحدّ أدنى للسعر وبوحدتين**: يُظهر في المعاينة تحذير «تحت الحدّ
+  // الأدنى» وحقل السبب، ومنتقي الوحدة داخل السطر — وكلاهما لا يظهر بلا بيانات.
+  {
+    ...product('pr9', 'SKU-009', 'كرتون مناديل ورقية', 'good', 'carton', 120, 78, true, 320, 76),
+    min_sale_price: '100.00',
+    units: [{ name: 'كرتون', factor: 1 }, { name: 'باكيت', factor: 12 }],
+  },
+  // اسمٌ طويل عمداً — لاختبار القصّ والالتفاف في منتقي المنتج وسطر البند.
+  {
+    ...product('pr10', 'SKU-010', 'وحدة تكييف مركزي مخفي بقدرة ٣٦٠٠٠ وحدة حرارية مع لوحة تحكّم رقمية', 'good', 'piece', 4850, 3600, true, 12, 3550),
+  },
 ];
+
+/**
+ * ─────────────────────────── قوائم الأسعار (`/price-lists`) ───────────────────────────
+ * لم يكن لها معالج، فكان `.catch(() => {})` في نموذج الفاتورة يبتلع الفشل ويختفي
+ * قسم قائمة الأسعار كلياً من المعاينة. العيّنة تغطّي قائمةً نشطة بأسعار مطابقة
+ * لبعض المنتجات، وأخرى معطّلة تُعرَض ولا تُطبَّق.
+ */
+const mockPriceLists = [
+  { id: 'pl-1', name: 'أسعار الجملة', is_active: true, items_count: 3 },
+  { id: 'pl-2', name: 'عملاء التجزئة', is_active: true, items_count: 2 },
+  { id: 'pl-3', name: 'حملة نهاية العام (منتهية)', is_active: false, items_count: 4 },
+];
+
+/** أسعار كل قائمة لكل منتج/وحدة — مفتاحها `productId|unitName`. */
+const mockPriceListItems: Record<string, Record<string, string>> = {
+  'pl-1': { 'pr2|': '1080.00', 'pr3|': '82.00', 'pr9|': '96.00', 'pr9|باكيت': '9.00' },
+  'pl-2': { 'pr2|': '1250.00', 'pr5|': '690.00' },
+};
 
 function allMockProducts(): MockProduct[] {
   const stored = (listDemoProducts() as unknown as MockProduct[]).map((item) => ({
@@ -2161,6 +2191,16 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/fuel-stations/devices') return resolve({ data: mockFuelDevices });
   if (clean === '/fuel-stations/shifts') return resolve({ data: mockFuelShifts });
   if (clean === '/subscription') return resolve(mockSubscription);
+  if (clean === '/price-lists') return resolve({ data: mockPriceLists });
+  // `resolve` يعيد `matched` صراحةً: عدم المطابقة يعني «أبقِ السعر الأساسي»، لا
+  // «سعرٌ صفر» — والفرق بينهما هو الفرق بين فاتورة صحيحة وأخرى بلا ثمن.
+  const priceListResolve = clean.match(/^\/price-lists\/([^/]+)\/resolve$/);
+  if (priceListResolve) {
+    const query = new URLSearchParams(path.split('?')[1] ?? '');
+    const key = `${query.get('product_id') ?? ''}|${query.get('unit_name') ?? ''}`;
+    const price = mockPriceListItems[priceListResolve[1]]?.[key] ?? null;
+    return resolve({ data: { matched: price !== null, price } });
+  }
   if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
   if (clean === '/customer-settings') return resolve({ data: mockCustomerSettings });
   const salesConfigMatch = clean.match(/^\/sales-config\/([^/]+)$/);
