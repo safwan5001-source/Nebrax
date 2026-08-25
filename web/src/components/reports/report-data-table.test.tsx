@@ -1,6 +1,6 @@
 'use client';
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -56,7 +56,7 @@ describe('ReportDataTable', () => {
       ['Cash', '2,500.00 𞸁', '2026-08-05'],
     ]);
 
-    await user.click(screen.getByRole('button', { name: /Amount/i }));
+    await user.click(screen.getByRole('button', { name: 'Amount' }));
 
     const bodyRows = within(screen.getByRole('table')).getAllByRole('row').slice(1, 4);
     expect(bodyRows.map((row) => row.textContent?.match(/Zakat|Assets|Cash/)?.[0])).toEqual(['Assets', 'Zakat', 'Cash']);
@@ -90,9 +90,9 @@ describe('ReportDataTable', () => {
     const user = userEvent.setup();
     const rows = Array.from({ length: 30 }, (_, index) => [`Account ${index + 1}`, `${index + 1}.00 𞸁`, '2026-08-01']);
     function ControlledTable() {
-      const [viewState, setViewState] = useState<ReportTableViewState>({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 10 });
+      const [viewState, setViewState] = useState<ReportTableViewState>({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 10, columnOrder: [], columnSizing: {} });
       return <>
-        <button type="button" onClick={() => setViewState({ columnVisibility: { date: false }, sorting: [{ id: 'amount', desc: true }], density: 'comfortable', pageSize: 10 })}>Apply saved view</button>
+        <button type="button" onClick={() => setViewState({ columnVisibility: { date: false }, sorting: [{ id: 'amount', desc: true }], density: 'comfortable', pageSize: 10, columnOrder: ['amount', 'account', 'date'], columnSizing: { amount: 200 } })}>Apply saved view</button>
         <ReportDataTable columns={columns} rows={rows} labels={labels} viewState={viewState} onViewStateChange={setViewState} />
       </>;
     }
@@ -104,6 +104,7 @@ describe('ReportDataTable', () => {
     expect(screen.getByText('Page 1 of 3')).toBeTruthy();
     expect(screen.queryByRole('columnheader', { name: 'Date' })).toBeNull();
     expect(screen.getByRole('columnheader', { name: 'Amount' }).getAttribute('aria-sort')).toBe('descending');
+    expect(within(screen.getByRole('table')).getAllByRole('columnheader').map((header) => header.textContent?.trim())).toEqual(['Amount', 'Account']);
   });
 
   it('keeps the primary column visible while allowing secondary columns to be hidden', async () => {
@@ -149,6 +150,70 @@ describe('ReportDataTable', () => {
     expect(screen.getByText('120.00 𞸁').closest('td')?.className).toContain('text-positive');
     expect(screen.getByText('-45.00 𞸁').closest('td')?.className).toContain('text-negative');
     expect(screen.getByText('0.00 𞸁').closest('td')?.className).not.toMatch(/text-(positive|negative)/);
+  });
+
+  it('reorders through accessible controls without breaking sorting, primary drill-down, or hidden-column placement', async () => {
+    const user = userEvent.setup();
+    render(
+      <ReportDataTable
+        columns={columns}
+        rows={[["Cash", "1,250.00 𞸁", "2026-08-01"]]}
+        labels={labels}
+        primaryColumnId="account"
+        rowActions={[{ href: '/accounts/1', label: 'View details' }]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('button', { name: 'Move down: Account' }));
+    expect(within(screen.getByRole('table')).getAllByRole('columnheader').map((header) => header.textContent?.trim())).toEqual(['Amount', 'Account', 'Date']);
+    expect(screen.getByRole('link', { name: 'Cash' }).getAttribute('href')).toBe('/accounts/1');
+
+    await user.click(screen.getByRole('button', { name: 'Amount' }));
+    expect(screen.getByRole('columnheader', { name: 'Amount' }).getAttribute('aria-sort')).toBe('ascending');
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    const dateCheckbox = screen.getByRole('checkbox', { name: 'Date' });
+    await user.click(dateCheckbox);
+    expect(screen.queryByRole('columnheader', { name: 'Date' })).toBeNull();
+    await user.click(dateCheckbox);
+    expect(within(screen.getByRole('table')).getAllByRole('columnheader').map((header) => header.textContent?.trim())).toEqual(['Amount', 'Account', 'Date']);
+  });
+
+  it('applies constrained column resizing to controlled layout state without changing sort behavior', () => {
+    function ControlledLayoutTable() {
+      const [viewState, setViewState] = useState<ReportTableViewState>({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25, columnOrder: [], columnSizing: {} });
+      return <>
+        <output data-testid="layout-state">{JSON.stringify(viewState)}</output>
+        <ReportDataTable columns={columns} rows={[["Cash", "1,250.00 𞸁", "2026-08-01"]]} labels={labels} viewState={viewState} onViewStateChange={setViewState} resizeDirection="ltr" />
+      </>;
+    }
+
+    render(<ControlledLayoutTable />);
+    const amountHeader = screen.getByRole('columnheader', { name: 'Amount' });
+    expect(amountHeader.getAttribute('style')).toContain('width: 144px');
+    fireEvent.click(screen.getByRole('button', { name: 'Amount' }));
+    expect(amountHeader.getAttribute('aria-sort')).toBe('ascending');
+
+    const resizeHandle = screen.getByRole('button', { name: 'Resize column: Amount' });
+    fireEvent.mouseDown(resizeHandle, { clientX: 100 });
+    fireEvent.mouseMove(document, { clientX: 1000 });
+    fireEvent.mouseUp(document);
+    expect(amountHeader.getAttribute('style')).toContain('width: 260px');
+    expect(screen.getByTestId('layout-state').textContent).toContain('"amount":260');
+    expect(amountHeader.getAttribute('aria-sort')).toBe('ascending');
+
+    fireEvent.mouseDown(resizeHandle, { clientX: 1000 });
+    fireEvent.mouseMove(document, { clientX: -1000 });
+    fireEvent.mouseUp(document);
+    expect(amountHeader.getAttribute('style')).toContain('width: 120px');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    const amountCheckbox = screen.getByRole('checkbox', { name: 'Amount' });
+    fireEvent.click(amountCheckbox);
+    expect(screen.queryByRole('columnheader', { name: 'Amount' })).toBeNull();
+    fireEvent.click(amountCheckbox);
+    expect(screen.getByRole('columnheader', { name: 'Amount' }).getAttribute('style')).toContain('width: 120px');
   });
 
   it('uses the supplied empty report message when the source data has no rows', () => {
