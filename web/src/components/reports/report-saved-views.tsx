@@ -1,12 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bookmark, ChevronDown, Pencil, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { Bookmark, Pencil, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { currentUser } from '@/lib/auth';
-import { cn } from '@/lib/utils';
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import type { ReportTableViewState } from '@/components/reports/report-data-table';
 
 const STORAGE_VERSION = 1;
@@ -148,7 +148,12 @@ export function parseStoredSavedReportViews(value: string, reportKey: string): S
 }
 
 function storageKey(reportKey: string): string {
-  const user = currentUser();
+  let user: ReturnType<typeof currentUser> = null;
+  try {
+    user = currentUser();
+  } catch {
+    // قد تكون جلسة التخزين نفسها محجوبة؛ المفتاح المجهول يحافظ على عمل التقرير بلا استثناء.
+  }
   const tenantId = user?.tenant_id ?? 'anonymous';
   const userId = user?.id ?? 'anonymous';
   return `nibras_report_saved_views_v${STORAGE_VERSION}:${tenantId}:${userId}:${reportKey}`;
@@ -202,7 +207,12 @@ export function useSavedReportViews(reportKey: string | undefined, defaultState:
 
     const key = storageKey(reportKey);
     keyRef.current = key;
-    const raw = localStorage.getItem(key);
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(key);
+    } catch {
+      // بعض بيئات المتصفح تمنع القراءة من التخزين المحلي؛ نعود إلى العرض الافتراضي بصمت.
+    }
     const stored = raw ? parseStoredSavedReportViews(raw, reportKey) : null;
     setViews(stored ?? []);
     setLoaded(true);
@@ -273,7 +283,6 @@ export function useSavedReportViews(reportKey: string | undefined, defaultState:
 
 export function ReportSavedViewsMenu({ controller, locale, className }: { controller: SavedReportViewsController; locale: string; className?: string }) {
   const labels = savedViewLabels(locale);
-  const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'save' | 'rename' | 'delete' | null>(null);
   const [targetId, setTargetId] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -288,14 +297,12 @@ export function ReportSavedViewsMenu({ controller, locale, className }: { contro
   }
 
   function openSave() {
-    setOpen(false);
     setName('');
     setValidation(null);
     setMode('save');
   }
 
   function openRename(view: SavedReportView) {
-    setOpen(false);
     setTargetId(view.id);
     setName(view.name);
     setValidation(null);
@@ -303,7 +310,6 @@ export function ReportSavedViewsMenu({ controller, locale, className }: { contro
   }
 
   function openDelete(view: SavedReportView) {
-    setOpen(false);
     setTargetId(view.id);
     setMode('delete');
   }
@@ -323,40 +329,27 @@ export function ReportSavedViewsMenu({ controller, locale, className }: { contro
         : null;
 
   return (
-    <div className={cn('relative', className)}>
-      <Button variant="outline" size="sm" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((value) => !value)}>
-        <Bookmark className="h-4 w-4" strokeWidth={1.7} />
-        {labels.views}
-        <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
-      </Button>
-      {open && (
-        <div role="menu" className="absolute end-0 z-30 mt-2 min-w-64 rounded border border-border bg-surface p-2 shadow-sm">
-          <button type="button" role="menuitem" className="flex min-h-10 w-full items-center gap-2 rounded px-2 text-start text-sm font-medium text-text hover:bg-primary-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => { controller.applyDefaultView(); setOpen(false); }}>
-            <RotateCcw className="h-4 w-4 text-muted" strokeWidth={1.7} aria-hidden />
-            <span className="flex-1">{labels.defaultView}</span>
-          </button>
-          {controller.isModified && <p className="px-2 py-1 text-xs text-muted">{labels.modified}</p>}
-          <div className="my-1 border-t border-border" />
-          {controller.views.length === 0 ? <p className="px-2 py-2 text-xs text-muted">{labels.noSavedViews}</p> : controller.views.map((view) => (
-            <div key={view.id} className="flex items-center gap-1 rounded hover:bg-primary-soft/50">
-              <button type="button" role="menuitem" className="min-h-10 min-w-0 flex-1 truncate px-2 text-start text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => { controller.applyView(view.id); setOpen(false); }}>
-                {view.name}
-              </button>
-              <button type="button" aria-label={`${labels.renameView}: ${view.name}`} className="flex h-9 w-9 items-center justify-center rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => openRename(view)}>
-                <Pencil className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
-              </button>
-              <button type="button" aria-label={`${labels.deleteView}: ${view.name}`} className="flex h-9 w-9 items-center justify-center rounded text-muted hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => openDelete(view)}>
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
-              </button>
-            </div>
-          ))}
-          <div className="my-1 border-t border-border" />
-          <button type="button" role="menuitem" className="flex min-h-10 w-full items-center gap-2 rounded px-2 text-start text-sm font-medium text-primary hover:bg-primary-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={openSave}>
-            <Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden />
-            {labels.saveCurrent}
-          </button>
-        </div>
-      )}
+    <div className={className}>
+      <Dropdown
+        trigger={<><Bookmark className="h-4 w-4" strokeWidth={1.7} /><span>{labels.views}</span></>}
+        menuLabel={labels.views}
+        triggerLabel={labels.views}
+        triggerClassName="h-9 gap-2 border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-primary-soft"
+        menuClassName="min-w-64 p-2"
+      >
+        <DropdownItem icon={RotateCcw} onClick={controller.applyDefaultView}>{labels.defaultView}</DropdownItem>
+        {controller.isModified && <p className="px-2 py-1 text-xs text-muted">{labels.modified}</p>}
+        <div className="my-1 border-t border-border" />
+        {controller.views.length === 0 ? <p className="px-2 py-2 text-xs text-muted">{labels.noSavedViews}</p> : controller.views.map((view) => (
+          <div key={view.id} className="rounded">
+            <DropdownItem onClick={() => controller.applyView(view.id)}>{view.name}</DropdownItem>
+            <DropdownItem icon={Pencil} onClick={() => openRename(view)}>{`${labels.renameView}: ${view.name}`}</DropdownItem>
+            <DropdownItem icon={Trash2} tone="danger" onClick={() => openDelete(view)}>{`${labels.deleteView}: ${view.name}`}</DropdownItem>
+          </div>
+        ))}
+        <div className="my-1 border-t border-border" />
+        <DropdownItem icon={Plus} onClick={openSave}>{labels.saveCurrent}</DropdownItem>
+      </Dropdown>
 
       <Dialog open={mode !== null} onClose={closeDialog} title={mode === 'rename' ? labels.renameView : mode === 'delete' ? labels.deleteView : labels.saveView}>
         {mode === 'delete' ? (

@@ -1,7 +1,7 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { useMemo } from 'react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReportTableViewState } from './report-data-table';
 import { parseStoredSavedReportViews, ReportSavedViewsMenu, useSavedReportViews } from './report-saved-views';
 
@@ -60,19 +60,60 @@ describe('Saved report views persistence', () => {
     expect(restoredState).toContain('"pageSize":50');
 
     await user.click(screen.getByRole('button', { name: 'Views' }));
-    await user.click(screen.getByRole('button', { name: 'Rename view: Management review' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename view: Management review' }));
     const nameInput = screen.getByRole('textbox', { name: 'View name' });
     await user.clear(nameInput);
     await user.type(nameInput, 'Month end');
     await user.click(screen.getByRole('button', { name: 'Rename view' }));
 
     await user.click(screen.getByRole('button', { name: 'Views' }));
-    await user.click(screen.getByRole('button', { name: 'Delete view: Month end' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete view: Month end' }));
     expect(screen.getByText('Delete this saved view?')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     await user.click(screen.getByRole('button', { name: 'Views' }));
     expect(screen.getByText('No saved views yet.')).toBeTruthy();
+  });
+
+  it('falls back to an empty collection and the default table state when localStorage reads are blocked', async () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('storage blocked'); });
+    render(<SavedViewsHarness reportKey="sales:customer" />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Views' })).toBeTruthy());
+    expect(screen.getByTestId('state').textContent).toContain('"density":"compact"');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Views' }));
+    expect(screen.getByText('No saved views yet.')).toBeTruthy();
+    getItem.mockRestore();
+  });
+
+  it('closes the standard menu on Escape, restores trigger focus, and dismisses outside clicks without closing on non-actions inside it', async () => {
+    const user = userEvent.setup();
+    render(<SavedViewsHarness reportKey="sales:customer" />);
+    const trigger = screen.getByRole('button', { name: 'Views' });
+
+    await user.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    await user.click(within(screen.getByRole('menu')).getByText('No saved views yet.'));
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+    await user.keyboard('{Escape}');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+
+    await user.click(trigger);
+    await user.click(document.body);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('closes the menu before opening the save dialog', async () => {
+    const user = userEvent.setup();
+    render(<SavedViewsHarness reportKey="sales:customer" />);
+    const trigger = screen.getByRole('button', { name: 'Views' });
+
+    await user.click(trigger);
+    await user.click(screen.getByRole('menuitem', { name: 'Save current view' }));
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('dialog', { name: 'Save view' })).toBeTruthy();
   });
 
   it('keeps saved views isolated by stable reportKey and renders Arabic labels', async () => {
