@@ -28,6 +28,13 @@ interface ProductCategory {
   products_count?: number;
 }
 
+interface PaginationMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
 const sortOptions: SortOption[] = [
   { value: 'name', label: 'الاسم: أ-ي' },
   { value: '-name', label: 'الاسم: ي-أ' },
@@ -45,13 +52,27 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
     : String(filter.value).trim() === '';
 }
 
-function moneyMatches(value: number, filter?: ActiveFilter): boolean {
-  if (!filter || Array.isArray(filter.value) || String(filter.value).trim() === '') return true;
-  const target = Number(filter.value);
-  if (!Number.isFinite(target)) return true;
-  if (filter.operator === 'lte' || filter.operator === 'lt') return value <= target;
-  if (filter.operator === 'eq') return value === target;
-  return value >= target;
+function productQuery(state: DataExplorerState): string {
+  const params = new URLSearchParams();
+  if (state.search.trim()) params.set('search', state.search.trim());
+  if (state.sort) params.set('sort', state.sort);
+  params.set('page', String(state.page ?? 1));
+  params.set('per_page', String(state.perPage ?? 25));
+
+  for (const filter of state.filters) {
+    if (Array.isArray(filter.value) || String(filter.value).trim() === '') continue;
+    const value = String(filter.value);
+    if (['category_id', 'type', 'is_active', 'stock_state'].includes(filter.key)) {
+      params.set(filter.key, value);
+      continue;
+    }
+    if (filter.key === 'sale_price' || filter.key === 'purchase_price') {
+      const operator = ['gte', 'lte', 'eq'].includes(filter.operator) ? filter.operator : 'gte';
+      params.set(`${filter.key}_${operator}`, value);
+    }
+  }
+
+  return params.toString();
 }
 
 export default function ProductsPage() {
@@ -67,6 +88,7 @@ export default function ProductsPage() {
   const [searchInput, setSearchInput] = useState(explorer.search);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [data, setData] = useState<Product[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -76,19 +98,35 @@ export default function ProductsPage() {
   const [showStock, setShowStock] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const loadProducts = useCallback(() => {
     setLoading(true);
     setLoadError(null);
-    Promise.all([api<{ data: Product[] }>('/products'), api<{ data: ProductCategory[] }>('/product-categories')])
-      .then(([products, productCategories]) => {
-        setData(products.data);
-        setCategories(productCategories.data);
+    const query = productQuery(explorer);
+    api<{ data: Product[]; meta?: PaginationMeta }>(`/products?${query}`)
+      .then((response) => {
+        const rows = Array.isArray(response.data) ? response.data : [];
+        setData(rows);
+        setPagination(response.meta ?? {
+          current_page: 1,
+          last_page: 1,
+          per_page: explorer.perPage ?? 25,
+          total: rows.length,
+        });
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : t('action_failed')))
       .finally(() => setLoading(false));
-  }, [t]);
+  }, [explorer, t]);
 
-  useEffect(() => load(), [load]);
+  const load = useCallback(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  useEffect(() => {
+    api<{ data: ProductCategory[] }>('/product-categories')
+      .then((response) => setCategories(response.data))
+      .catch(() => setCategories([]));
+  }, []);
+  useEffect(() => loadProducts(), [loadProducts]);
   useEffect(() => { getSystemTaxInclusive().then(setTaxInclusive).catch(() => {}); }, []);
   useEffect(() => { getShowStockQuantities().then(setShowStock).catch(() => {}); }, []);
   useEffect(() => {
@@ -148,69 +186,6 @@ export default function ProductsPage() {
     })),
     [definitions, explorer.filters]
   );
-
-  const filtered = useMemo(() => {
-    const byKey = new Map(explorer.filters.map((filter) => [filter.key, filter]));
-    const query = explorer.search.trim().toLocaleLowerCase();
-    return data.filter((product) => {
-      if (query && ![product.name, product.name_en, product.sku, product.barcode, product.category, product.brand]
-        .filter(Boolean).join(' ').toLocaleLowerCase().includes(query)) return false;
-
-      const category = byKey.get('category_id');
-      if (category && !Array.isArray(category.value) && String(category.value) && product.category_id !== String(category.value)) return false;
-
-      const type = byKey.get('type');
-      if (type && !Array.isArray(type.value) && String(type.value) && product.type !== String(type.value)) return false;
-
-      const active = byKey.get('is_active');
-      if (active && !Array.isArray(active.value) && String(active.value) !== '' && product.is_active !== (String(active.value) === '1')) return false;
-
-      const stock = byKey.get('stock_state');
-      if (stock && !Array.isArray(stock.value) && String(stock.value)) {
-        const state = String(stock.value);
-        const quantity = Number(product.quantity_on_hand ?? 0);
-        const reorder = Number(product.reorder_level ?? 0);
-        if (state === 'tracked' && !product.track_inventory) return false;
-        if (state === 'not_tracked' && product.track_inventory) return false;
-        if (state === 'out' && (!product.track_inventory || quantity > 0)) return false;
-        if (state === 'low' && (!product.track_inventory || quantity <= 0 || reorder <= 0 || quantity > reorder)) return false;
-      }
-
-      return moneyMatches(Number(product.sale_price), byKey.get('sale_price'))
-        && moneyMatches(Number(product.purchase_price), byKey.get('purchase_price'));
-    });
-  }, [data, explorer.filters, explorer.search]);
-
-  const sorted = useMemo(() => {
-    const next = [...filtered];
-    const sort = explorer.sort ?? 'name';
-    const desc = sort.startsWith('-');
-    const key = sort.replace(/^-/, '');
-    next.sort((a, b) => {
-      let left: string | number = '';
-      let right: string | number = '';
-      if (['sale_price', 'purchase_price', 'quantity_on_hand'].includes(key)) {
-        left = Number(a[key as 'sale_price' | 'purchase_price' | 'quantity_on_hand'] ?? 0);
-        right = Number(b[key as 'sale_price' | 'purchase_price' | 'quantity_on_hand'] ?? 0);
-      } else if (key === 'sku') {
-        left = a.sku ?? '';
-        right = b.sku ?? '';
-      } else {
-        left = a.name ?? '';
-        right = b.name ?? '';
-      }
-      const compared = typeof left === 'number' && typeof right === 'number'
-        ? left - right
-        : String(left).localeCompare(String(right), 'ar');
-      return desc ? -compared : compared;
-    });
-    return next;
-  }, [explorer.sort, filtered]);
-
-  const perPage = explorer.perPage ?? 25;
-  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
-  const page = Math.min(explorer.page ?? 1, totalPages);
-  const pageData = sorted.slice((page - 1) * perPage, page * perPage);
 
   function updateFilter(next: ActiveFilter) {
     setExplorer((current) => ({
@@ -300,7 +275,6 @@ export default function ProductsPage() {
     { accessorKey: 'sku', header: t('sku'), cell: ({ row }) => <span className="num whitespace-nowrap text-muted">{row.original.sku ?? '—'}</span> },
     {
       accessorKey: 'name', header: t('name'),
-      // كما في الفواتير: سطر واحد بحدٍّ أقصى، والنص كاملٌ في الـ DOM وفي `title`.
       cell: ({ row }) => (
         <Link href={`/products/${row.original.id}`} title={row.original.name} className="block max-w-64 truncate font-medium text-primary hover:underline">
           {row.original.name}
@@ -333,6 +307,11 @@ export default function ProductsPage() {
     { key: 'add', label: t('add'), icon: Plus, href: '/products/new', variant: 'primary' },
   ];
 
+  const page = pagination?.current_page ?? explorer.page ?? 1;
+  const perPage = pagination?.per_page ?? explorer.perPage ?? 25;
+  const total = pagination?.total ?? data.length;
+  const lastPage = pagination?.last_page ?? 1;
+
   return (
     <div className="space-y-4">
       <PageHeader title={t('title')} actions={headerActions} />
@@ -353,13 +332,13 @@ export default function ProductsPage() {
           onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
           options: sortOptions,
         }}
-        resultCount={sorted.length}
-        totalCount={data.length}
+        resultCount={data.length}
+        totalCount={total}
       />
 
       <DataTable
         columns={columns}
-        data={pageData}
+        data={data}
         loading={loading}
         error={loadError}
         onRetry={load}
@@ -384,8 +363,6 @@ export default function ProductsPage() {
               <Badge tone={product.is_active ? 'positive' : 'muted'}>{product.is_active ? t('active') : t('inactive')}</Badge>
             </>
           ),
-          // المعرّفان مستقلان: الباركود يُمسح ضوئياً في نقطة البيع، فإخفاؤه لمجرّد
-          // وجود SKU يُفقد الجوالَ المعلومةَ التي جاء المستخدم من أجلها.
           meta: product.sku || product.barcode ? (
             <span className="flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5">
               {product.sku ? (
@@ -408,9 +385,9 @@ export default function ProductsPage() {
 
       <Pagination
         page={page}
-        lastPage={totalPages}
+        lastPage={lastPage}
         perPage={perPage}
-        total={sorted.length}
+        total={total}
         disabled={loading}
         onPageChange={(next) => setExplorer((current) => ({ ...current, page: next }))}
         onPerPageChange={(next) => setExplorer((current) => ({ ...current, page: 1, perPage: next }))}
