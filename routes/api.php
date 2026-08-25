@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\DocumentIntakeController;
 use App\Http\Controllers\Api\DocumentRevisionController;
+use App\Http\Controllers\Api\DocumentReviewController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeeCustodyController;
 use App\Http\Controllers\Api\EmployeeRequestController;
@@ -226,6 +227,16 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('document-files/{file}/download', [DocumentIntakeController::class, 'download'])
             ->middleware([$perm('documents.center.view'), $commercialApp('document_center.core'), 'signed'])
             ->name('document-files.download');
+        Route::get('document-batches', [DocumentReviewController::class, 'index'])->middleware([$perm('documents.center.view'), $commercialApp('document_center.core')]);
+        Route::get('document-batches/{batch}/review', [DocumentReviewController::class, 'review'])->middleware([$perm('documents.center.view'), $commercialApp('document_center.core')]);
+        Route::post('document-batches/{batch}/review-changes', [DocumentReviewController::class, 'change'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-batches/{batch}/assign-reviewer', [DocumentReviewController::class, 'assign'])->middleware([$perm('documents.center.manage'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-match-results/{match}/confirm', [DocumentReviewController::class, 'confirm'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-match-results/{match}/reject', [DocumentReviewController::class, 'reject'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-issues/{issue}/resolve', [DocumentReviewController::class, 'resolve'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-issues/{issue}/reopen', [DocumentReviewController::class, 'reopen'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-batches/{batch}/revalidate-financial', [DocumentReviewController::class, 'revalidateFinancial'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-batches/{batch}/complete-review', [DocumentReviewController::class, 'complete'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
 
         // الأطراف
         Route::get('partners', [PartnerController::class, 'index'])->middleware($perm('partners.view'));

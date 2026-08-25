@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\DocumentWorkflowStatus;
+use App\Services\DocumentCenter\DocumentReviewMutationGate;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchScoped;
 use App\Tenancy\TenantContext;
@@ -53,6 +54,9 @@ class DocumentBatch extends BaseModel
         });
 
         static::updating(function (self $batch): void {
+            if ($batch->isDirty('review_assigned_to')) {
+                DocumentReviewMutationGate::assertOpen();
+            }
             if ($batch->isDirty(['status', 'version'])) {
                 throw new LogicException('Document workflow state may only change through DocumentWorkflowService.');
             }
@@ -86,5 +90,15 @@ class DocumentBatch extends BaseModel
     public function files(): HasMany
     {
         return $this->hasMany(DocumentFile::class);
+    }
+
+    public function issues(): HasMany
+    {
+        return $this->hasMany(DocumentIssue::class);
+    }
+
+    public function extractionResults(): HasMany
+    {
+        return $this->hasMany(DocumentExtractionResult::class);
     }
 }
