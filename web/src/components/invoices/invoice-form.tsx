@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Plus, Trash2, FileText, Users, ShoppingCart, StickyNote, Tag } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, FileText, Users, ShoppingCart, StickyNote, Tag, Wallet } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { FieldGrid, FieldSpan, FormActions, FormAlert, FormPage, FormSection } from '@/components/nebrax';
+import { InvoiceLineRow, LINE_GRID } from '@/components/invoices/invoice-line-row';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberPreviewField } from '@/components/ui/number-preview-field';
@@ -18,11 +20,11 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { cn } from '@/lib/utils';
-import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { SAUDI_RIYAL_SYMBOL, formatRiyal, riyalToMinor } from '@/lib/money';
 import type { Warehouse } from '@/lib/warehouse';
 
 interface Partner {
-  id: string; name: string; type?: string; phone?: string | null; vat_number?: string | null;
+  id: string; name: string; type?: string; code?: string | null; phone?: string | null; vat_number?: string | null;
   default_price_list_id?: string | null;
   default_price_list?: { id: string; name: string; is_active: boolean } | null;
 }
@@ -152,7 +154,10 @@ export function InvoiceForm({ editId }: { editId?: string }) {
 
   const loadPartners = useCallback(
     (selectFirst = false) =>
-      api<{ data: Partner[] }>('/partners')
+      // `?type=customer` ⇒ `whereIn('type', ['customer','both'])` في الخادم — نفس ما
+      // تستعمله شاشة العملاء وسند القبض. بلا هذه الفلترة يظهر المورّدون خيارات
+      // عميلٍ لفاتورة مبيعات، وقد يُختار أحدهم تلقائياً لو تصدّر القائمة.
+      api<{ data: Partner[] }>('/partners?type=customer')
         .then((r) => {
           setPartners(r.data);
           if (selectFirst && r.data[0]) {
@@ -309,7 +314,9 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const partnerOptions = useMemo<ComboOption[]>(
     () => partners.map((p) => ({
       value: p.id, label: p.name,
-      sub: p.vat_number ?? undefined,
+      // `Combobox` يبحث في `label` و`sub` و`hint` معاً، فما يوضع هنا يصير قابلاً
+      // للبحث: الرمز ثم الرقم الضريبي — كلاهما في حمولة `PartnerResource` أصلاً.
+      sub: [p.code, p.vat_number].filter(Boolean).join('  ·  ') || undefined,
       hint: p.phone ?? undefined,
     })),
     [partners]
@@ -455,6 +462,30 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     return { ...line, allocationInputMode, allocations: converted };
   }));
 
+  /**
+   * الحدّ الأدنى للسعر — مرآةٌ للشرط في `InvoiceService`: يُقارَن **صافي السطر**
+   * بـ`min × quantity × unitFactor`. غرضُها إبرازُ القاعدة عند الحاجة لا فرضُها؛
+   * الفرض في الخادم وحده (ويشترط فوقه صلاحية `sales.minimum_price_override`).
+   *
+   * ولذلك لا يُخفى حقل السبب أبداً حين تكون النتيجة سالبة: الواجهة لا ترى إعداد
+   * `sales.enforce_min_sale_price`، فحسابٌ محلّي مخالف كان سيترك المستخدم أمام
+   * رفضٍ من الخادم بلا حقلٍ يملؤه.
+   */
+  const lineMinimum = (line: Line): { minSalePrice: string | null; belowMinimum: boolean } => {
+    const product = products.find((item) => item.id === line.productId);
+    const minMinor = product?.min_sale_price ? riyalToMinor(product.min_sale_price) : 0;
+    if (!product?.min_sale_price || !Number.isFinite(minMinor) || minMinor <= 0) {
+      return { minSalePrice: null, belowMinimum: false };
+    }
+    const quantity = Number(line.qty) || 0;
+    const factor = product.units?.find((unit) => unit.name === line.unit)?.factor ?? 1;
+    const threshold = minMinor * quantity * factor;
+    return {
+      minSalePrice: product.min_sale_price,
+      belowMinimum: quantity > 0 && riyalToMinor(line.price) > 0 && lineNetTax(line)[0] < threshold,
+    };
+  };
+
   const canSave = useMemo(
     () => !!partnerId && !saving && !loadingDoc && !lines.some((line) => allocationError(line)),
     [partnerId, saving, loadingDoc, lines, taxInclusive, t]
@@ -560,468 +591,307 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     </>
   );
 
-  return (
-    <div className="space-y-5">
-      {dialogs}
-      {/* شريط الإجراءات */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/invoices'>
-          <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Link></Button>
-        <h1 className="text-xl font-semibold text-text">{editId ? t('edit_title') : t('new_title')}</h1>
-        <div className="ms-auto flex items-center gap-2">
-          <Button asChild variant="ghost"><Link href='/invoices'>{t('cancel')}</Link></Button>
-          <Button variant="outline" disabled={!canSave} onClick={() => submit(false)}>{t('save_draft')}</Button>
-          <Button disabled={!canSave} onClick={() => submit(true)}>{t('save_post')}</Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_300px]">
-        {/* العمود الرئيسي */}
-        <div className="min-w-0 space-y-5">
-          {/* العميل — بلا «نوع الدفع»: السداد صار خانةً واحدة في ملخّص الفاتورة
-              أسفل الإجمالي، حيث يُقرَّر فعلاً. */}
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('customer_section')}</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="partner">{t('partner')} <span className="text-negative">*</span></Label>
-                  <div className="flex items-center gap-2">
-                    <Combobox
-                      id="partner"
-                      className="min-w-0 flex-1"
-                      value={partnerId}
-                      onChange={selectPartner}
-                      options={partnerOptions}
-                      placeholder={t('choose_partner')}
-                      searchPlaceholder={t('search_partner')}
-                      emptyText={t('no_partner_found')}
-                    />
-                    <Button type="button" variant="outline" onClick={() => setNewPartner(true)}>
-                      <Plus className="h-4 w-4" strokeWidth={1.7} />
-                      {t('new_partner')}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* بيانات الفاتورة */}
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('meta_section')}</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {!editId && <NumberPreviewField id="invoice-number" label={t('invoice_number')} number={suggestedNumber} loading={loadingNumber} />}
-                <div className="space-y-1.5">
-                  <Label htmlFor="date">{t('invoice_date')}</Label>
-                  <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => changeDate(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="terms">{t('payment_terms')}</Label>
-                  <div className="relative">
-                    <Input id="terms" type="number" min={0} dir="ltr" className="num pe-14" value={terms} onChange={(e) => applyTerms(e.target.value)} />
-                    <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">{t('days')}</span>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="due">{t('due_date')}</Label>
-                  <Input id="due" type="date" dir="ltr" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-                </div>
-                {warehouses.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="warehouse">{t('warehouse')}</Label>
-                    <Select id="warehouse" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
-                      <option value="">{t('warehouse_auto')}</option>
-                      {warehouses.map((warehouse) => (
-                        <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>
-                      ))}
-                    </Select>
-                    <p className="text-xs text-muted">{t('warehouse_hint')}</p>
-                  </div>
-                )}
-                {priceLists.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="price-list">{t('price_list')}</Label>
-                    <div className="flex gap-2">
-                      <Select id="price-list" value={priceListId} onChange={(e) => setPriceListId(e.target.value)}>
-                        <option value="">{t('price_list_base')}</option>
-                        {priceLists.map((list) => <option key={list.id} value={list.id} disabled={!list.is_active && list.id !== priceListId}>{list.name}{!list.is_active ? ` — ${t('price_list_inactive')}` : ''}</option>)}
-                      </Select>
-                      <Button type="button" variant="outline" size="sm" disabled={!priceListId || !priceLists.find((list) => list.id === priceListId)?.is_active || applyingPriceList} onClick={() => void applyPriceListToLines()}>{applyingPriceList ? t('price_list_applying') : t('price_list_apply')}</Button>
-                    </div>
-                    <p className="text-xs text-muted">{t('price_list_hint')}</p>
-                  </div>
-                )}
-                {centers.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="center">{t('cost_center')}</Label>
-                    <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
-                      <option value="">{t('no_center')}</option>
-                      {centers.map((c) => (<option key={c.id} value={c.id}>{c.code} — {c.name}</option>))}
-                    </Select>
-                  </div>
-                )}
-                {employees.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="sp">{t('salesperson')}</Label>
-                    <Select id="sp" value={salespersonId} onChange={(e) => setSalespersonId(e.target.value)}>
-                      <option value="">{t('no_salesperson')}</option>
-                      {employees.map((e2) => (<option key={e2.id} value={e2.id}>{e2.name}</option>))}
-                    </Select>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* البنود */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('lines')}</CardTitle>
-              <Button type="button" variant="outline" size="sm" onClick={addLine}>
-                <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />{t('add_line')}
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="hidden grid-cols-12 gap-2 px-1 text-[11px] font-medium text-muted md:grid">
-                <div className="col-span-2">{t('item')}</div>
-                <div className="col-span-2">{t('description')}</div>
-                <div className="col-span-2 text-end">{t('price')}</div>
-                <div className="col-span-2 text-end">{t('qty')}</div>
-                <div className="col-span-1 text-end">{t('line_discount_short')}</div>
-                <div className="col-span-1 text-end">{t('tax')}</div>
-                <div className="col-span-1 text-end">{t('total_with_vat')}</div>
-                <div className="col-span-1" />
-              </div>
-
-              {lines.map((l) => {
-                const [net, lineTax] = lineNetTax(l);
-                return (
-                  <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded-lg border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
-                    {/* **السطر الوصفي يبقى متاحاً هنا عمداً** — خلافاً لفاتورة
-                        الشراء. بيعُ خدمةٍ خارج الكتالوج يُقيَّد إيراداً على 4110
-                        كأي بيع، فلا خطأ محاسبياً يُبرّر الإلزام. */}
-                    <Combobox
-                      className="col-span-2 md:col-span-2"
-                      value={l.productId ?? ''}
-                      onChange={(v) => pickProduct(l.key, v)}
-                      options={productOptions}
-                      placeholder={t('manual')}
-                      searchPlaceholder={t('search_product')}
-                      emptyText={t('no_product_found')}
-                      clearLabel={t('manual')}
-                      footerLabel={t('new_product')}
-                      onFooterClick={() => setNewProductFor(l.key)}
-                      aria-label={t('item')}
-                    />
-                    <Input className="col-span-2 md:col-span-2" placeholder={t('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
-                    <Input className="num text-end md:col-span-2" inputMode="decimal" placeholder={t('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
-                    {/* الكمية ووحدتها خلية واحدة: الوحدة تُعرَض فقط حين يحمل
-                        المنتج قالباً بأكثر من وحدة، فلا تزدحم الشاشة بلا داعٍ. */}
-                    <div className="col-span-2 flex items-center gap-1 md:col-span-2">
-                      <Input className="num flex-1 text-end" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
-                      {(() => {
-                        const units = products.find((p) => p.id === l.productId)?.units ?? [];
-                        if (units.length < 2) return null;
-                        return (
-                          <Select className="w-24 shrink-0" value={l.unit} onChange={(e) => void changeLineUnit(l.key, e.target.value)} aria-label={t('unit')}>
-                            {units.map((u) => (<option key={u.name} value={u.factor === 1 ? '' : u.name}>{u.name}</option>))}
-                          </Select>
-                        );
-                      })()}
-                    </div>
-                    <Input className="num text-end md:col-span-1" inputMode="decimal" placeholder="0" value={l.disc} onChange={(e) => setLine(l.key, { disc: e.target.value })} />
-                    <Input className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
-                    <div className="num col-span-1 text-end text-sm text-text md:col-span-1">{formatRiyal((net + lineTax) / 100)}</div>
-                    <Button type="button" variant="ghost" size="icon" className="col-span-1 ms-auto md:col-span-1" aria-label={t('remove_line')} onClick={() => removeLine(l.key)}>
-                      <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
-                    </Button>
-
-                    {(() => {
-                      const product = products.find((item) => item.id === l.productId);
-                      if (!product?.min_sale_price || riyalToMinor(product.min_sale_price) <= 0) return null;
-                      return <div className="col-span-2 rounded-md border border-warning/30 bg-warning/5 p-3 md:col-span-12"><div className="space-y-1.5"><Label htmlFor={`minimum-price-reason-${l.key}`}>{t('minimum_price_override_reason')}</Label><Input id={`minimum-price-reason-${l.key}`} value={l.minimumPriceOverrideReason} maxLength={500} onChange={(event) => setLine(l.key, { minimumPriceOverrideReason: event.target.value })} placeholder={t('minimum_price_override_reason_placeholder')} /><p className="text-xs leading-relaxed text-muted">{t('minimum_price_override_reason_hint', { amount: formatRiyal(Number(product.min_sale_price)) })}</p></div></div>;
-                    })()}
-
-                    {centers.length > 0 && (() => {
-                      const allocationTotal = allocationMinorTotal(l);
-                      const allocationIssue = allocationError(l);
-                      const lineNet = net;
-                      const remaining = allocationTotal === null
-                        ? null
-                        : l.allocationInputMode === 'percent' ? 10000 - allocationTotal : lineNet - allocationTotal;
-                      return (
-                        <div className="col-span-2 rounded-md border border-border bg-surface/60 p-3 md:col-span-12">
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            <div className="space-y-1.5">
-                              <Label htmlFor={`line-center-kind-${l.key}`}>{t('line_cost_center')}</Label>
-                              <Select
-                                id={`line-center-kind-${l.key}`}
-                                value={l.allocationKind}
-                                onChange={(event) => setAllocationKind(l.key, event.target.value as AllocationKind)}
-                              >
-                                <option value="none">{t('line_cost_center_none')}</option>
-                                <option value="single">{t('line_cost_center_single')}</option>
-                                <option value="multiple">{t('line_cost_center_multiple')}</option>
-                              </Select>
-                            </div>
-                            {l.allocationKind !== 'none' && (
-                              <div className="space-y-1.5">
-                                <Label htmlFor={`line-center-mode-${l.key}`}>{t('allocation_mode')}</Label>
-                                <Select
-                                  id={`line-center-mode-${l.key}`}
-                                  value={l.allocationInputMode}
-                                  onChange={(event) => changeAllocationInputMode(l.key, event.target.value as AllocationInputMode)}
-                                >
-                                  <option value="percent">{t('allocation_percent')}</option>
-                                  <option value="amount">{t('allocation_amount')}</option>
-                                </Select>
-                              </div>
-                            )}
-                          </div>
-
-                          {l.allocationKind !== 'none' && (
-                            <div className="mt-3 space-y-2">
-                              {l.allocations.map((allocation, allocationIndex) => (
-                                <div key={`${l.key}-allocation-${allocationIndex}`} className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,180px)_auto]">
-                                  <div className="space-y-1.5">
-                                    <Label htmlFor={`line-center-${l.key}-${allocationIndex}`}>{t('allocation_center')}</Label>
-                                    <Select
-                                      id={`line-center-${l.key}-${allocationIndex}`}
-                                      value={allocation.costCenterId}
-                                      onChange={(event) => patchAllocation(l.key, allocationIndex, { costCenterId: event.target.value })}
-                                    >
-                                      <option value="">{t('no_center')}</option>
-                                      {centers.map((center) => (
-                                        <option
-                                          key={center.id}
-                                          value={center.id}
-                                          disabled={center.id !== allocation.costCenterId && l.allocations.some((item) => item.costCenterId === center.id)}
-                                        >
-                                          {center.code} — {center.name}
-                                        </option>
-                                      ))}
-                                    </Select>
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <Label htmlFor={`line-center-value-${l.key}-${allocationIndex}`}>
-                                      {l.allocationInputMode === 'percent' ? t('allocation_value_percent') : t('allocation_value_amount')}
-                                    </Label>
-                                    <Input
-                                      id={`line-center-value-${l.key}-${allocationIndex}`}
-                                      className="num text-end"
-                                      inputMode="decimal"
-                                      placeholder="0"
-                                      value={allocation.value}
-                                      onChange={(event) => patchAllocation(l.key, allocationIndex, { value: event.target.value })}
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="mb-0.5"
-                                    aria-label={t('allocation_remove')}
-                                    onClick={() => removeAllocation(l.key, allocationIndex)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
-                                  </Button>
-                                </div>
-                              ))}
-
-                              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2">
-                                <Button type="button" variant="outline" size="sm" onClick={() => addAllocation(l.key)}>
-                                  <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />{t('allocation_add')}
-                                </Button>
-                                <div className="text-end text-xs" aria-live="polite">
-                                  <p className="text-muted">
-                                    {t('allocation_total')}: <span className="num text-text">
-                                      {allocationTotal === null
-                                        ? '—'
-                                        : l.allocationInputMode === 'percent'
-                                          ? `${basisPointsToPercent(allocationTotal)}%`
-                                          : formatRiyal(allocationTotal / 100)}
-                                    </span> {t('allocation_of_line')}
-                                  </p>
-                                  {remaining !== null && (
-                                    <p className={cn('num', remaining === 0 ? 'text-positive' : 'text-negative')}>
-                                      {remaining === 0
-                                        ? t('allocation_complete')
-                                        : `${t('allocation_remaining')}: ${l.allocationInputMode === 'percent' ? `${basisPointsToPercent(Math.abs(remaining))}%` : formatRiyal(Math.abs(remaining) / 100)}`}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-[11px] leading-relaxed text-muted">{t('allocation_hint')}</p>
-                              {allocationIssue && <p className="text-xs text-negative" role="alert">{allocationIssue}</p>}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          {/* الخصم والشحن على مستوى الفاتورة */}
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('discount_shipping')}</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="taxmode">{t('tax_mode')}</Label>
-                  <Select id="taxmode" value={taxInclusive ? '1' : '0'} onChange={(e) => setTaxInclusive(e.target.value === '1')}>
-                    <option value="0">{t('tax_exclusive')}</option>
-                    <option value="1">{t('tax_inclusive')}</option>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="dmode">{t('discount_mode')}</Label>
-                  <Select id="dmode" value={discountMode} onChange={(e) => setDiscountMode(e.target.value as 'amount' | 'percent')}>
-                    <option value="amount">{t('discount_amount')}</option>
-                    <option value="percent">{t('discount_percent')}</option>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="dval">{discountMode === 'percent' ? t('discount_percent') : t('discount_amount')}</Label>
-                  <div className="relative">
-                    <Input id="dval" inputMode="decimal" className="num text-end pe-12" placeholder="0" value={discountInput} onChange={(e) => setDiscountInput(e.target.value)} />
-                    <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">{discountMode === 'percent' ? '%' : '﷼'}</span>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ship">{t('shipping')}</Label>
-                  <div className="relative">
-                    <Input id="ship" inputMode="decimal" className="num text-end pe-12" placeholder="0" value={shippingInput} onChange={(e) => setShippingInput(e.target.value)} />
-                    <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">﷼</span>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="adj">{t('adjustment')}</Label>
-                  <div className="relative">
-                    <Input id="adj" inputMode="decimal" dir="ltr" className="num text-end pe-12" placeholder="0" value={adjustmentInput} onChange={(e) => setAdjustmentInput(e.target.value)} />
-                    <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">﷼</span>
-                  </div>
-                </div>
-              </div>
-              <p className="mt-2 text-[11px] text-muted">{t('adjustment_hint')}</p>
-            </CardContent>
-          </Card>
-
-          {/* الملاحظات */}
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><StickyNote className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('notes')}</CardTitle></CardHeader>
-            <CardContent>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="min-h-20 w-full resize-y rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                placeholder={t('notes')}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* الملخّص الجانبي اللاصق */}
-        <aside className="lg:sticky lg:top-4 lg:self-start">
-          <Card>
-            <CardHeader><CardTitle>{t('summary_title')}</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between text-muted"><span>{t('subtotal')}</span><span className="num">{formatRiyal(subMinor / 100)}</span></div>
-              {discountMinor > 0 && (
-                <div className="flex justify-between text-muted"><span>{t('discount')}</span><span className="num text-positive">-{formatRiyal(discountMinor / 100)}</span></div>
-              )}
-              {shippingMinor > 0 && (
-                <div className="flex justify-between text-muted"><span>{t('shipping')}</span><span className="num">{formatRiyal(shippingMinor / 100)}</span></div>
-              )}
-              <div className="flex justify-between text-muted"><span>{t('tax_total')}</span><span className="num">{formatRiyal(taxMinor / 100)}</span></div>
-              {adjustmentMinor !== 0 && (
-                <div className="flex justify-between text-muted"><span>{t('adjustment')}</span><span className="num">{adjustmentMinor > 0 ? '+' : ''}{formatRiyal(adjustmentMinor / 100)}</span></div>
-              )}
-              <div className="flex items-baseline justify-between border-t border-border pt-2">
-                <span className="font-semibold text-text">{t('total')}</span>
-                <span className="num text-2xl font-bold text-primary-hover">{formatRiyal(totalMinor / 100)}</span>
-              </div>
-
-              {/* ═══ مدفوع بالفعل ═══
-                  التأشير يعني تحصيل الإجمالي كاملاً لحظة الترحيل: الفاتورة على
-                  1130 ثم **سند قبض مرحَّل** يقفلها (مدين الخزينة · دائن 1130).
-                  التسمية تلفّ المربّع والنصّ معاً فتُنقر كلّها. */}
-              <div className="border-t border-border pt-3">
-                <label className="flex cursor-pointer items-center gap-2 py-0.5 text-sm font-medium text-text">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 shrink-0 accent-primary"
-                    checked={isPaid}
-                    onChange={(e) => setIsPaid(e.target.checked)}
-                  />
-                  {t('paid_already')}
-                </label>
-
-                {/* **إخفاء بصري لا إزالة**: الحقول تبقى في الـ DOM وقيمها في
-                    الحالة، فإلغاء الخانة لا يُفقد ما أُدخل، وإعادة التأشير
-                    تُظهره كما تُرك. والارتفاع ينتقل بلطف فلا تقفز الأزرار.
-                    و`invisible` ضرورية فوق قصّ الارتفاع: المقصوص وحده يبقى في
-                    شجرة الوصولية وقابلاً للتركيز، فيُملى على المستخدم حقلٌ لا
-                    يراه. */}
-                <div
-                  className={cn(
-                    'grid transition-[grid-template-rows] duration-150 ease-out',
-                    isPaid ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-                  )}
-                >
-                  <div className={cn('overflow-hidden', !isPaid && 'invisible')}>
-                    <div className="space-y-2.5 pt-3" aria-hidden={!isPaid}>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="pay-method">{t('payment_method')}</Label>
-                        <Select
-                          id="pay-method" value={payMethod} tabIndex={isPaid ? undefined : -1}
-                          onChange={(e) => setPayMethod(e.target.value)}
-                        >
-                          <option value="cash">{t('method_cash')}</option>
-                          <option value="transfer">{t('method_transfer')}</option>
-                          <option value="card">{t('method_card')}</option>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="pay-ref">{t('payment_reference')}</Label>
-                        <Input
-                          id="pay-ref" dir="ltr" className="num" value={payReference}
-                          tabIndex={isPaid ? undefined : -1}
-                          onChange={(e) => setPayReference(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="pay-account">{t('cash_account')}</Label>
-                        <Select
-                          id="pay-account" value={cashAccountId} tabIndex={isPaid ? undefined : -1}
-                          onChange={(e) => setCashAccountId(e.target.value)}
-                        >
-                          {/* الافتراضية = خزينة الأداة (1110 للنقد، 1120 للتحويل/البطاقة). */}
-                          <option value="">{t('cash_account_main')}</option>
-                          {cashAccounts.map((a) => (
-                            <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
-                          ))}
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
-              <Button className="mt-2 w-full" disabled={!canSave} onClick={() => submit(true)}>{t('save_post')}</Button>
-              <Button variant="outline" className="w-full" disabled={!canSave} onClick={() => submit(false)}>{t('save_draft')}</Button>
-              <p className="pt-1 text-[11px] leading-relaxed text-muted">{t('summary_hint')}</p>
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
+  const summaryRow = (label: string, value: string, tone?: 'positive' | 'muted') => (
+    <div className="flex items-baseline justify-between gap-3 text-sm">
+      <span className="text-muted">{label}</span>
+      <span className={cn('num text-end', tone === 'positive' ? 'text-positive' : 'text-text')}>{value}</span>
     </div>
+  );
+
+  return (
+    <FormPage
+      width="full"
+      backHref="/invoices"
+      backLabel={t('back')}
+      title={editId ? t('edit_title') : t('new_title')}
+      actions={
+        <FormActions
+          secondary={<>
+            <Button asChild type="button" variant="ghost"><Link href='/invoices'>{t('cancel')}</Link></Button>
+            <Button type="button" variant="outline" disabled={!canSave} onClick={() => submit(false)}>{t('save_draft')}</Button>
+          </>}
+          primary={<Button type="button" disabled={!canSave} onClick={() => submit(true)}>{t('save_post')}</Button>}
+        />
+      }
+    >
+      {dialogs}
+
+      {/* ═══ ١. العميل وهويّة الفاتورة ═══
+          العميل أولاً لأنه يقرّر قائمة الأسعار وشروط السداد، ثم ما يعرّف المستند. */}
+      <FormSection title={t('customer_section')} icon={Users}>
+        <FieldGrid columns={3}>
+          <FieldSpan className="space-y-1.5 lg:col-span-2">
+            <Label htmlFor="partner">{t('partner')} <span className="text-negative">*</span></Label>
+            <div className="flex items-center gap-2">
+              <Combobox
+                id="partner"
+                className="min-w-0 flex-1"
+                value={partnerId}
+                onChange={selectPartner}
+                options={partnerOptions}
+                placeholder={t('choose_partner')}
+                searchPlaceholder={t('search_partner')}
+                emptyText={t('no_partner_found')}
+              />
+              <Button type="button" variant="outline" className="shrink-0" onClick={() => setNewPartner(true)}>
+                <Plus className="h-4 w-4" strokeWidth={1.7} />
+                <span className="hidden sm:inline">{t('new_partner')}</span>
+              </Button>
+            </div>
+          </FieldSpan>
+          {!editId && <NumberPreviewField id="invoice-number" label={t('invoice_number')} number={suggestedNumber} loading={loadingNumber} />}
+          <div className="space-y-1.5">
+            <Label htmlFor="date">{t('invoice_date')}</Label>
+            <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => changeDate(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="terms">{t('payment_terms')}</Label>
+            <div className="relative">
+              <Input id="terms" type="number" min={0} dir="ltr" className="num pe-14" value={terms} onChange={(e) => applyTerms(e.target.value)} />
+              <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">{t('days')}</span>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="due">{t('due_date')}</Label>
+            <Input id="due" type="date" dir="ltr" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </div>
+        </FieldGrid>
+      </FormSection>
+
+      {/* ═══ ٢. البنود — منطقة العمل الأولى ═══ */}
+      <FormSection
+        title={t('lines')}
+        icon={ShoppingCart}
+        action={
+          <Button type="button" variant="outline" size="sm" onClick={addLine}>
+            <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />{t('add_line')}
+          </Button>
+        }
+        contentClassName="space-y-2"
+      >
+        {/* رأس الأعمدة للصفّ الكثيف وحده — دونه لكل حقلٍ تسميتُه. */}
+        <div className={cn('hidden gap-2 px-1 text-[11px] font-medium text-muted lg:grid', LINE_GRID)}>
+          <div>{t('item')}</div>
+          <div>{t('description')}</div>
+          <div className="text-end">{t('price')}</div>
+          <div className="text-end">{t('qty')}</div>
+          <div className="text-end">{t('line_discount_short')}</div>
+          <div className="text-end">{t('tax')}</div>
+          <div className="text-end">{t('total_with_vat')}</div>
+          <div />
+        </div>
+
+        {lines.map((l) => {
+          const [net, lineTax] = lineNetTax(l);
+          const { minSalePrice, belowMinimum } = lineMinimum(l);
+          return (
+            <InvoiceLineRow
+              key={l.key}
+              line={l}
+              productOptions={productOptions}
+              units={products.find((p) => p.id === l.productId)?.units ?? []}
+              centers={centers}
+              net={net}
+              lineTax={lineTax}
+              minSalePrice={minSalePrice}
+              belowMinimum={belowMinimum}
+              allocationTotal={allocationMinorTotal(l)}
+              allocationIssue={allocationError(l)}
+              canRemove={lines.length > 1}
+              onPatch={(patch) => setLine(l.key, patch)}
+              onPickProduct={(productId) => void pickProduct(l.key, productId)}
+              onChangeUnit={(unit) => void changeLineUnit(l.key, unit)}
+              onNewProduct={() => setNewProductFor(l.key)}
+              onRemove={() => removeLine(l.key)}
+              onAllocationKind={(kind) => setAllocationKind(l.key, kind)}
+              onAllocationInputMode={(mode) => changeAllocationInputMode(l.key, mode)}
+              onAllocationPatch={(index, patch) => patchAllocation(l.key, index, patch)}
+              onAllocationAdd={() => addAllocation(l.key)}
+              onAllocationRemove={(index) => removeAllocation(l.key, index)}
+            />
+          );
+        })}
+
+        <p className="pt-1 text-xs leading-relaxed text-muted">{t('items_hint')}</p>
+      </FormSection>
+
+      {/* ═══ ٣. التسويات التجارية ═══ */}
+      <FormSection title={t('discount_shipping')} icon={Tag}>
+        <FieldGrid columns={3}>
+          <div className="space-y-1.5">
+            <Label htmlFor="taxmode">{t('tax_mode')}</Label>
+            <Select id="taxmode" value={taxInclusive ? '1' : '0'} onChange={(e) => setTaxInclusive(e.target.value === '1')}>
+              <option value="0">{t('tax_exclusive')}</option>
+              <option value="1">{t('tax_inclusive')}</option>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="dmode">{t('discount_mode')}</Label>
+            <Select id="dmode" value={discountMode} onChange={(e) => setDiscountMode(e.target.value as 'amount' | 'percent')}>
+              <option value="amount">{t('discount_amount')}</option>
+              <option value="percent">{t('discount_percent')}</option>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="dval">{discountMode === 'percent' ? t('discount_percent') : t('discount_amount')}</Label>
+            <div className="relative">
+              <Input id="dval" inputMode="decimal" dir="ltr" className="num pe-12 text-end" placeholder="0" value={discountInput} onChange={(e) => setDiscountInput(e.target.value)} />
+              <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted" aria-hidden="true">{discountMode === 'percent' ? '%' : SAUDI_RIYAL_SYMBOL}</span>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ship">{t('shipping')}</Label>
+            <div className="relative">
+              <Input id="ship" inputMode="decimal" dir="ltr" className="num pe-12 text-end" placeholder="0" value={shippingInput} onChange={(e) => setShippingInput(e.target.value)} />
+              <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted" aria-hidden="true">{SAUDI_RIYAL_SYMBOL}</span>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="adj">{t('adjustment')}</Label>
+            <div className="relative">
+              <Input id="adj" inputMode="decimal" dir="ltr" className="num pe-12 text-end" placeholder="0" value={adjustmentInput} onChange={(e) => setAdjustmentInput(e.target.value)} />
+              <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted" aria-hidden="true">{SAUDI_RIYAL_SYMBOL}</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted">{t('adjustment_hint')}</p>
+          </div>
+        </FieldGrid>
+      </FormSection>
+
+      {/* ═══ ٤. الإجماليات ═══
+          في تدفّق القراءة تحت التسويات التي تصنعها مباشرة، لا في عمودٍ جانبي:
+          العمود الجانبي كان يقتطع من عرض البنود — وهي منطقة العمل الأولى — نحو
+          ٣٠٠px عند كل مقاس، فيضيق صفّها الكثيف حتى تُقصّ أرقامه. */}
+      <Card>
+        <CardContent className="grid gap-x-8 gap-y-2 p-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            {summaryRow(t('subtotal'), formatRiyal(subMinor / 100))}
+            {discountMinor > 0 && summaryRow(t('discount'), `-${formatRiyal(discountMinor / 100)}`, 'positive')}
+            {shippingMinor > 0 && summaryRow(t('shipping'), formatRiyal(shippingMinor / 100))}
+            {summaryRow(t('tax_total'), formatRiyal(taxMinor / 100))}
+            {adjustmentMinor !== 0 && summaryRow(t('adjustment'), `${adjustmentMinor > 0 ? '+' : ''}${formatRiyal(adjustmentMinor / 100)}`)}
+          </div>
+          <div className="flex flex-col justify-end gap-1 border-t border-border pt-3 sm:border-0 sm:pt-0">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-semibold text-text">{t('total')}</span>
+              <span className="num text-2xl font-bold text-primary-hover">{formatRiyal(totalMinor / 100)}</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted">{t('summary_hint')}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ═══ ٥. السداد — الخانة هي البوّابة ═══ */}
+      <FormSection title={t('payment_section')} icon={Wallet}>
+        <label className="flex cursor-pointer items-center gap-2 py-0.5 text-sm font-medium text-text">
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={isPaid}
+            onChange={(e) => setIsPaid(e.target.checked)}
+          />
+          {t('paid_already')}
+        </label>
+
+        {/* **إخفاء بصري لا إزالة**: الحقول تبقى في الـDOM وقيمها في الحالة، فإلغاء
+            الخانة لا يُفقد ما أُدخل، وإعادة التأشير تُظهره كما تُرك. و`invisible`
+            ضرورية فوق قصّ الارتفاع: المقصوص وحده يبقى في شجرة الوصولية وقابلاً
+            للتركيز، فيُملى على المستخدم حقلٌ لا يراه. */}
+        <div className={cn('grid transition-[grid-template-rows] duration-150 ease-out', isPaid ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+          <div className={cn('overflow-hidden', !isPaid && 'invisible')}>
+            <div className="pt-3" aria-hidden={!isPaid}>
+              <FieldGrid columns={3}>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pay-method">{t('payment_method')}</Label>
+                  <Select id="pay-method" value={payMethod} tabIndex={isPaid ? undefined : -1} onChange={(e) => setPayMethod(e.target.value)}>
+                    <option value="cash">{t('method_cash')}</option>
+                    <option value="transfer">{t('method_transfer')}</option>
+                    <option value="card">{t('method_card')}</option>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pay-ref">{t('payment_reference')}</Label>
+                  <Input id="pay-ref" dir="ltr" className="num" value={payReference} tabIndex={isPaid ? undefined : -1} onChange={(e) => setPayReference(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pay-account">{t('cash_account')}</Label>
+                  <Select id="pay-account" value={cashAccountId} tabIndex={isPaid ? undefined : -1} onChange={(e) => setCashAccountId(e.target.value)}>
+                    {/* الافتراضية = خزينة الأداة (1110 للنقد، 1120 للتحويل/البطاقة). */}
+                    <option value="">{t('cash_account_main')}</option>
+                    {cashAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                    ))}
+                  </Select>
+                </div>
+              </FieldGrid>
+            </div>
+          </div>
+        </div>
+      </FormSection>
+
+      {/* ═══ ٦. بيانات تشغيلية ومحاسبية ثانوية ═══
+          تحت البنود لا فوقها: كانت سبعة حقولٍ تفصل المحاسب عن منطقة عمله. */}
+      {(warehouses.length > 0 || priceLists.length > 0 || centers.length > 0 || employees.length > 0) && (
+        <FormSection title={t('meta_section')} icon={FileText}>
+          <FieldGrid columns={3}>
+            {warehouses.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="warehouse">{t('warehouse')}</Label>
+                <Select id="warehouse" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                  <option value="">{t('warehouse_auto')}</option>
+                  {warehouses.map((warehouse) => (
+                    <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>
+                  ))}
+                </Select>
+                <p className="text-xs text-muted">{t('warehouse_hint')}</p>
+              </div>
+            )}
+            {priceLists.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="price-list">{t('price_list')}</Label>
+                <div className="flex gap-2">
+                  <Select id="price-list" className="min-w-0 flex-1" value={priceListId} onChange={(e) => setPriceListId(e.target.value)}>
+                    <option value="">{t('price_list_base')}</option>
+                    {priceLists.map((list) => <option key={list.id} value={list.id} disabled={!list.is_active && list.id !== priceListId}>{list.name}{!list.is_active ? ` — ${t('price_list_inactive')}` : ''}</option>)}
+                  </Select>
+                  <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={!priceListId || !priceLists.find((list) => list.id === priceListId)?.is_active || applyingPriceList} onClick={() => void applyPriceListToLines()}>{applyingPriceList ? t('price_list_applying') : t('price_list_apply')}</Button>
+                </div>
+                <p className="text-xs text-muted">{t('price_list_hint')}</p>
+              </div>
+            )}
+            {centers.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="center">{t('cost_center')}</Label>
+                <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
+                  <option value="">{t('no_center')}</option>
+                  {centers.map((c) => (<option key={c.id} value={c.id}>{c.code} — {c.name}</option>))}
+                </Select>
+              </div>
+            )}
+            {employees.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="sp">{t('salesperson')}</Label>
+                <Select id="sp" value={salespersonId} onChange={(e) => setSalespersonId(e.target.value)}>
+                  <option value="">{t('no_salesperson')}</option>
+                  {employees.map((e2) => (<option key={e2.id} value={e2.id}>{e2.name}</option>))}
+                </Select>
+              </div>
+            )}
+          </FieldGrid>
+        </FormSection>
+      )}
+
+      {/* ═══ ٧. الملاحظات ═══ */}
+      <FormSection title={t('notes')} icon={StickyNote}>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          className="min-h-20 w-full resize-y rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          placeholder={t('notes')}
+        />
+      </FormSection>
+
+      {error && <FormAlert>{error}</FormAlert>}
+    </FormPage>
   );
 }
