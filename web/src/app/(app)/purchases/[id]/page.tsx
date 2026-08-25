@@ -16,6 +16,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { Tabs, TabPanel } from '@/components/ui/tabs';
 import { Accordion, AccordionItem } from '@/components/ui/accordion';
+import { EmptyState } from '@/components/nebrax';
 import { useToast } from '@/components/ui/toast';
 import type { Party, DocLine } from '@/components/documents/tax-document';
 import { PurchaseDocument } from '@/components/purchases/purchase-document';
@@ -258,7 +259,16 @@ export default function PurchaseDetailPage() {
     return <div className="rounded border border-border bg-surface p-8 text-center"><p className="text-sm text-negative">{t('load_error')}</p><Button variant="outline" className="mt-3" onClick={load}>{t('retry')}</Button></div>;
   }
 
-  if (!purchase) return <div className="text-muted">{t('not_found')}</div>;
+  // نصٌّ عارٍ بلا طريق رجوع كان يترك المستخدم عالقاً. باقي الصفحة خارج نطاق
+  // المرحلة (مساحة عمل مستندية، انظر مسح المرحلة ٣) ولم يُمَس.
+  if (!purchase) {
+    return (
+      <EmptyState
+        title={t('not_found')}
+        action={<Button asChild variant="outline"><Link href="/purchases">{t('back')}</Link></Button>}
+      />
+    );
+  }
 
   const receivedStatusKey = receiptKey(purchase.received_status);
   const receivedStatusLabel = tpp(`received_${receivedStatusKey}`);

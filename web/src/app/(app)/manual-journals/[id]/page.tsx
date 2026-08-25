@@ -1,19 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Copy, FileText, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import { Copy, FileText, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toast';
+import { DetailPage, ErrorState, FormAlert, LoadingState, type PageAction } from '@/components/nebrax';
+import { LedgerLinesTable } from '@/components/accounting/ledger-lines-table';
 import { api, ApiError } from '@/lib/api';
-import { formatRiyal } from '@/lib/money';
 
 interface ManualJournalLine {
   id: string;
@@ -49,6 +49,7 @@ export default function ManualJournalDetailsPage() {
   const { success, error: toastError } = useToast();
   const [journal, setJournal] = useState<ManualJournal | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [acting, setActing] = useState(false);
   const [reverseOpen, setReverseOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -56,17 +57,14 @@ export default function ManualJournalDetailsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     api<{ data: ManualJournal }>(`/manual-journals/${params.id}`)
       .then((response) => setJournal(response.data))
-      .catch((err) => toastError(err instanceof ApiError ? err.message : t('loadFailed')))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : t('loadFailed')))
       .finally(() => setLoading(false));
-  }, [params.id, t, toastError]);
+  }, [params.id, t]);
 
   useEffect(() => load(), [load]);
-
-  const totals = useMemo(() => (journal?.lines ?? []).reduce((sum, line) => ({
-    debit: sum.debit + Number(line.debit || 0), credit: sum.credit + Number(line.credit || 0),
-  }), { debit: 0, credit: 0 }), [journal]);
 
   const post = async () => {
     if (!journal) return;
@@ -119,46 +117,62 @@ export default function ManualJournalDetailsPage() {
     } finally { setActing(false); }
   };
 
-  if (loading) return <div className="h-72 animate-pulse rounded-md bg-muted" />;
-  if (!journal) return null;
+  if (loading) return <LoadingState rows={8} label={tc('loading')} />;
+  // لا صفحة بيضاء صامتة: إمّا القيد أو خطأٌ بزرّ إعادة محاولة.
+  if (!journal) return <ErrorState message={loadError ?? t('loadFailed')} onRetry={load} />;
 
   const isDraft = journal.status === 'draft';
   const isPosted = journal.status === 'posted';
 
+  const actions: PageAction[] = [
+    { key: 'duplicate', label: t('duplicate'), icon: Copy, onClick: duplicate, variant: 'outline', emphasis: 'secondary', disabled: acting },
+    ...(isDraft ? [
+      { key: 'edit', label: t('edit'), icon: Pencil, href: `/manual-journals/new?edit=${journal.id}`, variant: 'outline' as const, emphasis: 'secondary' as const },
+      { key: 'delete', label: t('delete'), icon: Trash2, onClick: remove, variant: 'danger' as const, emphasis: 'secondary' as const, disabled: acting },
+      { key: 'post', label: acting ? t('saving') : t('post'), onClick: post, variant: 'primary' as const, disabled: acting },
+    ] : []),
+    ...(isPosted ? [
+      { key: 'reverse', label: t('reverse'), icon: RotateCcw, variant: 'outline' as const, emphasis: 'secondary' as const, disabled: acting,
+        onClick: () => { setReason(''); setReverseDate(journal.entry_date); setReverseOpen(true); } },
+    ] : []),
+  ];
+
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/manual-journals'><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button>
-          <div>
-            <div className="flex flex-wrap items-center gap-2"><h1 className="num text-xl font-semibold text-text">{journal.number}</h1><Badge tone={statusTone[journal.status] ?? 'muted'}>{t(journal.status)}</Badge></div>
-            <p className="mt-1 text-sm text-muted">{journal.entry_date} · {journal.description || t('noDescription')}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={acting} onClick={duplicate}><Copy className="h-4 w-4" strokeWidth={1.7} />{t('duplicate')}</Button>
-          {isDraft && <><Button asChild variant="outline"><Link href={`/manual-journals/new?edit=${journal.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Link></Button><Button variant="outline" disabled={acting} onClick={remove}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />{t('delete')}</Button><Button disabled={acting} onClick={post}>{acting ? t('saving') : t('post')}</Button></>}
-          {isPosted && <Button variant="outline" disabled={acting} onClick={() => { setReason(''); setReverseDate(journal.entry_date); setReverseOpen(true); }}><RotateCcw className="h-4 w-4" strokeWidth={1.7} />{t('reverse')}</Button>}
-        </div>
-      </div>
-
-      {isDraft && <p className="rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">{t('draftPostHint')}</p>}
-      {journal.status === 'reversed' && <p className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{t('reversedHint')}</p>}
-
-      <Card>
-        <CardHeader><CardTitle>{t('lines')}</CardTitle></CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="min-w-full text-sm">
-            <thead className="border-y border-border bg-muted/40 text-muted"><tr><th className="px-4 py-3 text-start font-medium">{t('account')}</th><th className="px-4 py-3 text-start font-medium">{t('lineDescription')}</th><th className="px-4 py-3 text-start font-medium">{t('costCenter')}</th><th className="px-4 py-3 text-end font-medium">{t('debit')}</th><th className="px-4 py-3 text-end font-medium">{t('credit')}</th></tr></thead>
-            <tbody>
-              {journal.lines.map((line) => <tr key={line.id} className="border-b border-border last:border-0"><td className="px-4 py-3"><span className="num text-muted">{line.account_code}</span> {line.account_name}</td><td className="px-4 py-3 text-muted">{line.description || '—'}</td><td className="px-4 py-3 text-muted">{line.cost_center_name ? `${line.cost_center_code ?? ''} — ${line.cost_center_name}` : '—'}</td><td className="num px-4 py-3 text-end text-negative">{Number(line.debit) ? formatRiyal(line.debit) : '—'}</td><td className="num px-4 py-3 text-end text-positive">{Number(line.credit) ? formatRiyal(line.credit) : '—'}</td></tr>)}
-            </tbody>
-            <tfoot className="bg-muted/40 font-semibold text-text"><tr><td colSpan={3} className="px-4 py-3">{t('totals')}</td><td className="num px-4 py-3 text-end">{formatRiyal(totals.debit)}</td><td className="num px-4 py-3 text-end">{formatRiyal(totals.credit)}</td></tr></tfoot>
-          </table>
-        </CardContent>
-      </Card>
-
-      {journal.journal_entry_id && <Card><CardContent className="flex items-center gap-3 p-5"><FileText className="h-5 w-5 text-primary" strokeWidth={1.7} /><div><p className="font-medium text-text">{t('journalEntryCreated')}</p><p className="num text-sm text-muted">{journal.journal_entry_id}</p></div></CardContent></Card>}
+    <DetailPage
+      backHref="/manual-journals"
+      backLabel={t('back')}
+      title={journal.number}
+      badges={<Badge tone={statusTone[journal.status] ?? 'muted'}>{t(journal.status)}</Badge>}
+      meta={<><span className="num">{journal.entry_date}</span> · {journal.description || t('noDescription')}</>}
+      actions={actions}
+      alert={
+        isDraft ? <FormAlert tone="warning">{t('draftPostHint')}</FormAlert>
+        : journal.status === 'reversed' ? <FormAlert>{t('reversedHint')}</FormAlert>
+        : undefined
+      }
+      sections={[{
+        id: 'lines',
+        title: t('lines'),
+        count: journal.lines.length,
+        flush: true,
+        content: (
+          <LedgerLinesTable
+            lines={journal.lines}
+            showCostCenter
+            labels={{
+              account: t('account'),
+              description: t('lineDescription'),
+              costCenter: t('costCenter'),
+              debit: t('debit'),
+              credit: t('credit'),
+              totals: t('totals'),
+              unknownAccount: t('noDescription'),
+            }}
+          />
+        ),
+      }]}
+    >
+      {journal.journal_entry_id && <Card><CardContent className="flex items-center gap-3 p-5"><FileText className="h-5 w-5 shrink-0 text-primary" strokeWidth={1.7} /><div className="min-w-0"><p className="font-medium text-text">{t('journalEntryCreated')}</p><p className="num truncate text-sm text-muted">{journal.journal_entry_id}</p></div></CardContent></Card>}
 
       <Dialog open={reverseOpen} onClose={() => setReverseOpen(false)} title={t('reverseTitle')}>
         <div className="space-y-4">
@@ -168,6 +182,6 @@ export default function ManualJournalDetailsPage() {
           <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setReverseOpen(false)}>{t('cancel')}</Button><Button disabled={acting || reason.trim().length < 3} onClick={reverse}>{acting ? t('saving') : t('confirmReverse')}</Button></div>
         </div>
       </Dialog>
-    </div>
+    </DetailPage>
   );
 }

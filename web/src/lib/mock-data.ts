@@ -944,6 +944,85 @@ const mockJournalEntriesList = [
   },
 ];
 
+/**
+ * بنود كل قيد — يقرأها `GET /journal-entries/{id}`. كلّها متوازنة (Σ مدين = Σ دائن)
+ * لأن قيداً غير متوازن في المعاينة يعلّم القارئ خطأً محاسبياً لا يقع في المنتج.
+ */
+const ledgerLine = (
+  id: string, code: string, name: string, debit: number, credit: number, description: string | null = null,
+) => ({
+  id, account_id: `a${code}`, account_code: code, account_name: name,
+  description, debit: debit.toFixed(2), credit: credit.toFixed(2),
+  cost_center_code: null as string | null, cost_center_name: null as string | null,
+});
+
+const mockJournalEntryLines: Record<string, ReturnType<typeof ledgerLine>[]> = {
+  // ترحيل مصروف: مدين مصروف الإيجار وضريبة المدخلات، دائن البنك.
+  'je-6': [
+    ledgerLine('l61', '5130', 'الإيجار', 12000, 0, 'إيجار المعرض - يونيو'),
+    ledgerLine('l62', '1150', 'ضريبة مدخلات', 1800, 0),
+    ledgerLine('l63', '1120', 'البنك', 0, 13800),
+  ],
+  // ترحيل فاتورة مبيعات: مدين العملاء، دائن الإيراد وضريبة المخرجات.
+  'je-5': [
+    ledgerLine('l51', '1130', 'العملاء', 5750, 0, 'فاتورة INV-2026-0118'),
+    ledgerLine('l52', '4110', 'إيرادات المبيعات', 0, 5000),
+    ledgerLine('l53', '2120', 'ضريبة مخرجات', 0, 750),
+  ],
+  'je-4': [
+    ledgerLine('l41', '5160', 'مصروف الإهلاك', 1800, 0, 'إهلاك يونيو'),
+    ledgerLine('l42', '1250', 'مجمّع إهلاك الأصول', 0, 1800),
+  ],
+  // ترحيل فاتورة شراء: مدين المخزون وضريبة المدخلات، دائن الموردين.
+  'je-3': [
+    ledgerLine('l31', '1140', 'المخزون', 6000, 0, 'فاتورة مشتريات PUR-2026-0042'),
+    ledgerLine('l32', '1150', 'ضريبة مدخلات', 900, 0),
+    ledgerLine('l33', '2110', 'الموردون', 0, 6900),
+  ],
+  'je-2': [
+    ledgerLine('l21', '1160', 'عُهَد الموظفين', 2500, 0, 'عهدة فرع الدمام'),
+    ledgerLine('l22', '1110', 'الصندوق', 0, 2500),
+  ],
+  // العكس يقلب اتجاه كل سطر في القيد الأصلي.
+  'je-1': [
+    ledgerLine('l11', '1110', 'الصندوق', 2500, 0, 'عكس JE-2026-0002'),
+    ledgerLine('l12', '1160', 'عُهَد الموظفين', 0, 2500),
+  ],
+};
+
+/**
+ * ─────────────────────── القيود اليدوية (`/manual-journals`) ───────────────────────
+ * وحدة مستقلة عن سجلّ القيود أعلاه: هنا يُنشئ المستخدم القيد ويرحّله، وهناك يقرأ
+ * أثره في دفتر الأستاذ. تغطّي العيّنة الحالات الثلاث — مسودة (تقبل التعديل والحذف
+ * والترحيل)، ومرحَّلة (تقبل العكس وحده)، ومعكوسة.
+ */
+const mockManualJournals = [
+  {
+    id: 'mj-3', number: 'MJ-2026-0003', entry_date: '2026-06-26', status: 'draft',
+    description: 'تسوية مخصص إجازات — يونيو', journal_entry_id: null,
+    lines: [
+      { ...ledgerLine('mjl31', '5120', 'الرواتب والأجور', 7400, 0, 'مخصص إجازات'), cost_center_code: 'CC1', cost_center_name: 'الإدارة العامة' },
+      ledgerLine('mjl32', '2130', 'رواتب مستحقة', 0, 7400),
+    ],
+  },
+  {
+    id: 'mj-2', number: 'MJ-2026-0002', entry_date: '2026-06-21', status: 'posted',
+    description: 'قيد إهلاك الأصول الثابتة — يونيو', journal_entry_id: 'je-4',
+    lines: [
+      ledgerLine('mjl21', '5160', 'مصروف الإهلاك', 1800, 0, 'إهلاك يونيو'),
+      ledgerLine('mjl22', '1250', 'مجمّع إهلاك الأصول', 0, 1800),
+    ],
+  },
+  {
+    id: 'mj-1', number: 'MJ-2026-0001', entry_date: '2026-06-15', status: 'reversed',
+    description: 'قيد تسوية عهدة نقدية — فرع الدمام', journal_entry_id: 'je-2',
+    lines: [
+      { ...ledgerLine('mjl11', '1160', 'عُهَد الموظفين', 2500, 0, 'عهدة فرع الدمام'), cost_center_code: 'CC2', cost_center_name: 'فرع الدمام' },
+      ledgerLine('mjl12', '1110', 'الصندوق', 0, 2500),
+    ],
+  },
+];
+
 // ── الموارد البشرية ────────────────────────────────────────────────────────
 export interface MockEmployee {
   id: string;
@@ -2076,6 +2155,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/me') return resolve({ user: DEMO_USER, company: mockCompany });
   if (clean === '/applications') return resolve({ data: mockApplications });
   if (clean === '/journal-entries') return resolve({ data: mockJournalEntriesList });
+  if (clean === '/manual-journals') return resolve({ data: mockManualJournals });
   if (clean === '/fuel-stations/workspace') return resolve({ data: { stations: mockFuelStations } });
   if (clean === '/fuel-stations/dashboard') return resolve({ data: mockFuelDashboard });
   if (clean === '/fuel-stations/devices') return resolve({ data: mockFuelDevices });
@@ -2387,6 +2467,49 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (purchaseMatch) {
     const found = mockPurchases.find((p) => p.id === purchaseMatch[1]) ?? mockPurchases[0];
     return resolve({ data: found });
+  }
+
+  // تفاصيل القيد: الحقول التي تزيد على سطر القائمة هي البنود ومرجع القيد المعكوس.
+  const journalEntryMatch = clean.match(/^\/journal-entries\/([^/]+)$/);
+  if (journalEntryMatch) {
+    const found = mockJournalEntriesList.find((entry) => entry.id === journalEntryMatch[1]) ?? mockJournalEntriesList[0];
+    return resolve({
+      data: {
+        ...found,
+        reversal_of: found.entry_kind === 'reversal' ? 'je-2' : null,
+        lines: mockJournalEntryLines[found.id] ?? [],
+      },
+    });
+  }
+
+  const manualJournalMatch = clean.match(/^\/manual-journals\/([^/]+)$/);
+  if (manualJournalMatch) {
+    const found = mockManualJournals.find((journal) => journal.id === manualJournalMatch[1]) ?? mockManualJournals[0];
+    return resolve({ data: found });
+  }
+
+  // تفاصيل المصروف: سطر القائمة لا يحمل التصنيف ولا المرفقات ولا أثر الترحيل،
+  // وصفحة التفاصيل تعرض الثلاثة — فتُشتقّ هنا من الحالة نفسها لا تُخترع.
+  const expenseMatch = clean.match(/^\/expenses\/([^/]+)$/);
+  if (expenseMatch) {
+    const found = mockExpenses.find((expense) => expense.id === expenseMatch[1]) ?? mockExpenses[0];
+    const posted = found.status === 'posted';
+    return resolve({
+      data: {
+        ...found,
+        category_name: found.account_name,
+        vendor_name: found.payment_method === 'credit' ? 'مؤسسة نجد للتوريدات' : null,
+        partner_name: found.partner_id ? 'مؤسسة نجد للتوريدات' : null,
+        cost_center_code: null,
+        cost_center_name: null,
+        journal_entry_id: posted ? 'je-6' : null,
+        document_linked: false,
+        source_document_url: null,
+        attachments: posted
+          ? [{ id: `att-${found.id}`, original_name: `${found.number}.pdf`, mime_type: 'application/pdf', size: 184320 }]
+          : [],
+      },
+    });
   }
 
   const returnMatch = clean.match(/^\/returns\/([^/]+)$/);

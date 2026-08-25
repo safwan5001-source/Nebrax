@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { FieldGrid, FieldSpan, FormActions, FormAlert, FormPage, FormSection } from '@/components/nebrax';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberPreviewField } from '@/components/ui/number-preview-field';
@@ -147,41 +149,40 @@ export default function ManualJournalEditorPage() {
   }, [description, editId, entryDate, lines, router, success, t, tc]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/manual-journals'>
-            <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Link></Button>
-          <div>
-            <h1 className="text-xl font-semibold text-text">{t(editId ? 'editTitle' : 'newTitle')}</h1>
-            <p className="mt-1 text-sm text-muted">{t('draftHint')}</p>
-          </div>
-        </div>
-        <span className="rounded-md bg-muted px-3 py-1.5 text-sm text-muted">{t('draft')}</span>
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <FormPage
+      width="wide"
+      backHref="/manual-journals"
+      backLabel={t('back')}
+      title={t(editId ? 'editTitle' : 'newTitle')}
+      description={t('draftHint')}
+      status={<Badge tone="muted">{t('draft')}</Badge>}
+      actions={
+        <FormActions
+          secondary={<Button asChild type="button" variant="outline"><Link href='/manual-journals'>{t('cancel')}</Link></Button>}
+          primary={<Button type="button" disabled={saving} onClick={submit}>{saving ? t('saving') : t('saveDraft')}</Button>}
+          note={balanced ? undefined : t('notBalanced')}
+        />
+      }
+    >
+      <FormSection title={t('details')}>
+        <FieldGrid columns={3}>
           {!editId && <NumberPreviewField id="manual-journal-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />}
           <div className="space-y-1.5">
             <Label htmlFor="entry-date">{t('entryDate')}</Label>
             <Input id="entry-date" type="date" dir="ltr" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} />
           </div>
-          <div className="space-y-1.5 sm:col-span-2">
+          <FieldSpan className="space-y-1.5 lg:col-span-2">
             <Label htmlFor="description">{t('description')}</Label>
             <Input id="description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t('descriptionPlaceholder')} />
-          </div>
-        </CardContent>
-      </Card>
+          </FieldSpan>
+        </FieldGrid>
+      </FormSection>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle>{t('lines')}</CardTitle>
-          <Button variant="outline" size="sm" onClick={addLine}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('addLine')}</Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <FormSection
+        title={t('lines')}
+        action={<Button variant="outline" size="sm" onClick={addLine}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('addLine')}</Button>}
+        contentClassName="space-y-3"
+      >
           <div className="hidden grid-cols-[minmax(13rem,2fr)_minmax(10rem,1.5fr)_7.5rem_7.5rem_minmax(10rem,1.25fr)_minmax(10rem,1.25fr)_2.5rem] gap-2 text-xs font-medium text-muted xl:grid">
             <span>{t('account')}</span><span>{t('lineDescription')}</span><span className="text-end">{t('debit')}</span><span className="text-end">{t('credit')}</span><span>{t('costCenter')}</span><span>{t('partner')}</span><span />
           </div>
@@ -196,11 +197,12 @@ export default function ManualJournalEditorPage() {
               <Button variant="ghost" size="icon" disabled={lines.length <= 2} onClick={() => removeLine(index)} aria-label={t('removeLine')}><Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} /></Button>
             </div>
           ))}
-        </CardContent>
-      </Card>
+      </FormSection>
 
+      {/* عمودان على الجوال لا عمود واحد: أربعة أرقام مكدّسة رأسياً تدفع مؤشّر
+          التوازن — وهو أهمّها — خارج الشاشة تماماً. */}
       <Card>
-        <CardContent className="grid gap-3 p-5 sm:grid-cols-4">
+        <CardContent className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">
           <div><p className="text-sm text-muted">{t('totalDebit')}</p><p className="num mt-1 text-lg font-semibold text-text">{formatRiyal(totals.debit / 100)}</p></div>
           <div><p className="text-sm text-muted">{t('totalCredit')}</p><p className="num mt-1 text-lg font-semibold text-text">{formatRiyal(totals.credit / 100)}</p></div>
           <div><p className="text-sm text-muted">{t('difference')}</p><p className={`num mt-1 text-lg font-semibold ${balanced ? 'text-positive' : 'text-negative'}`}>{formatRiyal(Math.abs(difference) / 100)}</p></div>
@@ -208,11 +210,7 @@ export default function ManualJournalEditorPage() {
         </CardContent>
       </Card>
 
-      {error && <p className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button asChild variant="outline"><Link href='/manual-journals'>{t('cancel')}</Link></Button>
-        <Button disabled={saving} onClick={submit}>{saving ? t('saving') : t('saveDraft')}</Button>
-      </div>
-    </div>
+      {error && <FormAlert>{error}</FormAlert>}
+    </FormPage>
   );
 }
