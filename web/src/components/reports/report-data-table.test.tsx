@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   defaultReportTableLabels,
+  reportCellToneFromValue,
   ReportDataTable,
   type ReportDataColumn,
 } from './report-data-table';
@@ -104,6 +105,28 @@ describe('ReportDataTable', () => {
 
     expect(screen.getByText('No results match your search.')).toBeTruthy();
     expect(screen.getByText('2,500.00 𞸁')).toBeTruthy();
+  });
+
+  it('applies positive, negative, and neutral semantic tones to profitability cells', () => {
+    const profitColumns: ReportDataColumn[] = [
+      { id: 'center', label: 'Center' },
+      { id: 'profit', label: 'Profit', align: 'end', numeric: true, cellTone: reportCellToneFromValue },
+    ];
+    render(
+      <ReportDataTable
+        columns={profitColumns}
+        rows={[
+          ['North', '120.00 𞸁'],
+          ['South', '-45.00 𞸁'],
+          ['Central', '0.00 𞸁'],
+        ]}
+        labels={labels}
+      />
+    );
+
+    expect(screen.getByText('120.00 𞸁').closest('td')?.className).toContain('text-positive');
+    expect(screen.getByText('-45.00 𞸁').closest('td')?.className).toContain('text-negative');
+    expect(screen.getByText('0.00 𞸁').closest('td')?.className).not.toMatch(/text-(positive|negative)/);
   });
 
   it('uses the supplied empty report message when the source data has no rows', () => {

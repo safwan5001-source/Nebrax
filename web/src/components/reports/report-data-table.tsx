@@ -25,6 +25,8 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
+export type ReportCellTone = 'positive' | 'negative' | 'neutral';
+
 export interface ReportDataColumn {
   id: string;
   label: string;
@@ -32,6 +34,7 @@ export interface ReportDataColumn {
   numeric?: boolean;
   sortable?: boolean;
   hideable?: boolean;
+  cellTone?: (value: string, row: string[], rowIndex: number) => ReportCellTone;
 }
 
 export interface ReportDataTableLabels {
@@ -63,6 +66,8 @@ export interface ReportDataTableProps {
 
 interface DataRow {
   id: string;
+  rowIndex: number;
+  values: string[];
   cells: Record<string, string>;
 }
 
@@ -83,6 +88,12 @@ function numericValue(value: string): number | null {
   if (!/^-?\d+(?:\.\d+)?$/.test(cleaned)) return null;
   const numeric = Number(cleaned);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+export function reportCellToneFromValue(value: string): ReportCellTone {
+  const numeric = numericValue(value);
+  if (numeric === null || numeric === 0) return 'neutral';
+  return numeric > 0 ? 'positive' : 'negative';
 }
 
 function isoDateValue(value: string): number | null {
@@ -167,6 +178,8 @@ export function ReportDataTable({
   const data = useMemo<DataRow[]>(
     () => rows.map((row, rowIndex) => ({
       id: String(rowIndex),
+      rowIndex,
+      values: row,
       cells: Object.fromEntries(columns.map((column, columnIndex) => [column.id, row[columnIndex] ?? ''])),
     })),
     [columns, rows]
@@ -329,6 +342,8 @@ export function ReportDataTable({
                 <tr key={row.id} className="border-b border-border last:border-0 hover:bg-primary-soft/35">
                   {row.getVisibleCells().map((cell) => {
                     const definition = columns.find((column) => column.id === cell.column.id);
+                    const value = String(cell.getValue() ?? '');
+                    const tone = definition?.cellTone?.(value, row.original.values, row.original.rowIndex);
                     return (
                       <td
                         key={cell.id}
@@ -336,10 +351,12 @@ export function ReportDataTable({
                           'px-3 text-text',
                           density === 'compact' ? 'py-2' : 'py-3',
                           definition?.align === 'end' && 'text-end',
-                          definition?.numeric && 'num tabular-nums'
+                          definition?.numeric && 'num tabular-nums',
+                          tone === 'positive' && 'text-positive',
+                          tone === 'negative' && 'text-negative'
                         )}
                       >
-                        {String(cell.getValue() ?? '') || '—'}
+                        {value || '—'}
                       </td>
                     );
                   })}
@@ -352,6 +369,8 @@ export function ReportDataTable({
                   {visibleColumns.map((column) => {
                     const columnIndex = columns.findIndex((definition) => definition.id === column.id);
                     const definition = columns[columnIndex];
+                    const value = totalRow[columnIndex] ?? '—';
+                    const tone = definition?.cellTone?.(value, totalRow, -1);
                     return (
                       <td
                         key={column.id}
@@ -359,10 +378,12 @@ export function ReportDataTable({
                           'px-3',
                           density === 'compact' ? 'py-2' : 'py-3',
                           definition?.align === 'end' && 'text-end',
-                          definition?.numeric && 'num tabular-nums'
+                          definition?.numeric && 'num tabular-nums',
+                          tone === 'positive' && 'text-positive',
+                          tone === 'negative' && 'text-negative'
                         )}
                       >
-                        {totalRow[columnIndex] ?? '—'}
+                        {value}
                       </td>
                     );
                   })}

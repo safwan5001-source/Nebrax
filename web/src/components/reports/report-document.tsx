@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import type { ReportDataColumn } from '@/components/reports/report-data-table';
 
 export interface Company {
   name: string;
@@ -10,6 +11,7 @@ export interface Company {
 export interface ReportColumn {
   label: string;
   align?: 'start' | 'end';
+  cellTone?: ReportDataColumn['cellTone'];
 }
 
 /**

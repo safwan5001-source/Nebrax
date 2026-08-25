@@ -15,7 +15,6 @@ import { ReportFilters, EMPTY_FILTERS, filtersToQuery, type ReportFilterState } 
 import { ReportDocument, type ReportColumn } from '@/components/reports/report-document';
 import { ReportMobileRows } from '@/components/reports/report-workspace-ui';
 import { ReportDataTable, defaultReportTableLabels } from '@/components/reports/report-data-table';
-import { ReportResultsTable } from '@/components/reports/report-results-table';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
@@ -259,32 +258,84 @@ function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: b
   </Card>;
 }
 
-function JournalTable({ journal, loading, g, t }: { journal: JournalReport | null; loading: boolean; g: ReturnType<typeof useTranslations>; t: ReturnType<typeof useTranslations> }) {
+export function JournalTable({ journal, loading, g, t }: { journal: JournalReport | null; loading: boolean; g: ReturnType<typeof useTranslations>; t: ReturnType<typeof useTranslations> }) {
   if (loading || !journal) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
-  const columns = [
-    { label: g('date') },
-    { label: g('entryNumber') },
-    { label: g('description') },
-    { label: g('debit'), align: 'end' as const },
-    { label: g('credit'), align: 'end' as const },
-  ];
-  const rows = journal.rows.flatMap((entry) => entry.lines.map((line, index) => [
-    index === 0 ? entry.date : '',
-    index === 0 ? entry.number : '',
-    `${line.account_code ?? ''} — ${line.account_name ?? ''}`.trim(),
-    formatRiyal(line.debit),
-    formatRiyal(line.credit),
-  ]));
+  const totalDebit = formatRiyal(journal.total_debit);
+  const totalCredit = formatRiyal(journal.total_credit);
 
   return <Card><CardHeader><CardTitle>{g('journalEntries')}</CardTitle></CardHeader><CardContent>
-    <ReportResultsTable
-      columns={columns}
-      rows={rows}
-      totalRow={['', '', t('total'), formatRiyal(journal.total_debit), formatRiyal(journal.total_credit)]}
-      emptyText={t('empty')}
-      primaryIndex={2}
-      secondaryIndex={0}
-    />
+    {journal.rows.length === 0 ? <p className="py-8 text-center text-sm text-muted">{t('empty')}</p> : <>
+      <div className="space-y-3 md:hidden">
+        {journal.rows.map((entry) => (
+          <article key={entry.entry_id} className="rounded border border-border bg-surface p-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="num text-xs text-muted">{entry.date}</p>
+                <p className="num mt-1 text-sm font-semibold text-text">{entry.number}</p>
+              </div>
+            </div>
+            {entry.description && <p className="mt-2 text-sm leading-5 text-text">{entry.description}</p>}
+            <div className="mt-3 divide-y divide-border border-y border-border">
+              {entry.lines.map((line, lineIndex) => (
+                <div key={`${entry.entry_id}-${line.account_id}-${lineIndex}`} className="py-3 first:pt-2 last:pb-2">
+                  <p className="text-sm font-medium text-text">{`${line.account_code ?? ''} — ${line.account_name ?? ''}`.trim() || '—'}</p>
+                  {line.description && <p className="mt-1 text-xs text-muted">{line.description}</p>}
+                  <dl className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                    <div><dt className="text-muted">{g('debit')}</dt><dd className="num mt-1 font-medium text-text">{formatRiyal(line.debit)}</dd></div>
+                    <div><dt className="text-muted">{g('credit')}</dt><dd className="num mt-1 font-medium text-text">{formatRiyal(line.credit)}</dd></div>
+                  </dl>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+        <article className="rounded border border-primary/25 bg-primary-soft p-3.5">
+          <p className="text-sm font-semibold text-text">{t('total')}</p>
+          <dl className="mt-3 grid grid-cols-2 gap-3 text-xs">
+            <div><dt className="text-muted">{g('debit')}</dt><dd className="num mt-1 font-semibold text-text">{totalDebit}</dd></div>
+            <div><dt className="text-muted">{g('credit')}</dt><dd className="num mt-1 font-semibold text-text">{totalCredit}</dd></div>
+          </dl>
+        </article>
+      </div>
+
+      <div className="hidden overflow-hidden rounded border border-border bg-surface md:block">
+        <div className="max-h-[62vh] overflow-auto">
+          <Table>
+            <THead className="sticky top-0 z-10 bg-surface">
+              <TR>
+                <TH scope="col">{g('date')}</TH>
+                <TH scope="col">{g('entryNumber')}</TH>
+                <TH scope="col">{g('description')}</TH>
+                <TH scope="col" className="text-end">{g('debit')}</TH>
+                <TH scope="col" className="text-end">{g('credit')}</TH>
+              </TR>
+            </THead>
+            {journal.rows.map((entry) => (
+              <TBody key={entry.entry_id} className="border-b-2 border-border last:border-0">
+                {entry.lines.map((line, lineIndex) => (
+                  <TR key={`${entry.entry_id}-${line.account_id}-${lineIndex}`}>
+                    <TD className="num align-top">{lineIndex === 0 ? entry.date : ''}</TD>
+                    <TD className="num align-top">{lineIndex === 0 ? entry.number : ''}</TD>
+                    <TD>{`${line.account_code ?? ''} — ${line.account_name ?? ''}`.trim() || '—'}{line.description && <p className="mt-1 text-xs text-muted">{line.description}</p>}</TD>
+                    <TD className="num text-end">{formatRiyal(line.debit)}</TD>
+                    <TD className="num text-end">{formatRiyal(line.credit)}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            ))}
+            <tfoot className="sticky bottom-0 border-t border-primary/20 bg-primary-soft font-semibold text-text">
+              <TR>
+                <TD />
+                <TD />
+                <TD>{t('total')}</TD>
+                <TD className="num text-end">{totalDebit}</TD>
+                <TD className="num text-end">{totalCredit}</TD>
+              </TR>
+            </tfoot>
+          </Table>
+        </div>
+      </div>
+    </>}
   </CardContent></Card>;
 }
 

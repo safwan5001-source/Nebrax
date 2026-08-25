@@ -26,6 +26,7 @@ import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/re
 import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader, type ReportMetric } from '@/components/reports/report-workspace-ui';
 import { CustomerAgingChart } from '@/components/reports/customer-aging-chart';
 import { ReportResultsTable } from '@/components/reports/report-results-table';
+import { reportCellToneFromValue } from '@/components/reports/report-data-table';
 
 export type ReportTab = 'trial' | 'income' | 'balance' | 'costcenter' | 'aging';
 type Tab = ReportTab;
@@ -201,7 +202,7 @@ export function ReportsWorkspace({
           { label: t('center') },
           { label: t('revenue'), align: 'end' },
           { label: t('expense'), align: 'end' },
-          { label: t('profit'), align: 'end' },
+          { label: t('profit'), align: 'end', cellTone: reportCellToneFromValue },
         ],
         rows: cc.rows.map((r) => [r.code, r.name, formatRiyal(r.revenue), formatRiyal(r.expense), formatRiyal(r.profit)]),
         totalRow: ['', t('total'), formatRiyal(cc.total_revenue), formatRiyal(cc.total_expense), formatRiyal(cc.total_profit)],

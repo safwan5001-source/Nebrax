@@ -32,6 +32,7 @@ export function ReportResultsTable({
     align: column.align,
     numeric: column.align === 'end',
     hideable: index !== primaryIndex,
+    cellTone: column.cellTone,
   }));
 
   return (
