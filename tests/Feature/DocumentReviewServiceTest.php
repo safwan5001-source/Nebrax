@@ -138,6 +138,32 @@ class DocumentReviewServiceTest extends TestCase
         }
     }
 
+    /** @test */
+    public function completion_rejects_incomplete_review_evidence_without_creating_business_transactions(): void
+    {
+        $fixture = $this->reviewFixture('review-service-readiness', false);
+
+        try {
+            app(DocumentReviewService::class)->complete(
+                $fixture['batch'],
+                $fixture['result'],
+                $fixture['version'],
+                $fixture['actor']->id,
+            );
+            $this->fail('Incomplete evidence must not become ready for draft.');
+        } catch (ValidationException) {
+            $this->assertDatabaseHas('document_batches', [
+                'id' => $fixture['batch']->id,
+                'status' => DocumentWorkflowStatus::NEEDS_REVIEW->value,
+                'version' => $fixture['version'],
+            ]);
+            $this->assertDatabaseCount('document_review_actions', 0);
+            $this->assertDatabaseMissing('invoices', ['tenant_id' => $fixture['batch']->tenant_id]);
+            $this->assertDatabaseMissing('purchases', ['tenant_id' => $fixture['batch']->tenant_id]);
+            $this->assertDatabaseMissing('journal_entries', ['tenant_id' => $fixture['batch']->tenant_id]);
+        }
+    }
+
     /**
      * @return array{batch: DocumentBatch, result: DocumentExtractionResult, match: DocumentMatchResult, candidate: DocumentMatchCandidate, issue: DocumentIssue, actor: User, version: int}
      */
