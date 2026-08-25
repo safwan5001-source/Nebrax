@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -66,12 +66,51 @@ interface DataRow {
   cells: Record<string, string>;
 }
 
+function normalizeLocalizedDigits(value: string) {
+  return value
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - '٠'.charCodeAt(0)))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - '۰'.charCodeAt(0)))
+    .replace(/٫/g, '.')
+    .replace(/٬/g, ',');
+}
+
+function numericValue(value: string): number | null {
+  const cleaned = normalizeLocalizedDigits(value)
+    .replace(/[\u200e\u200f\u061c]/g, '')
+    .replace(/,/g, '')
+    .replace(/[^0-9.\-]/g, '');
+
+  if (!/^-?\d+(?:\.\d+)?$/.test(cleaned)) return null;
+  const numeric = Number(cleaned);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function isoDateValue(value: string): number | null {
+  const match = normalizeLocalizedDigits(value).trim().match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const date = Date.UTC(Number(year), Number(month) - 1, Number(day));
+  return Number.isFinite(date) ? date : null;
+}
+
 function compareValues(a: string, b: string) {
-  const clean = (value: string) => value.replace(/[^0-9.\-]/g, '');
-  const an = Number(clean(a));
-  const bn = Number(clean(b));
-  if (clean(a) && clean(b) && Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+  const aDate = isoDateValue(a);
+  const bDate = isoDateValue(b);
+  if (aDate !== null && bDate !== null) return aDate - bDate;
+
+  const aNumber = numericValue(a);
+  const bNumber = numericValue(b);
+  if (aNumber !== null && bNumber !== null) return aNumber - bNumber;
+
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function normalizeSearchValue(value: string) {
+  return normalizeLocalizedDigits(value).toLocaleLowerCase();
+}
+
+function compactSearchValue(value: string) {
+  return normalizeSearchValue(value).replace(/[\s,،]/g, '');
 }
 
 export function defaultReportTableLabels(locale: string): ReportDataTableLabels {
@@ -157,15 +196,24 @@ export function ReportDataTable({
     onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: setColumnVisibility,
     globalFilterFn: (row, _columnId, filterValue) => {
-      const query = String(filterValue ?? '').trim().toLocaleLowerCase();
+      const query = normalizeSearchValue(String(filterValue ?? '').trim());
       if (!query) return true;
-      return columns.some((column) => String(row.original.cells[column.id] ?? '').toLocaleLowerCase().includes(query));
+      const compactQuery = compactSearchValue(query);
+      return columns.some((column) => {
+        const value = String(row.original.cells[column.id] ?? '');
+        return normalizeSearchValue(value).includes(query) || compactSearchValue(value).includes(compactQuery);
+      });
     },
+    autoResetPageIndex: true,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
+
+  useEffect(() => {
+    table.setPageIndex(0);
+  }, [rows, table]);
 
   const visibleColumns = table.getVisibleLeafColumns();
   const filteredCount = table.getFilteredRowModel().rows.length;
@@ -241,6 +289,8 @@ export function ReportDataTable({
                     return (
                       <th
                         key={header.id}
+                        scope="col"
+                        aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
                         className={cn(
                           'whitespace-nowrap px-3 text-start text-xs font-semibold',
                           density === 'compact' ? 'py-2' : 'py-3',
@@ -296,7 +346,7 @@ export function ReportDataTable({
                 </tr>
               ))}
             </tbody>
-            {totalRow && table.getRowModel().rows.length > 0 && (
+            {totalRow && (
               <tfoot className="sticky bottom-0 border-t border-primary/20 bg-primary-soft font-semibold text-text">
                 <tr>
                   {visibleColumns.map((column) => {
@@ -330,7 +380,10 @@ export function ReportDataTable({
             <span>{labels.rowsPerPage}</span>
             <Select
               value={String(table.getState().pagination.pageSize)}
-              onChange={(event) => table.setPageSize(Number(event.target.value))}
+              onChange={(event) => {
+                table.setPageSize(Number(event.target.value));
+                table.setPageIndex(0);
+              }}
               className="h-8 w-20 py-1 text-xs"
             >
               {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
