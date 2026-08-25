@@ -17,6 +17,15 @@ use LogicException;
 
 final class DocumentReviewService
 {
+    private const FINANCIAL_ISSUE_CODES = [
+        'currency_missing',
+        'line_total_mismatch',
+        'financial_value_overflow',
+        'discount_exceeds_line',
+        'tax_total_mismatch',
+        'document_total_mismatch',
+    ];
+
     private const EDITABLE = [
         'fields.document_number' => 'text', 'fields.document_date' => 'date', 'fields.currency' => 'text',
         'lines.*.quantity' => 'quantity', 'lines.*.unit_price_minor' => 'minor', 'lines.*.discount_minor' => 'minor',
@@ -105,17 +114,110 @@ final class DocumentReviewService
         }, 3);
     }
 
-    public function complete(DocumentBatch $batch, DocumentExtractionResult $result, int $expectedVersion, ?string $actorId): DocumentBatch
+    /**
+     * يعيد احتساب مشكلات الدليل المالي المراجع. لا يحق للمراجع حل فشل ضريبي يدوياً؛
+     * لا تُغلق المشكلة إلا إذا لم يعد المدقق يعيد إنتاجها من projection الحالي.
+     */
+    public function revalidateFinancial(DocumentBatch $batch, DocumentExtractionResult $result, int $expectedVersion, string $reason, ?string $actorId): DocumentBatch
     {
-        return DB::transaction(function () use ($batch, $result, $expectedVersion, $actorId): DocumentBatch {
+        return DB::transaction(function () use ($batch, $result, $expectedVersion, $reason, $actorId): DocumentBatch {
+            $batch = $this->lockedReviewBatch($batch, $expectedVersion);
+            $result = $this->lockedResult($result, $batch);
+            $reason = $this->reason($reason);
+            $issues = app(DocumentFinancialValidator::class)->validate(
+                app(ReviewedDocumentProjector::class)->project($result),
+                $batch->document_type,
+            );
+            $expected = collect($issues)
+                ->filter(fn (array $issue): bool => $issue['severity'] === 'blocking')
+                ->keyBy(fn (array $issue): string => $issue['subject_key'].'|'.$issue['code']);
+            $existing = DocumentIssue::query()
+                ->where('document_batch_id', $batch->id)
+                ->where('document_extraction_result_id', $result->id)
+                ->whereIn('code', self::FINANCIAL_ISSUE_CODES)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy(fn (DocumentIssue $issue): string => $issue->subject_key.'|'.$issue->code);
+
+            $before = $existing->map(fn (DocumentIssue $issue): array => [
+                'id' => $issue->id,
+                'subject_key' => $issue->subject_key,
+                'code' => $issue->code,
+                'status' => $issue->status,
+            ])->values()->all();
+            $changed = [];
+
+            foreach ($existing as $key => $issue) {
+                if ($expected->has($key)) {
+                    continue;
+                }
+                if (in_array($issue->status, ['open', 'reopened'], true)) {
+                    DocumentReviewMutationGate::run(function () use ($issue, $actorId): void {
+                        $issue->status = 'resolved';
+                        $issue->resolved_by = $actorId;
+                        $issue->resolved_at = now('UTC');
+                        $issue->save();
+                    });
+                    $changed[] = $issue->id;
+                }
+            }
+
+            foreach ($expected as $key => $issue) {
+                $current = $existing->get($key);
+                if ($current === null) {
+                    $current = DocumentIssue::create([
+                        'document_batch_id' => $batch->id,
+                        'document_extraction_result_id' => $result->id,
+                        'subject_key' => $issue['subject_key'],
+                        'code' => $issue['code'],
+                        'severity' => $issue['severity'],
+                        'status' => 'open',
+                        'safe_message' => $issue['safe_message'],
+                        'metadata' => $issue['metadata'],
+                    ]);
+                    $existing->put($key, $current);
+                    $changed[] = $current->id;
+                    continue;
+                }
+                if ($current->status === 'resolved') {
+                    DocumentReviewMutationGate::run(function () use ($current): void {
+                        $current->status = 'reopened';
+                        $current->resolved_by = null;
+                        $current->resolved_at = null;
+                        $current->save();
+                    });
+                    $changed[] = $current->id;
+                }
+            }
+
+            $after = $existing->map(fn (DocumentIssue $issue): array => [
+                'id' => $issue->id,
+                'subject_key' => $issue->subject_key,
+                'code' => $issue->code,
+                'status' => $issue->fresh()->status,
+            ])->values()->all();
+            $this->bump($batch, $expectedVersion);
+            $this->audit($batch, $result, 'financial_revalidated', 'batch', $batch->id, $before, [
+                'issues' => $after,
+                'changed_issue_ids' => $changed,
+            ], $actorId, $reason, $expectedVersion + 1);
+
+            return $batch->fresh();
+        }, 3);
+    }
+
+    public function complete(DocumentBatch $batch, DocumentExtractionResult $result, int $expectedVersion, string $reason, ?string $actorId): DocumentBatch
+    {
+        return DB::transaction(function () use ($batch, $result, $expectedVersion, $reason, $actorId): DocumentBatch {
             $locked = DocumentBatch::query()->whereKey($batch->id)->lockForUpdate()->firstOrFail();
             if ($locked->status === DocumentWorkflowStatus::READY_FOR_DRAFT) return $locked;
             $locked = $this->lockedReviewBatch($locked, $expectedVersion);
             $result = $this->lockedResult($result, $locked);
+            $reason = $this->reason($reason);
             app(DocumentReviewReadinessPolicy::class)->assertReady($locked, $result);
             $before = ['status' => $locked->status->value];
             $completed = app(DocumentWorkflowService::class)->transition($locked, DocumentWorkflowStatus::READY_FOR_DRAFT, 'review_completed', 'user', $actorId, null, ['review_version' => $expectedVersion]);
-            $this->audit($completed, $result, 'review_completed', 'batch', $completed->id, $before, ['status' => $completed->status->value], $actorId, null, $completed->version);
+            $this->audit($completed, $result, 'review_completed', 'batch', $completed->id, $before, ['status' => $completed->status->value], $actorId, $reason, $completed->version);
             return $completed;
         }, 3);
     }

@@ -368,7 +368,11 @@ export default function DocumentReviewPage() {
         ) : (
           <div className="mt-4 space-y-3">
             {review.issues.map((issue) => {
-              const action = issue.status === 'resolved' ? 'reopen' : 'resolve';
+              const isBlockingTaxIssue = issue.severity === 'blocking' && issue.code.startsWith('tax_');
+              const action = isBlockingTaxIssue ? 'revalidateFinancial' : issue.status === 'resolved' ? 'reopen' : 'resolve';
+              const endpoint = isBlockingTaxIssue
+                ? `/document-batches/${review.batch.id}/revalidate-financial`
+                : `/document-issues/${issue.id}/${action}`;
 
               return (
                 <article key={issue.id} className="rounded border border-border p-3">
@@ -386,7 +390,7 @@ export default function DocumentReviewPage() {
                       onClick={() => setCommand({
                         title: t(action),
                         label: t(action),
-                        endpoint: `/document-issues/${issue.id}/${action}`,
+                        endpoint,
                       })}
                       disabled={!canReview}
                       title={!canReview ? t('notAllowed') : undefined}

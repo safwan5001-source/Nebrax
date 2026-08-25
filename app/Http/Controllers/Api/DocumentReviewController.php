@@ -8,6 +8,7 @@ use App\Http\Requests\CompleteDocumentReviewRequest;
 use App\Http\Requests\ConfirmDocumentMatchRequest;
 use App\Http\Requests\DocumentIssueActionRequest;
 use App\Http\Requests\RejectDocumentMatchRequest;
+use App\Http\Requests\RevalidateDocumentFinancialRequest;
 use App\Http\Requests\StoreDocumentReviewChangeRequest;
 use App\Http\Resources\DocumentBatchReviewResource;
 use App\Http\Resources\DocumentReviewResource;
@@ -172,12 +173,26 @@ class DocumentReviewController extends Controller
         return response()->json(['data' => ['id' => $action->id]]);
     }
 
+    public function revalidateFinancial(RevalidateDocumentFinancialRequest $request, DocumentBatch $batch): JsonResponse
+    {
+        $review = $this->review->revalidateFinancial(
+            $batch,
+            $this->resultFor($batch),
+            $request->integer('expected_version'),
+            $request->string('reason')->toString(),
+            $request->user()?->id,
+        );
+
+        return response()->json(['data' => ['id' => $review->id]]);
+    }
+
     public function complete(CompleteDocumentReviewRequest $request, DocumentBatch $batch): JsonResponse
     {
         $action = $this->review->complete(
             $batch,
             $this->resultFor($batch),
             $request->integer('expected_version'),
+            $request->string('reason')->toString(),
             $request->user()?->id,
         );
 

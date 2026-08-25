@@ -23,7 +23,7 @@ async function fillDecision(page: import('@playwright/test').Page, reason: strin
 }
 
 test.describe('مساحة مراجعة المستند في وضع المعاينة', () => {
-  test('يفتح الحزمة ويعدل الدليل ويؤكد المطابقة ويحل المشكلة ثم يكمل المراجعة', async ({ page }) => {
+  test('يفتح الحزمة ويعدل الدليل ويؤكد المطابقة ويعيد التحقق المالي ثم يكمل المراجعة', async ({ page }) => {
     await enterDemo(page);
     await page.goto('/documents', { waitUntil: 'networkidle' });
 
@@ -46,9 +46,9 @@ test.describe('مساحة مراجعة المستند في وضع المعاين
     await page.getByRole('button', { name: 'تأكيد' }).last().click();
 
     await openSection(page, 'المشكلات');
-    await page.getByRole('button', { name: 'حل المشكلة' }).first().click();
-    await fillDecision(page, 'تمت مراجعة قيمة الضريبة.');
-    await page.getByRole('button', { name: 'حل المشكلة' }).last().click();
+    await page.getByRole('button', { name: 'إعادة التحقق المالي' }).click();
+    await fillDecision(page, 'إعادة تحقق مالي بعد مراجعة الدليل.');
+    await page.getByRole('button', { name: 'إعادة التحقق المالي' }).last().click();
 
     const complete = page.getByRole('button', { name: 'إكمال المراجعة' });
     await expect(complete).toBeEnabled();
@@ -57,6 +57,8 @@ test.describe('مساحة مراجعة المستند في وضع المعاين
     await page.getByRole('button', { name: 'إكمال المراجعة' }).last().click();
     await openSection(page, 'التفاصيل');
     await expect(page.locator('span:visible').filter({ hasText: 'جاهزة للمسودة' }).first()).toBeVisible();
+    await openSection(page, 'السجل');
+    await expect(page.locator('p:visible').filter({ hasText: 'اكتملت المراجعة البشرية.' }).first()).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
   });
 

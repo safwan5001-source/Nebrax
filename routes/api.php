@@ -235,6 +235,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('document-match-results/{match}/reject', [DocumentReviewController::class, 'reject'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
         Route::post('document-issues/{issue}/resolve', [DocumentReviewController::class, 'resolve'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
         Route::post('document-issues/{issue}/reopen', [DocumentReviewController::class, 'reopen'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-batches/{batch}/revalidate-financial', [DocumentReviewController::class, 'revalidateFinancial'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
         Route::post('document-batches/{batch}/complete-review', [DocumentReviewController::class, 'complete'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
 
         // الأطراف

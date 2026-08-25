@@ -152,6 +152,7 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
   const reviewMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/review$/);
   const changeMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/review-changes$/);
   const completeMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/complete-review$/);
+  const revalidateMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/revalidate-financial$/);
 
   if (method === 'GET' && clean === '/document-batches') {
     const query = new URLSearchParams(path.split('?')[1] ?? '');
@@ -242,6 +243,9 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
   if (method === 'POST' && issueAction) {
     if (!validVersion(requestBody)) return { handled: true, error: staleError() };
     const issue = state.issues.find((item) => item.id === issueAction[1]);
+    if (issue?.severity === 'blocking' && issue.code.startsWith('tax_') && issueAction[2] === 'resolve') {
+      return { handled: true, error: new Error('financial_revalidation_required') };
+    }
     if (issue) {
       issue.status = issueAction[2] === 'resolve' ? 'resolved' : 'open';
       state.version += 1;
@@ -250,12 +254,26 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
     return { handled: true, response: { data: { id: 'demo-issue-action' } } };
   }
 
-  if (method === 'POST' && completeMatch) {
+  if (method === 'POST' && revalidateMatch) {
     if (!validVersion(requestBody)) return { handled: true, error: staleError() };
+    const taxIssue = state.issues.find((issue) => issue.code === 'tax_total_mismatch');
+    if (taxIssue) {
+      const taxField = state.fields.find((field) => field.key === 'tax_minor');
+      taxIssue.status = taxField?.current === 37500 ? 'resolved' : 'open';
+    }
+    state.version += 1;
+    addHistory('financial_revalidated', String(requestBody.reason ?? ''), null, { status: taxIssue?.status ?? 'resolved' });
+    return { handled: true, response: { data: { id: 'demo-financial-revalidation' } } };
+  }
+
+  if (method === 'POST' && completeMatch) {
+    if (state.status === 'ready_for_draft') return { handled: true, response: { data: { id: 'demo-complete' } } };
+    if (!validVersion(requestBody)) return { handled: true, error: staleError() };
+    if (!String(requestBody.reason ?? '').trim()) return { handled: true, error: new Error('reason_required') };
     if (!completeReady()) return { handled: true, error: new Error('review_not_ready') };
     state.status = 'ready_for_draft';
     state.version += 1;
-    addHistory('review_completed', null, null, { status: state.status });
+    addHistory('review_completed', String(requestBody.reason), null, { status: state.status });
     return { handled: true, response: { data: { id: 'demo-complete' } } };
   }
 

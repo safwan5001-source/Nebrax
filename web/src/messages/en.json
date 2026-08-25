@@ -5975,6 +5975,7 @@
     "reject": "Reject",
     "resolve": "Resolve issue",
     "reopen": "Reopen",
+    "revalidateFinancial": "Revalidate financials",
     "reason": "Decision reason",
     "save": "Save correction",
     "stale": "Another reviewer changed this batch. Reload its current state and try again.",
