@@ -2454,6 +2454,7 @@
     "notes": "Notes",
     "notes_placeholder": "Internal note for this voucher…",
     "save_draft": "Save as draft",
+    "saving": "Saving…",
     "draft_saved": "Receipt voucher saved as draft.",
     "draft_updated": "Receipt voucher draft updated.",
     "detail_title": "Receipt voucher details",

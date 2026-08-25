@@ -4,10 +4,12 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, FileInput, Paperclip, Plus, X } from 'lucide-react';
+import { FileInput, Paperclip, Plus, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
+import { FieldGrid, FieldSpan, FormActions, FormAlert, FormPage, FormSection } from '@/components/nebrax';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberPreviewField } from '@/components/ui/number-preview-field';
@@ -16,7 +18,7 @@ import { useToast } from '@/components/ui/toast';
 import { PartnerDialog } from '@/components/partners/partner-dialog';
 import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
-import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { SAUDI_RIYAL_SYMBOL, formatRiyal, riyalToMinor } from '@/lib/money';
 
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
 interface Partner { id: string; name: string; type?: string }
@@ -176,162 +178,155 @@ export default function NewExpensePage() {
     }
   }
 
+  const summaryAside = (
+    <Card>
+      <CardHeader><CardTitle>{t('summary')}</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('subtotal')}</span><span className="num">{formatRiyal(amountMinor / 100)}</span></div>
+        <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('tax_total')}</span><span className="num">{formatRiyal(taxMinor / 100)}</span></div>
+        <div className="flex justify-between gap-4 border-t border-border pt-3"><span className="font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal((amountMinor + taxMinor) / 100)}</span></div>
+        {!editId && <>
+          <Button asChild className="w-full" variant="outline">
+            <Link href="/documents?document_type=expense&status=ready_for_draft">
+              <FileInput className="h-4 w-4" aria-hidden="true" />
+              {t('import_from_document')}
+            </Link>
+          </Button>
+          <p className="text-xs leading-5 text-muted">{t('import_from_document_hint')}</p>
+        </>}
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/expenses'>
-            <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Link></Button>
-          <div>
-            <h1 className="text-xl font-semibold text-text">{t(editId ? 'edit_title' : 'new_title')}</h1>
-            <p className="mt-1 text-sm text-muted">{t('number_generated')}</p>
+    <FormPage
+      backHref="/expenses"
+      backLabel={t('back')}
+      title={t(editId ? 'edit_title' : 'new_title')}
+      description={t('number_generated')}
+      status={<Badge tone="muted">{t('draft_mode')}</Badge>}
+      aside={summaryAside}
+      actions={
+        <FormActions
+          secondary={<Button asChild type="button" variant="outline"><Link href='/expenses'>{t('cancel')}</Link></Button>}
+          primary={<Button type="button" disabled={saving || !accountId} onClick={submit}>{saving ? t('saving') : t('save_draft')}</Button>}
+        />
+      }
+    >
+      <FormSection title={t('details')} contentClassName="space-y-5">
+        <FieldGrid>
+          {!editId && <NumberPreviewField id="expense-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />}
+          <div className="space-y-1.5">
+            <Label htmlFor="amount">{t('amount')}</Label>
+            <div className="flex rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-primary/40">
+              <Input id="amount" inputMode="decimal" dir="ltr" className="num border-0 text-end shadow-none focus-visible:ring-0" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              {/* رمز الريال المعتمد من المنسّق المركزي — لا «SAR» ولا «ريال» في أي واجهة بشرية. */}
+              <span className="flex items-center border-s border-input px-3 font-medium text-muted" dir="ltr" aria-hidden="true">{SAUDI_RIYAL_SYMBOL}</span>
+            </div>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="date">{t('date')}</Label>
+            <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <FieldSpan className="space-y-1.5">
+            <Label htmlFor="description">{t('description')}</Label>
+            <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-text outline-none transition focus-visible:ring-2 focus-visible:ring-primary/40" />
+          </FieldSpan>
+        </FieldGrid>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="attachments">{t('attachments')}</Label>
+          <label htmlFor="attachments" className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/40 px-4 text-center transition hover:border-primary/50 focus-within:ring-2 focus-within:ring-primary/40">
+            <Paperclip className="h-5 w-5 text-primary" strokeWidth={1.7} />
+            <span className="text-sm font-medium text-text">{t('attachment_prompt')}</span>
+            <span className="text-xs text-muted">{t('attachment_hint')}</span>
+            <Input id="attachments" type="file" multiple className="sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.zip" onChange={(e) => addFiles(e.target.files)} />
+          </label>
+          {files.length > 0 && (
+            <div className="space-y-1.5">
+              {files.map((file, index) => (
+                <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm">
+                  <span className="truncate text-text">{file.name}</span>
+                  <Button variant="ghost" size="icon" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={t('remove_attachment')}>
+                    <X className="h-4 w-4" strokeWidth={1.8} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        <span className="rounded-md bg-muted px-3 py-1.5 text-sm text-muted">{t('draft_mode')}</span>
-      </div>
+      </FormSection>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="space-y-5">
-          <Card>
-            <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {!editId && <NumberPreviewField id="expense-number" label={t('number')} number={suggestedNumber} loading={loadingNumber} />}
-                <div className="space-y-1.5">
-                  <Label htmlFor="amount">{t('amount')}</Label>
-                  <div className="flex rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-primary/40">
-                    <Input id="amount" inputMode="decimal" className="num border-0 text-end shadow-none focus-visible:ring-0" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                    <span className="flex items-center border-s border-input px-3 font-medium text-muted" dir="ltr">SAR</span>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="date">{t('date')}</Label>
-                  <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="description">{t('description')}</Label>
-                  <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-text outline-none transition focus-visible:ring-2 focus-visible:ring-primary/40" />
-                </div>
-              </div>
+      <FormSection title={t('classification')}>
+        <FieldGrid>
+          <div className="space-y-1.5">
+            <Label htmlFor="account">{t('account')}</Label>
+            <Select id="account" value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
+              <option value="" disabled>{t('choose_account')}</option>
+              {accounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="category">{t('category')}</Label>
+              <Button variant="ghost" size="sm" onClick={() => setNewCategoryOpen(true)}><Plus className="h-3.5 w-3.5" />{t('new_category')}</Button>
+            </div>
+            <Select id="category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <option value="">{t('no_category')}</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="vendor_name">{t('vendor_name')}</Label>
+            <Input id="vendor_name" value={vendorName} onChange={(e) => setVendorName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="supplier">{t('supplier')}</Label>
+              <Button variant="ghost" size="sm" onClick={() => setNewSupplierOpen(true)}><Plus className="h-3.5 w-3.5" />{t('new_supplier')}</Button>
+            </div>
+            <Select id="supplier" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
+              <option value="">{t('none')}</option>
+              {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
+            </Select>
+          </div>
+          {centers.length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="center">{t('cost_center')}</Label>
+              <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
+                <option value="">{t('no_center')}</option>
+                {centers.map((center) => <option key={center.id} value={center.id}>{center.code} — {center.name}</option>)}
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="method">{t('payment_method')}</Label>
+            <Select id="method" value={method} onChange={(e) => setMethod(e.target.value)}>
+              <option value="cash">{t('method.cash')}</option>
+              <option value="bank">{t('method.bank')}</option>
+              <option value="credit">{t('method.credit')}</option>
+            </Select>
+            <p className="text-xs text-muted">{t('treasury_deferred')}</p>
+          </div>
+        </FieldGrid>
+      </FormSection>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="attachments">{t('attachments')}</Label>
-                <label htmlFor="attachments" className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/40 px-4 text-center transition hover:border-primary/50 focus-within:ring-2 focus-within:ring-primary/40">
-                  <Paperclip className="h-5 w-5 text-primary" strokeWidth={1.7} />
-                  <span className="text-sm font-medium text-text">{t('attachment_prompt')}</span>
-                  <span className="text-xs text-muted">{t('attachment_hint')}</span>
-                  <Input id="attachments" type="file" multiple className="sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.zip" onChange={(e) => addFiles(e.target.files)} />
-                </label>
-                {files.length > 0 && (
-                  <div className="space-y-1.5">
-                    {files.map((file, index) => (
-                      <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm">
-                        <span className="truncate text-text">{file.name}</span>
-                        <Button variant="ghost" size="icon" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={t('remove_attachment')}>
-                          <X className="h-4 w-4" strokeWidth={1.8} />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+      <FormSection title={t('tax_and_controls')}>
+        <FieldGrid>
+          <div className="space-y-1.5">
+            <Label htmlFor="tax">{t('tax')}</Label>
+            <Input id="tax" type="number" min={0} max={100} className="num text-end" dir="ltr" value={tax} onChange={(e) => setTax(e.target.value)} />
+          </div>
+          <div className="flex items-end">
+            <label className="flex w-full cursor-not-allowed items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted">
+              <input type="checkbox" disabled />
+              <span>{t('recurring_soon')}</span>
+            </label>
+          </div>
+        </FieldGrid>
+      </FormSection>
 
-          <Card>
-            <CardHeader><CardTitle>{t('classification')}</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="account">{t('account')}</Label>
-                <Select id="account" value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
-                  <option value="" disabled>{t('choose_account')}</option>
-                  {accounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="category">{t('category')}</Label>
-                  <Button variant="ghost" size="sm" onClick={() => setNewCategoryOpen(true)}><Plus className="h-3.5 w-3.5" />{t('new_category')}</Button>
-                </div>
-                <Select id="category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                  <option value="">{t('no_category')}</option>
-                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="vendor_name">{t('vendor_name')}</Label>
-                <Input id="vendor_name" value={vendorName} onChange={(e) => setVendorName(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="supplier">{t('supplier')}</Label>
-                  <Button variant="ghost" size="sm" onClick={() => setNewSupplierOpen(true)}><Plus className="h-3.5 w-3.5" />{t('new_supplier')}</Button>
-                </div>
-                <Select id="supplier" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
-                  <option value="">{t('none')}</option>
-                  {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
-                </Select>
-              </div>
-              {centers.length > 0 && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="center">{t('cost_center')}</Label>
-                  <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
-                    <option value="">{t('no_center')}</option>
-                    {centers.map((center) => <option key={center.id} value={center.id}>{center.code} — {center.name}</option>)}
-                  </Select>
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <Label htmlFor="method">{t('payment_method')}</Label>
-                <Select id="method" value={method} onChange={(e) => setMethod(e.target.value)}>
-                  <option value="cash">{t('method.cash')}</option>
-                  <option value="bank">{t('method.bank')}</option>
-                  <option value="credit">{t('method.credit')}</option>
-                </Select>
-                <p className="text-xs text-muted">{t('treasury_deferred')}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>{t('tax_and_controls')}</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="tax">{t('tax')}</Label>
-                <Input id="tax" type="number" min={0} max={100} className="num text-end" dir="ltr" value={tax} onChange={(e) => setTax(e.target.value)} />
-              </div>
-              <div className="flex items-end">
-                <label className="flex w-full cursor-not-allowed items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted">
-                  <input type="checkbox" disabled />
-                  <span>{t('recurring_soon')}</span>
-                </label>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="h-fit lg:sticky lg:top-5">
-          <CardHeader><CardTitle>{t('summary')}</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('subtotal')}</span><span className="num">{formatRiyal(amountMinor / 100)}</span></div>
-            <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('tax_total')}</span><span className="num">{formatRiyal(taxMinor / 100)}</span></div>
-            <div className="flex justify-between gap-4 border-t border-border pt-3"><span className="font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal((amountMinor + taxMinor) / 100)}</span></div>
-            {error && <p className="rounded-md bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
-            <Button className="w-full" disabled={saving || !accountId} onClick={submit}>{saving ? t('saving') : t('save_draft')}</Button>
-            {!editId && <>
-              <Button asChild className="w-full" variant="outline">
-                <Link href="/documents?document_type=expense&status=ready_for_draft">
-                  <FileInput className="h-4 w-4" aria-hidden="true" />
-                  {t('import_from_document')}
-                </Link>
-              </Button>
-              <p className="text-xs leading-5 text-muted">{t('import_from_document_hint')}</p>
-            </>}
-            <Button asChild className="w-full" variant="outline"><Link href='/expenses'>{t('cancel')}</Link></Button>
-          </CardContent>
-        </Card>
-      </div>
+      {error && <FormAlert>{error}</FormAlert>}
 
       <PartnerDialog
         open={newSupplierOpen}
@@ -358,6 +353,6 @@ export default function NewExpensePage() {
           </div>
         </div>
       </Dialog>
-    </div>
+    </FormPage>
   );
 }

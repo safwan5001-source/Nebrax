@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Copy, Download, FileText, Pencil, Printer, ReceiptText, Trash2 } from 'lucide-react';
-import { Accordion, AccordionItem } from '@/components/ui/accordion';
+import { Copy, Download, FileText, Pencil, Printer, ReceiptText, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
+import {
+  DetailPage, DetailSummary, ErrorState, FormAlert, LoadingState, type PageAction,
+} from '@/components/nebrax';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 
@@ -38,8 +39,6 @@ interface Expense {
   attachments?: Attachment[];
 }
 
-type MobileSection = 'details' | 'attachments' | 'summary';
-
 const statusTone: Record<string, 'positive' | 'warning' | 'muted'> = {
   posted: 'positive', draft: 'warning', cancelled: 'muted',
 };
@@ -62,9 +61,6 @@ export default function ExpenseDetailPage() {
   const [posting, setPosting] = useState(false);
   const [acting, setActing] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
-  // الجوال يحافظ على قسم واحد ظاهر، ويتيح طيّه بالنقر عليه مرة ثانية.
-  const [mobileSection, setMobileSection] = useState<MobileSection>('details');
-  const [mobileCollapsed, setMobileCollapsed] = useState(false);
 
   const load = useCallback(() => {
     if (!params.id) return;
@@ -77,16 +73,6 @@ export default function ExpenseDetailPage() {
   }, [params.id, t]);
 
   useEffect(() => load(), [load]);
-
-  function toggleMobileSection(section: MobileSection) {
-    if (mobileSection === section) {
-      setMobileCollapsed((collapsed) => !collapsed);
-      return;
-    }
-
-    setMobileSection(section);
-    setMobileCollapsed(false);
-  }
 
   async function postExpense() {
     if (!expense || expense.status !== 'draft') return;
@@ -149,18 +135,9 @@ export default function ExpenseDetailPage() {
     }
   }
 
-  if (loading) {
-    return <div className="mx-auto max-w-5xl space-y-5"><div className="h-16 animate-pulse rounded-md bg-muted" /><div className="h-96 animate-pulse rounded-md bg-muted" /></div>;
-  }
+  if (loading) return <LoadingState rows={8} label={tc('loading')} />;
 
-  if (!expense) {
-    return (
-      <div className="mx-auto max-w-5xl space-y-4">
-        <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error ?? t('expense_not_found')}</p>
-        <Button asChild variant="outline"><Link href="/expenses">{t('back')}</Link></Button>
-      </div>
-    );
-  }
+  if (!expense) return <ErrorState message={error ?? t('expense_not_found')} onRetry={load} />;
 
   const details = [
     [t('number'), expense.number],
@@ -173,40 +150,21 @@ export default function ExpenseDetailPage() {
     [t('payment_method'), t(`method.${expense.payment_method}`)],
   ];
 
-  const mobileOpen = (section: MobileSection) => !mobileCollapsed && mobileSection === section;
-  const actionButtons = (mobile = false) => (
-    <>
-      <Button className={mobile ? 'shrink-0' : undefined} variant="outline" onClick={() => window.print()}>
-        <Printer className="h-4 w-4" strokeWidth={1.7} />
-        {t('prints')}
-      </Button>
-      {expense.status === 'draft' ? (
-        <Button asChild variant="outline"><Link className={mobile ? 'shrink-0' : undefined} href={`/expenses/new?edit=${expense.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Link></Button>
-      ) : null}
-      <Button className={mobile ? 'shrink-0' : undefined} variant="outline" disabled={acting || posting} onClick={duplicateExpense}>
-        <Copy className="h-4 w-4" strokeWidth={1.7} />
-        {t('duplicate')}
-      </Button>
-      <Button
-        className={mobile ? 'shrink-0' : undefined}
-        variant="outline"
-        disabled={expense.status !== 'draft' || expense.document_linked || acting || posting}
-        title={expense.document_linked ? t('linked_draft_delete_blocked') : expense.status !== 'draft' ? t('draft_action_only') : undefined}
-        onClick={deleteExpense}
-      >
-        <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
-        {t('delete')}
-      </Button>
-      {expense.status === 'draft' && (
-        <Button className={mobile ? 'shrink-0' : undefined} disabled={posting || acting} onClick={postExpense}>
-          {posting ? t('posting') : t('post')}
-        </Button>
-      )}
-    </>
-  );
+  const isDraft = expense.status === 'draft';
+  const actions: PageAction[] = [
+    { key: 'print', label: t('prints'), icon: Printer, onClick: () => window.print(), variant: 'outline', emphasis: 'secondary' },
+    ...(isDraft ? [{ key: 'edit', label: t('edit'), icon: Pencil, href: `/expenses/new?edit=${expense.id}`, variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+    { key: 'duplicate', label: t('duplicate'), icon: Copy, onClick: duplicateExpense, variant: 'outline', emphasis: 'secondary', disabled: acting || posting },
+    {
+      key: 'delete', label: t('delete'), icon: Trash2, onClick: deleteExpense, variant: 'danger', emphasis: 'secondary',
+      disabled: !isDraft || expense.document_linked || acting || posting,
+      title: expense.document_linked ? t('linked_draft_delete_blocked') : !isDraft ? t('draft_action_only') : undefined,
+    },
+    ...(isDraft ? [{ key: 'post', label: posting ? t('posting') : t('post'), onClick: postExpense, variant: 'primary' as const, disabled: posting || acting }] : []),
+  ];
 
   const detailContent = (
-    <div className="space-y-5 p-4 lg:p-0">
+    <div className="space-y-5">
       <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
         {details.map(([label, value]) => (
           <div key={label} className="space-y-1">
@@ -223,7 +181,7 @@ export default function ExpenseDetailPage() {
   );
 
   const attachmentsContent = (
-    <div className="p-4 lg:p-0">
+    <div>
       {(expense.attachments?.length ?? 0) === 0 ? (
         <p className="py-5 text-center text-sm text-muted">{t('no_attachments')}</p>
       ) : (
@@ -249,82 +207,47 @@ export default function ExpenseDetailPage() {
   );
 
   const summaryContent = (
-    <div className="space-y-3 p-4 lg:p-0">
-      <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('subtotal')}</span><span className="num">{formatRiyal(expense.amount)}</span></div>
-      <div className="flex justify-between gap-4 text-sm text-muted"><span>{t('tax_total')} ({expense.tax_rate}%)</span><span className="num">{formatRiyal(expense.tax_amount)}</span></div>
-      <div className="flex justify-between gap-4 border-t border-border pt-3"><span className="font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal(expense.total)}</span></div>
-      <div className="mt-5 rounded-md bg-muted/50 px-3 py-3 text-xs leading-5 text-muted">
-        <ReceiptText className="mb-1 h-4 w-4 text-primary" strokeWidth={1.7} />
+    <DetailSummary
+      rows={[
+        { label: t('subtotal'), value: formatRiyal(expense.amount) },
+        { label: `${t('tax_total')} (${expense.tax_rate}%)`, value: formatRiyal(expense.tax_amount) },
+        { label: t('total'), value: formatRiyal(expense.total), strong: true },
+      ]}
+      note={<>
+        <ReceiptText className="mb-1 h-4 w-4 text-primary" strokeWidth={1.7} aria-hidden="true" />
         {expense.status === 'posted' ? t('posted_immutable_note') : t('draft_posting_note')}
-      </div>
-    </div>
+      </>}
+    />
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/expenses'>
-            <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-          </Link></Button>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold text-text">{t('expense_document', { number: expense.number })}</h1>
-              <Badge tone={statusTone[expense.status] ?? 'muted'}>{t(expense.status)}</Badge>
-            </div>
-            <p className="mt-1 text-sm text-muted">
-              {expense.journal_entry_id ? t('journal_entry_created') : t('journal_entry_pending')}
-            </p>
-            {expense.source_document_url && (
-              <Button asChild className="mt-3" size="sm" variant="outline">
-                <Link href={expense.source_document_url}>
-                  <FileText className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
-                  {t('source_document')}
-                </Link>
-              </Button>
-            )}
-            {expense.document_linked && !expense.source_document_url && (
-              <p className="mt-2 text-xs text-muted">{t('linked_draft_delete_blocked')}</p>
-            )}
-          </div>
-        </div>
-        <div className="no-print hidden flex-wrap items-center gap-2 lg:flex">{actionButtons()}</div>
-      </div>
-
-      <div className="no-print -mx-4 overflow-x-auto px-4 lg:hidden">
-        <div className="flex w-max gap-2">{actionButtons(true)}</div>
-      </div>
-
-      {error && <p className="rounded-md bg-negative/10 px-4 py-3 text-sm text-negative">{error}</p>}
-
-      <Accordion className="lg:hidden">
-        <AccordionItem id="expense-details" title={t('detail_title')} open={mobileOpen('details')} onToggle={() => toggleMobileSection('details')}>
-          {mobileOpen('details') && detailContent}
-        </AccordionItem>
-        <AccordionItem id="expense-attachments" title={t('attachments')} count={expense.attachments?.length} open={mobileOpen('attachments')} onToggle={() => toggleMobileSection('attachments')}>
-          {mobileOpen('attachments') && attachmentsContent}
-        </AccordionItem>
-        <AccordionItem id="expense-summary" title={t('financial_summary')} open={mobileOpen('summary')} onToggle={() => toggleMobileSection('summary')}>
-          {mobileOpen('summary') && summaryContent}
-        </AccordionItem>
-      </Accordion>
-
-      <div className="hidden gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="space-y-5">
-          <Card>
-            <CardHeader><CardTitle>{t('detail_title')}</CardTitle></CardHeader>
-            <CardContent>{detailContent}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>{t('attachments')}</CardTitle></CardHeader>
-            <CardContent>{attachmentsContent}</CardContent>
-          </Card>
-        </div>
-        <Card className="h-fit lg:sticky lg:top-5">
-          <CardHeader><CardTitle>{t('financial_summary')}</CardTitle></CardHeader>
-          <CardContent>{summaryContent}</CardContent>
-        </Card>
-      </div>
-    </div>
+    <DetailPage
+      backHref="/expenses"
+      backLabel={t('back')}
+      title={t('expense_document', { number: expense.number })}
+      badges={<Badge tone={statusTone[expense.status] ?? 'muted'}>{t(expense.status)}</Badge>}
+      meta={<>
+        <p>{expense.journal_entry_id ? t('journal_entry_created') : t('journal_entry_pending')}</p>
+        {expense.source_document_url && (
+          <Button asChild className="mt-3" size="sm" variant="outline">
+            <Link href={expense.source_document_url}>
+              <FileText className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              {t('source_document')}
+            </Link>
+          </Button>
+        )}
+        {expense.document_linked && !expense.source_document_url && (
+          <p className="mt-2 text-xs">{t('linked_draft_delete_blocked')}</p>
+        )}
+      </>}
+      actions={actions}
+      alert={error ? <FormAlert>{error}</FormAlert> : undefined}
+      summaryTitle={t('financial_summary')}
+      summary={summaryContent}
+      sections={[
+        { id: 'expense-details', title: t('detail_title'), content: detailContent },
+        { id: 'expense-attachments', title: t('attachments'), count: expense.attachments?.length, content: attachmentsContent },
+      ]}
+    />
   );
 }

@@ -76,8 +76,10 @@ export function FieldGrid({
 
 /**
  * حقلٌ يشغل عرض الشبكة كاملاً — الوصف والملاحظات والحقول الطويلة.
- * تفادياً لتكرار `sm:col-span-2 lg:col-span-3` بأشكال متضاربة في كل صفحة.
+ *
+ * `col-span-full` لا `col-span-2` لأنه لا يعرف عدد أعمدة الشبكة ولا يحتاج أن يعرفه:
+ * تمديدٌ بعددٍ ثابت داخل شبكةٍ أضيق منه يفتح عموداً ضمنياً ويكسر التخطيط بصمت.
  */
 export function FieldSpan({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('sm:col-span-2 lg:col-span-3', className)}>{children}</div>;
+  return <div className={cn('col-span-full', className)}>{children}</div>;
 }

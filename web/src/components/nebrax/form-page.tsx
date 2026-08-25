@@ -56,10 +56,14 @@ export function FormActions({
       )}
     >
       {note ? <div className="text-xs leading-5 text-muted">{note}</div> : null}
+      {/* على الجوال تتقاسم الأزرار العرض بأوزان: الحفظ الأساسي ضعف الثانوي فيبقى
+          أكبر هدفٍ للإبهام مهما تعدّدت الأزرار. ومن `lg` تعود كلٌّ إلى عرضها الطبيعي. */}
       <div className="flex items-center gap-2 lg:justify-end">
         {destructive ? <div className="me-auto shrink-0">{destructive}</div> : null}
-        {secondary ? <div className="flex-1 lg:flex-none [&>*]:w-full lg:[&>*]:w-auto">{secondary}</div> : null}
-        <div className="flex-[2] lg:flex-none [&>*]:w-full lg:[&>*]:w-auto">{primary}</div>
+        {secondary ? (
+          <div className="flex flex-1 items-center gap-2 lg:flex-none [&>*]:flex-1 lg:[&>*]:flex-none">{secondary}</div>
+        ) : null}
+        <div className="flex flex-[2] items-center gap-2 lg:flex-none [&>*]:flex-1 lg:[&>*]:flex-none">{primary}</div>
       </div>
     </div>
   );

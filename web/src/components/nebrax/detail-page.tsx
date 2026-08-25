@@ -16,6 +16,11 @@ export interface DetailSection {
   /** عدّاد بجانب العنوان (عدد المرفقات، التخصيصات…). */
   count?: number;
   content: React.ReactNode;
+  /**
+   * محتوى يمتدّ إلى حافّة القسم بلا حشوة — الجداول تحديداً، فحشوةٌ حولها تسرق
+   * من عرضٍ شحيح أصلاً على الجوال وتترك الصفّ الأول معلّقاً عن رأس القسم.
+   */
+  flush?: boolean;
 }
 
 /**
@@ -108,7 +113,7 @@ export function DetailPage({
                 open={openId === section.id}
                 onToggle={() => toggle(section.id)}
               >
-                {section.content}
+                <div className={section.flush ? undefined : 'p-4'}>{section.content}</div>
               </AccordionItem>
             ))}
             {summary ? (
@@ -118,7 +123,7 @@ export function DetailPage({
                 open={openId === 'summary'}
                 onToggle={() => toggle('summary')}
               >
-                {summary}
+                <div className="p-4">{summary}</div>
               </AccordionItem>
             ) : null}
           </Accordion>
@@ -135,7 +140,7 @@ export function DetailPage({
                   <CardHeader>
                     <CardTitle>{section.title}</CardTitle>
                   </CardHeader>
-                  <CardContent>{section.content}</CardContent>
+                  <CardContent className={section.flush ? 'p-0 pt-2' : undefined}>{section.content}</CardContent>
                 </Card>
               ))}
             </div>
