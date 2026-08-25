@@ -45,6 +45,8 @@ const generalLabels: Record<string, string> = {
   netCashFlow: 'Net cash flow',
   cashFlow: 'Direct cash flow',
   description: 'Description',
+  inflows: 'Inflows',
+  outflows: 'Outflows',
   empty: 'No data in range',
 };
 const g = ((key: string) => generalLabels[key] ?? key) as ReturnType<typeof useTranslations>;
@@ -107,7 +109,6 @@ describe('StructuredFinancialStatement', () => {
           descriptionLabel="Account"
           amountLabel="Amount"
           sections={sections}
-          grandTotal={{ id: 'grand-assets', kind: 'grand-total', label: 'Total assets', amount: '100.00' }}
           equation={{ id: 'equation', kind: 'equation', label: 'Total assets = Total liabilities + Equity and income', amount: '100.00' }}
         />
       </NextIntlClientProvider>,
@@ -117,7 +118,12 @@ describe('StructuredFinancialStatement', () => {
 
     expect(text.indexOf('Assets')).toBeLessThan(text.indexOf('Liabilities'));
     expect(text.indexOf('Liabilities')).toBeLessThan(text.indexOf('Equity'));
-    expect(within(desktop).getByText('Total assets = Total liabilities + Equity and income')).toBeTruthy();
+    const footer = desktop.querySelector('tfoot') as HTMLElement;
+    expect(within(desktop).getAllByText('Total assets', { exact: true })).toHaveLength(1);
+    expect(within(footer).getByText('Total assets = Total liabilities + Equity and income')).toBeTruthy();
+    expect(footer.querySelectorAll('tr')).toHaveLength(1);
+    expect(within(desktop).getByText('Total liabilities')).toBeTruthy();
+    expect(within(desktop).getByText('Equity and income')).toBeTruthy();
     expect(within(desktop).queryByRole('link', { name: /Total assets =/ })).toBeNull();
   });
 
@@ -142,17 +148,53 @@ describe('StructuredFinancialStatement', () => {
 });
 
 describe('CashFlowTable', () => {
-  it('keeps operating, investing, and financing sections together with their subtotals and net cash without sorting or pagination', () => {
+  it('keeps operating, investing, and financing sections together while preserving every cash-flow value without sorting or pagination', () => {
     const { container } = renderCashFlow();
     const desktop = container.querySelector('[data-testid="structured-financial-statement-desktop"]') as HTMLElement;
     const text = desktop.textContent ?? '';
+    const cashSale = within(desktop).getByText('Cash sale').closest('tr') as HTMLTableRowElement;
+    const assetPurchase = within(desktop).getByText('Asset purchase').closest('tr') as HTMLTableRowElement;
+    const operatingSubtotal = within(desktop).getByText('Operating activities — Net cash flow').closest('tr') as HTMLTableRowElement;
+    const investingSubtotal = within(desktop).getByText('Investing activities — Net cash flow').closest('tr') as HTMLTableRowElement;
+    const financingSubtotal = within(desktop).getByText('Financing activities — Net cash flow').closest('tr') as HTMLTableRowElement;
 
     expect(text.indexOf('Operating activities')).toBeLessThan(text.indexOf('Investing activities'));
     expect(text.indexOf('Investing activities')).toBeLessThan(text.indexOf('Financing activities'));
-    expect(within(desktop).getByText('Operating activities — Net cash flow')).toBeTruthy();
-    expect(within(desktop).getByText('Net cash flow', { selector: 'tfoot th' })).toBeTruthy();
+    expect(within(desktop).getByText('Inflows')).toBeTruthy();
+    expect(within(desktop).getByText('Outflows')).toBeTruthy();
+    expect(cashSale.textContent).toContain('2026-08-01 · JV-001');
+    expect(cashSale.textContent).toContain('900.00');
+    expect(cashSale.textContent).toContain('0.00');
+    expect(assetPurchase.textContent).toContain('300.00');
+    expect(assetPurchase.textContent).toContain('-300.00');
+    expect(operatingSubtotal.textContent).toContain('900.00');
+    expect(operatingSubtotal.textContent).toContain('200.00');
+    expect(operatingSubtotal.textContent).toContain('700.00');
+    expect(investingSubtotal.textContent).toContain('0.00');
+    expect(investingSubtotal.textContent).toContain('300.00');
+    expect(investingSubtotal.textContent).toContain('-300.00');
+    expect(financingSubtotal.textContent).toContain('0.00');
+    expect(within(desktop).getAllByText('Net cash flow', { selector: 'tfoot th' })).toHaveLength(1);
     expect(within(desktop).queryByRole('button', { name: /sort|next|previous|search/i })).toBeNull();
     expect(within(desktop).queryByRole('link')).toBeNull();
+  });
+
+  it('presents each cash-flow movement and section subtotal as an organised three-value mobile grid', () => {
+    const { container } = renderCashFlow();
+    const mobile = container.querySelector('[data-testid="structured-financial-statement-mobile"]') as HTMLElement;
+    const cashSale = within(mobile).getByText('Cash sale').closest('li') as HTMLLIElement;
+    const operatingSubtotal = within(mobile).getByText('Operating activities — Net cash flow').closest('li') as HTMLLIElement;
+
+    expect(cashSale.textContent).toContain('2026-08-01 · JV-001');
+    expect(cashSale.textContent).toContain('Inflows');
+    expect(cashSale.textContent).toContain('Outflows');
+    expect(cashSale.textContent).toContain('Net cash flow');
+    expect(cashSale.textContent).toContain('900.00');
+    expect(cashSale.textContent).toContain('0.00');
+    expect(operatingSubtotal.textContent).toContain('900.00');
+    expect(operatingSubtotal.textContent).toContain('200.00');
+    expect(operatingSubtotal.textContent).toContain('700.00');
+    expect(mobile.querySelector('table')).toBeNull();
   });
 
   it('shows a loading state before cash-flow data is available', () => {

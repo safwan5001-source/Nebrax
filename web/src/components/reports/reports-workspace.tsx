@@ -532,7 +532,6 @@ export function ReportsWorkspace({
                   descriptionLabel={t('account')}
                   amountLabel={t('amount')}
                   sections={balanceSheetSections}
-                  grandTotal={{ id: 'balance-total-assets', kind: 'grand-total', label: t('total_assets'), amount: balance.total_assets }}
                   equation={{ id: 'balance-equation', kind: 'equation', label: `${t('total_assets')} = ${t('total_liabilities')} + ${t('equity_and_income')}`, amount: balance.total_assets }}
                 />
                 <p className="mt-3 text-[11px] leading-relaxed text-muted">{t('as_of_hint')}</p>

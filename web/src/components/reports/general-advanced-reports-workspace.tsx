@@ -369,11 +369,23 @@ export function CashFlowTable({ cashFlow, loading, g, emptyLabel }: { cashFlow: 
             kind: 'detail' as const,
             code: `${entry.date} · ${entry.number}`,
             label: entry.description || entry.number,
-            amount: entry.net,
-            tone: 'auto' as const,
+            values: [
+              { id: 'inflows', amount: entry.inflow },
+              { id: 'outflows', amount: entry.outflow },
+              { id: 'net', amount: entry.net, tone: 'auto' as const },
+            ],
           }))
           : [{ id: `${key}-empty`, kind: 'empty' as const, label: emptyLabel }]),
-        { id: `${key}-net`, kind: 'subtotal' as const, label: `${label} — ${g('netCashFlow')}`, amount: section.net, tone: 'auto' as const },
+        {
+          id: `${key}-net`,
+          kind: 'subtotal' as const,
+          label: `${label} — ${g('netCashFlow')}`,
+          values: [
+            { id: 'inflows', amount: section.inflows },
+            { id: 'outflows', amount: section.outflows },
+            { id: 'net', amount: section.net, tone: 'auto' as const },
+          ],
+        },
       ],
     };
   });
@@ -388,9 +400,13 @@ export function CashFlowTable({ cashFlow, loading, g, emptyLabel }: { cashFlow: 
       <CardContent>
         <StructuredFinancialStatement
           descriptionLabel={g('description')}
-          amountLabel={g('netCashFlow')}
+          columns={[
+            { id: 'inflows', label: g('inflows') },
+            { id: 'outflows', label: g('outflows') },
+            { id: 'net', label: g('netCashFlow') },
+          ]}
           sections={statementSections}
-          grandTotal={{ id: 'net-cash-flow', kind: 'grand-total', label: g('netCashFlow'), amount: cashFlow.net_cash_flow, tone: 'auto' }}
+          grandTotal={{ id: 'net-cash-flow', kind: 'grand-total', label: g('netCashFlow'), values: [{ id: 'net', amount: cashFlow.net_cash_flow, tone: 'auto' }] }}
         />
       </CardContent>
     </Card>
