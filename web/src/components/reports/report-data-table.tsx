@@ -16,8 +16,8 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   type ColumnDef,
-  type ColumnVisibilityState,
   type SortingState,
+  type VisibilityState,
   useReactTable,
 } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
@@ -121,7 +121,7 @@ export function ReportDataTable({
 }: ReportDataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [density, setDensity] = useState<'comfortable' | 'compact'>(initialDensity);
   const [columnsOpen, setColumnsOpen] = useState(false);
 
@@ -144,7 +144,6 @@ export function ReportDataTable({
         String(rowA.getValue(column.id) ?? ''),
         String(rowB.getValue(column.id) ?? '')
       ),
-      meta: { align: column.align, numeric: column.numeric },
     })),
     [columns]
   );
