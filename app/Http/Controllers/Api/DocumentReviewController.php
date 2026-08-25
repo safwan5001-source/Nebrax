@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\DraftBuildContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignDocumentReviewerRequest;
 use App\Http\Requests\CompleteDocumentReviewRequest;
+use App\Http\Requests\CreateDocumentPurchaseDraftRequest;
 use App\Http\Requests\ConfirmDocumentMatchRequest;
 use App\Http\Requests\DocumentIssueActionRequest;
 use App\Http\Requests\RejectDocumentMatchRequest;
@@ -21,6 +23,8 @@ use App\Models\DocumentMatchResult;
 use App\Models\DocumentReviewAction;
 use App\Models\User;
 use App\Services\DocumentCenter\DocumentReviewService;
+use App\Services\DocumentCenter\PurchaseDocumentDraftBuilder;
+use App\Services\DocumentCenter\PurchaseDraftBuildOptions;
 use App\Services\DocumentCenter\ReviewedDocumentProjector;
 use App\Support\DocumentScanStatus;
 use Illuminate\Http\JsonResponse;
@@ -80,7 +84,7 @@ class DocumentReviewController extends Controller
 
     public function review(Request $request, DocumentBatch $batch): DocumentReviewResource
     {
-        $batch->load(['files', 'reviewer:id,name']);
+        $batch->load(['files', 'reviewer:id,name', 'transactionLinks.purchase']);
         $result = $this->resultFor($batch);
         $original = $result->normalized_payload;
         $reviewed = app(ReviewedDocumentProjector::class)->project($result);
@@ -92,6 +96,7 @@ class DocumentReviewController extends Controller
             'matches' => $this->matches($result),
             'issues' => $this->issues($result),
             'history' => $this->history($batch),
+            'linked_purchase' => $this->linkedPurchase($batch),
             'capabilities' => $this->capabilities($request->user()),
         ]);
     }
@@ -171,6 +176,33 @@ class DocumentReviewController extends Controller
         );
 
         return response()->json(['data' => ['id' => $action->id]]);
+    }
+
+    public function createPurchaseDraft(CreateDocumentPurchaseDraftRequest $request, DocumentBatch $batch): JsonResponse
+    {
+        $draft = app(PurchaseDocumentDraftBuilder::class)->build(
+            $batch,
+            new DraftBuildContext(
+                expectedVersion: $request->integer('expected_version'),
+                reason: $request->string('reason')->toString(),
+                actorId: $request->user()?->id,
+                options: new PurchaseDraftBuildOptions(
+                    warehouseId: $request->validated('warehouse_id'),
+                    costCenterId: $request->validated('cost_center_id'),
+                ),
+            ),
+        );
+
+        return response()->json(['data' => [
+            'document_batch_id' => $batch->id,
+            'link_id' => $draft->linkId,
+            'transaction_type' => $draft->transactionType,
+            'transaction_id' => $draft->transactionId,
+            'transaction_number' => $draft->transactionNumber,
+            'status' => $draft->status,
+            'url' => '/purchases/'.$draft->transactionId,
+            'idempotent_replay' => $draft->idempotentReplay,
+        ]], $draft->idempotentReplay ? 200 : 201);
     }
 
     public function revalidateFinancial(RevalidateDocumentFinancialRequest $request, DocumentBatch $batch): JsonResponse
@@ -329,6 +361,26 @@ class DocumentReviewController extends Controller
             'view' => $user?->hasPermission('documents.center.view') ?? false,
             'review' => $user?->hasPermission('documents.center.review') ?? false,
             'manage' => $user?->hasPermission('documents.center.manage') ?? false,
+            'build_draft' => $user?->hasPermission('documents.center.build_draft') ?? false,
+        ];
+    }
+
+    /** @return array<string, string>|null */
+    private function linkedPurchase(DocumentBatch $batch): ?array
+    {
+        $link = $batch->transactionLinks->firstWhere('transaction_type', 'purchase');
+        $purchase = $link?->purchase;
+        if ($link === null || $purchase === null) {
+            return null;
+        }
+
+        return [
+            'link_id' => $link->id,
+            'transaction_type' => $link->transaction_type,
+            'transaction_id' => $purchase->id,
+            'transaction_number' => $purchase->number,
+            'status' => $purchase->status,
+            'url' => '/purchases/'.$purchase->id,
         ];
     }
 

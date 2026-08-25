@@ -16,6 +16,7 @@ import {
   documentFieldTranslationKey,
   reviewHasVisibleBlocker,
 } from '@/lib/document-review';
+import { canBuildPurchaseDraft, linkedPurchasePresentation } from '@/lib/document-review-access';
 
 type ReviewFile = {
   id: string;
@@ -79,13 +80,15 @@ type Review = {
     status: string;
     version: number;
     reviewer: { id: string; name: string } | null;
+    document_type: string;
   };
   fields: ReviewField[];
   files: ReviewFile[];
   matches: Match[];
   issues: Issue[];
   history: ReviewHistory[];
-  capabilities: { view: boolean; review: boolean; manage: boolean };
+  linked_purchase: { link_id: string; transaction_type: string; transaction_id: string; transaction_number: string; status: string; url: string } | null;
+  capabilities: { view: boolean; review: boolean; manage: boolean; build_draft: boolean };
 };
 
 type Command = {
@@ -98,7 +101,7 @@ type Command = {
 type MobileSection = 'details' | 'matches' | 'issues' | 'history';
 
 function reviewTone(status: string): 'positive' | 'muted' | 'warning' | 'negative' {
-  if (status === 'confirmed' || status === 'resolved' || status === 'ready_for_draft') return 'positive';
+  if (status === 'confirmed' || status === 'resolved' || status === 'ready_for_draft' || status === 'draft_created') return 'positive';
   if (status === 'rejected') return 'muted';
   if (status === 'blocking') return 'negative';
   return 'warning';
@@ -174,7 +177,13 @@ export default function DocumentReviewPage() {
   }
 
   const canReview = review.capabilities.review;
-  const canComplete = canReview && review.batch.status !== 'ready_for_draft' && !hasVisibleBlocker;
+  const canComplete = canReview && review.batch.status === 'needs_review' && !hasVisibleBlocker;
+  const canBuildDraft = canBuildPurchaseDraft({
+    canBuildDraft: review.capabilities.build_draft,
+    documentType: review.batch.document_type,
+    status: review.batch.status,
+    hasLinkedPurchase: review.linked_purchase !== null,
+  });
   const activeFile = review.files.find((file) => file.download_available) ?? review.files[0];
   const sectionItems: Array<{ id: MobileSection; label: string }> = [
     { id: 'details', label: t('details') },
@@ -183,20 +192,44 @@ export default function DocumentReviewPage() {
     { id: 'history', label: t('history') },
   ];
 
-  const completionButton = (
+  const completionButton = canComplete ? (
     <Button
       onClick={() => setCommand({
         title: t('completeReview'),
         label: t('completeReview'),
         endpoint: `/document-batches/${id}/complete-review`,
       })}
-      disabled={!canComplete}
-      title={!canReview ? t('notAllowed') : hasVisibleBlocker ? t('readinessBlocked') : undefined}
     >
       <ShieldCheck className="h-4 w-4" aria-hidden="true" />
       {t('completeReview')}
     </Button>
-  );
+  ) : null;
+
+  const linkedPurchaseState = review.linked_purchase ? linkedPurchasePresentation(review.linked_purchase.status) : null;
+  const draftButton = review.linked_purchase && linkedPurchaseState ? (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button asChild variant="outline">
+        <Link href={review.linked_purchase.url}>
+          {linkedPurchaseState.action === 'posted'
+            ? t('openPostedPurchase', { number: review.linked_purchase.transaction_number })
+            : linkedPurchaseState.action === 'cancelled'
+              ? t('openCancelledPurchase', { number: review.linked_purchase.transaction_number })
+              : t('openPurchaseDraft', { number: review.linked_purchase.transaction_number })}
+        </Link>
+      </Button>
+      <Badge tone={reviewTone(review.linked_purchase.status)}>{t(linkedPurchaseState.badge)}</Badge>
+    </div>
+  ) : canBuildDraft ? (
+    <Button
+      onClick={() => setCommand({
+        title: t('createPurchaseDraft'),
+        label: t('createPurchaseDraft'),
+        endpoint: `/document-batches/${id}/create-purchase-draft`,
+      })}
+    >
+      {t('createPurchaseDraft')}
+    </Button>
+  ) : null;
 
   const details = (
     <div className="space-y-5">
@@ -210,7 +243,11 @@ export default function DocumentReviewPage() {
               </p>
             </div>
             <Badge tone={reviewTone(review.batch.status)}>
-              {review.batch.status === 'ready_for_draft' ? t('readyForDraft') : t('needsReview')}
+              {review.batch.status === 'ready_for_draft'
+                ? t('readyForDraft')
+                : review.batch.status === 'draft_created'
+                  ? t('draftCreated')
+                  : t('needsReview')}
             </Badge>
           </div>
           {activeFile ? (
@@ -445,7 +482,7 @@ export default function DocumentReviewPage() {
           <h1 className="mt-2 text-xl font-semibold text-text">{t('reviewTitle')}</h1>
           <p className="mt-1 font-mono text-xs text-muted">{t('version', { version: review.batch.version })}</p>
         </div>
-        <div className="hidden md:block">{completionButton}</div>
+        <div className="hidden flex-wrap gap-2 md:flex">{draftButton}{completionButton}</div>
       </header>
 
       {!canComplete && review.batch.status !== 'ready_for_draft' && (
@@ -481,7 +518,7 @@ export default function DocumentReviewPage() {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:hidden">
-        {completionButton}
+        <div className="flex gap-2">{draftButton}{completionButton}</div>
       </div>
 
       {command && (

@@ -101,4 +101,9 @@ class DocumentBatch extends BaseModel
     {
         return $this->hasMany(DocumentExtractionResult::class);
     }
+
+    public function transactionLinks(): HasMany
+    {
+        return $this->hasMany(DocumentTransactionLink::class);
+    }
 }

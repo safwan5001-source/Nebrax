@@ -294,6 +294,9 @@ class PurchaseService
             if (! $purchase->isDraft()) {
                 throw new RuntimeException('لا يمكن حذف فاتورة مشتريات مرحّلة.');
             }
+            if ($purchase->documentTransactionLinks()->lockForUpdate()->exists()) {
+                throw new RuntimeException('لا يمكن حذف مسودة مشتريات مرتبطة بمستند؛ استخدم الإلغاء أو الأرشفة وفق دورة المشتريات.');
+            }
             $purchase->lines()->delete();
             $purchase->delete();
         });

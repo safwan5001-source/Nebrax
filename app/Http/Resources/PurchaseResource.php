@@ -25,6 +25,7 @@ class PurchaseResource extends JsonResource
             ] : null),
             'payment_type'        => $this->payment_type,
             'status'              => $this->status,
+            'document_linked'     => (int) ($this->document_transaction_links_count ?? 0) > 0,
             'payment_status'      => $this->payment_status,
             'purchase_date'       => optional($this->purchase_date)->toDateString(),
             'supplier_invoice_no' => $this->supplier_invoice_no,

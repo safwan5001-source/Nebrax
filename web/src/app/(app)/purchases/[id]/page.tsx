@@ -65,6 +65,7 @@ interface Purchase {
   partner_id: string;
   payment_type: string;
   status: string;
+  document_linked: boolean;
   payment_status: string;
   purchase_date: string;
   supplier_invoice_no: string | null;
@@ -407,6 +408,7 @@ export default function PurchaseDetailPage() {
     }
   }
 
+  const canDeleteDraft = isDraft && !purchase.document_linked;
   const workControls = isDraft ? <Button size="sm" onClick={() => setPendingAction('post')} disabled={actioning}><CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />{t('post')}</Button> : null;
   const purchaseActions = <>
     {isDraft && <DropdownItem icon={Pencil} href={`/purchases/${purchase.id}/edit`}>{tp('edit')}</DropdownItem>}
@@ -418,7 +420,7 @@ export default function PurchaseDetailPage() {
     <DropdownItem icon={Share2} onClick={handleSharePdf}>{t('share')}</DropdownItem>
     <DropdownItem icon={FileSpreadsheet} onClick={handleExcel}>{t('excel')}</DropdownItem>
     {frozenThermalDefinition && thermalPaper && thermalTemplateId && <DropdownItem icon={Printer} onClick={() => printDocument(thermalPaper, 'thermal-print-root')}>{tPrint('thermal_print')}</DropdownItem>}
-    {isDraft && <DropdownItem icon={Trash2} tone="danger" onClick={() => setPendingAction('delete')}>{tp('delete')}</DropdownItem>}
+    {isDraft && <DropdownItem icon={Trash2} tone="danger" disabled={!canDeleteDraft} onClick={() => setPendingAction('delete')}>{tp('delete')}</DropdownItem>}
   </>;
 
   const documentPreview = <Card>
@@ -428,7 +430,7 @@ export default function PurchaseDetailPage() {
 
   return <div className="space-y-5">
     <header className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-2"><Button asChild variant="ghost" size="icon" className="no-print shrink-0" aria-label={t('back')}><Link href='/purchases'><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="num text-xl font-semibold text-text">{purchase.number}</h1><Badge tone={statusTone[purchase.status] ?? 'muted'}>{ts(purchase.status)}</Badge><Badge tone={payTone[purchase.payment_status] ?? 'muted'}>{ts(purchase.payment_status)}</Badge><Badge tone={receivedStatusKey === 'full' ? 'positive' : receivedStatusKey === 'partial' ? 'warning' : 'muted'}>{receivedStatusLabel}</Badge></div><p className="mt-1 text-sm text-muted">{isDraft ? t('post_confirm') : t('payment_section_note')}</p></div></div><div className="no-print hidden flex-wrap items-center justify-end gap-2 lg:flex">{workControls}<Dropdown align="end" menuLabel={tp('actions')} triggerLabel={tp('actions')} triggerClassName="h-8 border border-border px-2 text-text hover:bg-primary-soft" trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}>{purchaseActions}</Dropdown></div></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-2"><Button asChild variant="ghost" size="icon" className="no-print shrink-0" aria-label={t('back')}><Link href='/purchases'><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="num text-xl font-semibold text-text">{purchase.number}</h1><Badge tone={statusTone[purchase.status] ?? 'muted'}>{ts(purchase.status)}</Badge><Badge tone={payTone[purchase.payment_status] ?? 'muted'}>{ts(purchase.payment_status)}</Badge><Badge tone={receivedStatusKey === 'full' ? 'positive' : receivedStatusKey === 'partial' ? 'warning' : 'muted'}>{receivedStatusLabel}</Badge></div><p className="mt-1 text-sm text-muted">{isDraft ? (purchase.document_linked ? t('document_linked_locked') : t('post_confirm')) : t('payment_section_note')}</p></div></div><div className="no-print hidden flex-wrap items-center justify-end gap-2 lg:flex">{workControls}<Dropdown align="end" menuLabel={tp('actions')} triggerLabel={tp('actions')} triggerClassName="h-8 border border-border px-2 text-text hover:bg-primary-soft" trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}>{purchaseActions}</Dropdown></div></div>
       <div className="no-print lg:hidden"><div className="flex flex-wrap items-center gap-2">{workControls}<Dropdown align="end" menuLabel={tp('actions')} triggerLabel={tp('actions')} mobilePopover triggerClassName="h-8 border border-border bg-surface px-2 text-text hover:bg-primary-soft" trigger={<MoreVertical className="h-4 w-4" strokeWidth={1.8} />}>{purchaseActions}</Dropdown></div></div>
       <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-surface px-3 py-2.5"><span className="text-sm font-medium text-text">{t('template')}</span><Dropdown align="end" menuLabel={t('template')} triggerLabel={t('template')} triggerClassName="h-8 gap-2 border border-border px-3 text-sm text-text hover:bg-primary-soft" trigger={<><LayoutTemplate className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} /><span>{tt(getTemplate(templateId).nameKey)}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.8} /></>}>{listTemplates().map((definition) => <DropdownItem key={definition.id} onClick={() => setTemplateId(definition.id)}>{tt(definition.nameKey)}</DropdownItem>)}</Dropdown></div>
     </header>
