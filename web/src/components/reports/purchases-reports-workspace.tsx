@@ -14,7 +14,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { ReportDocument, type ReportColumn } from '@/components/reports/report-document';
 import { PurchaseReportFilters, EMPTY_PURCHASE_REPORT_FILTERS, type PurchaseReportFilterState } from '@/components/reports/purchases-report-filters';
 import { api } from '@/lib/api';
@@ -25,7 +24,8 @@ import { useToast } from '@/components/ui/toast';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
-import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
+import { ReportMetricGrid, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
+import { ReportResultsTable } from '@/components/reports/report-results-table';
 
 export type PurchaseReportView = 'period' | 'supplier' | 'product' | 'classification' | 'employee' | 'balances' | 'payments';
 
@@ -246,16 +246,13 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
               {!doc || doc.rows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
               ) : (
-                <>
-                <ReportMobileRows columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} emptyText={t('empty')} primaryIndex={0} />
-                <Table className="hidden md:table">
-                  <THead><TR>{doc.columns.map((column) => <TH key={column.label} className={column.align === 'end' ? 'text-end' : undefined}>{column.label}</TH>)}</TR></THead>
-                  <TBody>
-                    {doc.rows.map((row, rowIndex) => <TR key={`${row[0]}-${rowIndex}`}>{row.map((cell, cellIndex) => <TD key={cellIndex} className={doc.columns[cellIndex]?.align === 'end' ? 'num text-end' : undefined}>{cell}</TD>)}</TR>)}
-                    <TR className="font-semibold">{doc.totalRow.map((cell, cellIndex) => <TD key={cellIndex} className={doc.columns[cellIndex]?.align === 'end' ? 'num text-end' : undefined}>{cell}</TD>)}</TR>
-                  </TBody>
-                </Table>
-                </>
+                <ReportResultsTable
+                  columns={doc.columns}
+                  rows={doc.rows}
+                  totalRow={doc.totalRow}
+                  emptyText={t('empty')}
+                  primaryIndex={0}
+                />
               )}
             </CardContent>
           </Card>
