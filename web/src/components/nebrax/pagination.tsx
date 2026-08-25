@@ -1,10 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
-import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
+import { displayLocale } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_PER_PAGE_OPTIONS = [25, 50, 100];
@@ -20,7 +21,6 @@ export function Pagination({
   lastPage,
   perPage,
   total,
-  totalUnit,
   onPageChange,
   onPerPageChange,
   perPageOptions = DEFAULT_PER_PAGE_OPTIONS,
@@ -32,30 +32,34 @@ export function Pagination({
   perPage: number;
   /** إجمالي السجلات — يُعرض قبل موضع الصفحة حين يكون معروفاً. */
   total?: number;
-  totalUnit?: string;
   onPageChange: (page: number) => void;
   onPerPageChange?: (perPage: number) => void;
   perPageOptions?: number[];
   disabled?: boolean;
   className?: string;
 }) {
+  const t = useTranslations('nebrax');
+  const locale = useLocale();
   const safeLastPage = Math.max(1, lastPage);
   const safePage = Math.min(Math.max(1, page), safeLastPage);
-  const num = (value: number) => value.toLocaleString(ARABIC_DISPLAY_LOCALE);
+
+  // كما في `ListToolbar`: الأرقام تُنسَّق بلغة الواجهة وتُمرَّر إلى ICU نصوصاً.
+  const num = (value: number) => value.toLocaleString(displayLocale(locale));
+  const mono = (chunks: React.ReactNode) => <span className="num">{chunks}</span>;
 
   return (
     <nav
-      aria-label="تنقّل النتائج"
+      aria-label={t('resultsNavigation')}
       className={cn('flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between', className)}
     >
       <p className="text-xs text-muted" aria-live="polite">
         {typeof total === 'number' ? (
           <>
-            <span className="num">{num(total)}</span>
-            {totalUnit ? ` ${totalUnit}` : ''} ·{' '}
+            {t.rich('resultCount', { n: total, count: num(total), num: mono })}
+            {' · '}
           </>
         ) : null}
-        صفحة <span className="num">{num(safePage)}</span> من <span className="num">{num(safeLastPage)}</span>
+        {t.rich('pagePosition', { page: num(safePage), lastPage: num(safeLastPage), num: mono })}
       </p>
 
       <div className="flex items-center gap-2">
@@ -63,7 +67,7 @@ export function Pagination({
           <Select
             value={String(perPage)}
             onChange={(event) => onPerPageChange(Number(event.target.value))}
-            aria-label="عدد النتائج في الصفحة"
+            aria-label={t('perPage')}
             className="h-10 w-24 bg-surface text-sm sm:h-9"
           >
             {perPageOptions.map((option) => (
@@ -78,7 +82,7 @@ export function Pagination({
           type="button"
           variant="outline"
           size="icon"
-          aria-label="الصفحة السابقة"
+          aria-label={t('previousPage')}
           className="h-10 w-10 sm:h-9 sm:w-9"
           disabled={disabled || safePage <= 1}
           onClick={() => onPageChange(Math.max(1, safePage - 1))}
@@ -89,7 +93,7 @@ export function Pagination({
           type="button"
           variant="outline"
           size="icon"
-          aria-label="الصفحة التالية"
+          aria-label={t('nextPage')}
           className="h-10 w-10 sm:h-9 sm:w-9"
           disabled={disabled || safePage >= safeLastPage}
           onClick={() => onPageChange(Math.min(safeLastPage, safePage + 1))}

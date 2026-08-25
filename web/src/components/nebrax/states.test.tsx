@@ -1,37 +1,61 @@
 /* @vitest-environment jsdom */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EmptyState, ErrorState, LoadingState } from './states';
+import { TEST_LOCALES, nebraxText, renderIntl } from '@/test-utils/intl';
 
 afterEach(cleanup);
 
-describe('screen states', () => {
-  it('announces loading as a busy status rather than an empty surface', () => {
-    render(<LoadingState label="جارٍ تحميل الفواتير" rows={3} />);
-    const status = screen.getByRole('status', { name: 'جارٍ تحميل الفواتير' });
+describe.each(TEST_LOCALES)('screen states (%s)', (locale) => {
+  it('announces loading with a translated busy label rather than an empty surface', () => {
+    renderIntl(<LoadingState rows={3} />, locale);
+
+    const status = screen.getByRole('status', { name: nebraxText(locale, 'loading') });
     expect(status.getAttribute('aria-busy')).toBe('true');
   });
 
-  it('shows an empty state title with an optional first action', () => {
-    render(<EmptyState title="لا توجد فواتير بعد" description="ابدأ بإصدار أول فاتورة." action={<button type="button">فاتورة جديدة</button>} />);
+  it('lets a screen name what is loading instead of the generic label', () => {
+    renderIntl(<LoadingState rows={3} label="Loading invoices" />, locale);
 
-    expect(screen.getByText('لا توجد فواتير بعد')).toBeTruthy();
-    expect(screen.getByText('ابدأ بإصدار أول فاتورة.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'فاتورة جديدة' })).toBeTruthy();
+    expect(screen.getByRole('status', { name: 'Loading invoices' })).toBeTruthy();
+    expect(screen.queryByRole('status', { name: nebraxText(locale, 'loading') })).toBeNull();
   });
 
-  it('raises a load failure as an alert and offers a retry', async () => {
+  it('offers a translated retry on a load failure', async () => {
     const onRetry = vi.fn();
-    render(<ErrorState message="تعذّر تحميل البيانات" onRetry={onRetry} />);
+    renderIntl(<ErrorState message="Could not load" onRetry={onRetry} />, locale);
 
-    expect(screen.getByRole('alert').textContent).toBe('تعذّر تحميل البيانات');
-    await userEvent.click(screen.getByRole('button', { name: 'إعادة المحاولة' }));
+    expect(screen.getByRole('alert').textContent).toBe('Could not load');
+    await userEvent.click(screen.getByRole('button', { name: nebraxText(locale, 'retry') }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
   it('omits the retry button when no retry is possible', () => {
-    render(<ErrorState message="تعذّر تحميل البيانات" />);
+    renderIntl(<ErrorState message="Could not load" />, locale);
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('shows the caller-supplied empty title, description and first action', () => {
+    renderIntl(
+      <EmptyState title="No invoices yet" description="Issue the first one." action={<button type="button">New invoice</button>} />,
+      locale
+    );
+
+    expect(screen.getByText('No invoices yet')).toBeTruthy();
+    expect(screen.getByText('Issue the first one.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'New invoice' })).toBeTruthy();
+  });
+});
+
+describe('screen state language', () => {
+  it('uses Arabic defaults in Arabic and English defaults in English', () => {
+    const { unmount } = renderIntl(<ErrorState message="x" onRetry={() => {}} />, 'ar');
+    expect(screen.getByRole('button').textContent).toBe('إعادة المحاولة');
+    unmount();
+
+    renderIntl(<ErrorState message="x" onRetry={() => {}} />, 'en');
+    expect(screen.getByRole('button').textContent).toBe('Try again');
+    expect(screen.getByRole('button').textContent).not.toMatch(/[؀-ۿ]/);
   });
 });

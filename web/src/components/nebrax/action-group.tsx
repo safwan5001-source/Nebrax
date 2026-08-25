@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -77,14 +78,17 @@ function ActionButton({ action, className }: { action: PageAction; className?: s
 export function ActionGroup({
   actions,
   inlineLimit = 2,
-  overflowLabel = 'إجراءات إضافية',
+  overflowLabel,
   className,
 }: {
   actions: PageAction[];
   inlineLimit?: number;
+  /** يتجاوز التسمية المترجمة حين يحتاج السياق اسماً أدقّ من «إجراءات إضافية». */
   overflowLabel?: string;
   className?: string;
 }) {
+  const t = useTranslations('nebrax');
+  const overflowMenuLabel = overflowLabel ?? t('moreActions');
   const visible = actions.filter(Boolean);
   if (visible.length === 0) return null;
 
@@ -102,8 +106,8 @@ export function ActionGroup({
       {overflow.length > 0 ? (
         <Dropdown
           align="end"
-          menuLabel={overflowLabel}
-          triggerLabel={overflowLabel}
+          menuLabel={overflowMenuLabel}
+          triggerLabel={overflowMenuLabel}
           mobilePopover
           triggerClassName="h-9 w-9 justify-center border border-border bg-surface text-text hover:bg-primary-soft"
           trigger={<MoreHorizontal className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}

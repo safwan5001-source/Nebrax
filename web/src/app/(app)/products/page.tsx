@@ -352,11 +352,9 @@ export default function ProductsPage() {
           value: explorer.sort ?? 'name',
           onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
           options: sortOptions,
-          label: 'ترتيب المنتجات',
         }}
         resultCount={sorted.length}
         totalCount={data.length}
-        countUnit="منتج"
       />
 
       <DataTable
@@ -396,7 +394,6 @@ export default function ProductsPage() {
         lastPage={totalPages}
         perPage={perPage}
         total={sorted.length}
-        totalUnit="منتج"
         disabled={loading}
         onPageChange={(next) => setExplorer((current) => ({ ...current, page: next }))}
         onPerPageChange={(next) => setExplorer((current) => ({ ...current, page: 1, perPage: next }))}

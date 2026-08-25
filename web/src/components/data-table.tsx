@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   type ColumnDef,
   type SortingState,
@@ -59,6 +60,7 @@ export function DataTable<T>({
   onRetry,
   retryLabel,
 }: DataTableProps<T>) {
+  const t = useTranslations('nebrax');
   const [sorting, setSorting] = useState<SortingState>([]);
   const [internalGlobalFilter, setInternalGlobalFilter] = useState('');
   const globalFilter = searchValue ?? internalGlobalFilter;
@@ -112,7 +114,7 @@ export function DataTable<T>({
             className="ms-auto"
             onClick={exportCsv}
             disabled={loading || data.length === 0}
-            title="تصدير CSV"
+            title={t('exportCsv')}
           >
             <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
             CSV
@@ -125,7 +127,7 @@ export function DataTable<T>({
       ) : loading ? (
         <LoadingState surface="bare" />
       ) : rows.length === 0 ? (
-        <EmptyState title={emptyLabel ?? 'لا توجد نتائج'} description={emptyDescription} action={emptyAction} surface="bare" />
+        <EmptyState title={emptyLabel ?? t('noResults')} description={emptyDescription} action={emptyAction} surface="bare" />
       ) : (
         <>
           {/* الجدول يمرّر أفقياً داخل حاويته (لا على مستوى الصفحة) بدل أن تنضغط

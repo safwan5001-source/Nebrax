@@ -4930,6 +4930,23 @@
       "fuel_stations_integrations": "Station Device Integrations"
     }
   },
+  "nebrax": {
+    "search": "Search",
+    "searchAndFilter": "Search and filters",
+    "sortResults": "Sort results",
+    "resultCount": "{n, plural, one {<num>{count}</num> result} other {<num>{count}</num> results}}",
+    "filteredCount": "<num>{count}</num> of <num>{total}</num>",
+    "moreActions": "More actions",
+    "loading": "Loading…",
+    "noResults": "No results",
+    "retry": "Try again",
+    "exportCsv": "Export CSV",
+    "resultsNavigation": "Results navigation",
+    "perPage": "Results per page",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "pagePosition": "Page <num>{page}</num> of <num>{lastPage}</num>"
+  },
   "numberingSettings": {
     "title": "Document numbering",
     "picker_title": "Document type",

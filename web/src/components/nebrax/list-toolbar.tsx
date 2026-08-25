@@ -1,12 +1,13 @@
 'use client';
 
 import * as React from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { ArrowUpDown } from 'lucide-react';
 import { ActiveFilterChips } from '@/components/data-explorer/active-filter-chips';
 import { QuickFilters } from '@/components/data-explorer/quick-filters';
 import { SearchBar } from '@/components/data-explorer/search-bar';
 import { Select } from '@/components/ui/select';
-import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
+import { displayLocale } from '@/lib/formatting';
 import type { ActiveFilter, FilterDefinition } from '@/lib/data-explorer/types';
 import { cn } from '@/lib/utils';
 
@@ -44,13 +45,13 @@ export function ListToolbar({
   sort,
   resultCount,
   totalCount,
-  countUnit = 'نتيجة',
   trailing,
   className,
 }: {
   search: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder: string;
+  /** تسمية وصول للحقل حين يفيد اسم الشاشة أكثر من كلمة «بحث» المجرّدة. */
   searchLabel?: string;
   definitions: FilterDefinition[];
   filters: ActiveFilter[];
@@ -61,15 +62,22 @@ export function ListToolbar({
   sort?: ListSortControl;
   resultCount?: number;
   totalCount?: number;
-  countUnit?: string;
   trailing?: React.ReactNode;
   className?: string;
 }) {
+  const t = useTranslations('nebrax');
+  const locale = useLocale();
   const hasQuickFilters = definitions.some((definition) => definition.quick) || Boolean(onOpenAdvanced);
+
+  // الأرقام تُنسَّق بلغة الواجهة النشطة، وبأرقام لاتينية في الحالتين — وهو ما
+  // يضمنه `displayLocale`. تُمرَّر إلى ICU **نصوصاً** كي لا يعيد تنسيقها بلغة
+  // العرض فتنقلب إلى أرقام هندية في العربية.
+  const num = (value: number) => value.toLocaleString(displayLocale(locale));
+  const mono = (chunks: React.ReactNode) => <span className="num">{chunks}</span>;
 
   return (
     <section
-      aria-label="أدوات البحث والفلترة"
+      aria-label={t('searchAndFilter')}
       className={cn('space-y-3 rounded border border-border bg-surface p-3 sm:p-4', className)}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -77,7 +85,7 @@ export function ListToolbar({
           value={search}
           onChange={onSearchChange}
           placeholder={searchPlaceholder}
-          ariaLabel={searchLabel ?? 'بحث'}
+          ariaLabel={searchLabel ?? t('search')}
           className="min-w-0 sm:flex-1"
         />
 
@@ -87,7 +95,7 @@ export function ListToolbar({
             <Select
               value={sort.value}
               onChange={(event) => sort.onChange(event.target.value)}
-              aria-label={sort.label ?? 'ترتيب النتائج'}
+              aria-label={sort.label ?? t('sortResults')}
               className="h-10 w-full bg-surface text-sm sm:h-10 sm:w-48"
             >
               {sort.options.map((option) => (
@@ -118,8 +126,8 @@ export function ListToolbar({
           {typeof resultCount === 'number' ? (
             <p className="ms-auto text-xs text-muted" aria-live="polite">
               {typeof totalCount === 'number' && totalCount !== resultCount
-                ? `${resultCount.toLocaleString(ARABIC_DISPLAY_LOCALE)} من أصل ${totalCount.toLocaleString(ARABIC_DISPLAY_LOCALE)}`
-                : `${resultCount.toLocaleString(ARABIC_DISPLAY_LOCALE)} ${countUnit}`}
+                ? t.rich('filteredCount', { count: num(resultCount), total: num(totalCount), num: mono })
+                : t.rich('resultCount', { n: resultCount, count: num(resultCount), num: mono })}
             </p>
           ) : null}
         </div>

@@ -353,10 +353,8 @@ export default function InvoicesPage() {
           value: explorer.sort ?? '-invoice_date',
           onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
           options: sortOptions,
-          label: 'ترتيب الفواتير',
         }}
         resultCount={meta.total}
-        countUnit="فاتورة"
       />
 
       <DataTable
@@ -395,7 +393,6 @@ export default function InvoicesPage() {
         lastPage={meta.last_page}
         perPage={explorer.perPage ?? 25}
         total={meta.total}
-        totalUnit="فاتورة"
         disabled={loading}
         onPageChange={(page) => setExplorer((current) => ({ ...current, page }))}
         onPerPageChange={(perPage) => setExplorer((current) => ({ ...current, page: 1, perPage }))}

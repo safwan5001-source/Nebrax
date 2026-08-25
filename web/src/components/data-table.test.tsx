@@ -1,9 +1,10 @@
 /* @vitest-environment jsdom */
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from './data-table';
+import { TEST_LOCALES, nebraxText, renderIntl } from '@/test-utils/intl';
 
 afterEach(cleanup);
 
@@ -35,14 +36,14 @@ function mobileList() {
 
 describe('DataTable mobile record hierarchy', () => {
   it('renders the desktop table and a mobile list from the same rows', () => {
-    render(<DataTable columns={columns} data={rows} showToolbar={false} />);
+    renderIntl(<DataTable columns={columns} data={rows} showToolbar={false} />);
 
     expect(screen.getByRole('table')).toBeTruthy();
     expect(within(mobileList()).getAllByRole('listitem')).toHaveLength(1);
   });
 
   it('falls back to labelled cells when no mobile hierarchy is declared', () => {
-    render(<DataTable columns={columns} data={rows} showToolbar={false} />);
+    renderIntl(<DataTable columns={columns} data={rows} showToolbar={false} />);
 
     const record = within(mobileList()).getAllByRole('listitem')[0];
     // السلوك القديم: كل عمود يظهر بتسميته — تبقى الشاشات غير المهاجَرة كما هي.
@@ -52,7 +53,7 @@ describe('DataTable mobile record hierarchy', () => {
   });
 
   it('replaces the labelled cells with an ordered record when a hierarchy is declared', () => {
-    render(
+    renderIntl(
       <DataTable
         columns={columns}
         data={rows}
@@ -84,7 +85,7 @@ describe('DataTable mobile record hierarchy', () => {
   });
 
   it('orders the record by importance: identifier, counterpart, then metric', () => {
-    render(
+    renderIntl(
       <DataTable
         columns={columns}
         data={rows}
@@ -102,32 +103,74 @@ describe('DataTable mobile record hierarchy', () => {
 
 describe('DataTable screen states', () => {
   it('shows a busy state instead of an empty table while loading', () => {
-    render(<DataTable columns={columns} data={[]} loading showToolbar={false} />);
+    renderIntl(<DataTable columns={columns} data={[]} loading showToolbar={false} />);
 
     expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true');
     expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('shows an explicit empty message when there are no rows', () => {
-    render(<DataTable columns={columns} data={[]} emptyLabel="لا توجد فواتير" showToolbar={false} />);
+  it('shows the caller-supplied empty message when there are no rows', () => {
+    renderIntl(<DataTable columns={columns} data={[]} emptyLabel="No invoices" showToolbar={false} />);
 
-    expect(screen.getByText('لا توجد فواتير')).toBeTruthy();
+    expect(screen.getByText('No invoices')).toBeTruthy();
     expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('shows a load failure with a retry instead of a misleading empty list', async () => {
     const onRetry = vi.fn();
-    render(<DataTable columns={columns} data={[]} error="تعذّر تحميل الفواتير" onRetry={onRetry} showToolbar={false} />);
+    renderIntl(<DataTable columns={columns} data={[]} error="Could not load invoices" onRetry={onRetry} showToolbar={false} />);
 
-    expect(screen.getByRole('alert').textContent).toBe('تعذّر تحميل الفواتير');
+    expect(screen.getByRole('alert').textContent).toBe('Could not load invoices');
     expect(screen.queryByRole('table')).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'إعادة المحاولة' }));
+    await userEvent.click(screen.getByRole('button', { name: nebraxText('ar', 'retry') }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
   it('prefers the error state over stale rows', () => {
-    render(<DataTable columns={columns} data={rows} error="تعذّر التحديث" showToolbar={false} />);
+    renderIntl(<DataTable columns={columns} data={rows} error="Could not refresh" showToolbar={false} />);
     expect(screen.queryByRole('table')).toBeNull();
+  });
+});
+
+describe.each(TEST_LOCALES)('DataTable default labels (%s)', (locale) => {
+  it('falls back to a translated empty message when the page supplies none', () => {
+    renderIntl(<DataTable columns={columns} data={[]} showToolbar={false} />, locale);
+    expect(screen.getByText(nebraxText(locale, 'noResults'))).toBeTruthy();
+  });
+
+  it('names the CSV export in the active language', () => {
+    renderIntl(<DataTable columns={columns} data={rows} exportName="invoices" />, locale);
+    expect(screen.getByTitle(nebraxText(locale, 'exportCsv'))).toBeTruthy();
+  });
+
+  it('offers a translated retry on a load failure', () => {
+    renderIntl(<DataTable columns={columns} data={[]} error="x" onRetry={() => {}} showToolbar={false} />, locale);
+    expect(screen.getByRole('button', { name: nebraxText(locale, 'retry') })).toBeTruthy();
+  });
+});
+
+describe('DataTable label language', () => {
+  it('leaves no Arabic default in an English interface', () => {
+    const { container, unmount } = renderIntl(<DataTable columns={columns} data={[]} exportName="invoices" />, 'en');
+
+    expect(screen.getByText('No results')).toBeTruthy();
+    expect(screen.getByTitle('Export CSV')).toBeTruthy();
+    expect(container.textContent).not.toMatch(/[\u0600-\u06FF]/);
+    unmount();
+
+    renderIntl(<DataTable columns={columns} data={[]} error="Could not load" onRetry={() => {}} showToolbar={false} />, 'en');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+  });
+
+  it('keeps the Arabic defaults in an Arabic interface', () => {
+    const { unmount } = renderIntl(<DataTable columns={columns} data={[]} exportName="invoices" />, 'ar');
+
+    expect(screen.getByText('لا توجد نتائج')).toBeTruthy();
+    expect(screen.getByTitle('تصدير CSV')).toBeTruthy();
+    unmount();
+
+    renderIntl(<DataTable columns={columns} data={[]} error="تعذّر التحميل" onRetry={() => {}} showToolbar={false} />, 'ar');
+    expect(screen.getByRole('button', { name: 'إعادة المحاولة' })).toBeTruthy();
   });
 });
