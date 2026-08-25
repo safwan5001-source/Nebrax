@@ -241,6 +241,8 @@ export function ReportsWorkspace({
     };
   }, [tab, agingType, trial, aging, cc, income, balance, t]);
 
+  const agingRowHrefs = useMemo(() => aging?.rows.map((row) => row.partner_id ? `/partners/${row.partner_id}` : null), [aging]);
+
   function exportCsv() {
     if (!doc) return;
     const headers = doc.columns.map((c) => c.label);
@@ -636,6 +638,7 @@ export function ReportsWorkspace({
                 totalRow={doc?.totalRow}
                 emptyText={t('empty')}
                 primaryIndex={0}
+                rowHrefs={agingRowHrefs}
               />
             )}
           </CardContent>

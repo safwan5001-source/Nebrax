@@ -163,6 +163,13 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
     };
   }, [report, view, t, tr, count, percentage, rowLabel]);
 
+  const rowHrefs = useMemo(() => report?.data.map((row) => {
+    if (!row.key) return null;
+    if (view === 'customer') return `/partners/${row.key}`;
+    if (view === 'product') return `/products/${row.key}`;
+    return null;
+  }), [report, view]);
+
   const summary = useMemo<ReportMetric[]>(() => {
     if (!report) return [];
     if (view === 'profit') return [
@@ -258,7 +265,7 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
               {!doc || doc.rows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
               ) : (
-                <ReportResultsTable columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} emptyText={t('empty')} primaryIndex={0} />
+                <ReportResultsTable columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} emptyText={t('empty')} primaryIndex={0} rowHrefs={rowHrefs} />
               )}
             </CardContent>
           </Card>
