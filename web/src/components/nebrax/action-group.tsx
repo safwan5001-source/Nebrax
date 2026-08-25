@@ -119,6 +119,7 @@ export function ActionGroup({
               href={action.disabled ? undefined : action.href}
               onClick={action.onClick}
               disabled={action.disabled}
+              title={action.title}
               tone={action.variant === 'danger' ? 'danger' : 'default'}
             >
               {action.hint ? `${action.label} ${action.hint}` : action.label}

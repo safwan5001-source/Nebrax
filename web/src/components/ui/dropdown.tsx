@@ -152,6 +152,7 @@ export function DropdownItem({
   onClick,
   tone = 'default',
   disabled = false,
+  title,
 }: {
   children: React.ReactNode;
   icon?: LucideIcon;
@@ -159,6 +160,8 @@ export function DropdownItem({
   onClick?: () => void;
   tone?: 'default' | 'danger';
   disabled?: boolean;
+  /** سببُ التعطيل خاصةً — عنصرٌ معطَّل بلا تفسير يبدو عطلاً لا قاعدة عمل. */
+  title?: string;
 }) {
   const { open, close } = useContext(DropdownCtx);
   const tabIndex = open ? 0 : -1; // خارج ترتيب التنقّل عند الإغلاق
@@ -178,7 +181,7 @@ export function DropdownItem({
 
   if (href) {
     return (
-      <Link href={href} role="menuitem" tabIndex={tabIndex} onClick={close} className={className}>
+      <Link href={href} role="menuitem" tabIndex={tabIndex} onClick={close} className={className} title={title}>
         {inner}
       </Link>
     );
@@ -189,6 +192,7 @@ export function DropdownItem({
       role="menuitem"
       tabIndex={tabIndex}
               disabled={disabled}
+        title={title}
         onClick={() => {
           if (disabled) return;
           onClick?.();
