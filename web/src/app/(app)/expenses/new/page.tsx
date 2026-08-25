@@ -204,7 +204,9 @@ export default function NewExpensePage() {
       backLabel={t('back')}
       title={t(editId ? 'edit_title' : 'new_title')}
       description={t('number_generated')}
-      status={<Badge tone="muted">{t('draft_mode')}</Badge>}
+      // `draft_mode` نصُّه «حفظ كمسودة» حرفياً كنصّ زرّ الحفظ، فيقرأ بجانبه كزرّ
+      // حفظٍ ثانٍ. الشارة تصف حالة المستند، فتسميتها الصحيحة حالته: «مسودة».
+      status={<Badge tone="muted">{t('draft')}</Badge>}
       aside={summaryAside}
       actions={
         <FormActions
@@ -240,7 +242,7 @@ export default function NewExpensePage() {
             <Paperclip className="h-5 w-5 text-primary" strokeWidth={1.7} />
             <span className="text-sm font-medium text-text">{t('attachment_prompt')}</span>
             <span className="text-xs text-muted">{t('attachment_hint')}</span>
-            <Input id="attachments" type="file" multiple className="sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.zip" onChange={(e) => addFiles(e.target.files)} />
+            <Input id="attachments" type="file" multiple className="sr-only size-px" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.zip" onChange={(e) => addFiles(e.target.files)} />
           </label>
           {files.length > 0 && (
             <div className="space-y-1.5">

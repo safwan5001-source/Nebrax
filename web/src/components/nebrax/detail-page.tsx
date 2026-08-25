@@ -75,7 +75,7 @@ export function DetailPage({
   const hasActions = (actions && actions.length > 0) || actionsSlot;
 
   return (
-    <div className={cn('mx-auto max-w-5xl space-y-5', className)}>
+    <div className={cn('erp-touch mx-auto max-w-5xl space-y-5', className)}>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2">
           <Button asChild variant="ghost" size="icon" className="no-print shrink-0" aria-label={backLabel || t('back')}>

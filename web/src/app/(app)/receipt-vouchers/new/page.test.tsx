@@ -119,11 +119,11 @@ describe('ReceiptVoucherFormPage — create', () => {
     expect(screen.getByRole('link', { name: 'Cancel' })).toBeTruthy();
   });
 
-  it('keeps the primary save reachable in a sticky bar on mobile', async () => {
+  it('keeps the primary save reachable in a bar pinned to the bottom on mobile', async () => {
     respondWithReferenceData();
     const { container } = render(<ReceiptVoucherFormPage />);
 
-    const bar = container.querySelector('.sticky.bottom-0') as HTMLElement;
+    const bar = container.querySelector('.fixed.bottom-0') as HTMLElement;
     expect(bar).toBeTruthy();
     expect(bar.className).toContain('pb-safe');
     expect(bar.textContent).toContain('Save as draft');

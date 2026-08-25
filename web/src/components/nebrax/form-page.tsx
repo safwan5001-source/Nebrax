@@ -49,8 +49,12 @@ export function FormActions({
     <div
       className={cn(
         'flex flex-col gap-2',
+        // `fixed` لا `sticky`: الشريط آخر أبناء حاويته، و`sticky bottom-0` لا
+        // يثبُت أبداً في هذا الموضع لأن الحاوية تنتهي معه فلا يبقى تحته ما
+        // يُثبَّت خلاله. التثبيت للجوال وحده — من `lg` يعود الشريط إلى التدفّق
+        // العادي حيث للصفحة عرضٌ يكفي لصفٍّ في نهايتها.
         sticky
-          ? 'sticky bottom-0 z-20 -mx-4 border-t border-border bg-surface px-4 pt-3 pb-safe lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0'
+          ? 'fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface px-4 pt-3 pb-safe lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0'
           : undefined,
         className
       )}
@@ -106,7 +110,8 @@ export function FormPage({
   const t = useTranslations('nebrax');
 
   return (
-    <div className={cn(widthClass[width], 'space-y-5', className)}>
+    // حشوة سفلية على الجوال بقدر الشريط المثبَّت، وإلا غطّى آخر حقلٍ في النموذج.
+    <div className={cn('erp-touch', widthClass[width], 'space-y-5', actions ? 'pb-24 lg:pb-0' : undefined, className)}>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2">
           <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label={backLabel || t('back')}>

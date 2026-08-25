@@ -47,6 +47,15 @@ describe('FormPage', () => {
     expect(screen.queryByText('Draft')).toBeNull();
   });
 
+  it('reserves room under the body for the pinned mobile bar, and only when there are actions', () => {
+    const { container, unmount } = renderPage({ actions: <p>bar</p> });
+    expect((container.firstElementChild as HTMLElement).className).toContain('pb-24');
+    unmount();
+
+    const bare = renderPage();
+    expect((bare.container.firstElementChild as HTMLElement).className).not.toContain('pb-24');
+  });
+
   it('renders the aside beside the body only when one is provided', () => {
     const { container, unmount } = renderPage();
     // بلا عمود جانبي لا شبكة أصلاً — المحتوى يأخذ العرض كاملاً.
@@ -62,23 +71,24 @@ describe('FormPage', () => {
 });
 
 describe('FormActions', () => {
-  it('sticks to the bottom on mobile, clear of the iPhone home indicator, and unsticks on desktop', () => {
+  it('pins to the bottom on mobile, clear of the iPhone home indicator, and returns to flow on desktop', () => {
     const { container } = render(<FormActions primary={<button type="button">Save</button>} />);
 
     const bar = container.firstElementChild as HTMLElement;
-    expect(bar.className).toContain('sticky');
+    // `fixed` لا `sticky`: الشريط آخر أبناء حاويته، فـ`sticky` لا يثبُت هناك أبداً.
+    expect(bar.className).toContain('fixed');
     expect(bar.className).toContain('bottom-0');
     // `pb-safe` هي التي تمنع وقوع الزرّ تحت الشريط المنزلق.
     expect(bar.className).toContain('pb-safe');
     expect(bar.className).toContain('lg:static');
   });
 
-  it('drops the sticky bar when a form opts out', () => {
+  it('drops the pinned bar when a form opts out', () => {
     const { container } = render(
       <FormActions sticky={false} primary={<button type="button">Save</button>} />
     );
 
-    expect((container.firstElementChild as HTMLElement).className).not.toContain('sticky');
+    expect((container.firstElementChild as HTMLElement).className).not.toContain('fixed');
   });
 
   it('gives the primary save twice the width of the secondary actions on mobile', () => {

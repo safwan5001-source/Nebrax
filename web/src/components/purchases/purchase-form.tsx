@@ -791,7 +791,9 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
             multiple
             accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.zip"
             onChange={selectAttachments}
-            className="sr-only"
+            // `sr-only` وحدها لا تغلب `w-full` الآتية من `Input`، فيتمدّد الحقل المخفيّ
+            // بعرض الصفحة ويتجاوز حافّتها لأنه مطلق الموضع. `size-px` تحسم قياسه.
+            className="sr-only size-px"
           />
 
           {pendingAttachments.length === 0 && storedAttachments.length === 0 ? (
