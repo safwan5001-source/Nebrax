@@ -107,11 +107,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function parseColumnOrder(value: unknown): ReportTableViewState['columnOrder'] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((id) => typeof id !== 'string')) return null;
+  return value;
+}
+
+function parseColumnSizing(value: unknown): ReportTableViewState['columnSizing'] | null {
+  if (value === undefined) return {};
+  if (!isRecord(value)) return null;
+  const sizing: ReportTableViewState['columnSizing'] = {};
+  for (const [id, size] of Object.entries(value)) {
+    if (typeof size !== 'number' || !Number.isFinite(size) || size < 80 || size > 640) return null;
+    sizing[id] = size;
+  }
+  return sizing;
+}
+
 function parseState(value: unknown): ReportTableViewState | null {
   if (!isRecord(value)) return null;
   if (value.density !== 'compact' && value.density !== 'comfortable') return null;
   if (![10, 25, 50, 100].includes(value.pageSize as number)) return null;
   if (!isRecord(value.columnVisibility) || !Array.isArray(value.sorting)) return null;
+  const columnOrder = parseColumnOrder(value.columnOrder);
+  const columnSizing = parseColumnSizing(value.columnSizing);
+  if (!columnOrder || !columnSizing) return null;
 
   const columnVisibility: Record<string, boolean> = {};
   for (const [key, visible] of Object.entries(value.columnVisibility)) {
@@ -125,7 +145,7 @@ function parseState(value: unknown): ReportTableViewState | null {
   });
   if (sorting.some((item) => item === null)) return null;
 
-  return { columnVisibility, sorting: sorting as ReportTableViewState['sorting'], density: value.density, pageSize: value.pageSize as number };
+  return { columnVisibility, sorting: sorting as ReportTableViewState['sorting'], density: value.density, pageSize: value.pageSize as number, columnOrder, columnSizing };
 }
 
 export function parseStoredSavedReportViews(value: string, reportKey: string): SavedReportView[] | null {
@@ -165,6 +185,8 @@ function cloneState(state: ReportTableViewState): ReportTableViewState {
     sorting: state.sorting.map((sort) => ({ ...sort })),
     density: state.density,
     pageSize: state.pageSize,
+    columnOrder: [...state.columnOrder],
+    columnSizing: { ...state.columnSizing },
   };
 }
 
