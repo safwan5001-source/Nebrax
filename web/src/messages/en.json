@@ -4046,6 +4046,19 @@
       "vat": "Output VAT",
       "totalSales": "Total sales",
       "details": "Report details",
+      "presentationMode": "Presentation mode",
+      "summary": "Summary",
+      "detail": "Detail",
+      "detailUnavailableTitle": "Document detail is unavailable for this source",
+      "detailUnavailableDescription": "The current report source returns sales aggregates only. Invoice documents are not shown because their scope and filters cannot be matched safely to this summary.",
+      "analytics": {
+        "description": "Top results from the current filters and the same summary source.",
+        "titles": {
+          "customer": "Top customers by sales",
+          "product": "Top products by sales",
+          "salesperson": "Top salespeople by sales"
+        }
+      },
       "sourcePostedInvoices": "Posted invoices",
       "sourceReceipts": "Posted receipt vouchers",
       "manualItem": "Descriptive item",

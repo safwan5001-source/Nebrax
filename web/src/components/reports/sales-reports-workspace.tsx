@@ -26,6 +26,8 @@ import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
 import { ReportMetricGrid, ReportScreenHeader, type ReportMetric } from '@/components/reports/report-workspace-ui';
+import { ReportPresentationModeControl, type ReportPresentationMode } from '@/components/reports/report-presentation-mode';
+import { SalesReportAnalytics, type SalesAnalyticsView } from '@/components/reports/sales-report-analytics';
 
 export type SalesReportView = 'period' | 'customer' | 'product' | 'classification' | 'salesperson' | 'profit' | 'payments';
 
@@ -93,6 +95,8 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
   const company = useCompany();
   const { success, error: errorToast } = useToast();
   const [filters, setFilters] = useState<SalesReportFilterState>(EMPTY_SALES_REPORT_FILTERS);
+  // وضع العرض presentation-only: مستقل عن Saved Views وعن عقد التصدير الحالي.
+  const [presentationMode, setPresentationMode] = useState<ReportPresentationMode>('summary');
   const [report, setReport] = useState<SalesReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -231,6 +235,9 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
     return `${branchScope} · ${periodScope}`;
   }, [filters.branchIds, filters.from, filters.to, tr]);
 
+  const analyticsView: SalesAnalyticsView | null = view === 'customer' || view === 'product' || view === 'salesperson' ? view : null;
+  const supportsPresentationModes = analyticsView !== null;
+
   const actions = [
     { id: 'csv', label: tr('csv'), icon: Download, onSelect: exportCsv, disabled: !doc || !!busy },
     { id: 'pdf', label: busy === 'pdf' ? tPrint('generating') : tr('pdf'), icon: Download, onSelect: () => void downloadPdf(), disabled: !doc || !!busy, busy: busy === 'pdf' },
@@ -251,6 +258,18 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
 
       <SalesReportFilters view={view} value={filters} onChange={setFilters} />
 
+      {supportsPresentationModes && (
+        <div className="no-print flex justify-start">
+          <ReportPresentationModeControl
+            value={presentationMode}
+            onChange={setPresentationMode}
+            label={t('presentationMode')}
+            summaryLabel={t('summary')}
+            detailLabel={t('detail')}
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-24 w-full" />)}</div>
       ) : failed ? (
@@ -259,16 +278,35 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
         <>
           <ReportMetricGrid metrics={summary} />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{t('details')}</CardTitle><Badge tone="neutral">{t(view === 'payments' ? 'sourceReceipts' : 'sourcePostedInvoices')}</Badge></CardHeader>
-            <CardContent>
-              {!doc || doc.rows.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
-              ) : (
-                <ReportResultsTable columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} emptyText={t('empty')} primaryIndex={0} rowHrefs={rowHrefs} reportKey={`sales:${view}`} />
-              )}
-            </CardContent>
-          </Card>
+          {analyticsView && presentationMode === 'summary' && (
+            <SalesReportAnalytics
+              view={analyticsView}
+              rows={report?.data ?? []}
+              loading={loading}
+              title={t(`analytics.titles.${analyticsView}`)}
+              description={t('analytics.description')}
+              emptyLabel={t('empty')}
+              unassignedLabel={t('unassigned')}
+            />
+          )}
+
+          {supportsPresentationModes && presentationMode === 'detail' ? (
+            <Card data-testid="sales-detail-unavailable">
+              <CardHeader><CardTitle>{t('detailUnavailableTitle')}</CardTitle></CardHeader>
+              <CardContent><p className="text-sm leading-6 text-muted">{t('detailUnavailableDescription')}</p></CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{supportsPresentationModes ? t('summary') : t('details')}</CardTitle><Badge tone="neutral">{t(view === 'payments' ? 'sourceReceipts' : 'sourcePostedInvoices')}</Badge></CardHeader>
+              <CardContent>
+                {!doc || doc.rows.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
+                ) : (
+                  <ReportResultsTable columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} emptyText={t('empty')} primaryIndex={0} rowHrefs={rowHrefs} reportKey={`sales:${view}`} />
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {doc && showPreview && (
             <Card>
