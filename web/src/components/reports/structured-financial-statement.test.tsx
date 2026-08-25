@@ -50,6 +50,16 @@ const generalLabels: Record<string, string> = {
   empty: 'No data in range',
 };
 const g = ((key: string) => generalLabels[key] ?? key) as ReturnType<typeof useTranslations>;
+const t = ((key: string) => ({
+  current_amount: 'Current', comparison_amount: 'Comparison', variance: 'Variance', variance_percent: 'Variance %', comparison: 'Comparison',
+}[key] ?? key)) as ReturnType<typeof useTranslations>;
+
+const comparisonCashFlow = {
+  operating: { inflows: '600.00', outflows: '100.00', net: '500.00', entries: [{ date: '2026-07-02', number: 'JV-099', description: 'Previous cash sale', inflow: '600.00', outflow: '0.00', net: '600.00' }] },
+  investing: { inflows: '0.00', outflows: '100.00', net: '-100.00', entries: [] },
+  financing: { inflows: '0.00', outflows: '0.00', net: '0.00', entries: [] },
+  net_cash_flow: '400.00',
+};
 
 const cashFlow = {
   operating: {
@@ -67,7 +77,7 @@ const cashFlow = {
 function renderCashFlow() {
   return render(
     <NextIntlClientProvider locale="en" messages={{}}>
-      <CashFlowTable cashFlow={cashFlow} loading={false} g={g} emptyLabel="No data in range" />
+      <CashFlowTable cashFlow={cashFlow} comparisonCashFlow={null} loading={false} g={g} t={t} emptyLabel="No data in range" />
     </NextIntlClientProvider>,
   );
 }
@@ -90,7 +100,7 @@ describe('StructuredFinancialStatement', () => {
     const { container } = renderStatement();
     const desktop = container.querySelector('[data-testid="structured-financial-statement-desktop"]') as HTMLElement;
 
-    expect(within(desktop).getByText(/850\.00/).className).toContain('text-positive');
+    expect(within(desktop).getByText(/850\.00/).closest('td')?.className).toContain('text-positive');
     const totalExpense = within(desktop).getByText('Total expense').closest('tr') as HTMLTableRowElement;
     expect(totalExpense.querySelector('td')?.className).toContain('text-negative');
     const totalRevenue = within(desktop).getByText('Total revenue').closest('tr') as HTMLTableRowElement;
@@ -179,6 +189,26 @@ describe('CashFlowTable', () => {
     expect(within(desktop).queryByRole('link')).toBeNull();
   });
 
+  it('keeps current transactions unblended while presenting only comparative section summaries and the grand net cash flow', () => {
+    const { container } = render(
+      <NextIntlClientProvider locale="en" messages={{}}>
+        <CashFlowTable cashFlow={cashFlow} comparisonCashFlow={comparisonCashFlow} loading={false} g={g} t={t} emptyLabel="No data in range" />
+      </NextIntlClientProvider>,
+    );
+    const statements = container.querySelectorAll('[data-testid="structured-financial-statement-desktop"]');
+    const details = statements[0] as HTMLElement;
+    const summary = statements[1] as HTMLElement;
+
+    expect(within(details).getByText('Cash sale')).toBeTruthy();
+    expect(within(details).queryByText('Previous cash sale')).toBeNull();
+    expect(within(details).queryByText('Operating activities — Net cash flow')).toBeNull();
+    expect(within(summary).getByText('Operating activities — Net cash flow')).toBeTruthy();
+    expect(within(summary).getByText('Net cash flow', { selector: 'tfoot th' })).toBeTruthy();
+    expect(within(summary).getByText('Current')).toBeTruthy();
+    expect(within(summary).getByRole('columnheader', { name: 'Comparison' })).toBeTruthy();
+    expect(within(summary).getByText('Variance')).toBeTruthy();
+  });
+
   it('presents each cash-flow movement and section subtotal as an organised three-value mobile grid', () => {
     const { container } = renderCashFlow();
     const mobile = container.querySelector('[data-testid="structured-financial-statement-mobile"]') as HTMLElement;
@@ -200,7 +230,7 @@ describe('CashFlowTable', () => {
   it('shows a loading state before cash-flow data is available', () => {
     const { container } = render(
       <NextIntlClientProvider locale="en" messages={{}}>
-        <CashFlowTable cashFlow={null} loading g={g} emptyLabel="No data in range" />
+        <CashFlowTable cashFlow={null} comparisonCashFlow={null} loading g={g} t={t} emptyLabel="No data in range" />
       </NextIntlClientProvider>,
     );
 

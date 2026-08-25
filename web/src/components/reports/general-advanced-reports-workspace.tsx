@@ -2,7 +2,7 @@
 
 /** أسلوب «دفتر التحليل»: تفاصيل قابلة للقراءة أولاً، ومستند الطباعة إجراء اختياري. */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { Download, Eye, EyeOff, Printer, Share2 } from 'lucide-react';
@@ -15,7 +15,8 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { ReportFilters, EMPTY_FILTERS, filtersToQuery, type ReportFilterState } from '@/components/reports/report-filters';
 import { ReportDocument, type ReportColumn } from '@/components/reports/report-document';
 import { ReportMobileRows } from '@/components/reports/report-workspace-ui';
-import { StructuredFinancialStatement, type FinancialStatementSection } from '@/components/reports/structured-financial-statement';
+import { StructuredFinancialStatement, type FinancialStatementSection, type FinancialStatementValue } from '@/components/reports/structured-financial-statement';
+import { compareAmounts, comparisonPeriod, type ComparisonMode } from '@/components/reports/financial-comparison';
 import { ReportDataTable, defaultReportTableLabels, type ReportTableViewState } from '@/components/reports/report-data-table';
 import { ReportSavedViewsMenu, useSavedReportViews } from '@/components/reports/report-saved-views';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
@@ -60,6 +61,11 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
   const company = useCompany();
   const { success, error: toastError } = useToast();
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_FILTERS);
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('none');
+  const [comparisonCashFlow, setComparisonCashFlow] = useState<CashFlow | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonFailed, setComparisonFailed] = useState(false);
+  const requestGeneration = useRef(0);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -76,8 +82,13 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
     api<{ data: Account[] }>('/accounts').then((response) => setAccounts(response.data)).catch(() => setAccounts([]));
   }, [accounts.length, tab]);
 
+  const cashFlowComparisonScope = useMemo(() => tab === 'cashflow' ? comparisonPeriod(comparisonMode, { from: filters.from, to: filters.to }) : null, [comparisonMode, filters, tab]);
+
   const load = useCallback(() => {
+    const generation = ++requestGeneration.current;
     setFailed(false);
+    setComparisonFailed(false);
+    setComparisonLoading(false);
     if (tab === 'ledger' && !accountId) {
       setLoading(false);
       setLedger(null);
@@ -86,16 +97,46 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
 
     setLoading(true);
     const query = filtersToQuery(filters);
-    let request: Promise<unknown>;
-    if (tab === 'ledger') request = api<Ledger>(`/reports/account-ledger/${accountId}${appendAccount(query, accountId)}`).then(setLedger);
-    else if (tab === 'journal') request = api<JournalReport>(`/reports/journal-entries${query}`).then(setJournal);
-    else if (tab === 'cashflow') request = api<CashFlow>(`/reports/cash-flow${query}`).then(setCashFlow);
-    else request = api<TaxReport>(`/reports/tax-report${query}`).then(setTax);
+    const complete = () => { if (requestGeneration.current === generation) setLoading(false); };
 
-    request.catch(() => setFailed(true)).finally(() => setLoading(false));
-  }, [accountId, filters, tab]);
+    if (tab === 'cashflow' && cashFlowComparisonScope) {
+      setComparisonCashFlow(null);
+      setComparisonLoading(true);
+      const currentRequest = api<CashFlow>(`/reports/cash-flow${query}`);
+      const comparisonRequest = api<CashFlow>(`/reports/cash-flow${filtersToQuery({ ...filters, ...cashFlowComparisonScope })}`);
+      Promise.allSettled([currentRequest, comparisonRequest]).then(([current, comparison]) => {
+        if (requestGeneration.current !== generation) return;
+        if (current.status !== 'fulfilled') {
+          setComparisonCashFlow(null);
+          setFailed(true);
+          return;
+        }
+        setCashFlow(current.value);
+        if (comparison.status === 'fulfilled') setComparisonCashFlow(comparison.value);
+        else setComparisonFailed(true);
+      }).finally(() => {
+        if (requestGeneration.current === generation) {
+          setComparisonLoading(false);
+          complete();
+        }
+      });
+      return;
+    }
+
+    let request: Promise<unknown>;
+    if (tab === 'ledger') request = api<Ledger>(`/reports/account-ledger/${accountId}${appendAccount(query, accountId)}`).then((value) => requestGeneration.current === generation && setLedger(value));
+    else if (tab === 'journal') request = api<JournalReport>(`/reports/journal-entries${query}`).then((value) => requestGeneration.current === generation && setJournal(value));
+    else if (tab === 'cashflow') request = api<CashFlow>(`/reports/cash-flow${query}`).then((value) => requestGeneration.current === generation && setCashFlow(value));
+    else request = api<TaxReport>(`/reports/tax-report${query}`).then((value) => requestGeneration.current === generation && setTax(value));
+
+    request.catch(() => requestGeneration.current === generation && setFailed(true)).finally(complete);
+  }, [accountId, cashFlowComparisonScope, filters, tab]);
 
   useEffect(() => load(), [load]);
+
+  useEffect(() => {
+    if (comparisonMode !== 'none' && !cashFlowComparisonScope && tab === 'cashflow') setComparisonMode('none');
+  }, [cashFlowComparisonScope, comparisonMode, tab]);
 
   const doc = useMemo<ReportDoc | null>(() => {
     if (tab === 'ledger') {
@@ -188,7 +229,7 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
     <Card><CardContent className="py-10 text-center text-sm text-muted">{g('selectAccount')}</CardContent></Card>
   ) : tab === 'ledger' ? <LedgerTable ledger={ledger} loading={loading} g={g} />
     : tab === 'journal' ? <JournalTable journal={journal} loading={loading} g={g} t={t} />
-    : tab === 'cashflow' ? <CashFlowTable cashFlow={cashFlow} loading={loading} g={g} emptyLabel={t('empty')} />
+    : tab === 'cashflow' ? <CashFlowTable cashFlow={cashFlow} comparisonCashFlow={comparisonCashFlow} loading={loading} g={g} t={t} emptyLabel={t('empty')} />
     : <TaxCard tax={tax} loading={loading} g={g} />;
 
   return (
@@ -204,7 +245,20 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
         </div>
       </div>
 
-      <ReportFilters value={filters} onChange={setFilters} />
+      <ReportFilters
+        value={filters}
+        onChange={setFilters}
+        comparison={tab === 'cashflow' ? {
+          value: comparisonMode,
+          onChange: setComparisonMode,
+          previousPeriodDisabled: !filters.from || !filters.to,
+          previousYearDisabled: !filters.from || !filters.to,
+        } : undefined}
+      />
+      {cashFlowComparisonScope && <p className="no-print rounded border border-border bg-background px-3 py-2 text-xs leading-relaxed text-muted" aria-live="polite">{`${t('current_period')}: ${filters.from} ← ${filters.to} · ${t('comparison_period')}: ${cashFlowComparisonScope.from} ← ${cashFlowComparisonScope.to}`}</p>}
+      {comparisonLoading && <p className="no-print text-xs text-muted" role="status">{t('comparison_loading')}</p>}
+      {comparisonFailed && <p className="no-print rounded border border-warning/30 bg-background px-3 py-2 text-xs leading-relaxed text-text" role="alert">{t('comparison_failed')}</p>}
+      {tab === 'cashflow' && comparisonMode !== 'none' && <p className="no-print text-xs text-muted">{t('comparison_screen_only')}</p>}
       {tab === 'ledger' && (
         <Card className="no-print"><CardContent className="pt-5"><div className="max-w-md space-y-1.5"><label htmlFor="ledger-account" className="text-sm font-medium text-text">{g('account')}</label><Select id="ledger-account" value={accountId} onChange={(event) => setAccountId(event.target.value)}><option value="">{g('allAccounts')}</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}</Select></div></CardContent></Card>
       )}
@@ -353,7 +407,17 @@ export function JournalTable({ journal, loading, g, t }: { journal: JournalRepor
   </CardContent></Card>;
 }
 
-export function CashFlowTable({ cashFlow, loading, g, emptyLabel }: { cashFlow: CashFlow | null; loading: boolean; g: ReturnType<typeof useTranslations>; emptyLabel: string }) {
+function comparativeValues(current: string, comparison: string): FinancialStatementValue[] {
+  const values = compareAmounts(current, comparison);
+  return [
+    { id: 'current', amount: values.current },
+    { id: 'comparison', amount: values.comparison },
+    { id: 'variance', amount: values.variance },
+    { id: 'variance-percent', amount: values.variancePercent ?? '—' },
+  ];
+}
+
+export function CashFlowTable({ cashFlow, comparisonCashFlow, loading, g, t, emptyLabel }: { cashFlow: CashFlow | null; comparisonCashFlow: CashFlow | null; loading: boolean; g: ReturnType<typeof useTranslations>; t: ReturnType<typeof useTranslations>; emptyLabel: string }) {
   const sections: Array<[keyof Pick<CashFlow, 'operating' | 'investing' | 'financing'>, string]> = [['operating', g('operating')], ['investing', g('investing')], ['financing', g('financing')]];
   if (loading || !cashFlow) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
 
@@ -376,7 +440,7 @@ export function CashFlowTable({ cashFlow, loading, g, emptyLabel }: { cashFlow: 
             ],
           }))
           : [{ id: `${key}-empty`, kind: 'empty' as const, label: emptyLabel }]),
-        {
+        ...(comparisonCashFlow ? [] : [{
           id: `${key}-net`,
           kind: 'subtotal' as const,
           label: `${label} — ${g('netCashFlow')}`,
@@ -385,7 +449,7 @@ export function CashFlowTable({ cashFlow, loading, g, emptyLabel }: { cashFlow: 
             { id: 'outflows', amount: section.outflows },
             { id: 'net', amount: section.net, tone: 'auto' as const },
           ],
-        },
+        }]),
       ],
     };
   });
@@ -406,8 +470,32 @@ export function CashFlowTable({ cashFlow, loading, g, emptyLabel }: { cashFlow: 
             { id: 'net', label: g('netCashFlow') },
           ]}
           sections={statementSections}
-          grandTotal={{ id: 'net-cash-flow', kind: 'grand-total', label: g('netCashFlow'), values: [{ id: 'net', amount: cashFlow.net_cash_flow, tone: 'auto' }] }}
+          grandTotal={comparisonCashFlow ? undefined : { id: 'net-cash-flow', kind: 'grand-total', label: g('netCashFlow'), values: [{ id: 'net', amount: cashFlow.net_cash_flow, tone: 'auto' }] }}
         />
+        {comparisonCashFlow && (
+          <div className="mt-4">
+            <StructuredFinancialStatement
+              descriptionLabel={g('description')}
+              columns={[
+                { id: 'current', label: t('current_amount'), priority: 'primary' },
+                { id: 'comparison', label: t('comparison_amount'), priority: 'secondary' },
+                { id: 'variance', label: t('variance'), priority: 'tertiary' },
+                { id: 'variance-percent', label: t('variance_percent'), format: 'percentage', priority: 'tertiary' },
+              ]}
+              sections={[{
+                id: 'cash-flow-comparison',
+                label: t('comparison'),
+                rows: sections.map(([key, label]) => ({
+                  id: `${key}-comparison-net`,
+                  kind: 'subtotal' as const,
+                  label: `${label} — ${g('netCashFlow')}`,
+                  values: comparativeValues(cashFlow[key].net, comparisonCashFlow[key].net),
+                })),
+              }]}
+              grandTotal={{ id: 'comparative-net-cash-flow', kind: 'grand-total', label: g('netCashFlow'), values: comparativeValues(cashFlow.net_cash_flow, comparisonCashFlow.net_cash_flow) }}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
