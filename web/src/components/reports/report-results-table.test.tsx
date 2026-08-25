@@ -15,7 +15,7 @@ const rows = [
   ['Noor Stores', '1', '400.00 𞸁'],
 ];
 
-function renderResults({ locale = 'en', rowHrefs }: { locale?: 'en' | 'ar'; rowHrefs?: Array<string | null> } = {}) {
+function renderResults({ locale = 'en', rowHrefs, reportKey }: { locale?: 'en' | 'ar'; rowHrefs?: Array<string | null>; reportKey?: string } = {}) {
   return render(
     <NextIntlClientProvider locale={locale} messages={{}}>
       <ReportResultsTable
@@ -25,6 +25,7 @@ function renderResults({ locale = 'en', rowHrefs }: { locale?: 'en' | 'ar'; rowH
         emptyText="No report results"
         primaryIndex={0}
         rowHrefs={rowHrefs}
+        reportKey={reportKey}
       />
     </NextIntlClientProvider>
   );
@@ -48,6 +49,13 @@ describe('ReportResultsTable drill-down', () => {
     expect(within(desktop).queryByRole('link', { name: 'Noor Stores' })).toBeNull();
     desktopLink.focus();
     expect(document.activeElement).toBe(desktopLink);
+  });
+
+  it('keeps Saved Views reachable from the mobile representation when a stable reportKey is supplied', () => {
+    const { container } = renderResults({ reportKey: 'sales:customer' });
+    const mobile = container.querySelector('.md\\:hidden') as HTMLElement;
+
+    expect(within(mobile).getByRole('button', { name: 'Views' })).toBeTruthy();
   });
 
   it('shows an explicit mobile CTA in the active locale without making the entire card clickable', () => {

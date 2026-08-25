@@ -404,6 +404,7 @@ export function ReportsWorkspace({
                 emptyText={t('empty')}
                 primaryIndex={1}
                 secondaryIndex={0}
+                reportKey={tab === 'trial' ? 'general:trial-balance' : 'general:cost-center-profitability'}
               />
             )}
           </CardContent>
@@ -601,6 +602,7 @@ export function ReportsWorkspace({
                 emptyText={t('empty')}
                 primaryIndex={1}
                 secondaryIndex={0}
+                reportKey="general:cost-center-profitability"
               />
             )}
           </CardContent>
@@ -639,6 +641,7 @@ export function ReportsWorkspace({
                 emptyText={t('empty')}
                 primaryIndex={0}
                 rowHrefs={agingRowHrefs}
+                reportKey={`general:aging:${agingType}`}
               />
             )}
           </CardContent>

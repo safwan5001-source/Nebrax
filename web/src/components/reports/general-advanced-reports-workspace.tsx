@@ -15,7 +15,8 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { ReportFilters, EMPTY_FILTERS, filtersToQuery, type ReportFilterState } from '@/components/reports/report-filters';
 import { ReportDocument, type ReportColumn } from '@/components/reports/report-document';
 import { ReportMobileRows } from '@/components/reports/report-workspace-ui';
-import { ReportDataTable, defaultReportTableLabels } from '@/components/reports/report-data-table';
+import { ReportDataTable, defaultReportTableLabels, type ReportTableViewState } from '@/components/reports/report-data-table';
+import { ReportSavedViewsMenu, useSavedReportViews } from '@/components/reports/report-saved-views';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
@@ -217,9 +218,11 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
 
 function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: boolean; g: ReturnType<typeof useTranslations> }) {
   const locale = useLocale();
+  const defaultViewState = useMemo<ReportTableViewState>(() => ({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25 }), []);
+  const savedViews = useSavedReportViews('general:account-ledger', defaultViewState);
   if (loading || !ledger) return <Card><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>;
   const columns = [
-    { id: 'date', label: g('date') },
+    { id: 'date', label: g('date'), hideable: false },
     { id: 'number', label: g('entryNumber') },
     { id: 'description', label: g('description') },
     { id: 'debit', label: g('debit'), align: 'end' as const, numeric: true },
@@ -237,6 +240,7 @@ function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: b
   return <Card>
     <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{ledger.account.name}</CardTitle><Badge tone="neutral" className="num">{g('closingBalance')}: {formatRiyal(ledger.closing_balance)}</Badge></CardHeader>
     <CardContent>
+      {savedViews.loaded && <div className="no-print mb-3 flex justify-end md:hidden"><ReportSavedViewsMenu controller={savedViews} locale={locale} /></div>}
       <div className="space-y-3 md:hidden">
         <div className="flex items-center justify-between gap-3 rounded-lg bg-background px-3 py-2.5 text-sm"><span className="text-muted">{g('openingBalance')}</span><strong className="num">{formatRiyal(ledger.opening_balance)}</strong></div>
         {ledger.rows.length === 0 ? <p className="py-8 text-center text-sm text-muted">—</p> : ledger.rows.map((row) => <article key={`${row.number}-${row.date}`} className="rounded-xl border border-border bg-surface p-3"><div className="mb-2 flex items-start justify-between gap-3"><div><p className="num text-xs text-muted">{row.date}</p><p className="num mt-1 text-sm font-medium text-text">{row.number}</p></div><strong className="num text-sm">{formatRiyal(row.balance)}</strong></div><p className="mb-3 text-sm leading-5 text-text">{row.description}</p><dl className="grid grid-cols-2 gap-2 border-t border-border pt-2 text-xs"><div><dt className="text-muted">{g('debit')}</dt><dd className="num mt-1 font-medium">{formatRiyal(row.debit)}</dd></div><div><dt className="text-muted">{g('credit')}</dt><dd className="num mt-1 font-medium">{formatRiyal(row.credit)}</dd></div></dl></article>)}
@@ -253,6 +257,9 @@ function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: b
           totalRow={['', '', g('closingBalance'), '', '', formatRiyal(ledger.closing_balance)]}
           labels={defaultReportTableLabels(locale)}
           emptyText="—"
+          viewState={savedViews.viewState}
+          onViewStateChange={savedViews.setViewState}
+          toolbarAddon={savedViews.loaded ? <ReportSavedViewsMenu controller={savedViews} locale={locale} /> : undefined}
         />
       </div>
     </CardContent>

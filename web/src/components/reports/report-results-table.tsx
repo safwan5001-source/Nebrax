@@ -1,12 +1,15 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useLocale } from 'next-intl';
 import { ReportMobileRows, type ReportColumnCell } from '@/components/reports/report-workspace-ui';
 import {
   ReportDataTable,
   defaultReportTableLabels,
   type ReportDataColumn,
+  type ReportTableViewState,
 } from '@/components/reports/report-data-table';
+import { ReportSavedViewsMenu, useSavedReportViews } from '@/components/reports/report-saved-views';
 
 export interface ReportResultsTableProps {
   columns: ReportColumnCell[];
@@ -16,6 +19,7 @@ export interface ReportResultsTableProps {
   primaryIndex?: number;
   secondaryIndex?: number;
   rowHrefs?: Array<string | null | undefined>;
+  reportKey?: string;
 }
 
 export function ReportResultsTable({
@@ -26,9 +30,12 @@ export function ReportResultsTable({
   primaryIndex = 0,
   secondaryIndex,
   rowHrefs,
+  reportKey,
 }: ReportResultsTableProps) {
   const locale = useLocale();
   const labels = defaultReportTableLabels(locale);
+  const defaultViewState = useMemo<ReportTableViewState>(() => ({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 25 }), []);
+  const savedViews = useSavedReportViews(reportKey, defaultViewState);
   const rowActions = rowHrefs?.map((href) => href ? { href, label: labels.openDetails } : null);
   const dataColumns: ReportDataColumn[] = columns.map((column, index) => ({
     id: `column-${index}`,
@@ -41,6 +48,7 @@ export function ReportResultsTable({
 
   return (
     <>
+      {reportKey && savedViews.loaded && <div className="no-print mb-3 flex justify-end md:hidden"><ReportSavedViewsMenu controller={savedViews} locale={locale} /></div>}
       <div className="md:hidden">
         <ReportMobileRows
           columns={columns}
@@ -61,6 +69,9 @@ export function ReportResultsTable({
           emptyText={emptyText}
           primaryColumnId={`column-${primaryIndex}`}
           rowActions={rowActions}
+          viewState={reportKey ? savedViews.viewState : undefined}
+          onViewStateChange={reportKey ? savedViews.setViewState : undefined}
+          toolbarAddon={reportKey && savedViews.loaded ? <ReportSavedViewsMenu controller={savedViews} locale={locale} /> : undefined}
         />
       </div>
     </>

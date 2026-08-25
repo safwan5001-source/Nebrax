@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import {
   flexRender,
+  functionalUpdate,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
@@ -60,6 +61,13 @@ export interface ReportDataTableLabels {
   openDetails: string;
 }
 
+export interface ReportTableViewState {
+  columnVisibility: VisibilityState;
+  sorting: SortingState;
+  density: 'comfortable' | 'compact';
+  pageSize: number;
+}
+
 export interface ReportDataTableProps {
   columns: ReportDataColumn[];
   rows: string[][];
@@ -71,6 +79,9 @@ export interface ReportDataTableProps {
   className?: string;
   primaryColumnId?: string;
   rowActions?: Array<ReportRowAction | null | undefined>;
+  viewState?: ReportTableViewState;
+  onViewStateChange?: (state: ReportTableViewState) => void;
+  toolbarAddon?: React.ReactNode;
 }
 
 interface DataRow {
@@ -181,12 +192,31 @@ export function ReportDataTable({
   className,
   primaryColumnId,
   rowActions,
+  viewState: controlledViewState,
+  onViewStateChange,
+  toolbarAddon,
 }: ReportDataTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const defaultViewState = useMemo<ReportTableViewState>(() => ({
+    columnVisibility: {},
+    sorting: [],
+    density: initialDensity,
+    pageSize: initialPageSize,
+  }), [initialDensity, initialPageSize]);
+  const [uncontrolledViewState, setUncontrolledViewState] = useState<ReportTableViewState>(defaultViewState);
   const [globalFilter, setGlobalFilter] = useState('');
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [density, setDensity] = useState<'comfortable' | 'compact'>(initialDensity);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: initialPageSize });
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const activeViewState = controlledViewState ?? uncontrolledViewState;
+
+  useEffect(() => {
+    if (!controlledViewState) setUncontrolledViewState(defaultViewState);
+  }, [controlledViewState, defaultViewState]);
+
+  const updateViewState = useCallback((updater: (state: ReportTableViewState) => ReportTableViewState) => {
+    const next = updater(activeViewState);
+    if (onViewStateChange) onViewStateChange(next);
+    else setUncontrolledViewState(next);
+  }, [activeViewState, onViewStateChange]);
 
   const data = useMemo<DataRow[]>(
     () => rows.map((row, rowIndex) => ({
@@ -216,11 +246,11 @@ export function ReportDataTable({
   const table = useReactTable({
     data,
     columns: tableColumns,
-    state: { sorting, globalFilter, columnVisibility },
-    initialState: { pagination: { pageSize: initialPageSize } },
-    onSortingChange: setSorting,
+    state: { sorting: activeViewState.sorting, globalFilter, columnVisibility: activeViewState.columnVisibility, pagination },
+    onSortingChange: (updater) => updateViewState((current) => ({ ...current, sorting: functionalUpdate(updater, current.sorting) })),
     onGlobalFilterChange: setGlobalFilter,
-    onColumnVisibilityChange: setColumnVisibility,
+    onColumnVisibilityChange: (updater) => updateViewState((current) => ({ ...current, columnVisibility: functionalUpdate(updater, current.columnVisibility) })),
+    onPaginationChange: setPagination,
     globalFilterFn: (row, _columnId, filterValue) => {
       const query = normalizeSearchValue(String(filterValue ?? '').trim());
       if (!query) return true;
@@ -240,6 +270,14 @@ export function ReportDataTable({
   useEffect(() => {
     table.setPageIndex(0);
   }, [rows, table]);
+
+  useEffect(() => {
+    setPagination((current) => current.pageSize === activeViewState.pageSize ? current : { pageIndex: 0, pageSize: activeViewState.pageSize });
+  }, [activeViewState.pageSize]);
+
+  useEffect(() => {
+    if (controlledViewState) table.setPageIndex(0);
+  }, [controlledViewState, table]);
 
   const visibleColumns = table.getVisibleLeafColumns();
   const filteredCount = table.getFilteredRowModel().rows.length;
@@ -295,11 +333,12 @@ export function ReportDataTable({
           <label className="inline-flex items-center gap-2 rounded border border-border bg-surface px-2.5 py-1.5 text-sm text-text">
             <Rows3 className="h-4 w-4 text-muted" strokeWidth={1.7} aria-hidden />
             <span className="sr-only">{labels.density}</span>
-            <Select value={density} onChange={(event) => setDensity(event.target.value as 'comfortable' | 'compact')} className="h-7 border-0 bg-transparent px-1 py-0 shadow-none focus:ring-0">
+            <Select value={activeViewState.density} onChange={(event) => updateViewState((current) => ({ ...current, density: event.target.value as 'comfortable' | 'compact' }))} className="h-7 border-0 bg-transparent px-1 py-0 shadow-none focus:ring-0">
               <option value="compact">{labels.compact}</option>
               <option value="comfortable">{labels.comfortable}</option>
             </Select>
           </label>
+          {toolbarAddon}
         </div>
       </div>
 
@@ -319,7 +358,7 @@ export function ReportDataTable({
                         aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
                         className={cn(
                           'whitespace-nowrap px-3 text-start text-xs font-semibold',
-                          density === 'compact' ? 'py-2' : 'py-3',
+                          activeViewState.density === 'compact' ? 'py-2' : 'py-3',
                           definition?.align === 'end' && 'text-end'
                         )}
                       >
@@ -364,7 +403,7 @@ export function ReportDataTable({
                         key={cell.id}
                         className={cn(
                           'px-3 text-text',
-                          density === 'compact' ? 'py-2' : 'py-3',
+                          activeViewState.density === 'compact' ? 'py-2' : 'py-3',
                           definition?.align === 'end' && 'text-end',
                           definition?.numeric && 'num tabular-nums',
                           tone === 'positive' && 'text-positive',
@@ -395,7 +434,7 @@ export function ReportDataTable({
                         key={column.id}
                         className={cn(
                           'px-3',
-                          density === 'compact' ? 'py-2' : 'py-3',
+                          activeViewState.density === 'compact' ? 'py-2' : 'py-3',
                           definition?.align === 'end' && 'text-end',
                           definition?.numeric && 'num tabular-nums',
                           tone === 'positive' && 'text-positive',
@@ -419,10 +458,11 @@ export function ReportDataTable({
           <label className="inline-flex items-center gap-2">
             <span>{labels.rowsPerPage}</span>
             <Select
-              value={String(table.getState().pagination.pageSize)}
+              value={String(pagination.pageSize)}
               onChange={(event) => {
-                table.setPageSize(Number(event.target.value));
-                table.setPageIndex(0);
+                const pageSize = Number(event.target.value);
+                setPagination({ pageIndex: 0, pageSize });
+                updateViewState((current) => ({ ...current, pageSize }));
               }}
               className="h-8 w-20 py-1 text-xs"
             >
