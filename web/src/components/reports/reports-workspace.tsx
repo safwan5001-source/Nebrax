@@ -5,7 +5,7 @@
  * للمس أولاً؛ أما مستند A4 فمسار معاينة مستقل. تبقى الجداول الكثيفة لسطح المكتب.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Printer, Download, FileText, Info, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,7 +27,8 @@ import { ReportMetricGrid, ReportScreenHeader, type ReportMetric } from '@/compo
 import { CustomerAgingChart } from '@/components/reports/customer-aging-chart';
 import { ReportResultsTable } from '@/components/reports/report-results-table';
 import { reportCellToneFromValue } from '@/components/reports/report-data-table';
-import { StructuredFinancialStatement, type FinancialStatementSection } from '@/components/reports/structured-financial-statement';
+import { StructuredFinancialStatement, type FinancialStatementSection, type FinancialStatementValue } from '@/components/reports/structured-financial-statement';
+import { balanceComparisonAsOf, compareAmounts, comparisonPeriod, type ComparisonMode, unionAccountRows } from '@/components/reports/financial-comparison';
 
 export type ReportTab = 'trial' | 'income' | 'balance' | 'costcenter' | 'aging';
 type Tab = ReportTab;
@@ -70,6 +71,16 @@ interface BalanceSheet {
 interface CcRow { cost_center_id: string; code: string; name: string; revenue: string; expense: string; profit: string }
 interface Profitability { rows: CcRow[]; total_revenue: string; total_expense: string; total_profit: string }
 
+function comparisonValues(current: string, comparison: string): FinancialStatementValue[] {
+  const values = compareAmounts(current, comparison);
+  return [
+    { id: 'current', amount: values.current },
+    { id: 'comparison', amount: values.comparison },
+    { id: 'variance', amount: values.variance },
+    { id: 'variance-percent', amount: values.variancePercent ?? '—' },
+  ];
+}
+
 interface ReportDoc {
   title: string;
   asOf?: string | null;
@@ -101,87 +112,181 @@ export function ReportsWorkspace({
   const [balance, setBalance] = useState<BalanceSheet | null>(null);
   // مرشّحات مشتركة: مدى تاريخي + فروع (فارغة = كل الفروع مجمّعة).
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_FILTERS);
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('none');
+  const [comparisonIncome, setComparisonIncome] = useState<IncomeStatement | null>(null);
+  const [comparisonBalance, setComparisonBalance] = useState<BalanceSheet | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonFailed, setComparisonFailed] = useState(false);
+  const requestGeneration = useRef(0);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
   const [showPreview, setShowPreview] = useState(false);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    const q = filtersToQuery(filters);
-    if (tab === 'trial') {
-      api<TrialBalance>(`/reports/trial-balance${q}`).then(setTrial).finally(() => setLoading(false));
-    } else if (tab === 'income') {
-      api<IncomeStatement>(`/reports/income-statement${q}`).then(setIncome).finally(() => setLoading(false));
-    } else if (tab === 'balance') {
-      // الميزانية «حتى تاريخ»: الخادم يتجاهل `from` أصلاً، ولا نرسله كي لا
-      // يوحي المرشّح بأثرٍ لا يقع.
-      api<BalanceSheet>(`/reports/balance-sheet${filtersToQuery({ ...filters, from: '' })}`)
-        .then(setBalance).finally(() => setLoading(false));
-    } else if (tab === 'costcenter') {
-      api<Profitability>(`/reports/cost-center-profitability${q}`).then(setCc).finally(() => setLoading(false));
-    } else {
-      // الأعمار تعتمد «حتى تاريخ» لا مدى — يُمرَّر الفرع فقط.
-      api<Aging>(`/reports/aging/${agingType}${filtersToQuery({ ...filters, from: '', to: '' })}`)
-        .then(setAging).finally(() => setLoading(false));
+  const comparisonScope = useMemo(() => {
+    if (comparisonMode === 'none') return null;
+    if (tab === 'income') return comparisonPeriod(comparisonMode, { from: filters.from, to: filters.to });
+    if (tab === 'balance') {
+      const asOf = balanceComparisonAsOf(comparisonMode, filters);
+      return asOf ? { from: '', to: asOf } : null;
     }
-  }, [tab, agingType, filters]);
+    return null;
+  }, [comparisonMode, filters, tab]);
+
+  const load = useCallback(() => {
+    const generation = ++requestGeneration.current;
+    // التقرير المعروض يجب أن ينتمي دائماً إلى نطاق هذا الجيل؛ لا تبقِ نتيجة نطاق سابق
+    // أثناء الطلب أو بعد فشل current لهذا النطاق.
+    if (tab === 'income') {
+      setIncome(null);
+      setComparisonIncome(null);
+    } else if (tab === 'balance') {
+      setBalance(null);
+      setComparisonBalance(null);
+    }
+    setLoading(true);
+    setComparisonLoading(false);
+    setComparisonFailed(false);
+    const q = filtersToQuery(filters);
+    const complete = () => {
+      if (requestGeneration.current === generation) setLoading(false);
+    };
+
+    if (tab === 'income' && comparisonScope) {
+      setComparisonLoading(true);
+      setComparisonIncome(null);
+      const currentRequest = api<IncomeStatement>(`/reports/income-statement${q}`);
+      const comparisonRequest = api<IncomeStatement>(`/reports/income-statement${filtersToQuery({ ...filters, ...comparisonScope })}`);
+      Promise.allSettled([currentRequest, comparisonRequest]).then(([current, comparison]) => {
+        if (requestGeneration.current !== generation) return;
+        if (current.status !== 'fulfilled') {
+          setComparisonIncome(null);
+          return;
+        }
+        setIncome(current.value);
+        if (comparison.status === 'fulfilled') setComparisonIncome(comparison.value);
+        else setComparisonFailed(true);
+      }).finally(() => {
+        if (requestGeneration.current === generation) {
+          setComparisonLoading(false);
+          complete();
+        }
+      });
+      return;
+    }
+
+    if (tab === 'balance' && comparisonScope) {
+      setComparisonLoading(true);
+      setComparisonBalance(null);
+      const currentRequest = api<BalanceSheet>(`/reports/balance-sheet${filtersToQuery({ ...filters, from: '' })}`);
+      const comparisonRequest = api<BalanceSheet>(`/reports/balance-sheet${filtersToQuery({ ...filters, from: '', to: comparisonScope.to })}`);
+      Promise.allSettled([currentRequest, comparisonRequest]).then(([current, comparison]) => {
+        if (requestGeneration.current !== generation) return;
+        if (current.status !== 'fulfilled') {
+          setComparisonBalance(null);
+          return;
+        }
+        setBalance(current.value);
+        if (comparison.status === 'fulfilled') setComparisonBalance(comparison.value);
+        else setComparisonFailed(true);
+      }).finally(() => {
+        if (requestGeneration.current === generation) {
+          setComparisonLoading(false);
+          complete();
+        }
+      });
+      return;
+    }
+
+    if (tab === 'trial') api<TrialBalance>(`/reports/trial-balance${q}`).then((value) => requestGeneration.current === generation && setTrial(value)).finally(complete);
+    else if (tab === 'income') api<IncomeStatement>(`/reports/income-statement${q}`).then((value) => requestGeneration.current === generation && setIncome(value)).catch(() => {}).finally(complete);
+    else if (tab === 'balance') api<BalanceSheet>(`/reports/balance-sheet${filtersToQuery({ ...filters, from: '' })}`).then((value) => requestGeneration.current === generation && setBalance(value)).catch(() => {}).finally(complete);
+    else if (tab === 'costcenter') api<Profitability>(`/reports/cost-center-profitability${q}`).then((value) => requestGeneration.current === generation && setCc(value)).finally(complete);
+    else api<Aging>(`/reports/aging/${agingType}${filtersToQuery({ ...filters, from: '', to: '' })}`).then((value) => requestGeneration.current === generation && setAging(value)).finally(complete);
+  }, [agingType, comparisonScope, filters, tab]);
 
   useEffect(() => load(), [load]);
+
+  useEffect(() => {
+    if (comparisonMode !== 'none' && !comparisonScope) setComparisonMode('none');
+  }, [comparisonMode, comparisonScope]);
 
   useEffect(() => {
     if (fixedAgingType) setAgingType(fixedAgingType);
   }, [fixedAgingType]);
 
+  const incomeComparisonVisible = comparisonMode !== 'none' && !!comparisonIncome && !comparisonLoading && !comparisonFailed;
+  const balanceComparisonVisible = comparisonMode !== 'none' && !!comparisonBalance && !comparisonLoading && !comparisonFailed;
+
   const incomeStatementSections = useMemo<FinancialStatementSection[]>(() => {
     if (!income) return [];
+    const rowsFor = (kind: 'revenue' | 'expense', currentRows: AmountRow[], comparisonRows: AmountRow[], totalId: string, totalLabel: string, currentTotal: string, comparisonTotal: string, tone?: 'positive' | 'negative') => {
+      if (!incomeComparisonVisible) {
+        return [
+          ...(currentRows.length > 0
+            ? currentRows.map((row) => ({ id: `${kind}-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
+            : [{ id: `${kind}s-empty`, kind: 'empty' as const, label: t('empty') }]),
+          { id: totalId, kind: 'subtotal' as const, label: totalLabel, amount: currentTotal, tone },
+        ];
+      }
+      return [
+        ...unionAccountRows(currentRows, comparisonRows).map((row) => ({ id: `${kind}-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, values: comparisonValues(row.current, row.comparison) })),
+        { id: totalId, kind: 'subtotal' as const, label: totalLabel, values: comparisonValues(currentTotal, comparisonTotal) },
+      ];
+    };
+
     return [
-      {
-        id: 'revenues',
-        label: t('revenues'),
-        rows: [
-          ...(income.revenues.length > 0
-            ? income.revenues.map((row) => ({ id: `revenue-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
-            : [{ id: 'revenues-empty', kind: 'empty' as const, label: t('empty') }]),
-          { id: 'total-revenue', kind: 'subtotal' as const, label: t('total_revenue'), amount: income.total_revenue, tone: 'positive' as const },
-        ],
-      },
-      {
-        id: 'expenses',
-        label: t('expenses'),
-        rows: [
-          ...(income.expenses.length > 0
-            ? income.expenses.map((row) => ({ id: `expense-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
-            : [{ id: 'expenses-empty', kind: 'empty' as const, label: t('empty') }]),
-          { id: 'total-expense', kind: 'subtotal' as const, label: t('total_expense'), amount: income.total_expense, tone: 'negative' as const },
-        ],
-      },
+      { id: 'revenues', label: t('revenues'), rows: rowsFor('revenue', income.revenues, comparisonIncome?.revenues ?? [], 'total-revenue', t('total_revenue'), income.total_revenue, comparisonIncome?.total_revenue ?? '0.00', 'positive') },
+      { id: 'expenses', label: t('expenses'), rows: rowsFor('expense', income.expenses, comparisonIncome?.expenses ?? [], 'total-expense', t('total_expense'), income.total_expense, comparisonIncome?.total_expense ?? '0.00', 'negative') },
     ];
-  }, [income, t]);
+  }, [comparisonIncome, income, incomeComparisonVisible, t]);
 
   const balanceSheetSections = useMemo<FinancialStatementSection[]>(() => {
     if (!balance) return [];
-    const sectionRows = (id: string, rows: AmountRow[], totalId: string, totalLabel: string, totalAmount: string) => [
-      ...(rows.length > 0
-        ? rows.map((row) => ({ id: `${id}-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
-        : [{ id: `${id}-empty`, kind: 'empty' as const, label: t('empty') }]),
-      { id: totalId, kind: 'subtotal' as const, label: totalLabel, amount: totalAmount },
-    ];
+    const sectionRows = (id: string, currentRows: AmountRow[], comparisonRows: AmountRow[], totalId: string, totalLabel: string, currentTotal: string, comparisonTotal: string) => {
+      if (!balanceComparisonVisible) {
+        return [
+          ...(currentRows.length > 0
+            ? currentRows.map((row) => ({ id: `${id}-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
+            : [{ id: `${id}-empty`, kind: 'empty' as const, label: t('empty') }]),
+          { id: totalId, kind: 'subtotal' as const, label: totalLabel, amount: currentTotal },
+        ];
+      }
+      return [
+        ...unionAccountRows(currentRows, comparisonRows).map((row) => ({ id: `${id}-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, values: comparisonValues(row.current, row.comparison) })),
+        { id: totalId, kind: 'subtotal' as const, label: totalLabel, values: comparisonValues(currentTotal, comparisonTotal) },
+      ];
+    };
 
     return [
-      { id: 'assets', label: t('assets'), rows: sectionRows('asset', balance.assets, 'total-assets', t('total_assets'), balance.total_assets) },
-      { id: 'liabilities', label: t('liabilities'), rows: sectionRows('liability', balance.liabilities, 'total-liabilities', t('total_liabilities'), balance.total_liabilities) },
+      { id: 'assets', label: t('assets'), rows: sectionRows('asset', balance.assets, comparisonBalance?.assets ?? [], 'total-assets', t('total_assets'), balance.total_assets, comparisonBalance?.total_assets ?? '0.00') },
+      { id: 'liabilities', label: t('liabilities'), rows: sectionRows('liability', balance.liabilities, comparisonBalance?.liabilities ?? [], 'total-liabilities', t('total_liabilities'), balance.total_liabilities, comparisonBalance?.total_liabilities ?? '0.00') },
       {
         id: 'equity',
         label: t('equity'),
         rows: [
-          ...(balance.equity.length > 0
-            ? balance.equity.map((row) => ({ id: `equity-${row.code}`, kind: 'detail' as const, code: row.code, label: row.name, amount: row.amount }))
-            : [{ id: 'equity-empty', kind: 'empty' as const, label: t('empty') }]),
-          { id: 'net-income', kind: 'detail' as const, label: t('net_income'), amount: balance.net_income, level: 1 as const, tone: 'auto' as const },
-          { id: 'equity-and-income', kind: 'subtotal' as const, label: t('equity_and_income'), amount: balance.total_equity_and_income },
+          ...sectionRows('equity', balance.equity, comparisonBalance?.equity ?? [], 'equity-rows-total', t('total_equity'), balance.total_equity, comparisonBalance?.total_equity ?? '0.00').slice(0, -1),
+          balanceComparisonVisible
+            ? { id: 'net-income', kind: 'detail' as const, label: t('net_income'), level: 1 as const, values: comparisonValues(balance.net_income, comparisonBalance?.net_income ?? '0.00') }
+            : { id: 'net-income', kind: 'detail' as const, label: t('net_income'), amount: balance.net_income, level: 1 as const, tone: 'auto' as const },
+          balanceComparisonVisible
+            ? { id: 'equity-and-income', kind: 'subtotal' as const, label: t('equity_and_income'), values: comparisonValues(balance.total_equity_and_income, comparisonBalance?.total_equity_and_income ?? '0.00') }
+            : { id: 'equity-and-income', kind: 'subtotal' as const, label: t('equity_and_income'), amount: balance.total_equity_and_income },
         ],
       },
     ];
-  }, [balance, t]);
+  }, [balance, balanceComparisonVisible, comparisonBalance, t]);
+
+  const comparisonColumns = useMemo(() => [
+    { id: 'current', label: t('current_amount'), priority: 'primary' as const },
+    { id: 'comparison', label: t('comparison_amount'), priority: 'secondary' as const },
+    { id: 'variance', label: t('variance'), priority: 'tertiary' as const },
+    { id: 'variance-percent', label: t('variance_percent'), format: 'percentage' as const, priority: 'tertiary' as const },
+  ], [t]);
+
+  const comparisonSubtitle = useMemo(() => {
+    if (!comparisonScope || comparisonMode === 'none') return null;
+    if (tab === 'balance') return `${t('current_as_of')}: ${filters.to} · ${t('comparison_as_of')}: ${comparisonScope.to}`;
+    return `${t('current_period')}: ${filters.from} ← ${filters.to} · ${t('comparison_period')}: ${comparisonScope.from} ← ${comparisonScope.to}`;
+  }, [comparisonMode, comparisonScope, filters.from, filters.to, t, tab]);
 
   // وصف التقرير الحالي (أعمدة + صفوف) لاستخدامه في PDF و CSV معاً.
   const doc = useMemo<ReportDoc | null>(() => {
@@ -383,6 +488,10 @@ export function ReportsWorkspace({
     return [];
   }, [aging, balance, cc, income, t, tab, trial]);
 
+  const supportsComparison = tab === 'income' || tab === 'balance';
+  const comparisonDatesRequired = tab === 'income' ? !filters.from || !filters.to : !filters.to;
+  const previousPeriodDisabled = comparisonDatesRequired || (tab === 'balance' && !filters.from);
+
   const actions = [
     { id: 'csv', label: t('csv'), icon: Download, onSelect: exportCsv, disabled: !doc || !!busy },
     { id: 'pdf', label: busy === 'pdf' ? tPrint('generating') : t('pdf'), icon: Download, onSelect: () => void handleDownloadPdf(), disabled: !doc || !!busy, busy: busy === 'pdf' },
@@ -425,7 +534,21 @@ export function ReportsWorkspace({
         </div>
       )}
 
-      <ReportFilters value={filters} onChange={setFilters} />
+      <ReportFilters
+        value={filters}
+        onChange={setFilters}
+        comparison={supportsComparison ? {
+          value: comparisonMode,
+          onChange: setComparisonMode,
+          previousPeriodDisabled,
+          previousYearDisabled: comparisonDatesRequired,
+        } : undefined}
+      />
+
+      {comparisonSubtitle && <p className="no-print rounded border border-border bg-background px-3 py-2 text-xs leading-relaxed text-muted" aria-live="polite">{comparisonSubtitle}</p>}
+      {comparisonLoading && <p className="no-print text-xs text-muted" role="status">{t('comparison_loading')}</p>}
+      {comparisonFailed && <p className="no-print rounded border border-warning/30 bg-background px-3 py-2 text-xs leading-relaxed text-text" role="alert">{t('comparison_failed')}</p>}
+      {supportsComparison && comparisonMode !== 'none' && <p className="no-print text-xs text-muted">{t('comparison_screen_only')}</p>}
 
       <ReportMetricGrid metrics={metrics} />
 
@@ -473,14 +596,19 @@ export function ReportsWorkspace({
             )}
           </CardHeader>
           <CardContent>
-            {loading || !income ? (
+            {loading ? (
               <Skeleton className="h-40 w-full" />
+            ) : !income ? (
+              <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
             ) : (
               <StructuredFinancialStatement
                 descriptionLabel={t('account')}
                 amountLabel={t('amount')}
+                columns={incomeComparisonVisible ? comparisonColumns : undefined}
                 sections={incomeStatementSections}
-                grandTotal={{ id: 'net-income', kind: 'grand-total', label: t('net_income'), amount: income.net_income, tone: 'auto' }}
+                grandTotal={incomeComparisonVisible
+                  ? { id: 'net-income', kind: 'grand-total', label: t('net_income'), values: comparisonValues(income.net_income, comparisonIncome?.net_income ?? '0.00') }
+                  : { id: 'net-income', kind: 'grand-total', label: t('net_income'), amount: income.net_income, tone: 'auto' }}
               />
             )}
 
@@ -524,15 +652,20 @@ export function ReportsWorkspace({
             )}
           </CardHeader>
           <CardContent>
-            {loading || !balance ? (
+            {loading ? (
               <Skeleton className="h-40 w-full" />
+            ) : !balance ? (
+              <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
             ) : (
               <>
                 <StructuredFinancialStatement
                   descriptionLabel={t('account')}
                   amountLabel={t('amount')}
+                  columns={balanceComparisonVisible ? comparisonColumns : undefined}
                   sections={balanceSheetSections}
-                  equation={{ id: 'balance-equation', kind: 'equation', label: `${t('total_assets')} = ${t('total_liabilities')} + ${t('equity_and_income')}`, amount: balance.total_assets }}
+                  equation={balanceComparisonVisible
+                    ? { id: 'balance-equation', kind: 'equation', label: `${t('total_assets')} = ${t('total_liabilities')} + ${t('equity_and_income')}`, values: [{ id: 'current', amount: balance.total_assets }, { id: 'comparison', amount: comparisonBalance?.total_assets ?? '0.00' }] }
+                    : { id: 'balance-equation', kind: 'equation', label: `${t('total_assets')} = ${t('total_liabilities')} + ${t('equity_and_income')}`, amount: balance.total_assets }}
                 />
                 <p className="mt-3 text-[11px] leading-relaxed text-muted">{t('as_of_hint')}</p>
               </>

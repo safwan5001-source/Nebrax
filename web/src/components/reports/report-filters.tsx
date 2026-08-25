@@ -10,6 +10,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import type { Branch } from '@/lib/branch';
+import type { ComparisonMode } from './financial-comparison';
 
 export interface ReportFilterState {
   from: string;
@@ -40,6 +41,7 @@ export function ReportFilters({
   onClear,
   showDateRange = true,
   showBranches = true,
+  comparison,
 }: {
   value: ReportFilterState;
   onChange: (next: ReportFilterState) => void;
@@ -49,6 +51,8 @@ export function ReportFilters({
   showDateRange?: boolean;
   /** تقارير القيمة العالمية لا تتظاهر بأن لها فلتر فرع مستقل. */
   showBranches?: boolean;
+  /** يظهر فقط للتقارير التي تدعم شاشة مقارنة مستقلة. */
+  comparison?: { value: ComparisonMode; onChange: (mode: ComparisonMode) => void; previousPeriodDisabled?: boolean; previousYearDisabled?: boolean };
 }) {
   const t = useTranslations('reports');
   const tb = useTranslations('branches');
@@ -89,9 +93,14 @@ export function ReportFilters({
     return t('branches_selected', { n: value.branchIds.length });
   }, [value.branchIds, branches, t]);
 
-  const clear = () => onClear ? onClear() : onChange(EMPTY_FILTERS);
+  const clear = () => {
+    if (comparison) comparison.onChange('none');
+    if (onClear) onClear();
+    else onChange(EMPTY_FILTERS);
+  };
   const dateSet = showDateRange && (!!value.from || !!value.to);
-  const dirty = dateSet || (showBranches && value.branchIds.length > 0);
+  const comparisonActive = comparison?.value !== 'none';
+  const dirty = dateSet || comparisonActive || (showBranches && value.branchIds.length > 0);
 
   /**
    * نصّ chip التاريخ. **لا يُترك فارغاً**: الحالة الافتراضية تُسمّى «كل الفترات»
@@ -132,6 +141,19 @@ export function ReportFilters({
             <CalendarDays className="h-4 w-4 shrink-0" strokeWidth={1.8} />
             <span className={cn(dateSet && 'num')}>{dateLabel}</span>
           </button>
+        )}
+
+        {comparison && (
+          <select
+            aria-label={t('comparison')}
+            value={comparison.value}
+            onChange={(event) => comparison.onChange(event.target.value as ComparisonMode)}
+            className={`${chip(comparison.value !== 'none')} max-w-44 appearance-none`}
+          >
+            <option value="none">{t('comparison_none')}</option>
+            <option value="previous-period" disabled={comparison.previousPeriodDisabled}>{t('comparison_previous_period')}</option>
+            <option value="previous-year" disabled={comparison.previousYearDisabled}>{t('comparison_previous_year')}</option>
+          </select>
         )}
 
         {showBranches && (
@@ -192,6 +214,20 @@ export function ReportFilters({
             onChange={(e) => onChange({ ...value, to: e.target.value })} />
         </div>
       </>}
+
+      {comparison && <div className="space-y-1.5">
+        <Label htmlFor="rf-comparison">{t('comparison')}</Label>
+        <select
+          id="rf-comparison"
+          value={comparison.value}
+          onChange={(event) => comparison.onChange(event.target.value as ComparisonMode)}
+          className="h-9 w-48 rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <option value="none">{t('comparison_none')}</option>
+          <option value="previous-period" disabled={comparison.previousPeriodDisabled}>{t('comparison_previous_period')}</option>
+          <option value="previous-year">{t('comparison_previous_year')}</option>
+        </select>
+      </div>}
 
       {/* منتقي فروع متعدّد الاختيار */}
       {showBranches && <div className="space-y-1.5">
