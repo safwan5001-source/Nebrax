@@ -1,6 +1,7 @@
 'use client';
 
 import { cleanup, render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -8,6 +9,7 @@ import {
   reportCellToneFromValue,
   ReportDataTable,
   type ReportDataColumn,
+  type ReportTableViewState,
 } from './report-data-table';
 
 afterEach(cleanup);
@@ -82,6 +84,26 @@ describe('ReportDataTable', () => {
 
     await user.clear(search);
     expect(screen.getByText('Page 1 of 3')).toBeTruthy();
+  });
+
+  it('returns to the first page when an external saved view is applied', async () => {
+    const user = userEvent.setup();
+    const rows = Array.from({ length: 30 }, (_, index) => [`Account ${index + 1}`, `${index + 1}.00 𞸁`, '2026-08-01']);
+    function ControlledTable() {
+      const [viewState, setViewState] = useState<ReportTableViewState>({ columnVisibility: {}, sorting: [], density: 'compact', pageSize: 10 });
+      return <>
+        <button type="button" onClick={() => setViewState({ columnVisibility: { date: false }, sorting: [{ id: 'amount', desc: true }], density: 'comfortable', pageSize: 10 })}>Apply saved view</button>
+        <ReportDataTable columns={columns} rows={rows} labels={labels} viewState={viewState} onViewStateChange={setViewState} />
+      </>;
+    }
+
+    render(<ControlledTable />);
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Apply saved view' }));
+    expect(screen.getByText('Page 1 of 3')).toBeTruthy();
+    expect(screen.queryByRole('columnheader', { name: 'Date' })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Amount' }).getAttribute('aria-sort')).toBe('descending');
   });
 
   it('keeps the primary column visible while allowing secondary columns to be hidden', async () => {
