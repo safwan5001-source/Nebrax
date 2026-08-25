@@ -8,6 +8,7 @@ use App\Models\CostCenter;
 use App\Models\DocumentBatch;
 use App\Models\DocumentExtractionResult;
 use App\Models\DocumentFile;
+use App\Models\DocumentIssue;
 use App\Models\DocumentMatchCandidate;
 use App\Models\DocumentMatchResult;
 use App\Models\DocumentProcessingRun;
@@ -64,6 +65,10 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
             ->assertJsonPath('data.transaction_type', 'purchase')
             ->assertJsonPath('data.status', 'draft')
             ->assertJsonPath('data.idempotent_replay', false)
+            ->assertJsonMissingPath('data.normalized_payload')
+            ->assertJsonMissingPath('data.object_key')
+            ->assertJsonMissingPath('data.provider_metadata')
+            ->assertJsonMissingPath('data.raw_provider_response')
             ->assertJsonMissing(['object_key' => "fixtures/purchase-draft-builder/purchase.pdf"]);
 
         $purchaseId = $created->json('data.transaction_id');
@@ -175,6 +180,65 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
             'cost_center_id' => $costCenter->id,
             'status' => 'draft',
         ]);
+    }
+
+    /** @test */
+    public function purchase_draft_endpoint_rejects_a_foreign_tenant_warehouse_without_partial_state(): void
+    {
+        $fixture = $this->readyFixture();
+        $foreign = $this->registerTenant('foreign-warehouse-document-draft', 'owner@foreign-warehouse-document-draft.test');
+        $foreignBranch = Branch::query()->where('tenant_id', $foreign['tenant_id'])->firstOrFail();
+        app(TenantContext::class)->set($foreign['tenant_id']);
+        app(BranchContext::class)->set($foreignBranch->id);
+        $foreignWarehouse = Warehouse::create(['branch_id' => $foreignBranch->id, 'code' => 'FOREIGN-WH', 'name' => 'مخزن أجنبي', 'is_active' => true]);
+        app(TenantContext::class)->set($fixture['tenant_id']);
+        app(BranchContext::class)->set($fixture['batch']->branch_id);
+
+        $this->createDraftThroughApi($fixture, ['warehouse_id' => $foreignWarehouse->id])->assertUnprocessable();
+        $this->assertNoDraftState($fixture);
+    }
+
+    /** @test */
+    public function purchase_draft_endpoint_rejects_a_warehouse_outside_the_reviewers_branch_and_warehouse_access(): void
+    {
+        $fixture = $this->readyFixture();
+        $otherBranchId = $this->withToken($fixture['token'])->postJson('/api/branches', ['name' => 'فرع مخزن مقيّد'])->assertCreated()->json('data.id');
+        $otherWarehouse = Warehouse::create(['branch_id' => $otherBranchId, 'code' => 'OTHER-WH', 'name' => 'مخزن فرع آخر', 'is_active' => true]);
+        $reviewerToken = $this->tokenForRole($fixture['tenant_id'], 'owner', 'restricted-owner@purchase-draft-builder.test');
+        $reviewer = \App\Models\User::query()->where('email', 'restricted-owner@purchase-draft-builder.test')->firstOrFail();
+        $reviewer->branches()->attach($fixture['batch']->branch_id);
+        $reviewer->warehouses()->attach($fixture['warehouse']->id);
+
+        $this->createDraftThroughApi($fixture, ['warehouse_id' => $otherWarehouse->id], $reviewerToken)
+            ->assertUnprocessable();
+        $this->assertNoDraftState($fixture);
+    }
+
+    /** @test */
+    public function purchase_draft_endpoint_rejects_a_cost_center_hidden_by_branch_sharing_policy(): void
+    {
+        $fixture = $this->readyFixture();
+        $otherBranchId = $this->withToken($fixture['token'])->postJson('/api/branches', ['name' => 'فرع مركز تكلفة مقيّد'])->assertCreated()->json('data.id');
+        app(BranchContext::class)->set($otherBranchId);
+        $costCenter = CostCenter::create(['code' => 'HIDDEN-CC', 'name' => 'مركز تكلفة فرع آخر', 'is_active' => true]);
+        \App\Support\BranchSettings::merge(['share_cost_centers' => false]);
+        app(BranchContext::class)->set($fixture['batch']->branch_id);
+
+        $this->createDraftThroughApi($fixture, ['cost_center_id' => $costCenter->id])->assertUnprocessable();
+        $this->assertNoDraftState($fixture);
+    }
+
+    /** @test */
+    public function purchase_draft_endpoint_rejects_active_rbac_when_document_center_entitlement_is_revoked(): void
+    {
+        $fixture = $this->readyFixture();
+        app(EntitlementGrantService::class)->revokeGrantGroup(
+            Tenant::findOrFail($fixture['tenant_id']),
+            $fixture['entitlementGroup'],
+        );
+
+        $this->createDraftThroughApi($fixture)->assertForbidden();
+        $this->assertNoDraftState($fixture);
     }
 
     /** @test */
@@ -300,6 +364,98 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_an_open_blocking_issue_even_when_the_batch_is_ready_for_draft(): void
+    {
+        $fixture = $this->readyFixture();
+        DocumentIssue::create([
+            'document_batch_id' => $fixture['batch']->id,
+            'document_extraction_result_id' => $fixture['result']->id,
+            'subject_key' => 'fields.total_amount_minor',
+            'code' => 'tampered_blocking_issue',
+            'severity' => 'blocking',
+            'status' => 'open',
+            'safe_message' => 'مشكلة مانعة مفتوحة.',
+        ]);
+
+        $this->createDraftThroughApi($fixture)->assertUnprocessable();
+        $this->assertNoDraftState($fixture);
+    }
+
+    /** @test */
+    public function it_rejects_duplicate_confirmed_required_matches_without_partial_state(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->confirmedMatch($fixture['batch'], $fixture['result'], 'duplicate_header', 'header.counterparty', 'partner', $fixture['partner']->id);
+
+        $this->createDraftThroughApi($fixture)->assertUnprocessable();
+        $this->assertNoDraftState($fixture);
+    }
+
+    /** @test */
+    public function it_preserves_reviewed_line_discount_in_purchase_service_totals(): void
+    {
+        $fixture = $this->readyFixture(payloadOverrides: [
+            'fields' => ['subtotal_minor' => 9000, 'tax_amount_minor' => 1350, 'total_amount_minor' => 10350],
+            'line' => ['discount_minor' => 1000, 'tax_amount_minor' => 1350, 'total_minor' => 10350],
+        ]);
+
+        $created = $this->buildDraft($fixture, 'خصم سطر مراجع بالهللات.');
+        $this->assertDatabaseHas('purchases', ['id' => $created->transactionId, 'subtotal' => 9000, 'tax_amount' => 1350, 'total' => 10350]);
+        $this->assertDatabaseHas('purchase_lines', ['purchase_id' => $created->transactionId, 'line_discount' => 1000, 'line_total' => 10350]);
+    }
+
+    /** @test */
+    public function it_rejects_header_discount_evidence_until_document_schema_supports_a_non_ambiguous_allocation(): void
+    {
+        $fixture = $this->readyFixture(payloadOverrides: [
+            'fields' => ['discount_minor' => 1000, 'subtotal_minor' => 10000, 'tax_amount_minor' => 1350, 'total_amount_minor' => 10350],
+        ]);
+
+        $this->createDraftThroughApi($fixture)->assertUnprocessable();
+        $this->assertNoDraftState($fixture);
+    }
+
+    /** @test */
+    public function it_rolls_back_everything_when_purchase_service_creation_throws(): void
+    {
+        $fixture = $this->readyFixture();
+        $failing = \Mockery::mock(PurchaseService::class);
+        $failing->shouldReceive('create')->once()->andThrow(new \RuntimeException('purchase_create_failed'));
+        app()->instance(PurchaseService::class, $failing);
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->buildDraft($fixture, 'فشل خدمة إنشاء الشراء يجب أن يتراجع كلياً.');
+        } finally {
+            app()->forgetInstance(PurchaseService::class);
+            $this->assertNoDraftState($fixture);
+        }
+    }
+
+    /** @test */
+    public function it_rolls_back_everything_when_domain_totals_do_not_match_reviewed_evidence(): void
+    {
+        $fixture = $this->readyFixture();
+        $realPurchaseService = app(PurchaseService::class);
+        $mismatching = \Mockery::mock(PurchaseService::class);
+        $mismatching->shouldReceive('create')->once()->andReturnUsing(function (array $data, array $items) use ($realPurchaseService): Purchase {
+            $purchase = $realPurchaseService->create($data, $items);
+            $purchase->update(['total' => $purchase->total + 2]);
+
+            return $purchase->fresh('lines');
+        });
+        app()->instance(PurchaseService::class, $mismatching);
+
+        try {
+            $this->expectException(\Illuminate\Validation\ValidationException::class);
+            $this->buildDraft($fixture, 'فرق الإجمالي بعد خدمة المجال يجب أن يتراجع كلياً.');
+        } finally {
+            app()->forgetInstance(PurchaseService::class);
+            $this->assertNoDraftState($fixture);
+        }
+    }
+
+    /** @test */
     public function it_rejects_a_batch_that_is_not_ready_for_draft_without_partial_state(): void
     {
         $fixture = $this->readyFixture(markReady: false);
@@ -413,6 +569,27 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
         $this->assertUnsupportedQuantity('999999999999999999999999');
     }
 
+    /** @param array{batch:DocumentBatch,token:string,warehouse:Warehouse} $fixture */
+    private function createDraftThroughApi(array $fixture, array $overrides = [], ?string $token = null): \Illuminate\Testing\TestResponse
+    {
+        return $this->withToken($token ?? $fixture['token'])->postJson(
+            "/api/document-batches/{$fixture['batch']->id}/create-purchase-draft",
+            array_merge([
+                'expected_version' => $fixture['batch']->version,
+                'reason' => 'اختبار مسار إنشاء المسودة المحمي.',
+                'warehouse_id' => $fixture['warehouse']->id,
+            ], $overrides),
+        );
+    }
+
+    /** @param array{batch:DocumentBatch} $fixture */
+    private function assertNoDraftState(array $fixture): void
+    {
+        $this->assertDatabaseCount('purchases', 0);
+        $this->assertDatabaseCount('document_transaction_links', 0);
+        $this->assertDatabaseHas('document_batches', ['id' => $fixture['batch']->id, 'status' => 'ready_for_draft']);
+    }
+
     /** @param array{batch:DocumentBatch,actor:\App\Models\User,warehouse:Warehouse} $fixture */
     private function buildDraft(array $fixture, string $reason, ?string $warehouseId = null, ?string $costCenterId = null, ?int $expectedVersion = null): \App\Contracts\CreatedDraftReference
     {
@@ -474,14 +651,15 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
     }
 
     /** @return array{batch:DocumentBatch,actor:\App\Models\User,partner:Partner,product:Product,warehouse:Warehouse,result:DocumentExtractionResult,token:string,tenant_id:string} */
-    private function readyFixture(string $quantity = '1', string $tenantSlug = 'purchase-draft-builder', bool $taxInclusive = false, string $currency = 'SAR', bool $markReady = true, string $documentType = 'purchase_invoice'): array
+    private function readyFixture(string $quantity = '1', string $tenantSlug = 'purchase-draft-builder', bool $taxInclusive = false, string $currency = 'SAR', bool $markReady = true, string $documentType = 'purchase_invoice', array $payloadOverrides = []): array
     {
         $email = "owner@{$tenantSlug}.test";
         $auth = $this->registerTenant($tenantSlug, $email);
         $branch = Branch::query()->where('tenant_id', $auth['tenant_id'])->firstOrFail();
         app(TenantContext::class)->set($auth['tenant_id']);
         app(BranchContext::class)->set($branch->id);
-        app(EntitlementGrantService::class)->grant(Tenant::findOrFail($auth['tenant_id']), 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::ADDON, now('UTC')->subMinute(), null, 'purchase-draft-builder-test', (string) \Illuminate\Support\Str::uuid());
+        $entitlementGroup = (string) \Illuminate\Support\Str::uuid();
+        app(EntitlementGrantService::class)->grant(Tenant::findOrFail($auth['tenant_id']), 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::ADDON, now('UTC')->subMinute(), null, 'purchase-draft-builder-test', (string) \Illuminate\Support\Str::uuid(), $entitlementGroup);
         $actor = \App\Models\User::query()->where('tenant_id', $auth['tenant_id'])->where('email', $email)->firstOrFail();
         $partner = Partner::create(['type' => 'supplier', 'entity_type' => 'commercial', 'name' => 'مورد الاختبار', 'is_active' => true]);
         $template = UnitTemplate::create(['name' => 'قالب قطعة', 'base_unit' => 'piece', 'is_active' => true]);
@@ -519,8 +697,16 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
             'detected_language' => 'ar',
             'confidence_basis_points' => 9900,
             'normalized_payload' => [
-                'fields' => ['document_number' => 'SUP-100', 'document_date' => '2026-08-25', 'currency' => $currency, 'price_includes_tax' => $taxInclusive, 'subtotal_minor' => 10000, 'tax_amount_minor' => 1500, 'total_amount_minor' => 11500],
-                'lines' => [['description' => 'صنف الاختبار', 'quantity' => $quantity, 'unit_price_minor' => $taxInclusive ? 11500 : 10000, 'discount_minor' => 0, 'tax_amount_minor' => 1500, 'total_minor' => 11500, 'tax_rate' => '15', 'unit' => 'piece']],
+                'fields' => array_merge([
+                    'document_number' => 'SUP-100', 'document_date' => '2026-08-25', 'currency' => $currency,
+                    'price_includes_tax' => $taxInclusive, 'subtotal_minor' => 10000,
+                    'tax_amount_minor' => 1500, 'total_amount_minor' => 11500,
+                ], $payloadOverrides['fields'] ?? []),
+                'lines' => [array_merge([
+                    'description' => 'صنف الاختبار', 'quantity' => $quantity,
+                    'unit_price_minor' => $taxInclusive ? 11500 : 10000, 'discount_minor' => 0,
+                    'tax_amount_minor' => 1500, 'total_minor' => 11500, 'tax_rate' => '15', 'unit' => 'piece',
+                ], $payloadOverrides['line'] ?? [])],
             ],
             'extracted_at' => now('UTC'),
         ]);
@@ -534,7 +720,7 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
         $token = $auth['token'];
         $tenant_id = $auth['tenant_id'];
 
-        return compact('batch', 'actor', 'partner', 'product', 'warehouse', 'result', 'token', 'tenant_id');
+        return compact('batch', 'actor', 'partner', 'product', 'warehouse', 'result', 'token', 'tenant_id', 'entitlementGroup');
     }
 
     private function confirmedMatch(DocumentBatch $batch, DocumentExtractionResult $result, string $subjectType, string $subjectKey, string $matchedType, string $matchedId): void
