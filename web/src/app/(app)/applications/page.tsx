@@ -3,7 +3,9 @@
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { CircleAlert, Clock3, LayoutGrid, LockKeyhole, Search, ShieldCheck } from 'lucide-react';
+import { CircleAlert, Clock3, LayoutGrid, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { SearchBar } from '@/components/data-explorer/search-bar';
+import { EmptyState, ErrorState, LoadingState, PageHeader, type PageAction } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -212,44 +214,86 @@ export default function ApplicationsPage() {
     { id: 'coming_soon', label: t('comingSoonBadge'), count: counts.comingSoon },
   ];
 
+  const headerActions: PageAction[] = [
+    {
+      key: 'enable-all',
+      label: t('enable'),
+      hint: `(${allEnableCandidates.length})`,
+      variant: 'outline',
+      emphasis: 'secondary',
+      disabled: allEnableCandidates.length === 0 || loading,
+      onClick: () => openAction(apps, 'enable', t('experienceTitle')),
+    },
+    {
+      key: 'disable-all',
+      label: t('disable'),
+      hint: `(${allDisableCandidates.length})`,
+      variant: 'outline',
+      emphasis: 'secondary',
+      disabled: allDisableCandidates.length === 0 || loading,
+      onClick: () => openAction(apps, 'disable', t('experienceTitle')),
+    },
+  ];
+
   if (!canManage) {
-    return <div className="space-y-5"><h1 className="text-xl font-semibold text-text">{t('title')}</h1><Card><CardContent className="flex items-center gap-3 py-8 text-sm text-muted"><ShieldCheck className="h-5 w-5 shrink-0" strokeWidth={1.7} />{t('noAccess')}</CardContent></Card></div>;
+    return (
+      <div className="space-y-5">
+        <PageHeader title={t('title')} />
+        <Card>
+          <CardContent className="flex items-center gap-3 py-8 text-sm text-muted">
+            <ShieldCheck className="h-5 w-5 shrink-0" strokeWidth={1.7} />
+            {t('noAccess')}
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted">{t('subtitle')}</p></div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={allEnableCandidates.length === 0 || loading} onClick={() => openAction(apps, 'enable', t('experienceTitle'))}>{t('enable')} <span className="ms-1 font-mono text-xs text-muted">({allEnableCandidates.length})</span></Button>
-          <Button variant="outline" disabled={allDisableCandidates.length === 0 || loading} onClick={() => openAction(apps, 'disable', t('experienceTitle'))}>{t('disable')} <span className="ms-1 font-mono text-xs text-muted">({allDisableCandidates.length})</span></Button>
-        </div>
-      </header>
+      <PageHeader title={t('title')} description={t('subtitle')} actions={headerActions} />
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            {statusTabs.map((item) => <button key={item.id} type="button" onClick={() => setStatusFilter(item.id)} aria-pressed={statusFilter === item.id} className={`rounded-md border px-3 py-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${statusFilter === item.id ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:bg-background'}`}><span className="block text-xs text-muted">{item.label}</span><span className="mt-1 block font-mono text-lg font-semibold text-text">{item.count}</span></button>)}
+      <section aria-label={t('allTab')} className="space-y-4 rounded border border-border bg-surface p-3 sm:p-4">
+        <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 sm:gap-3">
+          {statusTabs.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setStatusFilter(item.id)}
+              aria-pressed={statusFilter === item.id}
+              className={`rounded border px-3 py-2.5 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${statusFilter === item.id ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:bg-background'}`}
+            >
+              <span className="block truncate text-xs text-muted">{item.label}</span>
+              <span className="num mt-1 block text-lg font-semibold text-text">{item.count}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-border pt-4 lg:flex-row lg:items-center">
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            placeholder={t('columns.name')}
+            ariaLabel={t('columns.name')}
+            className="min-w-0 lg:flex-1"
+          />
+          <div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 lg:mx-0 lg:max-w-[55%] lg:px-0">
+            <Button size="sm" variant={groupFilter === 'all' ? 'primary' : 'outline'} onClick={() => setGroupFilter('all')}>{t('allTab')}</Button>
+            {availableGroups.map((group) => (
+              <Button key={group} size="sm" variant={groupFilter === group ? 'primary' : 'outline'} onClick={() => setGroupFilter(group)}>
+                {groupLabels[group] ?? group}
+              </Button>
+            ))}
           </div>
-          <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 lg:flex-row lg:items-center">
-            <label className="relative block min-w-0 flex-1">
-              <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" strokeWidth={1.7} aria-hidden="true" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('columns.name')} aria-label={t('columns.name')} className="h-10 w-full rounded-md border border-border bg-surface ps-9 pe-3 text-sm text-text outline-none placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20" />
-            </label>
-            <div className="flex max-w-full gap-2 overflow-x-auto pb-1 lg:max-w-[55%]">
-              <Button size="sm" variant={groupFilter === 'all' ? 'primary' : 'outline'} onClick={() => setGroupFilter('all')}>{t('allTab')}</Button>
-              {availableGroups.map((group) => <Button key={group} size="sm" variant={groupFilter === group ? 'primary' : 'outline'} onClick={() => setGroupFilter(group)}>{groupLabels[group] ?? group}</Button>)}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {loading ? (
-        <div className="space-y-3" aria-label={tc('loading')}>{[0, 1, 2].map((item) => <div key={item} className="h-28 animate-pulse rounded-md border border-border bg-surface" />)}</div>
+        <LoadingState variant="cards" rows={3} label={tc('loading')} />
       ) : loadError ? (
-        <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{loadError}</p>
+        <ErrorState message={loadError} onRetry={load} retryLabel={tc('retry')} />
       ) : groups.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border bg-surface px-4 py-12 text-center"><LayoutGrid className="mx-auto h-7 w-7 text-muted" strokeWidth={1.6} /><p className="mt-3 font-medium text-text">{t('emptyTitle')}</p></div>
+        <EmptyState icon={LayoutGrid} title={t('emptyTitle')} />
       ) : (
         <div className="space-y-4">
           {groups.map(([group, groupApps]) => {
@@ -258,25 +302,37 @@ export default function ApplicationsPage() {
             const groupDisableCandidates = groupApps.filter((app) => actionFor(app).kind === 'disable');
             const groupLabel = groupLabels[group] ?? group;
             return (
-              <section key={group} className="overflow-hidden rounded-md border border-border bg-surface">
+              <section key={group} className="overflow-hidden rounded border border-border bg-surface">
                 <div className="flex flex-col gap-3 border-b border-border bg-background/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div><h2 className="font-semibold text-text">{groupLabel}</h2><p className="mt-0.5 text-xs text-muted"><span className="font-mono">{groupEnabled}</span> / <span className="font-mono">{groupApps.length}</span> {t('enabledBadge')}</p></div>
-                  <div className="flex gap-2"><Button size="sm" variant="outline" disabled={groupEnableCandidates.length === 0} onClick={() => openAction(groupApps, 'enable', groupLabel)}>{t('enable')}</Button><Button size="sm" variant="outline" disabled={groupDisableCandidates.length === 0} onClick={() => openAction(groupApps, 'disable', groupLabel)}>{t('disable')}</Button></div>
+                  <div>
+                    <h2 className="font-semibold text-text">{groupLabel}</h2>
+                    <p className="mt-0.5 text-xs text-muted">
+                      <span className="num">{groupEnabled}</span> / <span className="num">{groupApps.length}</span> {t('enabledBadge')}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" disabled={groupEnableCandidates.length === 0} onClick={() => openAction(groupApps, 'enable', groupLabel)}>{t('enable')}</Button>
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" disabled={groupDisableCandidates.length === 0} onClick={() => openAction(groupApps, 'disable', groupLabel)}>{t('disable')}</Button>
+                  </div>
                 </div>
                 <div className="divide-y divide-border">
                   {groupApps.map((app) => {
                     const action = actionFor(app);
                     return (
-                      <article key={app.key} className={`flex min-h-[72px] items-center justify-between gap-4 px-4 py-3 ${app.maturity !== 'built' ? 'opacity-70' : ''}`}>
+                      <article key={app.key} className={`flex items-start justify-between gap-3 px-4 py-3 sm:min-h-[72px] sm:items-center sm:gap-4 ${app.maturity !== 'built' ? 'opacity-70' : ''}`}>
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2"><h3 className="font-medium text-text">{labelFor(app.key)}</h3>{operationalBadge(app)}{commercialBadge(app)}</div>
-                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <h3 className="font-medium text-text">{labelFor(app.key)}</h3>
+                            {operationalBadge(app)}
+                            {commercialBadge(app)}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-relaxed text-muted">
                             {app.dependencies.length > 0 && <span>{t('columns.dependencies')}: {app.dependencies.map(labelFor).join('، ')}</span>}
                             {app.reason && app.status === 'suspended' && <span>{app.reason}</span>}
                             {action.kind === 'blocked' && <span>{t(`actions.blocked.${action.reason}`)}</span>}
                           </div>
                         </div>
-                        <div className="shrink-0"><ApplicationSwitch app={app} /></div>
+                        <div className="shrink-0 pt-0.5 sm:pt-0"><ApplicationSwitch app={app} /></div>
                       </article>
                     );
                   })}
@@ -287,13 +343,13 @@ export default function ApplicationsPage() {
         </div>
       )}
 
-      <div role="status" aria-atomic="true" className="flex items-center gap-2 text-xs text-muted"><CircleAlert className="h-4 w-4 shrink-0" strokeWidth={1.6} />{t('securityNotice')}</div>
+      <div role="status" aria-atomic="true" className="flex items-start gap-2 text-xs leading-relaxed text-muted"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.6} />{t('securityNotice')}</div>
 
       <Dialog open={dialog !== null} onClose={() => !acting && setDialog(null)} title={dialog ? t(dialog.mode === 'enable' ? 'enableTitle' : 'disableTitle', { name: dialog.label }) : ''}>
         {dialog && <div className="space-y-4">
-          {dialog.apps.length > 1 && <p className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted"><span className="font-mono font-semibold text-text">{dialog.apps.length}</span> {t('experienceTitle')}</p>}
+          {dialog.apps.length > 1 && <p className="rounded border border-border bg-background px-3 py-2 text-sm text-muted"><span className="num font-semibold text-text">{dialog.apps.length}</span> {t('experienceTitle')}</p>}
           <div className="space-y-1.5"><Label htmlFor="application-reason">{t('reasonLabel')}</Label><Textarea id="application-reason" value={reason} onChange={(event) => setReason(event.target.value)} /></div>
-          {dialogError && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-xs text-negative">{dialogError}</p>}
+          {dialogError && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{dialogError}</p>}
           <div className="flex justify-end gap-2"><Button variant="outline" disabled={acting} onClick={() => setDialog(null)}>{tc('cancel')}</Button><Button disabled={acting} onClick={confirmAction}>{acting ? <><Clock3 className="me-2 h-4 w-4 animate-spin" />{tc('loading')}</> : t(dialog.mode === 'enable' ? 'enable' : 'disable')}</Button></div>
         </div>}
       </Dialog>

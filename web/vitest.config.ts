@@ -7,6 +7,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // Next.js يبني بـ automatic JSX runtime؛ توحيد الاختبارات معه يجعل أي مكوّن
+  // مشترك قابلاً للعرض في jsdom دون أن يشترط استيراد React صراحةً.
+  esbuild: { jsx: 'automatic' },
   test: {
     environment: 'node',
     environmentMatchGlobs: [

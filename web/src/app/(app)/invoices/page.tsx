@@ -1,19 +1,17 @@
 'use client';
-import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
-import { DataExplorerToolbar } from '@/components/data-explorer/data-explorer-toolbar';
+import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
@@ -63,6 +61,18 @@ const payTone: Record<string, 'positive' | 'warning' | 'muted'> = {
   partial: 'warning',
   unpaid: 'muted',
 };
+
+const sortOptions: SortOption[] = [
+  { value: '-invoice_date', label: 'الأحدث أولًا' },
+  { value: 'invoice_date', label: 'الأقدم أولًا' },
+  { value: '-due_date', label: 'الاستحقاق الأبعد' },
+  { value: 'due_date', label: 'الاستحقاق الأقرب' },
+  { value: '-total', label: 'الإجمالي: الأعلى' },
+  { value: 'total', label: 'الإجمالي: الأقل' },
+  { value: '-remaining', label: 'المتبقي: الأعلى' },
+  { value: 'remaining', label: 'المتبقي: الأقل' },
+  { value: 'number', label: 'رقم الفاتورة' },
+];
 
 function isEmptyFilter(filter: ActiveFilter): boolean {
   return Array.isArray(filter.value)
@@ -240,6 +250,36 @@ export default function InvoicesPage() {
     }
   }
 
+  const rowActions = useCallback((invoice: Invoice) => {
+    const isDraft = invoice.status === 'draft';
+    return (
+      <>
+        <Button asChild variant="ghost" size="icon" aria-label={t('view')}>
+          <Link href={`/invoices/${invoice.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link>
+        </Button>
+        {isDraft ? (
+          <Button asChild variant="ghost" size="icon" aria-label={t('edit')} title={t('edit')}>
+            <Link href={`/invoices/${invoice.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
+          </Button>
+        ) : (
+          <Button variant="ghost" size="icon" aria-label={t('edit')} disabled title={t('posted_locked')}>
+            <Pencil className="h-4 w-4" strokeWidth={1.7} />
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('delete')}
+          disabled={!isDraft}
+          title={isDraft ? t('delete') : t('posted_locked')}
+          onClick={() => setToDelete(invoice)}
+        >
+          <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
+        </Button>
+      </>
+    );
+  }, [t]);
+
   const columns = useMemo<ColumnDef<Invoice, unknown>[]>(() => [
     {
       accessorKey: 'number', header: t('number'), enableSorting: false,
@@ -272,107 +312,89 @@ export default function InvoicesPage() {
     },
     {
       id: 'actions', header: '', enableSorting: false,
-      cell: ({ row }) => {
-        const inv = row.original;
-        const isDraft = inv.status === 'draft';
-        return (
-          <div className="flex items-center justify-end gap-0.5">
-            <Button asChild variant="ghost" size="icon" aria-label={t('view')}><Link href={`/invoices/${inv.id}`}>
-              <Eye className="h-4 w-4" strokeWidth={1.7} />
-            </Link></Button>
-            {isDraft ? (
-              <Button asChild variant="ghost" size="icon" aria-label={t('edit')} title={t('edit')}>
-                <Link href={`/invoices/${inv.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
-              </Button>
-            ) : (
-              <Button variant="ghost" size="icon" aria-label={t('edit')} disabled title={t('posted_locked')}>
-                <Pencil className="h-4 w-4" strokeWidth={1.7} />
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" aria-label={t('delete')} disabled={!isDraft} title={isDraft ? t('delete') : t('posted_locked')} onClick={() => setToDelete(inv)}>
-              <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
-            </Button>
-          </div>
-        );
-      },
+      cell: ({ row }) => <div className="flex items-center justify-end gap-0.5">{rowActions(row.original)}</div>,
     },
-  ], [partnerNames, router, t, ts]);
+  ], [partnerNames, rowActions, t, ts]);
+
+  const headerActions: PageAction[] = [
+    { key: 'create', label: t('create'), icon: Plus, href: '/invoices/new', variant: 'primary' },
+  ];
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <BranchViewToggle value={view} onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }} />
-        <Button asChild className="ms-auto">
-          <Link href="/invoices/new"><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create')}</Link>
-        </Button>
-      </div>
+      <PageHeader
+        title={t('title')}
+        context={
+          <BranchViewToggle
+            value={view}
+            onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }}
+          />
+        }
+        actions={headerActions}
+      />
 
-      <div className="rounded border border-border bg-surface p-3 sm:p-4">
-        <DataExplorerToolbar
-          search={searchInput}
-          onSearchChange={setSearchInput}
-          searchPlaceholder="ابحث برقم الفاتورة، العميل أو مرجع الدفع"
-          definitions={definitions}
-          filters={labelledFilters}
-          onFilterChange={updateFilter}
-          onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
-          onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
-          onOpenAdvanced={() => setAdvancedOpen(true)}
-          resultCount={meta.total}
-        />
+      <ListToolbar
+        search={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="ابحث برقم الفاتورة، العميل أو مرجع الدفع"
+        searchLabel={t('title')}
+        definitions={definitions}
+        filters={labelledFilters}
+        onFilterChange={updateFilter}
+        onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
+        onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
+        onOpenAdvanced={() => setAdvancedOpen(true)}
+        sort={{
+          value: explorer.sort ?? '-invoice_date',
+          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+          options: sortOptions,
+          label: 'ترتيب الفواتير',
+        }}
+        resultCount={meta.total}
+        countUnit="فاتورة"
+      />
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <span className="text-xs text-muted">ترتيب حسب</span>
-          <Select
-            value={explorer.sort ?? '-invoice_date'}
-            onChange={(event) => setExplorer((current) => ({ ...current, page: 1, sort: event.target.value }))}
-            className="h-9 min-w-44 bg-surface text-sm"
-            aria-label="ترتيب الفواتير"
-          >
-            <option value="-invoice_date">الأحدث أولًا</option>
-            <option value="invoice_date">الأقدم أولًا</option>
-            <option value="-due_date">الاستحقاق الأبعد</option>
-            <option value="due_date">الاستحقاق الأقرب</option>
-            <option value="-total">الإجمالي: الأعلى</option>
-            <option value="total">الإجمالي: الأقل</option>
-            <option value="-remaining">المتبقي: الأعلى</option>
-            <option value="remaining">المتبقي: الأقل</option>
-            <option value="number">رقم الفاتورة</option>
-          </Select>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={invoices}
+        loading={loading}
+        error={error}
+        onRetry={load}
+        retryLabel={t('retry')}
+        emptyLabel={t('empty')}
+        exportName="invoices"
+        showToolbar={false}
+        mobileRecord={(invoice) => ({
+          title: (
+            <Link href={`/invoices/${invoice.id}`} className="num text-primary hover:underline">
+              {invoice.number}
+            </Link>
+          ),
+          subtitle: partnerNames[invoice.partner_id] ?? '—',
+          amountLabel: t('total'),
+          amount: formatRiyal(invoice.total),
+          secondary: { label: 'المتبقي', value: formatRiyal(invoice.remaining) },
+          status: (
+            <>
+              <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
+              <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
+            </>
+          ),
+          meta: invoice.invoice_date,
+          actions: rowActions(invoice),
+        })}
+      />
 
-      {error ? (
-        <div className="rounded border border-border bg-surface p-8 text-center">
-          <p className="text-sm text-negative">{error}</p>
-          <Button variant="outline" className="mt-3" onClick={load}>{t('retry')}</Button>
-        </div>
-      ) : (
-        <DataTable columns={columns} data={invoices} loading={loading} emptyLabel={t('empty')} exportName="invoices" showToolbar={false} />
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted">صفحة {meta.current_page.toLocaleString(ARABIC_DISPLAY_LOCALE)} من {meta.last_page.toLocaleString(ARABIC_DISPLAY_LOCALE)}</p>
-        <div className="flex items-center gap-2">
-          <Select
-            value={String(explorer.perPage ?? 25)}
-            onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))}
-            className="h-9 w-24 bg-surface text-sm"
-            aria-label="عدد النتائج في الصفحة"
-          >
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </Select>
-          <Button variant="outline" size="icon" aria-label="الصفحة السابقة" disabled={loading || meta.current_page <= 1} onClick={() => setExplorer((current) => ({ ...current, page: Math.max(1, (current.page ?? 1) - 1) }))}>
-            <ChevronRight className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
-          <Button variant="outline" size="icon" aria-label="الصفحة التالية" disabled={loading || meta.current_page >= meta.last_page} onClick={() => setExplorer((current) => ({ ...current, page: Math.min(meta.last_page, (current.page ?? 1) + 1) }))}>
-            <ChevronLeft className="h-4 w-4" strokeWidth={1.7} />
-          </Button>
-        </div>
-      </div>
+      <Pagination
+        page={meta.current_page}
+        lastPage={meta.last_page}
+        perPage={explorer.perPage ?? 25}
+        total={meta.total}
+        totalUnit="فاتورة"
+        disabled={loading}
+        onPageChange={(page) => setExplorer((current) => ({ ...current, page }))}
+        onPerPageChange={(perPage) => setExplorer((current) => ({ ...current, page: 1, perPage }))}
+      />
 
       <AdvancedFilterDialog
         open={advancedOpen}
