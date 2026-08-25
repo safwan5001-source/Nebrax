@@ -10,10 +10,11 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowUp, ArrowDown, ChevronsUpDown, Search, Download, Inbox } from 'lucide-react';
+import { ArrowUp, ArrowDown, ChevronsUpDown, Search, Download } from 'lucide-react';
 import { Table, THead, TBody, TR, TH, TD } from './ui/table';
 import { Button } from './ui/button';
-import { Skeleton } from './ui/skeleton';
+import { EmptyState, ErrorState, LoadingState } from './nebrax/states';
+import { MobileRecordItem, type MobileRecord } from './nebrax/mobile-record';
 import { toCsv, downloadCsv } from '@/lib/export';
 import { cn } from '@/lib/utils';
 
@@ -23,10 +24,22 @@ interface DataTableProps<T> {
   loading?: boolean;
   searchPlaceholder?: string;
   emptyLabel?: string;
+  emptyDescription?: string;
+  emptyAction?: React.ReactNode;
   exportName?: string;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   showToolbar?: boolean;
+  /**
+   * هرم سجلّ الجوال. حين يُمرَّر، تعرض الشاشات دون `md` بطاقة مرتّبة بالأهمية
+   * بدل إسقاط كل خلية جدول كسطر «تسمية: قيمة». وحين لا يُمرَّر يبقى السلوك
+   * القديم كما هو، فلا تتأثر عشرات الشاشات التي لم تُهاجر بعد.
+   */
+  mobileRecord?: (row: T) => MobileRecord;
+  /** رسالة فشل الجلب — تُعرض مكان الجدول بحالة خطأ موحّدة. */
+  error?: string | null;
+  onRetry?: () => void;
+  retryLabel?: string;
 }
 
 export function DataTable<T>({
@@ -35,10 +48,16 @@ export function DataTable<T>({
   loading,
   searchPlaceholder,
   emptyLabel,
+  emptyDescription,
+  emptyAction,
   exportName,
   searchValue,
   onSearchChange,
   showToolbar = true,
+  mobileRecord,
+  error,
+  onRetry,
+  retryLabel,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [internalGlobalFilter, setInternalGlobalFilter] = useState('');
@@ -101,17 +120,12 @@ export function DataTable<T>({
         </div>
       ) : null}
 
-      {loading ? (
-        <div className="space-y-2 p-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 w-full" />
-          ))}
-        </div>
+      {error ? (
+        <ErrorState message={error} onRetry={onRetry} retryLabel={retryLabel} surface="bare" />
+      ) : loading ? (
+        <LoadingState surface="bare" />
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted">
-          <Inbox className="h-8 w-8 opacity-60" strokeWidth={1.5} />
-          <p className="text-sm">{emptyLabel}</p>
-        </div>
+        <EmptyState title={emptyLabel ?? 'لا توجد نتائج'} description={emptyDescription} action={emptyAction} surface="bare" />
       ) : (
         <>
           <div className="hidden md:block">
@@ -167,21 +181,27 @@ export function DataTable<T>({
           </div>
 
           <ul className="divide-y divide-border md:hidden">
-            {rows.map((row) => (
-              <li key={row.id} className="flex flex-col gap-1.5 p-3.5">
-                {row.getVisibleCells().map((cell) => {
-                  const header = headerLabels[cell.column.id];
-                  return (
-                    <div key={cell.id} className="flex items-baseline justify-between gap-3">
-                      {header ? <span className="shrink-0 text-xs text-muted">{header}</span> : <span />}
-                      <span className="min-w-0 text-end text-sm">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </span>
-                    </div>
-                  );
-                })}
-              </li>
-            ))}
+            {rows.map((row) =>
+              mobileRecord ? (
+                <li key={row.id}>
+                  <MobileRecordItem record={mobileRecord(row.original)} />
+                </li>
+              ) : (
+                <li key={row.id} className="flex flex-col gap-1.5 p-3.5">
+                  {row.getVisibleCells().map((cell) => {
+                    const header = headerLabels[cell.column.id];
+                    return (
+                      <div key={cell.id} className="flex items-baseline justify-between gap-3">
+                        {header ? <span className="shrink-0 text-xs text-muted">{header}</span> : <span />}
+                        <span className="min-w-0 text-end text-sm">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </li>
+              )
+            )}
           </ul>
         </>
       )}
