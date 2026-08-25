@@ -9,7 +9,7 @@ type DemoField = {
 type DemoState = {
   version: number;
   status: string;
-  purchaseDraft: { purchase_id: string; purchase_number: string; status: string; url: string } | null;
+  linkedPurchase: { link_id: string; transaction_type: string; transaction_id: string; transaction_number: string; status: string; url: string } | null;
   fields: DemoField[];
   matches: Array<{
     id: string;
@@ -57,7 +57,7 @@ function initialState(): DemoState {
   return {
     version: 7,
     status: 'needs_review',
-    purchaseDraft: null,
+    linkedPurchase: null,
     fields: [
       { key: 'document_number', original: 'PI-2084', current: 'PI-2084', confidence_basis_points: 9800, page: 1 },
       { key: 'document_date', original: '2026-08-22', current: '2026-08-22', confidence_basis_points: 9500, page: 1 },
@@ -193,7 +193,7 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
           matches: state.matches,
           issues: state.issues,
           history: state.history,
-          purchase_draft: state.purchaseDraft,
+          linked_purchase: state.linkedPurchase,
           capabilities: { view: true, review: true, manage: true, build_draft: true },
         },
       },
@@ -271,8 +271,8 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
   }
 
   if (method === 'POST' && createDraftMatch) {
-    if (state.purchaseDraft) {
-      return { handled: true, response: { data: { ...state.purchaseDraft, transaction_type: 'purchase', idempotent_replay: true } } };
+    if (state.linkedPurchase) {
+      return { handled: true, response: { data: { ...state.linkedPurchase, idempotent_replay: true } } };
     }
     if (!validVersion(requestBody)) return { handled: true, error: staleError() };
     if (state.status !== 'ready_for_draft') return { handled: true, error: new Error('review_not_ready') };
@@ -280,15 +280,17 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
 
     state.status = 'draft_created';
     state.version += 1;
-    state.purchaseDraft = {
-      purchase_id: 'demo-purchase-draft-001',
-      purchase_number: 'PUR-DRAFT-2084',
+    state.linkedPurchase = {
+      link_id: 'demo-link-purchase-001',
+      transaction_type: 'purchase',
+      transaction_id: 'demo-purchase-draft-001',
+      transaction_number: 'PUR-DRAFT-2084',
       status: 'draft',
       url: '/purchases/demo-purchase-draft-001',
     };
-    addHistory('purchase_draft_created', String(requestBody.reason), { status: 'ready_for_draft' }, { status: state.status, purchase_id: state.purchaseDraft.purchase_id });
+    addHistory('purchase_draft_created', String(requestBody.reason), { status: 'ready_for_draft' }, { status: state.status, transaction_id: state.linkedPurchase.transaction_id });
 
-    return { handled: true, response: { data: { ...state.purchaseDraft, transaction_type: 'purchase', idempotent_replay: false } } };
+    return { handled: true, response: { data: { ...state.linkedPurchase, idempotent_replay: false } } };
   }
 
   if (method === 'POST' && completeMatch) {

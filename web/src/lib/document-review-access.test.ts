@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canBuildPurchaseDraft, canViewDocumentCenter } from './document-review-access';
+import { canBuildPurchaseDraft, canViewDocumentCenter, linkedPurchasePresentation } from './document-review-access';
 
 describe('Document Center sidebar access', () => {
   it('shows the entry only for an explicit view permission or an administrative fallback role', () => {
@@ -14,14 +14,22 @@ describe('Purchase draft action access', () => {
     canBuildDraft: true,
     documentType: 'purchase_invoice',
     status: 'ready_for_draft',
-    hasPurchaseDraft: false,
+    hasLinkedPurchase: false,
   };
 
-  it('shows the creation action only for a ready purchase invoice with the distinct permission', () => {
+  it('shows the creation action only for a ready purchase invoice with the distinct permission and no existing link', () => {
     expect(canBuildPurchaseDraft(readyPurchase)).toBe(true);
     expect(canBuildPurchaseDraft({ ...readyPurchase, canBuildDraft: false })).toBe(false);
     expect(canBuildPurchaseDraft({ ...readyPurchase, status: 'needs_review' })).toBe(false);
     expect(canBuildPurchaseDraft({ ...readyPurchase, documentType: 'sales_invoice' })).toBe(false);
-    expect(canBuildPurchaseDraft({ ...readyPurchase, hasPurchaseDraft: true })).toBe(false);
+    expect(canBuildPurchaseDraft({ ...readyPurchase, hasLinkedPurchase: true })).toBe(false);
+  });
+});
+
+describe('Linked purchase presentation', () => {
+  it('keeps the action and badge truthful after the purchase changes state', () => {
+    expect(linkedPurchasePresentation('draft')).toEqual({ action: 'draft', badge: 'draft' });
+    expect(linkedPurchasePresentation('posted')).toEqual({ action: 'posted', badge: 'posted' });
+    expect(linkedPurchasePresentation('cancelled')).toEqual({ action: 'cancelled', badge: 'cancelled' });
   });
 });

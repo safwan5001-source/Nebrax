@@ -130,7 +130,11 @@ class PurchaseController extends ApiController
 
     public function show(Request $request, string $id): JsonResponse
     {
-        return (new PurchaseResource($this->visiblePurchase($request, $id)->load(['lines', 'attachments', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
+        $purchase = $this->visiblePurchase($request, $id)
+            ->load(['lines', 'attachments', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])
+            ->loadCount('documentTransactionLinks');
+
+        return (new PurchaseResource($purchase))->response();
     }
 
     /** قائمة مرفقات فاتورة المورد ضمن نطاق الفرع المسموح. */

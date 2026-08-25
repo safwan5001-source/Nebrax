@@ -57,6 +57,15 @@ test.describe('مساحة مراجعة المستند في وضع المعاين
     await page.getByRole('button', { name: 'إكمال المراجعة' }).last().click();
     await openSection(page, 'التفاصيل');
     await expect(page.locator('span:visible').filter({ hasText: 'جاهزة للمسودة' }).first()).toBeVisible();
+
+    const createDraft = page.getByRole('button', { name: 'إنشاء مسودة مشتريات' });
+    await expect(createDraft).toBeVisible();
+    await createDraft.click();
+    await fillDecision(page, 'إنشاء مسودة مشتريات من الدليل المراجع.');
+    await page.getByRole('button', { name: 'إنشاء مسودة مشتريات' }).last().click();
+    await expect(page.getByRole('link', { name: /فتح مسودة المشتريات PUR-DRAFT-2084/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'إكمال المراجعة' })).toHaveCount(0);
+
     await openSection(page, 'السجل');
     await expect(page.locator('p:visible').filter({ hasText: 'اكتملت المراجعة البشرية.' }).first()).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();

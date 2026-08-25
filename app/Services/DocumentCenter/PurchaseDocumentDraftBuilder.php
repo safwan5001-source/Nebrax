@@ -2,6 +2,8 @@
 
 namespace App\Services\DocumentCenter;
 
+use App\Contracts\CreatedDraftReference;
+use App\Contracts\DraftBuildContext;
 use App\Contracts\TransactionDraftBuilder;
 use App\Models\CostCenter;
 use App\Models\DocumentBatch;
@@ -31,12 +33,15 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
     ) {
     }
 
-    /** @return array{link_id:string,purchase_id:string,purchase_number:string,status:string,idempotent_replay:bool} */
-    public function build(DocumentBatch $batch, int $expectedVersion, string $reason, ?string $warehouseId, ?string $costCenterId, ?string $actorId): array
+    public function build(DocumentBatch $batch, DraftBuildContext $context): CreatedDraftReference
     {
-        return DB::transaction(function () use ($batch, $expectedVersion, $reason, $warehouseId, $costCenterId, $actorId): array {
+        if (! $context->options instanceof PurchaseDraftBuildOptions) {
+            throw ValidationException::withMessages(['options' => 'Purchase draft options are required.']);
+        }
+
+        return DB::transaction(function () use ($batch, $context): CreatedDraftReference {
             $batch = DocumentBatch::query()->whereKey($batch->id)->lockForUpdate()->firstOrFail();
-            $reason = $this->reason($reason);
+            $reason = $this->reason($context->reason);
             $existing = DocumentTransactionLink::query()
                 ->where('document_batch_id', $batch->id)
                 ->where('transaction_type', 'purchase')
@@ -46,7 +51,7 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
                 return $this->replay($batch, $existing);
             }
 
-            if ($batch->version !== $expectedVersion) {
+            if ($batch->version !== $context->expectedVersion) {
                 throw new StaleDocumentReviewVersion();
             }
             if ($batch->document_type !== 'purchase_invoice' || $batch->status !== DocumentWorkflowStatus::READY_FOR_DRAFT) {
@@ -60,10 +65,10 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
                 ->firstOrFail();
             $this->readiness->assertReady($batch, $result);
             $reviewed = $this->projector->project($result);
-            $actor = $this->actor($actorId, $batch);
-            $warehouse = $this->warehouse($warehouseId, $batch, $actor);
-            $costCenter = $this->costCenter($costCenterId);
-            $data = $this->header($reviewed, $batch, $warehouse, $costCenter?->id, $actor->id);
+            $actor = $this->actor($context->actorId, $batch);
+            $warehouse = $this->warehouse($context->options->warehouseId, $batch, $actor);
+            $costCenter = $this->costCenter($context->options->costCenterId);
+            $data = $this->header($result, $reviewed, $batch, $warehouse, $costCenter?->id, $actor->id);
             $items = $this->items($result, $reviewed);
 
             $creating = $this->workflow->transition(
@@ -113,19 +118,21 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
         }, 3);
     }
 
-    /** @return array{link_id:string,purchase_id:string,purchase_number:string,status:string,idempotent_replay:bool} */
-    private function replay(DocumentBatch $batch, DocumentTransactionLink $link): array
+    private function replay(DocumentBatch $batch, DocumentTransactionLink $link): CreatedDraftReference
     {
         $purchase = Purchase::query()->whereKey($link->transaction_id)->lockForUpdate()->first();
-        if ($batch->status !== DocumentWorkflowStatus::DRAFT_CREATED || $link->status !== 'created' || $purchase === null || $purchase->status !== 'draft') {
-            throw ValidationException::withMessages(['batch' => 'The existing purchase draft link is inconsistent and cannot be replayed.']);
+        if ($batch->status !== DocumentWorkflowStatus::DRAFT_CREATED
+            || $link->status !== 'created'
+            || $purchase === null
+            || ! in_array($purchase->status, ['draft', 'posted', 'cancelled'], true)) {
+            throw ValidationException::withMessages(['batch' => 'The existing purchase transaction link is inconsistent and cannot be replayed.']);
         }
 
         return $this->response($link, $purchase, true);
     }
 
     /** @param array<string,mixed> $reviewed @return array<string,mixed> */
-    private function header(array $reviewed, DocumentBatch $batch, Warehouse $warehouse, ?string $costCenterId, ?string $actorId): array
+    private function header(DocumentExtractionResult $result, array $reviewed, DocumentBatch $batch, Warehouse $warehouse, ?string $costCenterId, ?string $actorId): array
     {
         $fields = is_array($reviewed['fields'] ?? null) ? $reviewed['fields'] : [];
         $currency = strtoupper((string) ($fields['currency'] ?? ''));
@@ -137,7 +144,7 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
         }
 
         return [
-            'partner_id' => $this->partnerId($batch),
+            'partner_id' => $this->partnerId($result),
             'warehouse_id' => $warehouse->id,
             'cost_center_id' => $costCenterId,
             'purchase_date' => $fields['document_date'],
@@ -178,9 +185,9 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
         }, $lines, array_keys($lines));
     }
 
-    private function partnerId(DocumentBatch $batch): string
+    private function partnerId(DocumentExtractionResult $result): string
     {
-        $match = $this->confirmedMatchForBatch($batch, 'header.counterparty');
+        $match = $this->confirmedMatch($result, 'header.counterparty');
         if ($match->matched_type !== 'partner') {
             throw ValidationException::withMessages(['matches' => 'Confirmed counterparty match is not a supplier.']);
         }
@@ -220,16 +227,6 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
         }
 
         return $name;
-    }
-
-    private function confirmedMatchForBatch(DocumentBatch $batch, string $key): DocumentMatchResult
-    {
-        return DocumentMatchResult::query()
-            ->where('document_batch_id', $batch->id)
-            ->where('subject_key', $key)
-            ->where('status', 'confirmed')
-            ->lockForUpdate()
-            ->sole();
     }
 
     private function confirmedMatch(DocumentExtractionResult $result, string $key): DocumentMatchResult
@@ -343,15 +340,15 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
         return $reason;
     }
 
-    /** @return array{link_id:string,purchase_id:string,purchase_number:string,status:string,idempotent_replay:bool} */
-    private function response(DocumentTransactionLink $link, Purchase $purchase, bool $replay): array
+    private function response(DocumentTransactionLink $link, Purchase $purchase, bool $replay): CreatedDraftReference
     {
-        return [
-            'link_id' => $link->id,
-            'purchase_id' => $purchase->id,
-            'purchase_number' => $purchase->number,
-            'status' => $purchase->status,
-            'idempotent_replay' => $replay,
-        ];
+        return new CreatedDraftReference(
+            linkId: $link->id,
+            transactionType: $link->transaction_type,
+            transactionId: $purchase->id,
+            transactionNumber: $purchase->number,
+            status: $purchase->status,
+            idempotentReplay: $replay,
+        );
     }
 }

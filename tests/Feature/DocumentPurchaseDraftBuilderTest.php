@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\DraftBuildContext;
 use App\Models\Branch;
 use App\Models\CostCenter;
 use App\Models\DocumentBatch;
@@ -14,12 +15,15 @@ use App\Models\DocumentProviderAttempt;
 use App\Models\DocumentTransactionLink;
 use App\Models\Partner;
 use App\Models\Product;
+use App\Models\Purchase;
 use App\Models\Tenant;
 use App\Models\Warehouse;
 use App\Models\UnitTemplate;
 use App\Services\DocumentCenter\DocumentReviewMutationGate;
 use App\Services\DocumentCenter\DocumentWorkflowService;
 use App\Services\DocumentCenter\PurchaseDocumentDraftBuilder;
+use App\Services\DocumentCenter\PurchaseDraftBuildOptions;
+use App\Services\Accounting\PurchaseService;
 use App\Services\EntitlementGrantService;
 use App\Support\DocumentProcessingStatus;
 use App\Support\DocumentScanStatus;
@@ -62,11 +66,11 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
             ->assertJsonPath('data.idempotent_replay', false)
             ->assertJsonMissing(['object_key' => "fixtures/purchase-draft-builder/purchase.pdf"]);
 
-        $purchaseId = $created->json('data.purchase_id');
+        $purchaseId = $created->json('data.transaction_id');
         $this->assertIsString($purchaseId);
         $this->withToken($fixture['token'])->postJson("/api/document-batches/{$fixture['batch']->id}/create-purchase-draft", $payload)
             ->assertOk()
-            ->assertJsonPath('data.purchase_id', $purchaseId)
+            ->assertJsonPath('data.transaction_id', $purchaseId)
             ->assertJsonPath('data.idempotent_replay', true);
         $this->assertDatabaseCount('purchases', 1);
         $this->assertDatabaseCount('document_transaction_links', 1);
@@ -92,17 +96,10 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
     {
         $fixture = $this->readyFixture('1', 'purchase-draft-builder', true);
 
-        $created = app(PurchaseDocumentDraftBuilder::class)->build(
-            $fixture['batch'],
-            $fixture['batch']->version,
-            'إنشاء مسودة شاملة الضريبة من الدليل المراجع.',
-            $fixture['warehouse']->id,
-            null,
-            $fixture['actor']->id,
-        );
+        $created = $this->buildDraft($fixture, 'إنشاء مسودة شاملة الضريبة من الدليل المراجع.');
 
         $this->assertDatabaseHas('purchases', [
-            'id' => $created['purchase_id'],
+            'id' => $created->transactionId,
             'tax_inclusive' => true,
             'subtotal' => 10000,
             'tax_amount' => 1500,
@@ -115,21 +112,13 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
     public function it_builds_one_purchase_draft_from_confirmed_review_evidence_without_posting_or_stock_effect(): void
     {
         $fixture = $this->readyFixture();
-        $builder = app(PurchaseDocumentDraftBuilder::class);
 
-        $created = $builder->build(
-            $fixture['batch'],
-            $fixture['batch']->version,
-            'إنشاء مسودة مشتريات من الدليل المراجع.',
-            $fixture['warehouse']->id,
-            null,
-            $fixture['actor']->id,
-        );
+        $created = $this->buildDraft($fixture, 'إنشاء مسودة مشتريات من الدليل المراجع.');
 
-        $this->assertSame('draft', $created['status']);
-        $this->assertFalse($created['idempotent_replay']);
+        $this->assertSame('draft', $created->status);
+        $this->assertFalse($created->idempotentReplay);
         $this->assertDatabaseHas('purchases', [
-            'id' => $created['purchase_id'],
+            'id' => $created->transactionId,
             'partner_id' => $fixture['partner']->id,
             'warehouse_id' => $fixture['warehouse']->id,
             'status' => 'draft',
@@ -139,7 +128,7 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
             'received_status' => 'pending',
         ]);
         $this->assertDatabaseHas('purchase_lines', [
-            'purchase_id' => $created['purchase_id'],
+            'purchase_id' => $created->transactionId,
             'product_id' => $fixture['product']->id,
             'quantity' => 1,
             'unit_price' => 10000,
@@ -149,7 +138,7 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
         $this->assertDatabaseHas('document_transaction_links', [
             'document_batch_id' => $fixture['batch']->id,
             'transaction_type' => 'purchase',
-            'transaction_id' => $created['purchase_id'],
+            'transaction_id' => $created->transactionId,
             'status' => 'created',
         ]);
         $this->assertDatabaseHas('document_batches', ['id' => $fixture['batch']->id, 'status' => 'draft_created']);
@@ -157,9 +146,9 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
         $this->assertDatabaseCount('journal_lines', 0);
         $this->assertDatabaseCount('stock_movements', 0);
 
-        $replayed = $builder->build($fixture['batch'], 1, 'إعادة محاولة آمنة.', $fixture['warehouse']->id, null, $fixture['actor']->id);
-        $this->assertTrue($replayed['idempotent_replay']);
-        $this->assertSame($created['purchase_id'], $replayed['purchase_id']);
+        $replayed = $this->buildDraft($fixture, 'إعادة محاولة آمنة.', expectedVersion: 1);
+        $this->assertTrue($replayed->idempotentReplay);
+        $this->assertSame($created->transactionId, $replayed->transactionId);
         $this->assertSame(1, DocumentTransactionLink::query()->count());
         $this->assertDatabaseCount('purchases', 1);
 
@@ -179,17 +168,10 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
             'is_active' => true,
         ]);
 
-        $created = app(PurchaseDocumentDraftBuilder::class)->build(
-            $fixture['batch'],
-            $fixture['batch']->version,
-            'ربط مركز تكلفة قائم ومعتمد.',
-            $fixture['warehouse']->id,
-            $costCenter->id,
-            $fixture['actor']->id,
-        );
+        $created = $this->buildDraft($fixture, 'ربط مركز تكلفة قائم ومعتمد.', costCenterId: $costCenter->id);
 
         $this->assertDatabaseHas('purchases', [
-            'id' => $created['purchase_id'],
+            'id' => $created->transactionId,
             'cost_center_id' => $costCenter->id,
             'status' => 'draft',
         ]);
@@ -211,13 +193,195 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
     }
 
     /** @test */
+    public function it_keeps_the_link_visible_and_replays_the_same_purchase_after_normal_posting(): void
+    {
+        $fixture = $this->readyFixture();
+        $created = $this->buildDraft($fixture, 'أنشئ المسودة قبل ترحيلها الطبيعي.');
+        $purchase = Purchase::query()->findOrFail($created->transactionId);
+
+        app(PurchaseService::class)->post($purchase);
+
+        $this->withToken($fixture['token'])
+            ->getJson("/api/document-batches/{$fixture['batch']->id}/review")
+            ->assertOk()
+            ->assertJsonPath('data.linked_purchase.transaction_id', $created->transactionId)
+            ->assertJsonPath('data.linked_purchase.status', 'posted')
+            ->assertJsonMissing(['purchase_draft' => null]);
+
+        $replayed = $this->buildDraft($fixture, 'لا تنشئ معاملة ثانية بعد الترحيل.');
+        $this->assertTrue($replayed->idempotentReplay);
+        $this->assertSame('posted', $replayed->status);
+        $this->assertSame($created->transactionId, $replayed->transactionId);
+        $this->assertDatabaseCount('purchases', 1);
+        $this->assertDatabaseCount('document_transaction_links', 1);
+    }
+
+    /** @test */
+    public function it_rejects_deleting_a_document_linked_purchase_draft_with_a_clear_domain_message(): void
+    {
+        $fixture = $this->readyFixture();
+        $created = $this->buildDraft($fixture, 'اربط المسودة بالدليل قبل اختبار الحذف.');
+
+        $this->withToken($fixture['token'])
+            ->deleteJson("/api/purchases/{$created->transactionId}")
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'لا يمكن حذف مسودة مشتريات مرتبطة بمستند؛ استخدم الإلغاء أو الأرشفة وفق دورة المشتريات.');
+        $this->assertDatabaseHas('purchases', ['id' => $created->transactionId, 'status' => 'draft']);
+        $this->assertDatabaseCount('document_transaction_links', 1);
+    }
+
+    /** @test */
+    public function it_uses_the_current_extraction_result_supplier_match_when_historical_confirmed_matches_exist(): void
+    {
+        $fixture = $this->readyFixture();
+        $historicalPartner = Partner::create([
+            'type' => 'supplier',
+            'entity_type' => 'commercial',
+            'name' => 'مورد تاريخي لا يجب استخدامه',
+            'is_active' => true,
+        ]);
+        $historicalFile = DocumentFile::create([
+            'document_batch_id' => $fixture['batch']->id,
+            'original_name' => 'purchase-historical.pdf',
+            'object_key' => 'fixtures/purchase-draft-builder/purchase-historical.pdf',
+            'declared_mime' => 'application/pdf',
+            'detected_mime' => 'application/pdf',
+            'size_bytes' => 128,
+            'page_count' => 1,
+            'sha256' => hash('sha256', 'purchase-draft-builder-historical'),
+            'scan_status' => DocumentScanStatus::CLEAN,
+            'scanned_at' => now('UTC')->subMinute(),
+        ]);
+        $run = DocumentProcessingRun::create([
+            'document_batch_id' => $fixture['batch']->id,
+            'document_file_id' => $historicalFile->id,
+            'stage' => 'extraction',
+            'status' => DocumentProcessingStatus::SUCCEEDED,
+            'attempt_count' => 1,
+            'queued_at' => now('UTC')->subMinute(),
+            'started_at' => now('UTC')->subMinute(),
+            'finished_at' => now('UTC')->subMinute(),
+        ]);
+        $attempt = DocumentProviderAttempt::create([
+            'document_batch_id' => $fixture['batch']->id,
+            'document_file_id' => $historicalFile->id,
+            'document_processing_run_id' => $run->id,
+            'sequence' => 2,
+            'provider_key' => 'fixture-historical',
+            'model' => 'local',
+            'status' => 'succeeded',
+            'page_count' => 1,
+            'started_at' => now('UTC')->subMinute(),
+            'finished_at' => now('UTC')->subMinute(),
+        ]);
+        $historical = DocumentExtractionResult::create([
+            'document_batch_id' => $fixture['batch']->id,
+            'document_file_id' => $historicalFile->id,
+            'document_processing_run_id' => $run->id,
+            'document_provider_attempt_id' => $attempt->id,
+            'provider_key' => 'fixture-historical',
+            'model' => 'local',
+            'schema_version' => 1,
+            'detected_document_type' => 'purchase_invoice',
+            'detected_language' => 'ar',
+            'confidence_basis_points' => 9900,
+            'normalized_payload' => $fixture['result']->normalized_payload,
+            'extracted_at' => now('UTC')->subMinute(),
+        ]);
+        $this->confirmedMatch($fixture['batch'], $historical, 'header', 'header.counterparty', 'partner', $historicalPartner->id);
+
+        $created = $this->buildDraft($fixture, 'استخدم فقط دليل الاستخراج الحالي المقفل.');
+
+        $this->assertDatabaseHas('purchases', [
+            'id' => $created->transactionId,
+            'partner_id' => $fixture['partner']->id,
+        ]);
+        $this->assertDatabaseMissing('purchases', ['partner_id' => $historicalPartner->id]);
+    }
+
+    /** @test */
+    public function it_rejects_a_batch_that_is_not_ready_for_draft_without_partial_state(): void
+    {
+        $fixture = $this->readyFixture(markReady: false);
+
+        $this->assertDraftBuildFailsClosed($fixture, 'المراجعة لم تكتمل بعد.', 'needs_review');
+    }
+
+    /** @test */
+    public function it_rejects_a_non_purchase_invoice_document_type_without_partial_state(): void
+    {
+        $fixture = $this->readyFixture(documentType: 'expense');
+
+        $this->assertDraftBuildFailsClosed($fixture, 'هذا النوع لا يبني مسودة شراء.');
+    }
+
+    /** @test */
+    public function it_rejects_missing_required_confirmed_matches_without_partial_state(): void
+    {
+        $fixture = $this->readyFixture();
+        $productMatch = DocumentMatchResult::query()
+            ->where('document_extraction_result_id', $fixture['result']->id)
+            ->where('subject_key', 'lines.0.product')
+            ->sole();
+        DocumentReviewMutationGate::run(function () use ($productMatch): void {
+            $productMatch->status = 'rejected';
+            $productMatch->matched_type = null;
+            $productMatch->matched_id = null;
+            $productMatch->save();
+        });
+
+        $this->assertDraftBuildFailsClosed($fixture, 'مطابقة المنتج الإلزامية غير مؤكدة.');
+    }
+
+    /** @test */
+    public function it_rejects_an_inactive_confirmed_product_without_partial_state(): void
+    {
+        $fixture = $this->readyFixture();
+        $fixture['product']->update(['is_active' => false]);
+
+        $this->assertDraftBuildFailsClosed($fixture, 'المنتج المؤكد لم يعد نشطاً.');
+    }
+
+    /** @test */
+    public function it_rejects_a_confirmed_unit_that_belongs_to_another_product(): void
+    {
+        $fixture = $this->readyFixture();
+        $otherProduct = Product::create([
+            'sku' => 'TEST-OTHER-001',
+            'name' => 'منتج وحدته غير مطابقة',
+            'unit' => 'piece',
+            'unit_template_id' => $fixture['product']->unit_template_id,
+            'is_active' => true,
+            'tax_rate' => 15,
+        ]);
+        $unitMatch = DocumentMatchResult::query()
+            ->where('document_extraction_result_id', $fixture['result']->id)
+            ->where('subject_key', 'lines.0.unit')
+            ->sole();
+        DocumentReviewMutationGate::run(function () use ($unitMatch, $otherProduct): void {
+            $unitMatch->matched_id = $otherProduct->id;
+            $unitMatch->save();
+        });
+
+        $this->assertDraftBuildFailsClosed($fixture, 'الوحدة المؤكدة لا تخص المنتج المؤكد.');
+    }
+
+    /** @test */
+    public function it_rejects_non_sar_reviewed_evidence_without_partial_state(): void
+    {
+        $fixture = $this->readyFixture('1', 'purchase-draft-builder-usd', false, 'USD');
+
+        $this->assertDraftBuildFailsClosed($fixture, 'لا توجد سياسة تحويل عملة معتمدة.');
+    }
+
+    /** @test */
     public function it_rejects_fractional_quantities_without_creating_partial_purchase_or_link(): void
     {
         $fixture = $this->readyFixture('1.5');
 
         $this->expectException(\Illuminate\Validation\ValidationException::class);
         try {
-            app(PurchaseDocumentDraftBuilder::class)->build($fixture['batch'], $fixture['batch']->version, 'لا يسمح المجال الحالي بكمية كسرية.', $fixture['warehouse']->id, null, $fixture['actor']->id);
+            $this->buildDraft($fixture, 'لا يسمح المجال الحالي بكمية كسرية.');
         } finally {
             $this->assertDatabaseCount('purchases', 0);
             $this->assertDatabaseCount('document_transaction_links', 0);
@@ -249,12 +413,42 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
         $this->assertUnsupportedQuantity('999999999999999999999999');
     }
 
+    /** @param array{batch:DocumentBatch,actor:\App\Models\User,warehouse:Warehouse} $fixture */
+    private function buildDraft(array $fixture, string $reason, ?string $warehouseId = null, ?string $costCenterId = null, ?int $expectedVersion = null): \App\Contracts\CreatedDraftReference
+    {
+        return app(PurchaseDocumentDraftBuilder::class)->build(
+            $fixture['batch'],
+            new DraftBuildContext(
+                expectedVersion: $expectedVersion ?? $fixture['batch']->version,
+                reason: $reason,
+                actorId: $fixture['actor']->id,
+                options: new PurchaseDraftBuildOptions(
+                    warehouseId: $warehouseId ?? $fixture['warehouse']->id,
+                    costCenterId: $costCenterId,
+                ),
+            ),
+        );
+    }
+
+    /** @param array{batch:DocumentBatch,actor:\App\Models\User,warehouse:Warehouse} $fixture */
+    private function assertDraftBuildFailsClosed(array $fixture, string $reason, string $expectedStatus = 'ready_for_draft'): void
+    {
+        try {
+            $this->buildDraft($fixture, $reason);
+            $this->fail('The invalid reviewed evidence must fail closed.');
+        } catch (\Illuminate\Validation\ValidationException) {
+            $this->assertDatabaseCount('purchases', 0);
+            $this->assertDatabaseCount('document_transaction_links', 0);
+            $this->assertDatabaseHas('document_batches', ['id' => $fixture['batch']->id, 'status' => $expectedStatus]);
+        }
+    }
+
     private function assertUnsupportedQuantity(string $quantity): void
     {
         $fixture = $this->readyFixture($quantity);
 
         try {
-            app(PurchaseDocumentDraftBuilder::class)->build($fixture['batch'], $fixture['batch']->version, 'الكمية يجب أن تكون صحيحة ومدعومة.', $fixture['warehouse']->id, null, $fixture['actor']->id);
+            $this->buildDraft($fixture, 'الكمية يجب أن تكون صحيحة ومدعومة.');
             $this->fail('The unsupported quantity must fail closed.');
         } catch (\Illuminate\Validation\ValidationException) {
             $this->assertDatabaseCount('purchases', 0);
@@ -271,7 +465,7 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
 
         $this->expectException(\Illuminate\Validation\ValidationException::class);
         try {
-            app(PurchaseDocumentDraftBuilder::class)->build($fixture['batch'], $fixture['batch']->version, 'المورد المؤكد غير نشط.', $fixture['warehouse']->id, null, $fixture['actor']->id);
+            $this->buildDraft($fixture, 'المورد المؤكد غير نشط.');
         } finally {
             $this->assertDatabaseCount('purchases', 0);
             $this->assertDatabaseCount('document_transaction_links', 0);
@@ -280,7 +474,7 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
     }
 
     /** @return array{batch:DocumentBatch,actor:\App\Models\User,partner:Partner,product:Product,warehouse:Warehouse,result:DocumentExtractionResult,token:string,tenant_id:string} */
-    private function readyFixture(string $quantity = '1', string $tenantSlug = 'purchase-draft-builder', bool $taxInclusive = false): array
+    private function readyFixture(string $quantity = '1', string $tenantSlug = 'purchase-draft-builder', bool $taxInclusive = false, string $currency = 'SAR', bool $markReady = true, string $documentType = 'purchase_invoice'): array
     {
         $email = "owner@{$tenantSlug}.test";
         $auth = $this->registerTenant($tenantSlug, $email);
@@ -293,7 +487,7 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
         $template = UnitTemplate::create(['name' => 'قالب قطعة', 'base_unit' => 'piece', 'is_active' => true]);
         $product = Product::create(['sku' => 'TEST-001', 'name' => 'صنف الاختبار', 'unit' => 'piece', 'unit_template_id' => $template->id, 'is_active' => true, 'tax_rate' => 15]);
         $warehouse = Warehouse::create(['branch_id' => $branch->id, 'code' => 'WH-001', 'name' => 'مستودع الاختبار', 'is_default' => true, 'is_active' => true]);
-        $batch = DocumentBatch::create(['document_type' => 'purchase_invoice', 'source_type' => 'manual', 'created_by' => $actor->id]);
+        $batch = DocumentBatch::create(['document_type' => $documentType, 'source_type' => 'manual', 'created_by' => $actor->id]);
         $workflow = app(DocumentWorkflowService::class);
         $batch = $workflow->transition($batch, DocumentWorkflowStatus::RECEIVING, 'fixture_receiving', 'user', $actor->id, 'تهيئة الدليل.');
         $batch = $workflow->transition($batch, DocumentWorkflowStatus::RECEIVED, 'fixture_received', 'user', $actor->id, 'تهيئة الدليل.');
@@ -325,7 +519,7 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
             'detected_language' => 'ar',
             'confidence_basis_points' => 9900,
             'normalized_payload' => [
-                'fields' => ['document_number' => 'SUP-100', 'document_date' => '2026-08-25', 'currency' => 'SAR', 'price_includes_tax' => $taxInclusive, 'subtotal_minor' => 10000, 'tax_amount_minor' => 1500, 'total_amount_minor' => 11500],
+                'fields' => ['document_number' => 'SUP-100', 'document_date' => '2026-08-25', 'currency' => $currency, 'price_includes_tax' => $taxInclusive, 'subtotal_minor' => 10000, 'tax_amount_minor' => 1500, 'total_amount_minor' => 11500],
                 'lines' => [['description' => 'صنف الاختبار', 'quantity' => $quantity, 'unit_price_minor' => $taxInclusive ? 11500 : 10000, 'discount_minor' => 0, 'tax_amount_minor' => 1500, 'total_minor' => 11500, 'tax_rate' => '15', 'unit' => 'piece']],
             ],
             'extracted_at' => now('UTC'),
@@ -333,7 +527,9 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
         $this->confirmedMatch($batch, $result, 'header', 'header.counterparty', 'partner', $partner->id);
         $this->confirmedMatch($batch, $result, 'product', 'lines.0.product', 'product', $product->id);
         $this->confirmedMatch($batch, $result, 'unit', 'lines.0.unit', 'product_unit', $product->id);
-        $batch = $workflow->transition($batch, DocumentWorkflowStatus::READY_FOR_DRAFT, 'fixture_ready', 'user', $actor->id, 'المراجعة مكتملة.');
+        if ($markReady) {
+            $batch = $workflow->transition($batch, DocumentWorkflowStatus::READY_FOR_DRAFT, 'fixture_ready', 'user', $actor->id, 'المراجعة مكتملة.');
+        }
 
         $token = $auth['token'];
         $tenant_id = $auth['tenant_id'];

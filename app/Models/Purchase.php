@@ -62,6 +62,13 @@ class Purchase extends BaseModel
         return $this->hasMany(PurchaseLine::class);
     }
 
+    /** روابط تدقيق مركز المستندات؛ تحمي المسودة المرتبطة من حذف يمزق دليل المصدر. */
+    public function documentTransactionLinks(): HasMany
+    {
+        return $this->hasMany(DocumentTransactionLink::class, 'transaction_id')
+            ->where('transaction_type', 'purchase');
+    }
+
     /** مرفقات فاتورة المورد الخاصة؛ تتبع المستند ولا تنشئ أثراً مستقلاً. */
     public function attachments(): HasMany
     {

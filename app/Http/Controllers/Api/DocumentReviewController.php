@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\DraftBuildContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignDocumentReviewerRequest;
 use App\Http\Requests\CompleteDocumentReviewRequest;
@@ -23,6 +24,7 @@ use App\Models\DocumentReviewAction;
 use App\Models\User;
 use App\Services\DocumentCenter\DocumentReviewService;
 use App\Services\DocumentCenter\PurchaseDocumentDraftBuilder;
+use App\Services\DocumentCenter\PurchaseDraftBuildOptions;
 use App\Services\DocumentCenter\ReviewedDocumentProjector;
 use App\Support\DocumentScanStatus;
 use Illuminate\Http\JsonResponse;
@@ -94,7 +96,7 @@ class DocumentReviewController extends Controller
             'matches' => $this->matches($result),
             'issues' => $this->issues($result),
             'history' => $this->history($batch),
-            'purchase_draft' => $this->purchaseDraft($batch),
+            'linked_purchase' => $this->linkedPurchase($batch),
             'capabilities' => $this->capabilities($request->user()),
         ]);
     }
@@ -180,22 +182,27 @@ class DocumentReviewController extends Controller
     {
         $draft = app(PurchaseDocumentDraftBuilder::class)->build(
             $batch,
-            $request->integer('expected_version'),
-            $request->string('reason')->toString(),
-            $request->validated('warehouse_id'),
-            $request->validated('cost_center_id'),
-            $request->user()?->id,
+            new DraftBuildContext(
+                expectedVersion: $request->integer('expected_version'),
+                reason: $request->string('reason')->toString(),
+                actorId: $request->user()?->id,
+                options: new PurchaseDraftBuildOptions(
+                    warehouseId: $request->validated('warehouse_id'),
+                    costCenterId: $request->validated('cost_center_id'),
+                ),
+            ),
         );
 
         return response()->json(['data' => [
             'document_batch_id' => $batch->id,
-            'transaction_type' => 'purchase',
-            'purchase_id' => $draft['purchase_id'],
-            'purchase_number' => $draft['purchase_number'],
-            'status' => $draft['status'],
-            'url' => '/purchases/'.$draft['purchase_id'],
-            'idempotent_replay' => $draft['idempotent_replay'],
-        ]], $draft['idempotent_replay'] ? 200 : 201);
+            'link_id' => $draft->linkId,
+            'transaction_type' => $draft->transactionType,
+            'transaction_id' => $draft->transactionId,
+            'transaction_number' => $draft->transactionNumber,
+            'status' => $draft->status,
+            'url' => '/purchases/'.$draft->transactionId,
+            'idempotent_replay' => $draft->idempotentReplay,
+        ]], $draft->idempotentReplay ? 200 : 201);
     }
 
     public function revalidateFinancial(RevalidateDocumentFinancialRequest $request, DocumentBatch $batch): JsonResponse
@@ -359,17 +366,19 @@ class DocumentReviewController extends Controller
     }
 
     /** @return array<string, string>|null */
-    private function purchaseDraft(DocumentBatch $batch): ?array
+    private function linkedPurchase(DocumentBatch $batch): ?array
     {
         $link = $batch->transactionLinks->firstWhere('transaction_type', 'purchase');
         $purchase = $link?->purchase;
-        if ($link === null || $purchase === null || $purchase->status !== 'draft') {
+        if ($link === null || $purchase === null) {
             return null;
         }
 
         return [
-            'purchase_id' => $purchase->id,
-            'purchase_number' => $purchase->number,
+            'link_id' => $link->id,
+            'transaction_type' => $link->transaction_type,
+            'transaction_id' => $purchase->id,
+            'transaction_number' => $purchase->number,
             'status' => $purchase->status,
             'url' => '/purchases/'.$purchase->id,
         ];
