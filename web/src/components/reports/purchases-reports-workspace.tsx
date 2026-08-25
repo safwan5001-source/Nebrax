@@ -260,6 +260,7 @@ export function PurchasesReportsWorkspace({ view }: { view: PurchaseReportView }
                   emptyText={t('empty')}
                   primaryIndex={0}
                   rowHrefs={rowHrefs}
+                  reportKey={`purchases:${view}`}
                 />
               )}
             </CardContent>

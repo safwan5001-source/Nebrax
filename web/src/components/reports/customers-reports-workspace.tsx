@@ -276,6 +276,7 @@ export function CustomersReportsWorkspace({ view }: { view: CustomerReportView }
                   emptyText={t('empty')}
                   primaryIndex={0}
                   rowHrefs={rowHrefs}
+                  reportKey={`customers:${view}`}
                 />
               )}
             </CardContent>

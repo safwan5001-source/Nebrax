@@ -265,7 +265,7 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
               {!doc || doc.rows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
               ) : (
-                <ReportResultsTable columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} emptyText={t('empty')} primaryIndex={0} rowHrefs={rowHrefs} />
+                <ReportResultsTable columns={doc.columns} rows={doc.rows} totalRow={doc.totalRow} emptyText={t('empty')} primaryIndex={0} rowHrefs={rowHrefs} reportKey={`sales:${view}`} />
               )}
             </CardContent>
           </Card>

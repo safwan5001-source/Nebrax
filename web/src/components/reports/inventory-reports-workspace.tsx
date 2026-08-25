@@ -325,6 +325,7 @@ export function InventoryReportsWorkspace({ view }: { view: InventoryReportView 
                   emptyText={t('empty')}
                   primaryIndex={view === 'value' ? 1 : view === 'warehouses' ? 3 : view === 'movements' ? 2 : 1}
                   rowHrefs={rowHrefs}
+                  reportKey={`inventory:${view}`}
                 />
               )}
             </CardContent>
