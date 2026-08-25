@@ -3,6 +3,9 @@ export type DocumentReviewTranslationKey =
   | 'fieldDocumentNumber'
   | 'fieldDocumentDate'
   | 'fieldSupplierName'
+  | 'fieldIssuerName'
+  | 'fieldCurrency'
+  | 'fieldPriceIncludesTax'
   | 'fieldSubtotalMinor'
   | 'fieldTaxMinor'
   | 'fieldTotalMinor';
@@ -14,9 +17,14 @@ const fieldTranslationKeys: Record<string, DocumentReviewTranslationKey> = {
   invoice_date: 'fieldDocumentDate',
   supplier_name: 'fieldSupplierName',
   supplier: 'fieldSupplierName',
+  issuer_name: 'fieldIssuerName',
+  currency: 'fieldCurrency',
+  price_includes_tax: 'fieldPriceIncludesTax',
   subtotal_minor: 'fieldSubtotalMinor',
   tax_minor: 'fieldTaxMinor',
+  tax_amount_minor: 'fieldTaxMinor',
   total_minor: 'fieldTotalMinor',
+  total_amount_minor: 'fieldTotalMinor',
 };
 
 export function documentFieldTranslationKey(key: string): DocumentReviewTranslationKey {

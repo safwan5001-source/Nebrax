@@ -9,6 +9,7 @@ import { api, ApiError } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { ExpenseDraftDialog } from '@/components/document-center/expense-draft-dialog';
 import { ReviewCommandDialog } from '@/components/document-center/review-command-dialog';
 import { ReviewChangeDialog } from '@/components/document-center/review-change-dialog';
 import {
@@ -16,7 +17,7 @@ import {
   documentFieldTranslationKey,
   reviewHasVisibleBlocker,
 } from '@/lib/document-review';
-import { canBuildPurchaseDraft, linkedPurchasePresentation } from '@/lib/document-review-access';
+import { canBuildDocumentDraft, linkedTransactionPresentation, type LinkedTransaction } from '@/lib/document-review-access';
 
 type ReviewFile = {
   id: string;
@@ -87,7 +88,8 @@ type Review = {
   matches: Match[];
   issues: Issue[];
   history: ReviewHistory[];
-  linked_purchase: { link_id: string; transaction_type: string; transaction_id: string; transaction_number: string; status: string; url: string } | null;
+  linked_transaction: LinkedTransaction | null;
+  linked_purchase: LinkedTransaction | null;
   capabilities: { view: boolean; review: boolean; manage: boolean; build_draft: boolean };
 };
 
@@ -126,6 +128,7 @@ export default function DocumentReviewPage() {
   const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [command, setCommand] = useState<Command>(null);
+  const [expenseDraftOpen, setExpenseDraftOpen] = useState(false);
   const [edit, setEdit] = useState<ReviewField | null>(null);
   const [mobileSection, setMobileSection] = useState<MobileSection>('details');
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -178,11 +181,12 @@ export default function DocumentReviewPage() {
 
   const canReview = review.capabilities.review;
   const canComplete = canReview && review.batch.status === 'needs_review' && !hasVisibleBlocker;
-  const canBuildDraft = canBuildPurchaseDraft({
+  const linkedTransaction = review.linked_transaction ?? review.linked_purchase;
+  const canBuildDraft = canBuildDocumentDraft({
     canBuildDraft: review.capabilities.build_draft,
     documentType: review.batch.document_type,
     status: review.batch.status,
-    hasLinkedPurchase: review.linked_purchase !== null,
+    hasLinkedTransaction: linkedTransaction !== null,
   });
   const activeFile = review.files.find((file) => file.download_available) ?? review.files[0];
   const sectionItems: Array<{ id: MobileSection; label: string }> = [
@@ -205,29 +209,38 @@ export default function DocumentReviewPage() {
     </Button>
   ) : null;
 
-  const linkedPurchaseState = review.linked_purchase ? linkedPurchasePresentation(review.linked_purchase.status) : null;
-  const draftButton = review.linked_purchase && linkedPurchaseState ? (
+  const linkedTransactionState = linkedTransaction ? linkedTransactionPresentation(linkedTransaction.status) : null;
+  const linkedActionLabel = linkedTransaction && linkedTransactionState
+    ? linkedTransaction.transaction_type === 'expense'
+      ? linkedTransactionState.action === 'posted'
+        ? t('openPostedExpense', { number: linkedTransaction.transaction_number })
+        : linkedTransactionState.action === 'cancelled'
+          ? t('openCancelledExpense', { number: linkedTransaction.transaction_number })
+          : t('openExpenseDraft', { number: linkedTransaction.transaction_number })
+      : linkedTransactionState.action === 'posted'
+        ? t('openPostedPurchase', { number: linkedTransaction.transaction_number })
+        : linkedTransactionState.action === 'cancelled'
+          ? t('openCancelledPurchase', { number: linkedTransaction.transaction_number })
+          : t('openPurchaseDraft', { number: linkedTransaction.transaction_number })
+    : null;
+  const draftButton = linkedTransaction && linkedTransactionState && linkedActionLabel ? (
     <div className="flex flex-wrap items-center gap-2">
       <Button asChild variant="outline">
-        <Link href={review.linked_purchase.url}>
-          {linkedPurchaseState.action === 'posted'
-            ? t('openPostedPurchase', { number: review.linked_purchase.transaction_number })
-            : linkedPurchaseState.action === 'cancelled'
-              ? t('openCancelledPurchase', { number: review.linked_purchase.transaction_number })
-              : t('openPurchaseDraft', { number: review.linked_purchase.transaction_number })}
-        </Link>
+        <Link href={linkedTransaction.url}>{linkedActionLabel}</Link>
       </Button>
-      <Badge tone={reviewTone(review.linked_purchase.status)}>{t(linkedPurchaseState.badge)}</Badge>
+      <Badge tone={reviewTone(linkedTransaction.status)}>{t(linkedTransactionState.badge)}</Badge>
     </div>
   ) : canBuildDraft ? (
     <Button
-      onClick={() => setCommand({
-        title: t('createPurchaseDraft'),
-        label: t('createPurchaseDraft'),
-        endpoint: `/document-batches/${id}/create-purchase-draft`,
-      })}
+      onClick={() => review.batch.document_type === 'expense'
+        ? setExpenseDraftOpen(true)
+        : setCommand({
+          title: t('createPurchaseDraft'),
+          label: t('createPurchaseDraft'),
+          endpoint: `/document-batches/${id}/create-purchase-draft`,
+        })}
     >
-      {t('createPurchaseDraft')}
+      {review.batch.document_type === 'expense' ? t('createExpenseDraft') : t('createPurchaseDraft')}
     </Button>
   ) : null;
 
@@ -538,6 +551,38 @@ export default function DocumentReviewPage() {
             failed: t('saveFailed'),
           }}
           onSuccess={() => void load()}
+        />
+      )}
+
+      {expenseDraftOpen && (
+        <ExpenseDraftDialog
+          open
+          onClose={() => setExpenseDraftOpen(false)}
+          endpoint={`/document-batches/${id}/create-expense-draft`}
+          expectedVersion={review.batch.version}
+          onSuccess={() => void load()}
+          labels={{
+            title: t('createExpenseDraft'),
+            reason: t('reason'),
+            account: t('expenseAccount'),
+            category: t('expenseCategory'),
+            costCenter: t('expenseCostCenter'),
+            paymentMethod: t('expensePaymentMethod'),
+            chooseAccount: t('chooseExpenseAccount'),
+            noCategory: t('noExpenseCategory'),
+            noCostCenter: t('noExpenseCostCenter'),
+            cash: t('cash'),
+            bank: t('bank'),
+            credit: t('credit'),
+            cancel: t('cancel'),
+            create: t('createExpenseDraft'),
+            required: t('expenseDraftRequired'),
+            loadOptions: t('expenseDraftHint'),
+            optionsFailed: t('expenseOptionsFailed'),
+            retry: t('retry'),
+            failed: t('saveFailed'),
+            stale: t('stale'),
+          }}
         />
       )}
 

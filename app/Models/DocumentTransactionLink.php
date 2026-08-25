@@ -8,6 +8,11 @@ use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
+/**
+ * رابط تدقيق immutable بين دليل مركز المستندات ومعاملة نطاقها محفوظ في الخدمة.
+ * `transaction_type + transaction_id` مرجع منطقي متعدد الأنواع؛ لا تكفي قاعدة
+ * البيانات للتحقق من نطاقه، لذلك يثبت النموذج وجود المعاملة ونوعها وسياقها عند الإنشاء.
+ */
 class DocumentTransactionLink extends BaseModel
 {
     use BranchScoped;
@@ -32,19 +37,18 @@ class DocumentTransactionLink extends BaseModel
 
             $batch = DocumentBatch::query()->findOrFail($link->document_batch_id);
             $result = DocumentExtractionResult::query()->findOrFail($link->document_extraction_result_id);
-            $purchase = Purchase::query()->findOrFail($link->transaction_id);
+            $transaction = $link->transaction();
             $actor = $link->created_by === null ? null : User::query()->find($link->created_by);
             if ($actor === null
                 || ! $actor->canAccessBranch($batch->branch_id)
-                || $link->transaction_type !== 'purchase'
                 || $batch->tenant_id !== $tenant->id()
                 || $batch->branch_id !== $branch->id()
                 || $result->tenant_id !== $tenant->id()
                 || $result->branch_id !== $branch->id()
                 || $result->document_batch_id !== $batch->id
-                || $purchase->tenant_id !== $tenant->id()
-                || $purchase->branch_id !== $branch->id()
-                || $purchase->status !== 'draft') {
+                || $transaction->tenant_id !== $tenant->id()
+                || $transaction->branch_id !== $branch->id()
+                || $transaction->status !== 'draft') {
                 throw new LogicException('Document transaction link scope or transaction state is invalid.');
             }
 
@@ -61,13 +65,30 @@ class DocumentTransactionLink extends BaseModel
         return $this->belongsTo(DocumentBatch::class, 'document_batch_id');
     }
 
+    /** توافق صريح مع consumers الشراء الحاليين. */
     public function purchase(): BelongsTo
     {
         return $this->belongsTo(Purchase::class, 'transaction_id');
     }
 
+    /** رابط Expense الصريح؛ لا تُستخدم علاقة polymorphic غير محكومة بالنطاق. */
+    public function expense(): BelongsTo
+    {
+        return $this->belongsTo(Expense::class, 'transaction_id');
+    }
+
     public function extractionResult(): BelongsTo
     {
         return $this->belongsTo(DocumentExtractionResult::class, 'document_extraction_result_id');
+    }
+
+    /** @return Purchase|Expense */
+    public function transaction(): Purchase|Expense
+    {
+        return match ($this->transaction_type) {
+            'purchase' => Purchase::query()->whereKey($this->transaction_id)->firstOrFail(),
+            'expense' => Expense::query()->whereKey($this->transaction_id)->firstOrFail(),
+            default => throw new LogicException('Document transaction link type is unsupported.'),
+        };
     }
 }

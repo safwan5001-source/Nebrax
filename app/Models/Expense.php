@@ -57,6 +57,13 @@ class Expense extends BaseModel
         return $this->hasMany(ExpenseAttachment::class);
     }
 
+    /** روابط تدقيق مركز المستندات؛ تمنع حذف مسودة المصروف التي تمثل أصل الدليل. */
+    public function documentTransactionLinks(): HasMany
+    {
+        return $this->hasMany(DocumentTransactionLink::class, 'transaction_id')
+            ->where('transaction_type', 'expense');
+    }
+
     public function journalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class);

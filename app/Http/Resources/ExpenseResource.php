@@ -33,6 +33,12 @@ class ExpenseResource extends JsonResource
             'tax_amount'     => Money::toRiyal($this->tax_amount),
             'total'          => Money::toRiyal($this->total),
             'status'         => $this->status,
+            'document_linked' => (int) ($this->document_transaction_links_count ?? 0) > 0,
+            'source_document_url' => $this->whenLoaded('documentTransactionLinks', function () {
+                $batch = $this->documentTransactionLinks->first()?->batch;
+
+                return $batch === null ? null : '/documents/'.$batch->id;
+            }),
             'attachments'    => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn ($attachment) => [
                 'id'            => $attachment->id,
                 'original_name' => $attachment->original_name,

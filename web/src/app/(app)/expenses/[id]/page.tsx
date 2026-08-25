@@ -33,6 +33,8 @@ interface Expense {
   tax_amount: string;
   total: string;
   status: 'draft' | 'posted' | 'cancelled';
+  document_linked?: boolean;
+  source_document_url?: string | null;
   attachments?: Attachment[];
 }
 
@@ -117,7 +119,12 @@ export default function ExpenseDetailPage() {
   }
 
   async function deleteExpense() {
-    if (!expense || expense.status !== 'draft' || !window.confirm(t('confirm_delete_expense'))) return;
+    if (!expense || expense.status !== 'draft') return;
+    if (expense.document_linked) {
+      setError(t('linked_draft_delete_blocked'));
+      return;
+    }
+    if (!window.confirm(t('confirm_delete_expense'))) return;
     setActing(true);
     try {
       await api(`/expenses/${expense.id}`, { method: 'DELETE' });
@@ -180,7 +187,13 @@ export default function ExpenseDetailPage() {
         <Copy className="h-4 w-4" strokeWidth={1.7} />
         {t('duplicate')}
       </Button>
-      <Button className={mobile ? 'shrink-0' : undefined} variant="outline" disabled={expense.status !== 'draft' || acting || posting} title={expense.status !== 'draft' ? t('draft_action_only') : undefined} onClick={deleteExpense}>
+      <Button
+        className={mobile ? 'shrink-0' : undefined}
+        variant="outline"
+        disabled={expense.status !== 'draft' || expense.document_linked || acting || posting}
+        title={expense.document_linked ? t('linked_draft_delete_blocked') : expense.status !== 'draft' ? t('draft_action_only') : undefined}
+        onClick={deleteExpense}
+      >
         <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
         {t('delete')}
       </Button>
@@ -262,6 +275,17 @@ export default function ExpenseDetailPage() {
             <p className="mt-1 text-sm text-muted">
               {expense.journal_entry_id ? t('journal_entry_created') : t('journal_entry_pending')}
             </p>
+            {expense.source_document_url && (
+              <Button asChild className="mt-3" size="sm" variant="outline">
+                <Link href={expense.source_document_url}>
+                  <FileText className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+                  {t('source_document')}
+                </Link>
+              </Button>
+            )}
+            {expense.document_linked && !expense.source_document_url && (
+              <p className="mt-2 text-xs text-muted">{t('linked_draft_delete_blocked')}</p>
+            )}
           </div>
         </div>
         <div className="no-print hidden flex-wrap items-center gap-2 lg:flex">{actionButtons()}</div>

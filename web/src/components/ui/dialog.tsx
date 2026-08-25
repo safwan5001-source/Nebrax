@@ -28,6 +28,7 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
       <div
         role="dialog"
         aria-modal="true"
+        aria-label={title}
         className={cn(
           'relative z-10 my-8 w-full max-w-lg rounded border border-border bg-surface',
           className
