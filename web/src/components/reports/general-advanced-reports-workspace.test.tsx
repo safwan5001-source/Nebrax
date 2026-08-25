@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { useTranslations } from 'next-intl';
+import { NextIntlClientProvider, type useTranslations } from 'next-intl';
 import { JournalTable } from './general-advanced-reports-workspace';
 
 afterEach(cleanup);
@@ -48,9 +48,17 @@ const journal = {
   ],
 };
 
+function renderJournalTable() {
+  return render(
+    <NextIntlClientProvider locale="en" messages={{}}>
+      <JournalTable journal={journal} loading={false} g={g} t={t} />
+    </NextIntlClientProvider>
+  );
+}
+
 describe('JournalTable', () => {
   it('keeps all lines of each journal entry inside a dedicated desktop row group without table sorting or pagination controls', () => {
-    const { container } = render(<JournalTable journal={journal} loading={false} g={g} t={t} />);
+    const { container } = renderJournalTable();
 
     const desktopTable = within(container.querySelector('.md\\:block') as HTMLElement).getByRole('table');
     const entryBodies = desktopTable.querySelectorAll('tbody');
@@ -60,12 +68,14 @@ describe('JournalTable', () => {
     expect(within(entryBodies[0]).getByText('JV-001')).toBeTruthy();
     expect(within(entryBodies[0]).getByText(/Cash/)).toBeTruthy();
     expect(within(entryBodies[0]).getByText(/Revenue/)).toBeTruthy();
+    expect(within(entryBodies[0]).getByRole('link', { name: 'View details: JV-001' }).getAttribute('href')).toBe('/journal-entries/entry-1');
+    expect(within(entryBodies[0]).getAllByRole('link')).toHaveLength(1);
     expect(within(entryBodies[1]).getByText('JV-002')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /search|sort|next|previous/i })).toBeNull();
   });
 
   it('preserves each journal entry as one mobile article and retains official report totals', () => {
-    const { container } = render(<JournalTable journal={journal} loading={false} g={g} t={t} />);
+    const { container } = renderJournalTable();
 
     const mobileRows = container.querySelector('.md\\:hidden') as HTMLElement;
     const entryCards = mobileRows.querySelectorAll('article');
@@ -74,6 +84,7 @@ describe('JournalTable', () => {
     expect(within(entryCards[0]).getByText('JV-001')).toBeTruthy();
     expect(within(entryCards[0]).getByText(/Cash/)).toBeTruthy();
     expect(within(entryCards[0]).getByText(/Revenue/)).toBeTruthy();
+    expect(within(entryCards[0]).getByRole('link', { name: 'View details: JV-001' }).getAttribute('href')).toBe('/journal-entries/entry-1');
     expect(within(entryCards[1]).getByText('JV-002')).toBeTruthy();
     expect(within(entryCards[2]).getByText('Total')).toBeTruthy();
     expect(within(entryCards[2]).getAllByText(/200\.00/)).toHaveLength(2);
