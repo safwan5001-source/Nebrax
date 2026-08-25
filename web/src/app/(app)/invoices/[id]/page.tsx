@@ -18,6 +18,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { Tabs, TabPanel } from '@/components/ui/tabs';
 import { Accordion, AccordionItem } from '@/components/ui/accordion';
+import { EmptyState } from '@/components/nebrax';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
@@ -291,7 +292,16 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  if (!invoice) return <div className="text-muted">{t('not_found')}</div>;
+  // نصٌّ عارٍ بلا طريق رجوع كان يترك المستخدم عالقاً. باقي الصفحة **مساحة عمل
+  // مستندية** خارج نطاق المرحلة (طباعة وتصدير وZATCA) ولم يُمَسّ منها شيء.
+  if (!invoice) {
+    return (
+      <EmptyState
+        title={t('not_found')}
+        action={<Button asChild variant="outline"><Link href="/invoices">{t('back')}</Link></Button>}
+      />
+    );
+  }
 
   const info: [string, React.ReactNode][] = [
     [t('partner'), customer ? <Link href={`/partners/${invoice.partner_id}`} className="text-primary hover:underline">{partnerName}</Link> : partnerName],
