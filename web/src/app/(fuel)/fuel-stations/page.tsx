@@ -58,6 +58,18 @@ function collectionRows<T>(value: Collection<T> | undefined): T[] {
   return Array.isArray(value) ? value : value?.data ?? [];
 }
 
+/**
+ * يقرأ حمولة `/fuel-stations/workspace` **بعد التحقق من شكلها**.
+ *
+ * العقد هو `{ data: { stations: [...] } }`. حمولةٌ بلا `stations` كانت تُخزَّن كما
+ * هي فينهار العرض عند أول `stations.filter` — استثناءٌ في `useMemo` يسقط الصفحة
+ * كلها لا قسماً منها. إعادة `null` هنا تحوّل ذلك إلى حالة خطأ صريحة.
+ */
+function readWorkspace(payload: unknown): Workspace | null {
+  const stations = (payload as { data?: { stations?: unknown } } | null)?.data?.stations;
+  return Array.isArray(stations) ? { stations: stations as Station[] } : null;
+}
+
 export default function FuelStationsWorkspacePage() {
   const t = useTranslations('fuelStations');
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -77,8 +89,13 @@ export default function FuelStationsWorkspacePage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const workspaceResult = await api<{ data: Workspace }>('/fuel-stations/workspace');
-      setWorkspace(workspaceResult.data);
+      const workspaceResult = await api<unknown>('/fuel-stations/workspace');
+      const loadedWorkspace = readWorkspace(workspaceResult);
+      if (loadedWorkspace === null) {
+        setLoadError(t('loadFailed'));
+        return;
+      }
+      setWorkspace(loadedWorkspace);
 
       const allowed = permissions ?? [];
       const dashboardAllowed = canAccess(allowed, 'fuel.reports.view');
@@ -103,7 +120,7 @@ export default function FuelStationsWorkspacePage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const activeStations = useMemo(() => workspace?.stations.filter((station) => station.status === 'active').length ?? 0, [workspace]);
+  const activeStations = useMemo(() => workspace?.stations?.filter((station) => station.status === 'active').length ?? 0, [workspace]);
   const latestShiftByStation = useMemo(() => {
     const latest = new Map<string, Shift>();
     for (const shift of summary.shifts) {

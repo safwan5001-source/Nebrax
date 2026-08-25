@@ -47,6 +47,21 @@ interface ApplicationEntry {
 
 type ActionDialog = { mode: DialogMode; apps: ApplicationEntry[]; label: string } | null;
 
+/**
+ * يقرأ حمولة `/applications` **بعد التحقق من شكلها**.
+ *
+ * العقد هو خريطة مفاتيح: `{ data: { "sales.pos": {...} } }`. أي شكل آخر — مصفوفة،
+ * أو `null`، أو حمولة من طبقةٍ لا تعرف هذا المسار — ليس «صفر تطبيقات» بل تعذّرُ
+ * قراءة. إعادته كـ `null` هنا هي ما يمنع تحوّل الفشل إلى حالة فراغ مضلّلة.
+ */
+function readApplications(payload: unknown): ApplicationEntry[] | null {
+  const data = (payload as { data?: unknown } | null)?.data;
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) return null;
+
+  return Object.entries(data as Record<string, Omit<ApplicationEntry, 'key'>>)
+    .map(([key, app]) => ({ key, ...app }));
+}
+
 const commercialTone: Record<CommercialAvailability, 'positive' | 'neutral' | 'warning' | 'muted'> = {
   included: 'positive',
   addon: 'neutral',
@@ -78,8 +93,15 @@ export default function ApplicationsPage() {
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(null);
-    api<{ data: Record<string, Omit<ApplicationEntry, 'key'>> }>('/applications')
-      .then((res) => setApps(Object.entries(res.data).map(([key, app]) => ({ key, ...app }))))
+    api<unknown>('/applications')
+      .then((res) => {
+        const parsed = readApplications(res);
+        if (parsed === null) {
+          setLoadError(t('loadFailed'));
+          return;
+        }
+        setApps(parsed);
+      })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : t('loadFailed')))
       .finally(() => setLoading(false));
   }, [t]);

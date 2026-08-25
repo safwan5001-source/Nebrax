@@ -384,7 +384,24 @@ export default function ProductsPage() {
               <Badge tone={product.is_active ? 'positive' : 'muted'}>{product.is_active ? t('active') : t('inactive')}</Badge>
             </>
           ),
-          meta: product.sku ?? product.barcode ?? undefined,
+          // المعرّفان مستقلان: الباركود يُمسح ضوئياً في نقطة البيع، فإخفاؤه لمجرّد
+          // وجود SKU يُفقد الجوالَ المعلومةَ التي جاء المستخدم من أجلها.
+          meta: product.sku || product.barcode ? (
+            <span className="flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5">
+              {product.sku ? (
+                <span>
+                  <span className="font-sans">{t('sku')}</span>{' '}
+                  <span dir="ltr">{product.sku}</span>
+                </span>
+              ) : null}
+              {product.barcode ? (
+                <span>
+                  <span className="font-sans">{t('barcode')}</span>{' '}
+                  <span dir="ltr">{product.barcode}</span>
+                </span>
+              ) : null}
+            </span>
+          ) : undefined,
           actions: rowActions(product),
         })}
       />

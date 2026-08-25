@@ -24,5 +24,8 @@ export const DEMO_USER: AuthUser = {
   name: 'مستخدم المعاينة',
   email: 'demo@nibras.test',
   role: 'owner',
+  // مستخدم المعاينة مالك، فصلاحياته كاملة كما يعيدها الخادم لدور المالك. من دون
+  // هذه القائمة تسقط كل شاشة تقرأ `permissions` إلى «لا صلاحية» في وضع المعاينة.
+  permissions: ['*'],
   tenant_id: 'demo-tenant',
 };

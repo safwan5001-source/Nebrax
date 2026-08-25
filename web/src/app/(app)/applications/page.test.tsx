@@ -143,6 +143,25 @@ describe('ApplicationsPage operational actions', () => {
     expect(dependency.getByText('Enable the required dependencies before activating this application.')).toBeTruthy();
   });
 
+  it('treats a payload that is not a keyed application map as a load failure, not an empty catalogue', async () => {
+    // شكلٌ غير متوقّع (مصفوفة بدل خريطة مفاتيح) كان يمرّ عبر `Object.entries`
+    // فيُنتج صفر تطبيقات — فتبدو الشاشة «فارغة» بينما القراءة تعذّرت أصلاً.
+    api.mockResolvedValue({ data: [] });
+    render(<ApplicationsPage />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe('Load failed');
+    expect(screen.queryByText('No applications')).toBeNull();
+  });
+
+  it('still shows the empty state for a genuinely empty catalogue', async () => {
+    api.mockResolvedValue({ data: {} });
+    render(<ApplicationsPage />);
+
+    expect(await screen.findByText('No applications')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('renders compact status controls and group-level bulk actions', async () => {
     render(<ApplicationsPage />);
     await screen.findByRole('heading', { name: 'Fuel trial' });
