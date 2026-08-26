@@ -87,7 +87,7 @@ class ProductImportService
     /**
      * أعمدة الملف وعيّنة منه واقتراح المطابقة — بلا أي تحقق أو كتابة.
      *
-     * @return array{columns: array<int, array{index: int, header: string, samples: array<int, string>, suggested_field: string|null}>, total_rows: int, truncated: bool, fields: array<int, array<string, mixed>>}
+     * @return array{columns: array<int, array{index: int, header: string, samples: array<int, string>, suggested_field: string|null}>, total_rows: int, fields: array<int, array<string, mixed>>}
      */
     public function inspect(UploadedFile $file): array
     {
@@ -115,8 +115,8 @@ class ProductImportService
 
         return [
             'columns' => $columns,
+            // دقيقٌ لا تقديري: الملف الذي يتجاوز الحد يُرفض قبل الوصول إلى هنا.
             'total_rows' => count(array_filter($rows, fn (array $row): bool => ! $this->isBlankRow($row))),
-            'truncated' => false,
             'fields' => $this->fieldContract(),
         ];
     }

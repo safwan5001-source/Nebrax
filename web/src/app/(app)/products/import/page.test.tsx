@@ -65,7 +65,6 @@ const inspection = {
     { index: 4, header: 'Mystery', samples: [''], suggested_field: null },
   ],
   total_rows: 1,
-  truncated: false,
   fields,
 };
 

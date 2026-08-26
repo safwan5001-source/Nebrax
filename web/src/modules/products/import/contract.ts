@@ -34,7 +34,6 @@ export interface InspectedColumn {
 export interface InspectResult {
   columns: InspectedColumn[];
   total_rows: number;
-  truncated: boolean;
   fields: ImportField[];
 }
 
