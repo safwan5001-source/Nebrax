@@ -20,11 +20,10 @@ export function branchFilterDefinition(
     searchPlaceholder: 'ابحث عن فرع بالاسم أو الكود',
     emptyText: 'لا يوجد فرع مطابق',
     options: [
-      { value: 'all', label: 'كل الفروع', sub: 'ضمن نطاق صلاحياتك فقط' },
+      { value: 'all', label: 'كل الفروع' },
       ...branches.map((branch) => ({
         value: branch.id,
         label: branch.name,
-        sub: branch.is_main ? `الفرع الرئيسي · ${branch.code}` : branch.code,
       })),
     ],
   };
