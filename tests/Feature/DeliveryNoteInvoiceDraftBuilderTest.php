@@ -20,11 +20,13 @@ use App\Models\Role;
 use App\Models\StockMovement;
 use App\Models\Tenant;
 use App\Models\UnitTemplate;
+use App\Models\UnitTemplateUnit;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Accounting\DeliveryNoteInvoiceConflictException;
 use App\Services\Accounting\DeliveryNoteSalesInvoiceDraftBuilder;
 use App\Services\Accounting\DeliveryNoteService;
+use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\InvoiceService;
 use App\Services\EntitlementGrantService;
 use App\Services\PriceListService;
@@ -157,6 +159,65 @@ class DeliveryNoteInvoiceDraftBuilderTest extends TestCase
         $this->assertSame(15000, (int) $line->rounded_gross_minor);
         $this->assertSame(17250, (int) $result->invoice->total);
         $this->assertSame(2, DeliveryNoteLineInvoiceLink::count());
+    }
+
+    #[Test]
+    public function a_rational_delivery_draft_posts_the_exact_integer_base_inventory_quantity(): void
+    {
+        $template = UnitTemplate::create(['name' => 'قالب عبوة التسليم', 'base_unit' => 'piece']);
+        UnitTemplateUnit::create(['unit_template_id' => $template->id, 'name' => 'case', 'factor' => 10]);
+        $this->product->update(['unit_template_id' => $template->id, 'track_inventory' => true]);
+        $this->product->refresh();
+        app(InventoryService::class)->applyReceipt($this->product, 10, 5000, ['warehouse_id' => $this->warehouse->id]);
+
+        $note = $this->confirmedNote([[
+            'product_id' => $this->product->id,
+            'unit' => 'case',
+            'quantity' => 1,
+            'quantity_numerator' => 1,
+            'quantity_denominator' => 2,
+        ]]);
+        $draft = $this->builder->build($this->command([$note], unitPrice: 20000))->invoice;
+
+        $this->invoices->post($draft);
+
+        $movement = StockMovement::query()
+            ->where('source_type', Invoice::class)
+            ->where('source_id', $draft->id)
+            ->where('type', 'out')
+            ->sole();
+        $this->assertSame(5, (int) $movement->quantity);
+        $this->assertSame(25000, (int) $movement->total_cost);
+        $this->assertSame(5, (int) $this->product->fresh()->quantity_on_hand);
+    }
+
+    #[Test]
+    public function a_rational_delivery_draft_rejects_a_non_integral_base_inventory_quantity_without_effect(): void
+    {
+        $template = UnitTemplate::create(['name' => 'قالب كسر غير قابل للمخزون', 'base_unit' => 'piece']);
+        $this->product->update(['unit_template_id' => $template->id, 'track_inventory' => true]);
+        $this->product->refresh();
+        app(InventoryService::class)->applyReceipt($this->product, 1, 5000, ['warehouse_id' => $this->warehouse->id]);
+
+        $note = $this->confirmedNote([[
+            'product_id' => $this->product->id,
+            'unit' => 'piece',
+            'quantity' => 1,
+            'quantity_numerator' => 1,
+            'quantity_denominator' => 2,
+        ]]);
+        $draft = $this->builder->build($this->command([$note], unitPrice: 20000))->invoice;
+
+        try {
+            $this->invoices->post($draft);
+            $this->fail('يجب رفض كمية مخزون نسبية لا تمثل عدداً صحيحاً من وحدات الأساس.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('لا تمثل عدداً صحيحاً من وحدات المخزون', $exception->getMessage());
+        }
+
+        $this->assertTrue($draft->fresh()->isDraft());
+        $this->assertSame(1, (int) $this->product->fresh()->quantity_on_hand);
+        $this->assertSame(0, StockMovement::query()->where('source_type', Invoice::class)->count());
     }
 
     #[Test]
