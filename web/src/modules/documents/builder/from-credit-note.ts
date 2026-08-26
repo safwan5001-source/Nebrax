@@ -1,6 +1,7 @@
 import { riyalToMinor } from '@/lib/money';
 import type { DocumentModel } from '../types';
 import type { SourceCompany, SourceCustomer } from './from-invoice';
+import { buildDocumentSeller } from './company-seller';
 
 /** أشكال مصدر الإشعار الدائن (عقد الـ API) — المبالغ بالريال نصّاً. */
 export interface SourceCreditNoteLine {
@@ -23,7 +24,7 @@ export interface SourceCreditNote {
   lines: SourceCreditNoteLine[];
 }
 
-/** يبني `DocumentModel` من إشعار دائن (النوع `credit_note`) — يعيد استخدام نفس القوالب. */
+/** يبني `DocumentModel` من إشعار دائن/مدين — يعيد استخدام نفس القوالب. */
 export function buildCreditNoteDocumentModel(input: {
   note: SourceCreditNote;
   company: SourceCompany | null;
@@ -37,20 +38,13 @@ export function buildCreditNoteDocumentModel(input: {
   signatureUrl?: string | null;
 }): DocumentModel {
   const { note, company, customer, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
+  const seller = buildDocumentSeller(company, { logoUrl, logoHeight });
 
   return {
     type: note.type === 'purchase' ? 'debit_note' : 'credit_note',
     currency: 'SAR',
     direction: 'rtl',
-    seller: {
-      name: company?.name ?? '—',
-      vatNumber: company?.vat_number ?? null,
-      crNumber: company?.cr_number ?? null,
-      tagline: null,
-      logoText: null,
-      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : null,
-      logoHeight: logoHeight ?? null,
-    },
+    seller,
     buyer: {
       name: customer?.name ?? '—',
       vatNumber: customer?.vat_number ?? null,
