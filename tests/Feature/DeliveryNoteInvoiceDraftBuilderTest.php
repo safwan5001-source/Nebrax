@@ -221,6 +221,7 @@ class DeliveryNoteInvoiceDraftBuilderTest extends TestCase
 
             $result = $this->builder->build($this->command($notes, idempotencyKey: "source-line-limit-{$lineCount}"));
             $this->assertFalse($result->idempotentReplay);
+            $this->assertLessThanOrEqual(255, mb_strlen((string) $result->invoice->lines->sole()->description));
         }
 
         $overflowNotes = $this->confirmedNotesWithSourceLineCount(501);

@@ -38,6 +38,8 @@ class DeliveryNoteSalesInvoiceDraftBuilder
     private const MAX_NOTES = 50;
     /** عقد واحد لحمولة سطور المصدر في preview وbuild وForm Request. */
     public const MAX_SOURCE_LINES = 500;
+    /** حد عمود invoice_lines.description؛ لا يعتمد PostgreSQL على تساهل SQLite. */
+    private const MAX_INVOICE_LINE_DESCRIPTION_LENGTH = 255;
     private const MAX_MONEY = 100000000000;
     private const MAX_QUANTITY = 1000000;
 
@@ -692,7 +694,12 @@ class DeliveryNoteSalesInvoiceDraftBuilder
         $suffix = ' #' . substr(hash('sha256', $groupKey), 0, 12);
         $description = 'توريد — سندات ' . $references;
 
-        return mb_strimwidth($description, 0, 1000 - mb_strlen($suffix), '…') . $suffix;
+        return mb_strimwidth(
+            $description,
+            0,
+            self::MAX_INVOICE_LINE_DESCRIPTION_LENGTH - mb_strlen($suffix),
+            '…',
+        ) . $suffix;
     }
 
     /**
