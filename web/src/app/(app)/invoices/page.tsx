@@ -14,8 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
-import { type BranchView } from '@/lib/branch-view';
+import { useBranches } from '@/lib/branch';
+import { appendBranchFilter, branchFilterDefinition } from '@/lib/branch-filter';
 import { formatRiyal } from '@/lib/money';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import {
@@ -99,6 +99,7 @@ export default function InvoicesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { success, error: errorToast } = useToast();
+  const { branches, active } = useBranches();
 
   const [explorer, setExplorer] = useState<DataExplorerState>(() => {
     const parsed = parseExplorerState(new URLSearchParams(searchParams.toString()));
@@ -113,7 +114,6 @@ export default function InvoicesPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [toDelete, setToDelete] = useState<Invoice | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [view, setView] = useState<BranchView>('current');
 
   const partnerNames = useMemo(
     () => Object.fromEntries(partners.map((partner) => [partner.id, partner.name])),
@@ -121,6 +121,7 @@ export default function InvoicesPage() {
   );
 
   const definitions = useMemo<FilterDefinition[]>(() => [
+    branchFilterDefinition(branches, active?.name),
     {
       key: 'status', label: t('status'), kind: 'select', quick: true,
       options: [
@@ -152,7 +153,7 @@ export default function InvoicesPage() {
     { key: 'due_date', label: 'تاريخ الاستحقاق', kind: 'dateRange' },
     { key: 'total', label: t('total'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
     { key: 'remaining', label: 'المتبقي', kind: 'money', operators: ['gte', 'lte', 'eq'] },
-  ], [partners, t, ts]);
+  ], [active?.name, branches, partners, t, ts]);
 
   const labelledFilters = useMemo(
     () => explorer.filters.map((filter) => ({
@@ -184,7 +185,7 @@ export default function InvoicesPage() {
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
-    if (view === 'all') params.set('branch', 'all');
+    appendBranchFilter(params, explorer.filters);
     if (explorer.search.trim()) params.set('search', explorer.search.trim());
     params.set('per_page', String(explorer.perPage ?? 25));
     params.set('page', String(explorer.page ?? 1));
@@ -223,7 +224,7 @@ export default function InvoicesPage() {
       })
       .catch(() => setError(t('load_error')))
       .finally(() => setLoading(false));
-  }, [explorer, t, view]);
+  }, [explorer, t]);
 
   useEffect(() => load(), [load]);
 
@@ -288,8 +289,6 @@ export default function InvoicesPage() {
     {
       id: 'partner', header: t('partner'), enableSorting: false,
       accessorFn: (row) => partnerNames[row.partner_id] ?? '—',
-      // اسم الطرف يُقصّ عند حدٍّ معقول بدل أن يكسر الصف إلى خمسة أسطر:
-      // النص كاملٌ في الـ DOM (فيقرأه القارئ الصوتي) وفي `title` عند التحويم.
       cell: ({ row }) => {
         const name = partnerNames[row.original.partner_id] ?? '—';
         return <span className="block max-w-64 truncate" title={name}>{name}</span>;
@@ -327,16 +326,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={t('title')}
-        context={
-          <BranchViewToggle
-            value={view}
-            onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }}
-          />
-        }
-        actions={headerActions}
-      />
+      <PageHeader title={t('title')} actions={headerActions} />
 
       <ListToolbar
         search={searchInput}
