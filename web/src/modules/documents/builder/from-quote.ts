@@ -1,6 +1,7 @@
 import { riyalToMinor } from '@/lib/money';
 import type { DocumentModel } from '../types';
 import type { SourceCompany, SourceCustomer } from './from-invoice';
+import { buildDocumentSeller } from './company-seller';
 
 /** أشكال مصدر عرض السعر (عقد الـ API) — المبالغ بالريال نصّاً. */
 export interface SourceQuoteLine {
@@ -39,20 +40,13 @@ export function buildQuoteDocumentModel(input: {
   signatureUrl?: string | null;
 }): DocumentModel {
   const { quote, company, customer, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
+  const seller = buildDocumentSeller(company, { logoUrl, logoHeight });
 
   return {
     type: 'quotation',
     currency: 'SAR',
     direction: 'rtl',
-    seller: {
-      name: company?.name ?? '—',
-      vatNumber: company?.vat_number ?? null,
-      crNumber: company?.cr_number ?? null,
-      tagline: null,
-      logoText: null,
-      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : null,
-      logoHeight: logoHeight ?? null,
-    },
+    seller,
     buyer: {
       name: customer?.name ?? '—',
       vatNumber: customer?.vat_number ?? null,
