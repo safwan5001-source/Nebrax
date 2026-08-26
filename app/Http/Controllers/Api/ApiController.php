@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\Warehouse;
 use App\Tenancy\BranchContext;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use PDOException;
 use RuntimeException;
 
@@ -31,27 +33,43 @@ abstract class ApiController extends Controller
 
     /**
      * ═══════════════════════════════════════════════════════════════
-     *  تصفية قائمة مستندات بالفرع النشط — **صريحة، لا Global Scope**
+     *  تصفية قائمة مستندات بالفرع — **صريحة، لا Global Scope**
      * ═══════════════════════════════════════════════════════════════
      *  المستندات المحاسبية مصنَّفة `BelongsToBranch`: موسومة بالفرع بلا Scope
-     *  عالمي، حفاظاً على شمول ميزان المراجعة المجمّع (لو صُفّيت تلقائياً
-     *  لاختفت قيود صامتةً). فتصفية **العرض** تتمّ هنا في المتحكّم وحده،
-     *  ولا تمسّ `ReportService` ولا أي حساب محاسبي.
+     *  عالمي، حفاظاً على شمول ميزان المراجعة المجمّع. فتصفية **العرض** تتمّ
+     *  هنا في المتحكّم وحده ولا تغيّر BranchContext التشغيلي ولا تمس التقارير.
      *
-     *  ثلاث قواعد:
-     *   1. الافتراضي = الفرع النشط. `?branch=all` يُظهر كل الفروع صراحةً.
-     *   2. تشمل `branch_id IS NULL` — بيانات ما قبل الفروع تبقى مرئية للجميع.
-     *   3. بلا سياق فرع (مؤسسة بفرع واحد، أوامر artisan) لا تصفية إطلاقاً.
+     *  القواعد:
+     *   1. بلا معامل = الفرع النشط، كما كان قبل الفلتر المتقدم.
+     *   2. `?branch=all` = كل الفروع **المسموح بها للمستخدم فقط**.
+     *   3. `?branch=<uuid>` = فرع محدد بعد التحقق من المستأجر وصلاحية المستخدم.
+     *   4. تشمل `branch_id IS NULL` حفاظاً على بيانات ما قبل الفروع.
      */
     protected function scopeToActiveBranch(Builder $query, Request $request): Builder
     {
-        $table   = $query->getModel()->getTable();
-        $allowed = $request->user()?->allowedBranchIds();
+        $table     = $query->getModel()->getTable();
+        $allowed   = $request->user()?->allowedBranchIds();
+        $requested = $request->query('branch');
 
         // «كل الفروع» تعني كلَّ **ما يملكه المستخدم** لا كلَّ ما في المؤسسة:
         // القيد على المستخدم لا يُرفَع بمعاملٍ في الرابط.
-        if ($request->query('branch') === 'all') {
+        if ($requested === 'all') {
             return $allowed === null ? $query : $this->whereBranchIn($query, $table, $allowed);
+        }
+
+        // الفلتر المتقدم يستطيع تضييق قائمة واحدة إلى فرع معيّن من دون تغيير
+        // X-Branch-Id أو BranchContext. الرابط نفسه ليس إذناً: نتحقق من UUID،
+        // TenantScope، ثم صلاحية المستخدم قبل تطبيقه.
+        if (is_string($requested) && $requested !== '') {
+            $valid = Str::isUuid($requested)
+                && Branch::whereKey($requested)->exists()
+                && ($allowed === null || in_array($requested, $allowed, true));
+
+            if (! $valid) {
+                abort(422, 'الفرع المحدد غير متاح ضمن نطاق صلاحياتك.');
+            }
+
+            return $this->whereBranchIn($query, $table, [$requested]);
         }
 
         $branchId = app(BranchContext::class)->id();
