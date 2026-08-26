@@ -1,229 +1,79 @@
 'use client';
 
-import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { ImagePlus, Trash2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
-import { api, ApiError, fetchImageUrl } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
-import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
-import { getSystemTaxInclusive } from '@/lib/tax';
-import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
+import { riyalToMinor } from '@/lib/money';
 
-export interface Product {
-  id: string;
-  sku: string | null;
-  barcode: string | null;
-  name: string;
-  name_en: string | null;
-  type: string;
-  unit: string;
-  description: string | null;
-  category: string | null;
-  brand: string | null;
-  category_id: string | null;
-  brand_id: string | null;
-  unit_template_id: string | null;
-  reorder_level: number | null;
-  min_sale_price: string | null;
-  discount: number | null;
-  discount_type: string | null;
-  profit_margin: number | null;
-  tags: string | null;
-  internal_notes: string | null;
-  sales_account_id: string | null;
-  cogs_account_id: string | null;
-  sale_price: string;
-  purchase_price: string;
-  tax_rate: number;
-  track_inventory: boolean;
-  quantity_on_hand: number;
-  avg_cost: string;
-  is_active: boolean;
-}
-
-interface FormState {
-  name: string;
-  sku: string;
-  barcode: string;
-  name_en: string;
-  type: string;
-  unit: string;
-  description: string;
-  category_id: string;
-  brand_id: string;
-  unit_template_id: string;
-  reorder_level: string;
-  min_sale_price: string;
-  discount: string;
-  discount_type: string;
-  profit_margin: string;
-  tags: string;
-  internal_notes: string;
-  sales_account_id: string;
-  cogs_account_id: string;
-  sale_price: string;
-  purchase_price: string;
-  tax_rate: string;
-  track_inventory: boolean;
-  is_active: boolean;
-}
-
-interface Acct { id: string; code: string; name: string; type: string; is_group: boolean }
-/** عنصر قائمة مُدارة (تصنيف/علامة) — الاسم وحده يكفي للاختيار. */
-interface Listed { id: string; name: string }
-interface ProductMedia { id: string; original_name: string; download_url: string; sort_order: number; previewUrl?: string | null }
-
-const MAX_PRODUCT_IMAGES = 8;
-const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
-const PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
-const emptyForm = (): FormState => ({
-  name: '', sku: '', barcode: '', name_en: '', type: 'good', unit: 'piece',
-  description: '', category_id: '', brand_id: '', unit_template_id: '', reorder_level: '',
-  min_sale_price: '', discount: '', discount_type: 'percent', profit_margin: '', tags: '', internal_notes: '',
-  sales_account_id: '', cogs_account_id: '',
-  sale_price: '', purchase_price: '', tax_rate: '15', track_inventory: false, is_active: true,
-});
-
-function fromProduct(p: Product): FormState {
-  return {
-    name: p.name, sku: p.sku ?? '', barcode: p.barcode ?? '', name_en: p.name_en ?? '', type: p.type, unit: p.unit,
-    description: p.description ?? '', category_id: p.category_id ?? '', brand_id: p.brand_id ?? '', unit_template_id: p.unit_template_id ?? '', reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
-    min_sale_price: p.min_sale_price ?? '', discount: p.discount != null ? String(p.discount) : '', discount_type: p.discount_type ?? 'percent',
-    profit_margin: p.profit_margin != null ? String(p.profit_margin) : '', tags: p.tags ?? '', internal_notes: p.internal_notes ?? '',
-    sales_account_id: p.sales_account_id ?? '', cogs_account_id: p.cogs_account_id ?? '',
-    sale_price: p.sale_price, purchase_price: p.purchase_price, tax_rate: String(p.tax_rate),
-    track_inventory: p.track_inventory, is_active: p.is_active,
-  };
-}
-
+/**
+ * ═══ إنشاء منتج سريع من داخل مستند ═══
+ *
+ * هذا الحوار **ليس نموذج البيانات الأساسية**. مكان ذلك `/products/new` و
+ * `/products/[id]/edit`: التصنيف والعلامة والمورّد والحسابات والوحدات والصور
+ * والرصيد الابتدائي كلّها هناك.
+ *
+ * غرضه واحد: كاتب الفاتورة اكتشف صنفاً غير مسجَّل، فيسجّل أقلّ ما يلزم لإكمال
+ * السطر ويعود إليه فوراً. حشرُ النموذج الكامل في نافذة كان يعطي ثلاثة أعمدة
+ * ثابتة بعرض ~١٠٠px على شاشة هاتف، ويطلب من كاتب الفاتورة قرارات كتالوج
+ * ليست قراره ولا وقتها.
+ *
+ * النقطة النهائية والحمولة كما هي (`POST /products`)، والاختيار التلقائي
+ * للمنتج المُنشأ يبقى مسؤولية المستدعي.
+ */
 export function ProductDialog({
   open,
   onClose,
   onSaved,
-  product,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
-  product?: Product | null;
 }) {
   const t = useTranslations('products');
   const tc = useTranslations('common');
   const { success } = useToast();
-  const [form, setForm] = useState<FormState>(product ? fromProduct(product) : emptyForm());
-  const [revenueAccounts, setRevenueAccounts] = useState<Acct[]>([]);
-  const [expenseAccounts, setExpenseAccounts] = useState<Acct[]>([]);
-  const [taxInclusive, setTaxInclusive] = useState(false);
-  const [categories, setCategories] = useState<Listed[]>([]);
-  const [brands, setBrands] = useState<Listed[]>([]);
-  const [templates, setTemplates] = useState<ProductUnitTemplate[]>([]);
+
+  const [name, setName] = useState('');
+  const [sku, setSku] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [type, setType] = useState('good');
+  const [unit, setUnit] = useState('');
+  const [salePrice, setSalePrice] = useState('');
+  const [purchasePrice, setPurchasePrice] = useState('');
+  const [taxRate, setTaxRate] = useState('15');
   const [error, setError] = useState<string | null>(null);
-  const [media, setMedia] = useState<ProductMedia[]>([]);
-  const [loadingMedia, setLoadingMedia] = useState(false);
-  const [uploadingMedia, setUploadingMedia] = useState(false);
-  const { number: suggestedSku } = useNumberPreview('product', { enabled: open && !product?.id });
-  const mediaObjectUrls = useRef<string[]>([]);
-
-  const revokeMediaObjectUrls = useCallback(() => {
-    mediaObjectUrls.current.forEach((url) => URL.revokeObjectURL(url));
-    mediaObjectUrls.current = [];
-  }, []);
-
-  const loadMedia = useCallback(async () => {
-    if (!product?.id) return;
-    setLoadingMedia(true);
-    try {
-      const result = await api<{ data: ProductMedia[] }>(`/products/${product.id}/media`);
-      const hydrated = await Promise.all(result.data.map(async (item) => ({
-        ...item,
-        previewUrl: await fetchImageUrl(item.download_url),
-      })));
-      revokeMediaObjectUrls();
-      mediaObjectUrls.current = hydrated.flatMap((item) => item.previewUrl ? [item.previewUrl] : []);
-      setMedia(hydrated);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
-    } finally {
-      setLoadingMedia(false);
-    }
-  }, [product?.id, revokeMediaObjectUrls, t]);
-
-  useEffect(() => {
-    if (!open) return;
-    getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
-    api<{ data: Listed[] }>('/product-categories').then((r) => setCategories(r.data)).catch(() => {});
-    api<{ data: Listed[] }>('/brands').then((r) => setBrands(r.data)).catch(() => {});
-    api<{ data: ProductUnitTemplate[] }>('/unit-templates').then((r) => setTemplates(r.data)).catch(() => {});
-    api<{ data: Acct[] }>('/accounts')
-      .then((r) => {
-        const leaf = r.data.filter((a) => !a.is_group);
-        setRevenueAccounts(leaf.filter((a) => a.type === 'revenue'));
-        setExpenseAccounts(leaf.filter((a) => a.type === 'expense'));
-      })
-      .catch(() => {});
-  }, [open]);
-  useEffect(() => {
-    if (open && product?.id) void loadMedia();
-  }, [loadMedia, open, product?.id]);
-  useEffect(() => () => revokeMediaObjectUrls(), [revokeMediaObjectUrls]);
   const [saving, setSaving] = useState(false);
+  const { number: suggestedSku } = useNumberPreview('product', { enabled: open });
 
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
-
-  function selectUnitTemplate(templateId: string) {
-    setForm((current) => ({
-      ...current,
-      unit_template_id: templateId,
-      unit: productUnitForTemplate(templateId, templates, current.unit),
-    }));
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
     setSaving(true);
     setError(null);
-    const body = {
-      name: form.name,
-      name_en: form.name_en || null,
-      sku: form.sku || null,
-      barcode: form.barcode || null,
-      type: form.type,
-      unit: form.unit || null,
-      description: form.description || null,
-      category_id: form.category_id || null,
-      brand_id: form.brand_id || null,
-      unit_template_id: form.unit_template_id || null,
-      reorder_level: form.track_inventory && form.reorder_level !== '' ? Number(form.reorder_level) || 0 : null,
-      min_sale_price: form.min_sale_price !== '' ? riyalToMinor(form.min_sale_price) : null,
-      discount: form.discount !== '' ? Number(form.discount) || 0 : null,
-      discount_type: form.discount !== '' ? form.discount_type : null,
-      profit_margin: form.profit_margin !== '' ? Number(form.profit_margin) || 0 : null,
-      tags: form.tags || null,
-      internal_notes: form.internal_notes || null,
-      sales_account_id: form.sales_account_id || null,
-      cogs_account_id: form.cogs_account_id || null,
-      sale_price: riyalToMinor(form.sale_price),
-      purchase_price: riyalToMinor(form.purchase_price),
-      tax_rate: Number(form.tax_rate) || 0,
-      track_inventory: form.track_inventory,
-      is_active: form.is_active,
-    };
     try {
-      if (product?.id) {
-        await api(`/products/${product.id}`, { method: 'PUT', body });
-        success(tc('updated'));
-      } else {
-        await api('/products', { method: 'POST', body });
-        success(tc('created'));
-      }
+      await api('/products', {
+        method: 'POST',
+        body: {
+          name: name.trim(),
+          // فارغاً تعني «ولّده الخادم» — يخصّصه `ProductController::store` تحت القفل.
+          sku: sku.trim() || null,
+          barcode: barcode.trim() || null,
+          type,
+          unit: unit.trim() || null,
+          sale_price: riyalToMinor(salePrice),
+          purchase_price: riyalToMinor(purchasePrice),
+          tax_rate: Number(taxRate) || 0,
+          track_inventory: false,
+          is_active: true,
+        },
+      });
+      success(tc('created'));
       onSaved();
       onClose();
     } catch (err) {
@@ -233,263 +83,74 @@ export function ProductDialog({
     }
   }
 
-  async function uploadMedia(event: ChangeEvent<HTMLInputElement>) {
-    if (!product?.id) return;
-    const files = Array.from(event.target.files ?? []);
-    event.target.value = '';
-    if (files.length === 0) return;
-    if (media.length + files.length > MAX_PRODUCT_IMAGES) {
-      setError(t('media_limit_reached'));
-      return;
-    }
-    if (files.some((file) => !PRODUCT_IMAGE_TYPES.includes(file.type) || file.size > MAX_PRODUCT_IMAGE_SIZE)) {
-      setError(t('media_invalid_file'));
-      return;
-    }
-
-    setUploadingMedia(true);
-    setError(null);
-    try {
-      const body = new FormData();
-      files.forEach((file) => body.append('media[]', file));
-      await api(`/products/${product.id}/media`, { method: 'POST', body });
-      await loadMedia();
-      success(t('media_uploaded'));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
-    } finally {
-      setUploadingMedia(false);
-    }
-  }
-
-  async function removeMedia(mediaId: string) {
-    if (!product?.id) return;
-    setError(null);
-    try {
-      await api(`/products/${product.id}/media/${mediaId}`, { method: 'DELETE' });
-      await loadMedia();
-      success(t('media_deleted'));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
-    }
-  }
-
   return (
-    <Dialog open={open} onClose={onClose} title={product?.id ? t('edit') : t('add')} className="max-w-2xl">
+    <Dialog open={open} onClose={onClose} title={t('quick_add')}>
       <form onSubmit={submit} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="name">{t('name')}</Label>
-            <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sku">{t('sku')}</Label>
-            <Input id="sku" dir="ltr" value={form.sku || suggestedSku} onChange={(e) => set('sku', e.target.value)} />
-          </div>
-          <div className="col-span-2 space-y-1.5">
-            <Label htmlFor="barcode">{t('barcode')}</Label>
-            <Input id="barcode" dir="ltr" className="num" value={form.barcode} onChange={(e) => set('barcode', e.target.value)} />
-          </div>
+        <p className="text-xs leading-relaxed text-muted">{t('quick_add_hint')}</p>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="quick-product-name">{t('name')} <span className="text-negative">*</span></Label>
+          <Input id="quick-product-name" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="type">{t('type')}</Label>
-            <Select id="type" value={form.type} onChange={(e) => set('type', e.target.value)}>
+            <Label htmlFor="quick-product-sku">{t('sku')}</Label>
+            <Input
+              id="quick-product-sku" className="num" dir="ltr" value={sku}
+              placeholder={suggestedSku || t('sku_auto_placeholder')}
+              onChange={(e) => setSku(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="quick-product-barcode">{t('barcode')}</Label>
+            <Input
+              id="quick-product-barcode" className="num" dir="ltr" inputMode="numeric"
+              value={barcode} onChange={(e) => setBarcode(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="quick-product-type">{t('type')}</Label>
+            <Select id="quick-product-type" value={type} onChange={(e) => setType(e.target.value)}>
               <option value="good">{t('good')}</option>
               <option value="service">{t('service')}</option>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="unit">{t('unit')}</Label>
-            <Input id="unit" value={form.unit} onChange={(e) => set('unit', e.target.value)} readOnly={Boolean(form.unit_template_id)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="unit-template">{t('unit_template')}</Label>
-            <Select id="unit-template" value={form.unit_template_id} onChange={(e) => selectUnitTemplate(e.target.value)}>
-              <option value="">{t('no_unit_template')}</option>
-              {templates.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </Select>
-            <p className="text-xs text-muted">{t('unit_template_hint')}</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="category">{t('category')}</Label>
-            <Select id="category" value={form.category_id} onChange={(e) => set('category_id', e.target.value)}>
-              <option value="">{t('unclassified')}</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="brand">{t('brand')}</Label>
-            <Select id="brand" value={form.brand_id} onChange={(e) => set('brand_id', e.target.value)}>
-              <option value="">{t('unclassified')}</option>
-              {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </Select>
-          </div>
-          <div className="col-span-2 space-y-1.5">
-            <Label htmlFor="description">{t('description')}</Label>
-            <textarea id="description" rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary" />
+            <Label htmlFor="quick-product-unit">{t('unit')}</Label>
+            <Input id="quick-product-unit" value={unit} onChange={(e) => setUnit(e.target.value)} />
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
-            <Label htmlFor="sale_price">{t('sale_price')}</Label>
-            <Input id="sale_price" className="num text-end" inputMode="decimal" value={form.sale_price} onChange={(e) => set('sale_price', e.target.value)} required />
-            {(() => {
-              // تلميح وضع الضريبة (من إعدادات النظام): يوضّح دلالة السعر ويعرض المكمّل.
-              const pm = riyalToMinor(form.sale_price);
-              const rate = Number(form.tax_rate) || 0;
-              if (!Number.isFinite(pm) || pm <= 0 || rate <= 0) return null;
-              const other = taxInclusive ? pm - extractInclusiveTax(pm, rate) : pm + Math.round((pm * rate) / 100);
-              return (
-                <p className="text-[11px] text-muted">
-                  {t(taxInclusive ? 'price_hint_incl' : 'price_hint_excl', { amount: formatRiyal(other / 100) })}
-                </p>
-              );
-            })()}
+            <Label htmlFor="quick-product-sale">{t('sale_price')} <span className="text-negative">*</span></Label>
+            <Input
+              id="quick-product-sale" className="num text-end" inputMode="decimal" dir="ltr" placeholder="0.00"
+              value={salePrice} onChange={(e) => setSalePrice(e.target.value)} required
+            />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="purchase_price">{t('purchase_price')}</Label>
-            <Input id="purchase_price" className="num text-end" inputMode="decimal" value={form.purchase_price} onChange={(e) => set('purchase_price', e.target.value)} />
+            <Label htmlFor="quick-product-purchase">{t('purchase_price')}</Label>
+            <Input
+              id="quick-product-purchase" className="num text-end" inputMode="decimal" dir="ltr" placeholder="0.00"
+              value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="tax_rate">{t('tax_rate')}</Label>
-            <Input id="tax_rate" className="num text-end" type="number" min={0} max={100} value={form.tax_rate} onChange={(e) => set('tax_rate', e.target.value)} />
+            <Label htmlFor="quick-product-tax">{t('tax_rate')}</Label>
+            <Input
+              id="quick-product-tax" className="num text-end" type="number" min={0} max={100} dir="ltr"
+              value={taxRate} onChange={(e) => setTaxRate(e.target.value)}
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="min_sale">{t('min_sale_price')}</Label>
-            <Input id="min_sale" className="num text-end" inputMode="decimal" value={form.min_sale_price} onChange={(e) => set('min_sale_price', e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="margin">{t('profit_margin')}</Label>
-            <Input id="margin" className="num text-end" type="number" min={0} value={form.profit_margin} onChange={(e) => set('profit_margin', e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="disc">{t('discount')}</Label>
-            <div className="flex gap-1.5">
-              <Input id="disc" className="num text-end" type="number" min={0} value={form.discount} onChange={(e) => set('discount', e.target.value)} />
-              <Select className="w-16" value={form.discount_type} onChange={(e) => set('discount_type', e.target.value)}>
-                <option value="percent">%</option>
-                <option value="amount">﷼</option>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        {(revenueAccounts.length > 0 || expenseAccounts.length > 0) && (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="sales_acc">{t('sales_account')}</Label>
-              <Select id="sales_acc" value={form.sales_account_id} onChange={(e) => set('sales_account_id', e.target.value)}>
-                <option value="">{t('default_account')}</option>
-                {revenueAccounts.map((a) => (<option key={a.id} value={a.id}>{a.code} — {a.name}</option>))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cogs_acc">{t('cogs_account')}</Label>
-              <Select id="cogs_acc" value={form.cogs_account_id} onChange={(e) => set('cogs_account_id', e.target.value)}>
-                <option value="">{t('default_account')}</option>
-                {expenseAccounts.map((a) => (<option key={a.id} value={a.id}>{a.code} — {a.name}</option>))}
-              </Select>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="tags">{t('tags')}</Label>
-            <Input id="tags" placeholder={t('tags_hint')} value={form.tags} onChange={(e) => set('tags', e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="internal_notes">{t('internal_notes')}</Label>
-            <Input id="internal_notes" value={form.internal_notes} onChange={(e) => set('internal_notes', e.target.value)} />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6 pt-1">
-          <label className="flex items-center gap-2 text-sm text-text">
-            <input type="checkbox" checked={form.track_inventory} onChange={(e) => set('track_inventory', e.target.checked)} />
-            {t('track_inventory')}
-          </label>
-          <label className="flex items-center gap-2 text-sm text-text">
-            <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
-            {t('active')}
-          </label>
-        </div>
-
-        {form.track_inventory && (
-          <div className="space-y-1.5">
-            <Label htmlFor="reorder">{t('reorder_level')}</Label>
-            <Input id="reorder" className="num text-end w-40" type="number" min={0} value={form.reorder_level} onChange={(e) => set('reorder_level', e.target.value)} />
-          </div>
-        )}
-
-        {product?.id && (
-          <section className="space-y-3 rounded-md border border-border p-3" aria-labelledby="edit-product-media-title">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h3 id="edit-product-media-title" className="text-sm font-medium text-text">{t('product_media')}</h3>
-                <p className="mt-1 text-xs leading-relaxed text-muted">{t('product_media_hint')}</p>
-              </div>
-              <span className="num text-xs text-muted">{t('selected_media_count', { count: media.length, max: MAX_PRODUCT_IMAGES })}</span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Label htmlFor="edit-product-media" className="sr-only">{t('upload_media')}</Label>
-              <Input
-                id="edit-product-media"
-                type="file"
-                accept={PRODUCT_IMAGE_TYPES.join(',')}
-                multiple
-                disabled={uploadingMedia || loadingMedia || media.length >= MAX_PRODUCT_IMAGES}
-                onChange={uploadMedia}
-                className="max-w-sm"
-              />
-              {(uploadingMedia || loadingMedia) && <span className="text-xs text-muted">{t('loading_profile')}</span>}
-            </div>
-
-            {!loadingMedia && media.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2 text-sm text-muted">
-                <ImagePlus className="h-4 w-4" strokeWidth={1.6} aria-hidden />
-                {t('no_media')}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {media.map((item) => (
-                  <div key={item.id} className="overflow-hidden rounded-md border border-border bg-surface">
-                    <div className="relative aspect-square bg-background">
-                      {item.previewUrl ? (
-                        <Image src={item.previewUrl} alt={item.original_name} fill sizes="(max-width: 640px) 50vw, 160px" unoptimized className="object-cover" />
-                      ) : (
-                        <span className="grid h-full place-items-center text-muted" aria-hidden><ImagePlus className="h-5 w-5" strokeWidth={1.5} /></span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 p-2">
-                      <span className="min-w-0 flex-1 truncate text-xs" title={item.original_name}>{item.original_name}</span>
-                      <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${item.original_name}`} onClick={() => removeMedia(item.id)} disabled={uploadingMedia || loadingMedia}>
-                        <Trash2 className="h-4 w-4" strokeWidth={1.7} />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
+        {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t('cancel')}
-          </Button>
-          <Button type="submit" disabled={saving || uploadingMedia || loadingMedia}>
-            {t('save')}
-          </Button>
+          <Button type="button" variant="outline" onClick={onClose}>{t('cancel')}</Button>
+          <Button type="submit" disabled={saving || !name.trim()}>{t('save')}</Button>
         </div>
       </form>
     </Dialog>

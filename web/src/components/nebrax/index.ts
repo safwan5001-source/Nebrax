@@ -5,7 +5,7 @@ export { Pagination } from './pagination';
 export { LoadingState, EmptyState, ErrorState } from './states';
 export { MobileRecordItem, type MobileRecord } from './mobile-record';
 export { FormPage, FormActions } from './form-page';
-export { FormSection, FieldGrid, FieldSpan } from './form-section';
+export { FormSection, FieldGrid, FieldSpan, ToggleField } from './form-section';
 export { FormAlert } from './form-alert';
 export {
   DetailPage,

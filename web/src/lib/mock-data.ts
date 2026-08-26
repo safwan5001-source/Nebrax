@@ -33,10 +33,13 @@ export interface MockPartner {
   classification?: string | null;
   credit_limit?: string | null;   // بالريال كنص (مثل موارد الـ API)
   credit_period?: number | null;
+  default_price_list_id?: string | null;
+  default_price_list?: { id: string; name: string; is_active: boolean } | null;
+  is_active?: boolean;
 }
 
 export const mockPartners: MockPartner[] = [
-  { id: 'p1', name: 'مؤسسة الخليج للتجارة', type: 'customer', entity_type: 'commercial', email: 'info@gulf-trade.sa', phone: '0138012345', mobile: '0551234567', city: 'الدمام', vat_number: '311111111100003', code: 'C-001', classification: 'VIP', credit_limit: '150000.00', credit_period: 30, building_no: '3421', street: 'طريق الملك فهد', district: 'العليا', postal_code: '32233', country: 'SA' },
+  { id: 'p1', name: 'مؤسسة الخليج للتجارة', type: 'customer', entity_type: 'commercial', email: 'info@gulf-trade.sa', phone: '0138012345', mobile: '0551234567', city: 'الدمام', vat_number: '311111111100003', code: 'C-001', classification: 'VIP', credit_limit: '150000.00', credit_period: 30, building_no: '3421', street: 'طريق الملك فهد', district: 'العليا', postal_code: '32233', country: 'SA', default_price_list_id: 'pl-1', default_price_list: { id: 'pl-1', name: 'أسعار الجملة', is_active: true }, is_active: true },
   { id: 'p2', name: 'شركة الواحة للمقاولات', type: 'customer', email: 'accounts@alwaha.sa', phone: '0138023456', city: 'الخبر', vat_number: '312222222200003' },
   { id: 'p3', name: 'مصنع الشرق للبلاستيك', type: 'customer', email: 'sales@east-plast.sa', phone: '0138034567', city: 'الجبيل', vat_number: '313333333300003' },
   { id: 'p4', name: 'مؤسسة نجد للتوريدات', type: 'customer', email: 'po@najd-supply.sa', phone: '0138045678', city: 'الظهران', vat_number: '314444444400003' },
@@ -46,7 +49,11 @@ export const mockPartners: MockPartner[] = [
   { id: 'p7', name: 'شركة الجزيرة للتوريدات الصناعية', type: 'supplier', entity_type: 'commercial', email: 'sales@jazira-ind.sa', phone: '0138078901', city: 'الجبيل', vat_number: '317777777700003', code: 'S-001' },
   { id: 'p8', name: 'مصنع الرياض للتغليف', type: 'supplier', entity_type: 'commercial', email: 'orders@riyadh-pack.sa', phone: '0112233445', city: 'الرياض', vat_number: '318888888800003', code: 'S-002' },
   // طرف مزدوج (عميل ومورّد معاً) — يظهر في الشاشتين.
-  { id: 'p9', name: 'مجموعة الخليج التجارية الشاملة', type: 'both', entity_type: 'commercial', email: 'hub@gulf-group.sa', phone: '0138090123', city: 'الدمام', vat_number: '319999999900003', code: 'CS-001' },
+  { id: 'p9', name: 'مجموعة الخليج التجارية الشاملة', type: 'both', entity_type: 'commercial', email: 'hub@gulf-group.sa', phone: '0138090123', city: 'الدمام', vat_number: '319999999900003', code: 'CS-001', default_price_list_id: 'pl-2', default_price_list: { id: 'pl-2', name: 'عملاء التجزئة', is_active: true }, is_active: true },
+  // اسمٌ طويل عمداً وطرفٌ معطَّل — لاختبار القصّ وحالة «غير نشط» في القوائم والملفّ.
+  { id: 'p10', name: 'شركة المجموعة السعودية المتّحدة للمقاولات العامة والصيانة الشاملة', type: 'customer', entity_type: 'commercial', email: 'contracts@saudi-united-group.sa', phone: '0114455667', mobile: '0559988776', city: 'الرياض', vat_number: '310101010100003', code: 'C-010', classification: 'حكومي', credit_limit: '75000.00', credit_period: 60, is_active: false },
+  // فردٌ بلا رقم ضريبي — الحالة الشائعة في التجزئة.
+  { id: 'p11', name: 'خالد بن سعد الدوسري', type: 'customer', entity_type: 'individual', email: null, phone: '0501122334', city: 'الخبر', vat_number: null, code: 'C-011', is_active: true },
 ];
 
 // ── الفواتير ──────────────────────────────────────────────────────────────
@@ -357,6 +364,9 @@ export interface MockProduct {
   description: string | null;
   category: string | null;
   brand: string | null;
+  category_id: string | null;
+  brand_id: string | null;
+  unit_template_id: string | null;
   reorder_level: number | null;
   supplier_id: string | null;
   sales_account_id: string | null;
@@ -383,7 +393,8 @@ function product(
   return {
     id, sku, barcode: sku ? '2' + sku.replace(/\D/g, '').padStart(12, '0') : null, name, name_en: null, type, unit,
     units: unit ? [{ name: unit, factor: 1 }] : [],
-    description: null, category: null, brand: null, reorder_level: track ? 10 : null,
+    description: null, category: null, brand: null,
+    category_id: null, brand_id: null, unit_template_id: null, reorder_level: track ? 10 : null,
     supplier_id: null, sales_account_id: null, cogs_account_id: null, min_sale_price: null, discount: null, discount_type: null, profit_margin: null, tags: null, internal_notes: null,
     sale_price: sale.toFixed(2), purchase_price: purchase.toFixed(2), tax_rate: 15,
     track_inventory: track, quantity_on_hand: qty, avg_cost: avg.toFixed(2), is_active: active,
@@ -406,11 +417,47 @@ export const mockProducts: MockProduct[] = [
     ...product('pr9', 'SKU-009', 'كرتون مناديل ورقية', 'good', 'carton', 120, 78, true, 320, 76),
     min_sale_price: '100.00',
     units: [{ name: 'كرتون', factor: 1 }, { name: 'باكيت', factor: 12 }],
+    unit_template_id: 'ut-1',
+    category_id: 'pc-1', category: 'قرطاسية ومستلزمات مكتبية',
+    brand_id: 'br-2', brand: 'الرياض للتغليف',
+    description: 'كرتون مناديل ورقية فاخرة، اثنتا عشرة باكيتاً.',
+    tags: 'مناديل، تنظيف',
+    reorder_level: 40,
   },
   // اسمٌ طويل عمداً — لاختبار القصّ والالتفاف في منتقي المنتج وسطر البند.
   {
     ...product('pr10', 'SKU-010', 'وحدة تكييف مركزي مخفي بقدرة ٣٦٠٠٠ وحدة حرارية مع لوحة تحكّم رقمية', 'good', 'piece', 4850, 3600, true, 12, 3550),
+    name_en: 'Concealed central air-conditioning unit, 36,000 BTU, digital control panel',
+    unit_template_id: 'ut-2',
+    category_id: 'pc-3', category: 'أجهزة وقياس',
+    brand_id: 'br-1', brand: 'الجزيرة',
+    supplier_id: 'p7',
+    internal_notes: 'يُركَّب بعقد صيانة سنوي.',
   },
+];
+
+/**
+ * ─────────── مراجع الكتالوج (`/product-categories` · `/brands` · `/unit-templates`) ───────────
+ * لم يكن لها معالج في المعاينة، فكانت منتقيات التصنيف والعلامة وقالب الوحدات
+ * تظهر فارغةً وتُخفي أنّ الحقل يعمل أصلاً.
+ */
+const mockProductCategories = [
+  { id: 'pc-1', name: 'قرطاسية ومستلزمات مكتبية', parent_id: null, is_active: true, products_count: 3 },
+  { id: 'pc-2', name: 'أثاث مكتبي', parent_id: null, is_active: true, products_count: 2 },
+  { id: 'pc-3', name: 'أجهزة وقياس', parent_id: null, is_active: true, products_count: 2 },
+  { id: 'pc-4', name: 'خدمات واستشارات', parent_id: null, is_active: true, products_count: 3 },
+];
+
+const mockBrands = [
+  { id: 'br-1', name: 'الجزيرة', is_active: true },
+  { id: 'br-2', name: 'الرياض للتغليف', is_active: true },
+  { id: 'br-3', name: 'بلا علامة', is_active: true },
+];
+
+const mockUnitTemplates = [
+  { id: 'ut-1', name: 'كرتون / باكيت', base_unit: 'كرتون', is_active: true, units: [{ id: 'utu-1', name: 'باكيت', factor: 12 }], products_count: 1 },
+  { id: 'ut-2', name: 'قطعة', base_unit: 'قطعة', is_active: true, units: [], products_count: 4 },
+  { id: 'ut-3', name: 'طن / كيلوجرام', base_unit: 'طن', is_active: true, units: [{ id: 'utu-2', name: 'كيلوجرام', factor: 1000 }], products_count: 0 },
 ];
 
 /**
@@ -453,10 +500,23 @@ function productFromDemoInput(body: unknown): MockProduct {
     name_en: typeof input.name_en === 'string' && input.name_en ? input.name_en : null,
     type: String(input.type ?? 'good'),
     unit: String(input.unit ?? ''),
-    units: input.unit ? [{ name: String(input.unit), factor: 1 }] : [],
+    units: (() => {
+      const template = mockUnitTemplates.find((item) => item.id === input.unit_template_id);
+      if (template) {
+        return [{ name: template.base_unit, factor: 1 }, ...template.units.map((u) => ({ name: u.name, factor: u.factor }))];
+      }
+      return input.unit ? [{ name: String(input.unit), factor: 1 }] : [];
+    })(),
     description: typeof input.description === 'string' && input.description ? input.description : null,
-    category: typeof input.category === 'string' && input.category ? input.category : null,
-    brand: typeof input.brand === 'string' && input.brand ? input.brand : null,
+    // النموذج الكامل يرسل المُعرّفات (مصدر الحقيقة)؛ الاسم النصّي يُشتقّ منها
+    // للعرض كما يفعل `ProductResource` بالعلاقة.
+    category_id: typeof input.category_id === 'string' && input.category_id ? input.category_id : null,
+    brand_id: typeof input.brand_id === 'string' && input.brand_id ? input.brand_id : null,
+    unit_template_id: typeof input.unit_template_id === 'string' && input.unit_template_id ? input.unit_template_id : null,
+    category: mockProductCategories.find((item) => item.id === input.category_id)?.name
+      ?? (typeof input.category === 'string' && input.category ? input.category : null),
+    brand: mockBrands.find((item) => item.id === input.brand_id)?.name
+      ?? (typeof input.brand === 'string' && input.brand ? input.brand : null),
     reorder_level: input.reorder_level === null || input.reorder_level === undefined ? null : Number(input.reorder_level),
     supplier_id: typeof input.supplier_id === 'string' && input.supplier_id ? input.supplier_id : null,
     sales_account_id: typeof input.sales_account_id === 'string' && input.sales_account_id ? input.sales_account_id : null,
@@ -2353,6 +2413,19 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     });
   }
   if (clean === '/products') return resolve({ data: allMockProducts() });
+  // معاينة الترقيم: بلا معالج كان نائب حقل الرمز فارغاً في المعاينة، فلا يرى
+  // المراجع أنّ الخادم يولّده. الرقم معاينةٌ لا حجز — كما في الإنتاج.
+  if (clean === '/number-preview') {
+    const key = new URLSearchParams(path.split('?')[1] ?? '').get('key') ?? 'document';
+    const prefixes: Record<string, string> = {
+      product: 'SKU-', employee: 'EMP-', branch: '', warehouse: '',
+    };
+    const prefix = prefixes[key] ?? `${key.toUpperCase().slice(0, 3)}-`;
+    return resolve({ data: { key, series_key: key, number: `${prefix}00042` } });
+  }
+  if (clean === '/product-categories') return resolve({ data: mockProductCategories });
+  if (clean === '/brands') return resolve({ data: mockBrands });
+  if (clean === '/unit-templates') return resolve({ data: mockUnitTemplates });
   const productMediaCollection = clean.match(/^\/products\/([^/]+)\/media$/);
   if (productMediaCollection) return resolve({ data: listDemoProductMedia(productMediaCollection[1]) });
   const productBarcodes = clean.match(/^\/products\/([^/]+)\/barcodes$/);

@@ -20,7 +20,7 @@ import {
   type DocRow, type StatementRow,
 } from '@/components/partners/partner-panels';
 import { api } from '@/lib/api';
-import { formatRiyal } from '@/lib/money';
+import { formatRiyal, SAUDI_RIYAL_SYMBOL } from '@/lib/money';
 import { ReportFilters, filtersToQuery, EMPTY_FILTERS, type ReportFilterState } from '@/components/reports/report-filters';
 import { createPartnerStatementPdf, downloadPartnerStatementPdf, sharePartnerStatementPdf } from '@/modules/partners/services/statement-pdf';
 import { printDocument } from '@/modules/documents/services/export';
@@ -34,6 +34,8 @@ interface Partner {
   building_no: string | null; street: string | null; district: string | null;
   postal_code: string | null; country: string | null;
   classification: string | null; credit_limit: string | null; credit_period: number | null;
+  default_price_list_id: string | null;
+  default_price_list?: { id: string; name: string; is_active: boolean } | null;
   is_active: boolean;
 }
 interface Statement {
@@ -303,12 +305,38 @@ export default function PartnerProfilePage() {
         return (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 lg:divide-x lg:divide-x-reverse lg:divide-border">
+              {/* بيانات الطرف الأساسية كانت أربعة حقول: لا هاتف ولا بريد ولا رمز
+                  ولا مدينة ولا قائمة سعر ولا شروط ائتمان — وكلّها في الاستجابة أصلاً. */}
+              <div>
+                <SubHead>{tp('contact_details')}</SubHead>
+                <KeyValue label={tp('type')} value={tp(partner?.type ?? 'customer')} />
+                <KeyValue label={tp('code')} value={partner?.code || '—'} mono />
+                <KeyValue label={tp('phone')} value={partner?.phone || partner?.mobile || '—'} mono />
+                <KeyValue label={tp('email')} value={partner?.email || '—'} />
+                <KeyValue label={tp('city')} value={partner?.city || '—'} />
+              </div>
               <div>
                 <SubHead>{t('company_data')}</SubHead>
                 <KeyValue label={tp('vat_number')} value={partner?.vat_number || '—'} mono />
                 <KeyValue label={tp('cr_number')} value={partner?.cr_number || '—'} mono />
                 <KeyValue label={t('country_code')} value={partner?.country || '—'} />
-                <KeyValue label={t('classification')} value={partner?.classification || '—'} />
+                <KeyValue label={t('classification')} value={partner?.classification || tp('untitled_classification')} />
+              </div>
+              <div>
+                <SubHead>{tp('account_details')}</SubHead>
+                <KeyValue
+                  label={tp('default_price_list')}
+                  value={partner?.default_price_list?.name || tp('no_price_list')}
+                />
+                <KeyValue
+                  label={tp('credit_limit')}
+                  value={partner?.credit_limit ? formatRiyal(partner.credit_limit) : '—'} mono
+                />
+                <KeyValue
+                  label={tp('credit_period')}
+                  value={partner?.credit_period != null ? String(partner.credit_period) : '—'} mono
+                />
+                <KeyValue label={tp('active')} value={partner?.is_active === false ? tp('absent') : tp('present')} />
               </div>
               <div>
                 <SubHead>{t('quick_info')}</SubHead>
@@ -454,7 +482,7 @@ export default function PartnerProfilePage() {
             </thead>
             <tbody>
               <tr className="text-sm">
-                <td className="px-4 py-3 font-medium text-text">SAR</td>
+                <td className="num px-4 py-3 font-medium text-text">{SAUDI_RIYAL_SYMBOL}</td>
                 <td className="num px-4 py-3">{formatRiyal(gross)}</td>
                 <td className="num px-4 py-3">{formatRiyal(returned)}</td>
                 <td className="num px-4 py-3 text-negative">−{formatRiyal(paid)}</td>

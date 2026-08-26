@@ -2,6 +2,9 @@ export interface ProductUnitTemplate {
   id: string;
   name: string;
   base_unit: string;
+  /** الوحدات البديلة بمعاملاتها كما يعيدها `UnitTemplateResource`. */
+  units?: Array<{ id?: string; name: string; factor: number }>;
+  is_active?: boolean;
 }
 
 /**

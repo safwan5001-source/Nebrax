@@ -3,6 +3,8 @@
 import * as React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 /**
@@ -82,4 +84,39 @@ export function FieldGrid({
  */
 export function FieldSpan({ children, className }: { children: React.ReactNode; className?: string }) {
   return <div className={cn('col-span-full', className)}>{children}</div>;
+}
+
+/**
+ * حقل منطقي (تتبّع المخزون، نشط…) — صفٌّ محدَّد بحدّ فيه التسمية وشرحُها ثم المفتاح.
+ *
+ * لا `<input type="checkbox">` خام: مربّع النظام ١٣px لا يُصاب بالإبهام، ولا يقبل
+ * تنسيق الحالة ولا حلقة تركيز مرئية. و`Switch` زرٌّ حقيقي بـ`role="switch"` يعمل
+ * بلوحة المفاتيح، والصفّ حوله يجعل الشرح جزءاً من الهدف بصرياً لا نصّاً معلّقاً.
+ */
+export function ToggleField({
+  id,
+  label,
+  hint,
+  checked,
+  onCheckedChange,
+  disabled,
+  className,
+}: {
+  id: string;
+  label: string;
+  hint?: React.ReactNode;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex items-start justify-between gap-3 rounded-md border border-border p-3', className)}>
+      <div className="min-w-0">
+        <Label htmlFor={id} className="cursor-pointer">{label}</Label>
+        {hint ? <p className="mt-1 text-[11px] leading-relaxed text-muted">{hint}</p> : null}
+      </div>
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} aria-label={label} />
+    </div>
+  );
 }

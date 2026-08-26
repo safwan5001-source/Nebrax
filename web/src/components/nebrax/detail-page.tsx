@@ -37,6 +37,7 @@ export function DetailPage({
   backHref,
   backLabel,
   title,
+  titleMono = true,
   badges,
   meta,
   actions,
@@ -51,6 +52,11 @@ export function DetailPage({
   backHref: string;
   backLabel: string;
   title: React.ReactNode;
+  /**
+   * العنوان بخط Mono. الافتراض `true` لأن أول ما بُنيت له هذه الصفحة مستنداتٌ
+   * عنوانها **رقم**؛ أمّا اسم منتج أو طرف فيُقرأ بخط الواجهة لا بخط الأرقام.
+   */
+  titleMono?: boolean;
   /** شارات الحالة بجانب العنوان — نصّ لا لون فقط. */
   badges?: React.ReactNode;
   /** سطر السياق تحت العنوان (التاريخ، حالة القيد…). */
@@ -85,7 +91,7 @@ export function DetailPage({
           </Button>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="num text-xl font-semibold text-text">{title}</h1>
+              <h1 className={cn('text-xl font-semibold text-text', titleMono && 'num')}>{title}</h1>
               {badges}
             </div>
             {meta ? <div className="mt-1 text-sm leading-relaxed text-muted">{meta}</div> : null}

@@ -12,7 +12,7 @@ import { DataTable } from '@/components/data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
-import { PartnerDialog, type Partner } from '@/components/partners/partner-dialog';
+import type { Partner } from '@/components/partners/partner-dialog';
 import { api } from '@/lib/api';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
@@ -45,8 +45,6 @@ export default function SuppliersPage() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Partner | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [explorer, setExplorer] = useState<DataExplorerState>(() => {
     const parsed = parseExplorerState(new URLSearchParams(searchParams.toString()));
@@ -171,8 +169,8 @@ export default function SuppliersPage() {
           <Link href={`/suppliers/${row.original.id}/ledger`} className="inline-flex h-9 w-9 items-center justify-center rounded text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={ts('ledger')} title={ts('ledger')}>
             <BookOpen className="h-4 w-4" strokeWidth={1.7} />
           </Link>
-          <Button variant="ghost" size="icon" aria-label={tp('edit')} onClick={() => { setEditing(row.original); setDialogOpen(true); }}>
-            <Pencil className="h-4 w-4" strokeWidth={1.7} />
+          <Button asChild variant="ghost" size="icon" aria-label={tp('edit')} title={tp('edit')}>
+            <Link href={`/partners/${row.original.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
           </Button>
         </div>
       ),
@@ -182,7 +180,9 @@ export default function SuppliersPage() {
   return <div className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-xl font-semibold text-text">{ts('title')}</h1>
-      <Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{ts('add')}</Button>
+      {/* `?type=supplier` يفتح النموذج الكامل على المورّدين — الحوار السريع
+          بستة حقول لا يسع رقماً ضريبياً ولا شروط ائتمان. */}
+      <Button asChild><Link href="/partners/new?type=supplier"><Plus className="h-4 w-4" strokeWidth={1.8} />{ts('add')}</Link></Button>
     </div>
 
     <DataExplorerToolbar
@@ -224,6 +224,6 @@ export default function SuppliersPage() {
 
     <AdvancedFilterDialog open={advancedOpen} onClose={() => setAdvancedOpen(false)} definitions={definitions} filters={labelledFilters} onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))} />
 
-    <PartnerDialog key={editing?.id ?? 'new'} open={dialogOpen} onClose={() => setDialogOpen(false)} onSaved={load} partner={editing} defaultType="supplier" addTitle={ts('add')} editTitle={ts('edit')} />
+
   </div>;
 }

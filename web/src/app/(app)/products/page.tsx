@@ -11,7 +11,7 @@ import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ProductDialog, type Product } from '@/components/products/product-dialog';
+import type { ProductApi as Product } from '@/components/products/product-form';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
@@ -92,8 +92,6 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [showStock, setShowStock] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
@@ -251,6 +249,7 @@ export default function ProductsPage() {
     }
   }
 
+  // التعديل صفحةٌ كاملة لا حوار: بيانات المنتج الأساسية أوسع من نافذة.
   const rowActions = useCallback((product: Product) => {
     const working = workingId === product.id;
     return (
@@ -258,8 +257,8 @@ export default function ProductsPage() {
         <Button asChild type="button" variant="ghost" size="icon" aria-label={t('view')}>
           <Link href={`/products/${product.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link>
         </Button>
-        <Button type="button" variant="ghost" size="icon" aria-label={t('edit')} disabled={working} onClick={() => { setEditing(product); setDialog(true); }}>
-          <Pencil className="h-4 w-4" strokeWidth={1.7} />
+        <Button asChild variant="ghost" size="icon" aria-label={t('edit')} title={t('edit')}>
+          <Link href={`/products/${product.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
         </Button>
         <Button type="button" variant="ghost" size="icon" aria-label={t('copy')} disabled={working} onClick={() => void copyProduct(product)}>
           <Copy className="h-4 w-4" strokeWidth={1.7} />
@@ -401,7 +400,7 @@ export default function ProductsPage() {
         onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))}
       />
 
-      <ProductDialog key={editing?.id ?? 'new'} open={dialog} onClose={() => setDialog(false)} onSaved={load} product={editing} />
+
     </div>
   );
 }

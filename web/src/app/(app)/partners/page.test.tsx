@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PartnersPage from './page';
 
-const { api, translate, partnerDialogSpy } = vi.hoisted(() => {
+const { api, translate } = vi.hoisted(() => {
   const strings: Record<string, string> = {
     title: 'Customers',
     add: 'Add partner',
@@ -33,7 +33,7 @@ const { api, translate, partnerDialogSpy } = vi.hoisted(() => {
     rich: (key: string, values: Record<string, unknown> = {}) =>
       Object.values(values).filter((value) => typeof value !== 'function').join(' ') || (strings[key] ?? key),
   });
-  return { api: vi.fn(), translate: translator, partnerDialogSpy: vi.fn() };
+  return { api: vi.fn(), translate: translator };
 });
 
 vi.mock('next-intl', () => ({ useTranslations: () => translate, useLocale: () => 'en' }));
@@ -45,12 +45,6 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
 }));
 vi.mock('@/lib/api', () => ({ api, ApiError: class ApiError extends Error {} }));
-vi.mock('@/components/partners/partner-dialog', () => ({
-  PartnerDialog: (props: { open: boolean; partner: { name: string } | null }) => {
-    partnerDialogSpy(props);
-    return null;
-  },
-}));
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
   return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
@@ -86,15 +80,17 @@ describe('PartnersPage', () => {
 
   beforeEach(() => {
     api.mockReset();
-    partnerDialogSpy.mockReset();
   });
 
-  it('renders the header with a primary add action', async () => {
+  // الإضافة صفحةٌ كاملة لا حوار: الحوار السريع لا يحمل رقماً ضريبياً ولا رمزاً
+  // ولا رصيداً افتتاحياً، وكانت `/partners/new` بلا رابطٍ يصل إليها من القائمة.
+  it('links the primary add action to the full create page', async () => {
     respondWith([basePartner]);
     render(<PartnersPage />);
 
     expect(screen.getByRole('heading', { name: 'Customers' })).toBeTruthy();
-    expect(await screen.findByRole('button', { name: 'Add partner' })).toBeTruthy();
+    const add = await screen.findByRole('link', { name: 'Add partner' });
+    expect(add.getAttribute('href')).toBe('/partners/new');
   });
 
   it('shows a busy state before the data resolves', () => {
@@ -166,16 +162,12 @@ describe('PartnersPage', () => {
     expect(within(record).getByText('pt1')).toBeTruthy();
   });
 
-  it('opens the edit dialog with the selected partner', async () => {
+  it('links each row edit action to that partner full edit page', async () => {
     respondWith([basePartner]);
     render(<PartnersPage />);
 
     await screen.findAllByText('Al Tumooh Trading Co.');
-    const editButtons = screen.getAllByRole('button', { name: 'Edit' });
-    await userEvent.click(editButtons[0]);
-
-    expect(partnerDialogSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ open: true, partner: expect.objectContaining({ id: 'pt1' }) })
-    );
+    const editLinks = screen.getAllByRole('link', { name: 'Edit' });
+    expect(editLinks[0].getAttribute('href')).toBe('/partners/pt1/edit');
   });
 });
