@@ -472,6 +472,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('pos-devices', [PosDeviceController::class, 'index'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-devices', [PosDeviceController::class, 'store'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::put('pos-devices/{id}', [PosDeviceController::class, 'update'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        // Pairing يطلب إدارة الشركة؛ لا يمرر أوامر ESC/POS أو أي حمولة خام للخادم.
+        Route::post('pos-devices/{id}/cash-drawer/pair', [PosDeviceController::class, 'pairCashDrawer'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        Route::post('pos-devices/{id}/cash-drawer/test', [PosDeviceController::class, 'testCashDrawer'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
+        Route::post('pos-devices/{id}/cash-drawer/test/complete', [PosDeviceController::class, 'completeCashDrawerTest'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
+        Route::post('pos-devices/{id}/cash-drawer/test/unavailable', [PosDeviceController::class, 'drawerBridgeUnavailable'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
         Route::delete('pos-devices/{id}', [PosDeviceController::class, 'destroy'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::get('pos/products', [PosController::class, 'products'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
@@ -494,6 +499,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-movements', [PosSessionController::class, 'recordCashMovement'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-drawer/open', [PosSessionController::class, 'openCashDrawer'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
+        // الإكمال لا يفتح شيئاً بذاته: يقبل فقط action قصير العمر موقّعاً أنشأه
+        // الخادم بعد فتح يدوي مصرح أو بعد checkout ناجح، لذلك يكفي سياق البيع.
+        Route::post('pos-sessions/{id}/cash-drawer/complete', [PosSessionController::class, 'completeCashDrawer'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos-sessions/{id}/cash-drawer/unavailable', [PosSessionController::class, 'cashDrawerBridgeUnavailable'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/acknowledge-difference', [PosSessionController::class, 'acknowledgeDifference'])->middleware([$perm('pos.variance.approve'), $app('sales.pos')]);
 
         // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.

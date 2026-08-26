@@ -110,7 +110,15 @@ class PosController extends ApiController
 
         $invoice = $this->domain(fn () => $this->pos->checkout($data));
 
-        return (new InvoiceResource($invoice->load('lines')))->response()->setStatusCode(201);
+        $response = (new InvoiceResource($invoice->load('lines')))->response()->setStatusCode(201);
+        $drawerAction = $invoice->getAttribute('cash_drawer_action');
+        if (is_array($drawerAction)) {
+            $payload = $response->getData(true);
+            $payload['cash_drawer_action'] = $drawerAction;
+            $response->setData($payload);
+        }
+
+        return $response;
     }
 
     /**

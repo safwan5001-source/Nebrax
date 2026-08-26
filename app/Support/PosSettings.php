@@ -28,6 +28,8 @@ final class PosSettings
     public const PAYMENT_METHODS_ALL_ACTIVE = 'all_active';
     public const PAYMENT_METHODS_ONLY = 'only';
     public const PAYMENT_METHODS_NONE = 'none';
+    public const CASH_DRAWER_DRIVER_UNAVAILABLE = 'unavailable';
+    public const CASH_DRAWER_DRIVER_LOCAL_BRIDGE = 'local_bridge';
 
     private const DEFAULTS = [
         'default_customer'   => 'عميل نقدي (POS)',
@@ -69,10 +71,10 @@ final class PosSettings
         // صور الكتالوج تفضيل عرض خاص بنقطة البيع فقط؛ يبقى مفعّلاً افتراضياً
         // حتى تتوافق المنشآت القائمة مع عرض صور المنتجات عند توافرها.
         'show_product_images' => true,
-        // لا يوجد موصل أجهزة في النشر الحالي؛ تبقى إعدادات العقد مرئية وقابلة
-        // للقراءة، لكن لا يمكن تحويلها إلى فتح مادي قبل تسجيل Driver مدعوم.
+        // لا تتصل السحابة بالطابعة أو USB أبداً. الافتراض يظل unavailable حتى
+        // يقترن جهاز POS بجسر محلي موثوق وتفعّله المؤسسة صراحةً.
         'cash_drawer_enabled' => false,
-        'cash_drawer_driver' => 'unavailable',
+        'cash_drawer_driver' => self::CASH_DRAWER_DRIVER_UNAVAILABLE,
         'cash_drawer_auto_open_after_cash' => false,
         // تفضيلات feedback محلية للواجهة؛ لا تدخل في البيع أو القيد ولا تعتمد
         // عليها الخدمة لتقرير صحة العملية. تظل مفعلة بالتوافق مع تجربة POS.

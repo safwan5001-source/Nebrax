@@ -35,6 +35,7 @@ import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } fro
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
 import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 import { runPosCheckout } from '@/lib/pos-checkout';
+import { executeCashDrawerAction, type CashDrawerAction, type CashDrawerBridgeResult } from '@/lib/cash-drawer-bridge';
 
 const WALKIN = 'عميل نقدي (POS)';
 
@@ -96,9 +97,10 @@ interface Product {
   quantity_on_hand: number;
   is_active: boolean;
 }
-interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null }
+interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null; cash_drawer?: { configured: boolean } }
 interface WorkShift { id: string; name: string; is_active: boolean }
 interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
+interface PosCheckoutResponse { data: { id: string; number: string; total: string }; cash_drawer_action?: CashDrawerAction }
 
 const FAV_KEY = 'nibras_pos_favs';
 
@@ -305,6 +307,8 @@ export default function PosPage() {
     const enabled = posCfg.enabled_payment_method_ids;
     return paymentMethods.filter((method) => posCfg.payment_methods_mode === 'all_active' || enabled.includes(method.id));
   }, [paymentMethods, posCfg.enabled_payment_method_ids, posCfg.payment_methods_mode]);
+  const sessionDrawerConfigured = !!session?.pos_device_id
+    && devices.some((device) => device.id === session.pos_device_id && device.cash_drawer?.configured === true);
 
   // قد تصل الإعدادات بعد أن يبدأ الكاشير سلةً مؤقتة؛ لا نترك خصماً معروضاً
   // أو محفوظاً عندما تكون السياسة الخادمية قد أوقفته.
@@ -438,18 +442,65 @@ export default function PosPage() {
   }, [session?.id]);
   useEffect(() => { void refreshHeldCount(); }, [refreshHeldCount]);
 
+  function drawerMessage(result: CashDrawerBridgeResult): string {
+    if (result.status === 'bridge_unavailable') return t('cash_drawer_bridge_unavailable');
+    if (result.status === 'printer_unavailable') return t('cash_drawer_printer_unavailable');
+    if (result.status === 'not_configured' || result.status === 'unsupported') return t('cash_drawer_not_configured');
+    if (result.status === 'permission_denied') return t('cash_drawer_permission_denied');
+    return t('cash_drawer_open_failed');
+  }
+
+  function resultFromApiError(error: unknown): CashDrawerBridgeResult | null {
+    const body = error instanceof ApiError ? error.body : null;
+    const data = typeof body === 'object' && body !== null && 'data' in body
+      ? (body as { data?: unknown }).data
+      : null;
+    return typeof data === 'object' && data !== null && 'status' in data
+      ? data as CashDrawerBridgeResult
+      : null;
+  }
+
+  async function settleDrawerAction(action: CashDrawerAction): Promise<CashDrawerBridgeResult> {
+    if (!session) return { status: 'not_configured', error_code: 'pos_session_missing' };
+    const settle = async (path: string, body: Record<string, unknown>) => {
+      try {
+        return (await api<{ data: CashDrawerBridgeResult }>(path, { method: 'POST', body })).data;
+      } catch (error) {
+        const result = resultFromApiError(error);
+        if (result) return result;
+        throw error;
+      }
+    };
+    return executeCashDrawerAction(
+      action,
+      (actionId, result) => settle(`/pos-sessions/${session.id}/cash-drawer/complete`, { action_id: actionId, result }),
+      (actionId) => settle(`/pos-sessions/${session.id}/cash-drawer/unavailable`, { action_id: actionId }),
+    );
+  }
+
   async function openCashDrawer() {
-    if (!session || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable') {
+    if (!session || !sessionDrawerConfigured || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable') {
       errorToast(t('cash_drawer_unavailable'));
       return;
     }
     setDrawerBusy(true);
     try {
-      await api(`/pos-sessions/${session.id}/cash-drawer/open`, {
-        method: 'POST',
-        body: { reason: t('cash_drawer_manual_reason') },
-      });
-      success(t('cash_drawer_opened'));
+      let action: CashDrawerAction;
+      try {
+        action = (await api<{ data: CashDrawerAction }>(`/pos-sessions/${session.id}/cash-drawer/open`, {
+          method: 'POST', body: { reason: t('cash_drawer_manual_reason') },
+        })).data;
+      } catch (error) {
+        const result = resultFromApiError(error);
+        if (result) {
+          errorToast(drawerMessage(result));
+          return;
+        }
+        throw error;
+      }
+      const result = await settleDrawerAction(action);
+      if (result.status === 'opened') success(t('cash_drawer_opened'));
+      else errorToast(drawerMessage(result));
     } catch (err) {
       errorToast(err instanceof ApiError ? err.message : t('cash_drawer_open_failed'));
     } finally {
@@ -739,19 +790,33 @@ export default function PosPage() {
               discount: posCfg.allow_discount ? lineCalc(l).disc : 0, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
             }));
             // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
-            return api<{ data: { id: string; number: string; total: string } }>('/pos/checkout', {
+            return api<PosCheckoutResponse>('/pos/checkout', {
               method: 'POST',
               body: { partner_id: partnerId, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, notes: activeCart.note.trim() || null, items, tenders },
             });
           },
           // لحظة النجاح المالي هي استجابة checkout؛ نغلق السلة ونغادر شاشة الدفع
           // قبل انتظار QR، فلا تعود العملية قابلة لإرسال الدفع نفسه مرة ثانية.
-          onCheckoutSuccess: () => {
+          onCheckoutSuccess: (checkout) => {
             playPosFeedback('payment_success');
             success(t('sale_done'));
             closeCart(activeCart.id);
             setStep('sale');
             setMobileTab('products');
+            // عملية الدرج تبدأ بعد النجاح المالي والتنظيف؛ لا تنتظرها ولا تسمح
+            // لخطئها بإعادة شاشة الدفع أو إظهار فشل للفاتورة المكتملة.
+            const action = checkout.cash_drawer_action;
+            if (action?.status === 'pending') {
+              void settleDrawerAction(action).then((drawerResult) => {
+                if (drawerResult.status !== 'opened') {
+                  toast({ title: t('sale_done'), description: t('cash_drawer_automatic_warning'), variant: 'warning' });
+                }
+              }).catch(() => {
+                toast({ title: t('sale_done'), description: t('cash_drawer_automatic_warning'), variant: 'warning' });
+              });
+            } else if (action && action.status !== 'opened') {
+              toast({ title: t('sale_done'), description: t('cash_drawer_automatic_warning'), variant: 'warning' });
+            }
           },
           fetchQr: (created) => api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`),
           onPaymentError: (error) => {
@@ -1099,7 +1164,7 @@ export default function PosPage() {
         onOpenHeld={() => setRetrieveOpen(true)}
         onOpenRecentInvoices={() => setRecentInvoicesOpen(true)}
         onOpenCashDrawer={() => void openCashDrawer()}
-        cashDrawerDisabled={!session || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable' || drawerBusy}
+        cashDrawerDisabled={!session || !sessionDrawerConfigured || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable' || drawerBusy}
         cashDrawerBusy={drawerBusy}
         onReturn={() => setReturnOpen(true)}
         onExchange={() => setExchangeOpen(true)}
