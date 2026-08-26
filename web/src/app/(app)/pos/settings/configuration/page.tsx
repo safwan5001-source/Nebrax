@@ -12,11 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { PosSoundFeedbackSettings } from '@/components/pos/pos-sound-feedback-settings';
 import { api, ApiError } from '@/lib/api';
-import { POS_FEEDBACK_DEFAULTS, supportsPosHaptics, type PosFeedbackSettings } from '@/lib/pos-sound';
 
-interface PosConfig extends PosFeedbackSettings {
+interface PosConfig {
   default_customer: string;
   receipt_footer: string;
   print_receipt: boolean;
@@ -74,7 +72,6 @@ const DEFAULTS: PosConfig = {
   cash_drawer_enabled: false,
   cash_drawer_driver: 'unavailable',
   cash_drawer_auto_open_after_cash: false,
-  ...POS_FEEDBACK_DEFAULTS,
 };
 
 /** إعدادات تشغيل POS: السياسات ووسائل التحصيل الخادمية في مصدر إعداد واحد. */
@@ -90,10 +87,6 @@ export default function PosSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [hapticsSupported, setHapticsSupported] = useState(false);
-
-  useEffect(() => { setHapticsSupported(supportsPosHaptics()); }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -142,10 +135,6 @@ export default function PosSettingsPage() {
 
   function patch<K extends keyof PosConfig>(key: K, value: PosConfig[K]) {
     setConfig((current) => current ? { ...current, [key]: value } : current);
-  }
-
-  function patchFeedback<K extends keyof PosFeedbackSettings>(key: K, value: PosFeedbackSettings[K]) {
-    setConfig((current) => current ? ({ ...current, [key]: value } as PosConfig) : current);
   }
 
   function toggleCategory(categoryId: string) {
@@ -364,13 +353,6 @@ export default function PosSettingsPage() {
                 </label>
                 <p className="text-xs leading-relaxed text-muted">{t('allow_deferred_payment_hint')}</p>
               </section>
-
-              <PosSoundFeedbackSettings
-                settings={config}
-                hapticsSupported={hapticsSupported}
-                t={t}
-                onChange={patchFeedback}
-              />
 
               <section className="space-y-2 border-t border-border pt-5" aria-labelledby="cash-drawer-contract-title">
                 <Label id="cash-drawer-contract-title">{t('cash_drawer_contract')}</Label>
