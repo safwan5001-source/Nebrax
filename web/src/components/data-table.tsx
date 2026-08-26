@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   type ColumnDef,
@@ -18,6 +18,30 @@ import { EmptyState, ErrorState, LoadingState } from './nebrax/states';
 import { MobileRecordItem, type MobileRecord } from './nebrax/mobile-record';
 import { toCsv, downloadCsv } from '@/lib/export';
 import { cn } from '@/lib/utils';
+
+/**
+ * فرز خادميّ — حين تُمرَّر هذه الخاصية يصبح الخادم **مصدر الحقيقة الوحيد**
+ * للفرز، ويُطفأ فرز TanStack المحلي.
+ *
+ * بلا هذا التمييز كانت الصفحة المقسَّمة خادمياً تحمل فرزين متعارضين: قائمة
+ * الترتيب في الشريط تفرز الكتالوج كله على الخادم، ورأس العمود يفرز **الصفحة
+ * المحمَّلة وحدها** — فيرى المستخدم «الأعلى سعراً» وهو أعلى ما في هذه الصفحة
+ * فقط. الصفحات غير المقسَّمة لا تمرّر الخاصية فيبقى سلوكها كما هو.
+ */
+export interface ServerSortControl {
+  /** قيمة الفرز الحالية: `name` تصاعدي، `-name` تنازلي، فراغ = الافتراضي. */
+  value?: string | null;
+  onChange: (value: string) => void;
+  /** معرّفات الأعمدة التي يقبل الخادم الفرز بها؛ ما عداها غير قابل للفرز. */
+  columns: string[];
+}
+
+/** تحديد صفوف للإجراءات الجماعية (التصدير مثلاً). */
+export interface RowSelectionControl<T> {
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  getRowId: (row: T) => string;
+}
 
 interface DataTableProps<T> {
   columns: ColumnDef<T, unknown>[];
@@ -41,6 +65,10 @@ interface DataTableProps<T> {
   error?: string | null;
   onRetry?: () => void;
   retryLabel?: string;
+  /** يجعل الفرز خادمياً بالكامل — انظر `ServerSortControl`. */
+  serverSort?: ServerSortControl;
+  /** يضيف عمود تحديد للصفوف ويعيد المعرّفات المحدَّدة. */
+  selection?: RowSelectionControl<T>;
 }
 
 export function DataTable<T>({
@@ -59,6 +87,8 @@ export function DataTable<T>({
   error,
   onRetry,
   retryLabel,
+  serverSort,
+  selection,
 }: DataTableProps<T>) {
   const t = useTranslations('nebrax');
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -66,12 +96,22 @@ export function DataTable<T>({
   const globalFilter = searchValue ?? internalGlobalFilter;
   const setGlobalFilter = onSearchChange ?? setInternalGlobalFilter;
 
+  // حالة الفرز الظاهرة في الرؤوس تُشتقّ من قيمة الخادم حين يقودها، فلا يظهر
+  // سهمٌ يعد بترتيبٍ لم يُطلَب من الخادم.
+  const serverSorting = useMemo<SortingState>(() => {
+    const value = serverSort?.value ?? '';
+    if (!value) return [];
+    const desc = value.startsWith('-');
+    return [{ id: desc ? value.slice(1) : value, desc }];
+  }, [serverSort?.value]);
+
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, globalFilter },
+    state: { sorting: serverSort ? serverSorting : sorting, globalFilter },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    manualSorting: Boolean(serverSort),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -96,6 +136,41 @@ export function DataTable<T>({
   table.getAllLeafColumns().forEach((c) => {
     if (typeof c.columnDef.header === 'string') headerLabels[c.id] = c.columnDef.header;
   });
+
+  const canSort = (id: string): boolean =>
+    serverSort ? serverSort.columns.includes(id) : true;
+
+  function toggleSort(id: string): void {
+    if (!serverSort) return;
+    const current = serverSort.value ?? '';
+    serverSort.onChange(current === id ? `-${id}` : id);
+  }
+
+  const selectedSet = useMemo(() => new Set(selection?.selectedIds ?? []), [selection?.selectedIds]);
+  const pageIds = useMemo(
+    () => (selection ? rows.map((row) => selection.getRowId(row.original)) : []),
+    [rows, selection]
+  );
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedSet.has(id));
+
+  function toggleRow(id: string): void {
+    if (!selection) return;
+    const next = new Set(selectedSet);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selection.onChange([...next]);
+  }
+
+  function togglePage(): void {
+    if (!selection) return;
+    const next = new Set(selectedSet);
+    if (allPageSelected) pageIds.forEach((id) => next.delete(id));
+    else pageIds.forEach((id) => next.add(id));
+    selection.onChange([...next]);
+  }
+
+  const checkboxClass =
+    'h-4 w-4 cursor-pointer accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
 
   return (
     <div className="rounded border border-border bg-surface">
@@ -137,18 +212,34 @@ export function DataTable<T>({
               <THead>
                 {table.getHeaderGroups().map((hg) => (
                   <TR key={hg.id}>
+                    {selection ? (
+                      <TH className="w-10">
+                        <input
+                          type="checkbox"
+                          className={checkboxClass}
+                          checked={allPageSelected}
+                          onChange={togglePage}
+                          aria-label={t('selectAllRows')}
+                        />
+                      </TH>
+                    ) : null}
                     {hg.headers.map((header) => {
                       const sorted = header.column.getIsSorted();
                       const SortIcon = sorted === 'asc' ? ArrowUp : sorted === 'desc' ? ArrowDown : ChevronsUpDown;
+                      const sortable = header.column.getCanSort() && canSort(header.column.id);
                       return (
                         <TH
                           key={header.id}
                           aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
                         >
-                          {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                          {header.isPlaceholder ? null : sortable ? (
                             <button
                               type="button"
-                              onClick={header.column.getToggleSortingHandler()}
+                              onClick={
+                                serverSort
+                                  ? () => toggleSort(header.column.id)
+                                  : header.column.getToggleSortingHandler()
+                              }
                               className={cn(
                                 'inline-flex cursor-pointer select-none items-center gap-1 rounded transition-colors hover:text-text',
                                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
@@ -173,25 +264,38 @@ export function DataTable<T>({
                 ))}
               </THead>
               <TBody>
-                {rows.map((row) => (
-                  <TR key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TD key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TD>
-                    ))}
-                  </TR>
-                ))}
+                {rows.map((row) => {
+                  const rowId = selection?.getRowId(row.original);
+                  return (
+                    <TR key={row.id}>
+                      {selection && rowId != null ? (
+                        <TD className="w-10">
+                          <input
+                            type="checkbox"
+                            className={checkboxClass}
+                            checked={selectedSet.has(rowId)}
+                            onChange={() => toggleRow(rowId)}
+                            aria-label={t('selectRow')}
+                          />
+                        </TD>
+                      ) : null}
+                      {row.getVisibleCells().map((cell) => (
+                        <TD key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TD>
+                      ))}
+                    </TR>
+                  );
+                })}
               </TBody>
             </Table>
           </div>
 
           <ul className="divide-y divide-border md:hidden">
-            {rows.map((row) =>
-              mobileRecord ? (
-                <li key={row.id}>
-                  <MobileRecordItem record={mobileRecord(row.original)} />
-                </li>
+            {rows.map((row) => {
+              const rowId = selection?.getRowId(row.original);
+              const body = mobileRecord ? (
+                <MobileRecordItem record={mobileRecord(row.original)} />
               ) : (
-                <li key={row.id} className="flex flex-col gap-1.5 p-3.5">
+                <div className="flex flex-col gap-1.5 p-3.5">
                   {row.getVisibleCells().map((cell) => {
                     const header = headerLabels[cell.column.id];
                     return (
@@ -203,9 +307,30 @@ export function DataTable<T>({
                       </div>
                     );
                   })}
+                </div>
+              );
+
+              return (
+                <li key={row.id}>
+                  {selection && rowId != null ? (
+                    <div className="flex items-start gap-2">
+                      <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center ps-2">
+                        <input
+                          type="checkbox"
+                          className={checkboxClass}
+                          checked={selectedSet.has(rowId)}
+                          onChange={() => toggleRow(rowId)}
+                          aria-label={t('selectRow')}
+                        />
+                      </label>
+                      <div className="min-w-0 flex-1">{body}</div>
+                    </div>
+                  ) : (
+                    body
+                  )}
                 </li>
-              )
-            )}
+              );
+            })}
           </ul>
         </>
       )}

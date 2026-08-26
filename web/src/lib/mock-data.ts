@@ -1315,6 +1315,12 @@ export const mockSalesConfig: Record<string, unknown> = {
     cash_drawer_enabled: false,
     cash_drawer_driver: 'unavailable',
     cash_drawer_auto_open_after_cash: false,
+    sound_enabled: true,
+    scan_sound_enabled: true,
+    error_sound_enabled: true,
+    payment_sound_enabled: true,
+    sound_volume: 60,
+    haptics_enabled: true,
   },
 };
 

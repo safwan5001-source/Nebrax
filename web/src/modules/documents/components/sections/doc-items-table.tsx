@@ -3,12 +3,10 @@
 import { useTranslations } from 'next-intl';
 import type { CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
-import { DEFAULT_DOCUMENT_ITEMS_COLUMNS } from '@/modules/documents/registry/document-types';
+import { getDefaultDocumentItemColumns } from '@/modules/documents/registry/document-types';
 import type { DocBlockAlignment, DocItemsColumn, DocItemsColumnId, DocumentModel, TemplateStyle } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { blockTextClassName, useDocBlockProperties } from '../doc-block-properties-context';
-
-const DEFAULT_COLUMNS: readonly DocItemsColumn[] = DEFAULT_DOCUMENT_ITEMS_COLUMNS.map((id) => ({ id }));
 
 /**
  * الخط الأحادي مخصص للأرقام والأكواد القابلة للمقارنة فقط. لا يُطبّق على
@@ -33,9 +31,9 @@ export function usesMonospaceValue(column: DocItemsColumnId): boolean {
 function headRow(style: TemplateStyle): { className: string; style?: CSSProperties } {
   switch (style.tableHead) {
     case 'soft':
-      return { className: 'text-black', style: { background: 'var(--doc-brand-soft)' } };
+      return { className: 'border-y border-[color:var(--border)] text-black', style: { background: 'var(--doc-brand-soft)' } };
     case 'plain':
-      return { className: 'border-b-2 border-gray-300 text-gray-600' };
+      return { className: style.composition === 'minimal' ? 'border-y border-black text-black' : 'border-b-2 border-black text-black' };
     case 'brand':
     default:
       return { className: '', style: { background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' } };
@@ -50,6 +48,32 @@ function defaultAlignment(column: DocItemsColumnId): DocBlockAlignment {
   return column === 'product' || column === 'description' || column === 'product_code' || column === 'barcode' || column === 'number' ? 'start' : 'end';
 }
 
+function tableClassName(style: TemplateStyle): string {
+  switch (style.composition) {
+    case 'erp': return 'w-full border-collapse text-[10px] leading-snug';
+    case 'modern': return 'w-full border-collapse text-[11px] leading-relaxed';
+    case 'minimal': return 'w-full border-collapse text-[11px] leading-relaxed';
+    default: return 'w-full border-collapse text-[11px]';
+  }
+}
+
+function cellPadding(style: TemplateStyle): { head: string; body: string } {
+  switch (style.tableDensity) {
+    case 'compact': return { head: 'px-2 py-1.5', body: 'px-2 py-1.5' };
+    case 'spacious': return { head: 'px-3 py-2.5', body: 'px-3 py-3' };
+    default: return { head: 'px-3 py-2', body: 'px-3 py-2.5' };
+  }
+}
+
+function bodyRowClassName(style: TemplateStyle, index: number): string {
+  switch (style.composition) {
+    case 'erp': return 'border-b border-[color:var(--border)]';
+    case 'modern': return index % 2 ? 'border-b border-[color:var(--border)] bg-[color:var(--doc-brand-soft)]/30' : 'border-b border-[color:var(--border)]';
+    case 'minimal': return 'border-b border-[color:var(--border)]';
+    default: return index % 2 ? 'bg-gray-50' : '';
+  }
+}
+
 /** جدول البنود — أعمدة معتمدة قابلة للترتيب والإخفاء والتسمية والمحاذاة. */
 export function DocItemsTable({
   model,
@@ -62,7 +86,8 @@ export function DocItemsTable({
   const style = useDocStyle();
   const properties = useDocBlockProperties('items');
   const head = headRow(style);
-  const columns = properties.columns ?? DEFAULT_COLUMNS;
+  const padding = cellPadding(style);
+  const columns: readonly DocItemsColumn[] = properties.columns ?? getDefaultDocumentItemColumns(model.type).map((id): DocItemsColumn => ({ id }));
   const labels: Record<DocItemsColumnId, string> = {
     number: '#',
     product: t('product'),
@@ -92,29 +117,43 @@ export function DocItemsTable({
   };
 
   return (
-    <table className={blockTextClassName(properties, cn('w-full border-collapse text-[11px]', style.sectionGap))}>
+    <table className={blockTextClassName(properties, cn(tableClassName(style), style.sectionGap))}>
       <thead>
         <tr className={head.className} style={head.style}>
           {columns.map((column) => {
             const alignment = column.alignment ?? properties.alignment ?? defaultAlignment(column.id);
-            return <th key={column.id} className={cn('p-2 font-semibold', textAlignmentClass(alignment))}>{column.label?.trim() || labels[column.id]}</th>;
+            return (
+              <th
+                key={column.id}
+                className={cn(
+                  padding.head,
+                  'font-semibold',
+                  textAlignmentClass(alignment),
+                  column.id === 'total' && 'font-bold',
+                )}
+              >
+                {column.label?.trim() || labels[column.id]}
+              </th>
+            );
           })}
         </tr>
       </thead>
       <tbody>
         {model.lines.map((line, index) => (
-          <tr key={line.id} className={index % 2 ? 'bg-gray-50' : ''}>
+          <tr key={line.id} className={bodyRowClassName(style, index)}>
             {columns.map((column) => {
               const alignment = column.alignment ?? properties.alignment ?? defaultAlignment(column.id);
               return (
                 <td
                   key={column.id}
                   className={cn(
-                    'border-b border-gray-200 p-2',
+                    padding.body,
                     textAlignmentClass(alignment),
                     usesMonospaceValue(column.id) && 'num',
-                    column.id === 'number' && 'text-gray-500',
-                    column.id === 'total' && 'font-medium',
+                    column.id === 'number' && 'text-[color:var(--muted)]',
+                    column.id === 'total' && 'font-bold',
+                    column.id === 'total' && style.composition === 'erp' && 'bg-[color:var(--doc-brand-soft)]',
+                    column.id === 'total' && style.composition === 'minimal' && 'border-s-2 border-black',
                   )}
                 >
                   {valueFor(column.id, line, index)}

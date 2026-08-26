@@ -94,6 +94,7 @@ use App\Http\Controllers\Api\SettlementTypeController;
 use App\Http\Controllers\Api\SelfServiceController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\StockPermitController;
+use App\Http\Controllers\Api\InventoryOpeningController;
 use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\TenantApplicationController;
@@ -272,7 +273,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // المنتجات
         Route::get('products', [ProductController::class, 'index'])->middleware($perm('products.view'));
+        Route::get('products/export', [ProductController::class, 'export'])->middleware($perm('products.view'));
         Route::get('products/import/template', [ProductController::class, 'importTemplate'])->middleware($perm('products.manage'));
+        Route::get('products/import/fields', [ProductController::class, 'importFields'])->middleware($perm('products.manage'));
+        Route::post('products/import/inspect', [ProductController::class, 'importInspect'])->middleware($perm('products.manage'));
         Route::post('products/import/preview', [ProductController::class, 'importPreview'])->middleware($perm('products.manage'));
         Route::post('products/import/apply', [ProductController::class, 'importApply'])->middleware($perm('products.manage'));
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
@@ -732,6 +736,20 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::delete('stock-permits/{id}', [StockPermitController::class, 'destroy'])->middleware([$perm('products.manage'), $app('inventory.core')]);
 
         // الجرد (الترحيل يصحّح الكمية ويولّد قيد الفرق معاً)
+        // ─── الأرصدة الافتتاحية للمخزون ───
+        // نفس حارسَي بقية المخزون (`products.*` + `inventory.core`): مصفوفة
+        // الأدوار لا تعرف نطاق `inventory_*`، واختراعه كان سيجعل هذا المستند
+        // الوحيد بصلاحية خاصة به بلا سبب.
+        Route::get('inventory-openings', [InventoryOpeningController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::get('inventory-openings/import/template', [InventoryOpeningController::class, 'template'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::get('inventory-openings/import/fields', [InventoryOpeningController::class, 'fields'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('inventory-openings/import/inspect', [InventoryOpeningController::class, 'inspect'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('inventory-openings/import/preview', [InventoryOpeningController::class, 'preview'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('inventory-openings/import/apply', [InventoryOpeningController::class, 'apply'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::get('inventory-openings/{id}', [InventoryOpeningController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::post('inventory-openings/{id}/post', [InventoryOpeningController::class, 'post'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::delete('inventory-openings/{id}', [InventoryOpeningController::class, 'destroy'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+
         Route::get('stocktakes', [StocktakeController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('stocktakes/{id}', [StocktakeController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('stocktakes', [StocktakeController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);

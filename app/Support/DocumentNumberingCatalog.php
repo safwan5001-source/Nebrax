@@ -16,6 +16,7 @@ use App\Models\FuelShift;
 use App\Models\FuelSale;
 use App\Models\FuelStationSafetyInspection;
 use App\Models\FuelStationWorkOrder;
+use App\Models\InventoryOpening;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\ManualJournal;
@@ -160,6 +161,11 @@ class DocumentNumberingCatalog
             'model'  => Stocktake::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'STK']],
+        ],
+        'inventory_opening' => [
+            'model'  => InventoryOpening::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'OPN']],
         ],
         'expense' => [
             'model'  => Expense::class,

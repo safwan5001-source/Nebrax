@@ -16,6 +16,7 @@ export default defineConfig({
       ['src/components/platform/**/*.test.tsx', 'jsdom'],
       ['src/components/delivery-notes/**/*.test.tsx', 'jsdom'],
       ['src/components/reports/**/*.test.tsx', 'jsdom'],
+      ['src/components/products/**/*.test.tsx', 'jsdom'],
       ['src/app/platform/tenants/**/*.test.tsx', 'jsdom'],
     ],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],

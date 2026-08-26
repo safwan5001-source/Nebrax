@@ -5,13 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Copy, Eye, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { Copy, Download, Eye, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProductDialog, type Product } from '@/components/products/product-dialog';
+import { ProductExportDialog } from '@/components/products/product-export-dialog';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
@@ -19,6 +20,7 @@ import { getShowStockQuantities } from '@/lib/inventory';
 import { useToast } from '@/components/ui/toast';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
+import { PRODUCT_SORT_COLUMNS, productFilterQuery, productQuery } from '@/modules/products/list-query';
 
 interface ProductCategory {
   id: string;
@@ -52,29 +54,6 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
     : String(filter.value).trim() === '';
 }
 
-function productQuery(state: DataExplorerState): string {
-  const params = new URLSearchParams();
-  if (state.search.trim()) params.set('search', state.search.trim());
-  if (state.sort) params.set('sort', state.sort);
-  params.set('page', String(state.page ?? 1));
-  params.set('per_page', String(state.perPage ?? 25));
-
-  for (const filter of state.filters) {
-    if (Array.isArray(filter.value) || String(filter.value).trim() === '') continue;
-    const value = String(filter.value);
-    if (['category_id', 'type', 'is_active', 'stock_state'].includes(filter.key)) {
-      params.set(filter.key, value);
-      continue;
-    }
-    if (filter.key === 'sale_price' || filter.key === 'purchase_price') {
-      const operator = ['gte', 'lte', 'eq'].includes(filter.operator) ? filter.operator : 'gte';
-      params.set(`${filter.key}_${operator}`, value);
-    }
-  }
-
-  return params.toString();
-}
-
 export default function ProductsPage() {
   const t = useTranslations('products');
   const router = useRouter();
@@ -97,6 +76,8 @@ export default function ProductsPage() {
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [showStock, setShowStock] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const loadProducts = useCallback(() => {
     setLoading(true);
@@ -116,6 +97,11 @@ export default function ProductsPage() {
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : t('action_failed')))
       .finally(() => setLoading(false));
   }, [explorer, t]);
+
+  // التحديد يخصّ نتيجة بحثٍ بعينها: إبقاؤه بعد تغيّر الفلاتر كان سيصدّر
+  // منتجاتٍ لم تعد ظاهرة أمام المستخدم أصلاً.
+  const filterQuery = useMemo(() => productFilterQuery(explorer), [explorer]);
+  useEffect(() => { setSelectedIds([]); }, [filterQuery]);
 
   const load = useCallback(() => {
     loadProducts();
@@ -303,6 +289,7 @@ export default function ProductsPage() {
   ], [rowActions, showStock, t, taxInclusive]);
 
   const headerActions: PageAction[] = [
+    { key: 'export', label: t('export'), icon: Download, onClick: () => setExportOpen(true), variant: 'outline', emphasis: 'secondary' },
     { key: 'import', label: t('import'), icon: Upload, href: '/products/import', variant: 'outline', emphasis: 'secondary' },
     { key: 'add', label: t('add'), icon: Plus, href: '/products/new', variant: 'primary' },
   ];
@@ -336,6 +323,19 @@ export default function ProductsPage() {
         totalCount={total}
       />
 
+      {selectedIds.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-surface px-3 py-2 text-sm">
+          <span className="num text-text">{t('selected_count', { count: selectedIds.length })}</span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
+            {t('clear_selection')}
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="ms-auto" onClick={() => setExportOpen(true)}>
+            <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
+            {t('export')}
+          </Button>
+        </div>
+      ) : null}
+
       <DataTable
         columns={columns}
         data={data}
@@ -343,8 +343,17 @@ export default function ProductsPage() {
         error={loadError}
         onRetry={load}
         emptyLabel={t('empty')}
-        exportName="products"
         showToolbar={false}
+        serverSort={{
+          value: explorer.sort ?? 'name',
+          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+          columns: PRODUCT_SORT_COLUMNS,
+        }}
+        selection={{
+          selectedIds,
+          onChange: setSelectedIds,
+          getRowId: (product) => product.id,
+        }}
         mobileRecord={(product) => ({
           title: (
             <Link href={`/products/${product.id}`} className="text-primary hover:underline">
@@ -399,6 +408,14 @@ export default function ProductsPage() {
         definitions={definitions}
         filters={labelledFilters}
         onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))}
+      />
+
+      <ProductExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        filterQuery={filterQuery}
+        selectedIds={selectedIds}
+        filteredTotal={total}
       />
 
       <ProductDialog key={editing?.id ?? 'new'} open={dialog} onClose={() => setDialog(false)} onSaved={load} product={editing} />

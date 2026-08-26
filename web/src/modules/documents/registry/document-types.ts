@@ -72,6 +72,8 @@ export interface DocumentTypeDefinition {
   supportedPaper: readonly PaperSizeId[];
   allowedBlocks: readonly DocSectionKey[];
   requiredBlocks: readonly DocSectionKey[];
+  /** أعمدة fallback الدلالية؛ تبقى خصائص الكتلة المحفوظة أعلى أولوية. */
+  defaultItemColumns?: readonly DocItemsColumnId[];
   defaultLayout: readonly DocSectionLayoutItem[];
 }
 
@@ -119,6 +121,27 @@ export const DEFAULT_DOCUMENT_ITEMS_COLUMNS = [
   'number', 'product_code', 'barcode', 'product', 'description', 'unit_price',
   'quantity', 'price_before_tax', 'tax', 'total',
 ] as const satisfies readonly DocItemsColumnId[];
+
+/**
+ * أعمدة fallback بحسب دلالة المستند. لا تُكتب في تعريف المراجعة، لذلك تبقى
+ * تخصيصات الأعمدة المحفوظة والمراجعات المثبتة أعلى أولوية من هذه القيم.
+ */
+export const DOCUMENT_TYPE_DEFAULT_ITEM_COLUMNS: Readonly<Record<DocumentTypeId, readonly DocItemsColumnId[]>> = {
+  tax_invoice: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  simplified_tax_invoice: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  quotation: ['number', 'product', 'description', 'quantity', 'unit_price', 'tax', 'total'],
+  proforma_invoice: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  sales_order: ['number', 'product_code', 'product', 'description', 'quantity', 'unit_price', 'total'],
+  purchase_order: ['number', 'product_code', 'product', 'description', 'quantity', 'unit_price', 'total'],
+  purchase_invoice: ['number', 'product_code', 'product', 'description', 'quantity', 'unit_price', 'tax', 'total'],
+  delivery_note: ['number', 'product_code', 'product', 'description', 'quantity'],
+  packing_list: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  receipt_voucher: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  payment_voucher: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  credit_note: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  debit_note: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  statement_of_account: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+};
 const REQUIRED_ITEMS_COLUMNS = ['description', 'total'] as const satisfies readonly DocItemsColumnId[];
 const ALIGNMENTS = ['start', 'center', 'end'] as const;
 const FONT_SIZES = ['sm', 'md', 'lg'] as const;
@@ -149,6 +172,17 @@ function layoutWithVisibility(
   return keys.map((key) => ({ key, visible: visible.includes(key) }));
 }
 
+/** يحفظ ترتيب الأقسام الظاهرة في المستندات التجارية مع بقاء الكتل الاختيارية في العقد. */
+function orderedLayoutWithVisibility(
+  keys: readonly DocSectionKey[],
+  visible: readonly DocSectionKey[],
+): readonly DocSectionLayoutItem[] {
+  return [
+    ...visible.map((key) => ({ key, visible: true })),
+    ...keys.filter((key) => !visible.includes(key)).map((key) => ({ key, visible: false })),
+  ];
+}
+
 // هذه القيم تكرر المخرجات الحالية حرفياً؛ لا تغيّر مرحلة العقود شكل مستند قائم.
 const LINE_ITEM_DEFAULT = layoutWithVisibility(
   LINE_ITEM_BLOCKS,
@@ -163,6 +197,28 @@ const STATEMENT_DEFAULT = layoutWithVisibility(
   ['header', 'parties', 'items', 'summary', 'footer'],
 );
 
+/** تراكيب تجارية صريحة؛ تعيد استخدام الكتل نفسها من دون عارض مستقل لكل نوع. */
+const QUOTATION_DEFAULT = orderedLayoutWithVisibility(
+  LINE_ITEM_BLOCKS,
+  ['header', 'parties', 'items', 'summary', 'notes', 'terms', 'bank', 'stamp', 'signature', 'footer'],
+);
+const SALES_ORDER_DEFAULT = orderedLayoutWithVisibility(
+  LINE_ITEM_BLOCKS,
+  ['header', 'parties', 'items', 'summary', 'notes', 'terms', 'signature', 'footer'],
+);
+const PURCHASE_ORDER_DEFAULT = orderedLayoutWithVisibility(
+  LINE_ITEM_BLOCKS,
+  ['header', 'parties', 'items', 'summary', 'terms', 'notes', 'signature', 'footer'],
+);
+const PURCHASE_INVOICE_DEFAULT = orderedLayoutWithVisibility(
+  LINE_ITEM_BLOCKS,
+  ['header', 'parties', 'items', 'summary', 'notes', 'bank', 'footer'],
+);
+const DELIVERY_NOTE_DEFAULT = orderedLayoutWithVisibility(
+  LINE_ITEM_BLOCKS,
+  ['header', 'parties', 'items', 'notes', 'signature', 'footer'],
+);
+
 const TAX_INVOICE_TYPES = ['tax_invoice', 'simplified_tax_invoice'] as const satisfies readonly DocumentTypeId[];
 const STANDARD_LINE_ITEM_TYPES = [
   'quotation', 'proforma_invoice', 'sales_order', 'purchase_order', 'purchase_invoice', 'credit_note', 'debit_note',
@@ -173,7 +229,11 @@ const VOUCHER_TYPES = ['receipt_voucher', 'payment_voucher'] as const satisfies 
 function lineItemDefinition(
   id: DocumentTypeId,
   labelKey: string,
-  options: { papers?: readonly PaperSizeId[]; requiredBlocks?: readonly DocSectionKey[] } = {},
+  options: {
+    papers?: readonly PaperSizeId[];
+    requiredBlocks?: readonly DocSectionKey[];
+    defaultLayout?: readonly DocSectionLayoutItem[];
+  } = {},
 ): DocumentTypeDefinition {
   return {
     id,
@@ -182,7 +242,8 @@ function lineItemDefinition(
     supportedPaper: options.papers ?? PAGE_PAPERS,
     allowedBlocks: LINE_ITEM_BLOCKS,
     requiredBlocks: options.requiredBlocks ?? ['header', 'parties', 'items', 'summary', 'footer'],
-    defaultLayout: LINE_ITEM_DEFAULT,
+    defaultItemColumns: DOCUMENT_TYPE_DEFAULT_ITEM_COLUMNS[id],
+    defaultLayout: options.defaultLayout ?? LINE_ITEM_DEFAULT,
   };
 }
 
@@ -202,12 +263,18 @@ function voucherDefinition(id: 'receipt_voucher' | 'payment_voucher', labelKey: 
 export const DOCUMENT_TYPE_REGISTRY: Readonly<Record<DocumentTypeId, DocumentTypeDefinition>> = {
   tax_invoice: lineItemDefinition('tax_invoice', 'taxInvoice', { papers: [...PAGE_PAPERS, ...THERMAL_PAPERS] }),
   simplified_tax_invoice: lineItemDefinition('simplified_tax_invoice', 'simplifiedTaxInvoice', { papers: [...PAGE_PAPERS, ...THERMAL_PAPERS] }),
-  quotation: lineItemDefinition('quotation', 'quotation'),
+  quotation: lineItemDefinition('quotation', 'quotation', { defaultLayout: QUOTATION_DEFAULT }),
   proforma_invoice: lineItemDefinition('proforma_invoice', 'proformaInvoice'),
-  sales_order: lineItemDefinition('sales_order', 'salesOrder'),
-  purchase_order: lineItemDefinition('purchase_order', 'purchaseOrder'),
-  purchase_invoice: lineItemDefinition('purchase_invoice', 'purchaseInvoice', { papers: [...PAGE_PAPERS, ...THERMAL_PAPERS] }),
-  delivery_note: lineItemDefinition('delivery_note', 'deliveryNote', { requiredBlocks: ['header', 'parties', 'items', 'footer'] }),
+  sales_order: lineItemDefinition('sales_order', 'salesOrder', { defaultLayout: SALES_ORDER_DEFAULT }),
+  purchase_order: lineItemDefinition('purchase_order', 'purchaseOrder', { defaultLayout: PURCHASE_ORDER_DEFAULT }),
+  purchase_invoice: lineItemDefinition('purchase_invoice', 'purchaseInvoice', {
+    papers: [...PAGE_PAPERS, ...THERMAL_PAPERS],
+    defaultLayout: PURCHASE_INVOICE_DEFAULT,
+  }),
+  delivery_note: lineItemDefinition('delivery_note', 'deliveryNote', {
+    requiredBlocks: ['header', 'parties', 'items', 'footer'],
+    defaultLayout: DELIVERY_NOTE_DEFAULT,
+  }),
   packing_list: lineItemDefinition('packing_list', 'packingList', { requiredBlocks: ['header', 'parties', 'items', 'footer'] }),
   receipt_voucher: voucherDefinition('receipt_voucher', 'receiptVoucher'),
   payment_voucher: voucherDefinition('payment_voucher', 'paymentVoucher'),
@@ -269,6 +336,11 @@ export function getDocumentTypeDefinition(type: DocumentTypeId): DocumentTypeDef
 
 export function getDefaultDocumentLayout(type: DocumentTypeId): DocSectionLayoutItem[] {
   return getDocumentTypeDefinition(type).defaultLayout.map((item) => ({ ...item }));
+}
+
+/** أعمدة العارض عند غياب تخصيص ثابت داخل مراجعة القالب. */
+export function getDefaultDocumentItemColumns(type: DocumentTypeId): readonly DocItemsColumnId[] {
+  return getDocumentTypeDefinition(type).defaultItemColumns ?? DEFAULT_DOCUMENT_ITEMS_COLUMNS;
 }
 
 export function listDocumentVariables(type: DocumentTypeId): readonly DocumentVariableDefinition[] {

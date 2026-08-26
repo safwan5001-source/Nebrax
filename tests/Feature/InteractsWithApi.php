@@ -13,14 +13,19 @@ use App\Tenancy\TenantContext;
 trait InteractsWithApi
 {
     /**
-     * يُنسي حُرّاس المصادقة قبل كل طلب JSON حتى يُعاد حلّ المستخدم من توكنه.
+     * يُنسي حُرّاس المصادقة قبل **كل** طلب حتى يُعاد حلّ المستخدم من توكنه.
      * (في الاختبار يبقى الحارس حيّاً عبر الطلبات؛ في الإنتاج كل طلب إقلاع منفصل.)
+     *
+     * الاعتراض على `call` لا على `json` وحدها: `json` تمرّ به أصلاً، أمّا رفع
+     * الملفات (`post` بحمولة multipart) فلا يمرّ بـ`json` إطلاقاً — فكان يرث
+     * مستخدم الطلب السابق. وهذا يقلب اختبار عزلٍ بين مستأجرين إلى اختبار
+     * يجري كله تحت مستأجرٍ واحد، فينجح وهو لا يفحص شيئاً.
      */
-    public function json($method, $uri, array $data = [], array $headers = [], $options = 0)
+    public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
     {
         $this->app['auth']->forgetGuards();
 
-        return parent::json($method, $uri, $data, $headers, $options);
+        return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
     }
 
     /**

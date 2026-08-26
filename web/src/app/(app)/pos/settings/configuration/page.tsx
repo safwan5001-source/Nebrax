@@ -87,7 +87,6 @@ export default function PosSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);

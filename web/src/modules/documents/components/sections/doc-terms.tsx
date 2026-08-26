@@ -14,10 +14,18 @@ export function DocTerms({ model }: { model: DocumentModel }) {
   const content = properties.static_content ?? model.terms;
   if (!content || content.trim() === '') return null;
 
+  const frame = style.composition === 'erp'
+    ? 'border-t-2 border-black py-3'
+    : style.composition === 'modern'
+      ? 'rounded-md border border-[color:var(--border)] bg-[color:var(--doc-brand-soft)] p-4'
+      : style.composition === 'minimal'
+        ? 'border-t border-black py-3'
+        : 'rounded-lg bg-gray-50 p-3';
+
   return (
-    <div className={cn('rounded-lg bg-gray-50 p-3', style.sectionGap)}>
-      <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">{t('terms')}</div>
-      <p className={blockTextClassName(properties, 'whitespace-pre-line text-[10px] leading-relaxed text-gray-600')}>{content}</p>
-    </div>
+    <section className={cn(frame, style.sectionGap)}>
+      <div className="mb-1 text-[10px] font-bold text-[color:var(--muted)]">{t('terms')}</div>
+      <p className={blockTextClassName(properties, 'whitespace-pre-line text-[10px] leading-relaxed text-black')}>{content}</p>
+    </section>
   );
 }

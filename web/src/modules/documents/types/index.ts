@@ -194,7 +194,15 @@ export interface TemplateConfig {
  * توكنز أسلوب القالب — تُمرَّر للأقسام (عبر Context) فتتغيّر هوية القالب البصرية
  * دون تكرار منطق الأقسام. قالب واحد من الأقسام، مُعامَل بهذه التوكنز.
  */
+/**
+ * الهوية التركيبية للقالب. هذه قيمة عرضية محلية فقط؛ لا تحفظ داخل تعريف الكتلة
+ * ولا تعيد تفسير المراجعات المثبتة أو نموذج المستند.
+ */
+export type TemplateComposition = 'classic' | 'erp' | 'modern' | 'minimal' | 'retail';
+
 export interface TemplateStyle {
+  /** الهوية التركيبية للقالب ضمن الأقسام المشتركة. */
+  composition: TemplateComposition;
   /** حشو غلاف الصفحة (Tailwind). */
   pagePadding: string;
   /** زوايا البطاقات/الحاويات. */
@@ -203,6 +211,8 @@ export interface TemplateStyle {
   sectionGap: string;
   /** نمط رأس جدول البنود. */
   tableHead: 'brand' | 'soft' | 'plain';
+  /** كثافة جدول البنود؛ لا تغيّر أعمدته أو بياناته. */
+  tableDensity: 'compact' | 'comfortable' | 'spacious';
   /** إظهار شريط الهوية أسفل الترويسة. */
   brandBar: boolean;
 }
