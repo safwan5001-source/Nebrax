@@ -31,12 +31,12 @@ describe('مدير صوت POS', () => {
     ]);
 
     const expectedDurations = {
-      scan_success: 96,
-      scan_not_found: 182,
-      scan_error: 168,
-      warning: 156,
-      payment_success: 274,
-      payment_error: 236,
+      scan_success: 104,
+      scan_not_found: 194,
+      scan_error: 174,
+      warning: 176,
+      payment_success: 312,
+      payment_error: 256,
     } as const;
 
     for (const [event, source] of Object.entries(POS_SOUND_SOURCES) as Array<[keyof typeof expectedDurations, string]>) {
@@ -49,11 +49,17 @@ describe('مدير صوت POS', () => {
       const bitsPerSample = wav.readUInt16LE(34);
       const durationMs = (wav.readUInt32LE(40) / (sampleRate * channels * (bitsPerSample / 8))) * 1_000;
 
-      expect(sampleRate).toBe(22_050);
-      expect(channels).toBe(1);
+      expect(sampleRate).toBe(44_100);
+      expect(channels).toBe(2);
       expect(bitsPerSample).toBe(16);
-      expect(wav.length).toBeLessThan(13_000);
+      expect(wav.length).toBeLessThan(60_000);
       expect(durationMs).toBeCloseTo(expectedDurations[event], 0);
+
+      let peak = 0;
+      for (let offset = 44; offset < wav.length; offset += 2) {
+        peak = Math.max(peak, Math.abs(wav.readInt16LE(offset)) / 32_767);
+      }
+      expect(peak).toBeLessThan(0.6);
     }
   });
 
@@ -66,6 +72,20 @@ describe('مدير صوت POS', () => {
 
     expect(audio.playCalls).toBe(0);
     expect(vibrate).not.toHaveBeenCalled();
+  });
+
+  it('يحترم تعطيل فئات المسح والأخطاء والدفع لكل الأحداث التابعة', () => {
+    const createAudio = vi.fn(() => new FakeAudio());
+    const manager = new PosSoundManager({ createAudio });
+
+    manager.play('scan_success', { ...enabled, scan_sound_enabled: false });
+    manager.play('scan_not_found', { ...enabled, error_sound_enabled: false });
+    manager.play('scan_error', { ...enabled, error_sound_enabled: false });
+    manager.play('warning', { ...enabled, error_sound_enabled: false });
+    manager.play('payment_success', { ...enabled, payment_sound_enabled: false });
+    manager.play('payment_error', { ...enabled, payment_sound_enabled: false });
+
+    expect(createAudio).not.toHaveBeenCalled();
   });
 
   it('يطبق مستوى الصوت من الإعداد قبل كل تشغيل', () => {
