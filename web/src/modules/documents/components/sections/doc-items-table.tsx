@@ -3,12 +3,10 @@
 import { useTranslations } from 'next-intl';
 import type { CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
-import { DEFAULT_DOCUMENT_ITEMS_COLUMNS } from '@/modules/documents/registry/document-types';
+import { getDefaultDocumentItemColumns } from '@/modules/documents/registry/document-types';
 import type { DocBlockAlignment, DocItemsColumn, DocItemsColumnId, DocumentModel, TemplateStyle } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { blockTextClassName, useDocBlockProperties } from '../doc-block-properties-context';
-
-const DEFAULT_COLUMNS: readonly DocItemsColumn[] = DEFAULT_DOCUMENT_ITEMS_COLUMNS.map((id) => ({ id }));
 
 /**
  * الخط الأحادي مخصص للأرقام والأكواد القابلة للمقارنة فقط. لا يُطبّق على
@@ -89,7 +87,7 @@ export function DocItemsTable({
   const properties = useDocBlockProperties('items');
   const head = headRow(style);
   const padding = cellPadding(style);
-  const columns = properties.columns ?? DEFAULT_COLUMNS;
+  const columns: readonly DocItemsColumn[] = properties.columns ?? getDefaultDocumentItemColumns(model.type).map((id): DocItemsColumn => ({ id }));
   const labels: Record<DocItemsColumnId, string> = {
     number: '#',
     product: t('product'),

@@ -1,8 +1,10 @@
-import type { Direction, DocumentLine, DocumentModel } from '../types';
+import type { Direction, DocumentLine, DocumentModel, DocumentTypeId } from '../types';
 
 export type DocumentQaScenario = 'single' | 'five' | 'twenty' | 'multipage';
 
 export type DocumentQaOptions = {
+  /** اختياري للتوافق مع فحوصات المرحلة الأولى؛ الافتراضي فاتورة ضريبية. */
+  documentType?: DocumentTypeId;
   scenario: DocumentQaScenario;
   direction: Extract<Direction, 'rtl' | 'ltr'>;
   showQr: boolean;
@@ -57,15 +59,20 @@ function longEnglishText(label: string): string {
  * كي تُختبر القوالب نفسها مع المحتوى الطويل والأصول والاتجاهين، من دون كتابة بيانات.
  */
 export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
+  const type = options.documentType ?? 'tax_invoice';
   const english = options.direction === 'ltr';
   const lines = Array.from({ length: countForScenario(options.scenario) }, (_, index) => lineAt(index, options.direction));
   const subtotal = lines.reduce((sum, line) => sum + (line.priceBeforeTax ?? 0), 0);
   const tax = lines.reduce((sum, line) => sum + line.tax, 0);
   const assets = options.showAssets;
   const longContent = options.scenario === 'multipage';
+  const isPurchaseDocument = type === 'purchase_order' || type === 'purchase_invoice';
+  const isDeliveryNote = type === 'delivery_note';
+  const dueDate = type === 'delivery_note' ? null : type === 'sales_order' || type === 'purchase_order' ? '2026-09-30' : '2026-09-25';
+  const paymentType = type === 'purchase_invoice' || type === 'tax_invoice' ? 'credit' : null;
 
   return {
-    type: 'tax_invoice',
+    type: type,
     currency: 'SAR',
     direction: options.direction,
     seller: {
@@ -87,18 +94,22 @@ export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
     },
     buyer: {
       name: longContent
-        ? (english ? 'Gulf Regional Industrial Supplies and Logistics Establishment for Advanced Projects' : 'مؤسسة الخليج الإقليمية للتوريدات الصناعية واللوجستية للمشروعات المتقدمة')
-        : (english ? 'Gulf Trading Establishment' : 'مؤسسة الخليج للتجارة'),
+        ? (isPurchaseDocument
+          ? (english ? 'Gulf Regional Industrial Supplies and Logistics Establishment for Advanced Projects' : 'مؤسسة الخليج الإقليمية للتوريدات الصناعية واللوجستية للمشروعات المتقدمة')
+          : (english ? 'Gulf Regional Customer and Project Delivery Establishment' : 'مؤسسة الخليج الإقليمية للعملاء وتسليم المشروعات والخدمات التجارية المتكاملة'))
+        : (isPurchaseDocument
+          ? (english ? 'Gulf Trading Supplier' : 'مؤسسة الخليج للتوريد')
+          : (english ? 'Gulf Trading Customer' : 'مؤسسة الخليج للتجارة')),
       vatNumber: '311111111100003',
       crNumber: '2050987654',
       city: english ? 'Khobar' : 'الخبر',
       address: english ? 'King Saud Street, Khobar' : 'شارع الملك سعود، الخبر',
     },
     meta: {
-      number: `QA-${options.scenario.toUpperCase()}-2026-0001`,
+      number: `${type.toUpperCase()}-QA-${options.scenario.toUpperCase()}-2026-0001`,
       date: '2026-08-26',
-      dueDate: '2026-09-25',
-      paymentType: 'credit',
+      dueDate,
+      paymentType,
     },
     lines,
     totals: {
@@ -109,14 +120,14 @@ export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
       tax,
       total: subtotal - 12_500 + 7_500 - 2_500 + tax,
     },
-    qr: options.showQr ? {
+    qr: options.showQr && (type === 'tax_invoice' || type === 'simplified_tax_invoice') ? {
       value: `Nebrax QA ${options.direction} ${options.scenario} ${subtotal}`,
       note: english ? 'QA-only QR payload' : 'رمز تحقق خاص بالمعاينة',
     } : null,
     footerText: english ? 'This QA fixture is not a financial record and does not represent a posted document.' : 'هذه عينة تحقق لا تمثل سجلاً مالياً ولا مستنداً مرحّلاً.',
     notes: longContent
-      ? (english ? longEnglishText('Internal notes') : longArabicText('ملاحظات داخلية'))
-      : (english ? 'QA note for document visual verification.' : 'ملاحظة تحقق مرئية للمستند.'),
+      ? (english ? longEnglishText(isDeliveryNote ? 'Delivery notes' : 'Internal notes') : longArabicText(isDeliveryNote ? 'ملاحظات التسليم' : 'ملاحظات داخلية'))
+      : (english ? (isDeliveryNote ? 'Delivery received in good condition.' : 'QA note for document visual verification.') : (isDeliveryNote ? 'تم الاستلام بحالة جيدة.' : 'ملاحظة تحقق مرئية للمستند.')),
     terms: longContent
       ? (english ? longEnglishText('Terms and conditions') : longArabicText('الشروط والأحكام'))
       : (english ? 'Payment is due within 30 days from the issue date.' : 'تستحق الفاتورة خلال 30 يوماً من تاريخ الإصدار.'),
