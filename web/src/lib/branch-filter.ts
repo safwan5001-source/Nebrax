@@ -17,7 +17,7 @@ export function branchFilterDefinition(
     label: 'الفرع',
     kind: 'entity',
     emptyOptionLabel: activeBranchName ? `الفرع النشط: ${activeBranchName}` : 'الفرع النشط',
-    searchPlaceholder: 'ابحث عن فرع بالاسم أو الكود',
+    searchPlaceholder: 'ابحث عن فرع',
     emptyText: 'لا يوجد فرع مطابق',
     options: [
       { value: 'all', label: 'كل الفروع' },
