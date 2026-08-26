@@ -98,7 +98,7 @@ export default function DeliveryNoteDetailPage() {
         {isDraft && canManage && <Button asChild variant="outline"><Link href={`/delivery-notes/${note.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Link></Button>}
         {isDraft && canConfirm && <Button disabled={busy !== null} onClick={confirm}><CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />{busy === 'confirm' ? t('saving') : t('confirm')}</Button>}
         {isConfirmed && canInvoice && (note.invoice_draft ? (canViewInvoices && <Button asChild variant="outline"><Link href={`/invoices/${note.invoice_draft.invoice_id}`}><FileText className="h-4 w-4" strokeWidth={1.7} />{t('invoiceDraftOpenInvoice')}</Link></Button>) : <Button asChild variant="outline"><Link href={`/delivery-notes/invoice-draft?notes=${note.id}`}><FileText className="h-4 w-4" strokeWidth={1.7} />{t('invoiceDraftAction')}</Link></Button>)}
-        {!isCancelled && canCancel && <Button variant="danger" disabled={busy !== null} onClick={() => setCancelOpen(true)}><XCircle className="h-4 w-4" strokeWidth={1.7} />{t('cancel')}</Button>}
+        {!isCancelled && !note.invoice_draft && canCancel && <Button variant="danger" disabled={busy !== null} onClick={() => setCancelOpen(true)}><XCircle className="h-4 w-4" strokeWidth={1.7} />{t('cancel')}</Button>}
       </div>
     </div>
 

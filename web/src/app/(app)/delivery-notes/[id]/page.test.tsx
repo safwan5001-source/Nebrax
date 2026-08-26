@@ -80,6 +80,15 @@ describe('DeliveryNoteDetailPage linked-invoice permission guard', () => {
     expect(screen.queryByRole('link', { name: 'invoiceDraftAction' })).toBeNull();
   });
 
+  it('hides cancellation for a linked note even when the role has delivery_notes.cancel', async () => {
+    currentUser.mockReturnValue({ role: 'delivery-canceller', permissions: ['delivery_notes.view', 'delivery_notes.cancel', 'invoices.view'] });
+
+    render(<DeliveryNoteDetailPage />);
+
+    await screen.findByText('Already linked to draft INV-2026-001');
+    expect(screen.queryByRole('button', { name: 'cancel' })).toBeNull();
+  });
+
   it('shows linked invoice links only when the role has invoices.view', async () => {
     currentUser.mockReturnValue({ role: 'invoice-viewer', permissions: ['delivery_notes.view', 'delivery_notes.invoice', 'invoices.view'] });
 
