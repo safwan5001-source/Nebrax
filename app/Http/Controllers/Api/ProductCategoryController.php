@@ -22,9 +22,17 @@ class ProductCategoryController extends ApiController
 {
     public function __construct(protected DocumentStorageService $documentStorage) {}
 
-    /** القائمة مسطّحة بـ `parent_id` — الشجرة تُبنى في العرض، لا في الاستعلام. */
-    public function index(): JsonResponse
+    /**
+     * القائمة مسطّحة بـ `parent_id` — الشجرة تُبنى في العرض، لا في الاستعلام.
+     * وعند تمرير `image_id` يعيد المسار نفسه ملف الصورة محمياً بالمصادقة وRBAC.
+     */
+    public function index(Request $request)
     {
+        if ($request->filled('image_id')) {
+            $data = $request->validate(['image_id' => ['required', 'uuid']]);
+            return $this->downloadImage((string) $data['image_id']);
+        }
+
         return ProductCategoryResource::collection(
             ProductCategory::withCount('products')->orderBy('name')->get()
         )->response();
@@ -43,7 +51,11 @@ class ProductCategoryController extends ApiController
             'is_active'   => $data['is_active'] ?? true,
         ]);
 
-        return (new ProductCategoryResource($category))->response()->setStatusCode(201);
+        if ($request->hasFile('image')) {
+            $this->replaceImage($category, $request);
+        }
+
+        return (new ProductCategoryResource($category->fresh()))->response()->setStatusCode(201);
     }
 
     public function update(StoreProductCategoryRequest $request, string $id): JsonResponse
@@ -63,17 +75,49 @@ class ProductCategoryController extends ApiController
             'is_active'   => $data['is_active'] ?? $category->is_active,
         ]);
 
-        return (new ProductCategoryResource($category))->response();
+        if ($request->boolean('remove_image') && ! $request->hasFile('image')) {
+            $this->deleteStoredImage($category);
+        }
+        if ($request->hasFile('image')) {
+            $this->replaceImage($category, $request);
+        }
+
+        return (new ProductCategoryResource($category->fresh()))->response();
+    }
+
+    /**
+     * الحذف يُمنع ما دام التصنيف مستعمَلاً.
+     *
+     * الحذف هنا ناعم (soft delete)، فالمفتاح الأجنبي لا يُطلَق ولا تُصفَّر
+     * `products.category_id`. لو مرّ الحذف لاختفى تصنيف المنتج من الشاشة بلا
+     * أثر مفهوم — **فقدان بيانات صامت**. الرفض برسالة تعدّ المرتبطين أوضح.
+     */
+    public function destroy(string $id): JsonResponse
+    {
+        $category = ProductCategory::withCount(['products', 'children'])->findOrFail($id);
+
+        if ($category->products_count > 0) {
+            abort(422, "لا يمكن حذف التصنيف: مرتبط بـ {$category->products_count} منتجاً. انقل المنتجات إلى تصنيف آخر أولاً.");
+        }
+
+        if ($category->children_count > 0) {
+            abort(422, "لا يمكن حذف التصنيف: يحتوي {$category->children_count} تصنيفاً فرعياً.");
+        }
+
+        $this->deleteStoredImage($category);
+        $category->delete();
+
+        return response()->json(['message' => 'deleted']);
     }
 
     /** صورة واحدة فقط للتصنيف؛ رفع صورة جديدة يستبدل القديمة بعد نجاح الحفظ. */
-    public function storeImage(Request $request, string $id): JsonResponse
+    private function replaceImage(ProductCategory $category, Request $request): void
     {
-        $category = ProductCategory::findOrFail($id);
-        $data = $request->validate([
-            'image' => ['required', 'file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120'],
-        ]);
-        $file = $data['image'];
+        $file = $request->file('image');
+        if ($file === null) {
+            return;
+        }
+
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin');
         $path = "product-category-media/{$category->tenant_id}/{$category->id}/" . Str::uuid() . ".{$extension}";
         $stream = fopen($file->getRealPath(), 'rb');
@@ -105,12 +149,10 @@ class ProductCategoryController extends ApiController
                 report($exception);
             }
         }
-
-        return (new ProductCategoryResource($category->fresh()))->response();
     }
 
     /** تحميل مصادق عليه؛ الصور تبقى خاصة ولا تُكشف كرابط تخزين عام. */
-    public function downloadImage(string $id)
+    private function downloadImage(string $id)
     {
         $category = ProductCategory::findOrFail($id);
         if (! $category->image_path) {
@@ -132,39 +174,6 @@ class ProductCategoryController extends ApiController
         }, $category->image_original_name ?: "category-{$category->id}", [
             'Content-Type' => $category->image_mime_type ?: 'application/octet-stream',
         ]);
-    }
-
-    public function destroyImage(string $id): JsonResponse
-    {
-        $category = ProductCategory::findOrFail($id);
-        $this->deleteStoredImage($category);
-
-        return (new ProductCategoryResource($category->fresh()))->response();
-    }
-
-    /**
-     * الحذف يُمنع ما دام التصنيف مستعمَلاً.
-     *
-     * الحذف هنا ناعم (soft delete)، فالمفتاح الأجنبي لا يُطلَق ولا تُصفَّر
-     * `products.category_id`. لو مرّ الحذف لاختفى تصنيف المنتج من الشاشة بلا
-     * أثر مفهوم — **فقدان بيانات صامت**. الرفض برسالة تعدّ المرتبطين أوضح.
-     */
-    public function destroy(string $id): JsonResponse
-    {
-        $category = ProductCategory::withCount(['products', 'children'])->findOrFail($id);
-
-        if ($category->products_count > 0) {
-            abort(422, "لا يمكن حذف التصنيف: مرتبط بـ {$category->products_count} منتجاً. انقل المنتجات إلى تصنيف آخر أولاً.");
-        }
-
-        if ($category->children_count > 0) {
-            abort(422, "لا يمكن حذف التصنيف: يحتوي {$category->children_count} تصنيفاً فرعياً.");
-        }
-
-        $this->deleteStoredImage($category);
-        $category->delete();
-
-        return response()->json(['message' => 'deleted']);
     }
 
     private function deleteStoredImage(ProductCategory $category): void
