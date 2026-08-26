@@ -21,9 +21,11 @@ class JournalEntryController extends ApiController
 {
     public function index(Request $request): JsonResponse
     {
+        $branchIds = $this->requestedBranchIds($request, useActiveBranch: true);
+        $query = $this->applyBranchSelection(JournalEntry::query(), $branchIds);
+
         return response()->json([
-            'data' => $this->visibleEntries($request)
-                ->with(['lines.account'])
+            'data' => $this->withVisibleLines($query, $branchIds)
                 ->orderByDesc('entry_date')
                 ->orderByDesc('created_at')
                 ->get()
@@ -34,35 +36,26 @@ class JournalEntryController extends ApiController
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $entry = $this->visibleEntries($request)
-            ->with(['lines.account'])
-            ->whereKey($id)
-            ->firstOrFail();
+        // شاشة التفاصيل تُقيَّد بصلاحيات المستخدم، لا بالفرع النشط؛ وبذلك يظل
+        // فتح قيد من نتيجة «كل الفروع» أو من فرع آخر مسموح به ممكناً وآمناً.
+        $branchIds = $this->requestedBranchIds($request, useActiveBranch: false);
+        $query = $this->applyBranchSelection(JournalEntry::query(), $branchIds);
+        $entry = $this->withVisibleLines($query, $branchIds)->whereKey($id)->firstOrFail();
 
         return response()->json(['data' => $this->mapEntry($entry)]);
     }
 
     /**
-     * JournalEntry لا يحمل branch_id؛ يُحكم نطاقه من سطوره. يشمل هذا الفلتر
-     * السطور المركزية ذات branch_id = null، متسقاً مع بقية قوائم المستندات.
-     *
-     * معامل `branch` هنا فلتر عرض مستقل عن BranchContext:
-     * `all` يجمع الفروع المسموح بها فقط، وUUID صالح يضيّق العرض إلى فرع واحد
-     * بعد التحقق من TenantScope وصلاحية المستخدم. غياب المعامل يبقي السلوك
-     * التشغيلي القديم ويستخدم الفرع النشط القادم من X-Branch-Id.
+     * يعيد null للمستخدم غير المقيّد عندما يريد كل الفروع، ومصفوفة معرفات في
+     * كل الحالات المقيّدة. معامل `branch` فلتر عرض مستقل تماماً عن BranchContext.
      */
-    private function visibleEntries(Request $request): Builder
+    private function requestedBranchIds(Request $request, bool $useActiveBranch): ?array
     {
-        $query = JournalEntry::query();
         $allowed = $request->user()?->allowedBranchIds();
         $requested = $request->query('branch');
 
         if ($requested === 'all') {
-            if ($allowed === null) {
-                return $query;
-            }
-
-            return $query->whereHas('lines', fn (Builder $lines) => $this->filterLinesForBranches($lines, $allowed));
+            return $allowed;
         }
 
         if (is_string($requested) && $requested !== '') {
@@ -74,19 +67,39 @@ class JournalEntryController extends ApiController
                 abort(422, 'الفرع المحدد غير متاح ضمن نطاق صلاحياتك.');
             }
 
-            return $query->whereHas('lines', fn (Builder $lines) => $this->filterLinesForBranches($lines, [$requested]));
+            return [$requested];
+        }
+
+        if (! $useActiveBranch) {
+            return $allowed;
         }
 
         $branchId = app(BranchContext::class)->id();
-        if ($branchId === null) {
-            if ($allowed === null) {
-                return $query;
-            }
+        return $branchId !== null ? [$branchId] : $allowed;
+    }
 
-            return $query->whereHas('lines', fn (Builder $lines) => $this->filterLinesForBranches($lines, $allowed));
+    private function applyBranchSelection(Builder $query, ?array $branchIds): Builder
+    {
+        if ($branchIds === null) {
+            return $query;
         }
 
-        return $query->whereHas('lines', fn (Builder $lines) => $this->filterLinesForBranches($lines, [$branchId]));
+        return $query->whereHas('lines', fn (Builder $lines) => $this->filterLinesForBranches($lines, $branchIds));
+    }
+
+    /**
+     * لا يكفي تقييد whereHas وحده: قد يحمل القيد نفسه سطوراً من فروع متعددة.
+     * لذلك تُقيَّد السطور المُعادة أيضاً كي لا تتسرّب سطور فرع غير مصرّح به.
+     */
+    private function withVisibleLines(Builder $query, ?array $branchIds): Builder
+    {
+        if ($branchIds === null) {
+            return $query->with(['lines.account']);
+        }
+
+        return $query->with([
+            'lines' => fn (Builder $lines) => $this->filterLinesForBranches($lines, $branchIds)->with('account'),
+        ]);
     }
 
     private function filterLinesForBranches(Builder $lines, array $branchIds): Builder
