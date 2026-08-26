@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { MapPin, User, Wallet } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FieldGrid, FieldSpan, FormSection, ToggleField } from '@/components/nebrax';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -151,201 +151,212 @@ export function PartnerForm({
   );
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      {/* بيانات الطرف */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-4 w-4 text-primary" strokeWidth={1.8} />
-            {t('customer_details')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="name">{t('name')} <span className="text-negative">*</span></Label>
-              <Input id="name" value={form.name} onChange={(e) => onChange('name', e.target.value)} required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="name_en">{t('name_en')}</Label>
-              <Input id="name_en" dir="ltr" value={form.name_en} onChange={(e) => onChange('name_en', e.target.value)} />
-            </div>
-            {/* النوع: كان غائباً عن شاشة الإنشاء فكان كل طرف يُنشأ «عميلاً». */}
-            <div className="space-y-1.5">
-              <Label htmlFor="type">{t('type')}</Label>
-              <Select id="type" value={form.type} onChange={(e) => {
-                onChange('type', e.target.value);
-                if (e.target.value === 'supplier') onChange('default_price_list_id', '');
-              }}>
-                <option value="customer">{t('customer')}</option>
-                <option value="supplier">{t('supplier')}</option>
-                <option value="both">{t('both')}</option>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="entity_type">{entityLabel}</Label>
-              <Select id="entity_type" value={form.entity_type} onChange={(e) => onChange('entity_type', e.target.value)}>
-                <option value="commercial">{t('commercial')}</option>
-                <option value="individual">{t('individual')}</option>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="phone">{t('phone')}</Label>
-              <Input id="phone" dir="ltr" value={form.phone} onChange={(e) => onChange('phone', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="mobile">{t('mobile')}</Label>
-              <Input id="mobile" dir="ltr" value={form.mobile} onChange={(e) => onChange('mobile', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="city">{t('city')}</Label>
-              <Input id="city" value={form.city} onChange={(e) => onChange('city', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="vat">{t('vat_number')}</Label>
-              <Input
-                id="vat" dir="ltr" className="num" maxLength={15} placeholder={t('vat_hint')}
-                value={form.vat_number} onChange={(e) => onChange('vat_number', e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cr">{t('cr_number')}</Label>
-              <Input id="cr" dir="ltr" className="num" value={form.cr_number} onChange={(e) => onChange('cr_number', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="classification">{t('classification')}</Label>
-              <Input
-                id="classification" list="partner-classifications" placeholder={t('classification_hint')}
-                value={form.classification} onChange={(e) => onChange('classification', e.target.value)}
-              />
-              <datalist id="partner-classifications">
-                <option value="VIP" />
-                <option value={t('cls_wholesale')} />
-                <option value={t('cls_retail')} />
-                <option value={t('cls_government')} />
-              </datalist>
-            </div>
+    <>
+      <FormSection title={t('customer_details')} icon={User}>
+        <FieldGrid>
+          <FieldSpan>
+            <Label htmlFor="name">{t('name')} <span className="text-negative">*</span></Label>
+            <Input id="name" className="mt-1.5" value={form.name} required onChange={(e) => onChange('name', e.target.value)} />
+          </FieldSpan>
+          <div>
+            <Label htmlFor="name_en">{t('name_en')}</Label>
+            <Input id="name_en" className="mt-1.5" dir="ltr" value={form.name_en} onChange={(e) => onChange('name_en', e.target.value)} />
           </div>
-        </CardContent>
-      </Card>
+          {/* النوع: كان غائباً عن شاشة الإنشاء فكان كل طرف يُنشأ «عميلاً». */}
+          <div>
+            <Label htmlFor="type">{t('type')}</Label>
+            <Select
+              id="type" className="mt-1.5" value={form.type}
+              onChange={(e) => {
+                onChange('type', e.target.value);
+                // الخادم يرفض قائمة سعر افتراضية لطرفٍ ليس عميلاً (422)، فتُمحى هنا
+                // قبل الإرسال لا بعد الرفض.
+                if (e.target.value === 'supplier') onChange('default_price_list_id', '');
+              }}
+            >
+              <option value="customer">{t('customer')}</option>
+              <option value="supplier">{t('supplier')}</option>
+              <option value="both">{t('both')}</option>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="entity_type">{entityLabel}</Label>
+            <Select id="entity_type" className="mt-1.5" value={form.entity_type} onChange={(e) => onChange('entity_type', e.target.value)}>
+              <option value="commercial">{t('commercial')}</option>
+              <option value="individual">{t('individual')}</option>
+            </Select>
+          </div>
+          {/* الرمز مُعرّفٌ تشغيلي يُبحث به: LTR وخط Mono مهما كان اتجاه الصفحة. */}
+          <div>
+            <Label htmlFor="code">{t('code')}</Label>
+            <Input id="code" className="num mt-1.5" dir="ltr" value={form.code} onChange={(e) => onChange('code', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="classification">{t('classification')}</Label>
+            <Input
+              id="classification" className="mt-1.5" list="partner-classifications" placeholder={t('classification_hint')}
+              value={form.classification} onChange={(e) => onChange('classification', e.target.value)}
+            />
+            <datalist id="partner-classifications">
+              <option value="VIP" />
+              <option value={t('cls_wholesale')} />
+              <option value={t('cls_retail')} />
+              <option value={t('cls_government')} />
+            </datalist>
+          </div>
+          <FieldSpan>
+            <ToggleField
+              id="partner-active"
+              label={t('active')}
+              hint={t('active_hint')}
+              checked={form.is_active}
+              onCheckedChange={(value) => onChange('is_active', value)}
+            />
+          </FieldSpan>
+        </FieldGrid>
+      </FormSection>
 
-      {/* بيانات الحساب */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-primary" strokeWidth={1.8} />
-            {t('account_details')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="code">{t('code')}</Label>
-              <Input id="code" dir="ltr" className="num" value={form.code} onChange={(e) => onChange('code', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="email">{t('email')}</Label>
-              <Input id="email" type="email" dir="ltr" value={form.email} onChange={(e) => onChange('email', e.target.value)} />
-            </div>
+      <FormSection title={t('contact_details')} icon={User}>
+        <FieldGrid>
+          {/* الهاتف والجوال: لوحة أرقام على الجوال، واتجاه لاتيني فلا ينكسر ترتيب
+              رمز الدولة داخل صفحة عربية. */}
+          <div>
+            <Label htmlFor="phone">{t('phone')}</Label>
+            <Input id="phone" className="num mt-1.5" type="tel" inputMode="tel" dir="ltr" value={form.phone} onChange={(e) => onChange('phone', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="mobile">{t('mobile')}</Label>
+            <Input id="mobile" className="num mt-1.5" type="tel" inputMode="tel" dir="ltr" value={form.mobile} onChange={(e) => onChange('mobile', e.target.value)} />
+          </div>
+          <FieldSpan>
+            <Label htmlFor="email">{t('email')}</Label>
+            <Input id="email" className="mt-1.5" type="email" inputMode="email" dir="ltr" value={form.email} onChange={(e) => onChange('email', e.target.value)} />
+          </FieldSpan>
+        </FieldGrid>
+      </FormSection>
 
-            {mode === 'create' ? (
-              <>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ob">{t('opening_balance')}</Label>
-                  <Input
-                    id="ob" inputMode="decimal" className="num text-end" placeholder="0.00"
-                    value={form.opening_balance} onChange={(e) => onChange('opening_balance', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="obd">{t('opening_balance_date')}</Label>
-                  <Input
-                    id="obd" type="date" dir="ltr"
-                    value={form.opening_balance_date} onChange={(e) => onChange('opening_balance_date', e.target.value)}
-                  />
-                </div>
-                <p className="text-[11px] text-muted sm:col-span-2">{t('opening_balance_hint')}</p>
-              </>
-            ) : (
-              <p className="rounded bg-primary-soft px-3 py-2 text-[11px] leading-relaxed text-primary sm:col-span-2">
+      <FormSection title={t('tax_identity')} icon={Wallet}>
+        <FieldGrid>
+          <div>
+            <Label htmlFor="vat">{t('vat_number')}</Label>
+            <Input
+              id="vat" className="num mt-1.5" dir="ltr" inputMode="numeric" maxLength={15} placeholder={t('vat_hint')}
+              value={form.vat_number} onChange={(e) => onChange('vat_number', e.target.value)}
+              aria-describedby="vat-hint"
+            />
+            <p id="vat-hint" className="mt-1 text-[11px] leading-relaxed text-muted">{t('vat_length_hint')}</p>
+          </div>
+          <div>
+            <Label htmlFor="cr">{t('cr_number')}</Label>
+            <Input id="cr" className="num mt-1.5" dir="ltr" inputMode="numeric" value={form.cr_number} onChange={(e) => onChange('cr_number', e.target.value)} />
+          </div>
+        </FieldGrid>
+      </FormSection>
+
+      <FormSection title={t('account_details')} icon={Wallet}>
+        <FieldGrid>
+          {mode === 'create' ? (
+            <>
+              <div>
+                <Label htmlFor="ob">{t('opening_balance')}</Label>
+                <Input
+                  id="ob" className="num mt-1.5 text-end" inputMode="decimal" dir="ltr" placeholder="0.00"
+                  value={form.opening_balance} onChange={(e) => onChange('opening_balance', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="obd">{t('opening_balance_date')}</Label>
+                <Input
+                  id="obd" className="mt-1.5" type="date" dir="ltr"
+                  value={form.opening_balance_date} onChange={(e) => onChange('opening_balance_date', e.target.value)}
+                />
+              </div>
+              <FieldSpan>
+                <p className="text-[11px] leading-relaxed text-muted">{t('opening_balance_hint')}</p>
+              </FieldSpan>
+            </>
+          ) : (
+            <FieldSpan>
+              <p className="rounded bg-primary-soft px-3 py-2 text-[11px] leading-relaxed text-primary">
                 {t('opening_balance_locked')}
               </p>
-            )}
+            </FieldSpan>
+          )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="climit">{t('credit_limit')}</Label>
-              <Input
-                id="climit" inputMode="decimal" className="num text-end" placeholder="0.00"
-                value={form.credit_limit} onChange={(e) => onChange('credit_limit', e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cperiod">{t('credit_period')}</Label>
-              <Input
-                id="cperiod" inputMode="numeric" className="num text-end" placeholder="0"
-                value={form.credit_period} onChange={(e) => onChange('credit_period', e.target.value)}
-              />
-            </div>
-            <p className="text-[11px] text-muted sm:col-span-2">{t('credit_limit_hint')}</p>
-
-            {isCustomer && (
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="default-price-list">{t('default_price_list')}</Label>
-                <Select id="default-price-list" value={form.default_price_list_id} onChange={(e) => onChange('default_price_list_id', e.target.value)}>
-                  <option value="">{t('default_price_list_none')}</option>
-                  {priceLists.map((priceList) => <option key={priceList.id} value={priceList.id} disabled={!priceList.is_active && priceList.id !== form.default_price_list_id}>{priceList.name}{!priceList.is_active ? ` — ${t('default_price_list_inactive')}` : ''}</option>)}
-                </Select>
-                <p className="text-[11px] leading-relaxed text-muted">{t('default_price_list_hint')}</p>
-              </div>
-            )}
-
-            <div className="space-y-1.5 sm:col-span-2">
-              <label className="flex items-center gap-2 pt-1 text-sm text-text">
-                <input type="checkbox" checked={form.is_active} onChange={(e) => onChange('is_active', e.target.checked)} />
-                {t('active')}
-              </label>
-            </div>
+          <div>
+            <Label htmlFor="climit">{t('credit_limit')}</Label>
+            <Input
+              id="climit" className="num mt-1.5 text-end" inputMode="decimal" dir="ltr" placeholder="0.00"
+              value={form.credit_limit} onChange={(e) => onChange('credit_limit', e.target.value)}
+            />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* العنوان الوطني */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-primary" strokeWidth={1.8} />
-            {t('national_address')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-              <Label htmlFor="address">{t('address')}</Label>
-              <Input id="address" value={form.address} onChange={(e) => onChange('address', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="building_no">{t('building_no')}</Label>
-              <Input id="building_no" dir="ltr" className="num" value={form.building_no} onChange={(e) => onChange('building_no', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="street">{t('street')}</Label>
-              <Input id="street" value={form.street} onChange={(e) => onChange('street', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="district">{t('district')}</Label>
-              <Input id="district" value={form.district} onChange={(e) => onChange('district', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="postal_code">{t('postal_code')}</Label>
-              <Input id="postal_code" dir="ltr" className="num" value={form.postal_code} onChange={(e) => onChange('postal_code', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="country">{t('country')}</Label>
-              <Input id="country" dir="ltr" placeholder="SA" value={form.country} onChange={(e) => onChange('country', e.target.value)} />
-            </div>
+          <div>
+            <Label htmlFor="cperiod">{t('credit_period')}</Label>
+            <Input
+              id="cperiod" className="num mt-1.5 text-end" inputMode="numeric" dir="ltr" placeholder="0"
+              value={form.credit_period} onChange={(e) => onChange('credit_period', e.target.value)}
+            />
           </div>
-        </CardContent>
-      </Card>
-    </div>
+          <FieldSpan>
+            <p className="text-[11px] leading-relaxed text-muted">{t('credit_limit_hint')}</p>
+          </FieldSpan>
+
+          {isCustomer && (
+            <FieldSpan>
+              <Label htmlFor="default-price-list">{t('default_price_list')}</Label>
+              <Select
+                id="default-price-list" className="mt-1.5" value={form.default_price_list_id}
+                onChange={(e) => onChange('default_price_list_id', e.target.value)}
+                aria-describedby="default-price-list-hint"
+              >
+                <option value="">{t('default_price_list_none')}</option>
+                {priceLists.map((priceList) => (
+                  <option
+                    key={priceList.id} value={priceList.id}
+                    disabled={!priceList.is_active && priceList.id !== form.default_price_list_id}
+                  >
+                    {priceList.name}{!priceList.is_active ? ` — ${t('default_price_list_inactive')}` : ''}
+                  </option>
+                ))}
+              </Select>
+              <p id="default-price-list-hint" className="mt-1 text-[11px] leading-relaxed text-muted">{t('default_price_list_hint')}</p>
+            </FieldSpan>
+          )}
+        </FieldGrid>
+      </FormSection>
+
+      <FormSection title={t('national_address')} icon={MapPin}>
+        <FieldGrid columns={3}>
+          <FieldSpan>
+            <Label htmlFor="address">{t('address')}</Label>
+            <Input id="address" className="mt-1.5" value={form.address} onChange={(e) => onChange('address', e.target.value)} />
+          </FieldSpan>
+          <div>
+            <Label htmlFor="city">{t('city')}</Label>
+            <Input id="city" className="mt-1.5" value={form.city} onChange={(e) => onChange('city', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="district">{t('district')}</Label>
+            <Input id="district" className="mt-1.5" value={form.district} onChange={(e) => onChange('district', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="street">{t('street')}</Label>
+            <Input id="street" className="mt-1.5" value={form.street} onChange={(e) => onChange('street', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="building_no">{t('building_no')}</Label>
+            <Input id="building_no" className="num mt-1.5" dir="ltr" inputMode="numeric" value={form.building_no} onChange={(e) => onChange('building_no', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="postal_code">{t('postal_code')}</Label>
+            <Input id="postal_code" className="num mt-1.5" dir="ltr" inputMode="numeric" value={form.postal_code} onChange={(e) => onChange('postal_code', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="country">{t('country')}</Label>
+            <Input id="country" className="mt-1.5" dir="ltr" placeholder="SA" value={form.country} onChange={(e) => onChange('country', e.target.value)} />
+          </div>
+        </FieldGrid>
+      </FormSection>
+    </>
   );
 }

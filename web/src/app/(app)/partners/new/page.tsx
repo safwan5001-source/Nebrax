@@ -1,30 +1,44 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
+import { FormActions, FormAlert, FormPage } from '@/components/nebrax';
 import {
   EMPTY_PARTNER_FORM, PartnerForm, partnerFormToPayload, type PartnerFormValues,
 } from '@/components/partners/partner-form';
 import { api, ApiError } from '@/lib/api';
 
-/** إنشاء طرف جديد. الرصيد الافتتاحي متاح هنا وحده — يولّد قيده عند الإنشاء. */
+/**
+ * إنشاء طرف جديد (عميل/مورّد/كليهما).
+ *
+ * الرصيد الافتتاحي متاح هنا وحده: فعلٌ محاسبي يولّد قيداً مرحّلاً مرةً واحدة،
+ * و`UpdatePartnerRequest` يرفضه بـ`prohibited` عند التعديل.
+ *
+ * `?type=supplier` يفتح النموذج على المورّدين مباشرةً — تأتي من قائمة الموردين
+ * فلا يُنشأ مورّدٌ بنوع «عميل» لمجرّد أن النموذج يفتح عليه افتراضاً.
+ */
 export default function NewPartnerPage() {
   const t = useTranslations('partners');
   const tc = useTranslations('common');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { success } = useToast();
 
-  const [form, setForm] = useState<PartnerFormValues>(EMPTY_PARTNER_FORM);
+  const requestedType = searchParams.get('type');
+  const [form, setForm] = useState<PartnerFormValues>(() => ({
+    ...EMPTY_PARTNER_FORM,
+    type: requestedType === 'supplier' || requestedType === 'both' ? requestedType : 'customer',
+  }));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const backHref = requestedType === 'supplier' ? '/suppliers' : '/partners';
+
   const set = <K extends keyof PartnerFormValues>(key: K, value: PartnerFormValues[K]) =>
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((current) => ({ ...current, [key]: value }));
 
   async function submit() {
     if (!form.name.trim()) { setError(tc('saveFailed')); return; }
@@ -33,7 +47,7 @@ export default function NewPartnerPage() {
     try {
       await api('/partners', { method: 'POST', body: partnerFormToPayload(form, true) });
       success(tc('created'));
-      router.push('/partners');
+      router.push(backHref);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
       setSaving(false);
@@ -41,21 +55,28 @@ export default function NewPartnerPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/partners'>
-          <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Link></Button>
-        <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
-        <div className="ms-auto flex items-center gap-2">
-          <Button asChild variant="ghost"><Link href='/partners'>{t('cancel')}</Link></Button>
-          <Button disabled={saving || !form.name.trim()} onClick={submit}>{t('save')}</Button>
-        </div>
-      </div>
+    <FormPage
+      backHref={backHref}
+      backLabel={t('back')}
+      title={t('new_title')}
+      actions={
+        <FormActions
+          primary={
+            <Button type="button" disabled={saving || !form.name.trim()} onClick={() => void submit()}>
+              {t('save')}
+            </Button>
+          }
+          secondary={
+            <Button type="button" variant="outline" disabled={saving} onClick={() => router.push(backHref)}>
+              {t('cancel')}
+            </Button>
+          }
+        />
+      }
+    >
+      {error ? <FormAlert>{error}</FormAlert> : null}
 
       <PartnerForm form={form} onChange={set} mode="create" />
-
-      {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
-    </div>
+    </FormPage>
   );
 }
