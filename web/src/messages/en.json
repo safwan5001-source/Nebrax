@@ -3767,12 +3767,12 @@
         "unassignedOperation": "Unassigned operation",
         "unassignedStocktake": "Unassigned stocktake",
         "value": {
-          "title": "Top products by inventory value",
-          "description": "A presentation-only ranking of the top six products by current inventory value."
+          "title": "Largest inventory-value positions",
+          "description": "A presentation-only ranking of the top six products by inventory-value magnitude, with the original sign retained."
         },
         "warehouses": {
-          "title": "Top warehouses by quantity",
-          "description": "Total displayed product quantity per warehouse; this is not warehouse inventory value."
+          "title": "Largest inventory-quantity positions",
+          "description": "Total displayed product quantity per warehouse ranked by magnitude with the original sign retained; this is not warehouse inventory value."
         },
         "movements": {
           "title": "Incoming and outgoing",

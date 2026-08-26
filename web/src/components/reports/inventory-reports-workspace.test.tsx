@@ -77,6 +77,34 @@ describe('InventoryReportsWorkspace presentation modes', () => {
     expect(detail.querySelector('a')?.getAttribute('href')).toBe('/products/product-low');
   });
 
+  it('keeps negative inventory-value rows in the signed ranking, orders by magnitude, and does not mutate source rows', async () => {
+    const rows = [
+      { key: 'positive-500', sku: 'P500', label: 'Positive 500', unit: 'pc', quantity: 5, avg_cost: '100.00', stock_value: '500.00' },
+      { key: 'negative-400', sku: 'N400', label: 'Negative 400', unit: 'pc', quantity: -4, avg_cost: '100.00', stock_value: '-400.00' },
+      { key: 'positive-100', sku: 'P100', label: 'Positive 100', unit: 'pc', quantity: 1, avg_cost: '100.00', stock_value: '100.00' },
+    ];
+    const original = structuredClone(rows);
+    await renderLoaded('value', rows, { products: 3, quantity: 2, stock_value: '200.00' });
+
+    const analytics = screen.getByTestId('report-ranked-analytics-inventory-value');
+    const labels = Array.from(analytics.querySelectorAll('li span:first-child')).map((element) => element.textContent);
+    expect(labels).toEqual(['Positive 500', 'Negative 400', 'Positive 100']);
+    expect(analytics.textContent).toContain('-400.00');
+    expect(analytics.textContent).not.toContain('analytics.empty');
+    expect(rows).toEqual(original);
+  });
+
+  it('does not show an empty state for negative-only inventory value rows', async () => {
+    await renderLoaded('value', [
+      { key: 'negative-only', sku: 'NEG', label: 'Negative only product', unit: 'pc', quantity: -5, avg_cost: '10.00', stock_value: '-50.00' },
+    ], { products: 1, quantity: -5, stock_value: '-50.00' });
+
+    const analytics = screen.getByTestId('report-ranked-analytics-inventory-value');
+    expect(analytics.textContent).toContain('Negative only product');
+    expect(analytics.textContent).toContain('-50.00');
+    expect(analytics.textContent).not.toContain('analytics.empty');
+  });
+
   it('aggregates warehouse quantities only for the ranked presentation and never introduces warehouse value', async () => {
     await renderLoaded('warehouses', [
       { key: 'product-1', warehouse_id: 'warehouse-a', warehouse: 'Warehouse A', branch: 'North', sku: 'A', label: 'First', unit: 'pc', quantity: 2 },
@@ -88,6 +116,20 @@ describe('InventoryReportsWorkspace presentation modes', () => {
     expect(analytics.textContent).toContain('Warehouse A');
     expect(analytics.textContent).toContain('5');
     expect(analytics.textContent).not.toContain('stock_value');
+  });
+
+  it('keeps negative aggregated warehouse quantities in the signed ranking and orders them by magnitude', async () => {
+    await renderLoaded('warehouses', [
+      { key: 'product-a', warehouse_id: 'warehouse-a', warehouse: 'Warehouse A', label: 'Negative stock', unit: 'pc', quantity: -15 },
+      { key: 'product-b', warehouse_id: 'warehouse-b', warehouse: 'Warehouse B', label: 'Positive stock', unit: 'pc', quantity: 8 },
+      { key: 'product-c', warehouse_id: 'warehouse-c', warehouse: 'Warehouse C', label: 'Small stock', unit: 'pc', quantity: 2 },
+    ], { warehouses: 3, items: 3, quantity: -5 });
+
+    const analytics = screen.getByTestId('report-ranked-analytics-inventory-warehouses');
+    const labels = Array.from(analytics.querySelectorAll('li span:first-child')).map((element) => element.textContent);
+    expect(labels).toEqual(['Warehouse A', 'Warehouse B', 'Warehouse C']);
+    expect(analytics.textContent).toContain('-15');
+    expect(analytics.textContent).not.toContain('analytics.empty');
   });
 
   it('renders the movement in/out comparison from official totals and retains actual rows only in Detail', async () => {

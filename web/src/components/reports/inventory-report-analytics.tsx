@@ -78,6 +78,7 @@ export function InventoryReportAnalytics({
         emptyLabel={t('analytics.empty')}
         unassignedLabel={t('analytics.unassignedProduct')}
         color="var(--primary)"
+        rankingMode="absolute-signed"
       />
     );
   }
@@ -93,6 +94,7 @@ export function InventoryReportAnalytics({
         emptyLabel={t('analytics.empty')}
         unassignedLabel={t('analytics.unassignedWarehouse')}
         color="var(--primary)"
+        rankingMode="absolute-signed"
       />
     );
   }
