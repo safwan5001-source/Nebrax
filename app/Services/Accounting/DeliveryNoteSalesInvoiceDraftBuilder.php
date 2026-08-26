@@ -36,6 +36,8 @@ use RuntimeException;
 class DeliveryNoteSalesInvoiceDraftBuilder
 {
     private const MAX_NOTES = 50;
+    /** عقد واحد لحمولة سطور المصدر في preview وbuild وForm Request. */
+    public const MAX_SOURCE_LINES = 500;
     private const MAX_MONEY = 100000000000;
     private const MAX_QUANTITY = 1000000;
 
@@ -106,13 +108,19 @@ class DeliveryNoteSalesInvoiceDraftBuilder
         }
 
         $eligible = array_values(array_filter($rows, fn (array $row) => $row['eligible']));
+        $sourceLineCount = $notes->sum(fn (DeliveryNote $note) => $note->lines->count());
         $compatibility = $this->compatibilityIssues($eligible);
+        if (! $this->sourceLineCountAllowed($sourceLineCount)) {
+            $compatibility[] = 'source_line_limit_exceeded';
+        }
 
         return [
             'delivery_notes' => $rows,
             'compatible' => $compatibility === [] && count($rows) === count($eligible),
-            'compatibility_issues' => $compatibility,
+            'compatibility_issues' => array_values(array_unique($compatibility)),
             'pricing_required' => true,
+            'source_line_count' => $sourceLineCount,
+            'source_line_limit' => self::MAX_SOURCE_LINES,
             'requested_price_list_id' => $requestedPriceList?->id,
         ];
     }
@@ -170,6 +178,7 @@ class DeliveryNoteSalesInvoiceDraftBuilder
                 throw new DeliveryNoteInvoiceConflictException('أحد سندات التسليم مرتبط بالفعل بفاتورة مبيعات.');
             }
 
+            $this->assertSourceLineCount($this->sourceLineCount($lines->all()));
             $this->assertLockedNotes($notes->all(), $lines->all(), $command, $branchId);
             $notes->first()->loadMissing('customer.defaultPriceList');
             $priceList = $command['price_list_id'] === null
@@ -401,12 +410,15 @@ class DeliveryNoteSalesInvoiceDraftBuilder
         }
 
         $linePricing = $this->normaliseLinePricing($data['line_pricing'] ?? null);
+        // يظل تاريخ الإنشاء الفعلي افتراضياً صحيحاً، لكن checksum يعبّر عن
+        // غياب التاريخ كما أرسله العميل لا عن «اليوم» المتغير عند إعادة الطلب.
+        $semanticInvoiceDate = $this->nullableDate($data['invoice_date'] ?? null);
         $command = [
             'delivery_note_ids' => $noteIds,
             'expected_versions' => $normalizedVersions,
             'idempotency_key' => $this->idempotencyKey($data['idempotency_key'] ?? null),
             'reason' => $this->requiredText($data['reason'] ?? null, 500, 'إنشاء مسودة الفاتورة يتطلب سبب قرار واضحاً.'),
-            'invoice_date' => $this->dateString($data['invoice_date'] ?? null),
+            'invoice_date' => $semanticInvoiceDate ?? now()->toDateString(),
             'due_date' => $this->nullableDate($data['due_date'] ?? null),
             'notes' => $this->nullableText($data['notes'] ?? null, 5000),
             'tax_inclusive' => $this->strictBoolean($data['tax_inclusive'] ?? false, 'tax_inclusive'),
@@ -417,6 +429,7 @@ class DeliveryNoteSalesInvoiceDraftBuilder
         ];
         $checksumData = $command;
         unset($checksumData['actor_id']);
+        $checksumData['invoice_date'] = $semanticInvoiceDate;
         $command['checksum'] = hash('sha256', json_encode($checksumData, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
 
         return $command;
@@ -484,6 +497,24 @@ class DeliveryNoteSalesInvoiceDraftBuilder
         }
 
         return $center->id;
+    }
+
+    /** @param array<int,\Illuminate\Support\Collection<int,DeliveryNoteLine>> $lineGroups */
+    private function sourceLineCount(array $lineGroups): int
+    {
+        return array_sum(array_map(fn (\Illuminate\Support\Collection $lines) => $lines->count(), $lineGroups));
+    }
+
+    private function sourceLineCountAllowed(int $count): bool
+    {
+        return $count <= self::MAX_SOURCE_LINES;
+    }
+
+    private function assertSourceLineCount(int $count): void
+    {
+        if (! $this->sourceLineCountAllowed($count)) {
+            throw new RuntimeException('لا يمكن إنشاء مسودة فاتورة من أكثر من '.self::MAX_SOURCE_LINES.' سطر مصدر.');
+        }
     }
 
     /** @param array<int,DeliveryNote> $notes @param array<string,\Illuminate\Support\Collection<int,DeliveryNoteLine>> $lines */

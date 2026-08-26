@@ -46,6 +46,22 @@ test.describe('Delivery notes — local fixture only', () => {
     await expect(page.getByRole('button', { name: 'إلغاء السند' })).toHaveCount(0);
   });
 
+  test('keeps a linked draft visible but hides invoice navigation for a delivery-note-only fixture role', async ({ page }) => {
+    await seedLocalFixture(page, 'ar', ['delivery_notes.view', 'delivery_notes.invoice'], 'delivery-invoicer');
+    await page.goto('/delivery-notes/dn-100');
+
+    await expect(page.getByText(/مرتبط بالفعل بالمسودة/)).toBeVisible();
+    await expect(page.locator('main a[href^="/invoices/"]')).toHaveCount(0);
+  });
+
+  test('shows linked invoice navigation only to a fixture role with invoices.view', async ({ page }) => {
+    await seedLocalFixture(page, 'ar', ['delivery_notes.view', 'delivery_notes.invoice', 'invoices.view'], 'invoice-viewer');
+    await page.goto('/delivery-notes/dn-100');
+
+    await expect(page.getByText(/مرتبط بالفعل بالمسودة/)).toBeVisible();
+    await expect(page.locator('main a[href^="/invoices/"]').first()).toBeVisible();
+  });
+
   test('renders the LTR dark fixture without horizontal overflow', async ({ page }, testInfo) => {
     await seedLocalFixture(page, 'en');
     await page.goto('/delivery-notes');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\Accounting\DeliveryNoteSalesInvoiceDraftBuilder;
 use Illuminate\Foundation\Http\FormRequest;
 
 class BuildDeliveryNoteInvoiceDraftRequest extends FormRequest
@@ -26,7 +27,7 @@ class BuildDeliveryNoteInvoiceDraftRequest extends FormRequest
             'tax_inclusive' => ['nullable', 'boolean'],
             'price_list_id' => ['nullable', 'uuid'],
             'cost_center_id' => ['nullable', 'uuid'],
-            'line_pricing' => ['required', 'array', 'min:1', 'max:500'],
+            'line_pricing' => ['required', 'array', 'min:1', 'max:'.DeliveryNoteSalesInvoiceDraftBuilder::MAX_SOURCE_LINES],
             'line_pricing.*.delivery_note_line_id' => ['required', 'uuid', 'distinct'],
             'line_pricing.*.unit_price' => ['required', 'integer', 'min:1', 'max:100000000000'],
             'line_pricing.*.tax_rate' => ['nullable', 'integer', 'min:0', 'max:100'],

@@ -27,6 +27,8 @@ const { api, translate, currentUser, ApiError } = vi.hoisted(() => {
     invoiceDraftRunPreview: 'Preview eligibility and pricing',
     invoiceDraftPreviewing: 'Preparing preview…',
     invoiceDraftNeedSelection: 'Select a note.',
+    issue_source_line_limit_exceeded: 'The selection exceeds the {limit}-source-line limit.',
+    invoiceDraftIneligibleTitle: 'The current selection cannot create a draft',
     invoiceDraftEligible: 'Eligible',
     invoiceDraftIneligible: 'Ineligible',
     invoiceDraftUnitPrice: 'Unit price',
@@ -120,6 +122,26 @@ describe('DeliveryNoteInvoiceDraftWizard', () => {
     expect(screen.queryByRole('link', { name: 'Standalone sales invoice' })).toBeNull();
     const previewButton = screen.getByRole('button', { name: 'Preview eligibility and pricing' });
     expect((previewButton as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('shows the source-line cap from preview and blocks draft creation before pricing', async () => {
+    const user = userEvent.setup();
+    const oversizedPreview = { ...preview, compatible: false, compatibility_issues: ['source_line_limit_exceeded'], source_line_count: 501, source_line_limit: 500 };
+    api.mockImplementation((path: string) => {
+      if (path.startsWith('/delivery-notes?')) return Promise.resolve({ data: [note('dn-1', 'DN-001', 1), note('dn-2', 'DN-002', 2)] });
+      if (path === '/price-lists') return Promise.resolve({ data: [] });
+      if (path === '/delivery-notes/invoice-draft/preview') return Promise.resolve({ data: oversizedPreview });
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<DeliveryNoteInvoiceDraftWizard />);
+
+    const previewButton = await screen.findByRole('button', { name: 'Preview eligibility and pricing' });
+    await user.click(previewButton);
+    await screen.findByText('The selection exceeds the 500-source-line limit.');
+    const createButton = screen.getByRole('button', { name: 'Create invoice draft' });
+    expect((createButton as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByLabelText('Unit price')[0] as HTMLInputElement).disabled).toBe(true);
   });
 
   it('requests a safe preview for the selected notes and never calls invoice posting', async () => {

@@ -6393,6 +6393,7 @@
     "issue_invalid_line": "أحد سطور السند أو وحداته لم يعد صالحاً.",
     "issue_no_eligible_delivery_notes": "لا يوجد سند مؤهل ضمن الاختيار.",
     "issue_mixed_customer": "يجب أن تشترك السندات في العميل نفسه.",
-    "issue_mixed_warehouse": "يجب أن تشترك السندات في المستودع نفسه."
+    "issue_mixed_warehouse": "يجب أن تشترك السندات في المستودع نفسه.",
+    "issue_source_line_limit_exceeded": "يتجاوز الاختيار حد {limit} سطر مصدر؛ قلّل السندات قبل إدخال التسعير."
   }
 }

@@ -6397,6 +6397,7 @@
     "issue_invalid_line": "A note line or its unit is no longer valid.",
     "issue_no_eligible_delivery_notes": "No eligible note is included in the selection.",
     "issue_mixed_customer": "All selected notes must have the same customer.",
-    "issue_mixed_warehouse": "All selected notes must have the same warehouse."
+    "issue_mixed_warehouse": "All selected notes must have the same warehouse.",
+    "issue_source_line_limit_exceeded": "The selection exceeds the {limit}-source-line limit; reduce the selected notes before entering pricing."
   }
 }

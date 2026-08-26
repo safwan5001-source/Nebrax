@@ -33,6 +33,7 @@ use App\Support\EntitlementSourceType;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use LogicException;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
@@ -179,6 +180,59 @@ class DeliveryNoteInvoiceDraftBuilderTest extends TestCase
         $changed['line_pricing'][0]['unit_price'] = 13000;
         $this->expectException(DeliveryNoteInvoiceConflictException::class);
         $this->builder->build($changed);
+    }
+
+    #[Test]
+    public function an_omitted_invoice_date_replays_across_a_day_change_but_a_changed_payload_conflicts(): void
+    {
+        Carbon::setTestNow('2026-08-20 09:00:00');
+        try {
+            $note = $this->confirmedNote([['product_id' => $this->product->id, 'quantity' => 1]]);
+            $command = $this->command([$note], idempotencyKey: 'omitted-date-replay-0001');
+            unset($command['invoice_date']);
+
+            $first = $this->builder->build($command);
+            $this->assertSame('2026-08-20', $first->invoice->invoice_date->toDateString());
+
+            Carbon::setTestNow('2026-08-21 09:00:00');
+            $replay = $this->builder->build($command);
+            $this->assertTrue($replay->idempotentReplay);
+            $this->assertSame($first->invoice->id, $replay->invoice->id);
+            $this->assertSame(1, Invoice::count());
+
+            $changed = $command;
+            $changed['reason'] = 'سبب مختلف لا يجوز أن يعيد المسودة الأصلية.';
+            $this->expectException(DeliveryNoteInvoiceConflictException::class);
+            $this->builder->build($changed);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    #[Test]
+    public function preview_and_build_share_the_source_line_limit_contract_at_499_500_and_501(): void
+    {
+        foreach ([499, 500] as $lineCount) {
+            $notes = $this->confirmedNotesWithSourceLineCount($lineCount);
+            $preview = $this->builder->preview(['delivery_note_ids' => array_map(fn (DeliveryNote $note) => $note->id, $notes)]);
+            $this->assertTrue($preview['compatible']);
+            $this->assertSame($lineCount, $preview['source_line_count']);
+            $this->assertSame(DeliveryNoteSalesInvoiceDraftBuilder::MAX_SOURCE_LINES, $preview['source_line_limit']);
+
+            $result = $this->builder->build($this->command($notes, idempotencyKey: "source-line-limit-{$lineCount}"));
+            $this->assertFalse($result->idempotentReplay);
+        }
+
+        $overflowNotes = $this->confirmedNotesWithSourceLineCount(501);
+        $overflowPreview = $this->builder->preview(['delivery_note_ids' => array_map(fn (DeliveryNote $note) => $note->id, $overflowNotes)]);
+        $this->assertFalse($overflowPreview['compatible']);
+        $this->assertSame(['source_line_limit_exceeded'], $overflowPreview['compatibility_issues']);
+        $this->assertSame(501, $overflowPreview['source_line_count']);
+        $this->assertSame(DeliveryNoteSalesInvoiceDraftBuilder::MAX_SOURCE_LINES, $overflowPreview['source_line_limit']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('أكثر من '.DeliveryNoteSalesInvoiceDraftBuilder::MAX_SOURCE_LINES.' سطر مصدر');
+        $this->builder->build($this->command($overflowNotes, idempotencyKey: 'source-line-limit-501'));
     }
 
     #[Test]
@@ -509,6 +563,17 @@ class DeliveryNoteInvoiceDraftBuilderTest extends TestCase
         $note = $this->deliveryNotes->create($this->header($header), $items);
 
         return $this->deliveryNotes->confirm($note, $note->version, $this->owner->id, 'تم تأكيد التسليم للفوترة.');
+    }
+
+    /** @return array<int,DeliveryNote> */
+    private function confirmedNotesWithSourceLineCount(int $lineCount): array
+    {
+        $items = array_fill(0, $lineCount, ['product_id' => $this->product->id, 'quantity' => 1]);
+
+        return array_map(
+            fn (array $chunk): DeliveryNote => $this->confirmedNote($chunk),
+            array_chunk($items, 200),
+        );
     }
 
     /** @param array<string,mixed> $override @return array<string,mixed> */
