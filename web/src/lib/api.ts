@@ -124,6 +124,26 @@ export async function fetchImageUrl(path: string): Promise<string | null> {
   return URL.createObjectURL(await res.blob());
 }
 
+/**
+ * يستخرج اسم الملف من `Content-Disposition` — يدعم `filename*=UTF-8''…`
+ * المرمَّز و`filename="…"` العادي. يعيد `null` حين لا تحمل الترويسة اسماً.
+ */
+export function filenameFromDisposition(header: string | null): string | null {
+  if (!header) return null;
+
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1]).trim() || null;
+    } catch {
+      // ترويسة مشوّهة لا تُسقط التنزيل؛ نسقط إلى الاسم الاحتياطي.
+    }
+  }
+
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() || null;
+}
+
 /** تنزيل ملف خاص من الـ API مع ترويسات المصادقة والفرع النشط. */
 export async function downloadFile(path: string, fallbackName: string): Promise<void> {
   if (isDemo()) return;
@@ -146,7 +166,9 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = fallbackName;
+  // الخادم يسمّي ملفات التصدير بنطاقها وقالبها وتاريخها؛ الاسم الاحتياطي
+  // للمسارات التي لا ترسل ترويسة تسمية.
+  anchor.download = filenameFromDisposition(res.headers.get('Content-Disposition')) ?? fallbackName;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
