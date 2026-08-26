@@ -1,6 +1,7 @@
 import { riyalToMinor } from '@/lib/money';
 import type { DocumentModel } from '../types';
 import type { SourceCompany, SourceCustomer } from './from-invoice';
+import { buildDocumentSeller } from './company-seller';
 
 /** تخصيص سند من الـ API — نصّ الوصف والمبلغ بالريال نصّاً. */
 export interface SourcePaymentAllocation {
@@ -38,20 +39,13 @@ export function buildPaymentDocumentModel(input: {
   const { payment, company, partner, footerText, logoUrl, logoHeight, bank, stampUrl, signatureUrl } = input;
   const isReceived = payment.direction === 'received';
   const amount = riyalToMinor(payment.amount);
+  const seller = buildDocumentSeller(company, { logoUrl, logoHeight });
 
   return {
     type: isReceived ? 'receipt_voucher' : 'payment_voucher',
     currency: 'SAR',
     direction: 'rtl',
-    seller: {
-      name: company?.name ?? '—',
-      vatNumber: company?.vat_number ?? null,
-      crNumber: company?.cr_number ?? null,
-      tagline: null,
-      logoText: null,
-      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : null,
-      logoHeight: logoHeight ?? null,
-    },
+    seller,
     buyer: {
       name: partner?.name ?? '—',
       vatNumber: partner?.vat_number ?? null,
