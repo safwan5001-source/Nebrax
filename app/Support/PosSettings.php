@@ -74,6 +74,14 @@ final class PosSettings
         'cash_drawer_enabled' => false,
         'cash_drawer_driver' => 'unavailable',
         'cash_drawer_auto_open_after_cash' => false,
+        // تفضيلات feedback محلية للواجهة؛ لا تدخل في البيع أو القيد ولا تعتمد
+        // عليها الخدمة لتقرير صحة العملية. تظل مفعلة بالتوافق مع تجربة POS.
+        'sound_enabled' => true,
+        'scan_sound_enabled' => true,
+        'error_sound_enabled' => true,
+        'payment_sound_enabled' => true,
+        'sound_volume' => 60,
+        'haptics_enabled' => true,
     ];
 
     /** جميع إعدادات POS، مدموجة فوق الافتراضات المعتمدة. */

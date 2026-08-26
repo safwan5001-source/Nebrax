@@ -32,11 +32,13 @@ import { PosHeldSalesDialog, type PosHeldSale } from '@/components/pos/pos-held-
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
+import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
+import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 
 const WALKIN = 'عميل نقدي (POS)';
 
 /** إعدادات نقطة البيع (sales-config/pos) — تُطبَّق فعلياً على تدفّق البيع. */
-interface PosConfig {
+interface PosConfig extends PosFeedbackSettings {
   default_customer: string;
   receipt_footer: string;
   print_receipt: boolean;
@@ -71,6 +73,7 @@ const POS_DEFAULTS: PosConfig = {
   cash_drawer_enabled: false,
   cash_drawer_driver: 'unavailable',
   cash_drawer_auto_open_after_cash: false,
+  ...POS_FEEDBACK_DEFAULTS,
 };
 
 interface PosUnit { name: string; factor: number; price: string }
@@ -177,6 +180,8 @@ export default function PosPage() {
   const [clearCartOpen, setClearCartOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [unsavedExitAction, setUnsavedExitAction] = useState<'close_session' | 'logout' | null>(null);
+  const [lastScannedLineKey, setLastScannedLineKey] = useState<string | null>(null);
+  const [scanFeedbackMessage, setScanFeedbackMessage] = useState('');
 
   // اسم العميل الافتراضي (النقدي) من الإعداد؛ والمعروض = المختار أو الافتراضي.
   useEffect(() => {
@@ -189,6 +194,24 @@ export default function PosPage() {
 
   const walkinName = posCfg.default_customer?.trim() || WALKIN;
   const customerName = selectedCustomer?.name ?? walkinName;
+  const playPosFeedback = useCallback((event: PosSoundEvent) => posSound.play(event, posCfg), [posCfg]);
+
+  useEffect(() => {
+    posSound.preload();
+    const unlock = () => posSound.unlock();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!lastScannedLineKey) return;
+    const timer = window.setTimeout(() => setLastScannedLineKey(null), 700);
+    return () => window.clearTimeout(timer);
+  }, [lastScannedLineKey]);
 
   const loadProducts = useCallback(async (partnerId: string | null) => {
     const query = partnerId ? `?partner_id=${encodeURIComponent(partnerId)}` : '';
@@ -340,15 +363,12 @@ export default function PosPage() {
     })));
   }, [posCfg.allow_unit_price_override, products, updateCarts]);
 
-  function addProduct(p: Product, unitName: string | null = null, quantity = 1) {
+  function addProduct(p: Product, unitName: string | null = null, quantity = 1): string | null {
     const unit = pricedUnit(p, unitName);
-    const qty = Number.isInteger(quantity) && quantity >= 1 && quantity <= 1000000 ? quantity : 1;
-    if (!unit) return;
-    setCart((c) => {
-      const ex = c.find((l) => l.productId === p.id && l.unit === unit.name);
-      if (ex) return c.map((l) => (l.key === ex.key ? { ...l, qty: l.qty + qty } : l));
-      return [...c, { key: `${p.id}:${unit.name}`, productId: p.id, description: p.name, sku: p.sku, unit: unit.name, price: unit.price, qty, tax: p.tax_rate, discount: '' }];
-    });
+    if (!unit) return null;
+    const lineKey = `${p.id}:${unit.name}`;
+    setCart((current) => appendPosCartProduct(current, p, unit, quantity));
+    return lineKey;
   }
 
   const setUnit = (key: string, unitName: string) => {
@@ -507,24 +527,35 @@ export default function PosPage() {
   // مسح باركود: الأساسي/SKU يبيع وحدة الأساس، أما البديل فيحمل وحدته من
   // كتالوج POS المسعّر؛ فلا يتحول مسح كرتون غير مسعّر إلى بيع قطعة بصمت.
   function scanCode(code: string): boolean {
-    const c = code.trim();
-    if (!c) return false;
-    const baseProduct = products.find((product) => (product.sku ?? '').trim() === c || (product.barcode ?? '').trim() === c);
-    if (baseProduct) {
-      addProduct(baseProduct);
-      success(t('scan_added', { name: baseProduct.name }));
+    const normalizedCode = code.trim();
+    if (!normalizedCode) return false;
+
+    try {
+      const match = matchPosBarcode(products, normalizedCode);
+      if (!match) {
+        errorToast(t('scan_not_found', { code: normalizedCode }));
+        playPosFeedback('scan_not_found');
+        return false;
+      }
+
+      const lineKey = addProduct(match.product, match.unitName, match.quantity);
+      if (!lineKey) {
+        errorToast(t('scan_error'));
+        playPosFeedback('scan_error');
+        return false;
+      }
+
+      // لا Toast نجاح متكرر عند المسح السريع؛ السطر المضاف يضيء مؤقتاً وتبقى
+      // رسالة حية قصيرة لقارئات الشاشة.
+      setLastScannedLineKey(lineKey);
+      setScanFeedbackMessage(t('scan_added', { name: match.product.name }));
+      playPosFeedback('scan_success');
       return true;
+    } catch {
+      errorToast(t('scan_error'));
+      playPosFeedback('scan_error');
+      return false;
     }
-    const alternate = products
-      .map((product) => ({ product, barcode: product.pos_barcodes.find((item) => item.code.trim() === c) }))
-      .find((match) => match.barcode !== undefined);
-    if (alternate?.barcode) {
-      addProduct(alternate.product, alternate.barcode.unit_name, alternate.barcode.default_quantity);
-      success(t('scan_added', { name: alternate.product.name }));
-      return true;
-    }
-    errorToast(t('scan_not_found', { code: c }));
-    return false;
   }
   // مرجع حيّ لأحدث scanCode (يقرأ أحدث products) — يُستدعى من مستمع لوحة المفاتيح.
   const scanRef = useRef(scanCode);
@@ -679,17 +710,20 @@ export default function PosPage() {
     async (tenders: PosTender[]) => {
       if (catalogLoading) {
         setError(t('price_list_loading'));
+        playPosFeedback('warning');
         return;
       }
       if (cart.length === 0) return;
       if (!session) {
         setError(t('open_to_start'));
+        playPosFeedback('warning');
         return;
       }
       if (paymentRequestRef.current) return;
       paymentRequestRef.current = true;
       setPaying(true);
       setError(null);
+      let checkoutCompleted = false;
       try {
         // العميل المختار إن وُجد، وإلا العميل النقدي الافتراضي.
         const partnerId = selectedCustomer?.id ?? (await ensureWalkin());
@@ -707,6 +741,10 @@ export default function PosPage() {
           method: 'POST',
           body: { partner_id: partnerId, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, notes: activeCart.note.trim() || null, items, tenders },
         });
+        checkoutCompleted = true;
+        // النجاح الصوتي لا يرتبط بزر التأكيد ولا بطلب QR اللاحق، بل باستجابة
+        // checkout الذرية التي أنشأت البيع فعلاً على الخادم.
+        playPosFeedback('payment_success');
         const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
         success(t('sale_done'));
 
@@ -744,12 +782,15 @@ export default function PosPage() {
         setMobileTab('products');
       } catch (e) {
         setError(e instanceof ApiError ? e.message : tc('saveFailed'));
+        // لا نبلغ عن فشل دفع بعد أن يؤكد checkout نجاح البيع؛ قد يفشل طلب QR
+        // الثانوي، لكن العملية المالية تكون قد اكتملت بالفعل.
+        if (!checkoutCompleted) playPosFeedback('payment_error');
       } finally {
         paymentRequestRef.current = false;
         setPaying(false);
       }
     },
-    [activeCart, cart, catalogLoading, closeCart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products],
+    [activeCart, cart, catalogLoading, closeCart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -940,7 +981,7 @@ export default function PosPage() {
         {cart.map((line) => {
           const units = line.productId ? products.find((product) => product.id === line.productId)?.pos_units ?? [] : [];
           return (
-            <div key={line.key} className="flex gap-2 border-b border-border py-3 last:border-0">
+            <div key={line.key} className={'flex gap-2 border-b py-3 transition-colors motion-reduce:transition-none last:border-0 ' + (lastScannedLineKey === line.key ? 'border-primary bg-primary-soft' : 'border-border')}>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -1027,7 +1068,9 @@ export default function PosPage() {
   );
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
+          <div className="flex h-full flex-col overflow-hidden bg-background">
+      <p className="sr-only" aria-live="polite">{scanFeedbackMessage}</p>
+
       <PosTopbar
         cashier={cashier}
         branch={branch}

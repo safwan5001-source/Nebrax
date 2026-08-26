@@ -34,6 +34,12 @@ describe('POS demo contracts', () => {
       payment_methods_mode: string;
       cash_drawer_enabled: boolean;
       cash_drawer_driver: string;
+      sound_enabled: boolean;
+      scan_sound_enabled: boolean;
+      error_sound_enabled: boolean;
+      payment_sound_enabled: boolean;
+      sound_volume: number;
+      haptics_enabled: boolean;
     } }>('/sales-config/pos');
 
     expect(response.data).toMatchObject({
@@ -41,6 +47,12 @@ describe('POS demo contracts', () => {
       payment_methods_mode: 'all_active',
       cash_drawer_enabled: false,
       cash_drawer_driver: 'unavailable',
+      sound_enabled: true,
+      scan_sound_enabled: true,
+      error_sound_enabled: true,
+      payment_sound_enabled: true,
+      sound_volume: 60,
+      haptics_enabled: true,
     });
   });
 });
