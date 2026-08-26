@@ -24,9 +24,23 @@ class ProductCategory extends BaseModel implements BranchShareable
     use BranchScoped;
     use SoftDeletes;
 
-    protected $fillable = ['tenant_id', 'branch_id', 'parent_id', 'name', 'is_active'];
+    protected $fillable = [
+        'tenant_id',
+        'branch_id',
+        'parent_id',
+        'name',
+        'description',
+        'image_path',
+        'image_original_name',
+        'image_mime_type',
+        'image_size',
+        'is_active',
+    ];
 
-    protected $casts = ['is_active' => 'boolean'];
+    protected $casts = [
+        'image_size' => 'integer',
+        'is_active' => 'boolean',
+    ];
 
     protected $attributes = ['is_active' => true];
 
