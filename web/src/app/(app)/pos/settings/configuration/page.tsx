@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Volume2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,9 +13,8 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { POS_FEEDBACK_DEFAULTS, posSound, supportsPosHaptics, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 
-interface PosConfig extends PosFeedbackSettings {
+interface PosConfig {
   default_customer: string;
   receipt_footer: string;
   print_receipt: boolean;
@@ -73,7 +72,6 @@ const DEFAULTS: PosConfig = {
   cash_drawer_enabled: false,
   cash_drawer_driver: 'unavailable',
   cash_drawer_auto_open_after_cash: false,
-  ...POS_FEEDBACK_DEFAULTS,
 };
 
 /** إعدادات تشغيل POS: السياسات ووسائل التحصيل الخادمية في مصدر إعداد واحد. */
@@ -89,10 +87,6 @@ export default function PosSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [hapticsSupported, setHapticsSupported] = useState(false);
-
-  useEffect(() => { setHapticsSupported(supportsPosHaptics()); }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -358,61 +352,6 @@ export default function PosSettingsPage() {
                   {t('allow_deferred_payment')}
                 </label>
                 <p className="text-xs leading-relaxed text-muted">{t('allow_deferred_payment_hint')}</p>
-              </section>
-
-              <section className="space-y-4 border-t border-border pt-5" aria-labelledby="pos-feedback-title">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Volume2 className="h-4 w-4 text-muted" strokeWidth={1.7} aria-hidden="true" />
-                    <Label id="pos-feedback-title">{t('sound_feedback')}</Label>
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">{t('sound_feedback_hint')}</p>
-                </div>
-                <label className="flex items-center gap-2 text-sm font-medium text-text">
-                  <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.sound_enabled} onChange={(event) => patch('sound_enabled', event.target.checked)} />
-                  {t('sound_enabled')}
-                </label>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 text-sm text-text">
-                    <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" disabled={!config.sound_enabled} checked={config.scan_sound_enabled} onChange={(event) => patch('scan_sound_enabled', event.target.checked)} />
-                    {t('scan_sound_enabled')}
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-text">
-                    <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" disabled={!config.sound_enabled} checked={config.error_sound_enabled} onChange={(event) => patch('error_sound_enabled', event.target.checked)} />
-                    {t('error_sound_enabled')}
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-text">
-                    <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" disabled={!config.sound_enabled} checked={config.payment_sound_enabled} onChange={(event) => patch('payment_sound_enabled', event.target.checked)} />
-                    {t('payment_sound_enabled')}
-                  </label>
-                  {hapticsSupported && (
-                    <label className="flex items-center gap-2 text-sm text-text">
-                      <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.haptics_enabled} onChange={(event) => patch('haptics_enabled', event.target.checked)} />
-                      {t('haptics_enabled')}
-                    </label>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="sound_volume">{t('sound_volume')}</Label>
-                  <div className="flex items-center gap-3">
-                    <Input id="sound_volume" type="range" min="0" max="100" step="10" disabled={!config.sound_enabled} value={String(config.sound_volume)} onChange={(event) => patch('sound_volume', Number(event.target.value))} className="h-2 flex-1 px-0" />
-                    <span className="num min-w-10 text-end text-sm font-semibold text-text">{config.sound_volume}%</span>
-                  </div>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {([
-                    ['scan_success', 'preview_scan_success'],
-                    ['scan_not_found', 'preview_scan_not_found'],
-                    ['scan_error', 'preview_scan_error'],
-                    ['payment_success', 'preview_payment_success'],
-                    ['payment_error', 'preview_payment_error'],
-                  ] as const).map(([event, label]) => (
-                    <Button key={event} type="button" variant="outline" className="justify-start" onClick={() => { posSound.unlock(); posSound.play(event as PosSoundEvent, config); }}>
-                      {t(label)}
-                    </Button>
-                  ))}
-                </div>
-                <p className="text-xs leading-relaxed text-muted">{t('sound_autoplay_hint')}</p>
               </section>
 
               <section className="space-y-2 border-t border-border pt-5" aria-labelledby="cash-drawer-contract-title">

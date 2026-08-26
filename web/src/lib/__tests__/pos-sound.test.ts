@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { POS_FEEDBACK_DEFAULTS, PosSoundManager, type PosFeedbackSettings } from '@/lib/pos-sound';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { POS_FEEDBACK_DEFAULTS, POS_SOUND_SOURCES, PosSoundManager, type PosFeedbackSettings } from '@/lib/pos-sound';
 
 class FakeAudio {
   currentTime = 0;
@@ -18,6 +20,43 @@ class FakeAudio {
 const enabled: PosFeedbackSettings = { ...POS_FEEDBACK_DEFAULTS, haptics_enabled: false };
 
 describe('مدير صوت POS', () => {
+  it('يربط كل حدث بملف صوت مملوك ومعبأ في الواجهة', () => {
+    expect(Object.keys(POS_SOUND_SOURCES)).toEqual([
+      'scan_success',
+      'scan_not_found',
+      'scan_error',
+      'warning',
+      'payment_success',
+      'payment_error',
+    ]);
+
+    const expectedDurations = {
+      scan_success: 96,
+      scan_not_found: 182,
+      scan_error: 168,
+      warning: 156,
+      payment_success: 274,
+      payment_error: 236,
+    } as const;
+
+    for (const [event, source] of Object.entries(POS_SOUND_SOURCES) as Array<[keyof typeof expectedDurations, string]>) {
+      const asset = join(process.cwd(), 'public', source.replace(/^\//, ''));
+      expect(existsSync(asset)).toBe(true);
+
+      const wav = readFileSync(asset);
+      const sampleRate = wav.readUInt32LE(24);
+      const channels = wav.readUInt16LE(22);
+      const bitsPerSample = wav.readUInt16LE(34);
+      const durationMs = (wav.readUInt32LE(40) / (sampleRate * channels * (bitsPerSample / 8))) * 1_000;
+
+      expect(sampleRate).toBe(22_050);
+      expect(channels).toBe(1);
+      expect(bitsPerSample).toBe(16);
+      expect(wav.length).toBeLessThan(13_000);
+      expect(durationMs).toBeCloseTo(expectedDurations[event], 0);
+    }
+  });
+
   it('لا يشغل الصوت أو الاهتزاز عندما يعطله المستخدم', () => {
     const audio = new FakeAudio();
     const vibrate = vi.fn();
