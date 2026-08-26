@@ -566,7 +566,7 @@ $ php artisan test --filter="ProductImportV2Test|ProductImportTest|ProductExport
 
 ```
 $ php artisan test           # المجموعة كاملة، بلا --filter — بعد دمج main
-  Tests:  25 failed, 1 skipped, 1502 passed (9438 assertions)
+  Tests:  25 failed, 1 skipped, 1503 passed (9457 assertions)
   Duration: ~123s
 ```
 
@@ -634,8 +634,8 @@ SQLite لا يفرّق بين حالة أحرف أسماء الأعمدة فمر
 
 ```
 $ npm run test          # Vitest
-  Test Files  103 passed (103)
-  Tests       678 passed (678)
+  Test Files  106 passed (106)
+  Tests       688 passed (688)
 ```
 
 الجديد ضمنها (**62 اختباراً**):
@@ -700,7 +700,7 @@ $ npm run test          # Vitest
 |---|---|---|
 | أنواع TypeScript | `npx tsc --noEmit` | ✅ **نظيف تماماً** — بلا استثناءات بعد دمج main |
 | بناء الإنتاج | `npm run build` (Next.js 15.5.19) | ✅ نجح — 132 مساراً |
-| اختبارات الواجهة | `npm run test` | ✅ 103 ملف · 678 اختباراً (بعد دمج main) |
+| اختبارات الواجهة | `npm run test` | ✅ 106 ملفات · 688 اختباراً (بعد دمجَي main) |
 | اختبارات الخلفية (SQLite) | `php artisan test` | ✅ لا انحدار (مجموعة فشل مطابقة للأساس — §L) |
 | تحقّق بنية PHP | `php -l` على كل ملف جديد/معدَّل | ✅ نظيف |
 | مسافات الديف | `git diff --check` | ✅ نظيف |
@@ -874,14 +874,15 @@ export: GET /products/export?scope=filtered&type=good&sale_price_gte=200&page=1&
 | رقم الـPR | **#491** |
 | الرابط | https://github.com/safwan5001-source/Nebrax/pull/491 |
 | الفرع | `claude/product-import-export-task-6408cw` → `main` |
-| قاعدة الـPR | `b3116123` (main بعد PR #489) |
-| **آخر التزام يمسّ الكود** | **`ccf196330ce3d72da2deba314a9e0c3b5bbad10b`** — وهو ما جرى عليه CI أدناه |
-| HEAD الحالي للفرع | `901b5df` فما بعده — **التزامات توثيق فقط** (هذا الملف) |
+| قاعدة الـPR | `0f67126` (main بعد PR #492) |
+| **HEAD النهائي** | **`8968989`** (`89689898eb1e8b7f6f255ed4ec9ba20524e051cf`) |
 | الحالة | مفتوح · **غير مدموج** |
 
-> **لماذا رقمان؟** الالتزام الذي يسجّل نتيجة CI يغيّر بالضرورة HEAD بعد قراءتها.
-> فالمرجع الصحيح لسلامة الكود هو `ccf1963`: كل ما بعده لا يمسّ إلا هذا التقرير
-> (يتحقّق منه `git diff --stat ccf1963..HEAD` — ملفٌ واحد تحت `deliverables/`).
+> **`main` فرعٌ نشط وتحرّك مرّتين أثناء هذا العمل، ودُمج في كلّ مرّة.** ولأن الالتزام
+> الذي يسجّل نتيجة CI يغيّر HEAD بعد قراءتها، فالمرجع الصحيح لسلامة الكود هو **آخر
+> التزام يمسّ الكود** لا رأس الفرع لحظة القراءة. يتحقّق المراجع من ذلك بأمر واحد:
+> `git diff --name-only <sha>..HEAD` — إن لم يُظهر إلا ملفاً تحت `deliverables/`
+> فالكود هو نفسه الذي اجتاز CI.
 
 ### نتيجة CI الفعلية على HEAD النهائي
 
@@ -893,11 +894,19 @@ export: GET /products/export?scope=filtered&type=good&sale_price_gte=200&page=1&
 **وهذه ليست أول جولة، والفارق يستحق التسجيل.** أمسك PostgreSQL في CI خطأً حقيقياً لم
 تمسكه SQLite محلياً، وهو بالضبط ما وُجدت المصفوفة له:
 
-| الالتزام | CI | السبب |
+| الالتزام | CI | ما جرى |
 |---|---|---|
 | `40ac553` | ❌ 1 فاشل / 1527 ناجح | `where('SKU', …)` باسم عمود بحروف كبيرة في أحد اختباراتي — SQLite لا يفرّق بين الحالة فمرّ، وPostgreSQL يفرّق فرفض |
 | `b7a701a` | ✅ ناجح | بعد تصحيحه إلى `where('sku', …)` |
-| `ccf1963` | انظر الجدول أعلاه | التزام دمج `main` |
+| `ccf1963` | ✅ ناجح (sqlite · pgsql · Web CI) | دمج `main` الأول (‏`b311612` — PR #489) |
+| `3cba2e1` | ✅ ناجح (sqlite · pgsql · Web CI) | توثيق فقط |
+| **`8968989`** | **الجدول أعلاه** | دمج `main` الثاني (‏`0f67126` — PR #492: أصوات نقطة البيع) |
+
+**الدمجان كلاهما بالطريقة نفسها:** `git merge origin/main` — التزام بأبوين، بلا rebase
+وبلا force-push وبلا إعادة كتابة تاريخ، والدفع fast-forward في المرّتين. ولم يقع تعارض
+في أيٍّ منهما: `main` لمس `documentPresentation`/`documentTypesAlt` ثم `pos`/`posSettings`،
+ونحن لمسنا `products`/`nebrax` — **صفر مجموعات مشتركة في المرّتين**، وتحقّقتُ برمجياً بعد
+كل دمج من حضور مفاتيح الطرفين بقيمهما وبقاء تكافؤ `ar`/`en`.
 
 ## R. قائمة مراجعة المالك قبل الدمج
 
