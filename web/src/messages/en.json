@@ -1075,11 +1075,22 @@
   "documentTypesAlt": {
     "tax_invoice": "فاتورة ضريبية",
     "quotation": "عرض سعر",
+    "sales_order": "أمر بيع",
+    "purchase_order": "أمر شراء",
     "purchase_invoice": "فاتورة مشتريات",
+    "delivery_note": "إذن تسليم",
     "credit_note": "إشعار دائن",
     "debit_note": "إشعار مدين",
     "receipt_voucher": "سند قبض",
     "payment_voucher": "سند صرف"
+  },
+  "documentPresentation": {
+    "meta": "Document details",
+    "valid_until": "Valid until",
+    "expected_delivery_date": "Expected delivery date",
+    "payment_due_date": "Due date",
+    "delivery_date": "Delivery date",
+    "recipient": "Recipient"
   },
   "documentPrint": {
     "seller": "Company",

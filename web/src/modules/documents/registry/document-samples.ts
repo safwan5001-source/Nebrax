@@ -25,6 +25,14 @@ const PREVIEW_BUYER = {
   address: 'حي الشاطئ، الدمام',
 };
 
+const TYPE_PREVIEW_META: Partial<Record<DocumentTypeId, { number: string; dueDate: string | null; paymentType: 'cash' | 'credit' | null }>> = {
+  quotation: { number: 'Q-2026-0001', dueDate: '2026-09-14', paymentType: null },
+  sales_order: { number: 'SO-2026-0001', dueDate: '2026-09-30', paymentType: null },
+  purchase_order: { number: 'PO-2026-0001', dueDate: '2026-09-30', paymentType: null },
+  purchase_invoice: { number: 'PI-2026-0001', dueDate: '2026-09-14', paymentType: 'credit' },
+  delivery_note: { number: 'DN-2026-0001', dueDate: null, paymentType: null },
+};
+
 const PREVIEW_LINES = [
   {
     id: 'preview-line-1',
@@ -53,17 +61,20 @@ const PREVIEW_LINES = [
 ] as const;
 
 function makeLineItemPreview(type: DocumentTypeId): DocumentModel {
+  const meta = TYPE_PREVIEW_META[type] ?? { number: 'DOC-2026-0001', dueDate: '2026-09-14', paymentType: 'credit' as const };
+  const isPurchaseDocument = type === 'purchase_order' || type === 'purchase_invoice';
+
   return {
     type,
     currency: 'SAR',
     direction: 'rtl',
     seller: { ...PREVIEW_SELLER },
-    buyer: { ...PREVIEW_BUYER },
+    buyer: isPurchaseDocument ? { ...PREVIEW_BUYER, name: 'المورد التجريبي' } : { ...PREVIEW_BUYER },
     meta: {
-      number: 'DOC-2026-0001',
+      number: meta.number,
       date: '2026-08-15',
-      dueDate: '2026-09-14',
-      paymentType: 'credit',
+      dueDate: meta.dueDate,
+      paymentType: meta.paymentType,
     },
     lines: PREVIEW_LINES.map((line) => ({ ...line })),
     totals: {
@@ -76,8 +87,12 @@ function makeLineItemPreview(type: DocumentTypeId): DocumentModel {
       ? { value: 'Nebrax preview QR payload', note: 'رمز معاينة فقط' }
       : null,
     footerText: 'شكراً لتعاملكم معنا.',
-    notes: 'هذه معاينة تجريبية آمنة لمحرر القوالب.',
-    terms: 'تسدد الفاتورة خلال 30 يوماً من تاريخ الإصدار.',
+    notes: type === 'delivery_note' ? 'تم تسليم الأصناف الموضحة أعلاه إلى المستلم.' : 'هذه معاينة تجريبية آمنة لمحرر القوالب.',
+    terms: type === 'quotation'
+      ? 'العرض صالح حتى التاريخ الموضح في بيانات المستند.'
+      : type === 'sales_order' || type === 'purchase_order'
+        ? 'تُراجع الكميات وتاريخ التسليم المتوقع قبل الاعتماد النهائي.'
+        : 'تسدد الفاتورة خلال 30 يوماً من تاريخ الإصدار.',
     bank: 'البنك الأهلي السعودي — IBAN SA0000000000000000000000',
     stampUrl: null,
     signatureUrl: null,

@@ -4,7 +4,9 @@ import { getDocumentPreviewModel } from './document-samples';
 import {
   DEFAULT_DOCUMENT_ITEMS_COLUMNS,
   DOCUMENT_ITEMS_COLUMN_IDS,
+  DOCUMENT_TYPE_DEFAULT_ITEM_COLUMNS,
   DOCUMENT_TYPE_REGISTRY,
+  getDefaultDocumentItemColumns,
   getDefaultDocumentLayout,
   isDocumentBlockAllowed,
   listDocumentVariables,
@@ -125,7 +127,7 @@ describe('Document type registry', () => {
     });
   });
 
-  it('uses the configured complete default order for item columns', () => {
+  it('keeps the full financial column catalog available for builder customization', () => {
     expect(DOCUMENT_ITEMS_COLUMN_IDS).toEqual([
       'number', 'product_code', 'barcode', 'product', 'description', 'unit_price',
       'quantity', 'price_before_tax', 'tax', 'total',
@@ -134,6 +136,44 @@ describe('Document type registry', () => {
       'number', 'product_code', 'barcode', 'product', 'description', 'unit_price',
       'quantity', 'price_before_tax', 'tax', 'total',
     ]);
+  });
+
+  it('uses semantic fallback layouts and columns for the five commercial document types', () => {
+    const expected = {
+      quotation: {
+        visible: ['header', 'parties', 'items', 'summary', 'notes', 'terms', 'bank', 'stamp', 'signature', 'footer'],
+        columns: ['number', 'product', 'description', 'quantity', 'unit_price', 'tax', 'total'],
+      },
+      sales_order: {
+        visible: ['header', 'parties', 'items', 'summary', 'notes', 'terms', 'signature', 'footer'],
+        columns: ['number', 'product_code', 'product', 'description', 'quantity', 'unit_price', 'total'],
+      },
+      purchase_order: {
+        visible: ['header', 'parties', 'items', 'summary', 'terms', 'notes', 'signature', 'footer'],
+        columns: ['number', 'product_code', 'product', 'description', 'quantity', 'unit_price', 'total'],
+      },
+      purchase_invoice: {
+        visible: ['header', 'parties', 'items', 'summary', 'notes', 'bank', 'footer'],
+        columns: ['number', 'product_code', 'product', 'description', 'quantity', 'unit_price', 'tax', 'total'],
+      },
+      delivery_note: {
+        visible: ['header', 'parties', 'items', 'notes', 'signature', 'footer'],
+        columns: ['number', 'product_code', 'product', 'description', 'quantity'],
+      },
+    } as const;
+
+    for (const [type, expectation] of Object.entries(expected) as [keyof typeof expected, (typeof expected)[keyof typeof expected]][]) {
+      expect(getDefaultDocumentLayout(type).filter((item) => item.visible).map((item) => item.key)).toEqual(expectation.visible);
+      expect(getDefaultDocumentItemColumns(type)).toEqual(expectation.columns);
+      expect(DOCUMENT_TYPE_DEFAULT_ITEM_COLUMNS[type]).toEqual(expectation.columns);
+    }
+  });
+
+  it('keeps financial summary and tax columns out of the Delivery Note fallback', () => {
+    const layout = getDefaultDocumentLayout('delivery_note');
+
+    expect(layout.find((item) => item.key === 'summary')?.visible).toBe(false);
+    expect(getDefaultDocumentItemColumns('delivery_note')).not.toEqual(expect.arrayContaining(['unit_price', 'tax', 'total']));
   });
 
   it('exposes only compatible variables for vouchers', () => {
@@ -162,12 +202,19 @@ describe('Document preview samples', () => {
     });
   });
 
-  it('provides a safe line-item body for purchase invoices', () => {
-    const preview = getDocumentPreviewModel('purchase_invoice');
+  it('provides semantic safe preview data for the five commercial types', () => {
+    const quotation = getDocumentPreviewModel('quotation');
+    const salesOrder = getDocumentPreviewModel('sales_order');
+    const purchaseOrder = getDocumentPreviewModel('purchase_order');
+    const purchaseInvoice = getDocumentPreviewModel('purchase_invoice');
+    const deliveryNote = getDocumentPreviewModel('delivery_note');
 
-    expect(preview.type).toBe('purchase_invoice');
-    expect(preview.lines).toHaveLength(2);
-    expect(preview.qr).toBeNull();
+    expect(quotation.meta).toMatchObject({ number: 'Q-2026-0001', dueDate: '2026-09-14', paymentType: null });
+    expect(salesOrder.meta).toMatchObject({ number: 'SO-2026-0001', dueDate: '2026-09-30', paymentType: null });
+    expect(purchaseOrder).toMatchObject({ buyer: { name: 'المورد التجريبي' }, meta: { number: 'PO-2026-0001' } });
+    expect(purchaseInvoice).toMatchObject({ buyer: { name: 'المورد التجريبي' }, meta: { number: 'PI-2026-0001', paymentType: 'credit' } });
+    expect(deliveryNote).toMatchObject({ meta: { number: 'DN-2026-0001', dueDate: null, paymentType: null }, qr: null });
+    expect(deliveryNote.notes).toContain('تم تسليم');
   });
 
   it('provides a voucher body without line items for payment documents', () => {
