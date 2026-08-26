@@ -13,8 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
-import { branchViewQuery, type BranchView } from '@/lib/branch-view';
+import { useBranches } from '@/lib/branch';
+import { branchFilterDefinition } from '@/lib/branch-filter';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { formatRiyal } from '@/lib/money';
@@ -39,6 +39,7 @@ export default function ReceiptVouchersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { success, error: toastError } = useToast();
+  const { branches, active } = useBranches();
   const [explorer, setExplorer] = useState<DataExplorerState>(() => {
     const parsed = parseExplorerState(new URLSearchParams(searchParams.toString()));
     return { ...parsed, perPage: parsed.perPage ?? 25, sort: parsed.sort ?? '-payment_date' };
@@ -48,17 +49,20 @@ export default function ReceiptVouchersPage() {
   const [data, setData] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [view, setView] = useState<BranchView>('current');
   const [acting, setActing] = useState<string | null>(null);
+
+  const branchValue = useMemo(() => filterValue(explorer.filters.find((filter) => filter.key === 'branch')), [explorer.filters]);
 
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(null);
-    api<{ data: Voucher[] }>(`/payments?direction=received${branchViewQuery(view, true)}`)
+    const params = new URLSearchParams({ direction: 'received' });
+    if (branchValue) params.set('branch', branchValue);
+    api<{ data: Voucher[] }>(`/payments?${params.toString()}`)
       .then((response) => setData(response.data))
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : t('load_list_failed')))
       .finally(() => setLoading(false));
-  }, [t, view]);
+  }, [branchValue, t]);
 
   useEffect(() => load(), [load]);
 
@@ -120,6 +124,7 @@ export default function ReceiptVouchersPage() {
     .map((name) => ({ value: name, label: name })), [data]);
 
   const definitions = useMemo<FilterDefinition[]>(() => [
+    branchFilterDefinition(branches, active?.name),
     {
       key: 'status', label: t('status'), kind: 'select', quick: true,
       options: [
@@ -137,7 +142,7 @@ export default function ReceiptVouchersPage() {
     { key: 'date_to', label: t('filter_date_to'), kind: 'date' },
     { key: 'amount_min', label: t('filter_amount_min'), kind: 'money' },
     { key: 'amount_max', label: t('filter_amount_max'), kind: 'money' },
-  ], [customerOptions, methodOptions, t]);
+  ], [active?.name, branches, customerOptions, methodOptions, t]);
 
   const labelledFilters = useMemo(() => explorer.filters.map((filter) => ({
     ...filter,
@@ -244,14 +249,7 @@ export default function ReceiptVouchersPage() {
   ];
 
   return <div className="space-y-4">
-    <PageHeader
-      title={t('title')}
-      description={t('subtitle')}
-      context={
-        <BranchViewToggle value={view} onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }} />
-      }
-      actions={headerActions}
-    />
+    <PageHeader title={t('title')} description={t('subtitle')} actions={headerActions} />
 
     <ListToolbar
       search={searchInput}
