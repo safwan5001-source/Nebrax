@@ -117,7 +117,7 @@ describe.each(TEST_LOCALES)('ListToolbar (%s)', (locale) => {
       locale
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'إزالة الفلتر الحالة: draft' }));
+    await userEvent.click(screen.getByRole('button', { name: 'إزالة الفلتر الحالة: مسودة' }));
     expect(onRemoveFilter).toHaveBeenCalledWith('status');
 
     await userEvent.click(screen.getByRole('button', { name: 'مسح الكل' }));
