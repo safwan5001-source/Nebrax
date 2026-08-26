@@ -3750,6 +3750,37 @@
       "operations": "Operations",
       "stocktakes": "Stocktakes",
       "details": "Details",
+      "presentation": "Presentation",
+      "summary": "Summary",
+      "detail": "Detail",
+      "analytics": {
+        "empty": "There is not enough data to analyze in the selected scope",
+        "unassignedProduct": "Unassigned product",
+        "unassignedWarehouse": "Unassigned warehouse",
+        "unassignedOperation": "Unassigned operation",
+        "unassignedStocktake": "Unassigned stocktake",
+        "value": {
+          "title": "Top products by inventory value",
+          "description": "A presentation-only ranking of the top six products by current inventory value."
+        },
+        "warehouses": {
+          "title": "Top warehouses by quantity",
+          "description": "Total displayed product quantity per warehouse; this is not warehouse inventory value."
+        },
+        "movements": {
+          "title": "Incoming and outgoing",
+          "description": "A descriptive quantity comparison of incoming and outgoing movements in the selected scope."
+        },
+        "operations": {
+          "title": "Operation type distribution",
+          "description": "Count of posted permits by operation type in the selected scope.",
+          "singleCategoryDescription": "One operation type is visible in the selected scope."
+        },
+        "stocktakes": {
+          "title": "Largest stocktake differences by absolute value",
+          "description": "A presentation-only ranking by magnitude while preserving the reported difference-value sign."
+        }
+      },
       "currentSnapshot": "Current snapshot",
       "empty": "No data in the selected scope",
       "loadFailed": "The report could not be loaded. Check your connection and try again.",
