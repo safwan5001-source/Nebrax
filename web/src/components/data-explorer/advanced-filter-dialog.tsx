@@ -60,6 +60,7 @@ export function AdvancedFilterDialog({
       <div className="max-h-[65vh] space-y-5 overflow-y-auto pe-1">
         {definitions.map((definition) => {
           const active = byKey.get(definition.key);
+          const emptyOptionLabel = definition.emptyOptionLabel ?? 'الكل';
 
           if (definition.kind === 'entity' && definition.options?.length) {
             const options: ComboOption[] = definition.options.map((option) => ({
@@ -83,8 +84,8 @@ export function AdvancedFilterDialog({
                     );
                   }}
                   options={options}
-                  placeholder="الكل"
-                  clearLabel="الكل"
+                  placeholder={emptyOptionLabel}
+                  clearLabel={emptyOptionLabel}
                   searchPlaceholder={definition.searchPlaceholder ?? `ابحث في ${definition.label}`}
                   emptyText={definition.emptyText ?? 'لا توجد نتائج مطابقة'}
                   className="w-full"
@@ -111,7 +112,7 @@ export function AdvancedFilterDialog({
                   }}
                   className="w-full"
                 >
-                  <option value="">الكل</option>
+                  <option value="">{emptyOptionLabel}</option>
                   {definition.options.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
