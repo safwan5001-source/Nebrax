@@ -14,9 +14,10 @@ class StoreProductCategoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'      => ['required', 'string', 'max:255'],
-            'parent_id' => ['nullable', 'uuid'],
-            'is_active' => ['nullable', 'boolean'],
+            'name'        => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:4000'],
+            'parent_id'   => ['nullable', 'uuid'],
+            'is_active'   => ['nullable', 'boolean'],
         ];
     }
 }
