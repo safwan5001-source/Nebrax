@@ -272,7 +272,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // المنتجات
         Route::get('products', [ProductController::class, 'index'])->middleware($perm('products.view'));
+        Route::get('products/export', [ProductController::class, 'export'])->middleware($perm('products.view'));
         Route::get('products/import/template', [ProductController::class, 'importTemplate'])->middleware($perm('products.manage'));
+        Route::get('products/import/fields', [ProductController::class, 'importFields'])->middleware($perm('products.manage'));
+        Route::post('products/import/inspect', [ProductController::class, 'importInspect'])->middleware($perm('products.manage'));
         Route::post('products/import/preview', [ProductController::class, 'importPreview'])->middleware($perm('products.manage'));
         Route::post('products/import/apply', [ProductController::class, 'importApply'])->middleware($perm('products.manage'));
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
