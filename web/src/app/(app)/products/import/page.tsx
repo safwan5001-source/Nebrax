@@ -24,6 +24,7 @@ import { downloadCsv, toCsv } from '@/lib/export';
 import { Stepper } from '@/modules/products/import/stepper';
 import {
   ACCEPTED_IMPORT_TYPES,
+  MAX_IMPORT_BYTES,
   MAX_IMPORT_ROWS,
   type BlankPolicy,
   type ColumnMapping,
@@ -94,6 +95,15 @@ export default function ProductImportPage() {
     setResult(null);
     setError(null);
     if (!next) return;
+
+    // فحصٌ محلي قبل الرفع: ملف بعشرين ميغابايت لا يستحق رحلةً كاملة إلى
+    // الخادم لتعود برفضٍ كان يمكن قوله فوراً. الخادم يبقى هو الحارس.
+    if (next.size > MAX_IMPORT_BYTES) {
+      setFile(null);
+      setError(t('import_file_too_large', { limit: Math.round(MAX_IMPORT_BYTES / (1024 * 1024)) }));
+      if (fileInput.current) fileInput.current.value = '';
+      return;
+    }
 
     setBusy('inspect');
     try {

@@ -3304,6 +3304,7 @@
     "import_step_apply": "Apply",
     "import_step_result": "Result",
     "import_drop_hint": "Drag the file here, or pick one from your device.",
+    "import_file_too_large": "The file exceeds {limit} MB. Split it into smaller batches.",
     "import_file_size": "{size} KB",
     "import_inspecting": "Reading the file columns…",
     "import_mode_upsert": "Upsert (update existing, create new)",

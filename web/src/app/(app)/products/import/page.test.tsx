@@ -338,3 +338,25 @@ describe('جدول معاينة الاستيراد على الجوال', () => {
     expect(within(mobile as HTMLElement).getAllByText('قهوة').length).toBe(1);
   });
 });
+
+describe('حد حجم الملف في الواجهة', () => {
+  it('يرفض ملفاً يتجاوز الحد محلياً بلا رحلة إلى الخادم', async () => {
+    const user = userEvent.setup();
+    render(<ProductImportPage />);
+
+    const huge = new File([new Uint8Array(6 * 1024 * 1024)], 'huge.csv', { type: 'text/csv' });
+    await user.upload(screen.getByLabelText('import_file'), huge);
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('import_file_too_large'));
+    expect(api).not.toHaveBeenCalledWith('/products/import/inspect', expect.anything());
+  });
+
+  it('يمرّر ملفاً ضمن الحد إلى الفحص', async () => {
+    const user = userEvent.setup();
+    render(<ProductImportPage />);
+
+    await user.upload(screen.getByLabelText('import_file'), csvFile());
+
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/products/import/inspect', expect.anything()));
+  });
+});

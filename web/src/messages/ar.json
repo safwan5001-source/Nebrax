@@ -3304,6 +3304,7 @@
     "import_step_apply": "التنفيذ",
     "import_step_result": "النتيجة",
     "import_drop_hint": "اسحب الملف هنا أو اختره من جهازك.",
+    "import_file_too_large": "حجم الملف يتجاوز {limit} ميغابايت. قسّمه إلى دفعات أصغر.",
     "import_file_size": "{size} كيلوبايت",
     "import_inspecting": "جارٍ قراءة أعمدة الملف…",
     "import_mode_upsert": "دمج (تحديث الموجود وإنشاء الجديد)",
