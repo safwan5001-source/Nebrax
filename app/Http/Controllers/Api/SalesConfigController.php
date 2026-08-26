@@ -39,7 +39,7 @@ class SalesConfigController extends ApiController
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'sections' => [], 'accent_color' => '#2563EB', 'footer_text' => '', 'terms_text' => '', 'bank_text' => '', 'stamp' => '', 'signature' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
-        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'payment_methods_mode' => PosSettings::PAYMENT_METHODS_ALL_ACTIVE, 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true, 'cash_drawer_enabled' => false, 'cash_drawer_driver' => 'unavailable', 'cash_drawer_auto_open_after_cash' => false],
+        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'payment_methods_mode' => PosSettings::PAYMENT_METHODS_ALL_ACTIVE, 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true, 'cash_drawer_enabled' => false, 'cash_drawer_driver' => 'unavailable', 'cash_drawer_auto_open_after_cash' => false, 'sound_enabled' => true, 'scan_sound_enabled' => true, 'error_sound_enabled' => true, 'payment_sound_enabled' => true, 'sound_volume' => 60, 'haptics_enabled' => true],
     ];
 
     public function show(string $section): JsonResponse
@@ -94,6 +94,12 @@ class SalesConfigController extends ApiController
                 'data.cash_drawer_enabled' => ['nullable', 'boolean'],
                 'data.cash_drawer_driver' => ['nullable', Rule::in(['unavailable'])],
                 'data.cash_drawer_auto_open_after_cash' => ['nullable', 'boolean'],
+                'data.sound_enabled' => ['nullable', 'boolean'],
+                'data.scan_sound_enabled' => ['nullable', 'boolean'],
+                'data.error_sound_enabled' => ['nullable', 'boolean'],
+                'data.payment_sound_enabled' => ['nullable', 'boolean'],
+                'data.sound_volume' => ['nullable', 'integer', 'between:0,100'],
+                'data.haptics_enabled' => ['nullable', 'boolean'],
                 'data.product_category_visibility_mode' => ['nullable', Rule::in([
                     PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL,
                     PosSettings::PRODUCT_CATEGORY_VISIBILITY_ONLY,
