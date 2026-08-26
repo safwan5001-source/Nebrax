@@ -99,6 +99,8 @@ export interface OpeningDocument {
   status: OpeningStatus;
   notes: string | null;
   source_filename: string | null;
+  /** موافقة «تكلفة صفر» كما حُفظت على المستند — لا كما أُرسلت في الطلب. */
+  allow_zero_cost: boolean;
   total_quantity: number;
   total_value: string;
   journal_entry_id: string | null;

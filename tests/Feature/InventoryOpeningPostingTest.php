@@ -389,15 +389,90 @@ class InventoryOpeningPostingTest extends TestCase
         }
     }
 
+    // ═══════════ موافقة «تكلفة صفر»: قرارٌ محفوظ لا حالةُ طلب ═══════════
+
+    /**
+     * @test
+     *
+     * الموافقة تُقرأ من **المستند** لا من الطلب. مسودةٌ أُنشئت بلا موافقة لا
+     * تُرحَّل بموافقةٍ عابرة، ولو حملت سطوراً بتكلفة صفر.
+     */
+    public function a_zero_cost_line_is_refused_when_the_document_carries_no_consent(): void
+    {
+        $product = $this->product('P-1', ['purchase_price' => 0]);
+        $warehouse = $this->warehouse('WH-1');
+
+        $opening = $this->openings->createDraft(['opening_date' => '2026-01-01'], [
+            ['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'quantity' => 10, 'unit_cost' => 0],
+        ]);
+
+        $this->assertFalse($opening->allow_zero_cost, 'الافتراض: لا موافقة.');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/لا يحمل موافقة/');
+
+        try {
+            $this->openings->post($opening);
+        } finally {
+            $this->assertSame(0, StockMovement::count(), 'لا حركة.');
+            $this->assertSame(0, JournalEntry::count(), 'لا قيد.');
+            $this->assertSame(0, Product::where('sku', 'P-1')->value('quantity_on_hand'));
+            $this->assertSame('draft', $opening->fresh()->status);
+        }
+    }
+
+    /** @test */
+    public function a_zero_cost_line_posts_when_the_document_carries_a_stored_consent(): void
+    {
+        $product = $this->product('P-1', ['purchase_price' => 0]);
+        $warehouse = $this->warehouse('WH-1');
+
+        $opening = $this->openings->createDraft(
+            ['opening_date' => '2026-01-01', 'allow_zero_cost' => true],
+            [['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'quantity' => 10, 'unit_cost' => 0]]
+        );
+
+        $this->assertTrue($opening->allow_zero_cost, 'الموافقة محفوظة على المستند.');
+
+        $posted = $this->openings->post($opening);
+
+        $this->assertSame('posted', $posted->status);
+        $this->assertSame(10, Product::where('sku', 'P-1')->value('quantity_on_hand'));
+        $this->assertSame(1, StockMovement::count());
+        $this->assertTrue($posted->allow_zero_cost, 'الموافقة تبقى مقروءة بعد الترحيل.');
+    }
+
+    /**
+     * @test
+     *
+     * الموافقة تُطلق تكلفة الصفر وحدها — لا تُخفّف أي حارس آخر.
+     */
+    public function a_stored_consent_does_not_loosen_any_other_guard(): void
+    {
+        $product = $this->product('P-1');
+        $warehouse = $this->warehouse('WH-1');
+        app(InventoryService::class)->receiveStock($product, 5, 1000, ['warehouse_id' => $warehouse->id]);
+
+        $opening = $this->openings->createDraft(
+            ['opening_date' => '2026-01-01', 'allow_zero_cost' => true],
+            [['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'quantity' => 10, 'unit_cost' => 0]]
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/حركة مخزون سابقة/');
+        $this->openings->post($opening);
+    }
+
     /** @test */
     public function a_zero_value_document_moves_quantity_without_a_journal_entry(): void
     {
         $product = $this->product('P-1', ['purchase_price' => 0]);
         $warehouse = $this->warehouse('WH-1');
 
-        $opening = $this->openings->post($this->openings->createDraft(['opening_date' => '2026-01-01'], [
-            ['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'quantity' => 10, 'unit_cost' => 0],
-        ]));
+        $opening = $this->openings->post($this->openings->createDraft(
+            ['opening_date' => '2026-01-01', 'allow_zero_cost' => true],
+            [['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'quantity' => 10, 'unit_cost' => 0]]
+        ));
 
         $this->assertSame(10, Product::where('sku', 'P-1')->value('quantity_on_hand'));
         $this->assertSame(1, StockMovement::count());

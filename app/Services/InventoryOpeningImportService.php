@@ -170,6 +170,9 @@ class InventoryOpeningImportService
             'opening_date'    => $resolved['opening_date'],
             'notes'           => $resolved['notes'],
             'source_filename' => $file->getClientOriginalName(),
+            // الموافقة المعروضة في المعاينة تُحفظ مع المستند، فيرحّل الخادم بها
+            // لا بعلمٍ يُرسَل مع طلب الترحيل.
+            'allow_zero_cost' => $resolved['allow_zero_cost'],
             'created_by'      => $userId,
         ], $lines);
     }

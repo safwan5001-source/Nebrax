@@ -55,6 +55,7 @@ const draft = {
   status: 'draft' as const,
   notes: null,
   source_filename: 'openings.csv',
+  allow_zero_cost: false,
   total_quantity: 120,
   total_value: '2220.00',
   journal_entry_id: null,
@@ -93,6 +94,22 @@ describe('صفحة الرصيد الافتتاحي', () => {
     // القيمة تُعرض بالريال — لا هللات، ولا «ريال» ولا SAR ولا الرمز القديم.
     expect(screen.getAllByText(/2,220\.00/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/SAR|ريال|﷼/)).toBeNull();
+  });
+
+  /** الموافقة قرارٌ محفوظ على المستند، فتُعرض للمراجعة لا تُخمَّن. */
+  it('تعرض موافقة «تكلفة صفر» المحفوظة على المستند بحالتيها', async () => {
+    render(<InventoryOpeningDetailPage />);
+
+    await waitFor(() => expect(screen.getByText('allow_zero_cost')).toBeTruthy());
+    expect(screen.getByText('zero_cost_off')).toBeTruthy();
+    expect(screen.queryByText('zero_cost_on')).toBeNull();
+
+    cleanup();
+    api.mockImplementation(() => Promise.resolve({ data: { ...draft, allow_zero_cost: true } }));
+    render(<InventoryOpeningDetailPage />);
+
+    await waitFor(() => expect(screen.getByText('zero_cost_on')).toBeTruthy());
+    expect(screen.queryByText('zero_cost_off')).toBeNull();
   });
 
   it('ترحّل المستند وتعرض حالته غير القابلة للتعديل بعدها', async () => {

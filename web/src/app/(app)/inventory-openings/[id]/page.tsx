@@ -124,7 +124,7 @@ export default function InventoryOpeningDetailPage() {
           <CardTitle>{t('summary')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <div>
               <dt className="text-xs text-muted">{t('col_quantity')}</dt>
               <dd className="num mt-1 text-lg font-semibold text-text">{document.total_quantity}</dd>
@@ -136,6 +136,13 @@ export default function InventoryOpeningDetailPage() {
             <div>
               <dt className="text-xs text-muted">{t('source_file')}</dt>
               <dd className="mt-1 truncate text-sm text-text">{document.source_filename ?? '—'}</dd>
+            </div>
+            <div>
+              {/* قرارٌ محفوظ على المستند — يُراجَع بعد الترحيل كما يُراجَع قبله. */}
+              <dt className="text-xs text-muted">{t('allow_zero_cost')}</dt>
+              <dd className="mt-1 text-sm text-text">
+                {t(document.allow_zero_cost ? 'zero_cost_on' : 'zero_cost_off')}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-muted">{t('journal_entry')}</dt>

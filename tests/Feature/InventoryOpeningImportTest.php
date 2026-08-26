@@ -594,6 +594,91 @@ class InventoryOpeningImportTest extends TestCase
         $this->assertSame(1, InventoryOpening::count());
     }
 
+    // ═══════════ موافقة «تكلفة صفر» تُحفظ وتُعرض وتحكم الترحيل ═══════════
+
+    /**
+     * @test
+     *
+     * الموافقة **قرارٌ محفوظ على المستند** لا حالةُ طلب: تظهر في الإنشاء وفي
+     * العرض وفي القائمة، فيراجعها المدقّق بعد شهر كما يراجعها اليوم.
+     */
+    public function the_stored_zero_cost_consent_is_visible_in_the_api_for_review(): void
+    {
+        $scene = $this->scene();
+        $file = fn (): UploadedFile => $this->csv(
+            ['sku', 'warehouse', 'opening_quantity', 'opening_unit_cost'],
+            [['SKU-1001', 'WH-1', '10', '0']]
+        );
+
+        // بلا موافقة: المعاينة نفسها ترفض الصف، فلا مستند أصلاً.
+        $this->assertSame(['zero_unit_cost'], $this->codes($this->preview($scene['token'], $file()), 2));
+
+        $created = $this->withToken($scene['token'])->post('/api/inventory-openings/import/apply', [
+            'file' => $file(), 'opening_date' => '2026-01-01', 'allow_zero_cost' => '1',
+        ])->assertCreated()->json('data');
+
+        $this->assertTrue($created['allow_zero_cost'], 'الإنشاء يعلن الموافقة.');
+
+        $this->withToken($scene['token'])->getJson("/api/inventory-openings/{$created['id']}")
+            ->assertOk()->assertJsonPath('data.allow_zero_cost', true);
+
+        $this->withToken($scene['token'])->getJson('/api/inventory-openings')
+            ->assertOk()->assertJsonPath('data.0.allow_zero_cost', true);
+
+        // وتبقى مقروءة بعد الترحيل.
+        $this->withToken($scene['token'])->postJson("/api/inventory-openings/{$created['id']}/post")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'posted')
+            ->assertJsonPath('data.allow_zero_cost', true);
+    }
+
+    /** @test */
+    public function a_document_created_without_consent_reports_it_as_false(): void
+    {
+        $scene = $this->scene();
+
+        $created = $this->withToken($scene['token'])->post('/api/inventory-openings/import/apply', [
+            'file' => $this->csv(['sku', 'warehouse', 'opening_quantity', 'opening_unit_cost'],
+                [['SKU-1001', 'WH-1', '10', '5.00']]),
+            'opening_date' => '2026-01-01',
+        ])->assertCreated()->json('data');
+
+        $this->assertFalse($created['allow_zero_cost']);
+
+        app(TenantContext::class)->set($scene['tenant_id']);
+        $this->assertFalse(InventoryOpening::findOrFail($created['id'])->allow_zero_cost);
+    }
+
+    /**
+     * @test
+     *
+     * حتى لو صار للمسودة سطرٌ بتكلفة صفر بعد إنشائها بلا موافقة، الترحيل يرفض:
+     * القرار يُقرأ من المستند لا من الطلب.
+     */
+    public function posting_is_refused_for_a_zero_cost_line_on_a_document_without_consent(): void
+    {
+        $scene = $this->scene();
+
+        $created = $this->withToken($scene['token'])->post('/api/inventory-openings/import/apply', [
+            'file' => $this->csv(['sku', 'warehouse', 'opening_quantity', 'opening_unit_cost'],
+                [['SKU-1001', 'WH-1', '10', '5.00']]),
+            'opening_date' => '2026-01-01',
+        ])->assertCreated()->json('data');
+
+        app(TenantContext::class)->set($scene['tenant_id']);
+        InventoryOpeningLine::where('inventory_opening_id', $created['id'])
+            ->update(['unit_cost' => 0, 'total_cost' => 0]);
+
+        $this->withToken($scene['token'])->postJson("/api/inventory-openings/{$created['id']}/post")
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'لا يحمل موافقة'));
+
+        app(TenantContext::class)->set($scene['tenant_id']);
+        $this->assertSame(0, StockMovement::count());
+        $this->assertSame(0, JournalEntry::count());
+        $this->assertSame('draft', InventoryOpening::findOrFail($created['id'])->status);
+    }
+
     // ═══════════════════════ العزل بين المستأجرين ═══════════════════════
 
     /** @test */

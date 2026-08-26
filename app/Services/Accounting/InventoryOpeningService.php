@@ -58,7 +58,7 @@ class InventoryOpeningService
     /**
      * إنشاء مسودة من سطور تحقّقت مسبقاً في طبقة الاستيراد.
      *
-     * @param  array{opening_date?: string, notes?: string, source_filename?: string, created_by?: string, number?: string}  $data
+     * @param  array{opening_date?: string, notes?: string, source_filename?: string, created_by?: string, number?: string, allow_zero_cost?: bool}  $data
      * @param  array<int, array{product_id: string, warehouse_id: string, quantity: int, unit_cost: int, notes?: string|null}>  $lines
      */
     public function createDraft(array $data, array $lines): InventoryOpening
@@ -76,6 +76,9 @@ class InventoryOpeningService
                 'status'          => 'draft',
                 'notes'           => $data['notes'] ?? null,
                 'source_filename' => $data['source_filename'] ?? null,
+                // الموافقة تُحفظ مع المستند لا مع الطلب: الترحيل يقرؤها من هنا،
+                // والمراجع يقرؤها بعد شهر كما يقرؤها اليوم.
+                'allow_zero_cost' => (bool) ($data['allow_zero_cost'] ?? false),
                 'created_by'      => $data['created_by'] ?? null,
             ]);
 
@@ -148,7 +151,7 @@ class InventoryOpeningService
                 $product = $products[$line->product_id] ?? null;
                 $warehouse = $warehouses[$line->warehouse_id] ?? null;
 
-                $this->assertLinePostable($line, $product, $warehouse);
+                $this->assertLinePostable($line, $product, $warehouse, $opening->allow_zero_cost);
 
                 $movement = $this->inventory->applyReceipt(
                     $product,
@@ -265,7 +268,7 @@ class InventoryOpeningService
     }
 
     /** إعادة تحقّق حيّة داخل المعاملة: ما صحّ وقت المسودة قد يكون تغيّر. */
-    protected function assertLinePostable(InventoryOpeningLine $line, ?Product $product, ?Warehouse $warehouse): void
+    protected function assertLinePostable(InventoryOpeningLine $line, ?Product $product, ?Warehouse $warehouse, bool $allowZeroCost): void
     {
         if ($product === null) {
             throw new RuntimeException("الصنف في السطر {$line->position} لم يعد موجوداً في نطاق المؤسسة.");
@@ -285,9 +288,16 @@ class InventoryOpeningService
         if ($line->unit_cost < 0) {
             throw new RuntimeException("تكلفة الوحدة في السطر {$line->position} لا تكون سالبة.");
         }
-        // تكلفة الصفر لا تُفحص هنا: هي قرار مُعلَن قبله في طبقة الاستيراد
-        // (`allow_zero_cost`)، وإعادة حجبها عند الترحيل كانت ستُبطل قراراً
-        // اتخذه المستخدم صراحةً ووافق عليه في المعاينة.
+        // تكلفة الصفر تُدخل المخزون بلا قيمة فيصير هامش الربح مضلِّلاً في كل
+        // تقرير بعده. الموافقة عليها تُقرأ من **المستند المحفوظ** لا من الطلب:
+        // فمسودةٌ أُنشئت بلا موافقة لا تُرحَّل بموافقةٍ عابرة يمرّرها المستدعي،
+        // ويبقى سببُ قبولها بعد الترحيل مقروءاً في المستند نفسه.
+        if ($line->unit_cost === 0 && ! $allowZeroCost) {
+            throw new RuntimeException(
+                "تكلفة الوحدة في السطر {$line->position} صفر، والمستند لا يحمل موافقة «السماح بتكلفة صفر». "
+                . 'صحّح التكلفة، أو أعد الاستيراد بموافقة صريحة.'
+            );
+        }
     }
 
     /**

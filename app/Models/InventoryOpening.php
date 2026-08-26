@@ -29,20 +29,23 @@ class InventoryOpening extends BaseModel implements CompanyWide
 
     protected $fillable = [
         'tenant_id', 'number', 'opening_date', 'status', 'notes', 'source_filename',
-        'total_quantity', 'total_value', 'journal_entry_id', 'created_by', 'posted_by', 'posted_at',
+        'allow_zero_cost', 'total_quantity', 'total_value',
+        'journal_entry_id', 'created_by', 'posted_by', 'posted_at',
     ];
 
     protected $casts = [
-        'opening_date'   => 'date',
-        'total_quantity' => 'integer',
-        'total_value'    => 'integer',
-        'posted_at'      => 'datetime',
+        'opening_date'    => 'date',
+        'allow_zero_cost' => 'boolean',
+        'total_quantity'  => 'integer',
+        'total_value'     => 'integer',
+        'posted_at'       => 'datetime',
     ];
 
     protected $attributes = [
-        'status'         => 'draft',
-        'total_quantity' => 0,
-        'total_value'    => 0,
+        'status'          => 'draft',
+        'allow_zero_cost' => false,
+        'total_quantity'  => 0,
+        'total_value'     => 0,
     ];
 
     public function lines(): HasMany

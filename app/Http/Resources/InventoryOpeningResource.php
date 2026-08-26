@@ -17,6 +17,8 @@ class InventoryOpeningResource extends JsonResource
             'status'           => $this->status,
             'notes'            => $this->notes,
             'source_filename'  => $this->source_filename,
+            // قرارٌ محفوظ يُراجَع بعد الترحيل كما يُراجَع قبله.
+            'allow_zero_cost'  => (bool) $this->allow_zero_cost,
             'total_quantity'   => $this->total_quantity,
             'total_value'      => Money::toRiyal($this->total_value),
             'journal_entry_id' => $this->journal_entry_id,

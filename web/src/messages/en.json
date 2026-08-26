@@ -6516,6 +6516,8 @@
     "notes": "Notes",
     "allow_zero_cost": "Allow zero unit cost",
     "allow_zero_cost_hint": "A zero cost brings stock in with no value, which makes every margin report misleading. Enable it only when that is genuinely intended.",
+    "zero_cost_on": "Allowed — consent stored on the document",
+    "zero_cost_off": "Not allowed",
     "mapping_hint": "Map each column in your file to its Nebrax field. The suggestion is automatic and editable; an unmapped column is ignored.",
     "mapping_source": "File column",
     "mapping_samples": "Sample values",
