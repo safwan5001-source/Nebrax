@@ -24,6 +24,7 @@ import { downloadCsv, toCsv } from '@/lib/export';
 import { Stepper } from '@/modules/products/import/stepper';
 import {
   ACCEPTED_IMPORT_TYPES,
+  APPLY_BATCH_SIZE,
   MAX_IMPORT_BYTES,
   MAX_IMPORT_ROWS,
   type BlankPolicy,
@@ -64,6 +65,7 @@ export default function ProductImportPage() {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [busy, setBusy] = useState<'inspect' | 'preview' | 'apply' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [applyProgress, setApplyProgress] = useState(0);
 
   const steps = STEP_KEYS.map((key) => ({
     key,
@@ -83,6 +85,7 @@ export default function ProductImportPage() {
     setMapping({});
     setPreview(null);
     setResult(null);
+    setApplyProgress(0);
     setError(null);
     if (fileInput.current) fileInput.current.value = '';
   }, []);
@@ -152,17 +155,46 @@ export default function ProductImportPage() {
   }
 
   async function runApply() {
-    if (!file || !canApply) return;
+    if (!file || !canApply || !preview) return;
     setBusy('apply');
     setError(null);
+    setApplyProgress(0);
+
+    const aggregate: ImportResult = {
+      mode,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      total_rows: preview.total_rows,
+      results: [],
+    };
+
     try {
-      const response = await api<{ data: ImportResult }>('/products/import/apply', {
-        method: 'POST',
-        body: importFormData(file, { mode, blankPolicy, masterDataPolicy, mapping }),
-      });
-      setResult(response.data);
+      for (let offset = 0; offset < preview.total_rows; offset += APPLY_BATCH_SIZE) {
+        const response = await api<{ data: ImportResult }>('/products/import/apply', {
+          method: 'POST',
+          body: importFormData(file, {
+            mode,
+            blankPolicy,
+            masterDataPolicy,
+            mapping,
+            batchOffset: offset,
+            batchSize: APPLY_BATCH_SIZE,
+          }),
+        });
+
+        aggregate.created += response.data.created;
+        aggregate.updated += response.data.updated;
+        aggregate.skipped += response.data.skipped;
+        aggregate.results.push(...response.data.results);
+
+        const completed = Math.min(offset + response.data.total_rows, preview.total_rows);
+        setApplyProgress(Math.round((completed / preview.total_rows) * 100));
+      }
+
+      setResult(aggregate);
       setStep(6);
-      success(t('import_success', { created: response.data.created, updated: response.data.updated }));
+      success(t('import_success', { created: aggregate.created, updated: aggregate.updated }));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
@@ -577,6 +609,17 @@ export default function ProductImportPage() {
             <CardTitle>{t('import_confirm_title')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {busy === 'apply' ? (
+              <div className="space-y-2" aria-live="polite">
+                <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                  <span>{t('import_step_apply')}</span>
+                  <span className="num font-medium text-text">{applyProgress}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-background" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={applyProgress}>
+                  <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${applyProgress}%` }} />
+                </div>
+              </div>
+            ) : null}
             <p className="text-sm text-text">
               {t('import_confirm_body', {
                 created: preview.create_rows,

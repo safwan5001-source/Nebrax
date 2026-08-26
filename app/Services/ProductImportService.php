@@ -75,6 +75,9 @@ class ProductImportService
      */
     public const MAX_ROWS = 2000;
 
+    /** أقصى عدد صفوف في طلب تطبيق واحد كي يبقى الطلب تحت مهلة منصة التشغيل. */
+    public const APPLY_BATCH_SIZE = 100;
+
     /** حدّ أعمدة الملف — يصدّ ورقة عريضة بلا معنى قبل تحليلها. */
     public const MAX_COLUMNS = 200;
 
@@ -278,6 +281,8 @@ class ProductImportService
                 'updated' => $updated,
                 'skipped' => $skipped,
                 'total_rows' => $parsed['total_rows'],
+                'batch_offset' => (int) ($resolved['batch_offset'] ?? 0),
+                'batch_size' => $resolved['batch_size'],
                 'results' => $results,
             ];
         });
@@ -330,11 +335,18 @@ class ProductImportService
             }
         }
 
+        $batchOffset = array_key_exists('batch_offset', $options) ? max(0, (int) $options['batch_offset']) : 0;
+        $batchSize = array_key_exists('batch_size', $options)
+            ? min(self::APPLY_BATCH_SIZE, max(1, (int) $options['batch_size']))
+            : null;
+
         return [
             'mode' => $mode,
             'blank_policy' => $blank,
             'master_data_policy' => $masterData,
             'mapping' => $mapping,
+            'batch_offset' => $batchOffset,
+            'batch_size' => $batchSize,
         ];
     }
 
@@ -365,9 +377,17 @@ class ProductImportService
         $errors = [];
         $seen = ['sku' => [], 'barcode' => [], 'nebrax_id' => []];
         $counters = ['create' => 0, 'update' => 0, 'skip' => 0, 'warning' => 0, 'error' => 0];
+        $batchOffset = (int) ($options['batch_offset'] ?? 0);
+        $batchSize = $options['batch_size'] ?? null;
+        $dataIndex = 0;
 
         foreach ($raw as $offset => $values) {
             if ($this->isBlankRow($values)) {
+                continue;
+            }
+
+            $dataIndex++;
+            if ($batchSize !== null && ($dataIndex <= $batchOffset || $dataIndex > $batchOffset + $batchSize)) {
                 continue;
             }
 

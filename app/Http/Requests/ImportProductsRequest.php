@@ -44,6 +44,9 @@ class ImportProductsRequest extends FormRequest
             // مطابقة الأعمدة: فهرس العمود في الملف → مفتاح حقل نبراكس.
             'mapping' => ['sometimes', 'array', 'max:'.ProductImportService::MAX_COLUMNS],
             'mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), ['ignore']))],
+            // التطبيق الدفعي اختياري؛ غيابه يبقي عقد V1/V2 القديم كما هو.
+            'batch_offset' => ['sometimes', 'integer', 'min:0', 'max:'.ProductImportService::MAX_ROWS],
+            'batch_size' => ['sometimes', 'integer', 'min:1', 'max:'.ProductImportService::APPLY_BATCH_SIZE],
         ];
     }
 
@@ -75,6 +78,13 @@ class ImportProductsRequest extends FormRequest
 
         if ($this->has('mapping')) {
             $options['mapping'] = (array) $this->input('mapping', []);
+        }
+
+        if ($this->has('batch_offset')) {
+            $options['batch_offset'] = (int) $this->input('batch_offset');
+        }
+        if ($this->has('batch_size')) {
+            $options['batch_size'] = (int) $this->input('batch_size');
         }
 
         return $options;
