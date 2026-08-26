@@ -174,3 +174,173 @@ describe('DataTable label language', () => {
     expect(screen.getByRole('button', { name: 'إعادة المحاولة' })).toBeTruthy();
   });
 });
+
+/**
+ * الفرز الخادميّ وتحديد الصفوف — إضافتان اختياريتان، فما لا يمرّرهما يبقى
+ * على سلوكه القديم حرفياً (تحرسه المجموعات أعلاه).
+ */
+const sortRows: Row[] = [
+  { id: '1', number: 'INV-1001', partner: 'باء', total: '20.00', remaining: '0.00', status: 'مرحّلة', date: '2026-08-01' },
+  { id: '2', number: 'INV-1002', partner: 'ألف', total: '10.00', remaining: '0.00', status: 'مسودة', date: '2026-08-02' },
+];
+
+function firstBodyCell(): string {
+  return within(screen.getByRole('table')).getAllByRole('cell')[0].textContent ?? '';
+}
+
+describe('DataTable client sorting (unchanged default)', () => {
+  it('sorts the loaded rows locally when no server sort is supplied', async () => {
+    renderIntl(<DataTable columns={columns} data={sortRows} showToolbar={false} />);
+
+    expect(firstBodyCell()).toBe('INV-1001');
+    await userEvent.click(screen.getByRole('button', { name: 'العميل' }));
+    expect(firstBodyCell()).toBe('INV-1002');
+  });
+
+  it('adds no selection column unless one is requested', () => {
+    renderIntl(<DataTable columns={columns} data={sortRows} showToolbar={false} />);
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  });
+});
+
+describe('DataTable server sorting', () => {
+  it('lifts the sort to the caller and never reorders the page itself', async () => {
+    const onChange = vi.fn();
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={sortRows}
+        showToolbar={false}
+        serverSort={{ value: 'number', onChange, columns: ['number', 'partner'] }}
+      />
+    );
+
+    expect(firstBodyCell()).toBe('INV-1001');
+    await userEvent.click(screen.getByRole('button', { name: 'الرقم' }));
+
+    expect(onChange).toHaveBeenCalledWith('-number');
+    // الصفوف كما وردت من الخادم؛ الترتيب لا يتغيّر في المتصفح.
+    expect(firstBodyCell()).toBe('INV-1001');
+  });
+
+  it('starts a newly picked column ascending', async () => {
+    const onChange = vi.fn();
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={sortRows}
+        showToolbar={false}
+        serverSort={{ value: 'number', onChange, columns: ['number', 'partner'] }}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'العميل' }));
+    expect(onChange).toHaveBeenCalledWith('partner');
+  });
+
+  it('offers no header sort for a column the server cannot sort', () => {
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={sortRows}
+        showToolbar={false}
+        serverSort={{ value: 'number', onChange: vi.fn(), columns: ['number'] }}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'الرقم' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'العميل' })).toBeNull();
+  });
+
+  it('reflects the server direction in aria-sort', () => {
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={sortRows}
+        showToolbar={false}
+        serverSort={{ value: '-partner', onChange: vi.fn(), columns: ['number', 'partner'] }}
+      />
+    );
+
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers[0].getAttribute('aria-sort')).toBe('none');
+    expect(headers[1].getAttribute('aria-sort')).toBe('descending');
+  });
+});
+
+describe('DataTable row selection', () => {
+  it('returns the checked row id to the caller', async () => {
+    const onChange = vi.fn();
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={sortRows}
+        showToolbar={false}
+        selection={{ selectedIds: [], onChange, getRowId: (row) => row.id }}
+      />
+    );
+
+    await userEvent.click(within(screen.getByRole('table')).getAllByRole('checkbox')[1]);
+    expect(onChange).toHaveBeenCalledWith(['1']);
+  });
+
+  it('selects and clears every visible row from the header checkbox', async () => {
+    const onChange = vi.fn();
+    const { rerender } = renderIntl(
+      <DataTable
+        columns={columns}
+        data={sortRows}
+        showToolbar={false}
+        selection={{ selectedIds: [], onChange, getRowId: (row) => row.id }}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('checkbox', { name: nebraxText('ar', 'selectAllRows') }));
+    expect(onChange).toHaveBeenCalledWith(['1', '2']);
+
+    rerender(
+      <DataTable
+        columns={columns}
+        data={sortRows}
+        showToolbar={false}
+        selection={{ selectedIds: ['1', '2'], onChange, getRowId: (row) => row.id }}
+      />
+    );
+    await userEvent.click(screen.getByRole('checkbox', { name: nebraxText('ar', 'selectAllRows') }));
+    expect(onChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it('shows the same selection in the table and in the mobile record', () => {
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={sortRows}
+        showToolbar={false}
+        mobileRecord={(row) => ({ title: row.number })}
+        selection={{ selectedIds: ['2'], onChange: vi.fn(), getRowId: (row) => row.id }}
+      />
+    );
+
+    const checked = screen
+      .getAllByRole('checkbox', { name: nebraxText('ar', 'selectRow') })
+      .filter((box) => (box as HTMLInputElement).checked);
+    // صفٌّ واحد محدَّد، ظاهرٌ مرّتين: صفّ الجدول وبطاقة الجوال.
+    expect(checked).toHaveLength(2);
+  });
+
+  it('leaves no Arabic default in an English interface for the selection controls', () => {
+    const { container } = renderIntl(
+      <DataTable
+        columns={[{ accessorKey: 'number', header: 'Number' }]}
+        data={[{ ...sortRows[0], partner: 'Acme', status: 'Posted' }]}
+        showToolbar={false}
+        mobileRecord={(row) => ({ title: row.number })}
+        selection={{ selectedIds: [], onChange: vi.fn(), getRowId: (row) => row.id }}
+      />,
+      'en'
+    );
+
+    expect(screen.getByRole('checkbox', { name: 'Select all visible rows' })).toBeTruthy();
+    expect(container.textContent).not.toMatch(/[؀-ۿ]/);
+  });
+});

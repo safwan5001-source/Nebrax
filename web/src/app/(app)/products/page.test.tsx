@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import * as React from 'react';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ProductsPage from './page';
 
-const { api, translate, getSystemTaxInclusive, getShowStockQuantities } = vi.hoisted(() => {
+const { api, downloadFile, translate, getSystemTaxInclusive, getShowStockQuantities } = vi.hoisted(() => {
   const strings: Record<string, string> = {
     title: 'Products',
     search: 'Search products',
@@ -32,6 +33,21 @@ const { api, translate, getSystemTaxInclusive, getShowStockQuantities } = vi.hoi
     noResults: 'No results',
     exportCsv: 'Export CSV',
     retry: 'Try again',
+    export: 'Export',
+    export_title: 'Export products',
+    export_scope: 'Export scope',
+    export_scope_selected: 'Scope selected',
+    export_scope_filtered: 'Scope filtered',
+    export_scope_all: 'Scope all',
+    export_template: 'File template',
+    export_format: 'Format',
+    export_submit: 'Run export',
+    export_no_selection: 'Nothing selected',
+    cancel: 'Cancel',
+    selected_count: 'Selected',
+    clear_selection: 'Clear selection',
+    selectRow: 'Select row',
+    selectAllRows: 'Select all visible rows',
   };
   // بديلٌ مبسّط لـ`t`: `rich` تُرجع القيم غير الدالّية فقط، فيكفي لاختبار سجلّ
   // الجوال دون محاكاة ICU كاملاً — الترجمة نفسها مُختبَرة في `nebrax/`.
@@ -42,6 +58,7 @@ const { api, translate, getSystemTaxInclusive, getShowStockQuantities } = vi.hoi
   });
   return {
     api: vi.fn(),
+    downloadFile: vi.fn(),
     translate: translator,
     getSystemTaxInclusive: vi.fn(),
     getShowStockQuantities: vi.fn(),
@@ -56,7 +73,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
 }));
-vi.mock('@/lib/api', () => ({ api, ApiError: class ApiError extends Error {} }));
+vi.mock('@/lib/api', () => ({ api, downloadFile, ApiError: class ApiError extends Error {} }));
 vi.mock('@/lib/tax', () => ({ getSystemTaxInclusive }));
 vi.mock('@/lib/inventory', () => ({ getShowStockQuantities }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
@@ -151,5 +168,133 @@ describe('ProductsPage mobile record identifiers', () => {
     const text = (await firstMobileRecord()).textContent ?? '';
     expect(text.indexOf('Diesel oil filter')).toBeLessThan(text.indexOf('Spare parts'));
     expect(text.indexOf('Spare parts')).toBeLessThan(text.indexOf('75.50'));
+  });
+});
+
+/**
+ * تصدير المنتجات والفرز والتحديد — العقد الذي يمنع تصدير الصفحة الحالية
+ * تحت اسم «كل النتائج».
+ */
+describe('ProductsPage server-side export, sorting and selection', () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    api.mockReset();
+    downloadFile.mockReset();
+    downloadFile.mockResolvedValue(undefined);
+    getSystemTaxInclusive.mockResolvedValue(false);
+    getShowStockQuantities.mockResolvedValue(true);
+  });
+
+  /** آخر مسار طلبته القائمة من الـAPI. */
+  function lastListQuery(): URLSearchParams {
+    const call = api.mock.calls.filter((entry) => String(entry[0]).startsWith('/products?')).at(-1);
+    return new URLSearchParams(String(call?.[0]).split('?')[1] ?? '');
+  }
+
+  function lastExportQuery(): URLSearchParams {
+    const path = downloadFile.mock.calls.at(-1)?.[0] as string;
+    return new URLSearchParams(path.split('?')[1] ?? '');
+  }
+
+  it('never exports from the loaded rows — the download goes to the server route', async () => {
+    respondWith([baseProduct]);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    await user.click(screen.getAllByRole('button', { name: 'Export' })[0]);
+    await user.click(await screen.findByRole('button', { name: 'Run export' }));
+
+    await waitFor(() => expect(downloadFile).toHaveBeenCalled());
+    expect(String(downloadFile.mock.calls[0][0])).toContain('/products/export?');
+  });
+
+  it('sends the list filters to the export route without pagination parameters', async () => {
+    respondWith([baseProduct]);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    // القائمة نفسها تُقسَّم؛ التصدير المفلتر لا يحمل التقسيم إطلاقاً.
+    expect(lastListQuery().get('per_page')).toBe('25');
+
+    await user.click(screen.getAllByRole('button', { name: 'Export' })[0]);
+    await user.click(await screen.findByRole('button', { name: 'Run export' }));
+
+    await waitFor(() => expect(downloadFile).toHaveBeenCalled());
+    const params = lastExportQuery();
+    expect(params.get('scope')).toBe('filtered');
+    expect(params.get('sort')).toBe('name');
+    expect(params.get('page')).toBeNull();
+    expect(params.get('per_page')).toBeNull();
+  });
+
+  it('drives sorting through the server and keeps one source of truth', async () => {
+    respondWith([baseProduct]);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    expect(lastListQuery().get('sort')).toBe('name');
+
+    await user.click(screen.getByRole('button', { name: /Sale price/ }));
+    await waitFor(() => expect(lastListQuery().get('sort')).toBe('sale_price'));
+
+    await user.click(screen.getByRole('button', { name: /Sale price/ }));
+    await waitFor(() => expect(lastListQuery().get('sort')).toBe('-sale_price'));
+  });
+
+  it('does not offer header sorting for columns the server cannot sort', async () => {
+    respondWith([baseProduct]);
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    expect(screen.queryByRole('button', { name: /Barcode/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /SKU/ })).toBeTruthy();
+  });
+
+  it('exports only the selected products once rows are checked', async () => {
+    respondWith([baseProduct, { ...baseProduct, id: 'p2', sku: 'SKU-1001', name: 'Air filter' }]);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    await user.click(screen.getAllByRole('checkbox', { name: 'Select row' })[0]);
+    expect(screen.getByText('Selected')).toBeTruthy();
+
+    await user.click(screen.getAllByRole('button', { name: 'Export' })[0]);
+    await user.click(await screen.findByLabelText('Scope selected'));
+    await user.click(screen.getByRole('button', { name: 'Run export' }));
+
+    await waitFor(() => expect(downloadFile).toHaveBeenCalled());
+    const params = lastExportQuery();
+    expect(params.get('scope')).toBe('selected');
+    expect(params.getAll('ids[]')).toEqual(['p1']);
+  });
+
+  it('selects and clears every visible row from the header checkbox', async () => {
+    respondWith([baseProduct, { ...baseProduct, id: 'p2', sku: 'SKU-1001', name: 'Air filter' }]);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    const selectAll = screen.getByRole('checkbox', { name: 'Select all visible rows' });
+    await user.click(selectAll);
+    expect(screen.getAllByRole('checkbox', { name: 'Select row' }).every((box) => (box as HTMLInputElement).checked)).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(screen.queryByText('Selected')).toBeNull();
+  });
+
+  it('hides the selected scope until something is actually selected', async () => {
+    respondWith([baseProduct]);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    await user.click(screen.getAllByRole('button', { name: 'Export' })[0]);
+    expect(screen.queryByLabelText('Scope selected')).toBeNull();
+    expect(screen.getByLabelText('Scope all')).toBeTruthy();
   });
 });
