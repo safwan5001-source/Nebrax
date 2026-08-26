@@ -3315,6 +3315,7 @@
     "export_format_csv": "CSV",
     "export_submit": "تصدير",
     "export_working": "جارٍ تجهيز الملف…",
+    "export_demo_unavailable": "التنزيل غير متاح في وضع المعاينة. سجّل الدخول بحساب حقيقي لتصدير ملف فعلي.",
     "export_failed": "تعذّر تجهيز ملف التصدير.",
     "export_success": "تم تجهيز ملف التصدير وبدأ التنزيل.",
     "export_no_selection": "لم تحدد أي منتج في القائمة بعد.",

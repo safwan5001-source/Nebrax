@@ -144,9 +144,23 @@ export function filenameFromDisposition(header: string | null): string | null {
   return plain?.[1]?.trim() || null;
 }
 
+/**
+ * نتيجة محاولة تنزيل — **صريحة لا ضمنية**.
+ *
+ * وضع المعاينة لا يتصل بخادم، فلا ملف يُنزَّل فيه. وحين كان `downloadFile`
+ * يعود صامتاً في هذه الحالة، كان المستدعي يرى وعداً ناجحاً فيعلن للمستخدم أن
+ * الملف «جُهّز وبدأ التنزيل» — نجاحٌ كاذب وملفٌ لا وجود له. النتيجة المُنمَّطة
+ * تجعل الحالة **غير قابلة للتجاهل صامتاً** عند كل مستدعٍ يقرؤها.
+ *
+ * ولماذا نتيجة لا استثناء؟ لأن مستدعيين اثنين لا يلتقطان الأخطاء أصلاً، فرمي
+ * استثناء كان سيحوّل «لا شيء يحدث» إلى رفض غير ملتقَط في الطرفية. النتيجة
+ * تُبقي سلوك كل مستدعٍ قائم كما هو حرفياً حتى يقرأها.
+ */
+export type DownloadOutcome = 'downloaded' | 'demo-unavailable';
+
 /** تنزيل ملف خاص من الـ API مع ترويسات المصادقة والفرع النشط. */
-export async function downloadFile(path: string, fallbackName: string): Promise<void> {
-  if (isDemo()) return;
+export async function downloadFile(path: string, fallbackName: string): Promise<DownloadOutcome> {
+  if (isDemo()) return 'demo-unavailable';
 
   const token = getToken();
   const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
@@ -173,4 +187,6 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
+
+  return 'downloaded';
 }

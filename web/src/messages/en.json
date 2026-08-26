@@ -3315,6 +3315,7 @@
     "export_format_csv": "CSV",
     "export_submit": "Export",
     "export_working": "Preparing the file…",
+    "export_demo_unavailable": "Downloads are unavailable in preview mode. Sign in with a real account to export an actual file.",
     "export_failed": "Could not prepare the export file.",
     "export_success": "Export file ready — the download has started.",
     "export_no_selection": "No products are selected in the list yet.",

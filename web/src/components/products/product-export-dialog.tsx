@@ -34,7 +34,7 @@ export function ProductExportDialog({
   filteredTotal: number;
 }) {
   const t = useTranslations('products');
-  const { success, error } = useToast();
+  const { toast, success, error } = useToast();
   const [scope, setScope] = useState<ExportScope>('filtered');
   const [template, setTemplate] = useState<ExportTemplate>('catalog');
   const [format, setFormat] = useState<ExportFormat>('xlsx');
@@ -70,7 +70,16 @@ export function ProductExportDialog({
       params.set('template', template);
       if (scope === 'selected') selectedIds.forEach((id) => params.append('ids[]', id));
 
-      await downloadFile(`/products/export?${params.toString()}`, `nebrax-products.${format}`);
+      const outcome = await downloadFile(`/products/export?${params.toString()}`, `nebrax-products.${format}`);
+
+      // وضع المعاينة لا يتصل بخادم فلا ملف يُنزَّل. إعلان النجاح هنا كان كذباً
+      // صريحاً: رسالة «بدأ التنزيل» بلا ملف. نقولها كما هي، ولا نغلق الحوار
+      // لأن ما طلبه المستخدم لم يحدث.
+      if (outcome === 'demo-unavailable') {
+        toast({ title: t('export_demo_unavailable'), variant: 'info' });
+        return;
+      }
+
       success(t('export_success'));
       onClose();
     } catch (err) {

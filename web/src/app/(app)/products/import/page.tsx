@@ -49,7 +49,7 @@ export default function ProductImportPage() {
   const t = useTranslations('products');
   const tc = useTranslations('common');
   const locale = useLocale();
-  const { success } = useToast();
+  const { toast, success } = useToast();
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const [step, setStep] = useState(0);
@@ -170,6 +170,14 @@ export default function ProductImportPage() {
     }
   }
 
+  /** نفس علّة حوار التصدير: زرٌّ لا يفعل شيئاً في المعاينة أسوأ من زرٍّ يقول لماذا. */
+  async function downloadTemplate() {
+    const outcome = await downloadFile('/products/import/template', 'nebrax-products-import-template.csv');
+    if (outcome === 'demo-unavailable') {
+      toast({ title: t('export_demo_unavailable'), variant: 'info' });
+    }
+  }
+
   function downloadReport(rows: PreviewRow[], name: string) {
     downloadCsv(
       name,
@@ -204,7 +212,7 @@ export default function ProductImportPage() {
         </div>
         <Button
           variant="outline"
-          onClick={() => void downloadFile('/products/import/template', 'nebrax-products-import-template.csv')}
+          onClick={() => void downloadTemplate()}
         >
           <Download className="h-4 w-4" strokeWidth={1.7} />
           {t('import_template')}

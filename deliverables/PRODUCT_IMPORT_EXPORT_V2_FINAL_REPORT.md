@@ -44,6 +44,11 @@
 وأُصلح تضارب دلالة الفرز في صفحة المنتجات: كان رأس العمود يفرز الصفحة المحمَّلة وحدها
 بينما تفرز قائمة الترتيب الكتالوج كله على الخادم.
 
+وأُصلحت — بعد فحصٍ يدوي على Vercel Preview — علّة **نجاحٍ كاذب في وضع المعاينة**: كان
+`downloadFile` يعود صامتاً بلا تنزيل، فيعلن حوار التصدير أن الملف «جُهّز وبدأ التنزيل»
+وهو لم يحدث. صار للتنزيل **نتيجة مُنمَّطة صريحة**، والواجهة تقول للمستخدم إن التصدير
+الفعلي غير متاح في المعاينة. التفصيل في §N.
+
 **لم يتغيّر أي منطق محاسبي أو مخزني.** الاستيراد لا يولّد قيداً ولا حركة مخزون ولا
 رصيداً افتتاحياً، ولا يغيّر نوع منتج قائم ولا تتبّع مخزونه.
 
@@ -499,7 +504,7 @@ RTL أولاً ومرآة إنجليزية كاملة عبر next-intl (**98 م�
 
 ## K. الملفات المتغيّرة
 
-**33 ملفاً** (بما فيها هذا التقرير). الإحصاء الدقيق في `git diff --stat origin/main..HEAD` على الفرع.
+**34 ملفاً** (بما فيها هذا التقرير). الإحصاء الدقيق في `git diff --stat origin/main..HEAD` على الفرع.
 
 ### الخلفية (11)
 ```
@@ -531,7 +536,7 @@ M  web/src/messages/en.json
 M  web/vitest.config.ts
 ```
 
-### الاختبارات (8)
+### الاختبارات (10)
 ```
 A  tests/Feature/ProductImportV2Test.php
 A  tests/Feature/ProductExportTest.php
@@ -540,6 +545,7 @@ A  web/src/modules/products/import/contract.test.ts
 A  web/src/modules/products/list-query.test.ts
 A  web/src/app/(app)/products/import/page.test.tsx
 A  web/src/components/products/product-export-dialog.test.tsx
+A  web/src/lib/api-download.test.ts
 M  web/src/app/(app)/products/page.test.tsx
 M  web/src/components/data-table.test.tsx
 ```
@@ -634,18 +640,19 @@ SQLite لا يفرّق بين حالة أحرف أسماء الأعمدة فمر
 
 ```
 $ npm run test          # Vitest
-  Test Files  106 passed (106)
-  Tests       688 passed (688)
+  Test Files  107 passed (107)
+  Tests       693 passed (693)
 ```
 
-الجديد ضمنها (**62 اختباراً**):
+الجديد ضمنها (**67 اختباراً**):
 
 | الملف | العدد |
 |---|---|
-| `web/src/app/(app)/products/import/page.test.tsx` | 18 (جديد) |
+| `web/src/app/(app)/products/import/page.test.tsx` | 19 (جديد) |
 | `web/src/modules/products/import/contract.test.ts` | 13 (جديد) |
 | `web/src/modules/products/list-query.test.ts` | 6 (جديد) |
-| `web/src/components/products/product-export-dialog.test.tsx` | 8 (جديد) |
+| `web/src/components/products/product-export-dialog.test.tsx` | 10 (جديد) |
+| `web/src/lib/api-download.test.ts` | 2 (جديد — انحدار وضع المعاينة) |
 | `web/src/components/data-table.test.tsx` | +10 (16 ← 26) |
 | `web/src/app/(app)/products/page.test.tsx` | +7 (5 ← 12) |
 
@@ -700,7 +707,7 @@ $ npm run test          # Vitest
 |---|---|---|
 | أنواع TypeScript | `npx tsc --noEmit` | ✅ **نظيف تماماً** — بلا استثناءات بعد دمج main |
 | بناء الإنتاج | `npm run build` (Next.js 15.5.19) | ✅ نجح — 132 مساراً |
-| اختبارات الواجهة | `npm run test` | ✅ 106 ملفات · 688 اختباراً (بعد دمجَي main) |
+| اختبارات الواجهة | `npm run test` | ✅ 107 ملفات · 693 اختباراً (بعد دمجَي main وإصلاح وضع المعاينة) |
 | اختبارات الخلفية (SQLite) | `php artisan test` | ✅ لا انحدار (مجموعة فشل مطابقة للأساس — §L) |
 | تحقّق بنية PHP | `php -l` على كل ملف جديد/معدَّل | ✅ نظيف |
 | مسافات الديف | `git diff --check` | ✅ نظيف |
@@ -835,6 +842,73 @@ export: GET /products/export?scope=filtered&type=good&sale_price_gte=200&page=1&
 - أجهزة حقيقية (iOS/Android) — المحاكاة بمقاسات المتصفح فقط.
 - ملف بـ2000 صف تحت حِمل إنتاجي حقيقي: الحدّ مُختبَر (2001 صفاً تُرفض)، لكن زمن
   الاستجابة الفعلي على PostgreSQL إنتاجي لم يُقَس.
+
+### علّة كشفها الفحص اليدوي على Vercel Preview — «نجاح» بلا ملف
+
+المسح البصري الآلي (96/96 لقطة) لم يمسك هذه العلّة، والفحص اليدوي أمسكها. تستحق
+التسجيل كاملةً لأن سببها **عقدُ دالّة**، لا خطأ في شاشة.
+
+**العَرَض.** في وضع المعاينة (Demo) يضغط المستخدم «تصدير»، فتظهر رسالة نجاح خضراء
+تقول إن الملف جُهّز وبدأ التنزيل، ويُغلق الحوار — **ولا ملف**. أُعيد إنتاجها فعلياً على
+Vercel Preview.
+
+**السبب.** `web/src/lib/api.ts` كانت تفتح بـ:
+
+```ts
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  if (isDemo()) return;          // ← وعدٌ ينتهي «ناجحاً» بلا أن يحدث شيء
+```
+
+وضع المعاينة لا يتصل بخادم أصلاً، فلا ملف يُنزَّل فيه. لكن العودة الصامتة تُنهي الوعد
+بنجاح، و`ProductExportDialog.run()` تقرأ ذلك النجاح على ظاهره فتعرض `export_success`.
+النتيجة ليست «ميزة غير متاحة» — بل **النظام يخبر المستخدم بشيء لم يحدث**.
+
+**العلاج: نتيجة مُنمَّطة، لا استثناء.**
+
+```ts
+export type DownloadOutcome = 'downloaded' | 'demo-unavailable';
+
+export async function downloadFile(path: string, fallbackName: string): Promise<DownloadOutcome> {
+  if (isDemo()) return 'demo-unavailable';
+  …
+  return 'downloaded';
+}
+```
+
+**ولماذا نتيجة لا رمي استثناء؟** لأن للدالّة **ثمانية مستدعين** في المستودع، اثنان منهم
+بلا `.catch()` (`products/import/page.tsx` و`receipt-vouchers/[id]/page.tsx`). رمي استثناء
+كان سيحوّل «لا شيء يحدث» إلى **رفضٍ غير ملتقَط** في الطرفية — استبدال علّة بأخرى أسوأ.
+النتيجة المُنمَّطة تُبقي سلوك كل مستدعٍ **قائماً حرفياً كما هو** حتى يقرأها، فالتغيير
+غير كاسر بالبناء لا بالوعد.
+
+**ما قرأ النتيجة (شاشتا هذه المهمة وحدهما):**
+
+| الموضع | قبل | بعد |
+|---|---|---|
+| `product-export-dialog.tsx` | `success(export_success)` + إغلاق الحوار | `toast({ export_demo_unavailable, variant: 'info' })`، **بلا** نجاح و**بلا** إغلاق — ما طلبه المستخدم لم يحدث |
+| `products/import/page.tsx` (زرّ «تنزيل القالب») | صامت تماماً: زرٌّ لا يفعل شيئاً | الرسالة نفسها — زرٌّ يقول لماذا خيرٌ من زرٍّ لا يفعل شيئاً |
+
+المستدعون الستة الباقون **لم يُمسّوا**: خارج نطاق هذا الـPR، وسلوكهم لم يتغيّر بحرف.
+
+**الالتزام بنظام التصميم.** الرسالة `variant: 'info'` من `useToast` القائم، ولونها
+`var(--primary)` — رمز تصميم لا لون خام. لا مكوّن جديد، ولا نمط جديد، ولا نصّ عربي
+مكتوب في الشيفرة: مفتاح `products.export_demo_unavailable` مضاف في `ar.json` و`en.json`
+معاً (صار عدد مفاتيح `products` **221** في كل لغة، بتكافؤ تام).
+
+**اختبارات الانحدار (5 اختبارات، منها 3 تخصّ العلّة مباشرةً):**
+
+| الاختبار | ما يثبته |
+|---|---|
+| `api-download.test.ts` › «لا يتصل ولا ينقر تنزيلاً في وضع المعاينة» | على الدالّة **الحقيقية** لا على محاكٍ: `fetch` لم تُستدعَ، ولا نقرة على `<a download>`، ولا `createObjectURL`، والنتيجة `demo-unavailable` |
+| `api-download.test.ts` › «ينزّل فعلاً خارج وضع المعاينة» | الطرف المقابل: نقرة واحدة، والاسم من ترويسة الخادم، و`revokeObjectURL` تُستدعى |
+| `product-export-dialog.test.tsx` › «لا يدّعي نجاحاً في وضع المعاينة» | `success` **لم تُستدعَ**، و`error` لم تُستدعَ، والحوار **لم يُغلق**، والزرّ عاد قابلاً للضغط |
+| `product-export-dialog.test.tsx` › «يعلن النجاح ويغلق الحوار حين يتم التنزيل فعلاً» | ألّا يكون العلاج قد كسر المسار الناجح |
+| `import/page.test.tsx` › «تخبر أن تنزيل القالب غير متاح في المعاينة بدل الصمت» | الرسالة تظهر، وبلا سقوطٍ إلى بناء CSV في المتصفح |
+
+**نطاق التغيير: الواجهة وحدها.** لم يُمسّ الخادم ولا تنفيذ XLSX بحرف — لم يظهر سبب
+مستقل مثبَت يستدعي ذلك، والعلّة كلها في عقد دالّة في `web/src/lib/api.ts`.
+
+---
 
 ---
 

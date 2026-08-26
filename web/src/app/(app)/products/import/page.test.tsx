@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ProductImportPage from './page';
 
-const { api, downloadFile, downloadCsv, translate } = vi.hoisted(() => {
+const { api, downloadFile, downloadCsv, translate, toast, toastSuccess } = vi.hoisted(() => {
   const translator = Object.assign(
     (key: string, values: Record<string, unknown> = {}) =>
       Object.keys(values).length ? `${key}:${Object.values(values).join(',')}` : key,
@@ -16,6 +16,8 @@ const { api, downloadFile, downloadCsv, translate } = vi.hoisted(() => {
     downloadFile: vi.fn(),
     downloadCsv: vi.fn(),
     translate: translator,
+    toast: vi.fn(),
+    toastSuccess: vi.fn(),
   };
 });
 
@@ -35,7 +37,9 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 vi.mock('@/lib/export', () => ({ downloadCsv, toCsv: (h: unknown, r: unknown) => JSON.stringify({ h, r }) }));
-vi.mock('@/components/ui/toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('@/components/ui/toast', () => ({
+  useToast: () => ({ toast, success: toastSuccess, error: vi.fn() }),
+}));
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
   return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
@@ -109,7 +113,10 @@ async function uploadTo(step: 'mode' | 'mapping' | 'rules', user: ReturnType<typ
 beforeEach(() => {
   api.mockReset();
   downloadFile.mockReset();
+  downloadFile.mockResolvedValue('downloaded');
   downloadCsv.mockReset();
+  toast.mockReset();
+  toastSuccess.mockReset();
   api.mockImplementation((path: string) => {
     if (path === '/products/import/inspect') return Promise.resolve({ data: inspection });
     if (path === '/products/import/preview') return Promise.resolve({ data: cleanPreview });
@@ -308,6 +315,23 @@ describe('شاشة استيراد المنتجات', () => {
       '/products/import/template',
       'nebrax-products-import-template.csv'
     );
+    await waitFor(() => expect(toast).not.toHaveBeenCalled());
+    expect(downloadCsv).not.toHaveBeenCalled();
+  });
+
+  // انحدار: الزر في المعاينة كان يبتلع النتيجة فلا شيء يحدث ولا شيء يُقال.
+  it('تخبر أن تنزيل القالب غير متاح في وضع المعاينة بدل الصمت', async () => {
+    downloadFile.mockResolvedValue('demo-unavailable');
+    const user = userEvent.setup();
+    render(<ProductImportPage />);
+
+    await user.click(screen.getByRole('button', { name: 'import_template' }));
+
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith({ title: 'export_demo_unavailable', variant: 'info' })
+    );
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(downloadCsv).not.toHaveBeenCalled();
   });
 
   it('تبقي كل تسميات الحقول مترجَمة بلا نص عربي مكتوب في الشيفرة', async () => {

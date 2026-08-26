@@ -5,8 +5,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProductExportDialog } from './product-export-dialog';
 
-const { downloadFile, translate, toastError } = vi.hoisted(() => ({
+const { downloadFile, translate, toast, toastSuccess, toastError } = vi.hoisted(() => ({
   downloadFile: vi.fn(),
+  toast: vi.fn(),
+  toastSuccess: vi.fn(),
   toastError: vi.fn(),
   translate: Object.assign(
     (key: string, values: Record<string, unknown> = {}) =>
@@ -24,7 +26,9 @@ vi.mock('@/lib/api', () => ({
     }
   },
 }));
-vi.mock('@/components/ui/toast', () => ({ useToast: () => ({ success: vi.fn(), error: toastError }) }));
+vi.mock('@/components/ui/toast', () => ({
+  useToast: () => ({ toast, success: toastSuccess, error: toastError }),
+}));
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
   return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
@@ -58,7 +62,9 @@ function lastParams(): URLSearchParams {
 
 beforeEach(() => {
   downloadFile.mockReset();
-  downloadFile.mockResolvedValue(undefined);
+  downloadFile.mockResolvedValue('downloaded');
+  toast.mockReset();
+  toastSuccess.mockReset();
   toastError.mockReset();
 });
 
@@ -149,6 +155,39 @@ describe('حوار تصدير المنتجات', () => {
     await user.click(screen.getByRole('button', { name: 'export_submit' }));
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith('export_failed'));
+  });
+
+  it('يعلن النجاح ويغلق الحوار حين يتم التنزيل فعلاً', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderDialog({ onClose });
+
+    await user.click(screen.getByRole('button', { name: 'export_submit' }));
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('export_success'));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  // انحدار: وضع المعاينة لا ينزّل شيئاً، فادّعاء النجاح فيه كذبٌ صريح.
+  it('لا يدّعي نجاحاً في وضع المعاينة، بل يقول إن التصدير غير متاح', async () => {
+    downloadFile.mockResolvedValue('demo-unavailable');
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderDialog({ onClose });
+
+    await user.click(screen.getByRole('button', { name: 'export_submit' }));
+
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith({ title: 'export_demo_unavailable', variant: 'info' })
+    );
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+    // الحوار يبقى مفتوحاً: ما طلبه المستخدم لم يحدث.
+    expect(onClose).not.toHaveBeenCalled();
+    // ولا يظل الزر معطّلاً بعد الرسالة.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'export_submit' }).hasAttribute('disabled')).toBe(false)
+    );
   });
 
   it('لا يعرض نصاً عربياً مكتوباً في الشيفرة داخل واجهة مترجَمة', () => {
