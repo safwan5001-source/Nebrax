@@ -6,6 +6,8 @@ const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
 const evidenceDir = path.resolve(process.cwd(), 'test-results/document-qa');
 const templates = ['tax-invoice-erp', 'tax-invoice-modern', 'tax-invoice-minimal'] as const;
 const commercialTypes = ['quotation', 'sales_order', 'purchase_order', 'purchase_invoice', 'delivery_note'] as const;
+const taxTypes = ['tax_invoice', 'simplified_tax_invoice'] as const;
+const completedTypes = [...taxTypes, ...commercialTypes] as const;
 const visualSamples = new Set([
   'quotation:tax-invoice-erp:rtl',
   'sales_order:tax-invoice-modern:rtl',
@@ -77,17 +79,24 @@ async function openQa(page: Page, options: Record<string, string>) {
   await expect(page.getByTestId('document-qa-page')).toBeVisible();
   await expect(page.locator('#qa-print-root')).toBeVisible();
   await expect(page.getByTestId('qa-template-selector')).toBeVisible();
+  await expect(page.getByTestId('qa-scenario-selector')).toBeVisible();
+  await expect(page.getByTestId('qa-direction-selector')).toBeVisible();
 }
 
 test.describe('Document QA — scenarios, A4 and responsive preview', () => {
   test.setTimeout(900_000);
 
-  test('يرسم ERP وModern وMinimal لكل نوع واتجاه، ويغطي أحجام البنود الأربعة لكل نوع من دون تجاوز أفقي', async ({ page }) => {
+  test('يرسم كل نوع وقالب وسيناريو ضمن مصفوفة متعامدة بلا تجاوز أفقي', async ({ page }) => {
     const evidence: Array<Record<string, unknown>> = [];
-    const scenarios = ['single', 'five', 'twenty', 'multipage'] as const;
+    const scenarios = ['single', 'five', 'twenty', 'multipage', 'long_content'] as const;
     const cases = [
-      ...commercialTypes.flatMap((type) => templates.flatMap((template) => ['rtl', 'ltr'].map((direction) => ({ type, template, direction, scenario: 'five' as const })))),
-      ...commercialTypes.flatMap((type) => scenarios.map((scenario) => ({ type, template: 'tax-invoice-erp' as const, direction: 'rtl' as const, scenario }))),
+      ...completedTypes.flatMap((type, typeIndex) => templates.map((template, templateIndex) => ({
+        type,
+        template,
+        direction: (typeIndex + templateIndex) % 2 === 0 ? 'rtl' as const : 'ltr' as const,
+        scenario: 'five' as const,
+      }))),
+      ...completedTypes.flatMap((type) => scenarios.map((scenario) => ({ type, template: 'tax-invoice-erp' as const, direction: 'rtl' as const, scenario }))),
     ];
 
     for (const { type, template, direction, scenario } of cases) {
@@ -117,7 +126,7 @@ test.describe('Document QA — scenarios, A4 and responsive preview', () => {
 
   test('يتحقق من logo وBank وStamp وSignature عند دعمها، ويمنع QR والملخص المالي في Delivery Note', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
-    for (const type of commercialTypes) {
+    for (const type of completedTypes) {
       for (const template of ['tax-invoice-erp'] as const) {
         const qaPage = await page.context().newPage();
         try {
@@ -149,7 +158,7 @@ test.describe('Document QA — scenarios, A4 and responsive preview', () => {
   test('يبقي معاينة A4 ومحدد القالب مرئيين بلا تجاوز أفقي عند المقاسات المطلوبة', async ({ page }) => {
     const evidence: Array<Record<string, unknown>> = [];
     for (const viewport of viewports) {
-      for (const [index, type] of commercialTypes.entries()) {
+      for (const [index, type] of completedTypes.entries()) {
         for (const template of [templates[index % templates.length]]) {
           const qaPage = await page.context().newPage();
           try {
@@ -173,8 +182,11 @@ test.describe('Document QA — scenarios, A4 and responsive preview', () => {
   });
 
   test('ينتج PDF عبر مسار التصدير الحالي وطباعة Chromium على A4 لسيناريو متعدد الصفحات', async ({ page }) => {
-    for (const [index, type] of commercialTypes.entries()) {
-      for (const template of [templates[index % templates.length]]) {
+    const cases = [
+      ...commercialTypes.map((type, index) => ({ type, template: templates[index % templates.length] })),
+      ...taxTypes.flatMap((type) => templates.map((template) => ({ type, template }))),
+    ];
+    for (const { type, template } of cases) {
         const printPage = await page.context().newPage();
         try {
           await printPage.setViewportSize({ width: 1440, height: 960 });
@@ -210,7 +222,7 @@ test.describe('Document QA — scenarios, A4 and responsive preview', () => {
           await exportPage.setViewportSize({ width: 1440, height: 960 });
           await openQa(exportPage, { type, template, direction: 'rtl', scenario: 'multipage', logo: 'on', qr: 'on', assets: 'on' });
           const downloadPromise = exportPage.waitForEvent('download');
-          await exportPage.getByRole('button', { name: 'Download PDF' }).click();
+          await exportPage.getByTestId('qa-download-pdf').click();
           const download = await downloadPromise;
           const exportPath = path.join(evidenceDir, `${type}-${template}-multipage-export.pdf`);
           await download.saveAs(exportPath);
@@ -219,7 +231,38 @@ test.describe('Document QA — scenarios, A4 and responsive preview', () => {
         } finally {
           await exportPage.close();
         }
-      }
     }
+  });
+
+  test('يعرض مركز QA تسميات مفهومة ويحفظ اختيارات النوع والقالب والسيناريو والاتجاه', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openQa(page, { type: 'tax_invoice', template: 'tax-invoice-erp', direction: 'rtl', scenario: 'single', logo: 'on', qr: 'on', assets: 'on' });
+
+    await expect(page.getByTestId('qa-document-type-selector').locator('option')).toHaveText([
+      'فاتورة ضريبية',
+      'فاتورة ضريبية مبسطة',
+      'عرض سعر',
+      'أمر بيع',
+      'أمر شراء',
+      'فاتورة مشتريات',
+      'إذن تسليم',
+    ]);
+    await expect(page.getByText('purchase_invoice', { exact: true })).toHaveCount(0);
+
+    await page.getByTestId('qa-document-type-selector').selectOption('simplified_tax_invoice');
+    await page.waitForURL(/type=simplified_tax_invoice/);
+    await page.getByTestId('qa-template-selector').selectOption('tax-invoice-minimal');
+    await page.waitForURL(/template=tax-invoice-minimal/);
+    await page.getByTestId('qa-scenario-selector').selectOption('long_content');
+    await page.waitForURL(/scenario=long_content/);
+    await page.getByTestId('qa-direction-selector').selectOption('ltr');
+    await page.waitForURL(/direction=ltr/);
+
+    await expect(page.getByTestId('qa-document-type-selector')).toHaveValue('simplified_tax_invoice');
+    await expect(page.getByTestId('qa-template-selector')).toHaveValue('tax-invoice-minimal');
+    await expect(page.getByTestId('qa-scenario-selector')).toHaveValue('long_content');
+    await expect(page.getByTestId('qa-direction-selector')).toHaveValue('ltr');
+    await expect(page.getByTestId('qa-download-pdf')).toBeVisible();
+    expect((await captureMetrics(page)).horizontalOverflow).toBe(false);
   });
 });
