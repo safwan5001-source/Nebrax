@@ -20,10 +20,19 @@ export function DocSignature({ model }: { model: DocumentModel }) {
   if (!model.signatureUrl) return null;
 
   return (
-    <div className={cn('flex flex-col', itemsAlignment, style.sectionGap)}>
+    <div
+      className={cn(
+        'flex flex-col',
+        itemsAlignment,
+        style.sectionGap,
+        style.composition === 'erp' && 'border-t border-black pt-3',
+        style.composition === 'minimal' && 'border-t border-black pt-3',
+        style.composition === 'modern' && 'border-t border-[color:var(--border)] pt-3',
+      )}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
       <img src={model.signatureUrl} alt={t('signature')} className={cn(getDocumentImagePreviewClass('signature', properties.image_size), getDocumentImagePreviewOpacityClass('signature', properties.image_opacity))} />
-      <div className="mt-1 w-40 border-t border-gray-400 pt-1 text-[10px] text-gray-500">{t('signature')}</div>
+      <div className="mt-1 w-40 border-t border-[color:var(--muted)] pt-1 text-[10px] text-[color:var(--muted)]">{t('signature')}</div>
     </div>
   );
 }

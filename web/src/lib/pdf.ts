@@ -10,6 +10,48 @@ export interface PdfPaper {
 
 const A4: PdfPaper = { widthMm: 210, heightMm: 297 };
 
+type PdfImageSlice = { top: number; height: number };
+
+/**
+ * يقسم الصورة الطويلة إلى شرائح A4، مع تفضيل آخر حد آمن قبل نهاية الصفحة.
+ * الحد الآمن يأتي من نهاية صف جدول أو نهاية قسم مستند؛ يبقى السقوط إلى الحد
+ * الحسابي للكتل الأطول من صفحة، كي لا تتعطل المخرجات عند نص استثنائي طويل.
+ */
+export function getPdfImageSlices(
+  imageHeight: number,
+  pageHeight: number,
+  safeBreaks: readonly number[],
+): PdfImageSlice[] {
+  const normalizedBreaks = [...new Set(safeBreaks)]
+    .filter((point) => point > 0 && point < imageHeight)
+    .sort((left, right) => left - right);
+  const slices: PdfImageSlice[] = [];
+  let top = 0;
+
+  while (top < imageHeight) {
+    const nominalEnd = Math.min(top + pageHeight, imageHeight);
+    const candidate = normalizedBreaks.filter((point) => point > top && point <= nominalEnd).at(-1);
+    const end = candidate && candidate - top >= Math.max(pageHeight * 0.25, 48) ? candidate : nominalEnd;
+    slices.push({ top, height: end - top });
+    top = end;
+  }
+
+  return slices;
+}
+
+function getSafeCanvasBreaks(el: HTMLElement, canvas: HTMLCanvasElement): number[] {
+  const elementRect = el.getBoundingClientRect();
+  const cssToCanvas = canvas.width / el.scrollWidth;
+  const toCanvasY = (element: Element, edge: 'top' | 'bottom') => {
+    const rect = element.getBoundingClientRect();
+    return Math.round((rect[edge] - elementRect.top) * cssToCanvas);
+  };
+
+  const rowEnds = Array.from(el.querySelectorAll('tbody tr')).map((row) => toCanvasY(row, 'bottom'));
+  const sectionEnds = Array.from(el.children).map((section) => toCanvasY(section, 'bottom'));
+  return [...rowEnds, ...sectionEnds].filter((point) => point > 0 && point < canvas.height);
+}
+
 /**
  * بعض صفحات المستند تُبقي القالب الحقيقي في DOM لكنه مخفي إلى أن يطلب المستخدم
  * معاينته. نكشفه مؤقتاً كي يلتقطه المصدر نفسه في PDF، بدلاً من العودة إلى قالب
@@ -85,19 +127,25 @@ async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<
     return pdf.output('blob');
   }
 
-  // ورق ثابت (A4/Letter/Legal): ترقيم صفحات بارتفاع الصفحة.
+  // ورق ثابت (A4/Letter/Legal): نرسم كل صفحة من شريحة raster مستقلة. هذا
+  // يحافظ على الناقل الحالي نفسه، لكنه يفضّل حدود صفوف البنود وكتل المستند
+  // كي لا يمر فاصل A4 عبر صف أو إجماليات عند وجود مستند طويل.
   const ph = paper.heightMm;
   const pdf = new JsPDF({ unit: 'mm', format: [pw, ph], orientation: pw > ph ? 'landscape' : 'portrait' });
-  let heightLeft = imgH;
-  let position = 0;
-  pdf.addImage(img, 'PNG', 0, position, pw, imgH);
-  heightLeft -= ph;
-  while (heightLeft > 0) {
-    position -= ph;
-    pdf.addPage();
-    pdf.addImage(img, 'PNG', 0, position, pw, imgH);
-    heightLeft -= ph;
-  }
+  const pageHeightCanvas = (ph * canvas.width) / pw;
+  const slices = getPdfImageSlices(canvas.height, pageHeightCanvas, getSafeCanvasBreaks(el, canvas));
+
+  slices.forEach((slice, index) => {
+    if (index > 0) pdf.addPage();
+    const pageCanvas = document.createElement('canvas');
+    pageCanvas.width = canvas.width;
+    pageCanvas.height = Math.ceil(slice.height);
+    const context = pageCanvas.getContext('2d');
+    if (!context) throw new Error('تعذر إنشاء سياق رسم صفحة PDF');
+    context.drawImage(canvas, 0, slice.top, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+    const pageHeightMm = (slice.height * pw) / canvas.width;
+    pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', 0, 0, pw, pageHeightMm);
+  });
   return pdf.output('blob');
 }
 

@@ -13,7 +13,16 @@ export function DocStamp({ model }: { model: DocumentModel }) {
   if (!model.stampUrl) return null;
 
   return (
-    <div className={cn('flex', blockJustifyClassName(properties), style.sectionGap)}>
+    <div
+      className={cn(
+        'flex',
+        blockJustifyClassName(properties),
+        style.sectionGap,
+        style.composition === 'erp' && 'border-t border-black pt-3',
+        style.composition === 'minimal' && 'border-t border-black pt-3',
+        style.composition === 'modern' && 'border-t border-[color:var(--border)] pt-3',
+      )}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
       <img src={model.stampUrl} alt="stamp" className={cn(getDocumentImagePreviewClass('stamp', properties.image_size), getDocumentImagePreviewOpacityClass('stamp', properties.image_opacity))} />
     </div>
