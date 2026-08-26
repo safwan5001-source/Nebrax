@@ -76,6 +76,8 @@ export interface ImportResult {
   updated: number;
   skipped: number;
   total_rows: number;
+  batch_offset?: number;
+  batch_size?: number | null;
   results: PreviewRow[];
 }
 
@@ -84,6 +86,7 @@ export type ColumnMapping = Record<number, string | null>;
 
 export const IMPORT_MODES: ImportMode[] = ['create', 'update', 'upsert'];
 export const MAX_IMPORT_ROWS = 2000;
+export const APPLY_BATCH_SIZE = 100;
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_IMPORT_TYPES = '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -102,6 +105,8 @@ export function importFormData(
     blankPolicy?: BlankPolicy;
     masterDataPolicy?: MasterDataPolicy;
     mapping?: ColumnMapping;
+    batchOffset?: number;
+    batchSize?: number;
   } = {}
 ): FormData {
   const form = new FormData();
@@ -109,6 +114,8 @@ export function importFormData(
   if (options.mode) form.append('mode', options.mode);
   if (options.blankPolicy) form.append('blank_policy', options.blankPolicy);
   if (options.masterDataPolicy) form.append('master_data_policy', options.masterDataPolicy);
+  if (options.batchOffset !== undefined) form.append('batch_offset', String(options.batchOffset));
+  if (options.batchSize !== undefined) form.append('batch_size', String(options.batchSize));
 
   if (options.mapping) {
     for (const [index, key] of Object.entries(options.mapping)) {
