@@ -7,7 +7,9 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\StockMovement;
 use App\Models\UnitTemplate;
+use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\ProductImportService;
+use App\Services\ProductLifecycleService;
 use App\Support\SpreadsheetWriter;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -530,6 +532,236 @@ class ProductImportV2Test extends TestCase
         app(TenantContext::class)->set($auth['tenant_id']);
         $category = ProductCategory::where('name', 'تصنيف جديد')->firstOrFail();
         $this->assertSame($category->id, Product::where('sku', 'SKU-M4')->firstOrFail()->category_id);
+    }
+
+    // ══════════════ إنشاء البيانات الأساسية: متى يقع، وكم مرة ══════════════
+
+    /**
+     * @test
+     *
+     * المعاينة عقدها أنها **لا تغيّر البيانات**. وكان `create_missing` يكسر ذلك
+     * العقد: مجرّد فتح المعاينة لتجريب السياسة كان يزرع تصنيفاً وعلامةً دائمين
+     * لملفٍ قد لا يُطبَّق أصلاً.
+     */
+    public function preview_under_create_missing_creates_nothing_and_says_what_it_would_create(): void
+    {
+        $auth = $this->registerTenant();
+        $file = $this->csv(['sku', 'name', 'type', 'sale_price', 'category', 'brand'], [
+            ['SKU-P1', 'قهوة', 'good', '35.00', 'تصنيف مؤجَّل', 'علامة مؤجَّلة'],
+        ]);
+
+        $response = $this->withToken($auth['token'])->post('/api/products/import/preview', [
+            'file' => $file, 'mode' => 'create', 'master_data_policy' => 'create_missing',
+        ])->assertOk()
+            ->assertJsonPath('data.error_rows', 0)
+            ->assertJsonPath('data.create_rows', 1);
+
+        $messages = implode(' | ', $response->json('data.rows.0.messages'));
+        $this->assertStringContainsString('سيُنشأ عند تنفيذ الاستيراد', $messages, 'المعاينة تقول ما ستفعله بدل أن تفعله.');
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame(0, ProductCategory::count(), 'المعاينة لا تكتب تصنيفاً.');
+        $this->assertSame(0, Brand::count(), 'المعاينة لا تكتب علامة تجارية.');
+        $this->assertSame(0, Product::count());
+    }
+
+    /**
+     * @test
+     *
+     * كل صفٍّ كان يُنشئ سجلّاً مستقلاً لأن الفهرس يُبنى مرة واحدة قبل الصفوف
+     * فلا يرى ما أُنشئ أثناءها: ملفٌ فيه ٤ أسطر لـ«تصنيف مكرر» يخلّف ٤ تصنيفات
+     * بالاسم نفسه، فتصير المطابقة بالاسم غامضةً في كل استيراد لاحق.
+     */
+    public function create_missing_creates_one_record_per_name_however_many_rows_repeat_it(): void
+    {
+        $auth = $this->registerTenant();
+        $file = $this->csv(['sku', 'name', 'type', 'sale_price', 'category', 'brand'], [
+            ['SKU-D1', 'صنف ١', 'good', '10.00', 'تصنيف مكرر', 'علامة مكررة'],
+            ['SKU-D2', 'صنف ٢', 'good', '10.00', 'تصنيف مكرر', 'علامة مكررة'],
+            ['SKU-D3', 'صنف ٣', 'good', '10.00', '  تصنيف مكرر  ', 'علامة مكررة'],
+            ['SKU-D4', 'صنف ٤', 'good', '10.00', 'تصنيف آخر', 'علامة مكررة'],
+        ]);
+
+        $this->withToken($auth['token'])->post('/api/products/import/apply', [
+            'file' => $file, 'mode' => 'create', 'master_data_policy' => 'create_missing',
+        ])->assertOk()->assertJsonPath('data.created', 4);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame(2, ProductCategory::count(), 'اسمان متمايزان = تصنيفان، مهما تكررت الأسطر.');
+        $this->assertSame(1, Brand::count());
+
+        $repeated = ProductCategory::where('name', 'تصنيف مكرر')->firstOrFail();
+        foreach (['SKU-D1', 'SKU-D2', 'SKU-D3'] as $sku) {
+            $product = Product::where('sku', $sku)->firstOrFail();
+            $this->assertSame($repeated->id, $product->category_id, "الصفوف المتكررة تشير إلى السجلّ نفسه ({$sku}).");
+            $this->assertNull($product->category, 'المُعرّف يحلّ محلّ النصّ القديم.');
+        }
+    }
+
+    /**
+     * @test
+     *
+     * الإنشاء كان يقع **قبل** المعاملة، فرجوعها لا يمسحه: استيرادٌ فشل يخلّف
+     * تصنيفاً وعلامةً يتيمين لا منتج يشير إليهما.
+     */
+    public function a_rolled_back_apply_leaves_no_orphan_category_or_brand(): void
+    {
+        $auth = $this->registerTenant();
+
+        // فشلٌ مصطنع **داخل** المعاملة: أقرب ما يحاكي عطلاً بعد كتابة أول صف.
+        $this->app->bind(ProductLifecycleService::class, fn ($app) => new class($app->make(DocumentStorageService::class)) extends ProductLifecycleService
+        {
+            public function create(Product $product, ?string $userId): void
+            {
+                throw new \RuntimeException('عطل مصطنع أثناء الكتابة.');
+            }
+        });
+
+        $file = $this->csv(['sku', 'name', 'type', 'sale_price', 'category', 'brand'], [
+            ['SKU-R1', 'صنف', 'good', '10.00', 'تصنيف يتيم', 'علامة يتيمة'],
+        ]);
+
+        $this->withToken($auth['token'])->post('/api/products/import/apply', [
+            'file' => $file, 'mode' => 'create', 'master_data_policy' => 'create_missing',
+        ])->assertStatus(422);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame(0, Product::count(), 'لا كتابة جزئية.');
+        $this->assertSame(0, ProductCategory::count(), 'التصنيف يرجع مع المعاملة لأنه أُنشئ داخلها.');
+        $this->assertSame(0, Brand::count());
+    }
+
+    /**
+     * @test
+     *
+     * الاسم الذي أُنشئ بين المعاينة والتطبيق (طلبٌ متزامن) يُطابَق لا يُكرَّر.
+     */
+    public function create_missing_matches_a_name_that_appeared_between_preview_and_apply(): void
+    {
+        $auth = $this->registerTenant();
+        $rows = [['SKU-C1', 'صنف', 'good', '10.00', 'تصنيف سابق']];
+        $headers = ['sku', 'name', 'type', 'sale_price', 'category'];
+
+        $this->withToken($auth['token'])->post('/api/products/import/preview', [
+            'file' => $this->csv($headers, $rows), 'mode' => 'create', 'master_data_policy' => 'create_missing',
+        ])->assertOk()->assertJsonPath('data.error_rows', 0);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $existing = ProductCategory::create(['name' => 'تصنيف سابق']);
+
+        $this->withToken($auth['token'])->post('/api/products/import/apply', [
+            'file' => $this->csv($headers, $rows), 'mode' => 'create', 'master_data_policy' => 'create_missing',
+        ])->assertOk()->assertJsonPath('data.created', 1);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame(1, ProductCategory::count(), 'الاسم القائم يُطابَق ولا يُنسخ.');
+        $this->assertSame($existing->id, Product::where('sku', 'SKU-C1')->firstOrFail()->category_id);
+    }
+
+    /**
+     * @test
+     *
+     * تحديثٌ لا يغيّر إلا التصنيف الجديد كانت حمولته تبدو فارغة (المُعرّف لم
+     * يُملأ بعد)، فيتحوّل الصف إلى «تخطٍّ» ولا يُربط بشيء.
+     */
+    public function a_row_whose_only_change_is_a_new_category_is_an_update_not_a_skip(): void
+    {
+        $auth = $this->registerTenant();
+        $product = $this->createProduct($auth['token'], ['sku' => 'SKU-N1', 'name' => 'صنف ثابت']);
+
+        $file = $this->csv(['sku', 'name', 'type', 'sale_price', 'category'], [
+            ['SKU-N1', 'صنف ثابت', 'good', '100.00', 'تصنيف طارئ'],
+        ]);
+
+        $this->withToken($auth['token'])->post('/api/products/import/apply', [
+            'file' => $file, 'mode' => 'update', 'master_data_policy' => 'create_missing',
+        ])->assertOk()
+            ->assertJsonPath('data.updated', 1)
+            ->assertJsonPath('data.skipped', 0);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $category = ProductCategory::where('name', 'تصنيف طارئ')->firstOrFail();
+        $this->assertSame($category->id, Product::findOrFail($product['id'])->category_id);
+    }
+
+    // ══════════════ النص الحر يفكّ المرجع المُدار لا يتعايش معه ══════════════
+
+    /**
+     * @test
+     *
+     * `ProductResource` والتصدير يقرآن `productCategory?->name ?? category`،
+     * فالمُعرّف الباقي كان يطغى على النص الذي قال الاستيراد إنه حفظه: يقول
+     * «سيُحفظ نصّاً حرّاً» ثم يعرض المستخدمُ الاسمَ المُدار القديم نفسه.
+     */
+    public function free_text_detaches_the_managed_category_and_brand_it_replaces(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $category = ProductCategory::create(['name' => 'مشروبات']);
+        $brand = Brand::create(['name' => 'نبراكس']);
+
+        $product = $this->createProduct($auth['token'], [
+            'sku' => 'SKU-F1', 'category_id' => $category->id, 'brand_id' => $brand->id,
+        ]);
+        $this->assertSame($category->id, $product['category_id'], 'المنتج يبدأ بمرجع مُدار فعلاً.');
+
+        $file = $this->csv(['sku', 'name', 'type', 'sale_price', 'category', 'brand'], [
+            ['SKU-F1', 'منتج قائم', 'good', '100.00', 'تصنيف حر', 'علامة حرة'],
+        ]);
+
+        $response = $this->withToken($auth['token'])->post('/api/products/import/apply', [
+            'file' => $file, 'mode' => 'update', 'master_data_policy' => 'match_or_text',
+        ])->assertOk()->assertJsonPath('data.updated', 1);
+
+        $messages = implode(' | ', $response->json('data.results.0.messages'));
+        $this->assertStringContainsString('سيُفَكّ عن المنتج', $messages, 'فكّ ارتباطٍ قائم يُقال لا يُمرَّر صامتاً.');
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $stored = Product::findOrFail($product['id']);
+        $this->assertNull($stored->category_id, 'المُعرّف المُدار لا يبقى تحت نصّ حر.');
+        $this->assertNull($stored->brand_id);
+        $this->assertSame('تصنيف حر', $stored->category);
+        $this->assertSame('علامة حرة', $stored->brand);
+
+        // ما يراه المستخدم — لا الحمولة — هو محلّ العلّة.
+        $this->withToken($auth['token'])->getJson("/api/products/{$product['id']}")
+            ->assertOk()
+            ->assertJsonPath('data.category', 'تصنيف حر')
+            ->assertJsonPath('data.brand', 'علامة حرة')
+            ->assertJsonPath('data.category_id', null)
+            ->assertJsonPath('data.brand_id', null);
+
+        $export = $this->withToken($auth['token'])->get('/api/products/export?scope=all&format=csv&template=round_trip');
+        $export->assertOk();
+        $body = $export->streamedContent();
+        $this->assertStringContainsString('تصنيف حر', $body, 'التصدير يطابق ما قال الاستيراد إنه حفظه.');
+        $this->assertStringNotContainsString('مشروبات', $body);
+    }
+
+    /**
+     * @test
+     *
+     * ولا ينقلب الفكّ إلى أثرٍ جانبي: منتجٌ بلا مرجع مُدار أصلاً لا يستحق تنبيه فكّ.
+     */
+    public function free_text_on_a_product_without_a_managed_reference_warns_only_about_the_text(): void
+    {
+        $auth = $this->registerTenant();
+        $product = $this->createProduct($auth['token'], ['sku' => 'SKU-F2']);
+
+        $file = $this->csv(['sku', 'name', 'type', 'sale_price', 'category'], [
+            ['SKU-F2', 'منتج قائم', 'good', '100.00', 'تصنيف حر'],
+        ]);
+
+        $response = $this->withToken($auth['token'])->post('/api/products/import/apply', [
+            'file' => $file, 'mode' => 'update', 'master_data_policy' => 'match_or_text',
+        ])->assertOk()->assertJsonPath('data.updated', 1);
+
+        $messages = implode(' | ', $response->json('data.results.0.messages'));
+        $this->assertStringContainsString('سيُحفظ نصّاً حرّاً فقط', $messages);
+        $this->assertStringNotContainsString('سيُفَكّ عن المنتج', $messages);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame('تصنيف حر', Product::findOrFail($product['id'])->category);
     }
 
     /** @test */

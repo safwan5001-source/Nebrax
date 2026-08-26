@@ -231,6 +231,10 @@ class ProductImportService
             $skipped = 0;
             $results = [];
 
+            // البيانات الأساسية الناقصة تُنشأ هنا — **داخل** المعاملة وبعد أن
+            // ثبت أن الملف كله بلا أخطاء. فشلُ أي صف بعدها يرجع بها معه.
+            $references = $this->materializePendingReferences($parsed['pending_references']);
+
             foreach ($parsed['rows'] as $row) {
                 /** @var array<string, mixed> $payload */
                 $payload = $row['payload'];
@@ -242,6 +246,8 @@ class ProductImportService
                     $results[] = $this->rowSummary($row);
                     continue;
                 }
+
+                $payload = $this->applyDeferredReferences($payload, $row['deferred'], $references, (int) $row['row']);
 
                 if ($row['action'] === 'update') {
                     if (! $existing) {
@@ -352,6 +358,9 @@ class ProductImportService
         $this->assertMappingCoversContract($mapping, $options['mode']);
 
         $references = $this->referenceIndex();
+        // أسماء المراجع الناقصة التي طلب الملفُ إنشاءها. تُجمع هنا ولا تُكتب:
+        // الكتابة كلها داخل معاملة `apply` الناجحة وحدها (انظر §المراجع المؤجَّلة).
+        $pending = ['category' => [], 'brand' => []];
         $rows = [];
         $errors = [];
         $seen = ['sku' => [], 'barcode' => [], 'nebrax_id' => []];
@@ -375,20 +384,21 @@ class ProductImportService
                 $messages[] = 'عدد الأعمدة في هذا الصف يتجاوز صف العناوين، فبعض القيم ستسقط. صحّح الملف.';
             }
 
-            $normalized = $this->normalize($cells, $mapping, $options, $references, $messages, $warnings);
+            $normalized = $this->normalize($cells, $mapping, $options, $references, $pending, $messages, $warnings);
 
             $this->assertUniqueWithinFile($cells, $rowNumber, $seen, $messages);
             $existing = $this->matchExisting($cells, $options['mode'], $messages);
             $action = $this->resolveAction($cells, $options['mode'], $existing, $messages);
 
             $payload = [];
+            $deferred = [];
             if ($messages === []) {
                 $payload = $action === 'create'
-                    ? $this->buildCreatePayload($normalized, $messages)
-                    : $this->buildUpdatePayload($normalized, $existing, $options, $messages, $warnings);
+                    ? $this->buildCreatePayload($normalized, $messages, $deferred)
+                    : $this->buildUpdatePayload($normalized, $existing, $options, $messages, $warnings, $deferred);
             }
 
-            if ($messages === [] && $action === 'update' && $this->isNoOpUpdate($existing, $payload)) {
+            if ($messages === [] && $action === 'update' && $this->isNoOpUpdate($existing, $payload, $deferred)) {
                 $action = 'skip';
             }
 
@@ -416,6 +426,7 @@ class ProductImportService
                 'messages' => array_values(array_unique(array_merge($messages, $warnings))),
                 'cells' => $cells,
                 'payload' => $payload,
+                'deferred' => $deferred,
                 'existing' => $existing,
                 'preview' => [
                     'sku' => $payload['sku'] ?? ($cells['sku'] ?? null) ?: ($existing?->sku),
@@ -439,6 +450,7 @@ class ProductImportService
             'error_rows' => $counters['error'],
             'rows' => $rows,
             'errors' => $errors,
+            'pending_references' => $pending,
         ];
     }
 
@@ -506,11 +518,12 @@ class ProductImportService
      * @param  array<int, string>  $mapping
      * @param  array{mode: string, blank_policy: string, master_data_policy: string, mapping: array<int, string>|null}  $options
      * @param  array<string, array<string, mixed>>  $references
+     * @param  array<string, array<string, string>>  $pending
      * @param  array<int, string>  $messages
      * @param  array<int, string>  $warnings
      * @return array<string, array{present: bool, blank: bool, value: mixed}>
      */
-    private function normalize(array $cells, array $mapping, array $options, array $references, array &$messages, array &$warnings): array
+    private function normalize(array $cells, array $mapping, array $options, array $references, array &$pending, array &$messages, array &$warnings): array
     {
         $mapped = array_values($mapping);
         $normalized = [];
@@ -531,7 +544,7 @@ class ProductImportService
             $normalized[$key] = [
                 'present' => true,
                 'blank' => false,
-                'value' => $this->castValue($key, $field, $raw, $options, $references, $messages, $warnings),
+                'value' => $this->castValue($key, $field, $raw, $options, $references, $pending, $messages, $warnings),
             ];
         }
 
@@ -542,10 +555,11 @@ class ProductImportService
      * @param  array<string, mixed>  $field
      * @param  array{mode: string, blank_policy: string, master_data_policy: string, mapping: array<int, string>|null}  $options
      * @param  array<string, array<string, mixed>>  $references
+     * @param  array<string, array<string, string>>  $pending
      * @param  array<int, string>  $messages
      * @param  array<int, string>  $warnings
      */
-    private function castValue(string $key, array $field, string $raw, array $options, array $references, array &$messages, array &$warnings): mixed
+    private function castValue(string $key, array $field, string $raw, array $options, array $references, array &$pending, array &$messages, array &$warnings): mixed
     {
         $label = $field['label_ar'];
 
@@ -555,7 +569,7 @@ class ProductImportService
             ProductImportFields::TYPE_INTEGER => $this->parseInteger($raw, $label, (int) ($field['min'] ?? 0), (int) ($field['max'] ?? PHP_INT_MAX), $messages),
             ProductImportFields::TYPE_BOOLEAN => $this->parseBoolean($raw, $label, (bool) ($field['default'] ?? false), $messages),
             ProductImportFields::TYPE_ENUM => $this->parseEnum($raw, $label, $field['values'], $messages),
-            ProductImportFields::TYPE_REFERENCE => $this->resolveReference($key, $field, $raw, $options, $references, $messages, $warnings),
+            ProductImportFields::TYPE_REFERENCE => $this->resolveReference($key, $field, $raw, $options, $references, $pending, $messages, $warnings),
             default => $this->parseText($raw, $key, $label, (int) ($field['max'] ?? 255), $messages),
         };
     }
@@ -696,7 +710,7 @@ class ProductImportService
             $byName = [];
             foreach ($rows as $row) {
                 $byId[$row->id] = $row;
-                $key = mb_strtolower(trim((string) $row->name), 'UTF-8');
+                $key = self::referenceNeedle((string) $row->name);
                 // أول تطابق يفوز، ويُوسم التكرار كي يُرفض التطابق الغامض.
                 $byName[$key] = isset($byName[$key]) ? false : $row;
             }
@@ -715,11 +729,12 @@ class ProductImportService
      * @param  array<string, mixed>  $field
      * @param  array{mode: string, blank_policy: string, master_data_policy: string, mapping: array<int, string>|null}  $options
      * @param  array<string, array<string, mixed>>  $references
+     * @param  array<string, array<string, string>>  $pending
      * @param  array<int, string>  $messages
      * @param  array<int, string>  $warnings
-     * @return array{id: string|null, name: string, model: mixed}|null
+     * @return array{id: string|null, name: string, model: mixed, pending: string|null}|null
      */
-    private function resolveReference(string $key, array $field, string $raw, array $options, array $references, array &$messages, array &$warnings): ?array
+    private function resolveReference(string $key, array $field, string $raw, array $options, array $references, array &$pending, array &$messages, array &$warnings): ?array
     {
         $label = $field['label_ar'];
         $reference = (string) $field['reference'];
@@ -727,10 +742,10 @@ class ProductImportService
         $value = trim($raw);
 
         if (isset($index['by_id'][$value])) {
-            return ['id' => $value, 'name' => (string) $index['by_id'][$value]->name, 'model' => $index['by_id'][$value]];
+            return ['id' => $value, 'name' => (string) $index['by_id'][$value]->name, 'model' => $index['by_id'][$value], 'pending' => null];
         }
 
-        $needle = mb_strtolower($value, 'UTF-8');
+        $needle = self::referenceNeedle($value);
         $match = $index['by_name'][$needle] ?? null;
 
         if ($match === false) {
@@ -739,15 +754,24 @@ class ProductImportService
             return null;
         }
         if ($match !== null) {
-            return ['id' => (string) $match->id, 'name' => (string) $match->name, 'model' => $match];
+            return ['id' => (string) $match->id, 'name' => (string) $match->name, 'model' => $match, 'pending' => null];
         }
 
         return match ($options['master_data_policy']) {
             self::MASTER_DATA_ERROR => $this->referenceMissing($label, $value, $messages),
-            self::MASTER_DATA_CREATE => $this->createReference($reference, $value, $label, $messages),
+            self::MASTER_DATA_CREATE => $this->deferReference($reference, $value, $label, $pending, $messages, $warnings),
             // سلوك V1: النص الحر يُحفظ في العمود القديم مع تنبيه ظاهر.
             default => $this->referenceAsText($key, $label, $value, $warnings),
         };
+    }
+
+    /**
+     * مفتاح المطابقة بالاسم — واحدٌ للفهرس ولسجلّ التأجيل ولحلّه داخل المعاملة.
+     * اختلافُه بين الثلاثة كان سيُنشئ اسماً موجوداً أو يفشل في ربط ما أُنشئ.
+     */
+    private static function referenceNeedle(string $name): string
+    {
+        return mb_strtolower(trim($name), 'UTF-8');
     }
 
     /** @param array<int, string> $messages */
@@ -758,7 +782,7 @@ class ProductImportService
         return null;
     }
 
-    /** @param array<int, string> $warnings @return array{id: null, name: string, model: null}|null */
+    /** @param array<int, string> $warnings @return array{id: null, name: string, model: null, pending: null}|null */
     private function referenceAsText(string $key, string $label, string $value, array &$warnings): ?array
     {
         if ($key === 'unit_template') {
@@ -771,11 +795,27 @@ class ProductImportService
 
         $warnings[] = "«{$label}» بالقيمة «{$value}» غير مُدار في بيانات المؤسسة، وسيُحفظ نصّاً حرّاً فقط.";
 
-        return ['id' => null, 'name' => $value, 'model' => null];
+        return ['id' => null, 'name' => $value, 'model' => null, 'pending' => null];
     }
 
-    /** @param array<int, string> $messages @return array{id: string, name: string, model: mixed}|null */
-    private function createReference(string $reference, string $value, string $label, array &$messages): ?array
+    /**
+     * **لا يكتب شيئاً.** يسجّل الاسم الناقص فحسب، ويُنشأ فعلياً داخل معاملة
+     * `apply` الناجحة وحدها.
+     *
+     * المعاينة عقدها أنها لا تغيّر البيانات: إنشاء التصنيف وقتها كان يترك
+     * أثراً دائماً لملفٍ قد لا يُطبَّق أصلاً — يكفي أن يجرّب المستخدم سياسةً
+     * ثم يعدل عنها. وحتى داخل `apply` كان الإنشاء يقع **قبل** المعاملة، فرجوعُ
+     * المعاملة لا يمسحه: تُخلَّف تصنيفاتٌ يتيمة لاستيرادٍ لم يحدث.
+     *
+     * والتسجيل بمفتاح الاسم المُوحَّد يمنع تكرار الإنشاء للاسم نفسه داخل الملف:
+     * ألفُ صفٍّ يذكر «قهوة» ينتج عنها تصنيفٌ واحد لا ألف.
+     *
+     * @param  array<string, array<string, string>>  $pending
+     * @param  array<int, string>  $messages
+     * @param  array<int, string>  $warnings
+     * @return array{id: null, name: string, model: null, pending: string}|null
+     */
+    private function deferReference(string $reference, string $value, string $label, array &$pending, array &$messages, array &$warnings): ?array
     {
         if ($reference === 'unit_template') {
             $messages[] = "«{$label}» لا يُنشأ تلقائياً: قالب الوحدات يحتاج وحدة أساس ومعاملات تحويل صريحة. أنشئه من إعدادات المنتجات أولاً.";
@@ -783,11 +823,74 @@ class ProductImportService
             return null;
         }
 
-        $model = $reference === 'category'
-            ? ProductCategory::create(['name' => $value])
-            : Brand::create(['name' => $value]);
+        // المعاينة تقول ما ستفعله بدل أن تفعله: هذا التنبيه هو ما حلّ محلّ
+        // الإنشاء الفوري الذي كان يقع وقت المعاينة.
+        $warnings[] = "«{$label}» بالقيمة «{$value}» غير موجود، وسيُنشأ عند تنفيذ الاستيراد.";
 
-        return ['id' => (string) $model->id, 'name' => (string) $model->name, 'model' => $model];
+        $pending[$reference][self::referenceNeedle($value)] ??= $value;
+
+        return ['id' => null, 'name' => $value, 'model' => null, 'pending' => $reference];
+    }
+
+    /**
+     * ينشئ المراجع الناقصة **داخل معاملة التطبيق** ويعيد خريطة الاسم ← المُعرّف.
+     *
+     * يعيد الفهرسة من القاعدة أولاً لأن طلباً متزامناً قد يكون أنشأ الاسم نفسه
+     * بين التحليل والتطبيق؛ إنشاؤه ثانيةً يزرع تكراراً يجعل المطابقة بالاسم
+     * غامضةً في كل استيراد لاحق.
+     *
+     * @param  array<string, array<string, string>>  $pending
+     * @return array<string, array<string, string>>
+     */
+    private function materializePendingReferences(array $pending): array
+    {
+        $resolved = [];
+
+        foreach ($pending as $reference => $names) {
+            $resolved[$reference] = [];
+            if ($names === []) {
+                continue;
+            }
+
+            /** @var class-string<ProductCategory|Brand> $model */
+            $model = $reference === 'category' ? ProductCategory::class : Brand::class;
+
+            $live = [];
+            foreach ($model::query()->get(['id', 'name']) as $row) {
+                $live[self::referenceNeedle((string) $row->name)] = (string) $row->id;
+            }
+
+            foreach ($names as $needle => $name) {
+                $resolved[$reference][$needle] = $live[$needle]
+                    ?? (string) $model::create(['name' => $name])->id;
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * يستبدل الإسناد المؤجَّل بالمُعرّف الحقيقي بعد إنشائه — ويفرّغ العمود
+     * النصّي القديم كما يفعل المرجع المطابَق تماماً.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, string>  $deferred
+     * @param  array<string, array<string, string>>  $resolved
+     * @return array<string, mixed>
+     */
+    private function applyDeferredReferences(array $payload, array $deferred, array $resolved, int $rowNumber): array
+    {
+        foreach ($deferred as $reference => $needle) {
+            $id = $resolved[$reference][$needle] ?? null;
+            if ($id === null) {
+                throw new RuntimeException("تعذّر تجهيز البيانات الأساسية المطلوبة في الصف {$rowNumber} أثناء التطبيق.");
+            }
+
+            $payload["{$reference}_id"] = $id;
+            $payload[$reference] = null;
+        }
+
+        return $payload;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -891,9 +994,10 @@ class ProductImportService
     /**
      * @param  array<string, array{present: bool, blank: bool, value: mixed}>  $normalized
      * @param  array<int, string>  $messages
+     * @param  array<string, string>  $deferred
      * @return array<string, mixed>
      */
-    private function buildCreatePayload(array $normalized, array &$messages): array
+    private function buildCreatePayload(array $normalized, array &$messages, array &$deferred): array
     {
         $payload = [];
 
@@ -913,7 +1017,7 @@ class ProductImportService
                 continue; // القيمة رُفضت وسُجّلت رسالتها في التحقق.
             }
 
-            $this->assignField($payload, $key, $field, $cell['value']);
+            $this->assignField($payload, $key, $field, $cell['value'], $deferred);
         }
 
         if (($payload['type'] ?? null) === 'service' && ($payload['track_inventory'] ?? false)) {
@@ -929,9 +1033,10 @@ class ProductImportService
      * @param  array{mode: string, blank_policy: string, master_data_policy: string, mapping: array<int, string>|null}  $options
      * @param  array<int, string>  $messages
      * @param  array<int, string>  $warnings
+     * @param  array<string, string>  $deferred
      * @return array<string, mixed>
      */
-    private function buildUpdatePayload(array $normalized, ?Product $existing, array $options, array &$messages, array &$warnings): array
+    private function buildUpdatePayload(array $normalized, ?Product $existing, array $options, array &$messages, array &$warnings, array &$deferred): array
     {
         if ($existing === null) {
             return [];
@@ -969,7 +1074,8 @@ class ProductImportService
                 continue;
             }
 
-            $this->assignField($payload, $key, $field, $cell['value']);
+            $this->warnManagedReferenceDropped($key, $field, $cell['value'], $existing, $warnings);
+            $this->assignField($payload, $key, $field, $cell['value'], $deferred);
         }
 
         // تغيير رمز الصنف مسموح فقط حين تمّت المطابقة بمعرّف نبراكس؛ ومع ذلك
@@ -986,14 +1092,15 @@ class ProductImportService
     /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $field
+     * @param  array<string, string>  $deferred
      */
-    private function assignField(array &$payload, string $key, array $field, mixed $value): void
+    private function assignField(array &$payload, string $key, array $field, mixed $value, array &$deferred): void
     {
         if ($field['type'] === ProductImportFields::TYPE_REFERENCE) {
-            /** @var array{id: string|null, name: string, model: mixed} $value */
+            /** @var array{id: string|null, name: string, model: mixed, pending: string|null} $value */
             match ($key) {
-                'category' => $this->assignManagedReference($payload, 'category_id', 'category', $value),
-                'brand' => $this->assignManagedReference($payload, 'brand_id', 'brand', $value),
+                'category' => $this->assignManagedReference($payload, 'category_id', 'category', $value, $deferred),
+                'brand' => $this->assignManagedReference($payload, 'brand_id', 'brand', $value, $deferred),
                 default => $this->assignUnitTemplate($payload, $value),
             };
 
@@ -1008,9 +1115,10 @@ class ProductImportService
      * كي لا يبقى اسمان لشيء واحد ينحرفان مع أول إعادة تسمية.
      *
      * @param  array<string, mixed>  $payload
-     * @param  array{id: string|null, name: string, model: mixed}  $value
+     * @param  array{id: string|null, name: string, model: mixed, pending: string|null}  $value
+     * @param  array<string, string>  $deferred
      */
-    private function assignManagedReference(array &$payload, string $idColumn, string $textColumn, array $value): void
+    private function assignManagedReference(array &$payload, string $idColumn, string $textColumn, array $value, array &$deferred): void
     {
         if ($value['id'] !== null) {
             $payload[$idColumn] = $value['id'];
@@ -1019,7 +1127,44 @@ class ProductImportService
             return;
         }
 
+        if (($value['pending'] ?? null) !== null) {
+            // المُعرّف لا يوجد بعد. لا يُكتب في الحمولة شيء الآن، ويُملأ من
+            // خريطة الإنشاء داخل المعاملة (`applyDeferredReferences`).
+            $deferred[$textColumn] = self::referenceNeedle($value['name']);
+
+            return;
+        }
+
+        // النص الحر صار مصدر الحقيقة، فيُمسح المُعرّف المُدار معه. إبقاؤه كان
+        // يجعل `ProductResource` والتصدير يعرضان الاسم المُدار القديم — أي
+        // خلاف ما قال الاستيراد إنه حفظه، وهو ما يراه المستخدم لا الحمولة.
+        $payload[$idColumn] = null;
         $payload[$textColumn] = $value['name'];
+    }
+
+    /**
+     * اعتماد النص الحر على منتج له تصنيف/علامة مُدارة **يفكّ ارتباطاً قائماً**.
+     * ذلك أثرٌ يستحق أن يُقال، لا أن يُمرَّر صامتاً تحت تنبيه «سيُحفظ نصّاً».
+     *
+     * @param  array<string, mixed>  $field
+     * @param  array<int, string>  $warnings
+     */
+    private function warnManagedReferenceDropped(string $key, array $field, mixed $value, Product $existing, array &$warnings): void
+    {
+        if ($field['type'] !== ProductImportFields::TYPE_REFERENCE || ! in_array($key, ['category', 'brand'], true)) {
+            return;
+        }
+
+        /** @var array{id: string|null, name: string, model: mixed, pending: string|null} $value */
+        if ($value['id'] !== null || ($value['pending'] ?? null) !== null) {
+            return;
+        }
+        if ($existing->{"{$key}_id"} === null) {
+            return;
+        }
+
+        $current = $key === 'category' ? $existing->productCategory?->name : $existing->productBrand?->name;
+        $warnings[] = "«{$field['label_ar']}» المُدار «{$current}» سيُفَكّ عن المنتج، لأن القيمة «{$value['name']}» ستُحفظ نصّاً حرّاً.";
     }
 
     /** @param array<string, mixed> $payload @param array{id: string|null, name: string, model: mixed} $value */
@@ -1117,10 +1262,17 @@ class ProductImportService
      * «حُدّث ٢٠٠٠ منتج» بينما لم يتغيّر أيٌّ منها تقريرٌ كاذب.
      *
      * @param  array<string, mixed>  $payload
+     * @param  array<string, string>  $deferred
      */
-    private function isNoOpUpdate(?Product $existing, array $payload): bool
+    private function isNoOpUpdate(?Product $existing, array $payload, array $deferred): bool
     {
         if ($existing === null) {
+            return false;
+        }
+        // إسنادٌ مؤجَّل يعني مرجعاً لا وجود له بعد، فلا يمكن أن يكون المنتج
+        // مرتبطاً به أصلاً: الصف يغيّر شيئاً بالتأكيد. ولولا هذا الشرط لتحوّل
+        // إلى «تخطٍّ» لأن الحمولة تبدو فارغة قبل ملء المُعرّف.
+        if ($deferred !== []) {
             return false;
         }
         if ($payload === []) {
