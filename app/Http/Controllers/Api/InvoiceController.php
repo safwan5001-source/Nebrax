@@ -135,6 +135,7 @@ class InvoiceController extends ApiController
     {
         return (new InvoiceResource(Invoice::with([
             'priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
+            'deliveryNoteAllocations.deliveryNote', 'deliveryNoteAllocations.lineLinks',
         ])->findOrFail($id)))->response();
     }
 

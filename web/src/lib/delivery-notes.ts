@@ -48,6 +48,13 @@ export interface DeliveryNote {
   cancellation_reason: string | null;
   lines: DeliveryNoteLine[];
   events?: DeliveryNoteEvent[];
+  invoice_draft?: {
+    allocation_id: string;
+    invoice_id: string;
+    number: string | null;
+    status: string | null;
+    line_count: number | null;
+  } | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -65,6 +72,7 @@ export const DELIVERY_NOTE_PERMISSIONS = {
   manage: 'delivery_notes.manage',
   confirm: 'delivery_notes.confirm',
   cancel: 'delivery_notes.cancel',
+  invoice: 'delivery_notes.invoice',
 } as const;
 
 export function hasPermission(permissions: string[] | undefined, role: string | undefined, permission: string): boolean {

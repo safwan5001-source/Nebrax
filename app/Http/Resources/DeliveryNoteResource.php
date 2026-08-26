@@ -50,6 +50,15 @@ class DeliveryNoteResource extends JsonResource
                 'quantity_denominator' => $line->quantity_denominator === null ? null : (int) $line->quantity_denominator,
                 'description' => $line->description,
             ])->values()),
+            'invoice_draft' => $this->whenLoaded('invoiceAllocations', fn () => $this->invoiceAllocations->isNotEmpty() ? [
+                'allocation_id' => $this->invoiceAllocations->first()->id,
+                'invoice_id' => $this->invoiceAllocations->first()->invoice_id,
+                'number' => $this->invoiceAllocations->first()->invoice?->number,
+                'status' => $this->invoiceAllocations->first()->invoice?->status,
+                'line_count' => $this->invoiceAllocations->first()->relationLoaded('lineLinks')
+                    ? $this->invoiceAllocations->first()->lineLinks->count()
+                    : null,
+            ] : null),
             'events' => $this->whenLoaded('events', fn () => $this->events->map(fn ($event) => [
                 'id' => $event->id,
                 'event' => $event->event,

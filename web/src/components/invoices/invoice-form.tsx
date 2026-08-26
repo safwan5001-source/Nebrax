@@ -121,6 +121,7 @@ function addDays(date: string, days: number): string {
  */
 export function InvoiceForm({ editId }: { editId?: string }) {
   const t = useTranslations('invoiceForm');
+  const td = useTranslations('deliveryNotes');
   const tc = useTranslations('common');
   const router = useRouter();
   const { success } = useToast();
@@ -640,6 +641,8 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       }
     >
       {dialogs}
+
+      {!editId && <section className="flex flex-col gap-3 rounded border border-primary/25 bg-primary-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-medium text-text">{td('invoiceDraftAction')}</h2><p className="mt-1 text-sm text-muted">{td('invoiceDraftBoundaryHint')}</p></div><Button asChild variant="outline" className="shrink-0"><Link href="/delivery-notes/invoice-draft"><FileText className="h-4 w-4" strokeWidth={1.7} />{td('invoiceDraftAction')}</Link></Button></section>}
 
       {/* ═══ ١. العميل وهويّة الفاتورة ═══
           العميل أولاً لأنه يقرّر قائمة الأسعار وشروط السداد، ثم ما يعرّف المستند. */}

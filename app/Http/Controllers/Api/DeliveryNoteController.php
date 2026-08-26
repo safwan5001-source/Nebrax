@@ -2,19 +2,27 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\BuildDeliveryNoteInvoiceDraftRequest;
 use App\Http\Requests\CancelDeliveryNoteRequest;
 use App\Http\Requests\ConfirmDeliveryNoteRequest;
+use App\Http\Requests\PreviewDeliveryNoteInvoiceDraftRequest;
 use App\Http\Requests\StoreDeliveryNoteRequest;
 use App\Http\Requests\UpdateDeliveryNoteRequest;
 use App\Http\Resources\DeliveryNoteResource;
+use App\Http\Resources\InvoiceResource;
 use App\Models\DeliveryNote;
+use App\Services\Accounting\DeliveryNoteInvoiceConflictException;
+use App\Services\Accounting\DeliveryNoteSalesInvoiceDraftBuilder;
 use App\Services\Accounting\DeliveryNoteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DeliveryNoteController extends ApiController
 {
-    public function __construct(protected DeliveryNoteService $deliveryNotes) {}
+    public function __construct(
+        protected DeliveryNoteService $deliveryNotes,
+        protected DeliveryNoteSalesInvoiceDraftBuilder $invoiceDrafts,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -57,6 +65,32 @@ class DeliveryNoteController extends ApiController
             ->paginate($validated['per_page'] ?? 25)->withQueryString();
 
         return DeliveryNoteResource::collection($paginator)->response();
+    }
+
+    /** يعاين أهلية السندات ومصادر التسعير بلا كتابة فاتورة أو رابط أو حدث. */
+    public function previewInvoiceDraft(PreviewDeliveryNoteInvoiceDraftRequest $request): JsonResponse
+    {
+        return response()->json(['data' => $this->domain(fn () => $this->invoiceDrafts->preview($request->validated()))]);
+    }
+
+    /** ينشئ مسودة واحدة وروابط تخصيصها atomically؛ إعادة المفتاح المطابق آمنة. */
+    public function buildInvoiceDraft(BuildDeliveryNoteInvoiceDraftRequest $request): JsonResponse
+    {
+        $data = array_replace($request->validated(), ['actor_id' => $request->user()->id]);
+        try {
+            $result = $this->invoiceDrafts->build($data);
+        } catch (DeliveryNoteInvoiceConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        } catch (\PDOException $exception) {
+            throw $exception;
+        } catch (\RuntimeException $exception) {
+            abort(422, $exception->getMessage());
+        }
+
+        return response()->json([
+            'data' => (new InvoiceResource($result->invoice))->resolve(),
+            'meta' => ['idempotent_replay' => $result->idempotentReplay],
+        ], $result->idempotentReplay ? 200 : 201);
     }
 
     public function store(StoreDeliveryNoteRequest $request): JsonResponse
@@ -122,6 +156,9 @@ class DeliveryNoteController extends ApiController
     /** @return array<int,string> */
     private function detailRelations(): array
     {
-        return ['customer', 'warehouse', 'lines.product', 'events.actor'];
+        return [
+            'customer', 'warehouse', 'lines.product', 'events.actor',
+            'invoiceAllocations.invoice', 'invoiceAllocations.lineLinks',
+        ];
     }
 }

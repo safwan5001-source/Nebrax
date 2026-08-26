@@ -55,3 +55,41 @@ test.describe('Delivery notes — local fixture only', () => {
     await page.screenshot({ path: testInfo.outputPath(`delivery-notes-${testInfo.project.name}-ltr-dark.png`), fullPage: true });
   });
 });
+
+
+test.describe('Delivery notes to invoice draft — local fixture only', () => {
+  test('previews compatible confirmed notes and creates one draft without posting', async ({ page }, testInfo) => {
+    await seedLocalFixture(page);
+    await page.goto('/delivery-notes/invoice-draft?notes=dn-103,dn-102');
+
+    await expect(page.getByRole('heading', { name: 'إنشاء مسودة فاتورة مبيعات' })).toBeVisible();
+    await expect(page.getByText('إنشاء مسودة فقط')).toBeVisible();
+    await expect(page.getByLabel('اختيار سند التسليم DN-2026-00103').first()).toBeChecked();
+    await expect(page.getByLabel('اختيار سند التسليم DN-2026-00102').first()).toBeChecked();
+    await page.getByRole('button', { name: 'معاينة الأهلية والتسعير' }).click();
+    await expect(page.getByLabel('سبب إنشاء المسودة')).toBeVisible();
+    await page.getByLabel('سبب إنشاء المسودة').fill('تجميع دفعات تسليم متوافقة في مسودة مراجعة.');
+    await page.getByRole('button', { name: 'إنشاء مسودة الفاتورة' }).click();
+    await expect(page.getByText('تم إنشاء مسودة فاتورة المبيعات.')).toBeVisible();
+    await expect(page.getByText('لم تُرحّل ولم تُنشئ أي قيد أو دفعة أو حركة مخزون.')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath(`delivery-notes-invoice-draft-${testInfo.project.name}-rtl-light.png`), fullPage: true });
+  });
+
+  test('shows a local fixture mixed-customer eligibility error and keeps the build action disabled', async ({ page }, testInfo) => {
+    await seedLocalFixture(page);
+    await page.goto('/delivery-notes/invoice-draft?notes=dn-103,dn-101');
+    await page.getByRole('button', { name: 'معاينة الأهلية والتسعير' }).click();
+    await expect(page.getByText('يجب أن تشترك السندات في العميل نفسه.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'إنشاء مسودة الفاتورة' })).toBeDisabled();
+    await page.screenshot({ path: testInfo.outputPath(`delivery-notes-invoice-draft-${testInfo.project.name}-mixed-rtl.png`), fullPage: true });
+  });
+
+  test('renders the LTR invoice-draft wizard and local-fixture boundary label without overflow', async ({ page }, testInfo) => {
+    await seedLocalFixture(page, 'en');
+    await page.goto('/delivery-notes/invoice-draft?notes=dn-103,dn-102');
+    await expect(page.getByRole('heading', { name: 'Create sales invoice draft' })).toBeVisible();
+    await expect(page.getByText('Draft creation only')).toBeVisible();
+    await expect(page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).resolves.toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`delivery-notes-invoice-draft-${testInfo.project.name}-ltr-light.png`), fullPage: true });
+  });
+});

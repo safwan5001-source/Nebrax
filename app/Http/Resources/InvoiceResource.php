@@ -80,6 +80,15 @@ class InvoiceResource extends JsonResource
             'paid_amount'    => Money::toRiyal($this->paid_amount),
             'remaining'      => Money::toRiyal($this->remaining()),
             'lines'          => InvoiceLineResource::collection($this->whenLoaded('lines')),
+            'delivery_note_sources' => $this->whenLoaded('deliveryNoteAllocations', fn () => $this->deliveryNoteAllocations
+                ->map(fn ($allocation) => [
+                    'allocation_id' => $allocation->id,
+                    'delivery_note_id' => $allocation->delivery_note_id,
+                    'number' => $allocation->deliveryNote?->number ?? $allocation->delivery_note_number_snapshot,
+                    'status' => $allocation->deliveryNote?->status ?? $allocation->delivery_note_status_snapshot,
+                    'delivery_date' => $allocation->deliveryNote?->delivery_date?->toDateString(),
+                    'line_count' => $allocation->relationLoaded('lineLinks') ? $allocation->lineLinks->count() : null,
+                ])->values()),
             'zatca'          => [
                 'qr'   => $this->zatca_qr,
                 'hash' => $this->zatca_hash,

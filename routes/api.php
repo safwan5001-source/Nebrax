@@ -427,6 +427,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('invoices/{id}/post', [InvoiceController::class, 'post'])->middleware($perm('invoices.manage'));
 
         // سندات التسليم العامة: دليل تشغيلي مستقل. لا فاتورة ولا مخزون ولا دفتر في PR-9.
+        Route::post('delivery-notes/invoice-draft/preview', [DeliveryNoteController::class, 'previewInvoiceDraft'])
+            ->middleware([$perm('delivery_notes.invoice'), $commercialApp('sales.invoicing', 'read')]);
+        Route::post('delivery-notes/invoice-draft', [DeliveryNoteController::class, 'buildInvoiceDraft'])
+            ->middleware([$perm('delivery_notes.invoice'), $commercialApp('sales.invoicing', 'write'), EnforcePlanLimit::class . ':invoices']);
         Route::get('delivery-notes', [DeliveryNoteController::class, 'index'])
             ->middleware([$perm('delivery_notes.view'), $commercialApp('sales.invoicing', 'read')]);
         Route::get('delivery-notes/{id}', [DeliveryNoteController::class, 'show'])

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, CheckCircle2, ClipboardList, History, Pencil, XCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ClipboardList, FileText, History, Pencil, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,8 +32,9 @@ export default function DeliveryNoteDetailPage() {
   const canManage = hasPermission(user?.permissions, user?.role, DELIVERY_NOTE_PERMISSIONS.manage);
   const canConfirm = hasPermission(user?.permissions, user?.role, DELIVERY_NOTE_PERMISSIONS.confirm);
   const canCancel = hasPermission(user?.permissions, user?.role, DELIVERY_NOTE_PERMISSIONS.cancel);
+  const canInvoice = hasPermission(user?.permissions, user?.role, DELIVERY_NOTE_PERMISSIONS.invoice);
   const statusLabel = (value: string) => value === 'draft' ? t('statusDraft') : value === 'confirmed' ? t('statusConfirmed') : t('statusCancelled');
-  const eventLabel = (value: string) => value === 'created' ? t('eventCreated') : value === 'updated' ? t('eventUpdated') : value === 'confirmed' ? t('eventConfirmed') : t('eventCancelled');
+  const eventLabel = (value: string) => value === 'created' ? t('eventCreated') : value === 'updated' ? t('eventUpdated') : value === 'confirmed' ? t('eventConfirmed') : value === 'sales_invoice_draft_created' ? t('eventSalesInvoiceDraft') : t('eventCancelled');
 
   const load = useCallback(() => {
     if (!id) return;
@@ -86,6 +87,7 @@ export default function DeliveryNoteDetailPage() {
 
   const isDraft = note.status === 'draft';
   const isCancelled = note.status === 'cancelled';
+  const isConfirmed = note.status === 'confirmed';
   const displayQuantity = (line: DeliveryNote['lines'][number]) => line.quantity_numerator && line.quantity_denominator ? `${line.quantity_numerator}/${line.quantity_denominator}` : String(line.quantity);
 
   return <div className="space-y-5">
@@ -94,12 +96,14 @@ export default function DeliveryNoteDetailPage() {
       <div className="flex flex-wrap gap-2">
         {isDraft && canManage && <Button asChild variant="outline"><Link href={`/delivery-notes/${note.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} />{t('edit')}</Link></Button>}
         {isDraft && canConfirm && <Button disabled={busy !== null} onClick={confirm}><CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />{busy === 'confirm' ? t('saving') : t('confirm')}</Button>}
+        {isConfirmed && canInvoice && (note.invoice_draft ? <Button asChild variant="outline"><Link href={`/invoices/${note.invoice_draft.invoice_id}`}><FileText className="h-4 w-4" strokeWidth={1.7} />{t('invoiceDraftOpenInvoice')}</Link></Button> : <Button asChild variant="outline"><Link href={`/delivery-notes/invoice-draft?notes=${note.id}`}><FileText className="h-4 w-4" strokeWidth={1.7} />{t('invoiceDraftAction')}</Link></Button>)}
         {!isCancelled && canCancel && <Button variant="danger" disabled={busy !== null} onClick={() => setCancelOpen(true)}><XCircle className="h-4 w-4" strokeWidth={1.7} />{t('cancel')}</Button>}
       </div>
     </div>
 
     {error && <p role="alert" className="rounded border border-negative/30 bg-negative/10 p-3 text-sm text-negative">{error}</p>}
     {note.status === 'confirmed' && <div className="rounded border border-positive/30 bg-positive/10 p-3 text-sm text-positive">{t('confirmedReadOnly')}</div>}
+    {note.invoice_draft && <div className="flex flex-col gap-2 rounded border border-primary/25 bg-primary-soft/40 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"><span>{t('invoiceDraftAlreadyLinked', { number: note.invoice_draft.number ?? '—' })}</span><Button asChild size="sm" variant="outline"><Link href={`/invoices/${note.invoice_draft.invoice_id}`}>{t('invoiceDraftOpenInvoice')}</Link></Button></div>}
     {isCancelled && <div className="rounded border border-negative/30 bg-negative/10 p-3 text-sm text-negative"><strong>{t('cancellationReason')}:</strong> {note.cancellation_reason}</div>}
 
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
