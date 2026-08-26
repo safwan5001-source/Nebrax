@@ -11,10 +11,10 @@ import { DataTable } from '@/components/data-table';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { branchViewQuery, type BranchView } from '@/lib/branch-view';
+import { useBranches } from '@/lib/branch';
+import { branchFilterDefinition } from '@/lib/branch-filter';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 
@@ -48,6 +48,7 @@ export default function ManualJournalsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { success, error: toastError } = useToast();
+  const { branches, active } = useBranches();
   const [explorer, setExplorer] = useState<DataExplorerState>(() => {
     const parsed = parseExplorerState(new URLSearchParams(searchParams.toString()));
     return { ...parsed, perPage: parsed.perPage ?? 25, sort: parsed.sort ?? '-entry_date' };
@@ -57,23 +58,25 @@ export default function ManualJournalsPage() {
   const [data, setData] = useState<ManualJournal[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
-  const [view, setView] = useState<BranchView>('current');
+
+  const branchValue = useMemo(() => filterValue(explorer.filters.find((filter) => filter.key === 'branch')), [explorer.filters]);
 
   const load = useCallback(() => {
     setLoading(true);
-    api<{ data: ManualJournal[] }>(`/manual-journals${branchViewQuery(view)}`)
+    const params = new URLSearchParams();
+    if (branchValue) params.set('branch', branchValue);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    api<{ data: ManualJournal[] }>(`/manual-journals${suffix}`)
       .then((response) => setData(response.data))
       .catch((err) => toastError(err instanceof ApiError ? err.message : t('loadFailed')))
       .finally(() => setLoading(false));
-  }, [t, toastError, view]);
+  }, [branchValue, t, toastError]);
 
   useEffect(() => load(), [load]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setExplorer((current) => current.search === searchInput
-        ? current
-        : { ...current, search: searchInput, page: 1 });
+      setExplorer((current) => current.search === searchInput ? current : { ...current, search: searchInput, page: 1 });
     }, 300);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
@@ -107,14 +110,14 @@ export default function ManualJournalsPage() {
   }, [load, success, t, tc, toastError]);
 
   const statusOptions = useMemo(() => Array.from(new Set(data.map((item) => item.status).filter(Boolean)))
-    .sort()
-    .map((status) => ({ value: status, label: t(status) })), [data, t]);
+    .sort().map((status) => ({ value: status, label: t(status) })), [data, t]);
 
   const definitions = useMemo<FilterDefinition[]>(() => [
+    branchFilterDefinition(branches, active?.name),
     { key: 'status', label: t('status'), kind: 'select', quick: true, options: statusOptions },
     { key: 'date_from', label: `${t('entryDate')} ≥`, kind: 'date' },
     { key: 'date_to', label: `${t('entryDate')} ≤`, kind: 'date' },
-  ], [statusOptions, t]);
+  ], [active?.name, branches, statusOptions, t]);
 
   const labelledFilters = useMemo(() => explorer.filters.map((filter) => ({
     ...filter,
@@ -127,11 +130,9 @@ export default function ManualJournalsPage() {
     const status = filterValue(filters.get('status'));
     const dateFrom = filterValue(filters.get('date_from'));
     const dateTo = filterValue(filters.get('date_to'));
-
     return data.filter((journal) => {
       if (query) {
-        const haystack = [journal.number, journal.description, journal.status]
-          .filter(Boolean).join(' ').toLocaleLowerCase();
+        const haystack = [journal.number, journal.description, journal.status].filter(Boolean).join(' ').toLocaleLowerCase();
         if (!haystack.includes(query)) return false;
       }
       if (status && journal.status !== status) return false;
@@ -163,11 +164,7 @@ export default function ManualJournalsPage() {
   const pageData = sorted.slice((page - 1) * perPage, page * perPage);
 
   function updateFilter(next: ActiveFilter) {
-    setExplorer((current) => ({
-      ...current,
-      page: 1,
-      filters: isEmptyFilter(next) ? removeFilter(current.filters, next.key) : replaceFilter(current.filters, next),
-    }));
+    setExplorer((current) => ({ ...current, page: 1, filters: isEmptyFilter(next) ? removeFilter(current.filters, next.key) : replaceFilter(current.filters, next) }));
   }
 
   const renderActions = useCallback((journal: ManualJournal) => {
@@ -191,75 +188,22 @@ export default function ManualJournalsPage() {
   ], [renderActions, t]);
 
   const sortOptions: SortOption[] = [
-    { value: '-entry_date', label: `${t('entryDate')} ↓` },
-    { value: 'entry_date', label: `${t('entryDate')} ↑` },
-    { value: 'number', label: t('number') },
-    { value: 'description', label: t('description') },
-    { value: 'status', label: t('status') },
+    { value: '-entry_date', label: `${t('entryDate')} ↓` }, { value: 'entry_date', label: `${t('entryDate')} ↑` },
+    { value: 'number', label: t('number') }, { value: 'description', label: t('description') }, { value: 'status', label: t('status') },
   ];
+  const headerActions: PageAction[] = [{ key: 'create', label: t('create'), icon: Plus, href: '/manual-journals/new', variant: 'primary' }];
 
-  const headerActions: PageAction[] = [
-    { key: 'create', label: t('create'), icon: Plus, href: '/manual-journals/new', variant: 'primary' },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <PageHeader
-        title={t('title')}
-        description={t('subtitle')}
-        context={<BranchViewToggle value={view} onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }} />}
-        actions={headerActions}
-      />
-
-      <ListToolbar
-        search={searchInput}
-        searchPlaceholder={t('search')}
-        searchLabel={t('title')}
-        onSearchChange={setSearchInput}
-        definitions={definitions}
-        filters={labelledFilters}
-        onFilterChange={updateFilter}
-        onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
-        onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
-        onOpenAdvanced={() => setAdvancedOpen(true)}
-        sort={{ value: explorer.sort ?? '-entry_date', onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })), options: sortOptions }}
-        resultCount={sorted.length}
-        totalCount={data.length}
-      />
-
-      <DataTable
-        columns={columns}
-        data={pageData}
-        loading={loading}
-        emptyLabel={t('empty')}
-        exportName="manual-journals"
-        showToolbar={false}
-        mobileRecord={(journal) => ({
-          title: <Link href={`/manual-journals/${journal.id}`} className="num font-medium text-primary hover:underline">{journal.number}</Link>,
-          subtitle: journal.description || '—',
-          status: <Badge tone={statusTone[journal.status] ?? 'muted'}>{t(journal.status)}</Badge>,
-          meta: journal.entry_date,
-          actions: renderActions(journal),
-        })}
-      />
-
-      <Pagination
-        page={page}
-        lastPage={totalPages}
-        perPage={perPage}
-        total={sorted.length}
-        disabled={loading}
-        onPageChange={(next) => setExplorer((current) => ({ ...current, page: next }))}
-        onPerPageChange={(next) => setExplorer((current) => ({ ...current, page: 1, perPage: next }))}
-      />
-
-      <AdvancedFilterDialog
-        open={advancedOpen}
-        onClose={() => setAdvancedOpen(false)}
-        definitions={definitions}
-        filters={labelledFilters}
-        onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))}
-      />
-    </div>
-  );
+  return <div className="space-y-4">
+    <PageHeader title={t('title')} description={t('subtitle')} actions={headerActions} />
+    <ListToolbar search={searchInput} searchPlaceholder={t('search')} searchLabel={t('title')} onSearchChange={setSearchInput}
+      definitions={definitions} filters={labelledFilters} onFilterChange={updateFilter}
+      onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
+      onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))} onOpenAdvanced={() => setAdvancedOpen(true)}
+      sort={{ value: explorer.sort ?? '-entry_date', onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })), options: sortOptions }} resultCount={sorted.length} totalCount={data.length} />
+    <DataTable columns={columns} data={pageData} loading={loading} emptyLabel={t('empty')} exportName="manual-journals" showToolbar={false}
+      mobileRecord={(journal) => ({ title: <Link href={`/manual-journals/${journal.id}`} className="num font-medium text-primary hover:underline">{journal.number}</Link>, subtitle: journal.description || '—', status: <Badge tone={statusTone[journal.status] ?? 'muted'}>{t(journal.status)}</Badge>, meta: journal.entry_date, actions: renderActions(journal) })} />
+    <Pagination page={page} lastPage={totalPages} perPage={perPage} total={sorted.length} disabled={loading}
+      onPageChange={(next) => setExplorer((current) => ({ ...current, page: next }))} onPerPageChange={(next) => setExplorer((current) => ({ ...current, page: 1, perPage: next }))} />
+    <AdvancedFilterDialog open={advancedOpen} onClose={() => setAdvancedOpen(false)} definitions={definitions} filters={labelledFilters} onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))} />
+  </div>;
 }
