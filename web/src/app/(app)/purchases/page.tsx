@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { useBranches } from '@/lib/branch';
 import { appendBranchFilter, branchFilterDefinition } from '@/lib/branch-filter';
+import { fetchBranchScopedLookup } from '@/lib/branch-scoped-lookup';
 import { formatRiyal } from '@/lib/money';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import {
@@ -168,13 +169,13 @@ export default function PurchasesPage() {
 
   useEffect(() => {
     Promise.all([
-      api<{ data: Partner[] }>('/partners'),
+      fetchBranchScopedLookup<Partner>('/partners?type=supplier', explorer.filters, branches),
       api<{ data: Classification[] }>('/classifications?scope=purchase_invoice'),
     ]).then(([partnerResponse, classificationResponse]) => {
-      setPartners(partnerResponse.data);
+      setPartners(partnerResponse);
       setClassifications(classificationResponse.data.filter((classification) => classification.is_active !== false));
     }).catch(() => undefined);
-  }, []);
+  }, [branches, explorer.filters]);
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
