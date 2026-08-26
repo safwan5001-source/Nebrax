@@ -29,6 +29,7 @@ export function ReportRankedAnalytics({
   unassignedLabel,
   testId,
   color,
+  rankingMode = 'positive',
 }: {
   analyticsKey: string;
   rows: ReportRankedAnalyticsRow[];
@@ -39,14 +40,19 @@ export function ReportRankedAnalytics({
   unassignedLabel: string;
   testId?: string;
   color?: string;
+  /** الافتراضي يبقي تقارير المبيعات والمشتريات على القيم الموجبة فقط. */
+  rankingMode?: 'positive' | 'absolute-signed';
 }) {
   const rankedRows = rows
-    .map((row) => ({
-      label: row.label || unassignedLabel,
-      amount: row.rankValue ?? Number(row.amount ?? 0),
-      displayValue: row.displayValue,
-    }))
-    .filter((row) => Number.isFinite(row.amount) && row.amount > 0)
+    .map((row) => {
+      const sourceAmount = row.rankValue ?? Number(row.amount ?? 0);
+      return {
+        label: row.label || unassignedLabel,
+        amount: rankingMode === 'absolute-signed' ? Math.abs(sourceAmount) : sourceAmount,
+        displayValue: row.displayValue ?? (rankingMode === 'absolute-signed' ? formatRiyal(String(sourceAmount)) : undefined),
+      };
+    })
+    .filter((row) => Number.isFinite(row.amount) && (rankingMode === 'absolute-signed' ? row.amount !== 0 : row.amount > 0))
     .sort((left, right) => right.amount - left.amount)
     .slice(0, 6);
 
