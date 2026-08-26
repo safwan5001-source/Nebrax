@@ -139,8 +139,10 @@
   body:has([data-print-target]) * {
     visibility: hidden !important;
   }
-  [data-print-target],
-  [data-print-target] * {
+  /* يحتاج هذا المحدد إلى مطابقة خصوصية قاعدة الإخفاء أعلاه؛ وإلا ظلّت وجهة
+     الطباعة نفسها hidden عندما يكون لها سلف داخل body. */
+  body:has([data-print-target]) [data-print-target],
+  body:has([data-print-target]) [data-print-target] * {
     visibility: visible !important;
   }
   [data-print-target] {
