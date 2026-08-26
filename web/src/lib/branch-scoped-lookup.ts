@@ -21,13 +21,11 @@ export function branchFilterValue(filters: ActiveFilter[]): string {
  * هذا مخصص لبيانات الاختيار/الأسماء الصغيرة (عملاء، موردين، تصنيفات)، وليس
  * لقوائم المستندات الكبيرة أو التقارير.
  */
-export async function fetchBranchScopedLookup<T extends { id: string }>(
+export async function fetchBranchScopedLookupByScope<T extends { id: string }>(
   path: string,
-  filters: ActiveFilter[],
+  scope: string,
   branches: Branch[],
 ): Promise<T[]> {
-  const scope = branchFilterValue(filters);
-
   if (!scope) {
     return (await api<ApiCollection<T>>(path)).data;
   }
@@ -51,4 +49,12 @@ export async function fetchBranchScopedLookup<T extends { id: string }>(
   }
 
   return [...unique.values()];
+}
+
+export function fetchBranchScopedLookup<T extends { id: string }>(
+  path: string,
+  filters: ActiveFilter[],
+  branches: Branch[],
+): Promise<T[]> {
+  return fetchBranchScopedLookupByScope(path, branchFilterValue(filters), branches);
 }
