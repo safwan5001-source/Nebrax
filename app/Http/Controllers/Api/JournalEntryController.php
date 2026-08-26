@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Branch;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\ManualJournal;
@@ -10,6 +11,7 @@ use App\Tenancy\BranchContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * سجل قراءة موحّد للقيود المرحّلة الناتجة من المستندات والقيود اليدوية.
@@ -43,18 +45,36 @@ class JournalEntryController extends ApiController
     /**
      * JournalEntry لا يحمل branch_id؛ يُحكم نطاقه من سطوره. يشمل هذا الفلتر
      * السطور المركزية ذات branch_id = null، متسقاً مع بقية قوائم المستندات.
+     *
+     * معامل `branch` هنا فلتر عرض مستقل عن BranchContext:
+     * `all` يجمع الفروع المسموح بها فقط، وUUID صالح يضيّق العرض إلى فرع واحد
+     * بعد التحقق من TenantScope وصلاحية المستخدم. غياب المعامل يبقي السلوك
+     * التشغيلي القديم ويستخدم الفرع النشط القادم من X-Branch-Id.
      */
     private function visibleEntries(Request $request): Builder
     {
         $query = JournalEntry::query();
         $allowed = $request->user()?->allowedBranchIds();
+        $requested = $request->query('branch');
 
-        if ($request->query('branch') === 'all') {
+        if ($requested === 'all') {
             if ($allowed === null) {
                 return $query;
             }
 
             return $query->whereHas('lines', fn (Builder $lines) => $this->filterLinesForBranches($lines, $allowed));
+        }
+
+        if (is_string($requested) && $requested !== '') {
+            $valid = Str::isUuid($requested)
+                && Branch::whereKey($requested)->exists()
+                && ($allowed === null || in_array($requested, $allowed, true));
+
+            if (! $valid) {
+                abort(422, 'الفرع المحدد غير متاح ضمن نطاق صلاحياتك.');
+            }
+
+            return $query->whereHas('lines', fn (Builder $lines) => $this->filterLinesForBranches($lines, [$requested]));
         }
 
         $branchId = app(BranchContext::class)->id();
