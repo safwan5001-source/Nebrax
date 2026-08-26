@@ -9,6 +9,10 @@ export interface ReportRankedAnalyticsRow {
   key: string | null;
   label: string | null;
   amount?: string;
+  /** قيمة ترتيب اختيارية منفصلة عن حقل المال في التقرير. */
+  rankValue?: number;
+  /** نص دلالي ظاهر، مثل كمية أو قيمة موقّعة، بدلاً من تنسيق العملة الافتراضي. */
+  displayValue?: string;
 }
 
 /**
@@ -24,6 +28,7 @@ export function ReportRankedAnalytics({
   emptyLabel,
   unassignedLabel,
   testId,
+  color,
 }: {
   analyticsKey: string;
   rows: ReportRankedAnalyticsRow[];
@@ -33,9 +38,14 @@ export function ReportRankedAnalytics({
   emptyLabel: string;
   unassignedLabel: string;
   testId?: string;
+  color?: string;
 }) {
   const rankedRows = rows
-    .map((row) => ({ label: row.label || unassignedLabel, amount: Number(row.amount ?? 0) }))
+    .map((row) => ({
+      label: row.label || unassignedLabel,
+      amount: row.rankValue ?? Number(row.amount ?? 0),
+      displayValue: row.displayValue,
+    }))
     .filter((row) => Number.isFinite(row.amount) && row.amount > 0)
     .sort((left, right) => right.amount - left.amount)
     .slice(0, 6);
@@ -52,7 +62,7 @@ export function ReportRankedAnalytics({
         ) : rankedRows.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted">{emptyLabel}</p>
         ) : (
-          <RankedBars rows={rankedRows} format={(amount) => formatRiyal(String(amount))} emptyLabel={emptyLabel} />
+          <RankedBars rows={rankedRows} format={(amount) => formatRiyal(String(amount))} color={color} emptyLabel={emptyLabel} />
         )}
       </CardContent>
     </Card>

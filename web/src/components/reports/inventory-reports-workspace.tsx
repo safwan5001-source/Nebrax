@@ -6,7 +6,7 @@ import { displayLocale } from '@/lib/formatting';
  * لا تخلط قيمة المنتج العالمية بكميات المخزن ولا تعرض المسودات كعمليات مكتملة.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Download, FileText, Printer, Share2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -26,6 +26,8 @@ import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
 import { ReportMetricGrid, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
 import { ReportResultsTable } from '@/components/reports/report-results-table';
+import { ReportPresentationModeControl, type ReportPresentationMode } from '@/components/reports/report-presentation-mode';
+import { InventoryReportAnalytics } from '@/components/reports/inventory-report-analytics';
 
 export type InventoryReportView = 'value' | 'warehouses' | 'movements' | 'operations' | 'stocktakes';
 type Money = string;
@@ -117,20 +119,30 @@ export function InventoryReportsWorkspace({ view }: { view: InventoryReportView 
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [presentationMode, setPresentationMode] = useState<ReportPresentationMode>('summary');
+  const requestGeneration = useRef(0);
 
   const load = useCallback(() => {
-    setLoading(true);
+    const generation = ++requestGeneration.current;
+    setReport(null);
     setFailed(false);
+    setLoading(true);
     api<InventoryReportResponse>(`/reports/inventory${filtersToQuery(view, filters)}`)
       .then((response) => {
         if (!response?.totals || !Array.isArray(response.data)) throw new Error('invalid-inventory-report-response');
+        if (generation !== requestGeneration.current) return;
         setReport(response);
       })
-      .catch(() => setFailed(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (generation === requestGeneration.current) setFailed(true);
+      })
+      .finally(() => {
+        if (generation === requestGeneration.current) setLoading(false);
+      });
   }, [view, filters]);
 
   useEffect(() => load(), [load]);
+  useEffect(() => setPresentationMode('summary'), [view]);
 
   const count = useMemo(() => new Intl.NumberFormat(displayLocale(locale)).format.bind(new Intl.NumberFormat(displayLocale(locale))), [locale]);
   const historical = view === 'movements' || view === 'operations' || view === 'stocktakes';
@@ -311,25 +323,39 @@ export function InventoryReportsWorkspace({ view }: { view: InventoryReportView 
         <Card><CardContent className="py-10 text-center"><p className="text-sm text-negative">{t('loadFailed')}</p><Button className="mt-3" variant="outline" size="sm" onClick={load}>{t('retry')}</Button></CardContent></Card>
       ) : (
         <>
+          <div className="no-print flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-text">{t('presentation')}</h2>
+            <ReportPresentationModeControl
+              value={presentationMode}
+              onChange={setPresentationMode}
+              label={t('presentation')}
+              summaryLabel={t('summary')}
+              detailLabel={t('detail')}
+            />
+          </div>
           <ReportMetricGrid metrics={summary} />
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{t('details')}</CardTitle><Badge tone="neutral">{sourceLabel}</Badge></CardHeader>
-            <CardContent>
-              {!doc || doc.rows.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
-              ) : (
-                <ReportResultsTable
-                  columns={doc.columns}
-                  rows={doc.rows}
-                  totalRow={doc.totalRow}
-                  emptyText={t('empty')}
-                  primaryIndex={view === 'value' ? 1 : view === 'warehouses' ? 3 : view === 'movements' ? 2 : 1}
-                  rowHrefs={rowHrefs}
-                  reportKey={`inventory:${view}`}
-                />
-              )}
-            </CardContent>
-          </Card>
+          {presentationMode === 'summary' ? (
+            <InventoryReportAnalytics view={view} rows={report?.data ?? []} totals={report?.totals ?? {}} loading={loading} />
+          ) : (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{t('details')}</CardTitle><Badge tone="neutral">{sourceLabel}</Badge></CardHeader>
+              <CardContent>
+                {!doc || doc.rows.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
+                ) : (
+                  <ReportResultsTable
+                    columns={doc.columns}
+                    rows={doc.rows}
+                    totalRow={doc.totalRow}
+                    emptyText={t('empty')}
+                    primaryIndex={view === 'value' ? 1 : view === 'warehouses' ? 3 : view === 'movements' ? 2 : 1}
+                    rowHrefs={rowHrefs}
+                    reportKey={`inventory:${view}`}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {doc && showPreview && (
             <Card>

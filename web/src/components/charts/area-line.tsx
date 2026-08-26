@@ -79,8 +79,8 @@ export function RankedBars({
   color = 'var(--positive)',
   emptyLabel,
 }: {
-  rows: { label: string; amount: number }[];
-  format: (n: number) => string;
+  rows: { label: string; amount: number; displayValue?: string }[];
+  format: (n: number, row: { label: string; amount: number; displayValue?: string }) => string;
   color?: string;
   emptyLabel: string;
 }) {
@@ -96,7 +96,7 @@ export function RankedBars({
         <li key={row.label}>
           <div className="mb-1 flex items-baseline justify-between gap-3 text-xs">
             <span className="truncate text-muted">{row.label}</span>
-            <span className="num shrink-0 text-text">{format(row.amount)}</span>
+            <span className="num shrink-0 text-text">{row.displayValue ?? format(row.amount, row)}</span>
           </div>
           <div className="h-2 w-full overflow-hidden rounded bg-border/60">
             <div
