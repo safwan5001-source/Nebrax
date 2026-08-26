@@ -5,12 +5,16 @@ import { api } from './api';
 
 export interface Company {
   name: string;
+  name_en?: string | null;
   account_number?: number | null;
   support_number?: number | null;
   vat_number?: string | null;
   cr_number?: string | null;
+  unified_number?: string | null;
   currency?: string | null;
   country?: string | null;
+  email?: string | null;
+  website?: string | null;
   /** data URL أو فارغ — تعرضه قشرة التطبيق ورؤوس المستندات. */
   logo?: string | null;
   phone?: string | null;
