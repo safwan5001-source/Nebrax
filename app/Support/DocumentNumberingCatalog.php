@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\CashBankTransfer;
 use App\Models\CorporateFuelContract;
 use App\Models\CreditNote;
+use App\Models\DeliveryNote;
 use App\Models\Employee;
 use App\Models\EmployeeCustody;
 use App\Models\EmployeeCustodySettlement;
@@ -88,6 +89,12 @@ class DocumentNumberingCatalog
             'yearly'  => true,
             'setting' => ['group' => 'sales', 'key' => 'invoice_prefix'],
             'series'  => [['key' => 'default', 'prefix' => 'INV']],
+        ],
+        'delivery_note' => [
+            'model'   => DeliveryNote::class,
+            'yearly'  => true,
+            'setting' => ['group' => 'sales', 'key' => 'delivery_note_prefix'],
+            'series'  => [['key' => 'default', 'prefix' => 'DN']],
         ],
         'purchase' => [
             'model'   => Purchase::class,

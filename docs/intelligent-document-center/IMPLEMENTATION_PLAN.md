@@ -60,19 +60,23 @@ The Expense amount is the explicit reviewed base minor-unit amount. SAR is the o
 
 The new logical `transaction_type + transaction_id` link supports Purchase and Expense through a new migration that removes the purchase-only foreign key while preserving existing purchase links. Links and review audit records are immutable. The Expense link remains visible after normal posting or cancellation, replays idempotently, and protects a linked Expense draft from deletion. The protected endpoint requires both `document_center.core` write entitlement and `documents.center.build_draft`; the RTL-first review workspace uses the general `linked_transaction` projection and asks only for non-financial options. See [ADR-008](ADR-008-EXPENSE-DRAFT-BUILDER.md).
 
-### PR-9 — General delivery-note domain
+### PR-9 — General Delivery Note Domain
 
-Design and implement a reusable delivery-note domain outside the center before allowing several delivery notes to produce one sales-invoice draft. If that domain is not approved, this flow remains out of scope.
+**Status: implemented — operational evidence only.** PR-9 introduces the branch-scoped `DeliveryNote`, `DeliveryNoteLine`, `DeliveryNoteEvent`, and `DeliveryNoteService` outside Document Center, Fuel, and Procurement. It owns draft/update/confirm/cancel with append-only events, central branch-safe document numbering, exact quantity/unit preservation, independent RBAC, and `sales.invoicing` commercial access. It creates no Invoice or InvoiceLine, no allocation, no StockMovement, no journal, no payment, and no master data. The present Invoice posting lifecycle remains the stock owner to avoid a double deduction. See [ADR-009](ADR-009-GENERAL-DELIVERY-NOTE-DOMAIN.md).
 
-### PR-10 — Channels and integrations
+### PR-10 — Multiple Delivery Notes → Sales Invoice Draft
+
+Own the allocation and anti-reuse contract for several confirmed delivery notes, reconcile their billable quantities and units, and call the existing sales domain only to create one sales-invoice **draft**. Decide the unified inventory ownership before any stock timing changes; do not introduce a parallel stock deduction.
+
+### PR-11 — Channels and Integrations
 
 Add approved external channel identities and vendor-neutral intake adapters. Apply replay protection and the same file/intake policies; do not embed channel credentials in operational rows.
 
-### PR-11 — Operations, usage, and governance
+### PR-12 — Operations, Usage, Retention, and Governance
 
 Complete dashboards, safe retry tools, usage/cost reporting, retention jobs, redaction, audit export, support diagnostics, and tenant-visible processing status without exposing secrets or provider payloads.
 
-### PR-12 — Hardening and rollout
+### PR-13 — Hardening and Gradual Rollout
 
 Run security, isolation, recovery, performance, accessibility, and migration rehearsals. Roll out behind commercial assignment and application state, monitor fail-closed behavior, and document rollback/incident procedures.
 

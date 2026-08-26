@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 export type NumberingKey =
   | 'product'
   | 'invoice'
+  | 'delivery_note'
   | 'purchase'
   | 'quote'
   | 'return'

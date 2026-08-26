@@ -82,6 +82,8 @@ interface NavItem {
    * إلزامية أو بلا مفتاح تفعيل مستقل).
    */
   appKey?: string;
+  /** صلاحية RBAC مطلوبة لإظهار عنصر تشغيلي حساس في الشريط. */
+  permission?: string;
 }
 
 interface NavGroup {
@@ -100,6 +102,7 @@ const GROUPS: NavGroup[] = [
     icon: Receipt,
     items: [
       { href: '/invoices', icon: FileText, key: 'invoicesManage', built: true },
+      { href: '/delivery-notes', icon: ClipboardCheck, key: 'deliveryNotes', built: true, appKey: 'sales.invoicing', permission: 'delivery_notes.view' },
       { href: '/invoices/new', icon: FilePlus, key: 'invoiceCreate', built: true },
       { href: '/quotes', icon: ClipboardList, key: 'quotesManage', built: true },
       { href: '/quotes/new', icon: FilePlus2, key: 'quoteCreate', built: true },
@@ -331,8 +334,16 @@ export function Sidebar({
   const user = currentUser();
   const canViewDocuments = canViewDocumentCenter(user?.permissions, user?.role);
   const groupHidden = (group: NavGroup) => Boolean(group.appKey && hiddenAppKeys.has(group.appKey));
+  const canViewItem = (item: NavItem) => {
+    if (item.key === 'documentCenter' && !canViewDocuments) return false;
+    if (!item.permission) return true;
+    return user?.role === 'owner'
+      || user?.role === 'admin'
+      || user?.permissions?.includes('*') === true
+      || user?.permissions?.includes(item.permission) === true;
+  };
   const visibleItems = (group: NavGroup) =>
-    group.items.filter((item) => (!item.appKey || !hiddenAppKeys.has(item.appKey)) && (item.key !== 'documentCenter' || canViewDocuments));
+    group.items.filter((item) => (!item.appKey || !hiddenAppKeys.has(item.appKey)) && canViewItem(item));
 
   // المجموعة التي انبثقت قائمتها في الحالة المطوية (flyout)، وموضعها الرأسي.
   const [flyout, setFlyout] = useState<{ title: string; top: number } | null>(null);
