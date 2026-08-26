@@ -20,39 +20,45 @@ export interface Partner {
   city?: string | null;
 }
 
+/**
+ * ═══ إنشاء طرف سريع من داخل مستند ═══
+ *
+ * ليس نموذج البيانات الأساسية: مكانه `/partners/new` و`/partners/[id]/edit`
+ * (الرقم الضريبي، السجل التجاري، الرمز، شروط الائتمان، قائمة السعر الافتراضية،
+ * العنوان الوطني، الرصيد الافتتاحي).
+ *
+ * غرضه أن كاتب الفاتورة وجد عميلاً غير مسجَّل فيسجّل ما يكفي لإكمال المستند.
+ * ولذلك **لا تعديل من هنا**: تحرير طرفٍ قائم عبر ستة حقول كان يخفي ثمانية عشر
+ * حقلاً ويوهم بأنها كلّ بياناته.
+ */
 export function PartnerDialog({
   open,
   onClose,
   onSaved,
-  partner,
   defaultType = 'customer',
   addTitle,
-  editTitle,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
-  partner?: Partner | null;
   /** نوع الطرف عند الإنشاء — 'customer' لشاشة العملاء، 'supplier' لشاشة الموردين. */
   defaultType?: string;
-  /** عناوين تخصّ سياق الشاشة (مورّد/عميل)؛ بلا تمرير تُستخدم صيغة «الطرف» العامة. */
+  /** عنوانٌ يخصّ سياق الشاشة (مورّد/عميل)؛ بلا تمرير تُستخدم صيغة «الطرف» العامة. */
   addTitle?: string;
-  editTitle?: string;
 }) {
   const tp = useTranslations('partners');
   const tc = useTranslations('common');
   const { success } = useToast();
-  const [form, setForm] = useState<Partner>(
-    partner ?? { id: '', name: '', type: defaultType, entity_type: 'commercial', email: '', phone: '', city: '' }
-  );
+  const [form, setForm] = useState<Partner>({
+    id: '', name: '', type: defaultType, entity_type: 'commercial', email: '', phone: '', city: '',
+  });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const set = (k: keyof Partner, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   // الحقل واحد (تجاري/فردي) وسياقه ثلاثة: «نوع العميل» على مورّدٍ نصٌّ خاطئ
-  // يجعل المستخدم يشكّ أنه في النافذة الغلط. والقراءة من `form.type` لا من
-  // `defaultType` تُصيب حتى عند تعديل طرفٍ نوعُه يخالف نوع الشاشة.
+  // يجعل المستخدم يشكّ أنه في النافذة الغلط.
   const entityLabel = tp(
     form.type === 'supplier' ? 'entity_type_supplier'
       : form.type === 'customer' ? 'entity_type_customer'
@@ -65,7 +71,6 @@ export function PartnerDialog({
     setError(null);
     const body = {
       name: form.name,
-      // عند التعديل يُحفظ نوع الطرف كما هو؛ وعند الإنشاء يُحسم بنوع الشاشة (عميل/مورّد).
       type: form.type || defaultType,
       entity_type: form.entity_type || 'commercial',
       email: form.email || null,
@@ -73,13 +78,8 @@ export function PartnerDialog({
       city: form.city || null,
     };
     try {
-      if (partner?.id) {
-        await api(`/partners/${partner.id}`, { method: 'PUT', body });
-        success(tc('updated'));
-      } else {
-        await api('/partners', { method: 'POST', body });
-        success(tc('created'));
-      }
+      await api('/partners', { method: 'POST', body });
+      success(tc('created'));
       onSaved();
       onClose();
     } catch (err) {
@@ -90,8 +90,9 @@ export function PartnerDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title={partner?.id ? (editTitle ?? tp('edit')) : (addTitle ?? tp('add'))}>
+    <Dialog open={open} onClose={onClose} title={addTitle ?? tp('add')}>
       <form onSubmit={submit} className="space-y-3">
+        <p className="text-xs leading-relaxed text-muted">{tp('quick_add_hint')}</p>
         <div className="space-y-1.5">
           <Label htmlFor="name">{tp('name')}</Label>
           <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} required />
@@ -103,14 +104,14 @@ export function PartnerDialog({
             <option value="individual">{tp('individual')}</option>
           </Select>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="email">{tp('email')}</Label>
-            <Input id="email" type="email" dir="ltr" value={form.email ?? ''} onChange={(e) => set('email', e.target.value)} />
+            <Input id="email" type="email" inputMode="email" dir="ltr" value={form.email ?? ''} onChange={(e) => set('email', e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="phone">{tp('phone')}</Label>
-            <Input id="phone" dir="ltr" value={form.phone ?? ''} onChange={(e) => set('phone', e.target.value)} />
+            <Input id="phone" className="num" type="tel" inputMode="tel" dir="ltr" value={form.phone ?? ''} onChange={(e) => set('phone', e.target.value)} />
           </div>
         </div>
         <div className="space-y-1.5">
@@ -118,13 +119,13 @@ export function PartnerDialog({
           <Input id="city" value={form.city ?? ''} onChange={(e) => set('city', e.target.value)} />
         </div>
 
-        {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
+        {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>
             {tp('cancel')}
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || !form.name.trim()}>
             {tp('save')}
           </Button>
         </div>

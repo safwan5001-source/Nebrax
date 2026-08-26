@@ -11,7 +11,7 @@ import { DataTable } from '@/components/data-table';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PartnerDialog, type Partner } from '@/components/partners/partner-dialog';
+import type { Partner } from '@/components/partners/partner-dialog';
 import { api, ApiError } from '@/lib/api';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
@@ -40,8 +40,6 @@ export default function PartnersPage() {
   const [data, setData] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Partner | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [explorer, setExplorer] = useState<DataExplorerState>(() => {
     const parsed = parseExplorerState(new URLSearchParams(searchParams.toString()));
@@ -152,9 +150,11 @@ export default function PartnersPage() {
     }));
   }
 
+  // التعديل صفحةٌ كاملة: الحوار السريع يحمل ستة حقول من أصل أربعة وعشرين،
+  // فتحريرُ طرفٍ منه كان يخفي الرقم الضريبي والائتمان والعنوان الوطني.
   const rowActions = useCallback((partner: Partner) => (
-    <Button variant="ghost" size="icon" aria-label={tp('edit')} onClick={() => { setEditing(partner); setDialogOpen(true); }}>
-      <Pencil className="h-4 w-4" strokeWidth={1.7} />
+    <Button asChild variant="ghost" size="icon" aria-label={tp('edit')} title={tp('edit')}>
+      <Link href={`/partners/${partner.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
     </Button>
   ), [tp]);
 
@@ -176,7 +176,7 @@ export default function PartnersPage() {
   ], [rowActions, tp]);
 
   const headerActions: PageAction[] = [
-    { key: 'add', label: tp('add'), icon: Plus, onClick: () => { setEditing(null); setDialogOpen(true); }, variant: 'primary' },
+    { key: 'add', label: tp('add'), icon: Plus, href: '/partners/new', variant: 'primary' },
   ];
 
   return (
@@ -239,7 +239,7 @@ export default function PartnersPage() {
 
       <AdvancedFilterDialog open={advancedOpen} onClose={() => setAdvancedOpen(false)} definitions={definitions} filters={labelledFilters} onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))} />
 
-      <PartnerDialog key={editing?.id ?? 'new'} open={dialogOpen} onClose={() => setDialogOpen(false)} onSaved={load} partner={editing} />
+
     </div>
   );
 }
