@@ -66,7 +66,9 @@ The new logical `transaction_type + transaction_id` link supports Purchase and E
 
 ### PR-10 — Multiple Delivery Notes → Sales Invoice Draft
 
-Own the allocation and anti-reuse contract for several confirmed delivery notes, reconcile their billable quantities and units, and call the existing sales domain only to create one sales-invoice **draft**. Decide the unified inventory ownership before any stock timing changes; do not introduce a parallel stock deduction.
+**Status: implemented; PR #488 open، ويتطلب CI أخضر على الرأس الحالي ومراجعة بشرية مستقلة قبل أي دمج.** PR-10 owns the full-note allocation and anti-reuse contract for several confirmed delivery notes that share one customer and warehouse. `DeliveryNoteSalesInvoiceDraftBuilder` locks deterministic source rows, resolves explicit or active customer-default price lists, and invokes `InvoiceService::create()` exactly once to produce one sales-invoice **draft**. It records immutable build, header-allocation, and source-line links with idempotency checksum semantics and append-only source events. Linked drafts and their lines cannot be updated, deleted, duplicated, or rebuilt through the general invoice path; the linked delivery note cannot be cancelled.
+
+No partial allocation, remaining quantity, unlink/rebuild correction, source return, new inventory timing, posting, journal, payment, or stock effect belongs to this phase. `InvoiceService::post()` remains the exclusive owner of ledger and inventory effects, so draft creation writes **no journal entry**. The protected preview/build APIs use `delivery_notes.invoice` plus read/write `sales.invoicing` access, and build uses the same invoice plan limit as normal invoice creation. The shared bilingual RTL/LTR wizard is reachable from Delivery Notes selection/detail and an explicitly labelled invoice-form shortcut; its local fixture is labelled presentation-only. See [ADR-010](ADR-010-DELIVERY-NOTES-TO-SALES-INVOICE-DRAFT.md).
 
 ### PR-11 — Channels and Integrations
 

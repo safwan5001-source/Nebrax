@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { ChevronLeft, ChevronRight, FilePlus2, RefreshCw, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FilePlus2, FileText, RefreshCw, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
@@ -23,7 +23,9 @@ export default function DeliveryNotesPage() {
   const tc = useTranslations('common');
   const user = currentUser();
   const canManage = hasPermission(user?.permissions, user?.role, DELIVERY_NOTE_PERMISSIONS.manage);
+  const canInvoice = hasPermission(user?.permissions, user?.role, DELIVERY_NOTE_PERMISSIONS.invoice);
   const [notes, setNotes] = useState<DeliveryNote[]>([]);
+  const [selectedForInvoice, setSelectedForInvoice] = useState<string[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [status, setStatus] = useState('');
@@ -55,6 +57,7 @@ export default function DeliveryNotesPage() {
     api<{ data: DeliveryNote[]; meta?: Paginator }>(`/delivery-notes?${params.toString()}`)
       .then((result) => {
         setNotes(result.data);
+        setSelectedForInvoice((current) => current.filter((id) => result.data.some((note) => note.id === id && note.status === 'confirmed' && !note.invoice_draft)));
         setPagination(result.meta ?? { current_page: 1, last_page: 1, total: result.data.length });
       })
       .catch((caught) => setError(caught instanceof ApiError ? caught.message : tc('saveFailed')))
@@ -75,11 +78,21 @@ export default function DeliveryNotesPage() {
   function clearFilters(): void {
     setStatus(''); setCustomerId(''); setWarehouseId(''); setDateFrom(''); setDateTo(''); setSearch(''); setQuery(''); setPage(1);
   }
+  function toggleInvoiceSelection(note: DeliveryNote): void {
+    if (note.status !== 'confirmed' || note.invoice_draft) return;
+    setSelectedForInvoice((current) => current.includes(note.id) ? current.filter((id) => id !== note.id) : [...current, note.id]);
+  }
+  function invoiceAvailability(note: DeliveryNote): string | null {
+    if (note.invoice_draft) return t('invoiceDraftAlreadyLinked', { number: note.invoice_draft.number ?? '—' });
+    if (note.status !== 'confirmed') return t('invoiceDraftNotConfirmed');
+    return null;
+  }
+  const invoiceHref = `/delivery-notes/invoice-draft${selectedForInvoice.length ? `?notes=${selectedForInvoice.join(',')}` : ''}`;
 
-  return <div className="space-y-5">
+  return <div className="space-y-5 pb-20 md:pb-0">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 text-sm text-muted">{t('listSubtitle')}</p></div>
-      {canManage && <Button asChild><Link href="/delivery-notes/new"><FilePlus2 className="h-4 w-4" strokeWidth={1.8} />{t('create')}</Link></Button>}
+      <div className="flex flex-wrap gap-2">{canInvoice && <Button asChild variant="outline"><Link href={invoiceHref}><FileText className="h-4 w-4" strokeWidth={1.8} />{t('invoiceDraftAction')}</Link></Button>}{canManage && <Button asChild><Link href="/delivery-notes/new"><FilePlus2 className="h-4 w-4" strokeWidth={1.8} />{t('create')}</Link></Button>}</div>
     </div>
 
     <section aria-label={t('filters')} className="rounded border border-border bg-surface p-4">
@@ -97,13 +110,15 @@ export default function DeliveryNotesPage() {
 
     <section className="overflow-hidden rounded border border-border bg-surface">
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-sm"><thead className="border-b border-border bg-muted/50 text-start text-xs font-medium text-muted"><tr><th className="px-4 py-3">{t('number')}</th><th className="px-4 py-3">{t('customer')}</th><th className="px-4 py-3">{t('warehouse')}</th><th className="px-4 py-3">{t('deliveryDate')}</th><th className="px-4 py-3">{t('status')}</th><th className="px-4 py-3">{t('externalReference')}</th></tr></thead>
-          <tbody>{loading ? Array.from({ length: 6 }).map((_, index) => <tr key={index} className="border-b border-border last:border-0"><td colSpan={6} className="px-4 py-3"><div className="h-5 animate-pulse rounded bg-muted" /></td></tr>) : notes.map((note) => <tr key={note.id} className="border-b border-border last:border-0 hover:bg-primary-soft/30"><td className="px-4 py-3"><Link className="num font-medium text-primary hover:underline" href={`/delivery-notes/${note.id}`}>{note.number}</Link></td><td className="px-4 py-3 text-text">{note.customer?.name ?? '—'}</td><td className="px-4 py-3 text-muted">{note.warehouse?.name ?? '—'}</td><td className="num px-4 py-3 text-muted" dir="ltr">{note.delivery_date}</td><td className="px-4 py-3"><Badge tone={statusTone(note.status)}>{statusLabel(note.status)}</Badge></td><td className="px-4 py-3 text-muted">{note.external_reference ?? '—'}</td></tr>)}</tbody>
+        <table className="w-full text-sm"><thead className="border-b border-border bg-muted/50 text-start text-xs font-medium text-muted"><tr>{canInvoice && <th className="w-12 px-3 py-3"><span className="sr-only">{t('invoiceDraftSelectTitle')}</span></th>}<th className="px-4 py-3">{t('number')}</th><th className="px-4 py-3">{t('customer')}</th><th className="px-4 py-3">{t('warehouse')}</th><th className="px-4 py-3">{t('deliveryDate')}</th><th className="px-4 py-3">{t('status')}</th><th className="px-4 py-3">{t('externalReference')}</th>{canInvoice && <th className="px-4 py-3">{t('invoiceDraftAvailability')}</th>}</tr></thead>
+          <tbody>{loading ? Array.from({ length: 6 }).map((_, index) => <tr key={index} className="border-b border-border last:border-0"><td colSpan={canInvoice ? 8 : 6} className="px-4 py-3"><div className="h-5 animate-pulse rounded bg-muted" /></td></tr>) : notes.map((note) => { const unavailable = invoiceAvailability(note); return <tr key={note.id} className="border-b border-border last:border-0 hover:bg-primary-soft/30">{canInvoice && <td className="px-3 py-3"><input type="checkbox" checked={selectedForInvoice.includes(note.id)} disabled={!!unavailable} onChange={() => toggleInvoiceSelection(note)} aria-label={t('invoiceDraftSelectNote', { number: note.number })} /></td>}<td className="px-4 py-3"><Link className="num font-medium text-primary hover:underline" href={`/delivery-notes/${note.id}`}>{note.number}</Link></td><td className="px-4 py-3 text-text">{note.customer?.name ?? '—'}</td><td className="px-4 py-3 text-muted">{note.warehouse?.name ?? '—'}</td><td className="num px-4 py-3 text-muted" dir="ltr">{note.delivery_date}</td><td className="px-4 py-3"><Badge tone={statusTone(note.status)}>{statusLabel(note.status)}</Badge></td><td className="px-4 py-3 text-muted">{note.external_reference ?? '—'}</td>{canInvoice && <td className="px-4 py-3 text-xs">{unavailable ? <span className="text-negative">{unavailable}</span> : <span className="text-positive">{t('invoiceDraftAvailable')}</span>}</td>}</tr>; })}</tbody>
         </table>
       </div>
-      <div className="divide-y divide-border md:hidden">{loading ? Array.from({ length: 4 }).map((_, index) => <div className="p-4" key={index}><div className="h-20 animate-pulse rounded bg-muted" /></div>) : notes.map((note) => <Link key={note.id} href={`/delivery-notes/${note.id}`} className="block p-4 transition-colors hover:bg-primary-soft/30"><div className="flex items-center justify-between gap-3"><span className="num font-medium text-primary">{note.number}</span><Badge tone={statusTone(note.status)}>{statusLabel(note.status)}</Badge></div><p className="mt-2 font-medium text-text">{note.customer?.name ?? '—'}</p><div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted"><span>{note.warehouse?.name ?? '—'}</span><span dir="ltr">{note.delivery_date}</span></div></Link>)}</div>
+      <div className="divide-y divide-border md:hidden">{loading ? Array.from({ length: 4 }).map((_, index) => <div className="p-4" key={index}><div className="h-20 animate-pulse rounded bg-muted" /></div>) : notes.map((note) => { const unavailable = invoiceAvailability(note); return <div key={note.id} className="flex items-start gap-3 p-4">{canInvoice && <input className="mt-1" type="checkbox" checked={selectedForInvoice.includes(note.id)} disabled={!!unavailable} onChange={() => toggleInvoiceSelection(note)} aria-label={t('invoiceDraftSelectNote', { number: note.number })} />}<Link href={`/delivery-notes/${note.id}`} className="block min-w-0 flex-1 transition-colors hover:text-primary"><div className="flex items-center justify-between gap-3"><span className="num font-medium text-primary">{note.number}</span><Badge tone={statusTone(note.status)}>{statusLabel(note.status)}</Badge></div><p className="mt-2 font-medium text-text">{note.customer?.name ?? '—'}</p><div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted"><span>{note.warehouse?.name ?? '—'}</span><span dir="ltr">{note.delivery_date}</span></div>{canInvoice && <p className={`mt-1 text-xs ${unavailable ? 'text-negative' : 'text-positive'}`}>{unavailable ?? t('invoiceDraftAvailable')}</p>}</Link></div>; })}</div>
       {!loading && notes.length === 0 && <div className="px-6 py-16 text-center"><p className="font-medium text-text">{t('emptyTitle')}</p><p className="mt-1 text-sm text-muted">{t('emptyHint')}</p>{canManage && <Button asChild className="mt-4"><Link href="/delivery-notes/new">{t('create')}</Link></Button>}</div>}
     </section>
+
+    {canInvoice && selectedForInvoice.length > 0 && <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 p-3 backdrop-blur md:hidden"><Button asChild className="w-full"><Link href={invoiceHref}><FileText className="h-4 w-4" strokeWidth={1.7} />{t('invoiceDraftCreateSelected', { count: selectedForInvoice.length })}</Link></Button></div>}
 
     {!loading && pagination.last_page > 1 && <nav aria-label={t('pagination')} className="flex items-center justify-between gap-3"><p className="text-sm text-muted">{t('resultsCount', { count: pagination.total })}</p><div className="flex gap-2"><Button variant="outline" size="sm" disabled={pagination.current_page <= 1} onClick={() => setPage((value) => value - 1)}><ChevronRight className="h-4 w-4 rtl:rotate-180" />{t('previous')}</Button><span className="num flex items-center px-2 text-sm text-muted">{pagination.current_page} / {pagination.last_page}</span><Button variant="outline" size="sm" disabled={pagination.current_page >= pagination.last_page} onClick={() => setPage((value) => value + 1)}>{t('next')}<ChevronLeft className="h-4 w-4 rtl:rotate-180" /></Button></div></nav>}
   </div>;

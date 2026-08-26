@@ -8,6 +8,7 @@ use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * فاتورة مبيعات. تُنشأ بحالة draft ثم تُرحَّل عبر InvoiceService::post
@@ -67,6 +68,18 @@ class Invoice extends BaseModel
     public function lines(): HasMany
     {
         return $this->hasMany(InvoiceLine::class);
+    }
+
+    /** مرساة idempotency لمسودة بنيت من سندات تسليم، إن وجدت. */
+    public function deliveryNoteDraftBuild(): HasOne
+    {
+        return $this->hasOne(DeliveryNoteInvoiceDraftBuild::class);
+    }
+
+    /** تخصيصات سندات التسليم المدققة؛ تمنع حذف أو إعادة بناء المسودة بلا مسار تصحيح موثق. */
+    public function deliveryNoteAllocations(): HasMany
+    {
+        return $this->hasMany(DeliveryNoteInvoiceAllocation::class);
     }
 
     /** مرجع جلسة POS محفوظ؛ لا يختفي عند تبديل سياق الفرع بعد ترحيل الفاتورة. */

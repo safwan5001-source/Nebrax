@@ -125,6 +125,12 @@ class DeliveryNote extends BaseModel
         return $this->hasMany(DeliveryNoteEvent::class)->orderBy('occurred_at')->orderBy('id');
     }
 
+    /** تخصيص MVP كامل؛ السند لا يرتبط بأكثر من فاتورة واحدة. */
+    public function invoiceAllocations(): HasMany
+    {
+        return $this->hasMany(DeliveryNoteInvoiceAllocation::class);
+    }
+
     public function isDraft(): bool
     {
         return $this->status === self::STATUS_DRAFT;

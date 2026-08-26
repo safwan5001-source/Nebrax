@@ -135,6 +135,9 @@ class DeliveryNoteService
             if (! in_array($note->status, [DeliveryNote::STATUS_DRAFT, DeliveryNote::STATUS_CONFIRMED], true)) {
                 throw new RuntimeException('لا يمكن إلغاء سند التسليم في حالته الحالية.');
             }
+            if ($note->invoiceAllocations()->exists()) {
+                throw new RuntimeException('لا يمكن إلغاء سند تسليم مرتبط بمسودة فاتورة مبيعات.');
+            }
             $this->assertVersion($note, $expectedVersion);
 
             $fromStatus = $note->status;
