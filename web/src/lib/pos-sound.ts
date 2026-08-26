@@ -44,7 +44,7 @@ interface PosSoundManagerOptions {
   getNavigator?: () => VibrateNavigator | undefined;
 }
 
-const SOUND_SOURCES: Record<PosSoundEvent, string> = {
+export const POS_SOUND_SOURCES: Readonly<Record<PosSoundEvent, string>> = {
   scan_success: '/sounds/pos/scan-success.wav',
   scan_not_found: '/sounds/pos/scan-not-found.wav',
   scan_error: '/sounds/pos/scan-error.wav',
@@ -114,7 +114,7 @@ export class PosSoundManager {
 
   /** تحميل العناصر محلياً مرة واحدة بعد دخول صفحة POS، من دون تشغيلها. */
   preload(): void {
-    for (const event of Object.keys(SOUND_SOURCES) as PosSoundEvent[]) {
+    for (const event of Object.keys(POS_SOUND_SOURCES) as PosSoundEvent[]) {
       const clip = this.clipFor(event);
       try {
         clip?.load?.();
@@ -190,7 +190,7 @@ export class PosSoundManager {
     if (existing) return existing;
 
     try {
-      const clip = this.createAudio(SOUND_SOURCES[event]);
+      const clip = this.createAudio(POS_SOUND_SOURCES[event]);
       if (!clip) return null;
       clip.preload = 'auto';
       this.clips.set(event, clip);
