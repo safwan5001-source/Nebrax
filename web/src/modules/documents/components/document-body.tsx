@@ -35,22 +35,26 @@ const DEFAULT_SECTIONS: TemplateSectionsConfig = {
   footer: true,
 };
 
-/** هل القسم ظاهر وفق أعلام الإعداد (للترتيب الافتراضي). */
-function isVisible(key: DocSectionKey, s: TemplateSectionsConfig): boolean {
+/**
+ * لا تخفي أعلام `DEFAULT_SECTIONS` كتل التخطيط التجاري المسجل؛ فهذه الأعمدة
+ * التاريخية تخص الفاتورة الضريبية فقط. لكن أي قيمة `false` يمررها القالب
+ * صراحةً تبقى عقد إخفاء واجب الاحترام عند غياب `layout` محفوظ.
+ */
+export function isExplicitSectionVisible(key: DocSectionKey, sections: Partial<TemplateSectionsConfig>): boolean {
   switch (key) {
-    case 'header': return s.header;
-    case 'barcode': return s.barcode;
-    case 'parties': return s.seller || s.buyer || s.meta;
-    case 'items': return s.items;
-    case 'summary': return s.summary;
-    case 'voucher': return s.voucher;
-    case 'amountWords': return s.amountWords;
-    case 'notes': return s.notes;
-    case 'terms': return s.terms;
-    case 'bank': return s.bank;
-    case 'stamp': return s.stamp;
-    case 'signature': return s.signature;
-    case 'footer': return s.footer;
+    case 'header': return sections.header !== false;
+    case 'barcode': return sections.barcode !== false;
+    case 'parties': return sections.seller !== false || sections.buyer !== false || sections.meta !== false;
+    case 'items': return sections.items !== false;
+    case 'summary': return sections.summary !== false;
+    case 'voucher': return sections.voucher !== false;
+    case 'amountWords': return sections.amountWords !== false;
+    case 'notes': return sections.notes !== false;
+    case 'terms': return sections.terms !== false;
+    case 'bank': return sections.bank !== false;
+    case 'stamp': return sections.stamp !== false;
+    case 'signature': return sections.signature !== false;
+    case 'footer': return sections.footer !== false;
   }
 }
 
@@ -100,7 +104,7 @@ export function DocumentBody({
       ? layout
       : getDefaultDocumentLayout(model.type).map((item) => ({
           ...item,
-          visible: item.visible && isVisible(item.key, s),
+          visible: item.visible && isExplicitSectionVisible(item.key, sections ?? {}),
         }));
 
   const blockProperties = items.reduce<DocBlockPropertiesMap>((properties, item) => {

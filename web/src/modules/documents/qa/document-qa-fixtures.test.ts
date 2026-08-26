@@ -12,6 +12,21 @@ describe('نماذج تحقق المستندات', () => {
     }
   });
 
+  it('يميز نماذج الأنواع التجارية ويخفي QR للمستندات غير الضريبية', () => {
+    const quotation = makeDocumentQaModel({ documentType: 'quotation', scenario: 'single', direction: 'rtl', showQr: true, showAssets: true });
+    const salesOrder = makeDocumentQaModel({ documentType: 'sales_order', scenario: 'single', direction: 'rtl', showQr: true, showAssets: true });
+    const purchaseOrder = makeDocumentQaModel({ documentType: 'purchase_order', scenario: 'single', direction: 'rtl', showQr: true, showAssets: true });
+    const purchaseInvoice = makeDocumentQaModel({ documentType: 'purchase_invoice', scenario: 'single', direction: 'rtl', showQr: true, showAssets: true });
+    const deliveryNote = makeDocumentQaModel({ documentType: 'delivery_note', scenario: 'single', direction: 'rtl', showQr: true, showAssets: true });
+
+    expect(quotation.meta).toMatchObject({ dueDate: '2026-09-25', paymentType: null });
+    expect(salesOrder.meta).toMatchObject({ dueDate: '2026-09-30', paymentType: null });
+    expect(purchaseOrder.buyer.name).toContain('توريد');
+    expect(purchaseInvoice.meta.paymentType).toBe('credit');
+    expect(deliveryNote.meta).toMatchObject({ dueDate: null, paymentType: null });
+    for (const model of [quotation, salesOrder, purchaseOrder, purchaseInvoice, deliveryNote]) expect(model.qr).toBeNull();
+  });
+
   it('يغطي الحقول الطويلة والأصول والاتجاهين بلا اتصال ببيانات أعمال', () => {
     const arabic = makeDocumentQaModel({ scenario: 'multipage', direction: 'rtl', showQr: true, showAssets: true });
     const english = makeDocumentQaModel({ scenario: 'multipage', direction: 'ltr', showQr: false, showAssets: false });

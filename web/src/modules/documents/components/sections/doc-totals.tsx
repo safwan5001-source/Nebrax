@@ -28,7 +28,8 @@ export function DocTotals({
   );
 
   const outer = cn(
-    'w-[46%] max-w-[300px] overflow-hidden',
+    'max-w-[300px] overflow-hidden',
+    isModern ? 'w-full' : 'w-[46%]',
     isErp && 'border border-black',
     isModern && 'rounded-md border border-[color:var(--border)] bg-white',
     isMinimal && 'border-y border-black',

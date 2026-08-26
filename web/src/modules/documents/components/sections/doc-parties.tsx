@@ -14,17 +14,21 @@ export function DocParties({ model }: { model: DocumentModel }) {
   const t = useTranslations('invoiceDoc');
   const tPrint = useTranslations('documentPrint');
   const tp = useTranslations('purchasePdf');
+  const tDocument = useTranslations('documentPresentation');
   const style = useDocStyle();
   const { seller, buyer, meta } = model;
-  const isTaxInvoice = model.type === 'tax_invoice';
+  const isTaxInvoice = model.type === 'tax_invoice' || model.type === 'simplified_tax_invoice';
   const isPurchaseInvoice = model.type === 'purchase_invoice';
-  const isInvoice = isTaxInvoice || isPurchaseInvoice;
-  const issuerLabel = isPurchaseInvoice ? tp('buyer') : (isTaxInvoice ? t('seller') : tPrint('seller'));
-  const partyLabel = model.type === 'payment_voucher' || model.type === 'debit_note' || isPurchaseInvoice
-    ? tPrint('supplier')
-    : model.type === 'receipt_voucher' || model.type === 'quotation' || model.type === 'credit_note'
-      ? tPrint('customer')
-      : t('bill_to');
+  const isPurchaseDocument = model.type === 'purchase_order' || isPurchaseInvoice;
+  const isDeliveryNote = model.type === 'delivery_note';
+  const issuerLabel = isPurchaseDocument ? tp('buyer') : tPrint('seller');
+  const partyLabel = isDeliveryNote
+    ? tDocument('recipient')
+    : model.type === 'payment_voucher' || model.type === 'debit_note' || isPurchaseDocument
+      ? tPrint('supplier')
+      : model.type === 'receipt_voucher' || model.type === 'quotation' || model.type === 'sales_order' || model.type === 'credit_note'
+        ? tPrint('customer')
+        : t('bill_to');
 
   const sellerDetails = (
     <>
@@ -45,16 +49,30 @@ export function DocParties({ model }: { model: DocumentModel }) {
     </>
   );
 
+  const dueDateLabel = model.type === 'quotation'
+    ? tDocument('valid_until')
+    : model.type === 'sales_order' || model.type === 'purchase_order'
+      ? tDocument('expected_delivery_date')
+      : tDocument('payment_due_date');
+  const showsPaymentType = isTaxInvoice || isPurchaseInvoice;
+  const stackMetaRows = style.composition === 'modern';
+
   const metaDetails = (
     <>
-      <DocInfoRow label={t('date')} value={<span className="num">{meta.date}</span>} />
-      {isInvoice && (
+      <DocInfoRow label={isDeliveryNote ? tDocument('delivery_date') : t('date')} value={<span className="num">{meta.date}</span>} stacked={stackMetaRows} />
+      {showsPaymentType && (
         <DocInfoRow
           label={t('payment_type')}
           value={meta.paymentType ? (meta.paymentType === 'cash' ? t('cash') : t('credit')) : null}
+          stacked={stackMetaRows}
         />
       )}
-      {!isInvoice && meta.dueDate && <DocInfoRow label={tPrint('due_date')} value={<span className="num">{meta.dueDate}</span>} />}
+      {!isDeliveryNote && !showsPaymentType && meta.dueDate && (
+        <DocInfoRow label={dueDateLabel} value={<span className="num">{meta.dueDate}</span>} stacked={stackMetaRows} />
+      )}
+      {isPurchaseInvoice && meta.dueDate && (
+        <DocInfoRow label={tDocument('payment_due_date')} value={<span className="num">{meta.dueDate}</span>} stacked={stackMetaRows} />
+      )}
     </>
   );
 
@@ -70,7 +88,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
           {buyerDetails}
         </div>
         <div className="col-span-3 py-3 ps-4">
-          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{isInvoice ? t('meta') : tPrint('document_data')}</div>
+          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{isTaxInvoice ? t('meta') : tDocument('meta')}</div>
           {metaDetails}
         </div>
       </section>
@@ -81,7 +99,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
     const surface = cn('border border-[color:var(--border)] p-4', style.cardRadius);
     return (
       <section className={cn('grid grid-cols-12 gap-3', style.sectionGap)}>
-        <div className={cn('col-span-6', surface)}>
+        <div className={cn('col-span-5', surface)}>
           <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{issuerLabel}</div>
           {sellerDetails}
         </div>
@@ -89,8 +107,8 @@ export function DocParties({ model }: { model: DocumentModel }) {
           <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{partyLabel}</div>
           {buyerDetails}
         </div>
-        <div className={cn('col-span-2 bg-[color:var(--doc-brand-soft)]', surface)}>
-          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{isInvoice ? t('meta') : tPrint('document_data')}</div>
+        <div className={cn('col-span-3 bg-[color:var(--doc-brand-soft)]', surface)}>
+          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{isTaxInvoice ? t('meta') : tDocument('meta')}</div>
           {metaDetails}
         </div>
       </section>
@@ -109,7 +127,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
           {buyerDetails}
         </div>
         <div className="col-span-2 flex gap-8 border-t border-[color:var(--border)] pt-3">
-          <div className={cn(DOCUMENT_PARTY_CARD_LABEL_CLASS, 'mb-0 shrink-0')}>{isInvoice ? t('meta') : tPrint('document_data')}</div>
+          <div className={cn(DOCUMENT_PARTY_CARD_LABEL_CLASS, 'mb-0 shrink-0')}>{isTaxInvoice ? t('meta') : tDocument('meta')}</div>
           <div className="flex flex-wrap gap-x-6 gap-y-1">{metaDetails}</div>
         </div>
       </section>
@@ -128,7 +146,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
         {buyerDetails}
       </div>
       <div className={card}>
-        <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{isInvoice ? t('meta') : tPrint('document_data')}</div>
+        <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{isTaxInvoice ? t('meta') : tDocument('meta')}</div>
         {metaDetails}
       </div>
     </div>

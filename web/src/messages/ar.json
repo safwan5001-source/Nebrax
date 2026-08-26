@@ -1075,11 +1075,22 @@
   "documentTypesAlt": {
     "tax_invoice": "Tax Invoice",
     "quotation": "Quotation",
+    "sales_order": "Sales Order",
+    "purchase_order": "Purchase Order",
     "purchase_invoice": "Purchase Invoice",
+    "delivery_note": "Delivery Note",
     "credit_note": "Credit Note",
     "debit_note": "Debit Note",
     "receipt_voucher": "Receipt Voucher",
     "payment_voucher": "Payment Voucher"
+  },
+  "documentPresentation": {
+    "meta": "بيانات المستند",
+    "valid_until": "صالح حتى",
+    "expected_delivery_date": "التاريخ المتوقع للتسليم",
+    "payment_due_date": "تاريخ الاستحقاق",
+    "delivery_date": "تاريخ التسليم",
+    "recipient": "المستلم"
   },
   "documentPrint": {
     "seller": "المنشأة",
