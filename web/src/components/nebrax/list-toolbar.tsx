@@ -68,12 +68,24 @@ export function ListToolbar({
   const t = useTranslations('nebrax');
   const locale = useLocale();
   const hasQuickFilters = definitions.some((definition) => definition.quick) || Boolean(onOpenAdvanced);
+  const definitionsByKey = React.useMemo(
+    () => new Map(definitions.map((definition) => [definition.key, definition])),
+    [definitions]
+  );
 
   // الأرقام تُنسَّق بلغة الواجهة النشطة، وبأرقام لاتينية في الحالتين — وهو ما
   // يضمنه `displayLocale`. تُمرَّر إلى ICU **نصوصاً** كي لا يعيد تنسيقها بلغة
   // العرض فتنقلب إلى أرقام هندية في العربية.
   const num = (value: number) => value.toLocaleString(displayLocale(locale));
   const mono = (chunks: React.ReactNode) => <span className="num">{chunks}</span>;
+
+  const formatFilterValue = React.useCallback((filter: ActiveFilter): string => {
+    const definition = definitionsByKey.get(filter.key);
+    const raw = Array.isArray(filter.value) ? filter.value.map(String) : [String(filter.value)];
+    const values = raw.map((value) => definition?.options?.find((option) => option.value === value)?.label ?? value);
+    const label = filter.label ?? definition?.label;
+    return label ? `${label}: ${values.join('، ')}` : values.join('، ');
+  }, [definitionsByKey]);
 
   return (
     <section
@@ -121,7 +133,12 @@ export function ListToolbar({
 
       {filters.length > 0 || typeof resultCount === 'number' ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-          <ActiveFilterChips filters={filters} onRemove={onRemoveFilter} onClear={onClearFilters} />
+          <ActiveFilterChips
+            filters={filters}
+            onRemove={onRemoveFilter}
+            onClear={onClearFilters}
+            formatValue={formatFilterValue}
+          />
 
           {typeof resultCount === 'number' ? (
             <p className="ms-auto text-xs text-muted" aria-live="polite">
