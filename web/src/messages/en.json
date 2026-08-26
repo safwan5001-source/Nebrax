@@ -2836,6 +2836,8 @@
     "scan_added": "Added: {name}",
     "scan_not_found": "Unknown barcode: {code}",
     "scan_error": "The barcode scan could not be completed. Try again.",
+    "zatca_qr_unavailable": "The sale is complete, but the receipt QR code could not be loaded. You can review the invoice in Recent Invoices.",
+    "receipt_unavailable": "The sale is complete, but the receipt preview could not be prepared. You can review the invoice in Recent Invoices.",
     "hold": "Hold",
     "held": "Held",
     "held_title": "Held sales",

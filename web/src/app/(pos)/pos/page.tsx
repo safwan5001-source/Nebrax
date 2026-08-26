@@ -34,6 +34,7 @@ import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/custome
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
 import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
+import { runPosCheckout } from '@/lib/pos-checkout';
 
 const WALKIN = 'عميل نقدي (POS)';
 
@@ -106,7 +107,7 @@ export default function PosPage() {
   const tc = useTranslations('common');
   const tprod = useTranslations('products');
   const router = useRouter();
-  const { success, error: errorToast } = useToast();
+  const { success, error: errorToast, toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -723,74 +724,88 @@ export default function PosPage() {
       paymentRequestRef.current = true;
       setPaying(true);
       setError(null);
-      let checkoutCompleted = false;
       try {
-        // العميل المختار إن وُجد، وإلا العميل النقدي الافتراضي.
-        const partnerId = selectedCustomer?.id ?? (await ensureWalkin());
-        const items = cart.map((l) => ({
-          product_id: l.productId,
-          description: l.description,
-          quantity: l.qty,
-          unit: l.unit,
-          unit_price: riyalToMinor(effectiveLinePrice(l)),
-          tax_rate: l.tax,
-          discount: posCfg.allow_discount ? lineCalc(l).disc : 0, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
-        }));
-        // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
-        const created = await api<{ data: { id: string; number: string; total: string } }>('/pos/checkout', {
-          method: 'POST',
-          body: { partner_id: partnerId, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, notes: activeCart.note.trim() || null, items, tenders },
+        const result = await runPosCheckout({
+          submitCheckout: async () => {
+            // العميل المختار إن وُجد، وإلا العميل النقدي الافتراضي.
+            const partnerId = selectedCustomer?.id ?? (await ensureWalkin());
+            const items = cart.map((l) => ({
+              product_id: l.productId,
+              description: l.description,
+              quantity: l.qty,
+              unit: l.unit,
+              unit_price: riyalToMinor(effectiveLinePrice(l)),
+              tax_rate: l.tax,
+              discount: posCfg.allow_discount ? lineCalc(l).disc : 0, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
+            }));
+            // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
+            return api<{ data: { id: string; number: string; total: string } }>('/pos/checkout', {
+              method: 'POST',
+              body: { partner_id: partnerId, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, notes: activeCart.note.trim() || null, items, tenders },
+            });
+          },
+          // لحظة النجاح المالي هي استجابة checkout؛ نغلق السلة ونغادر شاشة الدفع
+          // قبل انتظار QR، فلا تعود العملية قابلة لإرسال الدفع نفسه مرة ثانية.
+          onCheckoutSuccess: () => {
+            playPosFeedback('payment_success');
+            success(t('sale_done'));
+            closeCart(activeCart.id);
+            setStep('sale');
+            setMobileTab('products');
+          },
+          fetchQr: (created) => api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`),
+          onPaymentError: (error) => {
+            setError(error instanceof ApiError ? error.message : tc('saveFailed'));
+            playPosFeedback('payment_error');
+          },
+          onQrUnavailable: () => {
+            toast({ title: t('sale_done'), description: t('zatca_qr_unavailable'), variant: 'warning' });
+          },
         });
-        checkoutCompleted = true;
-        // النجاح الصوتي لا يرتبط بزر التأكيد ولا بطلب QR اللاحق، بل باستجابة
-        // checkout الذرية التي أنشأت البيع فعلاً على الخادم.
-        playPosFeedback('payment_success');
-        const z = await api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`);
-        success(t('sale_done'));
 
-        // بناء نموذج الإيصال الحراري من السلة (بلا نداء إضافي) عبر محرّك المستندات.
-        const toRiyal = (m: number) => (m / 100).toFixed(2);
-        const totals = cart.reduce(
-          (a, l) => { const c = lineCalc(l); return { sub: a.sub + c.net, tax: a.tax + c.tax, tot: a.tot + c.total }; },
-          { sub: 0, tax: 0, tot: 0 },
-        );
-        // نوع الدفع للعرض: مسدّد فوراً بأي وسيلة مهيأة، وإلا آجل.
-        const paidNow = tenders.reduce((sum, tender) => sum + tender.amount, 0);
-        const receiptInvoice: SourceInvoice = {
-          number: created.data.number,
-          invoice_date: new Date().toISOString().slice(0, 10),
-          payment_type: paidNow > 0 ? 'cash' : 'credit',
-          subtotal: toRiyal(totals.sub),
-          tax_amount: toRiyal(totals.tax),
-          total: toRiyal(totals.tot),
-          notes: null,
-          lines: cart.map((l) => { const c = lineCalc(l); return {
-            id: l.key, description: l.unit ? `${l.description} (${l.unit})` : l.description, quantity: l.qty,
-            unit_price: effectiveLinePrice(l), tax_rate: l.tax, line_tax: toRiyal(c.tax), line_total: toRiyal(c.total),
-          }; }),
-        };
-        const model = buildInvoiceDocumentModel({
-          invoice: receiptInvoice,
-          company,
-          customer: { name: selectedCustomer?.name ?? walkinName, vat_number: null, city: null },
-          qr: z.qr,
-          footerText: posCfg.receipt_footer,
-        });
-        setReceipt({ model, number: created.data.number });
-        closeCart(activeCart.id);
-        setStep('sale');
-        setMobileTab('products');
-      } catch (e) {
-        setError(e instanceof ApiError ? e.message : tc('saveFailed'));
-        // لا نبلغ عن فشل دفع بعد أن يؤكد checkout نجاح البيع؛ قد يفشل طلب QR
-        // الثانوي، لكن العملية المالية تكون قد اكتملت بالفعل.
-        if (!checkoutCompleted) playPosFeedback('payment_error');
+        if (result.status !== 'success' || !result.checkout) return;
+
+        // بناء الإيصال من لقطة السلة السابقة بعد cleanup. فشل نموذج الإيصال نفسه
+        // لا يعيد شاشة الدفع ولا يحول بيعاً مؤكداً إلى فشل.
+        try {
+          const created = result.checkout.data;
+          const toRiyal = (m: number) => (m / 100).toFixed(2);
+          const totals = cart.reduce(
+            (a, l) => { const c = lineCalc(l); return { sub: a.sub + c.net, tax: a.tax + c.tax, tot: a.tot + c.total }; },
+            { sub: 0, tax: 0, tot: 0 },
+          );
+          // نوع الدفع للعرض: مسدّد فوراً بأي وسيلة مهيأة، وإلا آجل.
+          const paidNow = tenders.reduce((sum, tender) => sum + tender.amount, 0);
+          const receiptInvoice: SourceInvoice = {
+            number: created.number,
+            invoice_date: new Date().toISOString().slice(0, 10),
+            payment_type: paidNow > 0 ? 'cash' : 'credit',
+            subtotal: toRiyal(totals.sub),
+            tax_amount: toRiyal(totals.tax),
+            total: toRiyal(totals.tot),
+            notes: null,
+            lines: cart.map((l) => { const c = lineCalc(l); return {
+              id: l.key, description: l.unit ? `${l.description} (${l.unit})` : l.description, quantity: l.qty,
+              unit_price: effectiveLinePrice(l), tax_rate: l.tax, line_tax: toRiyal(c.tax), line_total: toRiyal(c.total),
+            }; }),
+          };
+          const model = buildInvoiceDocumentModel({
+            invoice: receiptInvoice,
+            company,
+            customer: { name: selectedCustomer?.name ?? walkinName, vat_number: null, city: null },
+            qr: result.qr?.qr ?? null,
+            footerText: posCfg.receipt_footer,
+          });
+          setReceipt({ model, number: created.number });
+        } catch {
+          toast({ title: t('sale_done'), description: t('receipt_unavailable'), variant: 'warning' });
+        }
       } finally {
         paymentRequestRef.current = false;
         setPaying(false);
       }
     },
-    [activeCart, cart, catalogLoading, closeCart, success, t, tc, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback],
+    [activeCart, cart, catalogLoading, closeCart, success, t, tc, toast, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
