@@ -875,8 +875,13 @@ export: GET /products/export?scope=filtered&type=good&sale_price_gte=200&page=1&
 | الرابط | https://github.com/safwan5001-source/Nebrax/pull/491 |
 | الفرع | `claude/product-import-export-task-6408cw` → `main` |
 | قاعدة الـPR | `b3116123` (main بعد PR #489) |
-| **HEAD النهائي** | **`ccf196330ce3d72da2deba314a9e0c3b5bbad10b`** |
+| **آخر التزام يمسّ الكود** | **`ccf196330ce3d72da2deba314a9e0c3b5bbad10b`** — وهو ما جرى عليه CI أدناه |
+| HEAD الحالي للفرع | `901b5df` فما بعده — **التزامات توثيق فقط** (هذا الملف) |
 | الحالة | مفتوح · **غير مدموج** |
+
+> **لماذا رقمان؟** الالتزام الذي يسجّل نتيجة CI يغيّر بالضرورة HEAD بعد قراءتها.
+> فالمرجع الصحيح لسلامة الكود هو `ccf1963`: كل ما بعده لا يمسّ إلا هذا التقرير
+> (يتحقّق منه `git diff --stat ccf1963..HEAD` — ملفٌ واحد تحت `deliverables/`).
 
 ### نتيجة CI الفعلية على HEAD النهائي
 
