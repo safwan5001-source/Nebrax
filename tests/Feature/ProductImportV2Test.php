@@ -547,7 +547,7 @@ class ProductImportV2Test extends TestCase
             ->post('/api/products/import/apply', ['file' => $file, 'mode' => 'create'])
             ->assertOk();
 
-        $product = Product::where('SKU', 'SKU-U1')->first() ?? Product::where('sku', 'SKU-U1')->firstOrFail();
+        $product = Product::where('sku', 'SKU-U1')->firstOrFail();
         $this->assertSame($template->id, $product->unit_template_id);
         $this->assertSame('حبة', $product->unit, 'وحدة الأساس تُفرض من القالب كما في بطاقة المنتج.');
     }
