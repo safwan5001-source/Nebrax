@@ -14,6 +14,7 @@ import { PaymentDialog } from '@/components/payments/payment-dialog';
 import { api, ApiError } from '@/lib/api';
 import { useBranches } from '@/lib/branch';
 import { branchFilterDefinition } from '@/lib/branch-filter';
+import { fetchBranchScopedLookup } from '@/lib/branch-scoped-lookup';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { formatRiyal } from '@/lib/money';
@@ -59,12 +60,12 @@ export default function SupplierPaymentsPage() {
     if (branchValue) params.set('branch', branchValue);
     Promise.all([
       api<{ data: Payment[] }>(`/payments?${params.toString()}`),
-      api<{ data: Partner[] }>('/partners?type=supplier'),
+      fetchBranchScopedLookup<Partner>('/partners?type=supplier', explorer.filters, branches),
     ])
-      .then(([pay, prt]) => { setData(pay.data); setPartnerList(prt.data); })
+      .then(([pay, prt]) => { setData(pay.data); setPartnerList(prt); })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : tsp('load_error')))
       .finally(() => setLoading(false));
-  }, [branchValue, tsp]);
+  }, [branchValue, branches, explorer.filters, tsp]);
 
   useEffect(() => load(), [load]);
   useEffect(() => {
