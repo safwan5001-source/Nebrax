@@ -12,6 +12,7 @@ import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption }
 import { api } from '@/lib/api';
 import { useBranches } from '@/lib/branch';
 import { branchFilterDefinition } from '@/lib/branch-filter';
+import { fetchBranchScopedLookup } from '@/lib/branch-scoped-lookup';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { formatRiyal } from '@/lib/money';
@@ -49,12 +50,12 @@ export default function PaymentsPage() {
     if (branchValue) params.set('branch', branchValue);
     Promise.all([
       api<{ data: Payment[] }>(`/payments?${params.toString()}`),
-      api<{ data: Partner[] }>('/partners?type=customer'),
+      fetchBranchScopedLookup<Partner>('/partners?type=customer', explorer.filters, branches),
     ]).then(([payments, customers]) => {
       setData(payments.data);
-      setPartners(Object.fromEntries(customers.data.map((partner) => [partner.id, partner.name])));
+      setPartners(Object.fromEntries(customers.map((partner) => [partner.id, partner.name])));
     }).finally(() => setLoading(false));
-  }, [branchValue]);
+  }, [branchValue, branches, explorer.filters]);
 
   useEffect(() => load(), [load]);
   useEffect(() => {
