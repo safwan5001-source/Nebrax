@@ -1,6 +1,6 @@
 import type { Direction, DocumentLine, DocumentModel, DocumentTypeId } from '../types';
 
-export type DocumentQaScenario = 'single' | 'five' | 'twenty' | 'multipage';
+export type DocumentQaScenario = 'single' | 'five' | 'twenty' | 'multipage' | 'long_content';
 
 export type DocumentQaOptions = {
   /** اختياري للتوافق مع فحوصات المرحلة الأولى؛ الافتراضي فاتورة ضريبية. */
@@ -43,7 +43,7 @@ function lineAt(index: number, direction: DocumentQaOptions['direction']): Docum
 }
 
 function countForScenario(scenario: DocumentQaScenario): number {
-  return { single: 1, five: 5, twenty: 20, multipage: 40 }[scenario];
+  return { single: 1, five: 5, twenty: 20, multipage: 40, long_content: 5 }[scenario];
 }
 
 function longArabicText(label: string): string {
@@ -65,7 +65,7 @@ export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
   const subtotal = lines.reduce((sum, line) => sum + (line.priceBeforeTax ?? 0), 0);
   const tax = lines.reduce((sum, line) => sum + line.tax, 0);
   const assets = options.showAssets;
-  const longContent = options.scenario === 'multipage';
+  const longContent = options.scenario === 'multipage' || options.scenario === 'long_content';
   const isPurchaseDocument = type === 'purchase_order' || type === 'purchase_invoice';
   const isDeliveryNote = type === 'delivery_note';
   const dueDate = type === 'delivery_note' ? null : type === 'sales_order' || type === 'purchase_order' ? '2026-09-30' : '2026-09-25';

@@ -1072,8 +1072,28 @@
     "revision_path_layout": "ترتيب الكتل",
     "revision_path_unknown": "خاصية القالب: {path}"
   },
+  "documentQa": {
+    "title": "مركز معاينة المستندات",
+    "subtitle": "معاينة يدوية آمنة للقوالب والاتجاهات وسيناريوهات المحتوى قبل اعتمادها.",
+    "current_selection": "المعاينة: {document} · {template} · {scenario} · {direction}",
+    "document_type": "نوع المستند",
+    "template": "القالب",
+    "scenario": "السيناريو",
+    "direction": "الاتجاه",
+    "pdf": "ملف PDF",
+    "download_pdf": "تنزيل PDF",
+    "preview_label": "معاينة المستند",
+    "scenario_single": "بند واحد",
+    "scenario_five": "5 بنود",
+    "scenario_twenty": "20 بنداً",
+    "scenario_multipage": "متعدد الصفحات",
+    "scenario_long_content": "محتوى طويل",
+    "direction_rtl": "العربية RTL",
+    "direction_ltr": "الإنجليزية LTR"
+  },
   "documentTypesAlt": {
     "tax_invoice": "Tax Invoice",
+    "simplified_tax_invoice": "Simplified Tax Invoice",
     "quotation": "Quotation",
     "sales_order": "Sales Order",
     "purchase_order": "Purchase Order",

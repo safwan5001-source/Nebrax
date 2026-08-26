@@ -1072,8 +1072,28 @@
     "revision_path_layout": "Block order",
     "revision_path_unknown": "Template property: {path}"
   },
+  "documentQa": {
+    "title": "Document Preview Center",
+    "subtitle": "Safe manual preview of templates, directions, and content scenarios before approval.",
+    "current_selection": "Preview: {document} · {template} · {scenario} · {direction}",
+    "document_type": "Document type",
+    "template": "Template",
+    "scenario": "Scenario",
+    "direction": "Direction",
+    "pdf": "PDF file",
+    "download_pdf": "Download PDF",
+    "preview_label": "Document preview",
+    "scenario_single": "Single line",
+    "scenario_five": "5 lines",
+    "scenario_twenty": "20 lines",
+    "scenario_multipage": "Multi-page",
+    "scenario_long_content": "Long content",
+    "direction_rtl": "Arabic RTL",
+    "direction_ltr": "English LTR"
+  },
   "documentTypesAlt": {
     "tax_invoice": "فاتورة ضريبية",
+    "simplified_tax_invoice": "فاتورة ضريبية مبسطة",
     "quotation": "عرض سعر",
     "sales_order": "أمر بيع",
     "purchase_order": "أمر شراء",

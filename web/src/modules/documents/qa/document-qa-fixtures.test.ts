@@ -3,7 +3,7 @@ import { makeDocumentQaModel } from './document-qa-fixtures';
 
 describe('نماذج تحقق المستندات', () => {
   it('تنشئ سيناريوهات أحجام البنود المطلوبة مع إجماليات مستمدة من البنود', () => {
-    const expectations = { single: 1, five: 5, twenty: 20, multipage: 40 } as const;
+    const expectations = { single: 1, five: 5, twenty: 20, multipage: 40, long_content: 5 } as const;
     for (const [scenario, count] of Object.entries(expectations) as Array<[keyof typeof expectations, number]>) {
       const model = makeDocumentQaModel({ scenario, direction: 'rtl', showQr: true, showAssets: true });
       expect(model.lines).toHaveLength(count);
@@ -30,6 +30,7 @@ describe('نماذج تحقق المستندات', () => {
   it('يغطي الحقول الطويلة والأصول والاتجاهين بلا اتصال ببيانات أعمال', () => {
     const arabic = makeDocumentQaModel({ scenario: 'multipage', direction: 'rtl', showQr: true, showAssets: true });
     const english = makeDocumentQaModel({ scenario: 'multipage', direction: 'ltr', showQr: false, showAssets: false });
+    const longContent = makeDocumentQaModel({ scenario: 'long_content', direction: 'rtl', showQr: true, showAssets: true });
 
     expect(arabic.seller.name.length).toBeGreaterThan(50);
     expect(arabic.buyer.name.length).toBeGreaterThan(50);
@@ -45,5 +46,9 @@ describe('نماذج تحقق المستندات', () => {
     expect(english.bank).toBeNull();
     expect(english.stampUrl).toBeNull();
     expect(english.signatureUrl).toBeNull();
+
+    expect(longContent.lines).toHaveLength(5);
+    expect(longContent.notes?.length).toBeGreaterThan(500);
+    expect(longContent.terms?.length).toBeGreaterThan(500);
   });
 });
