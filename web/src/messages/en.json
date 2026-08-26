@@ -3694,6 +3694,32 @@
       "outstanding": "Outstanding balance",
       "receivedAmount": "Received amount",
       "details": "Details",
+      "presentation": "Presentation",
+      "summary": "Summary",
+      "detail": "Detail",
+      "detailUnavailableTitle": "Source-level detail is unavailable for this report",
+      "detailUnavailableDescription": "This report shows grouped rows or time buckets. No details surface currently proves the report's exact scope and filters, so the transparent summarized rows remain the available source.",
+      "analytics": {
+        "empty": "There is not enough data to analyze in the selected scope",
+        "unassignedCustomer": "Unassigned customer",
+        "sales": {
+          "title": "Top customers by sales",
+          "description": "A presentation-only ranking of customers by posted sales-invoice totals in the selected scope."
+        },
+        "balances": {
+          "title": "Customers with the highest outstanding balances",
+          "description": "A presentation-only ranking of open outstanding balances from posted sales invoices."
+        },
+        "payments": {
+          "title": "Receipts over time",
+          "description": "A chronological sequence of posted customer-receipt amounts for the selected time grouping.",
+          "chartLabel": "Customer receipt amounts across chronological periods"
+        },
+        "appointments": {
+          "title": "Top customers by appointment count",
+          "description": "An operational ranking of customers by appointment count in the selected scope; it is not a financial indicator."
+        }
+      },
       "empty": "No data in the selected scope",
       "loadFailed": "The report could not be loaded. Check your connection and try again.",
       "retry": "Try again",

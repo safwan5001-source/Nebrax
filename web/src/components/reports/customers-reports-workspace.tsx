@@ -6,7 +6,7 @@ import { displayLocale } from '@/lib/formatting';
  * والقبض من سندات قبض مرحّلة، والمواعيد مصدر تشغيلي واضح مستقل عن المال.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Download, FileText, Printer, Share2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -26,6 +26,8 @@ import { printDocument } from '@/modules/documents/services/export';
 import { createReportPdf, downloadReportPdf, shareReportPdf } from '@/modules/reports/services/report-pdf';
 import { ReportMetricGrid, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
 import { ReportResultsTable } from '@/components/reports/report-results-table';
+import { ReportPresentationModeControl, type ReportPresentationMode } from '@/components/reports/report-presentation-mode';
+import { CustomerReportAnalytics } from '@/components/reports/customer-report-analytics';
 
 export type CustomerReportView = 'sales' | 'balances' | 'payments' | 'appointments';
 
@@ -90,25 +92,35 @@ export function CustomersReportsWorkspace({ view }: { view: CustomerReportView }
   const company = useCompany();
   const { success, error: errorToast } = useToast();
   const [filters, setFilters] = useState<CustomerReportFilterState>(EMPTY_CUSTOMER_REPORT_FILTERS);
+  const [presentationMode, setPresentationMode] = useState<ReportPresentationMode>('summary');
   const [report, setReport] = useState<CustomerReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const requestGeneration = useRef(0);
 
   const load = useCallback(() => {
-    setLoading(true);
+    const generation = ++requestGeneration.current;
+    setReport(null);
     setFailed(false);
+    setLoading(true);
     api<CustomerReportResponse>(`/reports/customers${filtersToQuery(view, filters)}`)
       .then((response) => {
         if (!response?.totals || !Array.isArray(response.data)) throw new Error('invalid-customer-report-response');
+        if (generation !== requestGeneration.current) return;
         setReport(response);
       })
-      .catch(() => setFailed(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (generation === requestGeneration.current) setFailed(true);
+      })
+      .finally(() => {
+        if (generation === requestGeneration.current) setLoading(false);
+      });
   }, [view, filters]);
 
   useEffect(() => load(), [load]);
+  useEffect(() => setPresentationMode('summary'), [view]);
 
   const count = useMemo(() => new Intl.NumberFormat(displayLocale(locale)).format.bind(new Intl.NumberFormat(displayLocale(locale))), [locale]);
   const rowLabel = useCallback((row: CustomerRow) => row.label ?? t('customer'), [t]);
@@ -169,12 +181,12 @@ export function CustomersReportsWorkspace({ view }: { view: CustomerReportView }
     if (view === 'appointments') return [
       { label: t('appointments'), value: count(report.totals.appointments ?? 0) },
       { label: t('scheduled'), value: count(report.totals.scheduled ?? 0) },
-      { label: t('done'), value: count(report.totals.done ?? 0), tone: 'positive' as const },
-      { label: t('cancelled'), value: count(report.totals.cancelled ?? 0), tone: 'negative' as const },
+      { label: t('done'), value: count(report.totals.done ?? 0) },
+      { label: t('cancelled'), value: count(report.totals.cancelled ?? 0) },
     ];
     if (view === 'payments') return [
       { label: t('receipts'), value: count(report.totals.receipts ?? 0) },
-      { label: t('receivedAmount'), value: formatRiyal(report.totals.amount ?? '0'), tone: 'positive' as const },
+      { label: t('receivedAmount'), value: formatRiyal(report.totals.amount ?? '0') },
     ];
     if (view === 'balances') return [
       { label: t('invoices'), value: count(report.totals.invoices ?? 0) },
@@ -185,7 +197,7 @@ export function CustomersReportsWorkspace({ view }: { view: CustomerReportView }
       { label: t('invoices'), value: count(report.totals.invoices ?? 0) },
       { label: t('netSales'), value: formatRiyal(report.totals.net_sales ?? report.totals.amount ?? '0') },
       { label: t('vat'), value: formatRiyal(report.totals.tax ?? '0') },
-      { label: t('totalSales'), value: formatRiyal(report.totals.amount ?? '0'), tone: 'positive' as const },
+      { label: t('totalSales'), value: formatRiyal(report.totals.amount ?? '0') },
     ];
   }, [report, view, t, count]);
 
@@ -261,26 +273,46 @@ export function CustomersReportsWorkspace({ view }: { view: CustomerReportView }
         <Card><CardContent className="py-10 text-center"><p className="text-sm text-negative">{t('loadFailed')}</p><Button className="mt-3" variant="outline" size="sm" onClick={load}>{t('retry')}</Button></CardContent></Card>
       ) : (
         <>
+          <div className="no-print flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-text">{t('presentation')}</h2>
+            <ReportPresentationModeControl
+              value={presentationMode}
+              onChange={setPresentationMode}
+              label={t('presentation')}
+              summaryLabel={t('summary')}
+              detailLabel={t('detail')}
+            />
+          </div>
           <ReportMetricGrid metrics={summary} />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{t('details')}</CardTitle><Badge tone="neutral">{sourceLabel}</Badge></CardHeader>
-            <CardContent>
-              {!doc || doc.rows.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
-              ) : (
-                <ReportResultsTable
-                  columns={doc.columns}
-                  rows={doc.rows}
-                  totalRow={doc.totalRow}
-                  emptyText={t('empty')}
-                  primaryIndex={0}
-                  rowHrefs={rowHrefs}
-                  reportKey={`customers:${view}`}
-                />
-              )}
-            </CardContent>
-          </Card>
+          {presentationMode === 'detail' ? (
+            <Card data-testid="customers-detail-unavailable">
+              <CardHeader><CardTitle>{t('detailUnavailableTitle')}</CardTitle></CardHeader>
+              <CardContent><p className="text-sm leading-6 text-muted">{t('detailUnavailableDescription')}</p></CardContent>
+            </Card>
+          ) : (
+            <>
+              <CustomerReportAnalytics view={view} rows={report?.data ?? []} loading={loading} />
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{t('summary')}</CardTitle><Badge tone="neutral">{sourceLabel}</Badge></CardHeader>
+                <CardContent>
+                  {!doc || doc.rows.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted">{t('empty')}</p>
+                  ) : (
+                    <ReportResultsTable
+                      columns={doc.columns}
+                      rows={doc.rows}
+                      totalRow={doc.totalRow}
+                      emptyText={t('empty')}
+                      primaryIndex={0}
+                      rowHrefs={rowHrefs}
+                      reportKey={`customers:${view}`}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
 
           {doc && showPreview && (
             <Card>
