@@ -24,6 +24,10 @@ class CompanyProfile
 
     /** مفاتيح company القابلة للحفظ والعرض في المستندات. */
     public const SETTINGS_FIELDS = [
+        'name_en',
+        'unified_number',
+        'email',
+        'website',
         'logo',
         'phone',
         'mobile',
@@ -47,22 +51,26 @@ class CompanyProfile
 
         return [
             'name'           => $tenant->name,
+            'name_en'        => $company['name_en'] ?? null,
             'account_number' => $tenant->account_number,
             'support_number' => $tenant->support_number,
             'vat_number'     => $tenant->vat_number,
-            'cr_number'     => $tenant->cr_number,
-            'currency'      => $tenant->currency,
-            'country'       => $tenant->country,
-            'logo'          => $company['logo'],
-            'phone'         => $company['phone'],
-            'mobile'        => $company['mobile'],
-            'building_no'   => $company['building_no'],
-            'street'        => $company['street'],
-            'additional_no' => $company['additional_no'],
-            'district'      => $company['district'],
-            'city'          => $company['city'],
-            'postal_code'   => $company['postal_code'],
-            'short_address' => $company['short_address'],
+            'cr_number'      => $tenant->cr_number,
+            'unified_number' => $company['unified_number'] ?? null,
+            'currency'       => $tenant->currency,
+            'country'        => $tenant->country,
+            'email'          => $company['email'] ?? null,
+            'website'        => $company['website'] ?? null,
+            'logo'           => $company['logo'],
+            'phone'          => $company['phone'],
+            'mobile'         => $company['mobile'],
+            'building_no'    => $company['building_no'],
+            'street'         => $company['street'],
+            'additional_no'  => $company['additional_no'],
+            'district'       => $company['district'],
+            'city'           => $company['city'],
+            'postal_code'    => $company['postal_code'],
+            'short_address'  => $company['short_address'],
         ];
     }
 }
