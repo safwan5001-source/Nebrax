@@ -222,7 +222,7 @@ export default function RecurringInvoicesPage() {
         amountLabel: t('total'),
         amount: formatRiyal(item.total),
         secondary: { label: t('frequency'), value: t(item.frequency) },
-        status: { label: item.active ? t('active') : t('inactive'), tone: item.active ? 'positive' : 'muted' },
+        status: <Badge tone={item.active ? 'positive' : 'muted'}>{item.active ? t('active') : t('inactive')}</Badge>,
         meta: item.next_run_date,
       })}
     />
