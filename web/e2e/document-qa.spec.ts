@@ -95,19 +95,21 @@ test.describe('Document QA — scenarios, A4 and responsive preview', () => {
 
   test('يتحقق من logo وQR وBank وStamp وSignature في حالتي التشغيل والإيقاف', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
-    await openQa(page, { template: 'tax-invoice-modern', direction: 'rtl', scenario: 'multipage', logo: 'on', qr: 'on', assets: 'on' });
-    await expect(page.locator('img[alt*="شركة نبراكس"]')).toBeVisible();
-    await expect(page.locator('img[alt="stamp"]')).toBeVisible();
-    await expect(page.getByText('البنك الأهلي السعودي')).toBeVisible();
-    await expect(page.getByText('رمز تحقق خاص بالمعاينة')).toBeVisible();
-    await expect(page.getByText('الشروط والأحكام:')).toBeVisible();
-    await expect(page.getByText('ملاحظات داخلية:')).toBeVisible();
+    for (const template of templates) {
+      await openQa(page, { template, direction: 'rtl', scenario: 'multipage', logo: 'on', qr: 'on', assets: 'on' });
+      await expect(page.locator('img[alt*="شركة نبراكس"]')).toBeVisible();
+      await expect(page.locator('img[alt="stamp"]')).toBeVisible();
+      await expect(page.getByText('البنك الأهلي السعودي')).toBeVisible();
+      await expect(page.getByText('رمز تحقق خاص بالمعاينة')).toBeVisible();
+      await expect(page.getByText('الشروط والأحكام:')).toBeVisible();
+      await expect(page.getByText('ملاحظات داخلية:')).toBeVisible();
 
-    await openQa(page, { template: 'tax-invoice-modern', direction: 'ltr', scenario: 'single', logo: 'off', qr: 'off', assets: 'off' });
-    await expect(page.locator('img[alt*="Nebrax QA"]')).toHaveCount(0);
-    await expect(page.locator('img[alt="stamp"]')).toHaveCount(0);
-    await expect(page.getByText('National Commercial Bank')).toHaveCount(0);
-    await expect(page.getByText('QA-only QR payload')).toHaveCount(0);
+      await openQa(page, { template, direction: 'ltr', scenario: 'single', logo: 'off', qr: 'off', assets: 'off' });
+      await expect(page.locator('img[alt*="Nebrax QA"]')).toHaveCount(0);
+      await expect(page.locator('img[alt="stamp"]')).toHaveCount(0);
+      await expect(page.getByText('National Commercial Bank')).toHaveCount(0);
+      await expect(page.getByText('QA-only QR payload')).toHaveCount(0);
+    }
   });
 
   test('يبقي معاينة A4 ومحدد القالب مرئيين بلا تجاوز أفقي عند المقاسات المطلوبة', async ({ page }) => {
