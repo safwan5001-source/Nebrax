@@ -1,10 +1,10 @@
 import * as React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DeliveryNoteInvoiceDraftWizard } from './delivery-note-invoice-draft-wizard';
 
-const { api, translate } = vi.hoisted(() => {
+const { api, translate, currentUser, ApiError } = vi.hoisted(() => {
   const strings: Record<string, string> = {
     invoiceDraftTitle: 'Create sales invoice draft',
     invoiceDraftSubtitle: 'Create one draft',
@@ -23,6 +23,7 @@ const { api, translate } = vi.hoisted(() => {
     invoiceDraftPriceList: 'Price list',
     invoiceDraftCustomerDefault: 'Customer default',
     invoiceDraftPriceListHint: 'Use the selected list.',
+    invoiceDraftPriceListsUnavailable: 'Price lists could not be loaded.',
     invoiceDraftRunPreview: 'Preview eligibility and pricing',
     invoiceDraftPreviewing: 'Preparing preview…',
     invoiceDraftNeedSelection: 'Select a note.',
@@ -52,14 +53,15 @@ const { api, translate } = vi.hoisted(() => {
   };
   const translator = (key: string, values?: Record<string, unknown>) => (strings[key] ?? key)
     .replace(/\{(\w+)\}/g, (_, name) => String(values?.[name] ?? ''));
-  return { api: vi.fn(), translate: translator };
+  class MockApiError extends Error {}
+  return { api: vi.fn(), translate: translator, currentUser: vi.fn(), ApiError: MockApiError };
 });
 
 vi.mock('next-intl', () => ({ useTranslations: () => translate }));
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('notes=dn-1,dn-2') }));
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
-vi.mock('@/lib/api', () => ({ api, ApiError: class ApiError extends Error {} }));
-vi.mock('@/lib/auth', () => ({ currentUser: () => ({ role: 'owner', permissions: ['*'] }) }));
+vi.mock('@/lib/api', () => ({ api, ApiError }));
+vi.mock('@/lib/auth', () => ({ currentUser: () => currentUser() }));
 vi.mock('lucide-react', () => {
   const Icon = () => <span />;
   return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
@@ -84,8 +86,12 @@ const preview = {
 };
 
 describe('DeliveryNoteInvoiceDraftWizard', () => {
+  afterEach(() => cleanup());
+
   beforeEach(() => {
     api.mockReset();
+    currentUser.mockReset();
+    currentUser.mockReturnValue({ role: 'owner', permissions: ['*'] });
     api.mockImplementation((path: string) => {
       if (path.startsWith('/delivery-notes?')) return Promise.resolve({ data: [note('dn-1', 'DN-001', 1), note('dn-2', 'DN-002', 2)] });
       if (path === '/price-lists') return Promise.resolve({ data: [] });
@@ -93,6 +99,27 @@ describe('DeliveryNoteInvoiceDraftWizard', () => {
       if (path === '/delivery-notes/invoice-draft') return Promise.resolve({ data: { id: 'invoice-1', number: 'INV-001', status: 'draft' }, meta: { idempotent_replay: false } });
       return Promise.resolve({ data: [] });
     });
+  });
+
+  it('keeps the wizard usable for delivery-note-only permissions when price-list access returns 403', async () => {
+    currentUser.mockReturnValue({
+      role: 'delivery-invoicer',
+      permissions: ['delivery_notes.view', 'delivery_notes.invoice'],
+    });
+    api.mockImplementation((path: string) => {
+      if (path.startsWith('/delivery-notes?')) return Promise.resolve({ data: [note('dn-1', 'DN-001', 1)] });
+      if (path === '/price-lists') return Promise.reject(new ApiError('Forbidden: price lists'));
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<DeliveryNoteInvoiceDraftWizard />);
+
+    await screen.findAllByText('DN-001');
+    await screen.findByText('Forbidden: price lists');
+    expect(screen.getByText('Forbidden: price lists')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Standalone sales invoice' })).toBeNull();
+    const previewButton = screen.getByRole('button', { name: 'Preview eligibility and pricing' });
+    expect((previewButton as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('requests a safe preview for the selected notes and never calls invoice posting', async () => {

@@ -75,6 +75,15 @@ test.describe('Delivery notes to invoice draft — local fixture only', () => {
     await page.screenshot({ path: testInfo.outputPath(`delivery-notes-invoice-draft-${testInfo.project.name}-rtl-light.png`), fullPage: true });
   });
 
+  test('shows a pre-linked note as unavailable while keeping an unlinked note selectable', async ({ page }) => {
+    await seedLocalFixture(page);
+    await page.goto('/delivery-notes/invoice-draft?notes=dn-100,dn-103');
+
+    await expect(page.getByLabel('اختيار سند التسليم DN-2026-00100').first()).toBeDisabled();
+    await expect(page.locator('span.text-xs.text-negative:visible').filter({ hasText: 'مرتبط بالفعل بالمسودة' })).toBeVisible();
+    await expect(page.getByLabel('اختيار سند التسليم DN-2026-00103').first()).toBeEnabled();
+  });
+
   test('shows a local fixture mixed-customer eligibility error and keeps the build action disabled', async ({ page }, testInfo) => {
     await seedLocalFixture(page);
     await page.goto('/delivery-notes/invoice-draft?notes=dn-103,dn-101');

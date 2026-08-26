@@ -38,7 +38,11 @@ class DeliveryNoteController extends ApiController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = DeliveryNote::query()->with(['customer', 'warehouse']);
+        $query = DeliveryNote::query()->with([
+            'customer',
+            'warehouse',
+            'invoiceAllocations.invoice',
+        ]);
         foreach (['status', 'customer_id', 'warehouse_id'] as $field) {
             if (! empty($validated[$field])) {
                 $query->where($field, $validated[$field]);

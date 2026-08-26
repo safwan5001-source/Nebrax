@@ -16,6 +16,7 @@ use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\PriceList;
+use App\Models\Role;
 use App\Models\StockMovement;
 use App\Models\Tenant;
 use App\Models\UnitTemplate;
@@ -178,6 +179,61 @@ class DeliveryNoteInvoiceDraftBuilderTest extends TestCase
         $changed['line_pricing'][0]['unit_price'] = 13000;
         $this->expectException(DeliveryNoteInvoiceConflictException::class);
         $this->builder->build($changed);
+    }
+
+    #[Test]
+    public function api_replays_a_matching_idempotency_key_after_the_invoice_plan_limit_but_rejects_new_or_changed_requests(): void
+    {
+        $this->tenant->update(['plan_limits' => ['invoices_per_month' => 1]]);
+        $first = $this->confirmedNote([['product_id' => $this->product->id, 'quantity' => 1]]);
+        $payload = $this->command([$first], idempotencyKey: 'api-plan-replay-0001');
+        unset($payload['actor_id']);
+
+        $created = $this->withToken($this->token)
+            ->postJson('/api/delivery-notes/invoice-draft', $payload)
+            ->assertCreated()
+            ->assertJsonPath('meta.idempotent_replay', false)
+            ->json('data.id');
+
+        $this->withToken($this->token)
+            ->postJson('/api/delivery-notes/invoice-draft', $payload)
+            ->assertOk()
+            ->assertJsonPath('data.id', $created)
+            ->assertJsonPath('meta.idempotent_replay', true);
+
+        $changed = $payload;
+        $changed['reason'] = 'سبب مختلف لا يجوز أن يعيد نفس الطلب.';
+        $this->withToken($this->token)
+            ->postJson('/api/delivery-notes/invoice-draft', $changed)
+            ->assertConflict();
+
+        $second = $this->confirmedNote([['product_id' => $this->product->id, 'quantity' => 1]]);
+        $new = $this->command([$second], idempotencyKey: 'api-plan-new-0001');
+        unset($new['actor_id']);
+        $this->withToken($this->token)
+            ->postJson('/api/delivery-notes/invoice-draft', $new)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', fn (string $message) => str_contains($message, 'حدّ خطتك'));
+
+        $this->assertSame(1, Invoice::count());
+    }
+
+    #[Test]
+    public function delivery_note_index_projects_linked_and_unlinked_draft_availability_without_extra_requests(): void
+    {
+        $linked = $this->confirmedNote([['product_id' => $this->product->id, 'quantity' => 1]]);
+        $available = $this->confirmedNote([['product_id' => $this->product->id, 'quantity' => 1]]);
+        $invoice = $this->builder->build($this->command([$linked], idempotencyKey: 'index-link-0001'))->invoice;
+
+        $rows = $this->withToken($this->token)
+            ->getJson('/api/delivery-notes?status=confirmed&per_page=100')
+            ->assertOk()
+            ->json('data');
+        $byId = collect($rows)->keyBy('id');
+
+        $this->assertSame($invoice->id, $byId[$linked->id]['invoice_draft']['invoice_id']);
+        $this->assertSame($invoice->number, $byId[$linked->id]['invoice_draft']['number']);
+        $this->assertNull($byId[$available->id]['invoice_draft']);
     }
 
     #[Test]
@@ -383,6 +439,43 @@ class DeliveryNoteInvoiceDraftBuilderTest extends TestCase
         $this->withToken($withoutGrant['token'])
             ->postJson('/api/delivery-notes/invoice-draft/preview', $previewPayload)
             ->assertForbidden();
+    }
+
+    #[Test]
+    public function a_custom_delivery_note_invoicer_can_preview_and_build_without_invoice_view_permission(): void
+    {
+        $role = Role::create([
+            'slug' => 'delivery-note-invoicer',
+            'name' => 'مُنشئ مسودات التسليم',
+            'permissions' => ['delivery_notes.view', 'delivery_notes.invoice'],
+            'is_system' => false,
+        ]);
+        $user = User::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'مُنشئ مسودات محدود',
+            'email' => 'delivery-invoicer@delivery-note-invoice-draft.test',
+            'password' => 'password123',
+            'role' => $role->slug,
+            'is_active' => true,
+        ]);
+        $token = $user->createToken('api')->plainTextToken;
+        $note = $this->confirmedNote([['product_id' => $this->product->id, 'quantity' => 1]]);
+
+        $this->withToken($token)
+            ->getJson('/api/delivery-notes?status=confirmed&per_page=100')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $note->id);
+        $this->withToken($token)
+            ->postJson('/api/delivery-notes/invoice-draft/preview', ['delivery_note_ids' => [$note->id]])
+            ->assertOk()
+            ->assertJsonPath('data.delivery_notes.0.eligible', true);
+
+        $payload = $this->command([$note], idempotencyKey: 'custom-delivery-invoicer-0001');
+        unset($payload['actor_id']);
+        $this->withToken($token)
+            ->postJson('/api/delivery-notes/invoice-draft', $payload)
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'draft');
     }
 
     #[Test]

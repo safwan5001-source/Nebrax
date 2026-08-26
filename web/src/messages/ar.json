@@ -6353,6 +6353,7 @@
     "invoiceDraftPriceList": "قائمة الأسعار",
     "invoiceDraftCustomerDefault": "قائمة العميل الافتراضية النشطة",
     "invoiceDraftPriceListHint": "يجب أن تطابق أسعار السطور قائمة الأسعار المختارة، إن اختيرت أو وُجدت قائمة افتراضية نشطة للعميل.",
+    "invoiceDraftPriceListsUnavailable": "تعذر تحميل قوائم الأسعار المتاحة. ما زال بإمكانك المتابعة بسعر السطر وقائمة العميل الافتراضية إن وجدت.",
     "invoiceDraftRunPreview": "معاينة الأهلية والتسعير",
     "invoiceDraftPreviewing": "جارٍ إنشاء المعاينة…",
     "invoiceDraftNeedSelection": "اختر سند تسليم واحداً على الأقل قبل إنشاء المعاينة.",

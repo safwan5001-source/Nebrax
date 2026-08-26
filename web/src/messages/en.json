@@ -6357,6 +6357,7 @@
     "invoiceDraftPriceList": "Price list",
     "invoiceDraftCustomerDefault": "Customer's active default price list",
     "invoiceDraftPriceListHint": "Line prices must match a selected list, or the customer's active default price list when one is present.",
+    "invoiceDraftPriceListsUnavailable": "Available price lists could not be loaded. You can still continue with the line price and the customer's active default list when one exists.",
     "invoiceDraftRunPreview": "Preview eligibility and pricing",
     "invoiceDraftPreviewing": "Preparing preview…",
     "invoiceDraftNeedSelection": "Select at least one delivery note before running the preview.",

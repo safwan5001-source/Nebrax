@@ -15,9 +15,11 @@ use App\Models\InvoiceLine;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\PriceList;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\PriceListService;
+use App\Support\PlanGate;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
@@ -191,6 +193,9 @@ class DeliveryNoteSalesInvoiceDraftBuilder
             if ($command['price_list_id'] !== null) {
                 $invoiceData['price_list_id'] = $command['price_list_id'];
             }
+            // يتحقق replay قبل الحصة؛ أما الطلب الجديد فيستهلك الحصة هنا فقط،
+            // فيبقى إنشاء المسودة مكافئاً لإنشاء فاتورة عادية من دون حجب retry آمن.
+            $this->assertInvoicePlanAvailable($tenantId);
             $invoice = $this->invoices->create($invoiceData, array_column($invoiceItems, 'item'));
 
             $build = DeliveryNoteInvoiceDraftBuild::withWriting(fn () => DeliveryNoteInvoiceDraftBuild::create([
@@ -211,6 +216,23 @@ class DeliveryNoteSalesInvoiceDraftBuilder
             }
 
             throw $exception;
+        }
+    }
+
+    private function assertInvoicePlanAvailable(string $tenantId): void
+    {
+        $tenant = Tenant::query()->whereKey($tenantId)->lockForUpdate()->firstOrFail();
+        $limit = PlanGate::limit($tenant, 'invoices_per_month');
+        if ($limit === null) {
+            return;
+        }
+
+        $count = Invoice::query()
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
+            ->count();
+        if ($count >= $limit) {
+            throw new RuntimeException("تجاوزت حدّ خطتك ({$limit} فاتورة شهرياً). رقِّ خطتك للمزيد.");
         }
     }
 

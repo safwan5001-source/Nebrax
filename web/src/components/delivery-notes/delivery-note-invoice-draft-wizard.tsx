@@ -85,12 +85,14 @@ export function DeliveryNoteInvoiceDraftWizard() {
   const searchParams = useSearchParams();
   const user = currentUser();
   const canInvoice = hasPermission(user?.permissions, user?.role, DELIVERY_NOTE_PERMISSIONS.invoice);
+  const canViewInvoices = hasPermission(user?.permissions, user?.role, 'invoices.view');
   const initialIds = useMemo(
     () => (searchParams.get('notes') ?? '').split(',').map((value) => value.trim()).filter(Boolean).slice(0, 50),
     [searchParams],
   );
   const [notes, setNotes] = useState<DeliveryNote[]>([]);
   const [priceLists, setPriceLists] = useState<PriceList[]>([]);
+  const [priceListError, setPriceListError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>(initialIds);
   const [priceListId, setPriceListId] = useState('');
   const [preview, setPreview] = useState<DraftPreview | null>(null);
@@ -111,17 +113,22 @@ export function DeliveryNoteInvoiceDraftWizard() {
   const loadNotes = useCallback(() => {
     setLoading(true);
     setError(null);
-    Promise.all([
-      api<{ data: DeliveryNote[] }>('/delivery-notes?status=confirmed&per_page=100&sort=delivery_date&direction=desc'),
-      api<{ data: PriceList[] }>('/price-lists'),
-    ])
-      .then(([noteResult, priceListResult]) => {
+    setPriceListError(null);
+
+    api<{ data: DeliveryNote[] }>('/delivery-notes?status=confirmed&per_page=100&sort=delivery_date&direction=desc')
+      .then((noteResult) => {
         setNotes(noteResult.data);
-        setPriceLists(priceListResult.data.filter((priceList) => priceList.is_active));
+        return api<{ data: PriceList[] }>('/price-lists')
+          .then((priceListResult) => setPriceLists(priceListResult.data.filter((priceList) => priceList.is_active)))
+          .catch((caught) => {
+            setPriceLists([]);
+            setPriceListId('');
+            setPriceListError(caught instanceof ApiError ? caught.message : t('invoiceDraftPriceListsUnavailable'));
+          });
       })
       .catch((caught) => setError(caught instanceof ApiError ? caught.message : tc('saveFailed')))
       .finally(() => setLoading(false));
-  }, [tc]);
+  }, [t, tc]);
 
   useEffect(() => {
     if (canInvoice) loadNotes();
@@ -253,7 +260,7 @@ export function DeliveryNoteInvoiceDraftWizard() {
         <h1 className="mt-2 text-xl font-semibold text-text">{t('invoiceDraftTitle')}</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted">{t('invoiceDraftSubtitle')}</p>
       </div>
-      <Button asChild variant="outline"><Link href="/invoices/new"><FileText className="h-4 w-4" strokeWidth={1.7} />{t('invoiceDraftGenericInvoice')}</Link></Button>
+      {canViewInvoices && <Button asChild variant="outline"><Link href="/invoices/new"><FileText className="h-4 w-4" strokeWidth={1.7} />{t('invoiceDraftGenericInvoice')}</Link></Button>}
     </header>
 
     <section className="rounded border border-primary/25 bg-primary-soft/40 p-4 text-sm text-text">
@@ -283,7 +290,7 @@ export function DeliveryNoteInvoiceDraftWizard() {
       <CardHeader><CardTitle>{t('invoiceDraftPreviewTitle')}</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-1.5"><Label htmlFor="invoice-draft-price-list">{t('invoiceDraftPriceList')}</Label><Select id="invoice-draft-price-list" value={priceListId} onChange={(event) => { setPriceListId(event.target.value); setPreview(null); setPricing({}); setBuilt(null); }}><option value="">{t('invoiceDraftCustomerDefault')}</option>{priceLists.map((priceList) => <option key={priceList.id} value={priceList.id}>{priceList.name}</option>)}</Select><p className="text-xs text-muted">{t('invoiceDraftPriceListHint')}</p></div>
+          <div className="space-y-1.5"><Label htmlFor="invoice-draft-price-list">{t('invoiceDraftPriceList')}</Label><Select id="invoice-draft-price-list" value={priceListId} disabled={priceListError !== null} onChange={(event) => { setPriceListId(event.target.value); setPreview(null); setPricing({}); setBuilt(null); }}><option value="">{t('invoiceDraftCustomerDefault')}</option>{priceLists.map((priceList) => <option key={priceList.id} value={priceList.id}>{priceList.name}</option>)}</Select><p className="text-xs text-muted">{t('invoiceDraftPriceListHint')}</p>{priceListError && <p role="alert" className="text-xs text-negative">{priceListError}</p>}</div>
           <div className="flex items-end"><Button type="button" className="w-full md:w-auto" disabled={previewing || selectedIds.length === 0} onClick={runPreview}>{previewing && <Loader2 className="h-4 w-4 animate-spin" />}{previewing ? t('invoiceDraftPreviewing') : t('invoiceDraftRunPreview')}</Button></div>
         </div>
         {preview && <div className="space-y-3" aria-live="polite">
@@ -307,7 +314,7 @@ export function DeliveryNoteInvoiceDraftWizard() {
       </CardContent>
     </Card>}
 
-    {built && <section className="rounded border border-positive/30 bg-positive/10 p-4" role="status"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2 font-medium text-positive"><CheckCircle2 className="h-5 w-5" />{built.replay ? t('invoiceDraftReplayCreated') : t('invoiceDraftCreated')}</div><p className="mt-1 text-sm text-muted">{t('invoiceDraftCreatedHint')}</p></div><Button asChild><Link href={`/invoices/${built.invoice.id}`}>{built.invoice.number ?? t('invoiceDraftOpenInvoice')}</Link></Button></div></section>}
+    {built && <section className="rounded border border-positive/30 bg-positive/10 p-4" role="status"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2 font-medium text-positive"><CheckCircle2 className="h-5 w-5" />{built.replay ? t('invoiceDraftReplayCreated') : t('invoiceDraftCreated')}</div><p className="mt-1 text-sm text-muted">{t('invoiceDraftCreatedHint')}</p></div>{canViewInvoices ? <Button asChild><Link href={`/invoices/${built.invoice.id}`}>{built.invoice.number ?? t('invoiceDraftOpenInvoice')}</Link></Button> : <Badge tone="positive" className="num self-start sm:self-auto">{built.invoice.number ?? t('invoiceDraftOpenInvoice')}</Badge>}</div></section>}
 
     <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 p-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0"><div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:justify-end"><Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setPreview(null); setPricing({}); setBuilt(null); setError(null); setIdempotencyKey(newKey()); }} disabled={building}><RefreshCw className="h-4 w-4" strokeWidth={1.7} />{t('invoiceDraftReset')}</Button><Button type="button" className="w-full sm:w-auto" disabled={!allPreviewEligible || !pricingValid || !reason.trim() || building} onClick={buildDraft}>{building && <Loader2 className="h-4 w-4 animate-spin" />}{building ? t('invoiceDraftCreating') : t('invoiceDraftCreate')}</Button></div></div>
   </div>;
