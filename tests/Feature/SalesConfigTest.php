@@ -250,6 +250,47 @@ class SalesConfigTest extends TestCase
     }
 
     /** @test */
+    public function pos_feedback_settings_have_safe_defaults_persist_and_validate_volume(): void
+    {
+        ['token' => $token] = $this->registerTenant('pos-feedback', 'owner@pos-feedback.test');
+
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.sound_enabled', true)
+            ->assertJsonPath('data.scan_sound_enabled', true)
+            ->assertJsonPath('data.error_sound_enabled', true)
+            ->assertJsonPath('data.payment_sound_enabled', true)
+            ->assertJsonPath('data.sound_volume', 60)
+            ->assertJsonPath('data.haptics_enabled', true);
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => [
+                'sound_enabled' => false,
+                'scan_sound_enabled' => false,
+                'error_sound_enabled' => true,
+                'payment_sound_enabled' => false,
+                'sound_volume' => 30,
+                'haptics_enabled' => false,
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.sound_enabled', false)
+            ->assertJsonPath('data.scan_sound_enabled', false)
+            ->assertJsonPath('data.error_sound_enabled', true)
+            ->assertJsonPath('data.payment_sound_enabled', false)
+            ->assertJsonPath('data.sound_volume', 30)
+            ->assertJsonPath('data.haptics_enabled', false);
+
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.sound_enabled', false)
+            ->assertJsonPath('data.sound_volume', 30);
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['sound_volume' => 101],
+        ])->assertUnprocessable();
+    }
+
+    /** @test */
     public function staff_cannot_update_config(): void
     {
         ['tenant_id' => $tid] = $this->registerTenant('nibras', 'owner@nibras.test');
