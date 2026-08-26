@@ -97,18 +97,33 @@ class ProductImportV2Test extends TestCase
     public function an_explicit_mapping_overrides_the_header_names(): void
     {
         $auth = $this->registerTenant();
-        $file = $this->csv(['A', 'B', 'C'], [['SKU-MAP-1', 'منتج مطابق', '12.75']]);
+        $file = $this->csv(['A', 'B', 'C', 'D'], [['SKU-MAP-1', 'منتج مطابق', '12.75', 'good']]);
 
         $this->withToken($auth['token'])->post('/api/products/import/apply', [
             'file' => $file,
             'mode' => 'create',
-            'mapping' => [0 => 'sku', 1 => 'name', 2 => 'sale_price'],
+            'mapping' => [0 => 'sku', 1 => 'name', 2 => 'sale_price', 3 => 'type'],
         ])->assertOk()->assertJsonPath('data.created', 1);
 
         $product = Product::where('sku', 'SKU-MAP-1')->firstOrFail();
         $this->assertSame('منتج مطابق', $product->name);
         $this->assertSame(1275, $product->sale_price);
-        $this->assertSame('good', $product->type, 'النوع غير المطابق يأخذ افتراض البطاقة.');
+        $this->assertSame('good', $product->type);
+    }
+
+    /** @test */
+    public function a_mapping_that_leaves_a_required_field_unmapped_is_refused_before_any_row(): void
+    {
+        $auth = $this->registerTenant();
+        $file = $this->csv(['A', 'B', 'C'], [['SKU-MAP-2', 'بلا نوع', '12.75']]);
+
+        // النوع مطلوب لإنشاء منتج تماماً كما في بطاقة المنتج؛ افتراضه صامتاً
+        // كان سيُنشئ سلعاً متتبَّعة من ملفٍ كلّه خدمات.
+        $this->withToken($auth['token'])->post('/api/products/import/preview', [
+            'file' => $file,
+            'mode' => 'create',
+            'mapping' => [0 => 'sku', 1 => 'name', 2 => 'sale_price'],
+        ])->assertStatus(422);
     }
 
     /** @test */

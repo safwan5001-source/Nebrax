@@ -1143,7 +1143,11 @@ class ProductImportService
      */
     private function assertLiveConflicts(array $payload, string $action, ?Product $existing, array &$messages): void
     {
-        $exceptId = $action === 'update' ? $existing?->id : null;
+        // الاستثناء يُشتقّ من **المنتج المطابَق** لا من اسم الإجراء: صفٌّ لا
+        // يغيّر شيئاً يتحوّل إلى «تخطٍّ» قبل هذا الفحص، فلو قرأنا الإجراء وحده
+        // لصار المنتج يتعارض مع باركود نفسه ويُرفض ملفُ round-trip كما صُدِّر.
+        // وفي وضع الإنشاء لا يصل الصف هنا أصلاً إن طابق منتجاً قائماً.
+        $exceptId = $existing?->id;
 
         $sku = (string) ($payload['sku'] ?? '');
         if ($sku !== '' && $this->hasLiveSkuConflict($sku, $exceptId)) {

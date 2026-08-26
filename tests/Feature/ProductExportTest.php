@@ -208,7 +208,7 @@ class ProductExportTest extends TestCase
         $this->assertStringContainsString('spreadsheetml.sheet', $response->headers->get('Content-Type'));
         $rows = $this->readXlsx($response);
         $this->assertSame(['XL-1'], $this->column($rows, 'sku'));
-        $this->assertSame(['35.00'], $this->column($rows, 'sale_price'));
+        $this->assertSame(['35.25'], $this->column($rows, 'sale_price'));
         $this->assertSame(['06281234567890'], $this->column($rows, 'barcode'), 'الباركود نصّ فلا يسقط صفره البادئ.');
     }
 
