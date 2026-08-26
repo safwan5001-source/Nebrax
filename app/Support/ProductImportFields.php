@@ -208,20 +208,19 @@ class ProductImportFields
     /**
      * يطبّع اسم عمود من ملف المستخدم إلى مفتاح مقارنة: حروف وأرقام فقط،
      * صغيرة، بلا مسافات ولا شرطات ولا «ال» التعريف ولا تشكيل.
+     *
+     * التنفيذ في `ImportHeaderMatcher` منذ أن احتاجه مسار استيراد ثانٍ؛ يبقى
+     * هذا الاسم قائماً فلا يتغيّر أي مستدعٍ.
      */
     public static function normalizeHeader(string $header): string
     {
-        $value = trim($header, "\xEF\xBB\xBF \t\n\r\0\x0B");
-        $value = mb_strtolower($value, 'UTF-8');
-        // توحيد الألف والهاء/التاء المربوطة والياء كي يطابق «الفئة» و«الفئه».
-        $value = strtr($value, [
-            'أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ٱ' => 'ا',
-            'ة' => 'ه', 'ى' => 'ي', 'ؤ' => 'و', 'ئ' => 'ي',
-        ]);
-        $value = preg_replace('/[\x{0610}-\x{061A}\x{064B}-\x{065F}\x{0670}]/u', '', $value) ?? $value;
-        $value = preg_replace('/[^\p{L}\p{N}]+/u', '', $value) ?? $value;
+        return ImportHeaderMatcher::normalize($header);
+    }
 
-        return $value;
+    /** مرادفات كل حقل بشكلٍ يفهمه المطابِق المشترك. @return array<string, array<int, string>> */
+    private static function aliasIndex(): array
+    {
+        return array_map(static fn (array $field): array => $field['aliases'], self::all());
     }
 
     /**
@@ -233,23 +232,7 @@ class ProductImportFields
      */
     public static function suggest(string $header): ?string
     {
-        $needle = self::normalizeHeader($header);
-        if ($needle === '') {
-            return null;
-        }
-
-        foreach (self::all() as $key => $field) {
-            if ($needle === self::normalizeHeader($key)) {
-                return $key;
-            }
-            foreach ($field['aliases'] as $alias) {
-                if ($needle === self::normalizeHeader($alias)) {
-                    return $key;
-                }
-            }
-        }
-
-        return null;
+        return ImportHeaderMatcher::suggest($header, self::aliasIndex());
     }
 
     /**
@@ -261,19 +244,6 @@ class ProductImportFields
      */
     public static function autoMap(array $headers): array
     {
-        $mapping = [];
-        $taken = [];
-
-        foreach (array_values($headers) as $index => $header) {
-            $key = self::suggest((string) $header);
-            if ($key !== null && ! isset($taken[$key])) {
-                $mapping[$index] = $key;
-                $taken[$key] = true;
-                continue;
-            }
-            $mapping[$index] = null;
-        }
-
-        return $mapping;
+        return ImportHeaderMatcher::autoMap($headers, self::aliasIndex());
     }
 }
