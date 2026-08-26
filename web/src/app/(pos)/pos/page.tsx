@@ -24,6 +24,7 @@ import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosRecentInvoicesDialog } from '@/components/pos/pos-recent-invoices-dialog';
 import { PosProductImage } from '@/components/pos/pos-product-image';
+import { PosCategoryImage } from '@/components/pos/pos-category-image';
 import { cartHasUnsavedData, createPosActiveCart, usePosActiveCarts, type PosCartLine } from '@/components/pos/use-pos-active-carts';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
 import { PosPayment, type PaymentSummaryItem, type PosPaymentMethod, type PosTender } from '@/components/pos/pos-payment';
@@ -90,6 +91,7 @@ interface Product {
   pos_image?: { download_url: string } | null;
   category_id: string | null;
   category: string | null;
+  category_image?: { download_url: string } | null;
   tax_rate: number;
   type: string;
   track_inventory: boolean;
@@ -813,12 +815,16 @@ export default function PosPage() {
   }));
 
   const CATS = [
-    { key: 'all', label: t('cat_all'), icon: LayoutGrid },
+    { key: 'all', label: t('cat_all'), image: null as string | null, icon: LayoutGrid },
     ...Array.from(new Map(products
       .filter((product) => product.category_id && product.category)
-      .map((product) => [product.category_id as string, product.category as string]))
-      .entries())
-      .map(([key, label]) => ({ key, label, icon: Package })),
+      .map((product) => [product.category_id as string, {
+        key: product.category_id as string,
+        label: product.category as string,
+        image: product.category_image?.download_url ?? null,
+        icon: Package,
+      }]))
+      .values()),
   ];
   const TABS = [
     { key: 'all', label: t('tab_all'), icon: null },
@@ -854,6 +860,31 @@ export default function PosPage() {
           />
           <kbd className="num hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted sm:block">F4</kbd>
         </div>
+      </div>
+
+      {/* تصنيفات POS على الجوال/التابلت: صور سريعة مع تمرير أفقي، ونفس الفلتر التشغيلي. */}
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden" aria-label={t('categories')}>
+        {CATS.map(({ key, label, image, icon: Icon }) => {
+          const on = cat === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setCat(key)}
+              className={'flex w-[72px] shrink-0 flex-col items-center gap-1.5 rounded-lg border p-1.5 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-text')}
+            >
+              <span className="h-11 w-11 overflow-hidden rounded-md bg-background">
+                {key === 'all' ? (
+                  <span className="grid h-full w-full place-items-center bg-primary-soft text-primary"><Icon className="h-5 w-5" strokeWidth={1.7} /></span>
+                ) : (
+                  <PosCategoryImage path={image} alt={label} />
+                )}
+              </span>
+              <span className="line-clamp-2 min-h-7 text-[10.5px] font-semibold leading-tight">{label}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex items-center gap-2">
@@ -1064,18 +1095,26 @@ export default function PosPage() {
   );
 
   const catsPanel = (
-    <aside className="hidden flex-col gap-2 overflow-y-auto border-s border-border bg-surface p-4 lg:flex">
+    <aside className="hidden flex-col gap-2 overflow-y-auto border-s border-border bg-surface p-3 lg:flex">
       <h4 className="mb-1 px-1 text-xs font-bold text-muted">{t('categories')}</h4>
-      {CATS.map(({ key, label, icon: Icon }) => {
+      {CATS.map(({ key, label, image, icon: Icon }) => {
         const on = cat === key;
         return (
           <button
             key={key}
+            type="button"
+            aria-pressed={on}
             onClick={() => setCat(key)}
-            className={'flex items-center gap-3 rounded-[11px] border px-3 py-3 text-[13px] font-semibold ' + (on ? 'border-transparent bg-primary-soft text-primary-hover' : 'border-transparent text-text hover:bg-background')}
+            className={'flex w-full flex-col items-center gap-2 rounded-lg border p-2 text-center text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'border-primary bg-primary-soft text-primary' : 'border-transparent text-text hover:bg-background')}
           >
-            <span className="grid h-[26px] w-[26px] place-items-center rounded-md bg-primary-soft text-primary-hover"><Icon className="h-3.5 w-3.5" strokeWidth={1.8} /></span>
-            {label}
+            <span className="h-12 w-12 overflow-hidden rounded-md bg-background">
+              {key === 'all' ? (
+                <span className="grid h-full w-full place-items-center bg-primary-soft text-primary"><Icon className="h-5 w-5" strokeWidth={1.7} /></span>
+              ) : (
+                <PosCategoryImage path={image} alt={label} />
+              )}
+            </span>
+            <span className="line-clamp-2 leading-tight">{label}</span>
           </button>
         );
       })}
@@ -1083,7 +1122,7 @@ export default function PosPage() {
   );
 
   return (
-          <div className="flex h-full flex-col overflow-hidden bg-background">
+    <div className="flex h-full flex-col overflow-hidden bg-background">
       <p className="sr-only" aria-live="polite">{scanFeedbackMessage}</p>
 
       <PosTopbar
@@ -1125,7 +1164,7 @@ export default function PosPage() {
       ) : (
         <>
           {/* ديسكتوب: 3 أعمدة (سلة · منتجات · أقسام) — جوال: تبويب واحد */}
-          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)_120px]">
+          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)_148px]">
             <div className={mobileTab === 'cart' ? 'flex min-h-0' : 'hidden lg:flex lg:min-h-0'}>{cartPanel}</div>
             <div className={mobileTab === 'products' ? 'relative flex min-h-0 flex-col' : 'hidden lg:flex lg:min-h-0 lg:flex-col'}>
               {productsPanel}

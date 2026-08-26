@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { Plus, Pencil, Trash2, Check, X, ImagePlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,18 +12,31 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { SettingsHeader } from '@/components/inventory-settings/settings-header';
+import { PosProductImage } from '@/components/pos/pos-product-image';
 import { api, ApiError } from '@/lib/api';
+
+interface CategoryImage {
+  download_url: string;
+  original_name?: string | null;
+  mime_type?: string | null;
+  size?: number | null;
+}
 
 interface Category {
   id: string;
   name: string;
+  description: string | null;
   parent_id: string | null;
   is_active: boolean;
+  image: CategoryImage | null;
   products_count?: number;
 }
 
 /** صفّ معروض: التصنيف ومستواه في الشجرة (يُحسب عند العرض لا يُخزَّن). */
 interface Node extends Category { depth: number }
+
+const MAX_CATEGORY_IMAGE_SIZE = 5 * 1024 * 1024;
+const CATEGORY_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 /**
  * تصنيفات المنتجات — شجرة متعدّدة المستويات.
@@ -34,15 +47,36 @@ interface Node extends Category { depth: number }
 export default function ProductCategoriesPage() {
   const t = useTranslations('inventorySettings');
   const tc = useTranslations('common');
+  const locale = useLocale();
   const { success } = useToast();
+  const ui = locale === 'ar' ? {
+    description: 'وصف التصنيف',
+    descriptionHint: 'وصف مختصر يساعد على تعريف التصنيف واستخدامه.',
+    image: 'صورة التصنيف',
+    imageHint: 'JPG أو PNG أو WebP، بحد أقصى 5 MB. تظهر الصورة أيضاً في نقاط البيع.',
+    removeImage: 'إزالة الصورة',
+    imagePreview: 'معاينة صورة التصنيف',
+  } : {
+    description: 'Category description',
+    descriptionHint: 'A short description that explains the category and its use.',
+    image: 'Category image',
+    imageHint: 'JPG, PNG, or WebP up to 5 MB. The image also appears in POS.',
+    removeImage: 'Remove image',
+    imagePreview: 'Category image preview',
+  };
 
   const [rows, setRows] = useState<Category[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [parentId, setParentId] = useState('');
   const [editing, setEditing] = useState<Category | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
+  const previewUrl = useRef<string | null>(null);
 
   const load = useCallback(() => {
     api<{ data: Category[] }>('/product-categories')
@@ -51,6 +85,9 @@ export default function ProductCategoriesPage() {
   }, []);
 
   useEffect(() => load(), [load]);
+  useEffect(() => () => {
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+  }, []);
 
   /** ترتيب العرض: كل أب يتبعه فروعه مباشرةً، بعمق يُترجَم إلى إزاحة. */
   const tree = useMemo<Node[]>(() => {
@@ -84,15 +121,48 @@ export default function ProductCategoriesPage() {
     [tree, editing]
   );
 
+  function clearPreview() {
+    if (previewUrl.current) {
+      URL.revokeObjectURL(previewUrl.current);
+      previewUrl.current = null;
+    }
+    setImagePreview(null);
+  }
+
+  function selectImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = '';
+    if (!file) return;
+    if (!CATEGORY_IMAGE_TYPES.includes(file.type) || file.size > MAX_CATEGORY_IMAGE_SIZE) {
+      setError(ui.imageHint);
+      return;
+    }
+    clearPreview();
+    const url = URL.createObjectURL(file);
+    previewUrl.current = url;
+    setImagePreview(url);
+    setImageFile(file);
+    setRemoveImage(false);
+    setError(null);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      const body = { name: name.trim(), parent_id: parentId || null };
+      const body = new FormData();
+      body.append('name', name.trim());
+      body.append('description', description.trim());
+      body.append('parent_id', parentId);
+      if (imageFile) body.append('image', imageFile);
+      if (removeImage) body.append('remove_image', '1');
+
       if (editing) {
-        await api(`/product-categories/${editing.id}`, { method: 'PUT', body });
+        // POST + method override يضمن أن PHP يقرأ multipart والملف ثم يراه Laravel كـ PUT.
+        body.append('_method', 'PUT');
+        await api(`/product-categories/${editing.id}`, { method: 'POST', body });
       } else {
         await api('/product-categories', { method: 'POST', body });
       }
@@ -118,27 +188,35 @@ export default function ProductCategoriesPage() {
   }
 
   function edit(row: Category) {
+    clearPreview();
     setEditing(row);
     setName(row.name);
+    setDescription(row.description ?? '');
     setParentId(row.parent_id ?? '');
+    setImageFile(null);
+    setRemoveImage(false);
   }
 
   function reset() {
+    clearPreview();
     setEditing(null);
     setName('');
+    setDescription('');
     setParentId('');
+    setImageFile(null);
+    setRemoveImage(false);
   }
 
   return (
     <div className="space-y-5">
       <SettingsHeader title={t('c_categories_t')} subtitle={t('c_categories_d')} />
 
-      <Card className="max-w-3xl">
+      <Card className="max-w-4xl">
         <CardHeader>
           <CardTitle>{editing ? t('cat_edit') : t('cat_new')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={submit} className="space-y-3">
+          <form onSubmit={submit} className="space-y-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="cat-name">{t('cat_name')}</Label>
@@ -154,6 +232,54 @@ export default function ProductCategoriesPage() {
                     </option>
                   ))}
                 </Select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="cat-description">{ui.description}</Label>
+                <textarea
+                  id="cat-description"
+                  rows={3}
+                  maxLength={4000}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={ui.descriptionHint}
+                  className="min-h-20 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-muted focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="cat-image">{ui.image}</Label>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                  <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
+                    {imagePreview ? (
+                      <img src={imagePreview} alt={ui.imagePreview} className="h-full w-full object-cover" />
+                    ) : editing?.image && !removeImage ? (
+                      <PosProductImage path={editing.image.download_url} alt={editing.name} />
+                    ) : (
+                      <span className="grid h-full w-full place-items-center text-muted" aria-hidden>
+                        <ImagePlus className="h-6 w-6" strokeWidth={1.6} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Input id="cat-image" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={selectImage} aria-describedby="cat-image-hint" />
+                    <p id="cat-image-hint" className="text-xs leading-relaxed text-muted">{ui.imageHint}</p>
+                    {(imageFile || (editing?.image && !removeImage)) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => {
+                          clearPreview();
+                          setImageFile(null);
+                          setRemoveImage(Boolean(editing?.image));
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+                        {ui.removeImage}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -175,7 +301,7 @@ export default function ProductCategoriesPage() {
         </CardContent>
       </Card>
 
-      <Card className="max-w-3xl">
+      <Card className="max-w-4xl">
         <CardHeader><CardTitle>{t('cat_list')}</CardTitle></CardHeader>
         <CardContent>
           {!rows ? (
@@ -185,11 +311,14 @@ export default function ProductCategoriesPage() {
           ) : (
             <ul className="divide-y divide-border">
               {tree.map((row) => (
-                <li key={row.id} className="flex items-center gap-3 py-2.5">
-                  {/* الإزاحة تمثّل العمق — تسير مع اتجاه الصفحة تلقائياً. */}
-                  <span className="min-w-0 flex-1 truncate text-sm text-text" style={{ paddingInlineStart: row.depth * 20 }}>
-                    {row.name}
-                  </span>
+                <li key={row.id} className="flex items-center gap-3 py-2.5" style={{ paddingInlineStart: row.depth * 20 }}>
+                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
+                    <PosProductImage path={row.image?.download_url} alt={row.name} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-text">{row.name}</p>
+                    {row.description && <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted">{row.description}</p>}
+                  </div>
                   {!!row.products_count && (
                     <Badge tone="muted">{t('cat_products', { count: row.products_count })}</Badge>
                   )}

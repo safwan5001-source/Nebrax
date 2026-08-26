@@ -23,6 +23,12 @@ class ProductResource extends JsonResource
             'brand'            => $this->productBrand?->name ?? $this->brand,
             'category_id'      => $this->category_id,
             'brand_id'         => $this->brand_id,
+            'category_image'   => $this->when(
+                $this->relationLoaded('productCategory'),
+                fn () => $this->productCategory?->image_path ? [
+                    'download_url' => "/api/product-categories?image_id={$this->productCategory->id}",
+                ] : null,
+            ),
             'unit_template_id' => $this->unit_template_id,
             // الوحدات المتاحة للسطر: الأساس بمعامل ١ ثم البدائل — تقرؤها شاشات
             // الفاتورة والمشتريات مباشرةً بلا استدعاء ثانٍ.
