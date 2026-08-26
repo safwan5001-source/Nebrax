@@ -35,7 +35,8 @@ use RuntimeException;
  */
 class DeliveryNoteSalesInvoiceDraftBuilder
 {
-    private const MAX_NOTES = 50;
+    /** حد واحد لعدد سندات المصدر في Request والباني وواجهة الاختيار. */
+    public const MAX_DELIVERY_NOTES = 50;
     /** عقد واحد لحمولة سطور المصدر في preview وbuild وForm Request. */
     public const MAX_SOURCE_LINES = 500;
     /** حد عمود invoice_lines.description؛ لا يعتمد PostgreSQL على تساهل SQLite. */
@@ -81,6 +82,9 @@ class DeliveryNoteSalesInvoiceDraftBuilder
 
             $issues = $this->eligibilityIssues($note, $branchId, false);
             $recommendedPriceList = $requestedPriceList ?? $this->activeDefaultPriceList($note);
+            if ($issues === [] && $recommendedPriceList !== null && $this->hasMissingPriceListItem($note, $recommendedPriceList)) {
+                $issues[] = 'price_list_item_missing';
+            }
             $rows[] = [
                 'id' => $note->id,
                 'number' => $note->number,
@@ -281,7 +285,7 @@ class DeliveryNoteSalesInvoiceDraftBuilder
     /** @param mixed $value @return array<int,string> */
     private function noteIds(mixed $value): array
     {
-        if (! is_array($value) || $value === [] || count($value) > self::MAX_NOTES) {
+        if (! is_array($value) || $value === [] || count($value) > self::MAX_DELIVERY_NOTES) {
             throw new RuntimeException('اختر سند تسليم واحداً إلى خمسين سنداً.');
         }
         $ids = array_values($value);
@@ -785,6 +789,22 @@ class DeliveryNoteSalesInvoiceDraftBuilder
         return $priceList?->is_active ? $priceList : null;
     }
 
+    private function hasMissingPriceListItem(DeliveryNote $note, PriceList $priceList): bool
+    {
+        foreach ($note->lines as $line) {
+            $product = $line->product;
+            if (! $product || ! $product->is_active) {
+                continue;
+            }
+            $unit = $line->unit_name === $product->unit ? null : $line->unit_name;
+            if ($this->priceLists->resolve($priceList, $product, $unit) === null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function suggestedPrice(DeliveryNoteLine $line, ?PriceList $priceList = null): ?int
     {
         $product = $line->product;
@@ -793,10 +813,8 @@ class DeliveryNoteSalesInvoiceDraftBuilder
         }
         if ($priceList !== null) {
             $unit = $line->unit_name === $product->unit ? null : $line->unit_name;
-            $listed = $this->priceLists->resolve($priceList, $product, $unit);
-            if ($listed !== null) {
-                return $listed;
-            }
+
+            return $this->priceLists->resolve($priceList, $product, $unit);
         }
         if ($line->unit_name === $product->unit && (int) $line->unit_factor === 1) {
             return (int) $product->sale_price > 0 ? (int) $product->sale_price : null;

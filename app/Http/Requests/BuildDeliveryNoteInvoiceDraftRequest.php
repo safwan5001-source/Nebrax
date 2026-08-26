@@ -15,9 +15,9 @@ class BuildDeliveryNoteInvoiceDraftRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'delivery_note_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'delivery_note_ids' => ['required', 'array', 'min:1', 'max:'.DeliveryNoteSalesInvoiceDraftBuilder::MAX_DELIVERY_NOTES],
             'delivery_note_ids.*' => ['required', 'uuid', 'distinct'],
-            'expected_versions' => ['required', 'array', 'min:1', 'max:50'],
+            'expected_versions' => ['required', 'array', 'min:1', 'max:'.DeliveryNoteSalesInvoiceDraftBuilder::MAX_DELIVERY_NOTES],
             'expected_versions.*' => ['required', 'integer', 'min:1'],
             'idempotency_key' => ['required', 'string', 'min:8', 'max:128', 'regex:/^[A-Za-z0-9._:-]+$/'],
             'reason' => ['required', 'string', 'min:3', 'max:500'],

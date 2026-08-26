@@ -6488,6 +6488,7 @@
     "invoiceDraftSelectTitle": "اختيار سندات التسليم",
     "invoiceDraftSelectHint": "تُقبل السندات المؤكدة غير المرتبطة بمسودة فاتورة فقط. يتحقق النظام من توافق العميل والمستودع عند المعاينة.",
     "invoiceDraftSelectedCount": "{count} محدد",
+    "invoiceDraftSelectionLimitReached": "تم اختيار الحد الأقصى ({limit}) من سندات التسليم.",
     "invoiceDraftSelectNote": "اختيار سند التسليم {number}",
     "invoiceDraftAvailability": "إتاحة الفوترة",
     "invoiceDraftAvailable": "متاح لإنشاء مسودة",
@@ -6541,7 +6542,8 @@
     "issue_no_eligible_delivery_notes": "لا يوجد سند مؤهل ضمن الاختيار.",
     "issue_mixed_customer": "يجب أن تشترك السندات في العميل نفسه.",
     "issue_mixed_warehouse": "يجب أن تشترك السندات في المستودع نفسه.",
-    "issue_source_line_limit_exceeded": "يتجاوز الاختيار حد {limit} سطر مصدر؛ قلّل السندات قبل إدخال التسعير."
+    "issue_source_line_limit_exceeded": "يتجاوز الاختيار حد {limit} سطر مصدر؛ قلّل السندات قبل إدخال التسعير.",
+    "issue_price_list_item_missing": "قائمة الأسعار المختارة لا تتضمن سعراً لهذا المنتج أو وحدته."
   },
   "inventoryOpenings": {
     "title": "الأرصدة الافتتاحية للمخزون",

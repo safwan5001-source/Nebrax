@@ -62,6 +62,9 @@ interface PricingDecision {
 }
 interface BuiltInvoice { id: string; number?: string; status?: string }
 
+/** يطابق عقد preview/build الخادمي: لا تسمح الواجهة بطلب سيتحوّل حتماً إلى 422. */
+const MAX_DELIVERY_NOTES = 50;
+
 function newKey(): string {
   return globalThis.crypto?.randomUUID?.() ?? `delivery-draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
@@ -89,7 +92,7 @@ export function DeliveryNoteInvoiceDraftWizard() {
   const canInvoice = hasPermission(user?.permissions, user?.role, DELIVERY_NOTE_PERMISSIONS.invoice);
   const canViewInvoices = hasPermission(user?.permissions, user?.role, 'invoices.view');
   const initialIds = useMemo(
-    () => (searchParams.get('notes') ?? '').split(',').map((value) => value.trim()).filter(Boolean).slice(0, 50),
+    () => (searchParams.get('notes') ?? '').split(',').map((value) => value.trim()).filter(Boolean).slice(0, MAX_DELIVERY_NOTES),
     [searchParams],
   );
   const [notes, setNotes] = useState<DeliveryNote[]>([]);
@@ -143,6 +146,7 @@ export function DeliveryNoteInvoiceDraftWizard() {
   const selectedNoteIds = useMemo(() => [...selectedIds].sort(), [selectedIds]);
   const previewRows = useMemo(() => preview?.delivery_notes ?? [], [preview]);
   const allPreviewEligible = preview !== null && preview.compatible && previewRows.length === selectedNoteIds.length && previewRows.every((note) => note.eligible);
+  const selectionLimitReached = selectedIds.length >= MAX_DELIVERY_NOTES;
 
   function toggleNote(note: DeliveryNote): void {
     if (note.invoice_draft) return;
@@ -150,7 +154,10 @@ export function DeliveryNoteInvoiceDraftWizard() {
     setPreview(null);
     setPricing({});
     setError(null);
-    setSelectedIds((current) => current.includes(note.id) ? current.filter((id) => id !== note.id) : [...current, note.id]);
+    setSelectedIds((current) => {
+      if (current.includes(note.id)) return current.filter((id) => id !== note.id);
+      return current.length >= MAX_DELIVERY_NOTES ? current : [...current, note.id];
+    });
   }
 
   async function runPreview(): Promise<void> {
@@ -276,12 +283,16 @@ export function DeliveryNoteInvoiceDraftWizard() {
       <CardContent className="space-y-3">
         {loading ? <div className="flex items-center gap-2 py-8 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />{t('loading')}</div> : <>
           <div className="hidden overflow-x-auto rounded border border-border md:block"><table className="w-full text-sm"><thead className="bg-muted/40 text-start text-xs text-muted"><tr><th className="w-12 px-3 py-3"><span className="sr-only">{t('invoiceDraftSelectTitle')}</span></th><th className="px-3 py-3">{t('number')}</th><th className="px-3 py-3">{t('customer')}</th><th className="px-3 py-3">{t('warehouse')}</th><th className="px-3 py-3">{t('deliveryDate')}</th><th className="px-3 py-3">{t('invoiceDraftAvailability')}</th></tr></thead><tbody>{notes.map((note) => {
+            const selected = selectedIds.includes(note.id);
             const unavailable = !!note.invoice_draft;
-            return <tr key={note.id} className="border-t border-border"><td className="px-3 py-3"><input type="checkbox" checked={selectedIds.includes(note.id)} disabled={unavailable} onChange={() => toggleNote(note)} aria-label={t('invoiceDraftSelectNote', { number: note.number })} /></td><td className="px-3 py-3"><Link href={`/delivery-notes/${note.id}`} className="num font-medium text-primary hover:underline">{note.number}</Link></td><td className="px-3 py-3">{note.customer?.name ?? '—'}</td><td className="px-3 py-3 text-muted">{note.warehouse?.name ?? '—'}</td><td className="num px-3 py-3 text-muted" dir="ltr">{note.delivery_date}</td><td className="px-3 py-3">{unavailable ? <span className="text-xs text-negative">{t('invoiceDraftAlreadyLinked', { number: note.invoice_draft?.number ?? '—' })}</span> : <span className="text-xs text-positive">{t('invoiceDraftAvailable')}</span>}</td></tr>;
+            const limitBlocked = !selected && selectionLimitReached;
+            return <tr key={note.id} className="border-t border-border"><td className="px-3 py-3"><input type="checkbox" checked={selected} disabled={unavailable || limitBlocked} onChange={() => toggleNote(note)} aria-label={t('invoiceDraftSelectNote', { number: note.number })} /></td><td className="px-3 py-3"><Link href={`/delivery-notes/${note.id}`} className="num font-medium text-primary hover:underline">{note.number}</Link></td><td className="px-3 py-3">{note.customer?.name ?? '—'}</td><td className="px-3 py-3 text-muted">{note.warehouse?.name ?? '—'}</td><td className="num px-3 py-3 text-muted" dir="ltr">{note.delivery_date}</td><td className="px-3 py-3">{unavailable ? <span className="text-xs text-negative">{t('invoiceDraftAlreadyLinked', { number: note.invoice_draft?.number ?? '—' })}</span> : limitBlocked ? <span className="text-xs text-muted">{t('invoiceDraftSelectionLimitReached', { limit: MAX_DELIVERY_NOTES })}</span> : <span className="text-xs text-positive">{t('invoiceDraftAvailable')}</span>}</td></tr>;
           })}</tbody></table></div>
           <div className="divide-y divide-border rounded border border-border md:hidden">{notes.map((note) => {
+            const selected = selectedIds.includes(note.id);
             const unavailable = !!note.invoice_draft;
-            return <label key={note.id} className="flex items-start gap-3 p-4"><input className="mt-1" type="checkbox" checked={selectedIds.includes(note.id)} disabled={unavailable} onChange={() => toggleNote(note)} aria-label={t('invoiceDraftSelectNote', { number: note.number })} /><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center justify-between gap-2"><span className="num font-medium text-primary">{note.number}</span>{unavailable && <Badge tone="negative">{t('invoiceDraftLinkedBadge')}</Badge>}</span><span className="mt-1 block text-sm text-text">{note.customer?.name ?? '—'}</span><span className="mt-1 block text-xs text-muted">{note.warehouse?.name ?? '—'} · <span dir="ltr">{note.delivery_date}</span></span>{unavailable && <span className="mt-1 block text-xs text-negative">{t('invoiceDraftAlreadyLinked', { number: note.invoice_draft?.number ?? '—' })}</span>}</span></label>;
+            const limitBlocked = !selected && selectionLimitReached;
+            return <label key={note.id} className="flex items-start gap-3 p-4"><input className="mt-1" type="checkbox" checked={selected} disabled={unavailable || limitBlocked} onChange={() => toggleNote(note)} aria-label={t('invoiceDraftSelectNote', { number: note.number })} /><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center justify-between gap-2"><span className="num font-medium text-primary">{note.number}</span>{unavailable && <Badge tone="negative">{t('invoiceDraftLinkedBadge')}</Badge>}</span><span className="mt-1 block text-sm text-text">{note.customer?.name ?? '—'}</span><span className="mt-1 block text-xs text-muted">{note.warehouse?.name ?? '—'} · <span dir="ltr">{note.delivery_date}</span></span>{unavailable ? <span className="mt-1 block text-xs text-negative">{t('invoiceDraftAlreadyLinked', { number: note.invoice_draft?.number ?? '—' })}</span> : limitBlocked && <span className="mt-1 block text-xs text-muted">{t('invoiceDraftSelectionLimitReached', { limit: MAX_DELIVERY_NOTES })}</span>}</span></label>;
           })}</div>
           {notes.length === 0 && <p className="py-8 text-center text-sm text-muted">{t('invoiceDraftNoConfirmed')}</p>}
         </>}

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\Accounting\DeliveryNoteSalesInvoiceDraftBuilder;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PreviewDeliveryNoteInvoiceDraftRequest extends FormRequest
@@ -14,7 +15,7 @@ class PreviewDeliveryNoteInvoiceDraftRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'delivery_note_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'delivery_note_ids' => ['required', 'array', 'min:1', 'max:'.DeliveryNoteSalesInvoiceDraftBuilder::MAX_DELIVERY_NOTES],
             'delivery_note_ids.*' => ['required', 'uuid', 'distinct'],
             'price_list_id' => ['nullable', 'uuid'],
             'tenant_id' => ['prohibited'],

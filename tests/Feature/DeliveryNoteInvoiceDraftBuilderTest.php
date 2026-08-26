@@ -398,6 +398,39 @@ class DeliveryNoteInvoiceDraftBuilderTest extends TestCase
     }
 
     #[Test]
+    public function a_price_list_without_an_item_marks_preview_ineligible_and_never_suggests_a_fallback_price(): void
+    {
+        $priceList = PriceList::create(['name' => 'قائمة بلا سعر المنتج', 'is_active' => true]);
+        $note = $this->confirmedNote([['product_id' => $this->product->id, 'quantity' => 1]]);
+
+        $explicitPreview = $this->builder->preview([
+            'delivery_note_ids' => [$note->id],
+            'price_list_id' => $priceList->id,
+        ]);
+        $explicitLine = $explicitPreview['delivery_notes'][0]['lines'][0];
+        $this->assertFalse($explicitPreview['compatible']);
+        $this->assertSame(['price_list_item_missing'], $explicitPreview['delivery_notes'][0]['issues']);
+        $this->assertNull($explicitLine['suggested_unit_price']);
+
+        $this->customer->update(['default_price_list_id' => $priceList->id]);
+        $defaultPreview = $this->builder->preview(['delivery_note_ids' => [$note->id]]);
+        $defaultLine = $defaultPreview['delivery_notes'][0]['lines'][0];
+        $this->assertFalse($defaultPreview['compatible']);
+        $this->assertSame(['price_list_item_missing'], $defaultPreview['delivery_notes'][0]['issues']);
+        $this->assertNull($defaultLine['suggested_unit_price']);
+
+        $command = $this->command([$note], unitPrice: 12500, idempotencyKey: 'missing-list-item-0001');
+        $command['price_list_id'] = $priceList->id;
+        try {
+            $this->builder->build($command);
+            $this->fail('قُبل سعر احتياطي غير موجود في قائمة الأسعار المحددة.');
+        } catch (RuntimeException) {
+            $this->addToAssertionCount(1);
+        }
+        $this->assertSame(0, Invoice::count());
+    }
+
+    #[Test]
     public function an_active_customer_default_price_list_is_used_for_preview_and_rechecked_during_build(): void
     {
         $priceList = PriceList::create(['name' => 'القائمة الافتراضية للعميل', 'is_active' => true]);

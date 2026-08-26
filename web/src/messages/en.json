@@ -6492,6 +6492,7 @@
     "invoiceDraftSelectTitle": "Select delivery notes",
     "invoiceDraftSelectHint": "Only confirmed notes with no linked invoice draft can be selected. The preview verifies customer and warehouse compatibility.",
     "invoiceDraftSelectedCount": "{count} selected",
+    "invoiceDraftSelectionLimitReached": "The maximum of {limit} delivery notes is already selected.",
     "invoiceDraftSelectNote": "Select delivery note {number}",
     "invoiceDraftAvailability": "Invoice availability",
     "invoiceDraftAvailable": "Available for a draft",
@@ -6545,7 +6546,8 @@
     "issue_no_eligible_delivery_notes": "No eligible note is included in the selection.",
     "issue_mixed_customer": "All selected notes must have the same customer.",
     "issue_mixed_warehouse": "All selected notes must have the same warehouse.",
-    "issue_source_line_limit_exceeded": "The selection exceeds the {limit}-source-line limit; reduce the selected notes before entering pricing."
+    "issue_source_line_limit_exceeded": "The selection exceeds the {limit}-source-line limit; reduce the selected notes before entering pricing.",
+    "issue_price_list_item_missing": "The selected price list has no price for this product and unit."
   },
   "inventoryOpenings": {
     "title": "Inventory opening balances",
