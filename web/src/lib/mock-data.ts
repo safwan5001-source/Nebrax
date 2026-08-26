@@ -123,6 +123,49 @@ function invoice(
   };
 }
 
+interface MockDeliveryNote {
+  id: string;
+  branch_id: string;
+  number: string;
+  status: 'draft' | 'confirmed' | 'cancelled';
+  version: number;
+  external_reference: string | null;
+  delivery_date: string;
+  notes: string | null;
+  customer_id: string;
+  warehouse_id: string;
+  customer: { id: string; name: string; type: string };
+  warehouse: { id: string; name: string; code: string | null };
+  lines: Array<{ id: string; line_number: number; product_id: string; product_name: string; product_sku: string | null; product_barcode: string | null; unit_name: string; unit_factor: number; quantity: number; quantity_numerator: number | null; quantity_denominator: number | null; description: string | null }>;
+  events: Array<{ id: string; event: string; from_status: string | null; to_status: string | null; actor_id: string | null; actor_name: string | null; reason: string | null; metadata: Record<string, unknown> | null; occurred_at: string }>;
+  confirmed_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  created_by: string | null;
+  confirmed_by: string | null;
+  cancelled_by: string | null;
+}
+
+/** بيانات fixture محلية فقط؛ لا تمثل سندات حقيقية ولا تتصل بأي API. */
+export const mockDeliveryNotes: MockDeliveryNote[] = [
+  {
+    id: 'dn-104', branch_id: 'br-1', number: 'DN-2026-00104', status: 'draft', version: 1,
+    external_reference: 'DN-PAPER-104', delivery_date: '2026-08-24', notes: 'تسليم مجدول للموقع الرئيسي.',
+    customer_id: 'p1', warehouse_id: 'wh-1', customer: { id: 'p1', name: 'مؤسسة الخليج للتجارة', type: 'customer' }, warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' },
+    lines: [{ id: 'dn-104-l1', line_number: 1, product_id: 'pr2', product_name: 'جهاز قياس رقمي', product_sku: 'SKU-002', product_barcode: null, unit_name: 'piece', unit_factor: 1, quantity: 3, quantity_numerator: null, quantity_denominator: null, description: 'تسليم أولي' }],
+    events: [{ id: 'dn-104-e1', event: 'created', from_status: null, to_status: 'draft', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: { line_count: 1 }, occurred_at: '2026-08-24T08:30:00Z' }],
+    confirmed_at: null, cancelled_at: null, cancellation_reason: null, created_by: 'demo-user', confirmed_by: null, cancelled_by: null,
+  },
+  {
+    id: 'dn-103', branch_id: 'br-1', number: 'DN-2026-00103', status: 'confirmed', version: 2,
+    external_reference: null, delivery_date: '2026-08-22', notes: null,
+    customer_id: 'p2', warehouse_id: 'wh-1', customer: { id: 'p2', name: 'شركة الواحة للمقاولات', type: 'customer' }, warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' },
+    lines: [{ id: 'dn-103-l1', line_number: 1, product_id: 'pr4', product_name: 'مواد تثبيت صناعية', product_sku: 'SKU-004', product_barcode: null, unit_name: 'box', unit_factor: 12, quantity: 4, quantity_numerator: null, quantity_denominator: null, description: null }],
+    events: [{ id: 'dn-103-e1', event: 'created', from_status: null, to_status: 'draft', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: { line_count: 1 }, occurred_at: '2026-08-21T09:00:00Z' }, { id: 'dn-103-e2', event: 'confirmed', from_status: 'draft', to_status: 'confirmed', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: null, occurred_at: '2026-08-22T10:10:00Z' }],
+    confirmed_at: '2026-08-22T10:10:00Z', cancelled_at: null, cancellation_reason: null, created_by: 'demo-user', confirmed_by: 'demo-user', cancelled_by: null,
+  },
+];
+
 export const mockInvoices: MockInvoice[] = [
   invoice('inv-118', 'INV-2026-0118', 'p1', '2026-06-24', 'posted', 'paid', 'cash', [
     line('l1', 'خدمات استشارية محاسبية', 1, 5000),
@@ -1982,6 +2025,86 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
 
   const clean = path.split('?')[0];
   const m = method.toUpperCase();
+  const deliveryMatch = clean.match(/^\/delivery-notes\/([^/]+)$/);
+  const deliveryActionMatch = clean.match(/^\/delivery-notes\/([^/]+)\/(confirm|cancel)$/);
+
+  // Fixture سندات التسليم: محلي للواجهة فقط، ولا يكتب فاتورة أو مخزوناً أو دفتراً.
+  if (clean === '/number-preview') {
+    const entity = new URLSearchParams(path.split('?')[1] ?? '').get('entity');
+    if (entity === 'delivery_note') {
+      const suffix = String(mockDeliveryNotes.length + 101).padStart(5, '0');
+      return resolve({ data: { key: 'delivery_note', series_key: 'default', number: `DN-2026-${suffix}` } } as T);
+    }
+  }
+  if (clean === '/delivery-notes' && m === 'GET') {
+    const params = new URLSearchParams(path.split('?')[1] ?? '');
+    const search = (params.get('search') ?? '').toLowerCase();
+    const filtered = mockDeliveryNotes.filter((note) => {
+      const status = params.get('status');
+      const customer = params.get('customer_id');
+      const warehouse = params.get('warehouse_id');
+      const dateFrom = params.get('date_from');
+      const dateTo = params.get('date_to');
+      return (!status || note.status === status)
+        && (!customer || note.customer_id === customer)
+        && (!warehouse || note.warehouse_id === warehouse)
+        && (!dateFrom || note.delivery_date >= dateFrom)
+        && (!dateTo || note.delivery_date <= dateTo)
+        && (!search || [note.number, note.external_reference ?? '', note.customer.name].some((value) => value.toLowerCase().includes(search)));
+    });
+    return resolve({ data: filtered, meta: { current_page: 1, last_page: 1, total: filtered.length } } as T);
+  }
+  if (deliveryMatch && m === 'GET') {
+    return resolve({ data: mockDeliveryNotes.find((note) => note.id === deliveryMatch[1]) ?? mockDeliveryNotes[0] } as T);
+  }
+  if (clean === '/delivery-notes' && m === 'POST') {
+    const input = (body ?? {}) as { customer_id?: string; warehouse_id?: string; delivery_date?: string; external_reference?: string | null; notes?: string | null; items?: Array<{ product_id?: string; unit?: string | null; quantity?: number; description?: string | null }> };
+    const customer = mockPartners.find((partner) => partner.id === input.customer_id) ?? mockPartners[0];
+    const warehouse = mockWarehouses.find((item) => item.id === input.warehouse_id) ?? mockWarehouses[0];
+    const now = new Date().toISOString();
+    const id = `dn-demo-${Date.now()}`;
+    const note: MockDeliveryNote = {
+      id, branch_id: warehouse.branch_id ?? 'br-1', number: `DN-2026-${String(mockDeliveryNotes.length + 101).padStart(5, '0')}`,
+      status: 'draft', version: 1, external_reference: input.external_reference ?? null, delivery_date: input.delivery_date ?? '2026-08-26', notes: input.notes ?? null,
+      customer_id: customer.id, warehouse_id: warehouse.id, customer: { id: customer.id, name: customer.name, type: customer.type }, warehouse: { id: warehouse.id, name: warehouse.name, code: warehouse.code ?? null },
+      lines: (input.items ?? []).map((item, index) => {
+        const product = allMockProducts().find((candidate) => candidate.id === item.product_id) ?? allMockProducts()[0];
+        return { id: `${id}-line-${index + 1}`, line_number: index + 1, product_id: product.id, product_name: product.name, product_sku: product.sku ?? null, product_barcode: product.barcode ?? null, unit_name: item.unit || product.unit || 'piece', unit_factor: 1, quantity: Number(item.quantity) || 1, quantity_numerator: null, quantity_denominator: null, description: item.description ?? null };
+      }),
+      events: [{ id: `${id}-event-1`, event: 'created', from_status: null, to_status: 'draft', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: { line_count: (input.items ?? []).length }, occurred_at: now }],
+      confirmed_at: null, cancelled_at: null, cancellation_reason: null, created_by: 'demo-user', confirmed_by: null, cancelled_by: null,
+    };
+    mockDeliveryNotes.unshift(note);
+    return resolve({ data: note } as T);
+  }
+  if (deliveryMatch && m === 'PUT') {
+    const note = mockDeliveryNotes.find((item) => item.id === deliveryMatch[1]);
+    if (!note) return resolve({ data: mockDeliveryNotes[0] } as T);
+    const input = (body ?? {}) as { delivery_date?: string; external_reference?: string | null; notes?: string | null; customer_id?: string; warehouse_id?: string; items?: Array<{ product_id?: string; unit?: string | null; quantity?: number; description?: string | null }> };
+    note.delivery_date = input.delivery_date ?? note.delivery_date;
+    note.external_reference = input.external_reference ?? null;
+    note.notes = input.notes ?? null;
+    note.version += 1;
+    if (input.customer_id) { const customer = mockPartners.find((partner) => partner.id === input.customer_id); if (customer) { note.customer_id = customer.id; note.customer = { id: customer.id, name: customer.name, type: customer.type }; } }
+    if (input.warehouse_id) { const warehouse = mockWarehouses.find((item) => item.id === input.warehouse_id); if (warehouse) { note.warehouse_id = warehouse.id; note.warehouse = { id: warehouse.id, name: warehouse.name, code: warehouse.code ?? null }; } }
+    if (input.items) note.lines = input.items.map((item, index) => { const product = allMockProducts().find((candidate) => candidate.id === item.product_id) ?? allMockProducts()[0]; return { id: `${note.id}-line-${index + 1}`, line_number: index + 1, product_id: product.id, product_name: product.name, product_sku: product.sku ?? null, product_barcode: product.barcode ?? null, unit_name: item.unit || product.unit || 'piece', unit_factor: 1, quantity: Number(item.quantity) || 1, quantity_numerator: null, quantity_denominator: null, description: item.description ?? null }; });
+    note.events.push({ id: `${note.id}-event-${note.events.length + 1}`, event: 'updated', from_status: 'draft', to_status: 'draft', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: { line_count: note.lines.length }, occurred_at: new Date().toISOString() });
+    return resolve({ data: note } as T);
+  }
+  if (deliveryActionMatch && m === 'POST') {
+    const note = mockDeliveryNotes.find((item) => item.id === deliveryActionMatch[1]);
+    if (!note) return resolve({ data: mockDeliveryNotes[0] } as T);
+    const now = new Date().toISOString();
+    if (deliveryActionMatch[2] === 'confirm') {
+      note.status = 'confirmed'; note.version += 1; note.confirmed_at = now; note.confirmed_by = 'demo-user';
+      note.events.push({ id: `${note.id}-event-${note.events.length + 1}`, event: 'confirmed', from_status: 'draft', to_status: 'confirmed', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: null, occurred_at: now });
+    } else {
+      const reason = ((body ?? {}) as { reason?: string }).reason ?? 'Fixture cancellation';
+      note.status = 'cancelled'; note.version += 1; note.cancelled_at = now; note.cancelled_by = 'demo-user'; note.cancellation_reason = reason;
+      note.events.push({ id: `${note.id}-event-${note.events.length + 1}`, event: 'cancelled', from_status: 'draft', to_status: 'cancelled', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason, metadata: null, occurred_at: now });
+    }
+    return resolve({ data: note } as T);
+  }
 
   // الطفرات (إنشاء/تعديل/حذف/ترحيل) — نجاح صوري دون أي أثر فعلي.
   if (m !== 'GET') {

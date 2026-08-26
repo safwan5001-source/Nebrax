@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\CrmActivityController;
 use App\Http\Controllers\Api\CustomerReportController;
 use App\Http\Controllers\Api\CustomerSettingsController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DeliveryNoteController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\DocumentIntakeController;
 use App\Http\Controllers\Api\DocumentRevisionController;
@@ -424,6 +425,20 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('invoices/{id}', [InvoiceController::class, 'update'])->middleware($perm('invoices.manage')); // مسوّدة فقط
         Route::delete('invoices/{id}', [InvoiceController::class, 'destroy'])->middleware($perm('invoices.manage')); // مسوّدة فقط
         Route::post('invoices/{id}/post', [InvoiceController::class, 'post'])->middleware($perm('invoices.manage'));
+
+        // سندات التسليم العامة: دليل تشغيلي مستقل. لا فاتورة ولا مخزون ولا دفتر في PR-9.
+        Route::get('delivery-notes', [DeliveryNoteController::class, 'index'])
+            ->middleware([$perm('delivery_notes.view'), $commercialApp('sales.invoicing', 'read')]);
+        Route::get('delivery-notes/{id}', [DeliveryNoteController::class, 'show'])
+            ->middleware([$perm('delivery_notes.view'), $commercialApp('sales.invoicing', 'read')]);
+        Route::post('delivery-notes', [DeliveryNoteController::class, 'store'])
+            ->middleware([$perm('delivery_notes.manage'), $commercialApp('sales.invoicing', 'write')]);
+        Route::put('delivery-notes/{id}', [DeliveryNoteController::class, 'update'])
+            ->middleware([$perm('delivery_notes.manage'), $commercialApp('sales.invoicing', 'write')]);
+        Route::post('delivery-notes/{id}/confirm', [DeliveryNoteController::class, 'confirm'])
+            ->middleware([$perm('delivery_notes.confirm'), $commercialApp('sales.invoicing', 'write')]);
+        Route::post('delivery-notes/{id}/cancel', [DeliveryNoteController::class, 'cancel'])
+            ->middleware([$perm('delivery_notes.cancel'), $commercialApp('sales.invoicing', 'write')]);
 
         // عروض الأسعار (مستند غير محاسبي؛ التحويل ينشئ فاتورة draft)
         Route::get('quotes', [QuoteController::class, 'index'])->middleware($perm('invoices.view'));
