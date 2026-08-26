@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { useBranches } from '@/lib/branch';
 import { appendBranchFilter, branchFilterDefinition } from '@/lib/branch-filter';
+import { fetchBranchScopedLookup } from '@/lib/branch-scoped-lookup';
 import { formatRiyal } from '@/lib/money';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import {
@@ -178,10 +179,10 @@ export default function InvoicesPage() {
   }, [explorer, router]);
 
   useEffect(() => {
-    api<{ data: Partner[] }>('/partners')
-      .then((response) => setPartners(response.data))
-      .catch(() => undefined);
-  }, []);
+    fetchBranchScopedLookup<Partner>('/partners?type=customer', explorer.filters, branches)
+      .then(setPartners)
+      .catch(() => setPartners([]));
+  }, [branches, explorer.filters]);
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
