@@ -16,6 +16,7 @@ use App\Models\Tenant;
 use App\Models\TenantApplicationEvent;
 use App\Models\TenantApplicationState;
 use App\Models\User;
+use App\Models\ZatcaCredential;
 use App\Support\ApplicationCatalog;
 use App\Tenancy\TenantContext;
 use Closure;
@@ -47,9 +48,9 @@ class TenantApplicationService
     /**
      * "هل توجد بيانات تشغيلية حقيقية؟" لكل قدرة قابلة للإيقاف — تحوّل الإيقاف
      * إلى `suspended` (قراءة فقط) بدل `disabled` الكاملة. القدرات الإلزامية
-     * الثلاث لا تحتاج فحصاً (لا تُوقَف بتاتاً). `compliance.zatca` مستثناة
-     * عمداً: لا نموذج مستقل لبياناتها، فحقولها أعمدة على `Invoice` نفسها
-     * (ملك `sales.invoicing` الإلزامية) — تعليقها لا يجمّد شيئاً مستقلاً.
+     * الثلاث لا تحتاج فحصاً (لا تُوقَف بتاتاً). فواتير ZATCA نفسها تظل ملك
+     * `sales.invoicing` الإلزامية، لكن بيانات اعتماد CSID نموذج مستقل وحساس؛
+     * وجودها يجعل إيقاف `compliance.zatca` تعليقاً للقراءة بدل إخفائها.
      * `company.branches`: الفرع الرئيسي يُزرع تلقائياً لكل مستأجر عند
      * التسجيل، فـ`Branch::exists()` الخام سيكون صحيحاً دوماً ويُبطل الفحص —
      * يُفحص وجود فرع غير رئيسي تحديداً.
@@ -71,6 +72,7 @@ class TenantApplicationService
             // حتى قبل Cycle 1، إنشاء محطة قرار تشغيلي لا ينبغي أن يختفي معه
             // التاريخ عند إيقاف التطبيق؛ يصبح الوصول قراءة فقط مثل بقية المجالات.
             'fuel_stations.core' => fn () => FuelStation::query()->exists(),
+            'compliance.zatca' => fn () => ZatcaCredential::query()->exists(),
         ];
     }
 

@@ -319,6 +319,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // تقرير المخزون (قراءة فقط — لا أثر محاسبي)
         Route::get('inventory', [InventoryController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::get('inventory/export', [InventoryController::class, 'export'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('inventory/{productId}/movements', [InventoryController::class, 'movements'])->middleware([$perm('products.view'), $app('inventory.core')]);
 
         // إعدادات المخزون (سياسة؛ تُقرأ فعلاً في حارس البيع بلا رصيد)

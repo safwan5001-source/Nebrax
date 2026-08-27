@@ -310,7 +310,7 @@ describe('DataTable row selection', () => {
     expect(onChange).toHaveBeenLastCalledWith([]);
   });
 
-  it('shows the same selection in the table and in the mobile record', () => {
+  it('keeps the selected row checked in the desktop table while mobile records omit persistent selection controls', () => {
     renderIntl(
       <DataTable
         columns={columns}
@@ -324,8 +324,8 @@ describe('DataTable row selection', () => {
     const checked = screen
       .getAllByRole('checkbox', { name: nebraxText('ar', 'selectRow') })
       .filter((box) => (box as HTMLInputElement).checked);
-    // صفٌّ واحد محدَّد، ظاهرٌ مرّتين: صفّ الجدول وبطاقة الجوال.
-    expect(checked).toHaveLength(2);
+    // مربع تحديد دائم واحد فقط في صف الجدول؛ بطاقة الجوال لا تكرر عنصر التحديد.
+    expect(checked).toHaveLength(1);
   });
 
   it('leaves no Arabic default in an English interface for the selection controls', () => {
