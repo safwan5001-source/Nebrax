@@ -158,32 +158,27 @@ git diff --check   ✅ نظيف
 demo-unavailable لا يعرض success وهمي** · إبلاغ الفشل · حارس النص العربي المكتوب في الشيفرة ·
 ظهور الزرّ وفتح الحوار.
 
-## J. CI
+## J. CI — مقروءة لا مفترَضة
 
-**الوظائف الثلاث لم تُشغَّل — لسببٍ خارج هذا الـPR تماماً.** أعادت GitHub على كل وظيفة
-الرسالة نفسها حرفياً:
+**كل الفحوص خضراء على `1e617b5f`** (آخر التزام يمسّ الكود):
 
-> *"The job was not started because recent account payments have failed or your spending
-> limit needs to be increased. Please check the 'Billing & plans' section in your settings."*
-
-هذا **حدّ إنفاق/فوترة على حساب GitHub Actions**، لا فشلٌ في الكود: الوظائف لم تبدأ أصلاً
-(سجلّاتها 404). `Vercel Preview` **نجح** لأنه بنية منفصلة لا تستهلك دقائق Actions.
-
-المطلوب فعلٌ بشريّ لا يملكه هذا الـPR: رفع حدّ الإنفاق أو تسوية الفوترة من
-**Settings → Billing & plans** في GitHub، ثم إعادة تشغيل الوظائف. وهذا الحدّ يصيب **كل**
-فرع (بما فيه `main`)، لا هذا الفرع وحده.
-
-**ما تحقّق محلياً بديلاً** (وهو ما كانت CI ستشغّله):
-
-| الفحص | النتيجة المحلية |
+| الفحص | النتيجة |
 |---|---|
-| `php artisan test --filter=InventoryBalanceExportTest` | ✅ 20 (104 تأكيداً) |
-| `php artisan test` كاملة (SQLite) | 1530 ناجح · 25 فاشل مطابقة للأساس (Fuel/PDF من امتدادين غائبين محلياً ومثبَّتين في CI) |
-| `npx vitest run` | ✅ 113 ملفاً · 715 اختباراً |
-| `npx tsc --noEmit` · `npm run build` · `git diff --check` | ✅ الثلاثة نظيفة |
+| `php artisan test (L11, sqlite)` | ✅ ناجح |
+| `php artisan test (L11, pgsql)` | ✅ ناجح |
+| `web build (Next.js)` — Vitest + بناء Next | ✅ ناجح |
 
-> PostgreSQL يبقى مرجعه CI؛ لكن استعلامات هذا الـPR (`whereRaw`، `orderByRaw`،
-> `getCountForPagination`) قياسية ولا تعتمد دوالّ خاصة بمحرّك.
+**وPostgreSQL أمسك علّتين حقيقيتين لم تظهرا محلياً على SQLite — وهو بالضبط ما وُجدت
+المصفوفة له:**
+
+| الالتزام | pgsql | ما جرى |
+|---|---|---|
+| `056f5ca4` | ❌ | إصلاح مراجعةٍ لمرشّح الكمية (`qty + 0`) أرسل `5.5` float لمقارنة عمود `integer`؛ SQLite تساهل، وPostgreSQL رفض: `invalid input syntax for type integer: "5.5"`. **اختبار الانحدار الذي أضفتُه في المراجعة هو من كشفه** (لولا قيمته العشرية لما ظهر). |
+| **`1e617b5f`** | ✅ | بعد تصحيحه إلى `ceil`/`floor` بربطٍ صحيح (integer) — يطابق الشاشة ويأمن على المحرّكين. |
+
+> **درسٌ مزدوج:** المصفوفة أمسكت خطأً، واختبارُ الانحدار الذي كتبتُه أثناء المراجعة هو
+> ما جعل الخطأ **يظهر أصلاً**. ولا يُثبَّت رقم HEAD هنا: المرجع الثابت آخر التزام يمسّ
+> الكود (`1e617b5f`)، ويتحقّق المراجع بـ`git diff --name-only 1e617b5f..HEAD`.
 
 ## K. المراجعة البصرية
 
