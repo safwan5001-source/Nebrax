@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\ExportInventoryBalancesRequest;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Services\InventoryBalanceExportService;
+use App\Support\InventoryBalanceFilters;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * تقرير المخزون — قراءة فقط. يعرض أرصدة الأصناف المتتبَّعة وقيمتها (متوسط متحرك)
@@ -14,6 +18,8 @@ use Illuminate\Http\JsonResponse;
  */
 class InventoryController extends ApiController
 {
+    public function __construct(protected InventoryBalanceExportService $exports) {}
+
     public function index(): JsonResponse
     {
         $products = Product::where('track_inventory', true)->orderBy('name')->get();
@@ -34,6 +40,34 @@ class InventoryController extends ApiController
             'data'        => $items,
             'total_value' => Money::toRiyal($totalMinor),
         ]);
+    }
+
+    /**
+     * تصدير أرصدة المخزون إلى CSV أو XLSX — **قراءة محضة**.
+     *
+     * `scope=filtered` يطبّق مرشّحات الشاشة نفسها (البحث والوحدة والمدى
+     * والفرز) عبر `InventoryBalanceFilters`، فيصدّر **كل** المطابق لا الصفحة
+     * المرئية. `scope=all` يتجاهل المرشّحات ويصدّر كل الأصناف المتتبَّعة
+     * المرئية للمستأجر. العزل تلقائيّ بحكم `TenantScope`.
+     */
+    public function export(ExportInventoryBalancesRequest $request): Response
+    {
+        $filters = $request->validated();
+        $scope = $filters['scope'] ?? InventoryBalanceExportService::SCOPE_FILTERED;
+        $format = $filters['format'] ?? InventoryBalanceExportService::FORMAT_XLSX;
+        // الافتراض: تضمين الصفر (كما تعرضه الشاشة). خيار تصدير فقط.
+        $includeZero = ! $request->has('include_zero') || $request->boolean('include_zero');
+        $locale = str_starts_with((string) $request->query('locale'), 'en') ? 'en' : 'ar';
+
+        $query = InventoryBalanceFilters::query();
+        if ($scope === InventoryBalanceExportService::SCOPE_FILTERED) {
+            InventoryBalanceFilters::apply($query, $filters);
+        }
+        InventoryBalanceFilters::applySort($query, $filters['sort'] ?? null);
+
+        $filename = 'nebrax-inventory-balances-'.now()->toDateString();
+
+        return $this->domain(fn () => $this->exports->download($query, $format, $filename, $locale, $includeZero));
     }
 
     public function movements(string $productId): JsonResponse
