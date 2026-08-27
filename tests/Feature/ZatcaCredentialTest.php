@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Models\ZatcaCredential;
+use App\Services\Accounting\ZatcaCredentialService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class ZatcaCredentialTest extends TestCase
@@ -70,6 +73,16 @@ class ZatcaCredentialTest extends TestCase
         $credential = ZatcaCredential::sole();
         $this->assertSame('PCSID-SECRET', $credential->credentials['secret']);
         $this->assertTrue($credential->expires_at->equalTo($expiresAt));
+
+        // شهادة جديدة بلا تاريخ لا ترث انتهاء الشهادة القديمة.
+        $this->withToken($auth['token'])->putJson($url, [
+            'stage' => 'production',
+            'binary_security_token' => 'PCSID-ROTATED-TOKEN',
+            'secret' => 'PCSID-ROTATED-SECRET',
+            'private_key' => 'PCSID-ROTATED-PRIVATE-KEY',
+            'current_password' => 'password123',
+        ])->assertOk()->assertJsonPath('data.expires_at', null);
+        $this->assertNull(ZatcaCredential::sole()->expires_at);
     }
 
     /** @test */
@@ -120,6 +133,28 @@ class ZatcaCredentialTest extends TestCase
             ->assertOk()->assertJsonCount(0, 'data');
         $this->withToken($first['token'])->getJson('/api/zatca-credentials')
             ->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    /** @test */
+    public function the_inner_application_guard_rejects_storage_after_disable_wins_the_lock(): void
+    {
+        $auth = $this->registerTenant('zatca-disabled-race', 'zatca-disabled-race@example.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', [
+            'application_key' => 'compliance.zatca',
+        ])->assertOk()->assertJsonPath('data.status', 'disabled');
+
+        $user = User::where('email', 'zatca-disabled-race@example.test')->firstOrFail();
+
+        try {
+            app(ZatcaCredentialService::class)->store($user, 'simulation', $this->payload());
+            $this->fail('Disabled ZATCA application accepted credential storage.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('application', $exception->errors());
+        }
+
+        $this->assertDatabaseCount('zatca_credentials', 0);
     }
 
     /** @test */

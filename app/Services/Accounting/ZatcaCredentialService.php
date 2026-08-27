@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\User;
 use App\Models\Tenant;
+use App\Models\TenantApplicationState;
 use App\Models\ZatcaCredential;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -31,6 +32,17 @@ class ZatcaCredentialService
             // بعد صف credential يمكن قفله. يمنع هذا إدراجين متزامنين لنفس البيئة.
             Tenant::whereKey($user->tenant_id)->lockForUpdate()->firstOrFail();
 
+            // الحارس الخارجي سبق القفل وقد تتغير الحالة أثناء انتظاره. نعيد
+            // التحقق داخل المقطع المتسلسل كي لا تُنشأ أسرار خلف تطبيق معطّل.
+            $applicationStatus = TenantApplicationState::query()
+                ->where('application_key', 'compliance.zatca')
+                ->value('status');
+            if (in_array($applicationStatus, ['disabled', 'suspended'], true)) {
+                throw ValidationException::withMessages([
+                    'application' => 'يجب تفعيل تطبيق ZATCA قبل حفظ بيانات الاعتماد.',
+                ]);
+            }
+
             $record = ZatcaCredential::where('environment', $environment)->lockForUpdate()->first();
             $credentials = is_array($record?->credentials) ? $record->credentials : [];
 
@@ -57,6 +69,15 @@ class ZatcaCredentialService
                 }
             }
 
+            $previousToken = is_array($record?->credentials)
+                ? (string) ($record->credentials['binary_security_token'] ?? '')
+                : '';
+            $tokenChanged = $previousToken === ''
+                || ! hash_equals($previousToken, (string) $credentials['binary_security_token']);
+            $expiresAt = array_key_exists('expires_at', $validated)
+                ? $validated['expires_at']
+                : ($tokenChanged ? null : $record?->expires_at);
+
             $record ??= new ZatcaCredential(['environment' => $environment]);
             $record->fill([
                 'stage' => $validated['stage'],
@@ -64,9 +85,7 @@ class ZatcaCredentialService
                 'credentials' => $credentials,
                 'certificate_fingerprint' => hash('sha256', $credentials['binary_security_token']),
                 'configured_at' => now('UTC'),
-                'expires_at' => array_key_exists('expires_at', $validated)
-                    ? $validated['expires_at']
-                    : $record->expires_at,
+                'expires_at' => $expiresAt,
                 'updated_by' => $user->id,
             ])->save();
 
