@@ -4,8 +4,10 @@ namespace App\Services\Accounting;
 
 use App\Models\PosHeldSale;
 use App\Models\PosSession;
+use App\Models\PosSessionEvent;
 use App\Models\User;
 use App\Support\PosSettings;
+use App\Services\Pos\PosAuditService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -16,7 +18,10 @@ use RuntimeException;
  */
 class PosHeldSaleService
 {
-    public function __construct(protected PosSessionService $sessions) {}
+    public function __construct(
+        protected PosSessionService $sessions,
+        protected PosAuditService $audit,
+    ) {}
 
     /** @param array{pos_session_id:string,customer_id?:?string,tax_inclusive?:bool,items:array<int,array>} $data */
     public function hold(array $data, User $actor): PosHeldSale
@@ -28,8 +33,14 @@ class PosHeldSaleService
         return DB::transaction(function () use ($data, $actor) {
             $session = $this->sessions->requireOpenForCheckout($data['pos_session_id'], $actor->id, $actor);
 
-            return PosHeldSale::create([
+            $cartId = $data['cart_id'] ?? null;
+            if (! is_string($cartId) || $cartId === '') {
+                $cartId = $this->audit->createCart($session, $actor)->cart_id;
+            }
+
+            $held = PosHeldSale::create([
                 'branch_id' => $session->branch_id,
+                'cart_id' => $cartId,
                 'pos_session_id' => $session->id,
                 'warehouse_id' => $session->warehouse_id,
                 'customer_id' => $data['customer_id'] ?? null,
@@ -48,7 +59,14 @@ class PosHeldSaleService
                         'discount' => (int) ($item['discount'] ?? 0),
                     ], $data['items']),
                 ],
-            ])->fresh(['customer']);
+            ]);
+
+            $this->audit->recordCartEvent($session, $actor, $cartId, PosSessionEvent::TYPE_CART_HELD, [
+                'held_sale_id' => $held->id,
+                'items' => $held->payload['items'] ?? [],
+            ]);
+
+            return $held->fresh(['customer']);
         });
     }
 
@@ -71,11 +89,22 @@ class PosHeldSaleService
             $held = PosHeldSale::lockForUpdate()->findOrFail($id);
             $this->assertAccessible($held, $session, $actor);
 
+            $cartId = $held->cart_id;
+            if (! is_string($cartId) || $cartId === '') {
+                $cartId = $this->audit->createCart($session, $actor)->cart_id;
+            }
+
             $held->update([
+                'cart_id' => $cartId,
                 'status' => PosHeldSale::STATUS_RESUMED,
                 'resumed_pos_session_id' => $session->id,
                 'resumed_at' => now(),
             ]);
+
+            $this->audit->recordCartEvent($session, $actor, $cartId, PosSessionEvent::TYPE_CART_RESUMED, [
+                'held_sale_id' => $held->id,
+                'items' => $held->payload['items'] ?? [],
+            ], true);
 
             return $held->fresh('customer');
         });
@@ -89,9 +118,18 @@ class PosHeldSaleService
             $held = PosHeldSale::lockForUpdate()->findOrFail($id);
             $this->assertAccessible($held, $session, $actor);
 
+            $cartId = $held->cart_id;
+            if (! is_string($cartId) || $cartId === '') {
+                $cartId = $this->audit->createCart($session, $actor)->cart_id;
+            }
             $held->update([
+                'cart_id' => $cartId,
                 'status' => PosHeldSale::STATUS_DISCARDED,
                 'discarded_at' => now(),
+            ]);
+            $this->audit->recordCartEvent($session, $actor, $cartId, PosSessionEvent::TYPE_CART_DISCARDED, [
+                'held_sale_id' => $held->id,
+                'items' => $held->payload['items'] ?? [],
             ]);
         });
     }

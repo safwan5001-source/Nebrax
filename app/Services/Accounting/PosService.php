@@ -8,6 +8,7 @@ use App\Models\PriceList;
 use App\Models\Product;
 use App\Support\PosSettings;
 use App\Services\Pos\CashDrawerService;
+use App\Services\Pos\PosAuditService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -31,6 +32,7 @@ class PosService
         protected CashBankAccountService $cashBankAccounts,
         protected PosCustomerPriceListResolver $customerPriceLists,
         protected CashDrawerService $cashDrawer,
+        protected PosAuditService $audit,
     ) {}
 
     /**
@@ -44,7 +46,8 @@ class PosService
         }
 
         $drawerAttempt = null;
-        $invoice = DB::transaction(function () use ($data, &$drawerAttempt) {
+        $paymentIds = [];
+        $invoice = DB::transaction(function () use ($data, &$drawerAttempt, &$paymentIds) {
             // تُقفل الجلسة وتتحقق قبل إنشاء أي مستند: لا بيع يُلحق بورديّة مغلقة
             // أو بكاشير/فرع آخر، ويظل القفل قائماً حتى اكتمال الفاتورة وسنداتها.
             $session = $this->sessions->requireOpenForCheckout(
@@ -66,6 +69,16 @@ class PosService
             $this->assertPosPaymentMethodsAvailable();
             $tenders = $this->normalizedTenders($data['tenders'] ?? []);
             $methods = $this->configuredPaymentMethods($tenders);
+
+            // بدء الإتمام دليل تشغيلي فقط؛ يسجل قبل أي فاتورة أو قبض كي تبقى
+            // السلسلة صادقة حتى لو تعذر إكمال طلب لاحق خارج هذه المعاملة.
+            $cartId = $data['cart_id'] ?? null;
+            if (is_string($cartId) && $cartId !== '') {
+                $this->audit->recordCheckout($session, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_CHECKOUT_STARTED, [
+                    'items' => $data['items'],
+                    'tenders' => $tenders,
+                ]);
+            }
 
             // الجلسات الجديدة تلتقط مخزن الجهاز عند الافتتاح؛ لا يقبل البيع أن
             // يستبدله بطلب عميل. تبقى الجلسات التاريخية بلا مخزن على سلوكها السابق.
@@ -110,7 +123,7 @@ class PosService
 
                 // 2) سند قبض بالوسيلة المهيأة: PaymentService يلتقط الحساب
                 // المقابل واسم الوسيلة ثم يرحّل القيد المتوازن عبر LedgerService.
-                $this->payments->post($this->payments->create([
+                $payment = $this->payments->post($this->payments->create([
                     'partner_id'        => $invoice->partner_id,
                     'invoice_id'        => $invoice->id,
                     'pos_session_id'    => $session->id,
@@ -120,6 +133,7 @@ class PosService
                     'notes'             => "{$method->name} — بيع {$invoice->number}",
                     'created_by'        => $data['created_by'] ?? null,
                 ]));
+                $paymentIds[] = $payment->id;
 
                 $remaining -= $applied;
             }
@@ -136,6 +150,15 @@ class PosService
                 && ($drawer['cash_drawer_auto_open_after_cash'] ?? false)
                 && $hasCashTender) {
                 $drawerAttempt = [$session, $data['actor'] ?? null, $invoice];
+            }
+
+            if (is_string($cartId) && $cartId !== '') {
+                $this->audit->recordCheckout($session, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_CHECKOUT_COMPLETED, [
+                    'invoice_id' => $invoice->id,
+                    'invoice_number' => $invoice->number,
+                    'payment_ids' => $paymentIds,
+                    'amount' => (int) $invoice->total,
+                ]);
             }
 
             return $invoice->fresh(['lines']);

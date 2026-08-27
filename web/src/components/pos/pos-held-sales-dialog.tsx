@@ -21,6 +21,7 @@ export interface PosHeldSaleItem {
 
 export interface PosHeldSale {
   id: string;
+  cart_id?: string | null;
   status: 'held' | 'resumed' | 'discarded';
   tax_inclusive: boolean;
   items: PosHeldSaleItem[];

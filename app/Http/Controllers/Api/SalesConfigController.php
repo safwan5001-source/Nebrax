@@ -40,7 +40,7 @@ class SalesConfigController extends ApiController
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'sections' => [], 'accent_color' => '#2563EB', 'footer_text' => '', 'terms_text' => '', 'bank_text' => '', 'stamp' => '', 'signature' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
-        'pos'        => ['default_customer_id' => null, 'default_customer' => PosSettings::DEFAULT_WALKIN_CUSTOMER, 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'payment_methods_mode' => PosSettings::PAYMENT_METHODS_ALL_ACTIVE, 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'show_onscreen_numeric_keypad' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true, 'cash_drawer_enabled' => false, 'cash_drawer_driver' => PosSettings::CASH_DRAWER_DRIVER_UNAVAILABLE, 'cash_drawer_auto_open_after_cash' => false, 'sound_enabled' => true, 'scan_sound_enabled' => true, 'error_sound_enabled' => true, 'payment_sound_enabled' => true, 'sound_volume' => 60, 'haptics_enabled' => true],
+        'pos'        => ['default_customer_id' => null, 'default_customer' => PosSettings::DEFAULT_WALKIN_CUSTOMER, 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'payment_methods_mode' => PosSettings::PAYMENT_METHODS_ALL_ACTIVE, 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'show_onscreen_numeric_keypad' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true, 'cash_drawer_enabled' => false, 'cash_drawer_driver' => PosSettings::CASH_DRAWER_DRIVER_UNAVAILABLE, 'cash_drawer_auto_open_after_cash' => false, 'blind_cash_count_enabled' => false, 'audit_operation_policies' => ['item_remove' => PosSettings::AUDIT_POLICY_ALLOWED, 'price_override' => PosSettings::AUDIT_POLICY_ALLOWED, 'discount_change' => PosSettings::AUDIT_POLICY_ALLOWED, 'cart_cancel' => PosSettings::AUDIT_POLICY_ALLOWED, 'cash_recount' => PosSettings::AUDIT_POLICY_APPROVAL_REQUIRED], 'sound_enabled' => true, 'scan_sound_enabled' => true, 'error_sound_enabled' => true, 'payment_sound_enabled' => true, 'sound_volume' => 60, 'haptics_enabled' => true],
     ];
 
     public function show(string $section): JsonResponse
@@ -101,6 +101,13 @@ class SalesConfigController extends ApiController
                     PosSettings::CASH_DRAWER_DRIVER_LOCAL_BRIDGE,
                 ])],
                 'data.cash_drawer_auto_open_after_cash' => ['nullable', 'boolean'],
+                'data.blind_cash_count_enabled' => ['nullable', 'boolean'],
+                'data.audit_operation_policies' => ['nullable', 'array:item_remove,price_override,discount_change,cart_cancel,cash_recount'],
+                'data.audit_operation_policies.*' => ['string', Rule::in([
+                    PosSettings::AUDIT_POLICY_ALLOWED,
+                    PosSettings::AUDIT_POLICY_APPROVAL_REQUIRED,
+                    PosSettings::AUDIT_POLICY_DENIED,
+                ])],
                 'data.sound_enabled' => ['nullable', 'boolean'],
                 'data.scan_sound_enabled' => ['nullable', 'boolean'],
                 'data.error_sound_enabled' => ['nullable', 'boolean'],
@@ -130,6 +137,7 @@ class SalesConfigController extends ApiController
             $this->assertPosPaymentMethods($data);
             $this->assertPosProductCategories($data);
             $this->assertCashDrawerContract($data);
+            $this->assertAuditPolicies($data);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -226,6 +234,18 @@ class SalesConfigController extends ApiController
      * لا تسمح إعدادات POS إلا بوسائل دفع نشطة تملكها المؤسسة الحالية. القائمة
      * الفارغة تعني كل الوسائل النشطة للحفاظ على سلوك المستأجرين قبل هذه المرحلة.
      */
+    /** يتحقق من السياسات ويمنع تعطيل اعتماد إعادة العد الحساسة. */
+    private function assertAuditPolicies(array $data): void
+    {
+        $policies = $data['audit_operation_policies'] ?? [];
+        if (! is_array($policies)) {
+            abort(422, 'سياسات الرقابة يجب أن تكون مجموعة قيم صريحة.');
+        }
+        if (($policies['cash_recount'] ?? PosSettings::AUDIT_POLICY_APPROVAL_REQUIRED) !== PosSettings::AUDIT_POLICY_APPROVAL_REQUIRED) {
+            abort(422, 'إعادة العد بعد كشف الفرق تتطلب اعتماداً دائماً.');
+        }
+    }
+
     private function assertPosPaymentMethods(array $data): void
     {
         $enabled = array_values(array_unique($data['enabled_payment_method_ids'] ?? []));

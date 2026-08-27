@@ -31,6 +31,9 @@ final class PosSettings
     public const PAYMENT_METHODS_NONE = 'none';
     public const CASH_DRAWER_DRIVER_UNAVAILABLE = 'unavailable';
     public const CASH_DRAWER_DRIVER_LOCAL_BRIDGE = 'local_bridge';
+    public const AUDIT_POLICY_ALLOWED = 'allowed';
+    public const AUDIT_POLICY_APPROVAL_REQUIRED = 'approval_required';
+    public const AUDIT_POLICY_DENIED = 'denied';
 
     private const DEFAULTS = [
         // المعرّف هو المصدر المستقر للعميل الافتراضي. الاسم يبقى للتوافق مع
@@ -83,6 +86,18 @@ final class PosSettings
         'cash_drawer_enabled' => false,
         'cash_drawer_driver' => self::CASH_DRAWER_DRIVER_UNAVAILABLE,
         'cash_drawer_auto_open_after_cash' => false,
+        // العد الأعمى لا يغير حساب expected، بل يؤخر كشفه إلى ما بعد تثبيت
+        // counted cash. يبقى معطلاً افتراضياً لحفظ سلوك المنشآت الحالية.
+        'blind_cash_count_enabled' => false,
+        // سياسات العمليات الحساسة تمديد قابل للضبط لا أسماء أدوار. «المسموح» هو
+        // الافتراض المتوافق للعمليات القائمة؛ إعادة العد لا يسمح بها إلا باعتماد.
+        'audit_operation_policies' => [
+            'item_remove' => self::AUDIT_POLICY_ALLOWED,
+            'price_override' => self::AUDIT_POLICY_ALLOWED,
+            'discount_change' => self::AUDIT_POLICY_ALLOWED,
+            'cart_cancel' => self::AUDIT_POLICY_ALLOWED,
+            'cash_recount' => self::AUDIT_POLICY_APPROVAL_REQUIRED,
+        ],
         // تفضيلات feedback محلية للواجهة؛ لا تدخل في البيع أو القيد ولا تعتمد
         // عليها الخدمة لتقرير صحة العملية. تظل مفعلة بالتوافق مع تجربة POS.
         'sound_enabled' => true,
@@ -203,6 +218,23 @@ final class PosSettings
         }
 
         return array_values(array_unique(array_filter($ids, fn (mixed $id) => is_string($id) && $id !== '')));
+    }
+
+    /** هل العد الأعمى مفعّل؟ قيمة غير معروفة لا تكشف بيانات إضافية. */
+    public static function blindCashCountEnabled(?Tenant $tenant = null): bool
+    {
+        return self::group($tenant)['blind_cash_count_enabled'] === true;
+    }
+
+    /** سياسة العملية الحساسة الصالحة؛ القيم المجهولة تعود إلى الافتراض المتوافق. */
+    public static function auditOperationPolicy(string $operation, ?Tenant $tenant = null): string
+    {
+        $policies = self::group($tenant)['audit_operation_policies'];
+        $policy = is_array($policies) ? ($policies[$operation] ?? self::AUDIT_POLICY_ALLOWED) : self::AUDIT_POLICY_ALLOWED;
+
+        return in_array($policy, [self::AUDIT_POLICY_ALLOWED, self::AUDIT_POLICY_APPROVAL_REQUIRED, self::AUDIT_POLICY_DENIED], true)
+            ? $policy
+            : self::AUDIT_POLICY_ALLOWED;
     }
 
     /** المنتج بلا تصنيف لا تقيّده السياسة؛ المقصود هو التصنيفات المُدارة حصراً. */

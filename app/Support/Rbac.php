@@ -78,6 +78,10 @@ class Rbac
             'pos.variance.approve',
             // فتح الدرج لا يورّث من صلاحية البيع؛ يضاف فقط لدور مخصص أو عبر *.
             'pos.cash_drawer.open',
+            // الرقابة والتدقيق مساحة واحدة مستقلة عن مسمى الدور. يفصل العرض عن
+            // المراجعة والتصدير والاعتماد وإدارة سياسات الأدلة.
+            'pos.audit.view', 'pos.audit.review', 'pos.audit.export',
+            'pos.override.approve', 'pos.audit.settings.manage',
             'apps.view', 'apps.manage',
             // Fuel Stations: يمنحها المالك/المدير عبر `*`، ولا تُضاف للأدوار
             // المقيدة تلقائياً؛ تُسند فقط عبر دور مخصص أو قرار مستأجر صريح.
