@@ -2336,14 +2336,27 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         usage?: 'print' | 'pdf' | 'thermal';
         print_template_revision_id?: string;
       };
-      const revisionId = input.print_template_revision_id ?? '';
-      const revision = mockRevisionForAssignment(revisionId);
       const documentType = input.document_type ?? '';
       const usage = input.usage ?? 'print';
-      if (!revision || revision.status !== 'published' || !revision.document_types.includes(documentType)) {
+      const branchId = input.branch_id ?? null;
+      if (m === 'DELETE') {
+        const index = mockPrintTemplateAssignments.findIndex((assignment) => (
+          assignment.branch_id === branchId
+          && assignment.document_type === documentType
+          && assignment.usage === usage
+        ));
+        if (index >= 0) mockPrintTemplateAssignments.splice(index, 1);
         return resolve({ data: null });
       }
-      const branchId = input.branch_id ?? null;
+      const revisionId = input.print_template_revision_id ?? '';
+      const revision = mockRevisionForAssignment(revisionId);
+      const expectedThermalTemplateId = usage === 'thermal'
+        ? ['tax-invoice-thermal58', 'tax-invoice-thermal80']
+        : null;
+      if (!revision || revision.status !== 'published' || !revision.document_types.includes(documentType)
+        || (expectedThermalTemplateId !== null && !expectedThermalTemplateId.includes(String(revision.definition.template_id ?? '')))) {
+        return resolve({ data: null });
+      }
       const now = new Date().toISOString();
       const index = mockPrintTemplateAssignments.findIndex((assignment) => (
         assignment.branch_id === branchId
@@ -2371,7 +2384,22 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     }
     // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
     if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
-    if (clean === '/pos/checkout') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body), payment_status: 'paid' } });
+    if (clean === '/pos/checkout') {
+      const thermalAssignment = mockPrintTemplateAssignments.find((assignment) => (
+        assignment.branch_id === null && assignment.document_type === 'tax_invoice' && assignment.usage === 'thermal'
+      ));
+      const thermalTemplateRevision = thermalAssignment
+        ? mockRevisionForAssignment(thermalAssignment.print_template_revision_id)
+        : null;
+      return resolve({ data: {
+        id: 'demo-inv',
+        number: 'INV-2026-0119',
+        total: invoiceTotalFromBody(body),
+        payment_status: 'paid',
+        thermal_template_revision_id: thermalTemplateRevision?.id ?? null,
+        thermal_template_revision: thermalTemplateRevision,
+      } });
+    }
     // إنشاء مصروف: نُعيد إجمالاً محسوباً من المبلغ والضريبة (مسودة).
     if (clean === '/expenses') {
       const b = (body ?? {}) as { amount?: number; tax_rate?: number };

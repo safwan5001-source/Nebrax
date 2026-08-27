@@ -44,6 +44,12 @@ const strings: Record<string, string> = {
   receipt_paper_size_hint: 'Paper hint.',
   receipt_footer: 'Receipt footer',
   receipt_footer_hint: 'Footer hint.',
+  default_pos_receipt_template: 'Default POS receipt template',
+  default_pos_receipt_template_hint: 'Receipt template hint.',
+  default_pos_receipt_template_fallback: 'Use fallback thermal template',
+  default_pos_receipt_template_reset: 'Reset to fallback',
+  default_pos_receipt_template_empty: 'No compatible receipt template.',
+  default_pos_receipt_template_manage: 'Manage document templates',
   payment_methods: 'Payment-method mode',
   payment_methods_hint: 'Methods hint.',
   payment_methods_empty: 'No methods.',
@@ -138,7 +144,19 @@ const customers = [
   { id: 'supplier-1', code: 'S-001', name: 'Supplier One', type: 'supplier', phone: '0500000001', is_active: true },
 ];
 
-function mockSuccessfulLoad(overrides: Partial<typeof settings> = {}) {
+const receiptTemplates = [
+  { id: 'thermal-80-a', name: 'Thermal 80 A', status: 'published', document_types: ['tax_invoice'], published_revision: { id: 'thermal-80-a-r1', status: 'published', document_types: ['tax_invoice'], definition: { template_id: 'tax-invoice-thermal80' } } },
+  { id: 'thermal-80-b', name: 'Thermal 80 B', status: 'published', document_types: ['tax_invoice'], published_revision: { id: 'thermal-80-b-r1', status: 'published', document_types: ['tax_invoice'], definition: { template_id: 'tax-invoice-thermal80' } } },
+  { id: 'thermal-58', name: 'Thermal 58', status: 'published', document_types: ['tax_invoice'], published_revision: { id: 'thermal-58-r1', status: 'published', document_types: ['tax_invoice'], definition: { template_id: 'tax-invoice-thermal58' } } },
+  { id: 'page-template', name: 'A4 template', status: 'published', document_types: ['tax_invoice'], published_revision: { id: 'page-r1', status: 'published', document_types: ['tax_invoice'], definition: { template_id: 'tax-invoice-classic' } } },
+  { id: 'draft-thermal', name: 'Draft thermal', status: 'draft', document_types: ['tax_invoice'], published_revision: null },
+];
+
+function mockSuccessfulLoad(
+  overrides: Partial<typeof settings> = {},
+  availableReceiptTemplates = receiptTemplates,
+  receiptAssignmentRevisionId: string | null = 'thermal-80-a-r1',
+) {
   const responseSettings = { ...settings, ...overrides };
   api.mockImplementation((url: string, options?: { method?: string; body?: { data: unknown } }) => {
     if (url === '/sales-config/pos' && options?.method === 'PUT') return Promise.resolve({ data: options.body?.data });
@@ -146,6 +164,11 @@ function mockSuccessfulLoad(overrides: Partial<typeof settings> = {}) {
     if (url === '/payment-methods') return Promise.resolve({ data: paymentMethods });
     if (url === '/product-categories') return Promise.resolve({ data: productCategories });
     if (url === '/partners') return Promise.resolve({ data: customers });
+    if (url === '/print-templates') return Promise.resolve({ data: availableReceiptTemplates });
+    if (url === '/print-templates/resolve?document_type=tax_invoice&usage=thermal') {
+      return Promise.resolve({ data: receiptAssignmentRevisionId ? { print_template_revision_id: receiptAssignmentRevisionId } : null });
+    }
+    if (url === '/print-templates/assignments/default') return Promise.resolve({ data: null });
     return Promise.reject(new Error(`Unexpected endpoint: ${url}`));
   });
 }
@@ -170,6 +193,63 @@ describe('صفحة تهيئة POS بعد توحيد UX', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Default customer' }));
     expect(await screen.findByRole('option', { name: /Customer One/ })).not.toBeNull();
     expect(screen.queryByRole('option', { name: /Supplier One/ })).toBeNull();
+  });
+
+  it('يحمّل القالب الحراري الملائم للمقاس فقط ويحفظ التعيين عبر المحرك العام', async () => {
+    await renderLoaded();
+    const selector = screen.getByLabelText('Default POS receipt template') as HTMLSelectElement;
+    expect(selector.value).toBe('thermal-80-a-r1');
+    expect(screen.getByRole('option', { name: 'Thermal 80 A' })).not.toBeNull();
+    expect(screen.getByRole('option', { name: 'Thermal 80 B' })).not.toBeNull();
+    expect(screen.queryByRole('option', { name: 'Thermal 58' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'A4 template' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Draft thermal' })).toBeNull();
+
+    fireEvent.change(selector, { target: { value: 'thermal-80-b-r1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => expect(api.mock.calls.some(([url, options]) => (
+      url === '/print-templates/assignments/default' && options?.method === 'PUT'
+    ))).toBe(true));
+    const assignment = api.mock.calls.find(([url, options]) => (
+      url === '/print-templates/assignments/default' && options?.method === 'PUT'
+    ))![1].body;
+    expect(assignment).toEqual({
+      document_type: 'tax_invoice',
+      usage: 'thermal',
+      print_template_revision_id: 'thermal-80-b-r1',
+    });
+    const saved = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
+    expect(saved).toMatchObject({ receipt_footer: 'Thank you', receipt_paper_size: 'thermal_80' });
+    expect(saved).not.toHaveProperty('cash_drawer_enabled');
+  });
+
+  it('يعيد selector إلى fallback ويعرض القوالب الملائمة للمقاس الجديد فقط', async () => {
+    await renderLoaded();
+    const selector = screen.getByLabelText('Default POS receipt template') as HTMLSelectElement;
+    fireEvent.change(screen.getByLabelText('Paper size'), { target: { value: 'thermal_58' } });
+    expect(selector.value).toBe('');
+    expect(screen.getByRole('option', { name: 'Thermal 58' })).not.toBeNull();
+    expect(screen.queryByRole('option', { name: 'Thermal 80 A' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => expect(api.mock.calls.some(([url, options]) => (
+      url === '/print-templates/assignments/default' && options?.method === 'DELETE'
+    ))).toBe(true));
+    const reset = api.mock.calls.find(([url, options]) => (
+      url === '/print-templates/assignments/default' && options?.method === 'DELETE'
+    ))![1].body;
+    expect(reset).toEqual({ document_type: 'tax_invoice', usage: 'thermal' });
+  });
+
+  it('يعرض حالة فارغة مفهومة عند غياب قالب حراري ملائم', async () => {
+    mockSuccessfulLoad({}, [], null);
+    render(<PosConfigurationPage />);
+    await screen.findByRole('heading', { name: 'Receipt and printing' });
+
+    expect(screen.getByText('No compatible receipt template.')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Manage document templates' }).getAttribute('href')).toBe('/document-design');
+    expect((screen.getByLabelText('Default POS receipt template') as HTMLSelectElement).disabled).toBe(true);
   });
 
   it('لا يعرض أي تحكم لدرج النقدية في صفحة Configuration', async () => {

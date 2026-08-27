@@ -179,6 +179,7 @@ class PrintTemplateService
             if (! in_array($documentType, $revision->document_types, true)) {
                 throw new RuntimeException('مراجعة القالب لا تدعم نوع المستند المحدد.');
             }
+            PrintTemplateContract::assertUsageCompatibleDefinition($usage, $revision->definition);
 
             $query = PrintTemplateAssignment::where('branch_id', $branchId)
                 ->where('document_type', $documentType)
@@ -201,6 +202,32 @@ class PrintTemplateService
 
             return $assignment->fresh('revision.template');
         });
+    }
+
+    /**
+     * يزيل تعييناً صريحاً ويعيد السلوك إلى fallback المحرك (تعيين الشركة أو العارض
+     * الافتراضي بحسب السياق). لا يلمس أي مراجعة أو مستند مرحّل.
+     */
+    public function unassign(array $data): void
+    {
+        $usage = PrintTemplateContract::assertUsage($data['usage'] ?? PrintTemplateAssignment::USAGE_PRINT);
+        $documentType = PrintTemplateContract::assertDocumentTypes([$data['document_type']])[0];
+        $branchId = $data['branch_id'] ?? null;
+
+        if ($branchId !== null && ! Branch::whereKey($branchId)->exists()) {
+            throw new RuntimeException('الفرع المحدد غير موجود.');
+        }
+
+        $query = PrintTemplateAssignment::query()
+            ->where('document_type', $documentType)
+            ->where('usage', $usage);
+        if ($branchId === null) {
+            $query->whereNull('branch_id');
+        } else {
+            $query->where('branch_id', $branchId);
+        }
+
+        $query->delete();
     }
 
     /** أولوية اختيار واحدة: الفرع أولاً، ثم افتراضي المؤسسة. */

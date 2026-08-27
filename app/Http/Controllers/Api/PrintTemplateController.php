@@ -114,4 +114,15 @@ class PrintTemplateController extends ApiController
 
         return new PrintTemplateAssignmentResource($assignment);
     }
+
+    /**
+     * إزالة تعيين حي صريح؛ لا تحذف القالب أو مراجعته المنشورة، فتظل لقطات
+     * المستندات السابقة قابلة للطباعة بلا تغيير.
+     */
+    public function unassign(ResolvePrintTemplateAssignmentRequest $request): JsonResponse
+    {
+        $this->domain(fn () => $this->templates->unassign($request->validated()));
+
+        return response()->json(['data' => null]);
+    }
 }
