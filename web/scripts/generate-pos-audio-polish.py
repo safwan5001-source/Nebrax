@@ -1,8 +1,8 @@
 """Generate project-owned Balanced Premium 3D POS feedback WAV assets.
 
-Every clip is synthesized locally from sine-based layers, shaped transients, short
-micro-delayed stereo detail, and click-free amplitude envelopes. No recordings,
-samples, runtime services, or third-party source material are used.
+Every clip is synthesized locally from sine-based layers, shaped transients, a
+mono-safe core, restrained stereo detail, and click-free amplitude envelopes. No
+recordings, samples, runtime services, or third-party source material are used.
 """
 
 from __future__ import annotations
@@ -44,39 +44,40 @@ class AssetSpec:
     layers: tuple[Layer, ...]
 
 
-# One identity: crisp digital transients, compact low-mid body, and only a very
-# small channel offset for spatial depth. The core remains present in both channels
-# so mono POS speakers retain the intended cue.
+# One identity: crisp digital transients, compact low-mid body, and a full centre
+# core. Spatial layers are deliberately quieter; their pan is modest and their far
+# channel offset stays below 0.2 ms. This retains a sense of depth in headphones
+# without allowing phase cancellation to hollow the cue on mono POS speakers.
 ASSETS: tuple[AssetSpec, ...] = (
     AssetSpec(
         "scan-success.wav",
         104,
-        "Punchy Tech 3D",
+        "Punchy Tech Spatial",
         (
-            Layer(0, 104, 820, 1_010, 0.255, 0.09, 0.00, 0.0, 2.0, 20.0),
-            Layer(0, 38, 2_080, 1_620, 0.082, 0.16, -0.16, 0.85, 1.2, 11.0),
-            Layer(8, 78, 540, 590, 0.082, 0.04, 0.15, 1.10, 3.0, 19.0),
+            Layer(0, 104, 820, 1_010, 0.275, 0.09, 0.00, 0.0, 2.0, 20.0),
+            Layer(0, 38, 2_080, 1_620, 0.045, 0.16, -0.12, 0.18, 1.2, 11.0),
+            Layer(8, 78, 540, 590, 0.042, 0.04, 0.10, 0.12, 3.0, 19.0),
         ),
     ),
     AssetSpec(
         "scan-not-found.wav",
         194,
-        "Punchy Tech 3D — Double Note",
+        "Punchy Tech Spatial — Double Note",
         (
-            Layer(0, 76, 640, 590, 0.315, 0.07, -0.07, 0.80, 2.5, 19.0),
-            Layer(104, 86, 535, 470, 0.335, 0.07, 0.07, 1.15, 2.5, 21.0),
-            Layer(8, 62, 375, 350, 0.072, 0.02, 0.12, 1.60, 4.0, 18.0),
-            Layer(112, 70, 330, 305, 0.076, 0.02, -0.12, 1.35, 4.0, 19.0),
+            Layer(0, 76, 640, 590, 0.305, 0.07, 0.00, 0.0, 2.5, 19.0),
+            Layer(104, 86, 535, 470, 0.325, 0.07, 0.00, 0.0, 2.5, 21.0),
+            Layer(6, 60, 1_600, 1_400, 0.038, 0.12, -0.12, 0.16, 2.0, 16.0),
+            Layer(110, 68, 1_480, 1_300, 0.040, 0.12, 0.12, 0.16, 2.0, 18.0),
         ),
     ),
     AssetSpec(
         "scan-error.wav",
         174,
-        "Deep Spatial 3D",
+        "Deep Spatial",
         (
-            Layer(0, 174, 470, 318, 0.285, 0.09, 0.00, 0.0, 2.8, 30.0),
-            Layer(8, 152, 258, 198, 0.115, 0.03, -0.10, 1.30, 4.0, 29.0),
-            Layer(0, 42, 970, 690, 0.042, 0.12, 0.13, 1.55, 1.4, 15.0),
+            Layer(0, 174, 470, 318, 0.295, 0.09, 0.00, 0.0, 2.8, 30.0),
+            Layer(8, 152, 258, 198, 0.070, 0.03, 0.00, 0.0, 4.0, 29.0),
+            Layer(0, 42, 970, 690, 0.032, 0.12, 0.12, 0.16, 1.4, 15.0),
         ),
     ),
     AssetSpec(
@@ -84,32 +85,32 @@ ASSETS: tuple[AssetSpec, ...] = (
         176,
         "Balanced Spatial Warning",
         (
-            Layer(0, 72, 675, 635, 0.212, 0.06, -0.06, 0.90, 2.6, 19.0),
-            Layer(98, 74, 610, 570, 0.218, 0.06, 0.06, 1.10, 2.6, 20.0),
-            Layer(7, 58, 430, 410, 0.062, 0.02, 0.12, 1.45, 3.5, 17.0),
-            Layer(105, 60, 390, 370, 0.065, 0.02, -0.12, 1.35, 3.5, 18.0),
+            Layer(0, 72, 675, 635, 0.225, 0.06, 0.00, 0.0, 2.6, 19.0),
+            Layer(98, 74, 610, 570, 0.230, 0.06, 0.00, 0.0, 2.6, 20.0),
+            Layer(7, 58, 1_420, 1_280, 0.035, 0.10, -0.10, 0.16, 2.0, 16.0),
+            Layer(105, 60, 1_260, 1_160, 0.035, 0.10, 0.10, 0.16, 2.0, 17.0),
         ),
     ),
     AssetSpec(
         "payment-success.wav",
         312,
-        "Crisp Glass 3D + Punchy Tech",
+        "Crisp Glass Spatial",
         (
-            Layer(0, 112, 720, 790, 0.225, 0.08, -0.02, 0.0, 2.0, 25.0),
-            Layer(66, 246, 1_080, 1_310, 0.290, 0.13, 0.08, 1.15, 3.0, 36.0),
-            Layer(72, 206, 1_740, 2_050, 0.092, 0.20, -0.16, 1.80, 2.6, 34.0),
-            Layer(20, 150, 430, 470, 0.088, 0.03, 0.15, 1.40, 4.0, 31.0),
+            Layer(0, 112, 720, 790, 0.240, 0.08, 0.00, 0.0, 2.0, 25.0),
+            Layer(66, 246, 1_080, 1_310, 0.305, 0.13, 0.00, 0.0, 3.0, 36.0),
+            Layer(72, 206, 1_740, 2_050, 0.040, 0.20, -0.12, 0.16, 2.6, 34.0),
+            Layer(20, 150, 430, 470, 0.055, 0.03, 0.10, 0.12, 4.0, 31.0),
         ),
     ),
     AssetSpec(
         "payment-error.wav",
         256,
-        "Deep Spatial 3D",
+        "Deep Spatial",
         (
-            Layer(0, 112, 405, 348, 0.302, 0.10, -0.03, 0.0, 2.2, 27.0),
-            Layer(128, 124, 338, 278, 0.314, 0.10, 0.04, 1.05, 2.4, 31.0),
-            Layer(9, 236, 232, 190, 0.138, 0.03, -0.10, 1.45, 4.0, 38.0),
-            Layer(0, 40, 860, 650, 0.046, 0.12, 0.14, 1.70, 1.5, 15.0),
+            Layer(0, 112, 405, 348, 0.310, 0.10, 0.00, 0.0, 2.2, 27.0),
+            Layer(128, 124, 338, 278, 0.320, 0.10, 0.00, 0.0, 2.4, 31.0),
+            Layer(9, 236, 232, 190, 0.090, 0.03, 0.00, 0.0, 4.0, 38.0),
+            Layer(0, 40, 860, 650, 0.028, 0.12, 0.10, 0.16, 1.5, 15.0),
         ),
     ),
 )
@@ -127,12 +128,12 @@ def envelope(position: int, length: int, attack_ms: float, release_ms: float) ->
 
 
 def layer_value(layer: Layer, sample: int, channel: int) -> float:
-    """Render a layer with a sub-2 ms far-channel delay and restrained pan."""
+    """Render a layer with a quiet sub-0.2 ms far-channel detail and restrained pan."""
     start = round(layer.start_ms * SAMPLE_RATE / 1_000)
     length = max(1, round(layer.duration_ms * SAMPLE_RATE / 1_000))
     delay = round(layer.side_delay_ms * SAMPLE_RATE / 1_000)
-    # Apply the micro-delay only to the farther channel, keeping the core coherent
-    # on mono terminals and avoiding exaggerated stereo widening.
+    # Apply the micro-delay only to the quieter spatial detail; the high-gain core
+    # stays centred so mono terminals retain the full cue without phase cancellation.
     if layer.pan > 0 and channel == 0:
         sample += delay
     elif layer.pan < 0 and channel == 1:

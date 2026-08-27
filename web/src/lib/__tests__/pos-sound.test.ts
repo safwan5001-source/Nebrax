@@ -20,7 +20,7 @@ class FakeAudio {
 const enabled: PosFeedbackSettings = { ...POS_FEEDBACK_DEFAULTS, haptics_enabled: false };
 
 describe('مدير صوت POS', () => {
-  it('يربط كل حدث بملف صوت مملوك ومعبأ في الواجهة', () => {
+  it('يربط كل حدث بملف صوت مملوك ومعبأ في الواجهة مع عمق ستيريو آمن أحادياً', () => {
     expect(Object.keys(POS_SOUND_SOURCES)).toEqual([
       'scan_success',
       'scan_not_found',
@@ -56,10 +56,35 @@ describe('مدير صوت POS', () => {
       expect(durationMs).toBeCloseTo(expectedDurations[event], 0);
 
       let peak = 0;
-      for (let offset = 44; offset < wav.length; offset += 2) {
-        peak = Math.max(peak, Math.abs(wav.readInt16LE(offset)) / 32_767);
+      let leftEnergy = 0;
+      let rightEnergy = 0;
+      let crossEnergy = 0;
+      let midEnergy = 0;
+      let sideEnergy = 0;
+      let hasStereoDetail = false;
+
+      for (let offset = 44; offset < wav.length; offset += 4) {
+        const left = wav.readInt16LE(offset) / 32_767;
+        const right = wav.readInt16LE(offset + 2) / 32_767;
+        const mid = (left + right) / 2;
+        const side = (left - right) / 2;
+
+        peak = Math.max(peak, Math.abs(left), Math.abs(right));
+        leftEnergy += left ** 2;
+        rightEnergy += right ** 2;
+        crossEnergy += left * right;
+        midEnergy += mid ** 2;
+        sideEnergy += side ** 2;
+        hasStereoDetail ||= left !== right;
       }
+
+      const correlation = crossEnergy / Math.sqrt(leftEnergy * rightEnergy);
+      const sideToMid = Math.sqrt(sideEnergy / midEnergy);
+
       expect(peak).toBeLessThan(0.6);
+      expect(hasStereoDetail).toBe(true);
+      expect(correlation).toBeGreaterThan(0.98);
+      expect(sideToMid).toBeLessThan(0.1);
     }
   });
 
