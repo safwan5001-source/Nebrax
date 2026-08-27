@@ -4519,6 +4519,8 @@
     "zatca_submission_hint": "Controls when an issued invoice is submitted. Manual is the safe default.",
     "zatca_manual_retry_hint": "Automatic mode will still allow a manual retry after a failed attempt.",
     "zatca_connection_pending": "Saving this policy does not start a live connection until the ZATCA device certificate and submission layer are configured.",
+    "zatca_application_inactive": "The e-invoicing application is inactive for this tenant. Enable it before opening the ZATCA settings.",
+    "zatca_open_applications": "Open application settings",
     "c_designs_t": "Invoice & quote designs",
     "c_designs_d": "Design and customize print/preview templates for sales documents.",
     "c_fields_t": "Custom invoice fields",

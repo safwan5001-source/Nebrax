@@ -2418,6 +2418,16 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: template ?? null });
   }
   if (clean === '/me') return resolve({ user: DEMO_USER, company: mockCompany });
+  if (clean === '/applications/nav-state') {
+    return resolve({
+      data: Object.fromEntries(
+        Object.entries(mockApplications).map(([key, application]) => [
+          key,
+          application.maturity === 'built' && application.status !== 'disabled',
+        ]),
+      ),
+    });
+  }
   if (clean === '/applications') return resolve({ data: mockApplications });
   if (clean === '/journal-entries') return resolve({ data: mockJournalEntriesList });
   if (clean === '/manual-journals') return resolve({ data: mockManualJournals });

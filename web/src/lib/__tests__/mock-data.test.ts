@@ -39,4 +39,10 @@ describe('mockApi ZATCA settings', () => {
       },
     });
   });
+  it('يعرض إتاحة تطبيق ZATCA من عقد nav-state في وضع المعاينة', async () => {
+    const response = await mockApi<{ data: Record<string, boolean> }>('/applications/nav-state');
+
+    expect(response.data['compliance.zatca']).toBe(true);
+  });
+
 });

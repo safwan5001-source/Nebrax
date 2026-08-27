@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,10 @@ interface ZatcaSettingsResponse {
   };
 }
 
+interface ApplicationNavStateResponse {
+  data: Record<string, boolean>;
+}
+
 /**
  * سياسة إرسال ZATCA تُحفظ في المصدر الحقيقي /zatca-settings.
  * النقل الحي وسجل المحاولات وإعادة الإرسال اليدوية تُضاف في PRs لاحقة.
@@ -26,21 +31,42 @@ export default function EInvoiceSettingsPage() {
   const t = useTranslations('salesSettings');
   const tc = useTranslations('common');
   const { success } = useToast();
+  const [zatcaAvailable, setZatcaAvailable] = useState<boolean | null>(null);
   const [mode, setMode] = useState<SubmissionMode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api<ZatcaSettingsResponse>('/zatca-settings')
-      .then((response) => setMode(response.data.submission_mode))
-      .catch((requestError) => {
-        setError(requestError instanceof ApiError ? requestError.message : tc('loadFailed'));
-      });
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const navState = await api<ApplicationNavStateResponse>('/applications/nav-state');
+        if (cancelled) return;
+
+        const available = !Array.isArray(navState.data)
+          && navState.data['compliance.zatca'] === true;
+        setZatcaAvailable(available);
+        if (!available) return;
+
+        const response = await api<ZatcaSettingsResponse>('/zatca-settings');
+        if (!cancelled) setMode(response.data.submission_mode);
+      } catch (requestError) {
+        if (!cancelled) {
+          setError(requestError instanceof ApiError ? requestError.message : tc('loadFailed'));
+        }
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [tc]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (mode === null) return;
+    if (mode === null || zatcaAvailable !== true) return;
 
     setSaving(true);
     setError(null);
@@ -70,15 +96,29 @@ export default function EInvoiceSettingsPage() {
           <CardTitle>{t('zatca_submission_mode')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {mode === null && !error ? (
+          {zatcaAvailable === null && !error ? (
             <Skeleton className="h-32 w-full" />
+          ) : zatcaAvailable === false ? (
+            <div className="space-y-3">
+              <p className="text-sm leading-relaxed text-muted">{t('zatca_application_inactive')}</p>
+              <Link
+                href="/applications"
+                className="inline-flex h-10 items-center rounded bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                {t('zatca_open_applications')}
+              </Link>
+            </div>
+          ) : mode === null ? (
+            <p className="rounded bg-negative/10 px-3 py-2 text-sm text-negative">
+              {error ?? tc('loadFailed')}
+            </p>
           ) : (
             <form onSubmit={submit} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="submission-mode">{t('zatca_submission_mode')}</Label>
                 <Select
                   id="submission-mode"
-                  value={mode ?? 'manual'}
+                  value={mode}
                   disabled={saving}
                   onChange={(event) => setMode(event.target.value as SubmissionMode)}
                 >
@@ -96,7 +136,7 @@ export default function EInvoiceSettingsPage() {
               {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 
               <div className="flex justify-end pt-1">
-                <Button type="submit" disabled={saving || mode === null}>{tc('save')}</Button>
+                <Button type="submit" disabled={saving}>{tc('save')}</Button>
               </div>
             </form>
           )}
