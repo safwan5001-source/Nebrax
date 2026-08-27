@@ -37,7 +37,7 @@ final class DocumentChannelIdentityService
         if ($displayName === '' || mb_strlen($displayName) > 160) {
             throw new DocumentSourceException(DocumentSourceException::INTAKE_REJECTED);
         }
-        $normalized = DocumentSourceEnvelope::normalizeIdentity($externalIdentity);
+        $normalized = DocumentSourceEnvelope::normalizeIdentity($channel, $externalIdentity);
 
         return DB::transaction(function () use ($actor, $channel, $displayName, $normalized, $metadata): DocumentChannelIdentity {
             $identity = DocumentChannelIdentity::create([

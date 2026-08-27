@@ -65,7 +65,7 @@ final readonly class DocumentSourceEnvelope
             actor: $actor,
             channel: $channel,
             documentType: $documentType,
-            externalReference: self::normalizeIdentifier($externalReference),
+            externalReference: self::normalizeReference($channel, $externalReference),
             uploadedFile: $uploadedFile,
             metadata: self::sanitizeMetadata($metadata),
         );
@@ -81,9 +81,14 @@ final readonly class DocumentSourceEnvelope
         return self::mask($this->externalReference);
     }
 
-    public static function normalizeIdentity(string $identity): string
+    public static function normalizeIdentity(DocumentSourceChannel $channel, string $identity): string
     {
-        return self::normalizeIdentifier($identity);
+        return self::canonicalizeForChannel($channel, $identity);
+    }
+
+    public static function normalizeReference(DocumentSourceChannel $channel, string $reference): string
+    {
+        return self::canonicalizeForChannel($channel, $reference);
     }
 
     public static function fingerprint(string $normalized): string
@@ -101,10 +106,18 @@ final readonly class DocumentSourceEnvelope
         return mb_substr($value, 0, 4).'…'.mb_substr($value, -4);
     }
 
+    private static function canonicalizeForChannel(DocumentSourceChannel $channel, string $value): string
+    {
+        $value = self::normalizeIdentifier($value);
+        $value = $channel->canonicalizeIdentifier($value);
+
+        return self::normalizeIdentifier($value);
+    }
+
+    /** Core محايد: trim وحدود الطول والتحقق، بلا تحويل حالة أو دلالة قناة. */
     private static function normalizeIdentifier(string $value): string
     {
-        $value = preg_replace('/\s+/u', ' ', trim($value)) ?? '';
-        $value = mb_strtolower($value);
+        $value = trim($value);
         if ($value === '' || mb_strlen($value) > 160) {
             throw new DocumentSourceException(DocumentSourceException::INTAKE_REJECTED);
         }

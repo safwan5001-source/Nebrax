@@ -18,19 +18,20 @@
 
 | طبقة | القرار الملزم |
 |---|---|
-| حد المصدر | لا ينشأ المغلف إلا من `fromResolvedIdentity()` داخل كود موثوق. يقبل نوع مستند معروفاً ومرجعاً خارجياً مطبعاً و`UploadedFile` وmetadata بالقائمة البيضاء فقط. |
+| حد المصدر | لا ينشأ المغلف إلا من `fromResolvedIdentity()` داخل كود موثوق. يقبل نوع مستند معروفاً ومرجعاً خارجياً بعد trim/length validation و`UploadedFile` وmetadata بالقائمة البيضاء فقط. |
+| canonicalization | core محايد لحالة الأحرف: لا يخفض identifier أو reference ولا يدمج `CaseRef-A` و`caseref-a` تلقائياً. تفوض canonicalization للقناة؛ `web` وحدها توثق lowercase، وأي قناة مستقبلية تبقى case-sensitive حتى ينص عقدها خلاف ذلك. يحسب fingerprint من القيمة canonical الخاصة بالقناة. |
 | metadata | المفاتيح قليلة ومحددة، والقيم JSON-safe صغيرة بعمق اثنين كحد أقصى. ترفض مفاتيح password/secret/token/credential/authorization/raw/payload وtenant/branch/checksum/storage/workflow/scan/processing، فلا تخزن ولا تؤثر في السياق. |
 | هوية القناة | `document_channel_identities` كيان `BranchScoped` بحالة `active` أو `disabled` واسم إداري وfingerprint SHA-256 وقيمة عرض مقنّعة. لا تحفظ القيمة الخارجية الخام ولا credential أو token أو webhook secret. |
 | حل الهوية | `DocumentChannelIdentityResolver` يفرغ السياق مؤقتاً، ويستعلم فقط عن `(channel, fingerprint)` ذي uniqueness العالمي، ويرفض النتيجة إن خالف tenant للممثل الداخلي. ثم تستعيد السياقات الأصلية. هذا حل ضيق ضروري قبل وجود السياق، لا تجاوز دائم لنطاق المستأجر. |
 | التفويض | قبل ضبط سياق الهوية، يفحص `DocumentSourceAccessGate` مستخدمًا نشطًا مطابق tenant وصلاحية `documents.center.manage` ووصول الفرع وقرار `document_center.core` لعملية `WRITE`، بما فيه entitlement وحالة التطبيق. إدارة الهوية تتطلب `documents.center.settings`. |
 | الاستقبال | تضبط الخدمة tenant/branch من صف الهوية ضمن `try/finally` قصير، وتحسب البصمة من `DocumentFileInspector`، وتنشئ حزمة `source_type=web` ثم تستدعي `DocumentFileIntakeService::ingest()` و`complete()` حصراً. لا تنسخ قواعد MIME أو التخزين أو الحجر. |
-| replay | `document_source_receipts` يحتفظ بهوية القناة والقناة وfingerprint المرجع ومرجع مقنّع وSHA-256 الخادمي وعلاقات الحزمة/الملف. uniqueness على `(document_channel_identity_id, channel, external_reference_fingerprint)` يمنع النسخ حتى مع السباق. |
+| replay | `document_source_receipts` يحتفظ بهوية القناة والقناة وfingerprint المرجع canonical الخاص بالقناة ومرجع مقنّع وSHA-256 الخادمي وعلاقات الحزمة/الملف. uniqueness على `(document_channel_identity_id, channel, external_reference_fingerprint)` يمنع النسخ حتى مع السباق. |
 | نتائج replay | المرجع نفسه مع SHA نفسه يعيد الحزمة والملف القائمين ودلالة `idempotentReplay=true`. المرجع نفسه مع SHA مختلف يسجل `document_source_conflict_rejected` آمنًا ويرمي `document_source_reference_conflict`. لا يعرض السر أو البصمة أو object key. |
-| السباق والفشل | مسار `QueryException` يعيد قراءة الفائز بعد تعارض uniqueness ويطبق المقارنة نفسها. إذا تراجع transaction بعد إنشاء الملف، يحذف كائن التخزين الذي كتبته المحاولة الخاسرة؛ وفشل التخزين قبل هذا لا ينشئ receipt نجاح. |
+| السباق والفشل | تقفل المعاملة الهوية ثم تعيد receipt قائم كقرار replay فقط؛ تسجل الخدمة replay أو conflict بعد commit وخارج المعاملة، فيبقى حدث `document_source_conflict_rejected` محفوظاً مرة واحدة حتى لمسار انتظار القفل. مسار `QueryException` يعيد قراءة الفائز ويطبق المقارنة نفسها. إذا تراجع transaction بعد إنشاء الملف، يحذف كائن التخزين الذي كتبته المحاولة الخاسرة؛ وفشل التخزين قبل هذا لا ينشئ receipt نجاح. |
 
 ## Immutability and audit
 
-تكون receipts وسجل `document_source_audit_events` append-only، وهما `BranchScoped` ومربوطان بـforeign keys مقيّدة (`restrict`) كي يبقى دليل الاستقبال متماسكاً. تسجل الأحداث `document_source_received` و`document_source_replayed` و`document_source_conflict_rejected` و`document_source_rejected` وأحداث إنشاء/تعطيل/تفعيل الهوية. يستعمل السجل metadata المقنّعة نفسها فقط.
+تكون receipts وسجل `document_source_audit_events` append-only، وهما `BranchScoped` ومربوطان بـforeign keys مقيّدة (`restrict`) كي يبقى دليل الاستقبال متماسكاً. تسجل الأحداث `document_source_received` و`document_source_replayed` و`document_source_conflict_rejected` و`document_source_rejected` وأحداث إنشاء/تعطيل/تفعيل الهوية. يسجل conflict بعد إغلاق معاملة قرار القفل، فلا يسحبه rollback؛ ولا يسجل مرتين لأن قرار receipt القائم يعالج في نقطة واحدة. يستعمل السجل metadata المقنّعة نفسها فقط.
 
 لا يستعمل connector `DocumentWorkflowService` كسجل تدقيق عام. تبقى الخدمة المذكورة مالكة انتقالات الحزمة فقط؛ والاستقبال يستدعيها من خلال `DocumentFileIntakeService` للانتقالات الصحيحة `draft → receiving → received`.
 
@@ -66,4 +67,4 @@
 
 ## Verification
 
-تغطي اختبارات PR-11 قبول قناة `web` من خلال inspector وintake الموجودين، SHA الخادمي والحجر، replay المطابق، تعارض المرجع والمحتوى، uniqueness لمرساة receipt، تعطيل الهوية، عزل tenant والفرع، RBAC وentitlement وحالة التطبيق، رفض metadata الحساسة وscope spoofing و`api` غير المدعومة، فشل ملف وتخزين بلا receipt نجاح أو object orphan، وإسقاط مراجعة مقنّع مع فلتر قناة خادمي. تثبت الاختبارات أيضاً صفر Invoice/Purchase/Expense/DeliveryNote/JournalEntry/Payment/StockMovement. يختبر CI نفس الهجرة وقيودها على SQLite وPostgreSQL.
+تغطي اختبارات PR-11 قبول قناة `web` من خلال inspector وintake الموجودين، SHA الخادمي والحجر، replay المطابق، تعارض المرجع والمحتوى بعد قرار القفل مع حدث conflict واحد محفوظ، uniqueness لمرساة receipt، تعطيل الهوية، عزل tenant والفرع، RBAC وentitlement وحالة التطبيق، رفض metadata الحساسة وscope spoofing و`api` غير المدعومة، وفصل canonicalization العام الحساس لحالة الأحرف عن lowercase المعلن لقناة `web`، وفشل ملف وتخزين بلا receipt نجاح أو object orphan، وإسقاط مراجعة مقنّع مع فلتر قناة خادمي. تثبت الاختبارات أيضاً صفر Invoice/Purchase/Expense/DeliveryNote/JournalEntry/Payment/StockMovement. يختبر CI نفس الهجرة وقيودها على SQLite وPostgreSQL.

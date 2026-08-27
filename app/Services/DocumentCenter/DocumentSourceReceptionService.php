@@ -69,14 +69,9 @@ final class DocumentSourceReceptionService
                 throw new DocumentSourceException(DocumentSourceException::INTAKE_REJECTED);
             }
 
-            $existing = $this->receiptFor($identity, $envelope);
-            if ($existing !== null) {
-                return $this->replayOrConflict($identity, $envelope, $existing, $inspected->sha256);
-            }
-
             $file = null;
             try {
-                return DB::transaction(function () use ($identity, $envelope, $inspected, &$file): DocumentSourceReceipt {
+                $outcome = DB::transaction(function () use ($identity, $envelope, $inspected, &$file): DocumentSourceReceipt|DocumentSourceReceiptRecord {
                     // يقفل هذا الصف المرساة المشتركة قبل أي كتابة تخزين؛ لذلك لا تصل
                     // محاولتان متزامنتان إلى intake للمرجع نفسه في الوقت ذاته.
                     $lockedIdentity = DocumentChannelIdentity::query()
@@ -87,7 +82,8 @@ final class DocumentSourceReceptionService
                     }
                     $existing = $this->receiptFor($lockedIdentity, $envelope);
                     if ($existing !== null) {
-                        return $this->replayOrConflict($lockedIdentity, $envelope, $existing, $inspected->sha256);
+                        // قرار فقط: يسجل التعارض بعد commit حتى لا يسحبه rollback.
+                        return $existing;
                     }
 
                     $batch = DocumentBatch::create([
@@ -141,6 +137,12 @@ final class DocumentSourceReceptionService
                 );
                 throw new DocumentSourceException(DocumentSourceException::INTAKE_REJECTED);
             }
+
+            if ($outcome instanceof DocumentSourceReceiptRecord) {
+                return $this->replayOrConflict($identity, $envelope, $outcome, $inspected->sha256);
+            }
+
+            return $outcome;
         });
     }
 

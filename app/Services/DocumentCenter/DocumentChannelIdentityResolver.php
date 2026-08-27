@@ -18,7 +18,7 @@ final class DocumentChannelIdentityResolver
 
     public function resolve(DocumentSourceChannel $channel, string $externalIdentity, User $actor): DocumentChannelIdentity
     {
-        $normalized = DocumentSourceEnvelope::normalizeIdentity($externalIdentity);
+        $normalized = DocumentSourceEnvelope::normalizeIdentity($channel, $externalIdentity);
 
         return $this->resolveFingerprint($channel, DocumentSourceEnvelope::fingerprint($normalized), $actor);
     }

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\DeliveryNote;
+use App\Models\DocumentBatch;
 use App\Models\DocumentChannelIdentity;
 use App\Models\DocumentFile;
 use App\Models\DocumentSourceAuditEvent;
@@ -66,7 +67,7 @@ class DocumentSourceChannelTest extends TestCase
         $identity = $this->identity($fixture['owner'], 'web-connector-01');
         $connector = app(WebDocumentSourceConnector::class);
 
-        $accepted = $connector->receive($this->envelope($identity, $fixture['owner'], 'message-001', $this->image('invoice.png')));
+        $accepted = $connector->receive($this->envelope($identity, $fixture['owner'], 'Message-001', $this->image('invoice.png')));
         $replayed = $connector->receive($this->envelope($identity, $fixture['owner'], 'message-001', $this->image('invoice-copy.png')));
 
         $this->assertFalse($accepted->idempotentReplay);
@@ -89,7 +90,7 @@ class DocumentSourceChannelTest extends TestCase
     }
 
     /** @test */
-    public function a_reused_external_reference_with_different_content_is_rejected_and_only_a_safe_conflict_event_is_recorded(): void
+    public function a_locked_replay_decision_with_different_content_preserves_one_safe_conflict_event_without_a_second_intake(): void
     {
         $fixture = $this->authorizedFixture('channel-conflict');
         $identity = $this->identity($fixture['owner'], 'web-connector-02');
@@ -101,10 +102,32 @@ class DocumentSourceChannelTest extends TestCase
         ));
 
         $this->assertSame(DocumentSourceException::REFERENCE_CONFLICT, $exception->errorCode);
+        $this->assertSame(1, DocumentBatch::query()->count());
         $this->assertSame(1, DocumentSourceReceiptRecord::query()->count());
         $this->assertSame(1, DocumentFile::query()->count());
-        $this->assertTrue(DocumentSourceAuditEvent::query()->where('event', DocumentSourceAuditEvent::CONFLICT_REJECTED)->exists());
+        $this->assertSame(1, DocumentSourceAuditEvent::query()
+            ->where('event', DocumentSourceAuditEvent::CONFLICT_REJECTED)
+            ->count());
         $this->assertCount(1, Storage::disk('local')->allFiles());
+    }
+
+    /** @test */
+    public function neutral_channel_canonicalization_keeps_case_distinct_until_a_channel_explicitly_declares_otherwise(): void
+    {
+        $identityUpper = DocumentSourceEnvelope::normalizeIdentity(DocumentSourceChannel::API, ' CaseIdentity-A ');
+        $identityLower = DocumentSourceEnvelope::normalizeIdentity(DocumentSourceChannel::API, 'caseidentity-a');
+        $referenceUpper = DocumentSourceEnvelope::normalizeReference(DocumentSourceChannel::API, ' CaseRef-A ');
+        $referenceLower = DocumentSourceEnvelope::normalizeReference(DocumentSourceChannel::API, 'caseref-a');
+
+        $this->assertSame('CaseIdentity-A', $identityUpper);
+        $this->assertSame('caseidentity-a', $identityLower);
+        $this->assertNotSame(DocumentSourceEnvelope::fingerprint($identityUpper), DocumentSourceEnvelope::fingerprint($identityLower));
+        $this->assertSame('CaseRef-A', $referenceUpper);
+        $this->assertSame('caseref-a', $referenceLower);
+        $this->assertNotSame(DocumentSourceEnvelope::fingerprint($referenceUpper), DocumentSourceEnvelope::fingerprint($referenceLower));
+
+        $this->assertSame('caseidentity-a', DocumentSourceEnvelope::normalizeIdentity(DocumentSourceChannel::WEB, ' CaseIdentity-A '));
+        $this->assertSame('caseref-a', DocumentSourceEnvelope::normalizeReference(DocumentSourceChannel::WEB, ' CaseRef-A '));
     }
 
     /** @test */
