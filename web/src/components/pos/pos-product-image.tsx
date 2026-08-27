@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Package } from 'lucide-react';
 import { api, fetchImageUrl, getToken } from '@/lib/api';
-import { hasMeaningfulLogoPixels } from './company-logo-quality';
+import { findLogoContentBounds, hasMeaningfulLogoPixels } from './company-logo-quality';
 
 type CompanyBrand = {
   logoUrl: string | null;
@@ -14,6 +14,11 @@ type CompanyBrand = {
 type CachedCompanyBrand = {
   sessionKey: string;
   promise: Promise<CompanyBrand>;
+};
+
+type PreparedLogo = {
+  usable: boolean;
+  displayUrl: string;
 };
 
 let cachedCompanyBrand: CachedCompanyBrand | null = null;
@@ -33,41 +38,94 @@ async function resolveCompanyLogo(rawLogo: string | null | undefined): Promise<{
 }
 
 /**
- * بعض الشعارات القديمة مخزنة كـPNG صالح تقنياً لكنه أبيض/فارغ بصرياً؛ لذلك
- * onError لا يكتشفها. نفحص عينة صغيرة مرة واحدة لكل جلسة قبل اعتماد الشعار.
+ * يتحقق من الشعار ويُنشئ نسخة عرض مقصوصة من الهوامش البيضاء/الشفافة فقط.
+ * النسخة الناتجة مؤقتة في جلسة POS ولا تعدل الشعار المخزن أو بيانات المنشأة.
  */
-async function isVisuallyUsableLogo(url: string): Promise<boolean> {
+async function prepareCompanyLogo(url: string): Promise<PreparedLogo> {
   return new Promise((resolve) => {
     const image = new Image();
 
     image.onload = () => {
       if (image.naturalWidth < 2 || image.naturalHeight < 2) {
-        resolve(false);
+        resolve({ usable: false, displayUrl: url });
         return;
       }
 
-      const canvas = document.createElement('canvas');
-      canvas.width = 32;
-      canvas.height = 32;
-      const context = canvas.getContext('2d', { willReadFrequently: true });
+      const analysisCanvas = document.createElement('canvas');
+      const maxAnalysisSize = 256;
+      const analysisScale = Math.min(1, maxAnalysisSize / Math.max(image.naturalWidth, image.naturalHeight));
+      analysisCanvas.width = Math.max(2, Math.round(image.naturalWidth * analysisScale));
+      analysisCanvas.height = Math.max(2, Math.round(image.naturalHeight * analysisScale));
+
+      const context = analysisCanvas.getContext('2d', { willReadFrequently: true });
       if (!context) {
-        resolve(true);
+        resolve({ usable: true, displayUrl: url });
         return;
       }
 
       try {
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-        resolve(hasMeaningfulLogoPixels(pixels));
+        context.clearRect(0, 0, analysisCanvas.width, analysisCanvas.height);
+        context.drawImage(image, 0, 0, analysisCanvas.width, analysisCanvas.height);
+        const imageData = context.getImageData(0, 0, analysisCanvas.width, analysisCanvas.height);
+        if (!hasMeaningfulLogoPixels(imageData.data)) {
+          resolve({ usable: false, displayUrl: url });
+          return;
+        }
+
+        const bounds = findLogoContentBounds(imageData.data, analysisCanvas.width, analysisCanvas.height);
+        if (!bounds) {
+          resolve({ usable: true, displayUrl: url });
+          return;
+        }
+
+        const sourceX = Math.max(0, Math.floor(bounds.x / analysisScale));
+        const sourceY = Math.max(0, Math.floor(bounds.y / analysisScale));
+        const sourceWidth = Math.min(
+          image.naturalWidth - sourceX,
+          Math.max(1, Math.ceil(bounds.width / analysisScale)),
+        );
+        const sourceHeight = Math.min(
+          image.naturalHeight - sourceY,
+          Math.max(1, Math.ceil(bounds.height / analysisScale)),
+        );
+
+        // لا نعيد ترميز الصورة إن كانت الهوامش أصلاً صغيرة؛ نتجنب عملاً بلا فائدة.
+        const retainedAreaRatio = (sourceWidth * sourceHeight) / (image.naturalWidth * image.naturalHeight);
+        if (retainedAreaRatio >= 0.82) {
+          resolve({ usable: true, displayUrl: url });
+          return;
+        }
+
+        const outputCanvas = document.createElement('canvas');
+        outputCanvas.width = sourceWidth;
+        outputCanvas.height = sourceHeight;
+        const outputContext = outputCanvas.getContext('2d');
+        if (!outputContext) {
+          resolve({ usable: true, displayUrl: url });
+          return;
+        }
+
+        outputContext.drawImage(
+          image,
+          sourceX,
+          sourceY,
+          sourceWidth,
+          sourceHeight,
+          0,
+          0,
+          sourceWidth,
+          sourceHeight,
+        );
+
+        resolve({ usable: true, displayUrl: outputCanvas.toDataURL('image/png') });
       } catch {
-        // قد تمنع CORS قراءة بكسلات شعار خارجي. في هذه الحالة لا نحجب شعاراً
-        // صالحاً لمجرد أن Canvas لا يستطيع فحصه؛ يبقى onError حارس التحميل.
-        resolve(true);
+        // شعارات خارجية قد تمنع قراءة Canvas عبر CORS. في هذه الحالة نحافظ على
+        // الشعار الأصلي ويظل onError حارس التحميل بدلاً من إسقاط شعار صالح.
+        resolve({ usable: true, displayUrl: url });
       }
     };
 
-    image.onerror = () => resolve(false);
+    image.onerror = () => resolve({ usable: false, displayUrl: url });
     image.src = url;
   });
 }
@@ -88,15 +146,19 @@ function getCompanyBrand(): Promise<CompanyBrand> {
   const promise = api<{ company?: { logo?: string | null; name?: string | null } }>('/me')
     .then(async (response) => {
       const resolved = await resolveCompanyLogo(response.company?.logo);
-      const usable = resolved.url ? await isVisuallyUsableLogo(resolved.url) : false;
+      const prepared = resolved.url
+        ? await prepareCompanyLogo(resolved.url)
+        : { usable: false, displayUrl: '' };
 
-      if (!usable && resolved.objectUrl && resolved.url) {
+      if (!prepared.usable && resolved.objectUrl && resolved.url) {
         URL.revokeObjectURL(resolved.url);
       }
 
       return {
-        logoUrl: usable ? resolved.url : null,
-        logoObjectUrl: usable ? resolved.objectUrl : false,
+        logoUrl: prepared.usable ? prepared.displayUrl : null,
+        // النسخة المقصوصة Data URL لا تحتاج revoke. نحتفظ بالعلم فقط عندما
+        // نعرض Object URL الأصلي بلا إعادة معالجة.
+        logoObjectUrl: prepared.usable && prepared.displayUrl === resolved.url ? resolved.objectUrl : false,
         name: response.company?.name?.trim() || null,
       };
     })
@@ -108,7 +170,7 @@ function getCompanyBrand(): Promise<CompanyBrand> {
 
 /**
  * صورة منتج POS مع تسلسل احتياطي موحّد:
- * صورة المنتج → شعار منشأة صالح بصرياً → Package + اسم المنشأة.
+ * صورة المنتج → شعار منشأة صالح ومهيأ للعرض → Package + اسم المنشأة.
  * الشعار للعرض فقط ولا يُنسخ إلى سجل المنتج أو التخزين.
  */
 export function PosProductImage({ path, alt }: { path: string | null | undefined; alt: string }) {
@@ -176,19 +238,14 @@ export function PosProductImage({ path, alt }: { path: string | null | undefined
 
   if (companyLogoUrl && !companyLogoFailed) {
     return (
-      <span className="flex h-full w-full flex-col items-center justify-center gap-1.5 overflow-hidden bg-surface px-3 py-2" aria-hidden>
+      <span className="flex h-full w-full items-center justify-center overflow-hidden bg-surface px-4 py-3" aria-hidden>
         <img
           src={companyLogoUrl}
           alt=""
           loading="lazy"
-          className="max-h-[68%] max-w-[72%] object-contain"
+          className="max-h-[78%] max-w-[78%] object-contain"
           onError={() => setCompanyLogoFailed(true)}
         />
-        {companyName ? (
-          <span className="max-w-full truncate text-[10px] font-medium text-muted" dir="auto">
-            {companyName}
-          </span>
-        ) : null}
       </span>
     );
   }
