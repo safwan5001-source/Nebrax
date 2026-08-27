@@ -80,6 +80,18 @@ class ZatcaSubmissionAttemptTest extends TestCase
     }
 
     /** @test */
+    public function an_idempotency_key_cannot_be_reused_for_another_invoice(): void
+    {
+        $firstInvoice = $this->postedInvoice();
+        $secondInvoice = $this->postedInvoice();
+
+        $this->request($firstInvoice, 'tenant-wide-key')->assertStatus(202);
+        $this->request($secondInvoice, 'tenant-wide-key')->assertStatus(409);
+
+        $this->assertDatabaseCount('zatca_submission_attempts', 1);
+    }
+
+    /** @test */
     public function a_parallel_manual_request_with_a_different_key_is_rejected(): void
     {
         $invoice = $this->postedInvoice();
