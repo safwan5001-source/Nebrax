@@ -1706,6 +1706,7 @@
     "zatca_document_type": "ZATCA document type",
     "zatca_standard": "Standard tax invoice — Clearance",
     "zatca_simplified": "Simplified tax invoice — Reporting",
+    "zatca_document_type_pending": "The system will classify it when saved",
     "zatca_document_type_hint": "Suggested from the customer's VAT number and saved as an immutable invoice snapshot when posted.",
     "title": "New sales invoice",
     "partner": "Customer",
