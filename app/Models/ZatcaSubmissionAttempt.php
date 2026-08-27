@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 /**
  * محاولة إرسال ZATCA دائمة. هوية المحاولة ولقطة الطلب لا تتغيران؛
@@ -46,6 +47,41 @@ class ZatcaSubmissionAttempt extends BaseModel
             'response_http_status' => 'integer',
             'response_payload' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $attempt): void {
+            if (! in_array($attempt->submission_type, ['clearance', 'reporting'], true)
+                || ! in_array($attempt->source, ['manual', 'automatic'], true)
+                || $attempt->status !== 'pending') {
+                throw new LogicException('Invalid ZATCA submission attempt identity.');
+            }
+        });
+
+        static::updating(function (self $attempt): void {
+            $allowed = [
+                'status',
+                'completed_at',
+                'response_http_status',
+                'response_code',
+                'response_message',
+                'response_payload',
+                'updated_at',
+            ];
+
+            if (array_diff(array_keys($attempt->getDirty()), $allowed) !== []) {
+                throw new LogicException('ZATCA submission attempt identity is immutable.');
+            }
+            if ($attempt->getOriginal('status') !== 'pending'
+                || ! in_array($attempt->status, ['accepted', 'rejected', 'failed'], true)) {
+                throw new LogicException('Invalid ZATCA submission attempt transition.');
+            }
+        });
+
+        static::deleting(function (): void {
+            throw new LogicException('ZATCA submission attempts are permanent audit records.');
+        });
     }
 
     public function invoice(): BelongsTo
