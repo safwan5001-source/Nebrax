@@ -6,12 +6,18 @@ use App\Models\User;
 use App\Models\Tenant;
 use App\Models\TenantApplicationState;
 use App\Models\ZatcaCredential;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class ZatcaCredentialService
 {
+    public function __construct(
+        private readonly ZatcaCredentialMaterialValidator $materialValidator,
+    ) {
+    }
+
     public const ENVIRONMENTS = ['developer', 'simulation', 'production'];
     public const STAGES = ['compliance', 'production'];
 
@@ -79,23 +85,32 @@ class ZatcaCredentialService
                 }
             }
 
-            $previousToken = is_array($record?->credentials)
-                ? (string) ($record->credentials['binary_security_token'] ?? '')
-                : '';
-            $tokenChanged = $previousToken === ''
-                || ! hash_equals($previousToken, (string) $credentials['binary_security_token']);
-            $expiresAt = array_key_exists('expires_at', $validated)
-                ? $validated['expires_at']
-                : ($tokenChanged ? null : $record?->expires_at);
+            $material = $this->materialValidator->validate(
+                (string) $credentials['binary_security_token'],
+                (string) $credentials['private_key'],
+            );
+            if (filled($validated['expires_at'] ?? null)) {
+                $claimedExpiry = CarbonImmutable::parse((string) $validated['expires_at'])->getTimestamp();
+                if (abs($claimedExpiry - $material['expires_at']) > 60) {
+                    throw ValidationException::withMessages([
+                        'expires_at' => 'تاريخ الانتهاء المُدخل لا يطابق شهادة CSID.',
+                    ]);
+                }
+            }
+
+            // مشتقات عامة موثوقة للتوقيع وQR اللاحق؛ تبقى داخل الحمولة
+            // المشفرة كي لا يتكوّن مصدر حقيقة ثانٍ منفصل عن مجموعة CSID.
+            $credentials['public_key'] = $material['public_key'];
+            $credentials['curve_name'] = $material['curve_name'];
 
             $record ??= new ZatcaCredential(['environment' => $environment]);
             $record->fill([
                 'stage' => $validated['stage'],
                 'status' => 'configured',
                 'credentials' => $credentials,
-                'certificate_fingerprint' => hash('sha256', $credentials['binary_security_token']),
+                'certificate_fingerprint' => $material['fingerprint'],
                 'configured_at' => now('UTC'),
-                'expires_at' => $expiresAt,
+                'expires_at' => CarbonImmutable::createFromTimestampUTC($material['expires_at']),
                 'updated_by' => $user->id,
             ])->save();
 
@@ -117,6 +132,7 @@ class ZatcaCredentialService
             'has_secret' => filled($secrets['secret'] ?? null),
             'has_private_key' => filled($secrets['private_key'] ?? null),
             'has_request_id' => filled($secrets['request_id'] ?? null),
+            'public_key_curve' => $secrets['curve_name'] ?? null,
             'certificate_fingerprint' => $credential->certificate_fingerprint,
             'configured_at' => $credential->configured_at?->toIso8601String(),
             'expires_at' => $credential->expires_at?->toIso8601String(),
