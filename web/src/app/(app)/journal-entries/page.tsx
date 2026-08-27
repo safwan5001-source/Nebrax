@@ -30,6 +30,9 @@ interface PaginationMeta {
 interface JournalEntryResponse {
   data: JournalEntry[];
   meta?: PaginationMeta;
+  facets?: {
+    source_types: string[];
+  };
 }
 
 interface JournalEntry {
@@ -78,6 +81,7 @@ export default function JournalEntriesPage() {
   const [searchInput, setSearchInput] = useState(explorer.search);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [sourceTypes, setSourceTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<BranchView>('current');
@@ -108,6 +112,7 @@ export default function JournalEntriesPage() {
     api<JournalEntryResponse>(`/journal-entries?${params.toString()}`)
       .then((response) => {
         setEntries(response.data);
+        setSourceTypes(response.facets?.source_types ?? []);
         setMeta(response.meta ?? {
           current_page: 1,
           last_page: 1,
@@ -139,10 +144,12 @@ export default function JournalEntriesPage() {
     router.replace(url.toString() ? `/journal-entries?${url.toString()}` : '/journal-entries', { scroll: false });
   }, [explorer, router]);
 
-  const sourceOptions = useMemo(() => {
-    const names = Array.from(new Set(entries.map((entry) => sourceName(entry.source_type)).filter(Boolean))).sort();
-    return names.map((name) => ({ value: name, label: name }));
-  }, [entries]);
+  // تأتي خيارات المصدر من facets الخادمية للنطاق الحالي، لا من الصفحة المعروضة.
+  // بذلك يظل مصدر موجود في صفحة لاحقة قابلاً للاختيار والبحث.
+  const sourceOptions = useMemo(() => sourceTypes.map((sourceType) => ({
+    value: sourceType,
+    label: sourceName(sourceType),
+  })), [sourceTypes]);
 
   const definitions = useMemo<FilterDefinition[]>(() => [
     {

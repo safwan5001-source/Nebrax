@@ -91,6 +91,65 @@ class JournalEntryListApiTest extends TestCase
     }
 
     /** @test */
+    public function it_returns_source_facets_from_the_full_visible_scope_not_only_the_loaded_page(): void
+    {
+        $auth = $this->registerTenant('journal-list-facets', 'journal-list-facets@example.test');
+        $this->seedAccounts($auth['tenant_id']);
+
+        for ($day = 1; $day <= 10; $day++) {
+            $this->postEntry(
+                $auth['tenant_id'],
+                null,
+                sprintf('2026-04-%02d', $day),
+                "قيد يدوي {$day}",
+                100000,
+                ManualJournal::class,
+            );
+        }
+        $this->postEntry($auth['tenant_id'], null, '2026-03-01', 'شراء في صفحة لاحقة', 100000, \App\Models\Purchase::class);
+
+        $payload = $this->withToken($auth['token'])
+            ->getJson('/api/journal-entries?per_page=10&sort=-entry_date')
+            ->assertOk()
+            ->json();
+
+        $this->assertSame(11, $payload['meta']['total']);
+        $this->assertCount(10, $payload['data']);
+        $this->assertNotContains(\App\Models\Purchase::class, array_column($payload['data'], 'source_type'));
+        $this->assertSame([ManualJournal::class, \App\Models\Purchase::class], $payload['facets']['source_types']);
+    }
+
+    /** @test */
+    public function it_includes_source_less_non_reversal_entries_in_the_automatic_filter(): void
+    {
+        $auth = $this->registerTenant('journal-list-automatic', 'journal-list-automatic@example.test');
+        $this->seedAccounts($auth['tenant_id']);
+        $this->postEntry($auth['tenant_id'], null, '2026-04-01', 'قيد بلا مصدر', 100000, null);
+        $this->postEntry($auth['tenant_id'], null, '2026-04-02', 'فاتورة آلية', 100000, Invoice::class);
+        $this->postEntry($auth['tenant_id'], null, '2026-04-03', 'قيد يدوي', 100000, ManualJournal::class);
+
+        $payload = $this->withToken($auth['token'])
+            ->getJson('/api/journal-entries?per_page=10&entry_kind=automatic')
+            ->assertOk()
+            ->json();
+
+        $this->assertSame(2, $payload['meta']['total']);
+        $this->assertSame(['فاتورة آلية', 'قيد بلا مصدر'], array_column($payload['data'], 'description'));
+        $this->assertSame(['automatic', 'automatic'], array_column($payload['data'], 'entry_kind'));
+    }
+
+    /** @test */
+    public function it_rejects_scientific_notation_for_money_filters_instead_of_converting_it_incorrectly(): void
+    {
+        $auth = $this->registerTenant('journal-list-decimal', 'journal-list-decimal@example.test');
+
+        $this->withToken($auth['token'])
+            ->getJson('/api/journal-entries?per_page=10&amount_min=1.2e3')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('amount_min');
+    }
+
+    /** @test */
     public function it_preserves_the_unpaginated_list_contract_for_existing_readers(): void
     {
         $auth = $this->registerTenant('journal-list-legacy', 'journal-list-legacy@example.test');

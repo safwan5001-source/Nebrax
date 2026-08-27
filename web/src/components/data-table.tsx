@@ -211,13 +211,17 @@ export function DataTable<T>({
             className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
           />
           {columnVisibility ? (
-            <ColumnLayoutMenu
-              items={columnLayoutItems}
-              labels={{ columns: t('columns'), moveColumn: t('moveColumn'), moveUp: t('moveUp'), moveDown: t('moveDown') }}
-              onReorder={() => {}}
-              onVisibilityChange={(id, visible) => table.getColumn(id)?.toggleVisibility(visible)}
-              allowReorder={false}
-            />
+            // بطاقة الجوال المخصصة تبني حقولها خارج خلايا الجدول، فلا يجوز أن
+            // نعرض لها متحكماً يوحي بأن إخفاء العمود سيخفي تلك الحقول.
+            <div className={mobileRecord ? 'hidden md:block' : undefined}>
+              <ColumnLayoutMenu
+                items={columnLayoutItems}
+                labels={{ columns: t('columns'), moveColumn: t('moveColumn'), moveUp: t('moveUp'), moveDown: t('moveDown') }}
+                onReorder={() => {}}
+                onVisibilityChange={(id, visible) => table.getColumn(id)?.toggleVisibility(visible)}
+                allowReorder={false}
+              />
+            </div>
           ) : null}
           <Button
             variant="outline"
@@ -232,7 +236,7 @@ export function DataTable<T>({
           </Button>
         </div>
       ) : columnVisibility ? (
-        <div className="flex justify-end border-b border-border p-2">
+        <div className={cn('flex justify-end border-b border-border p-2', mobileRecord && 'hidden md:flex')}>
           <ColumnLayoutMenu
             items={columnLayoutItems}
             labels={{ columns: t('columns'), moveColumn: t('moveColumn'), moveUp: t('moveUp'), moveDown: t('moveDown') }}

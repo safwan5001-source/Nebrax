@@ -286,6 +286,23 @@ describe('DataTable column visibility', () => {
     expect(onChange).toHaveBeenLastCalledWith({ partner: false });
     expect(screen.queryByLabelText('تحريك العمود: العميل')).toBeNull();
   });
+
+  it('does not offer the column menu on mobile custom-record layouts', () => {
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showToolbar={false}
+        mobileRecord={(row) => ({ title: row.number, subtitle: row.partner })}
+        columnVisibility={{ value: {}, onChange: vi.fn(), protectedColumnIds: ['number'] }}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: nebraxText('ar', 'columns') });
+    const responsiveContainer = trigger.closest('.hidden');
+    expect(responsiveContainer).not.toBeNull();
+    expect(responsiveContainer?.className).toContain('md:flex');
+  });
 });
 
 describe('DataTable row selection', () => {

@@ -25,12 +25,26 @@ class JournalEntryController extends ApiController
             'source_type' => ['sometimes', 'nullable', 'string', 'max:255'],
             'date_from' => ['sometimes', 'nullable', 'date'],
             'date_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:date_from'],
-            'amount_min' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'amount_max' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            // لا تقبل `numeric` هنا: تقبل الصيغة الأسّية ثم يفسّرها محول
+            // الهللات كنص كسري مختلف. هذا الحقل مبلغ معروض ذو منزلتين فقط.
+            'amount_min' => ['sometimes', 'nullable', 'regex:/^\d+(?:\.\d{1,2})?$/'],
+            'amount_max' => ['sometimes', 'nullable', 'regex:/^\d+(?:\.\d{1,2})?$/'],
             'sort' => ['sometimes', 'nullable', 'string', 'max:40'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:100'],
         ]);
+
+        // لا تُشتق خيارات المصدر من صفحة النتائج: pagination لا يصف كل المصادر
+        // الممكنة. تُحسب من النطاق المرئي ومن باقي الفلاتر، مع إزالة فلتر المصدر
+        // ذاته كي لا تختفي الخيارات عند تغيير اختيار المستخدم.
+        $facetFilters = $filters;
+        unset($facetFilters['source_type']);
+        $sourceTypes = $this->applyListFilters($this->visibleEntries($request), $facetFilters)
+            ->whereNotNull('source_type')
+            ->distinct()
+            ->orderBy('source_type')
+            ->pluck('source_type')
+            ->values();
 
         $query = $this->applyListFilters($this->visibleEntries($request), $filters)
             ->with(['lines.account']);
@@ -46,6 +60,9 @@ class JournalEntryController extends ApiController
                     'last_page' => $paginator->lastPage(),
                     'per_page' => $paginator->perPage(),
                     'total' => $paginator->total(),
+                ],
+                'facets' => [
+                    'source_types' => $sourceTypes,
                 ],
             ]);
         }
@@ -122,7 +139,11 @@ class JournalEntryController extends ApiController
             match ($filters['entry_kind']) {
                 'manual' => $query->where('source_type', ManualJournal::class),
                 'reversal' => $query->whereNotNull('reversal_of'),
-                'automatic' => $query->whereNull('reversal_of')->where('source_type', '!=', ManualJournal::class),
+                // NULL != ManualJournal ينتج UNKNOWN في SQL. القيد غير العاكس
+                // بلا مصدر ما زال آلياً وفق mapEntry() وعقد LedgerService.
+                'automatic' => $query->whereNull('reversal_of')->where(function (Builder $automatic) {
+                    $automatic->whereNull('source_type')->orWhere('source_type', '!=', ManualJournal::class);
+                }),
             };
         }
 
@@ -173,11 +194,11 @@ class JournalEntryController extends ApiController
 
     private function moneyFilterToMinor(string $value): int
     {
-        $normalized = trim($value);
-        [$whole, $fraction] = array_pad(explode('.', $normalized, 2), 2, '');
-        $fraction = substr(str_pad(preg_replace('/\\D/', '', $fraction) ?? '', 2, '0'), 0, 2);
+        // التحقق في index() يقبل صيغة عشرية موجبة ثابتة ذات منزلتين كحد أقصى.
+        // لذلك لا تدخل قيم علمية أو محارف لا يمكن تحويلها بصدق إلى هللات.
+        [$whole, $fraction] = array_pad(explode('.', trim($value), 2), 2, '');
 
-        return ((int) $whole * 100) + (int) $fraction;
+        return ((int) $whole * 100) + (int) str_pad($fraction, 2, '0');
     }
 
     private function mapEntry(JournalEntry $entry): array
