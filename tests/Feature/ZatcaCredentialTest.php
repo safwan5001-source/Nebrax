@@ -77,6 +77,12 @@ class ZatcaCredentialTest extends TestCase
         // شهادة جديدة بلا تاريخ لا ترث انتهاء الشهادة القديمة.
         $this->withToken($auth['token'])->putJson($url, [
             'stage' => 'production',
+            'binary_security_token' => 'PCSID-PARTIAL-TOKEN',
+            'current_password' => 'password123',
+        ])->assertUnprocessable()->assertJsonValidationErrors('secret');
+
+        $this->withToken($auth['token'])->putJson($url, [
+            'stage' => 'production',
             'binary_security_token' => 'PCSID-ROTATED-TOKEN',
             'secret' => 'PCSID-ROTATED-SECRET',
             'private_key' => 'PCSID-ROTATED-PRIVATE-KEY',

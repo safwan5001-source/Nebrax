@@ -46,11 +46,21 @@ class ZatcaCredentialService
             $record = ZatcaCredential::where('environment', $environment)->lockForUpdate()->first();
             $credentials = is_array($record?->credentials) ? $record->credentials : [];
 
-            if ($record !== null && $record->stage !== $validated['stage']) {
+            $storedToken = is_array($record?->credentials)
+                ? (string) ($record->credentials['binary_security_token'] ?? '')
+                : '';
+            $incomingToken = filled($validated['binary_security_token'] ?? null)
+                ? trim((string) $validated['binary_security_token'])
+                : null;
+            $identityChanging = $record !== null && (
+                $record->stage !== $validated['stage']
+                || ($incomingToken !== null && ! hash_equals($storedToken, $incomingToken))
+            );
+            if ($identityChanging) {
                 foreach (['binary_security_token', 'secret', 'private_key'] as $required) {
                     if (! filled($validated[$required] ?? null)) {
                         throw ValidationException::withMessages([
-                            $required => 'تغيير مرحلة CSID يتطلّب مجموعة بيانات اعتماد جديدة كاملة.',
+                            $required => 'تغيير مرحلة أو شهادة CSID يتطلّب مجموعة بيانات اعتماد جديدة كاملة.',
                         ]);
                     }
                 }
