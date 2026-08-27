@@ -17,6 +17,13 @@ class DocumentReviewResource extends JsonResource
                 'id' => $batch->id,
                 'document_type' => $batch->document_type,
                 'source_type' => $batch->source_type,
+                'source' => $batch->relationLoaded('sourceReceipt') && $batch->sourceReceipt !== null ? [
+                    'channel' => $batch->sourceReceipt->channel,
+                    'identity_name' => $batch->sourceReceipt->identity?->display_name,
+                    'identity_reference' => $batch->sourceReceipt->identity?->external_identity_masked,
+                    'external_reference' => $batch->sourceReceipt->external_reference_masked,
+                    'received_at' => $batch->sourceReceipt->received_at?->toIso8601String(),
+                ] : null,
                 'status' => $batch->status->value,
                 'version' => $batch->version,
                 'reviewer' => $batch->reviewer

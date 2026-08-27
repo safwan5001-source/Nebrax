@@ -16,6 +16,8 @@ const strings: Record<string, string> = {
   'posSettings.c_shifts_d': 'Shifts description',
   'posSettings.c_devices_t': 'POS devices',
   'posSettings.c_devices_d': 'Devices description',
+  'posSettings.c_cash_drawer_t': 'Cash Drawer',
+  'posSettings.c_cash_drawer_d': 'Configure the local bridge and printer in one place.',
   'posSettings.c_printing_t': 'Receipts and printing',
   'posSettings.c_printing_d': 'Printing description',
   'posSettings.c_desktop_t': 'Desktop app',
@@ -32,6 +34,14 @@ vi.mock('next/link', () => ({
 
 describe('مركز إعدادات POS', () => {
   afterEach(cleanup);
+
+  it('يعرض بطاقة درج النقدية كمسار مستقل بجانب بطاقات الإعداد الحالية', () => {
+    render(<PosSettingsPage />);
+
+    const card = screen.getByRole('link', { name: /Cash Drawer/i });
+    expect(card.getAttribute('href')).toBe('/pos/settings/cash-drawer');
+    expect(card.textContent).toContain('Configure the local bridge and printer in one place.');
+  });
 
   it('يعرض بطاقة الأصوات والتنبيهات كمسار مستقل بجانب بطاقات الإعداد الحالية', () => {
     render(<PosSettingsPage />);

@@ -36,12 +36,14 @@ import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } fro
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
 import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 import { runPosCheckout } from '@/lib/pos-checkout';
+import { resolvePosDefaultCustomer } from '@/lib/pos-default-customer';
 import { executeCashDrawerAction, type CashDrawerAction, type CashDrawerBridgeResult } from '@/lib/cash-drawer-bridge';
 
 const WALKIN = 'عميل نقدي (POS)';
 
 /** إعدادات نقطة البيع (sales-config/pos) — تُطبَّق فعلياً على تدفّق البيع. */
 interface PosConfig extends PosFeedbackSettings {
+  default_customer_id: string | null;
   default_customer: string;
   receipt_footer: string;
   print_receipt: boolean;
@@ -60,6 +62,7 @@ interface PosConfig extends PosFeedbackSettings {
   cash_drawer_auto_open_after_cash: boolean;
 }
 const POS_DEFAULTS: PosConfig = {
+  default_customer_id: null,
   default_customer: WALKIN,
   receipt_footer: '',
   print_receipt: true,
@@ -163,7 +166,7 @@ export default function PosPage() {
     ? `nibras_pos_active_carts:${cashierScope.tenantId}:${activeBranch?.id ?? 'main'}:${session.pos_device_id ?? 'no-device'}:${session.warehouse_id ?? 'no-warehouse'}:${session.shift_id ?? 'no-shift'}:${session.id}:${cashierScope.userId}`
     : null;
   const {
-    carts, activeCart, activeCartId, setActiveCartId, patchActive, updateActiveItems, updateCarts,
+    carts, activeCart, activeCartId, hydrated, setActiveCartId, patchActive, updateActiveItems, updateCarts,
     openCart, createCart, closeCart,
   } = usePosActiveCarts({ storageKey: activeCartStorageKey, defaultTaxInclusive: systemTaxInclusive });
   const cart = activeCart.items;
@@ -200,6 +203,23 @@ export default function PosPage() {
   const walkinName = posCfg.default_customer?.trim() || WALKIN;
   const customerName = selectedCustomer?.name ?? walkinName;
   const playPosFeedback = useCallback((event: PosSoundEvent) => posSound.play(event, posCfg), [posCfg]);
+
+  // العميل الافتراضي المُعدّ يصبح العميل المختار فعلياً عند بدء POS — لا مجرد
+  // تسمية. المعرّف مرجع صالح داخل نطاق الفرع/المستأجر الحالي لأن الخادم يعيد
+  // حلّه ويعيده null إن لم يكن كذلك، فلا تسريب ولا إنشاء صامت. يُطبَّق مرة واحدة
+  // لكل جلسة تخزين، بعد استقرار الاستعادة من التخزين، وعلى سلة نظيفة فقط: فلا
+  // يكتب فوق اختيار يدوي ولا فوق عميل سلة معلّقة مستأنفة.
+  const defaultCustomerKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hydrated || !activeCartStorageKey) return;
+    if (defaultCustomerKeyRef.current === activeCartStorageKey) return;
+    const defaultCustomer = resolvePosDefaultCustomer(posCfg, walkinName);
+    if (!defaultCustomer) return; // لم تصل الإعدادات بعد أو لا مرجع صالح → الرجوع النقدي الآمن
+    defaultCustomerKeyRef.current = activeCartStorageKey;
+    if (!cartHasUnsavedData(activeCart)) {
+      setSelectedCustomer(defaultCustomer);
+    }
+  }, [hydrated, activeCartStorageKey, posCfg, walkinName, activeCart, setSelectedCustomer]);
 
   useEffect(() => {
     posSound.preload();

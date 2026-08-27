@@ -13,6 +13,13 @@ class DocumentBatchReviewResource extends JsonResource
             'id' => $this->id,
             'document_type' => $this->document_type,
             'source_type' => $this->source_type,
+            'source' => $this->when($this->relationLoaded('sourceReceipt') && $this->sourceReceipt !== null, fn () => [
+                'channel' => $this->sourceReceipt->channel,
+                'identity_name' => $this->sourceReceipt->identity?->display_name,
+                'identity_reference' => $this->sourceReceipt->identity?->external_identity_masked,
+                'external_reference' => $this->sourceReceipt->external_reference_masked,
+                'received_at' => $this->sourceReceipt->received_at?->toIso8601String(),
+            ]),
             'status' => $this->status->value,
             'version' => $this->version,
             'files_count' => (int) ($this->files_count ?? 0),
