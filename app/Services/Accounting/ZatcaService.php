@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\Tenant;
 use App\Support\ZatcaIcvScope;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -175,6 +176,7 @@ LINE;
         }
 
         $issue = ($invoice->created_at ?? now());
+        $transactionCode = $invoice->zatca_document_type === 'standard' ? '0100000' : '0200000';
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
@@ -186,7 +188,7 @@ LINE;
   <cbc:UUID>{$e($uuid)}</cbc:UUID>
   <cbc:IssueDate>{$e($issue->format('Y-m-d'))}</cbc:IssueDate>
   <cbc:IssueTime>{$e($issue->format('H:i:s'))}</cbc:IssueTime>
-  <cbc:InvoiceTypeCode name="0100000">388</cbc:InvoiceTypeCode>
+  <cbc:InvoiceTypeCode name="{$transactionCode}">388</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
   <cac:AdditionalDocumentReference>
     <cbc:ID>ICV</cbc:ID>

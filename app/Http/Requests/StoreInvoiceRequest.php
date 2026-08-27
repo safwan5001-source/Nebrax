@@ -15,6 +15,8 @@ class StoreInvoiceRequest extends FormRequest
     {
         return [
             'partner_id'          => ['required', 'uuid'],
+            // لقطة مسار ZATCA على الفاتورة: Standard (Clearance) أو Simplified (Reporting).
+            'zatca_document_type'  => ['nullable', 'in:standard,simplified'],
             // اختياري للتوافق مع المستندات القديمة؛ يثبت مخزن الإخراج عند إرساله.
             'warehouse_id'        => ['nullable', 'uuid'],
             // اختيار يدوي لسعر اقتراحي؛ يبقى سعر السطر المرسل هو اللقطة التي تحسب منها الفاتورة.

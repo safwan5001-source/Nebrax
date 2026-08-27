@@ -331,6 +331,12 @@ class InvoiceController extends ApiController
             'icv'           => $invoice->zatca_icv,
             'previous_hash' => $invoice->zatca_previous_hash,
             'xml'           => $invoice->zatca_xml,
+            'document_type' => $invoice->zatca_document_type,
+            'submission_type' => match ($invoice->zatca_document_type) {
+                'standard' => 'clearance',
+                'simplified' => 'reporting',
+                default => null,
+            },
         ]);
     }
 
