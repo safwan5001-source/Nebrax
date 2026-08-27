@@ -128,6 +128,10 @@ export default function PlatformDashboardPage() {
               <ServerCog className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('manageIntegrations')}
             </Link></Button>
+            <Button asChild variant="outline" size="sm"><Link href='/platform/document-operations'>
+              <ShieldCheck className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              {t('documentOperations')}
+            </Link></Button>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
               {t('refresh')}

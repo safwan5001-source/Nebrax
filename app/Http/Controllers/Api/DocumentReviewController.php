@@ -23,6 +23,7 @@ use App\Models\DocumentMatchCandidate;
 use App\Models\DocumentMatchResult;
 use App\Models\DocumentReviewAction;
 use App\Models\User;
+use App\Services\DocumentCenter\DocumentRedactionProjector;
 use App\Services\DocumentCenter\DocumentReviewService;
 use App\Services\DocumentCenter\ExpenseDocumentDraftBuilder;
 use App\Services\DocumentCenter\ExpenseDraftBuildOptions;
@@ -37,7 +38,10 @@ use Illuminate\Support\Collection;
 
 class DocumentReviewController extends Controller
 {
-    public function __construct(private readonly DocumentReviewService $review) {}
+    public function __construct(
+        private readonly DocumentReviewService $review,
+        private readonly DocumentRedactionProjector $redactions,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -97,8 +101,10 @@ class DocumentReviewController extends Controller
     {
         $batch->load(['files', 'reviewer:id,name', 'sourceReceipt.identity:id,display_name,external_identity_masked', 'transactionLinks.purchase', 'transactionLinks.expense']);
         $result = $this->resultFor($batch);
-        $original = $result->normalized_payload;
-        $reviewed = app(ReviewedDocumentProjector::class)->project($result);
+        // الـoverlay لا يمس evidence أو projection الذي يبني المسودة؛ يطبق فقط
+        // على النسختين المرسلتين إلى واجهة العرض كي لا تظهر القيمة المحجوبة.
+        $original = $this->redactions->apply($result, $result->normalized_payload);
+        $reviewed = $this->redactions->apply($result, app(ReviewedDocumentProjector::class)->project($result));
 
         return new DocumentReviewResource([
             'batch' => $batch,
@@ -106,7 +112,7 @@ class DocumentReviewController extends Controller
             'files' => $this->files($batch->files),
             'matches' => $this->matches($result),
             'issues' => $this->issues($result),
-            'history' => $this->history($batch),
+            'history' => $this->history($batch, $result),
             'linked_transaction' => $this->linkedTransaction($batch),
             // يبقى الحقل التوافقي لمسار Purchase إلى أن تستهلك الواجهة العقد العام بالكامل.
             'linked_purchase' => $this->linkedPurchase($batch),
@@ -373,7 +379,7 @@ class DocumentReviewController extends Controller
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function history(DocumentBatch $batch): array
+    private function history(DocumentBatch $batch, DocumentExtractionResult $result): array
     {
         return DocumentReviewAction::query()
             ->where('document_batch_id', $batch->id)
@@ -384,8 +390,8 @@ class DocumentReviewController extends Controller
                 'id' => $action->id,
                 'action' => $action->action,
                 'reason' => $action->reason,
-                'before' => $this->safeAuditValue($action->before),
-                'after' => $this->safeAuditValue($action->after),
+                'before' => $this->redactedAuditValue($result, $action->before),
+                'after' => $this->redactedAuditValue($result, $action->after),
                 'review_version' => $action->review_version,
                 'actor' => $action->actor
                     ? ['id' => $action->actor->id, 'name' => $action->actor->name]
@@ -394,6 +400,18 @@ class DocumentReviewController extends Controller
             ], fn ($value) => $value !== null))
             ->values()
             ->all();
+    }
+
+    /** @param array<string,mixed>|null $snapshot @return array<string,string|int|bool>|null */
+    private function redactedAuditValue(DocumentExtractionResult $result, ?array $snapshot): ?array
+    {
+        $safe = $this->safeAuditValue($snapshot);
+        $targetKey = $safe['target_key'] ?? null;
+        if (is_string($targetKey) && $this->redactions->isRedacted($result, $targetKey)) {
+            $safe['value'] = DocumentRedactionProjector::MARKER;
+        }
+
+        return $safe;
     }
 
     /** @return array<string, bool> */

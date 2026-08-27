@@ -30,6 +30,9 @@ class DocumentFile extends BaseModel
         'uploaded_by',
         'retention_until',
         'purged_at',
+        'purge_pending_at',
+        'purge_reason_code',
+        'document_retention_policy_id',
     ];
 
     protected $attributes = [
@@ -46,6 +49,7 @@ class DocumentFile extends BaseModel
             'scanned_at' => 'immutable_datetime',
             'retention_until' => 'immutable_datetime',
             'purged_at' => 'immutable_datetime',
+            'purge_pending_at' => 'immutable_datetime',
         ];
     }
 
@@ -68,7 +72,7 @@ class DocumentFile extends BaseModel
         });
 
         static::updating(function (self $file): void {
-            $allowed = ['scan_status', 'scan_provider', 'scanned_at', 'retention_until', 'purged_at', 'updated_at'];
+            $allowed = ['scan_status', 'scan_provider', 'scanned_at', 'retention_until', 'purged_at', 'purge_pending_at', 'purge_reason_code', 'document_retention_policy_id', 'updated_at'];
             if (array_diff(array_keys($file->getDirty()), $allowed) !== []) {
                 throw new LogicException('Document file identity, evidence, and storage fields are immutable.');
             }
