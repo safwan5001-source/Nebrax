@@ -33,9 +33,6 @@ interface PosConfig {
   exchange_surplus_policy: 'customer_credit_only' | 'allow_cash_refund';
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   show_product_images: boolean;
-  cash_drawer_enabled: boolean;
-  cash_drawer_driver: 'unavailable' | 'local_bridge';
-  cash_drawer_auto_open_after_cash: boolean;
 }
 interface ProductCategory {
   id: string;
@@ -80,9 +77,6 @@ const DEFAULTS: PosConfig = {
   exchange_surplus_policy: 'customer_credit_only',
   held_sale_close_policy: 'discard_on_session_close',
   show_product_images: true,
-  cash_drawer_enabled: false,
-  cash_drawer_driver: 'unavailable',
-  cash_drawer_auto_open_after_cash: false,
 };
 
 /** إعدادات تشغيل POS: السياسات ووسائل التحصيل الخادمية في مصدر إعداد واحد. */
@@ -110,7 +104,11 @@ export default function PosSettingsPage() {
         api<{ data: ProductCategory[] }>('/product-categories'),
         api<{ data: Partner[] }>('/partners'),
       ]);
-      setConfig({ ...DEFAULTS, ...settings.data });
+      const configuration = { ...settings.data } as Partial<PosConfig> & Record<string, unknown>;
+      delete configuration.cash_drawer_driver;
+      delete configuration.cash_drawer_enabled;
+      delete configuration.cash_drawer_auto_open_after_cash;
+      setConfig({ ...DEFAULTS, ...configuration });
       setMethods(paymentMethods.data.filter((method) => method.is_active));
       setCategories(productCategories.data.filter((category) => category.is_active));
       setCustomers(partners.data.filter((partner) => partner.is_active && ['customer', 'both'].includes(partner.type)));
@@ -397,28 +395,6 @@ export default function PosSettingsPage() {
                   {t('allow_deferred_payment')}
                 </label>
                 <p className="text-xs leading-relaxed text-muted">{t('allow_deferred_payment_hint')}</p>
-              </section>
-
-              <section className="space-y-3 border-t border-border pt-5" aria-labelledby="cash-drawer-contract-title">
-                <div>
-                  <Label id="cash-drawer-contract-title">{t('cash_drawer_contract')}</Label>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">{t('cash_drawer_local_bridge_hint')}</p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="cash-drawer-driver">{t('cash_drawer_driver')}</Label>
-                  <Select id="cash-drawer-driver" value={config.cash_drawer_driver} onChange={(event) => patch('cash_drawer_driver', event.target.value as PosConfig['cash_drawer_driver'])}>
-                    <option value="unavailable">{t('cash_drawer_driver_unavailable')}</option>
-                    <option value="local_bridge">{t('cash_drawer_driver_local_bridge')}</option>
-                  </Select>
-                </div>
-                <label className="flex items-center gap-2 text-sm text-text">
-                  <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.cash_drawer_enabled} disabled={config.cash_drawer_driver !== 'local_bridge'} onChange={(event) => patch('cash_drawer_enabled', event.target.checked)} />
-                  {t('cash_drawer_enable')}
-                </label>
-                <label className="flex items-center gap-2 text-sm text-text">
-                  <input className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" type="checkbox" checked={config.cash_drawer_auto_open_after_cash} disabled={!config.cash_drawer_enabled || config.cash_drawer_driver !== 'local_bridge'} onChange={(event) => patch('cash_drawer_auto_open_after_cash', event.target.checked)} />
-                  {t('cash_drawer_auto_open_after_cash')}
-                </label>
               </section>
 
               <div className="space-y-1.5">
