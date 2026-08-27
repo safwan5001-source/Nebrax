@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\PlatformAuthController;
 use App\Http\Controllers\Api\PlatformCommercialAssignmentController;
 use App\Http\Controllers\Api\PlatformCommercialCatalogController;
 use App\Http\Controllers\Api\PlatformDashboardController;
+use App\Http\Controllers\Api\PlatformDocumentOperationsController;
 use App\Http\Controllers\Api\PlatformIntegrationController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformTenantController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DeliveryNoteController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\DocumentIntakeController;
+use App\Http\Controllers\Api\DocumentOperationsController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\DocumentReviewController;
 use App\Http\Controllers\Api\EmployeeController;
@@ -159,6 +161,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('integrations', [PlatformIntegrationController::class, 'index']);
         Route::get('tenants', [PlatformTenantController::class, 'index']);
         Route::get('tenants/{tenant}', [PlatformTenantController::class, 'show']);
+        Route::get('document-operations', [PlatformDocumentOperationsController::class, 'overview']);
+        Route::get('document-usage', [PlatformDocumentOperationsController::class, 'usage']);
+        Route::get('document-diagnostics', [PlatformDocumentOperationsController::class, 'diagnostics']);
     });
     Route::middleware(['auth:sanctum', EnsurePlatformAdministrator::class . ':platform:manage'])
         ->prefix('platform')
@@ -194,6 +199,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             Route::post('commercial-assignments/{assignment}/reconcile', [PlatformCommercialAssignmentController::class, 'reconcile']);
             Route::post('commercial-assignments/{assignment}/cancel', [PlatformCommercialAssignmentController::class, 'cancel']);
             Route::post('commercial-assignments/{assignment}/revoke', [PlatformCommercialAssignmentController::class, 'revoke']);
+            Route::patch('document-retention-policy', [PlatformDocumentOperationsController::class, 'updatePolicy']);
+            Route::post('document-retention-runs', [PlatformDocumentOperationsController::class, 'retentionRun']);
+            Route::get('document-audit/export', [PlatformDocumentOperationsController::class, 'auditExport'])->middleware('throttle:3,1');
         });
 
     // محمي: مصادقة Sanctum + ضبط المستأجر (العزل التلقائي)
@@ -242,6 +250,16 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('document-batches/{batch}/create-purchase-draft', [DocumentReviewController::class, 'createPurchaseDraft'])->middleware([$perm('documents.center.build_draft'), $commercialApp('document_center.core', 'write')]);
         Route::post('document-batches/{batch}/create-expense-draft', [DocumentReviewController::class, 'createExpenseDraft'])->middleware([$perm('documents.center.build_draft'), $commercialApp('document_center.core', 'write')]);
         Route::post('document-batches/{batch}/complete-review', [DocumentReviewController::class, 'complete'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
+        Route::get('document-operations', [DocumentOperationsController::class, 'overview'])->middleware([$perm('documents.center.operations'), $commercialApp('document_center.core')]);
+        Route::post('document-processing-runs/{run}/retry', [DocumentOperationsController::class, 'retry'])->middleware([$perm('documents.center.retry'), $commercialApp('document_center.core', 'write'), 'throttle:10,1']);
+        Route::get('document-usage', [DocumentOperationsController::class, 'usage'])->middleware([$perm('documents.center.usage'), $commercialApp('document_center.core')]);
+        Route::get('document-usage/export', [DocumentOperationsController::class, 'usageExport'])->middleware([$perm('documents.center.usage'), $commercialApp('document_center.core'), 'throttle:3,1']);
+        Route::get('document-governance', [DocumentOperationsController::class, 'governance'])->middleware([$perm('documents.center.settings'), $commercialApp('document_center.core')]);
+        Route::post('document-retention-holds', [DocumentOperationsController::class, 'createHold'])->middleware([$perm('documents.center.settings'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-retention-holds/{hold}/release', [DocumentOperationsController::class, 'releaseHold'])->middleware([$perm('documents.center.settings'), $commercialApp('document_center.core', 'write')]);
+        Route::post('document-redactions', [DocumentOperationsController::class, 'redact'])->middleware([$perm('documents.center.settings'), $commercialApp('document_center.core', 'write')]);
+        Route::get('document-audit/export', [DocumentOperationsController::class, 'auditExport'])->middleware([$perm('documents.center.audit_export'), $commercialApp('document_center.core'), 'throttle:3,1']);
+        Route::get('document-batches/{batch}/diagnostics', [DocumentOperationsController::class, 'diagnostics'])->middleware([$perm('documents.center.operations'), $commercialApp('document_center.core')]);
 
         // الأطراف
         Route::get('partners', [PartnerController::class, 'index'])->middleware($perm('partners.view'));

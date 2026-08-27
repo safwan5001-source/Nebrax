@@ -3,6 +3,7 @@
 
 import { DEMO_USER } from './demo';
 import { handleDocumentReviewDemo } from './document-review-demo';
+import { handleDocumentOperationsDemo } from './document-operations-demo';
 import {
   deleteDemoProductMedia,
   demoId,
@@ -2052,6 +2053,12 @@ const mockFuelShifts = [
 ];
 
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
+  const operationsResponse = handleDocumentOperationsDemo(path, method.toUpperCase(), body);
+  if (operationsResponse.handled) {
+    return 'error' in operationsResponse && operationsResponse.error
+      ? Promise.reject(operationsResponse.error)
+      : resolve(operationsResponse.response as T);
+  }
   const reviewResponse = handleDocumentReviewDemo(path, method.toUpperCase(), body);
   if (reviewResponse.handled) {
     return 'error' in reviewResponse

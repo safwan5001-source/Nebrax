@@ -101,6 +101,8 @@ class Rbac
             // لا ترثها الأدوار المقيدة من صلاحيات المستندات المحاسبية العامة.
             'documents.center.view', 'documents.center.manage',
             'documents.center.review', 'documents.center.settings', 'documents.center.build_draft',
+            'documents.center.operations', 'documents.center.retry',
+            'documents.center.usage', 'documents.center.audit_export',
             // Cycle 9: الصيانة والسلامة والتقارير والتنبيهات سلطات تشغيلية
             // مستقلة؛ لا تمنحها إدارة المحطة أو التصفح العام ضمنياً.
             'fuel.maintenance.view', 'fuel.maintenance.manage', 'fuel.maintenance.transition',
