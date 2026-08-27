@@ -327,6 +327,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('inventory-settings', [InventorySettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // دليل الحسابات: إدارة شجرية بلا حذف؛ التعطيل يمنع الترحيل الجديد ويحفظ الأثر التاريخي.
+        // تبقى القائمة المسطحة لمسارات التوافق، أما مساحة العمل فتقرأ أرصدة تجميعية
+        // من سطور القيود بحسب مرشح الفرع من دون تغيير بنية الدليل المشتركة.
+        Route::get('accounts/workspace', [AccountController::class, 'workspace'])->middleware($perm('accounts.view'));
+        Route::get('accounts/code-suggestion', [AccountController::class, 'suggestCode'])->middleware($perm('accounts.manage'));
         Route::get('accounts', [AccountController::class, 'index'])->middleware($perm('accounts.view'));
         Route::get('accounts/{id}', [AccountController::class, 'show'])->middleware($perm('accounts.view'));
         Route::post('accounts', [AccountController::class, 'store'])->middleware($perm('accounts.manage'));
