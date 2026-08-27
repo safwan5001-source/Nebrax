@@ -1273,6 +1273,10 @@ export const mockUsers = [
   { id: 'us-3', name: 'خالد الدوسري', email: 'khalid@nibras.sa', role: 'staff', is_active: true },
 ];
 
+type MockZatcaSubmissionMode = 'manual' | 'automatic';
+
+let mockZatcaSubmissionMode: MockZatcaSubmissionMode = 'manual';
+
 export const mockSalesConfig: Record<string, unknown> = {
   statuses: [
     { name: 'مسودة', color: '#6B7280' },
@@ -2057,6 +2061,22 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
 
   const clean = path.split('?')[0];
   const m = method.toUpperCase();
+  if (clean === '/zatca-settings') {
+    if (m === 'PUT') {
+      const requestedMode = (body as { submission_mode?: unknown } | undefined)?.submission_mode;
+      if (requestedMode === 'manual' || requestedMode === 'automatic') {
+        mockZatcaSubmissionMode = requestedMode;
+      }
+    }
+
+    return resolve({
+      data: {
+        icv_scope: 'tenant',
+        submission_mode: mockZatcaSubmissionMode,
+      },
+    });
+  }
+
   const deliveryMatch = clean.match(/^\/delivery-notes\/([^/]+)$/);
   const deliveryActionMatch = clean.match(/^\/delivery-notes\/([^/]+)\/(confirm|cancel)$/);
 
