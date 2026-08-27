@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DocumentOperationsNav } from '@/components/documents/document-operations-nav';
 
 type Batch = {
   id: string;
@@ -125,6 +126,8 @@ export default function DocumentsPage() {
           className="h-10 w-full rounded border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:max-w-sm"
         />
       </header>
+
+      <DocumentOperationsNav />
 
       <Card>
         <CardContent className="py-4">

@@ -1,6 +1,8 @@
 'use client';
 
-import { ApiError } from './api';
+import { ApiError, type DownloadOutcome } from './api';
+import { isDemo } from './demo';
+import { handleDocumentOperationsDemo } from './document-operations-demo';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 const PLATFORM_TOKEN_KEY = 'platform_token';
@@ -47,6 +49,13 @@ export function getPlatformAdministrator<T>(): T | null {
  * بسياق مستأجر أو فرع نشط في المتصفح نفسه.
  */
 export async function platformApi<T = unknown>(path: string, options: Options = {}): Promise<T> {
+  if (isDemo()) {
+    const demo = handleDocumentOperationsDemo(path, options.method ?? 'GET', options.body);
+    if (demo.handled) {
+      if (demo.error) throw demo.error;
+      return demo.response as T;
+    }
+  }
   const token = getPlatformToken();
   const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
@@ -78,4 +87,29 @@ export async function platformApi<T = unknown>(path: string, options: Options = 
 
   if (response.status === 204) return null as T;
   return response.json() as Promise<T>;
+}
+
+/** تنزيل خاص ضمن جلسة منصة الإدارة، منفصل صراحةً عن توكن tenant. */
+export async function platformDownloadFile(path: string, fallbackName: string): Promise<DownloadOutcome> {
+  if (isDemo()) return 'demo-unavailable';
+
+  const token = getPlatformToken();
+  const response = await fetch(`${BASE_URL}${path}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, (body as { message?: string }).message ?? 'حدث خطأ', body);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fallbackName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+
+  return 'downloaded';
 }

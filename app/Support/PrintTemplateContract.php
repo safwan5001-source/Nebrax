@@ -37,6 +37,12 @@ class PrintTemplateContract
         PrintTemplateAssignment::USAGE_THERMAL,
     ];
 
+    /** معرفات العارضين الحراريين المسجلين فعلياً في الواجهة. */
+    private const THERMAL_TEMPLATE_IDS = [
+        'tax-invoice-thermal58',
+        'tax-invoice-thermal80',
+    ];
+
     /** الخصائص التي يستطيع عارض كل كتلة استهلاكها؛ مصدر حراسة API. */
     private const BLOCK_PROPERTIES = [
         'header' => [],
@@ -101,6 +107,25 @@ class PrintTemplateContract
         }
 
         return $usage;
+    }
+
+    /**
+     * الاستعمال الحراري ليس مجرد وسم إخراج: يجب أن يشير إلى عارض حراري مسجل.
+     * يبقى هذا الحارس داخل عقد المحرك، فيسري على كل عميل API ولا يعتمد على فلترة
+     * واجهة POS وحدها.
+     *
+     * @param array<string, mixed> $definition
+     */
+    public static function assertUsageCompatibleDefinition(string $usage, array $definition): void
+    {
+        if ($usage !== PrintTemplateAssignment::USAGE_THERMAL) {
+            return;
+        }
+
+        $templateId = $definition['template_id'] ?? null;
+        if (! is_string($templateId) || ! in_array($templateId, self::THERMAL_TEMPLATE_IDS, true)) {
+            throw new RuntimeException('التعيين الحراري يحتاج قالب إيصال حرارياً مسجلاً.');
+        }
     }
 
     /**

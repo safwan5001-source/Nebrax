@@ -1,5 +1,6 @@
 'use client';
 
+import { isDemo } from './demo';
 import {
   clearPlatformSession,
   getPlatformAdministrator,
@@ -37,9 +38,10 @@ export async function platformLogout(): Promise<void> {
 }
 
 export function currentPlatformAdministrator(): PlatformAdministrator | null {
+  if (isDemo()) return { id: 'demo-platform-administrator', name: 'مدير المنصة التجريبي', email: 'platform-demo@nibras.test' };
   return getPlatformAdministrator<PlatformAdministrator>();
 }
 
 export function isPlatformAuthenticated(): boolean {
-  return getPlatformToken() !== null;
+  return isDemo() || getPlatformToken() !== null;
 }
