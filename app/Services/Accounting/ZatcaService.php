@@ -70,13 +70,33 @@ class ZatcaService
             ->first();
 
         $icv  = ($last->zatca_icv ?? 0) + 1;
-        $prev = $last->zatca_hash ?? $this->genesisHash();
+        $prev = $this->previousInvoiceHash($last);
 
         $xml  = $this->buildXml($invoice, $tenant, $uuid, $icv, $prev);
         $hash = $this->invoiceHasher->hash($xml);
         $qr   = $this->qrFor($invoice, $tenant);
 
         return compact('uuid', 'icv', 'prev', 'xml', 'hash', 'qr');
+    }
+
+    /**
+     * يشتق PIH دائماً من XML السابق المحفوظ، لا من عمود الهاش.
+     *
+     * هذا يجعل حدّ ترقية الخوارزمية آمناً: الهاشات التاريخية الخام تبقى
+     * كسجلٍ غير معدّل، لكن أول فاتورة جديدة تشير إلى C14N 1.1 الصحيح
+     * لمستندها السابق. وغياب XML يمنع الترحيل بدلاً من كسر السلسلة بصمت.
+     */
+    private function previousInvoiceHash(?Invoice $last): string
+    {
+        if ($last === null) {
+            return $this->genesisHash();
+        }
+
+        if (! is_string($last->zatca_xml) || trim($last->zatca_xml) === '') {
+            throw new RuntimeException('تعذر متابعة سلسلة ZATCA: XML الفاتورة السابقة غير محفوظ.');
+        }
+
+        return $this->invoiceHasher->hash($last->zatca_xml);
     }
 
     /**

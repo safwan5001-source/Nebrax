@@ -102,6 +102,26 @@ class ZatcaPhase2Test extends TestCase
     }
 
     /** @test */
+    public function legacy_raw_hash_is_recanonicalized_at_the_chain_boundary(): void
+    {
+        $legacy = $this->postInvoice();
+        $legacyRawHash = base64_encode(hash('sha256', $legacy->zatca_xml, true));
+
+        // يحاكي آخر فاتورة أنشأها الإصدار السابق الذي خزّن Hash النص الخام.
+        $legacy->update(['zatca_hash' => $legacyRawHash]);
+
+        $next = $this->postInvoice();
+        $canonicalLegacyHash = app(ZatcaInvoiceHasher::class)->hash($legacy->zatca_xml);
+
+        $this->assertNotSame($legacyRawHash, $canonicalLegacyHash);
+        $this->assertSame($canonicalLegacyHash, $next->zatca_previous_hash);
+        $this->assertStringContainsString(
+            $canonicalLegacyHash,
+            $next->zatca_xml
+        );
+    }
+
+    /** @test */
     public function document_hash_uses_the_official_zatca_c14n11_transform(): void
     {
         $invoice = $this->postInvoice();
