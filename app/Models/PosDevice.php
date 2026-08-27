@@ -15,11 +15,12 @@ class PosDevice extends BaseModel
     use BranchScoped;
 
     protected $fillable = [
-        'tenant_id', 'branch_id', 'warehouse_id', 'name', 'code', 'notes', 'is_active',
+        'tenant_id', 'branch_id', 'warehouse_id', 'name', 'code', 'notes', 'cash_drawer_config', 'is_active',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'cash_drawer_config' => 'array',
+            'is_active' => 'boolean',
     ];
 
     protected $attributes = [

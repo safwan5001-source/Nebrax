@@ -1,0 +1,15 @@
+{
+  "name": "@nebrax/local-hardware-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Localhost-only Nebrax POS cash-drawer bridge for ESC/POS printers",
+  "type": "module",
+  "scripts": {
+    "start": "node bridge.mjs",
+    "init": "node bridge.mjs --init",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

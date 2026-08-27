@@ -143,8 +143,9 @@ class PosService
 
         if ($drawerAttempt !== null) {
             [$session, $actor, $drawerInvoice] = $drawerAttempt;
-            // خدمة الجهاز تحوّل كل عطل إلى نتيجة وسجل تدقيق؛ لا يعاد رميه لمسار البيع.
-            $this->cashDrawer->openAfterCashPayment($session, $actor, $drawerInvoice);
+            // بعد commit فقط: يعود أمرٌ قصير العمر للواجهة لتنفيذه على localhost.
+            // لا يرمى أي عطل إلى معاملة البيع، ولا تتغير الفاتورة أو سندات القبض.
+            $invoice->setAttribute('cash_drawer_action', $this->cashDrawer->openAfterCashPayment($session, $actor, $drawerInvoice));
         }
 
         return $invoice;
