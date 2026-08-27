@@ -21,14 +21,14 @@ import { ArrowDown, ArrowUp, Columns3, GripVertical } from 'lucide-react';
 import { Dropdown } from '@/components/ui/dropdown';
 import { cn } from '@/lib/utils';
 
-export interface ReportColumnLayoutItem {
+export interface ColumnLayoutItem {
   id: string;
   label: string;
   visible: boolean;
   canHide: boolean;
 }
 
-export interface ReportColumnLayoutLabels {
+export interface ColumnLayoutLabels {
   columns: string;
   moveColumn: string;
   moveUp: string;
@@ -43,14 +43,16 @@ function SortableColumnRow({
   onMove,
   onVisibilityChange,
   menuOpen,
+  allowReorder,
 }: {
-  item: ReportColumnLayoutItem;
+  item: ColumnLayoutItem;
   index: number;
   count: number;
-  labels: ReportColumnLayoutLabels;
+  labels: ColumnLayoutLabels;
   onMove: (id: string, direction: 'up' | 'down') => void;
   onVisibilityChange: (id: string, visible: boolean) => void;
   menuOpen: boolean;
+  allowReorder: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
 
@@ -60,36 +62,40 @@ function SortableColumnRow({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn('flex min-h-10 items-center gap-1 rounded px-1.5 text-sm text-text hover:bg-primary-soft/50', isDragging && 'z-10 opacity-60 shadow-sm')}
     >
-      <button
-        type="button"
-        aria-label={`${labels.moveUp}: ${item.label}`}
-        tabIndex={menuOpen ? 0 : -1}
-        disabled={index === 0}
-        onClick={() => onMove(item.id, 'up')}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-35"
-      >
-        <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
-      </button>
-      <button
-        type="button"
-        aria-label={`${labels.moveDown}: ${item.label}`}
-        tabIndex={menuOpen ? 0 : -1}
-        disabled={index === count - 1}
-        onClick={() => onMove(item.id, 'down')}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-35"
-      >
-        <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
-      </button>
-      <button
-        type="button"
-        aria-label={`${labels.moveColumn}: ${item.label}`}
-        className="flex h-8 w-7 shrink-0 cursor-grab items-center justify-center rounded text-muted active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-        {...attributes}
-        {...listeners}
-        tabIndex={menuOpen ? 0 : -1}
-      >
-        <GripVertical className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
-      </button>
+      {allowReorder ? (
+        <>
+          <button
+            type="button"
+            aria-label={`${labels.moveUp}: ${item.label}`}
+            tabIndex={menuOpen ? 0 : -1}
+            disabled={index === 0}
+            onClick={() => onMove(item.id, 'up')}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label={`${labels.moveDown}: ${item.label}`}
+            tabIndex={menuOpen ? 0 : -1}
+            disabled={index === count - 1}
+            onClick={() => onMove(item.id, 'down')}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label={`${labels.moveColumn}: ${item.label}`}
+            className="flex h-8 w-7 shrink-0 cursor-grab items-center justify-center rounded text-muted active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            {...attributes}
+            {...listeners}
+            tabIndex={menuOpen ? 0 : -1}
+          >
+            <GripVertical className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
+          </button>
+        </>
+      ) : null}
       {item.canHide ? (
         <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-1">
           <input
@@ -106,16 +112,19 @@ function SortableColumnRow({
   );
 }
 
-export function ReportColumnLayoutMenu({
+export function ColumnLayoutMenu({
   items,
   labels,
   onReorder,
   onVisibilityChange,
+  allowReorder = true,
 }: {
-  items: ReportColumnLayoutItem[];
-  labels: ReportColumnLayoutLabels;
+  items: ColumnLayoutItem[];
+  labels: ColumnLayoutLabels;
   onReorder: (order: string[]) => void;
   onVisibilityChange: (id: string, visible: boolean) => void;
+  /** يعطّل الحركة حين تحتاج الشاشة ظهور الأعمدة فقط. */
+  allowReorder?: boolean;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -161,6 +170,7 @@ export function ReportColumnLayoutMenu({
                       onMove={move}
                       onVisibilityChange={onVisibilityChange}
                       menuOpen={open}
+                      allowReorder={allowReorder}
                     />
                   ))}
                 </div>

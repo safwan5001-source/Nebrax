@@ -17,7 +17,20 @@ import { branchViewQuery, type BranchView } from '@/lib/branch-view';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { formatRiyal } from '@/lib/money';
+import { useDataTableColumnVisibility } from '@/lib/data-explorer/table-layout';
 import { useToast } from '@/components/ui/toast';
+
+interface PaginationMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+interface JournalEntryResponse {
+  data: JournalEntry[];
+  meta?: PaginationMeta;
+}
 
 interface JournalEntry {
   id: string;
@@ -43,10 +56,7 @@ const sourcePath = (sourceType?: string | null, sourceId?: string | null): strin
 
 const sourceName = (sourceType?: string | null): string => sourceType?.split('\\').pop() ?? '';
 
-function filterValue(filter?: ActiveFilter): string {
-  if (!filter || Array.isArray(filter.value)) return '';
-  return String(filter.value).trim();
-}
+const JOURNAL_ENTRY_SORT_COLUMNS = ['number', 'entry_date', 'total', 'entry_kind'];
 
 function isEmptyFilter(filter: ActiveFilter): boolean {
   return Array.isArray(filter.value)
@@ -71,19 +81,47 @@ export default function JournalEntriesPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<BranchView>('current');
+  const [meta, setMeta] = useState<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
+  const storedColumnVisibility = useDataTableColumnVisibility('journal-entries');
+  const columnVisibility = useMemo(() => ({
+    ...storedColumnVisibility,
+    protectedColumnIds: ['number', 'actions'],
+    labels: { actions: t('actions') },
+  }), [storedColumnVisibility, t]);
 
   const load = useCallback(() => {
+    const params = new URLSearchParams(branchViewQuery(view).replace(/^\?/, ''));
+    if (explorer.search.trim()) params.set('search', explorer.search.trim());
+    params.set('per_page', String(explorer.perPage ?? 25));
+    params.set('page', String(explorer.page ?? 1));
+    params.set('sort', explorer.sort ?? '-entry_date');
+
+    for (const filter of explorer.filters) {
+      if (Array.isArray(filter.value)) continue;
+      const value = String(filter.value).trim();
+      if (!value || !['entry_kind', 'source_type', 'date_from', 'date_to', 'amount_min', 'amount_max'].includes(filter.key)) continue;
+      params.set(filter.key, value);
+    }
+
     setLoading(true);
     setLoadError(null);
-    api<{ data: JournalEntry[] }>(`/journal-entries${branchViewQuery(view)}`)
-      .then((response) => setEntries(response.data))
+    api<JournalEntryResponse>(`/journal-entries?${params.toString()}`)
+      .then((response) => {
+        setEntries(response.data);
+        setMeta(response.meta ?? {
+          current_page: 1,
+          last_page: 1,
+          per_page: response.data.length || explorer.perPage || 25,
+          total: response.data.length,
+        });
+      })
       .catch((err) => {
         const message = err instanceof ApiError ? err.message : tc('loadFailed');
         setLoadError(message);
         toastError(message);
       })
       .finally(() => setLoading(false));
-  }, [tc, toastError, view]);
+  }, [explorer, tc, toastError, view]);
 
   useEffect(() => load(), [load]);
 
@@ -135,57 +173,6 @@ export default function JournalEntriesPage() {
     ...filter,
     label: definitions.find((definition) => definition.key === filter.key)?.label ?? filter.label,
   })), [definitions, explorer.filters]);
-
-  const filtered = useMemo(() => {
-    const filters = new Map(explorer.filters.map((filter) => [filter.key, filter]));
-    const query = explorer.search.trim().toLocaleLowerCase();
-    const dateFrom = filterValue(filters.get('date_from'));
-    const dateTo = filterValue(filters.get('date_to'));
-    const amountMin = Number(filterValue(filters.get('amount_min')));
-    const amountMax = Number(filterValue(filters.get('amount_max')));
-    const kind = filterValue(filters.get('entry_kind'));
-    const source = filterValue(filters.get('source_type'));
-
-    return entries.filter((entry) => {
-      if (query) {
-        const haystack = [entry.number, entry.description, sourceName(entry.source_type), entry.status]
-          .filter(Boolean)
-          .join(' ')
-          .toLocaleLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      if (kind && entry.entry_kind !== kind) return false;
-      if (source && sourceName(entry.source_type) !== source) return false;
-      if (dateFrom && entry.entry_date < dateFrom) return false;
-      if (dateTo && entry.entry_date > dateTo) return false;
-
-      const total = Number(entry.total);
-      if (Number.isFinite(amountMin) && filterValue(filters.get('amount_min')) && total < amountMin) return false;
-      if (Number.isFinite(amountMax) && filterValue(filters.get('amount_max')) && total > amountMax) return false;
-      return true;
-    });
-  }, [entries, explorer.filters, explorer.search]);
-
-  const sorted = useMemo(() => {
-    const next = [...filtered];
-    const sort = explorer.sort ?? '-entry_date';
-    const desc = sort.startsWith('-');
-    const key = sort.replace(/^-/, '');
-    next.sort((left, right) => {
-      let comparison = 0;
-      if (key === 'total') comparison = Number(left.total) - Number(right.total);
-      else if (key === 'number') comparison = left.number.localeCompare(right.number, 'ar', { numeric: true });
-      else if (key === 'entry_kind') comparison = left.entry_kind.localeCompare(right.entry_kind, 'ar');
-      else comparison = left.entry_date.localeCompare(right.entry_date);
-      return desc ? -comparison : comparison;
-    });
-    return next;
-  }, [explorer.sort, filtered]);
-
-  const perPage = explorer.perPage ?? 25;
-  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
-  const page = Math.min(explorer.page ?? 1, totalPages);
-  const pageData = sorted.slice((page - 1) * perPage, page * perPage);
 
   function updateFilter(next: ActiveFilter) {
     setExplorer((current) => ({
@@ -255,13 +242,12 @@ export default function JournalEntriesPage() {
           onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
           options: sortOptions,
         }}
-        resultCount={sorted.length}
-        totalCount={entries.length}
+        resultCount={meta.total}
       />
 
       <DataTable
         columns={columns}
-        data={pageData}
+        data={entries}
         loading={loading}
         error={loadError}
         onRetry={load}
@@ -269,6 +255,13 @@ export default function JournalEntriesPage() {
         emptyLabel={t('empty')}
         exportName="journal-entries"
         showToolbar={false}
+        serverSort={{
+          value: explorer.sort ?? '-entry_date',
+          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+          columns: JOURNAL_ENTRY_SORT_COLUMNS,
+        }}
+        columnVisibility={columnVisibility}
+        stickyHeader
         mobileRecord={(entry) => ({
           title: (
             <Link href={`/journal-entries/${entry.id}`} className="num text-primary hover:underline">
@@ -285,10 +278,10 @@ export default function JournalEntriesPage() {
       />
 
       <Pagination
-        page={page}
-        lastPage={totalPages}
-        perPage={perPage}
-        total={sorted.length}
+        page={meta.current_page}
+        lastPage={meta.last_page}
+        perPage={meta.per_page}
+        total={meta.total}
         disabled={loading}
         onPageChange={(next) => setExplorer((current) => ({ ...current, page: next }))}
         onPerPageChange={(next) => setExplorer((current) => ({ ...current, page: 1, perPage: next }))}

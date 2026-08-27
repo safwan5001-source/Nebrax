@@ -19,14 +19,40 @@ class JournalEntryController extends ApiController
 {
     public function index(Request $request): JsonResponse
     {
+        $filters = $request->validate([
+            'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'entry_kind' => ['sometimes', 'nullable', 'in:manual,automatic,reversal'],
+            'source_type' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'date_from' => ['sometimes', 'nullable', 'date'],
+            'date_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:date_from'],
+            'amount_min' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'amount_max' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'sort' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:100'],
+        ]);
+
+        $query = $this->applyListFilters($this->visibleEntries($request), $filters)
+            ->with(['lines.account']);
+        $this->applyListSort($query, $filters['sort'] ?? null);
+
+        if (isset($filters['per_page'])) {
+            $paginator = $query->paginate((int) $filters['per_page'])->withQueryString();
+
+            return response()->json([
+                'data' => collect($paginator->items())->map(fn (JournalEntry $entry) => $this->mapEntry($entry))->values(),
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                ],
+            ]);
+        }
+
+        // توافق رجعي: المستهلكون القدامى بلا `per_page` يستمرون بقائمة كاملة.
         return response()->json([
-            'data' => $this->visibleEntries($request)
-                ->with(['lines.account'])
-                ->orderByDesc('entry_date')
-                ->orderByDesc('created_at')
-                ->get()
-                ->map(fn (JournalEntry $entry) => $this->mapEntry($entry))
-                ->values(),
+            'data' => $query->get()->map(fn (JournalEntry $entry) => $this->mapEntry($entry))->values(),
         ]);
     }
 
@@ -74,6 +100,84 @@ class JournalEntryController extends ApiController
         return $lines->where(function (Builder $query) use ($branchIds) {
             $query->whereIn('branch_id', $branchIds)->orWhereNull('branch_id');
         });
+    }
+
+    /**
+     * كل شرط هنا يضيف تضييقاً فوق `visibleEntries()`؛ لا يعيد بناء استعلام يتجاوز
+     * نطاق المستأجر أو نطاق الفروع المستمد من سطور القيد.
+     */
+    private function applyListFilters(Builder $query, array $filters): Builder
+    {
+        if ($search = trim((string) ($filters['search'] ?? ''))) {
+            $escaped = addcslashes($search, '%_\\');
+            $query->where(function (Builder $builder) use ($escaped) {
+                $builder
+                    ->where('number', 'like', "%{$escaped}%")
+                    ->orWhere('description', 'like', "%{$escaped}%")
+                    ->orWhere('source_type', 'like', "%{$escaped}%");
+            });
+        }
+
+        if (! empty($filters['entry_kind'])) {
+            match ($filters['entry_kind']) {
+                'manual' => $query->where('source_type', ManualJournal::class),
+                'reversal' => $query->whereNotNull('reversal_of'),
+                'automatic' => $query->whereNull('reversal_of')->where('source_type', '!=', ManualJournal::class),
+            };
+        }
+
+        if ($sourceType = trim((string) ($filters['source_type'] ?? ''))) {
+            if (str_contains($sourceType, '\\')) {
+                $query->where('source_type', $sourceType);
+            } else {
+                // دعم روابط الواجهة القديمة التي حفظت الاسم المختصر للمصدر.
+                $query->where('source_type', 'like', '%'.addcslashes($sourceType, '%_\\'));
+            }
+        }
+
+        if (! empty($filters['date_from'])) $query->whereDate('entry_date', '>=', $filters['date_from']);
+        if (! empty($filters['date_to'])) $query->whereDate('entry_date', '<=', $filters['date_to']);
+        if (isset($filters['amount_min'])) $query->whereRaw($this->entryTotalSql().' >= ?', [$this->moneyFilterToMinor((string) $filters['amount_min'])]);
+        if (isset($filters['amount_max'])) $query->whereRaw($this->entryTotalSql().' <= ?', [$this->moneyFilterToMinor((string) $filters['amount_max'])]);
+
+        return $query;
+    }
+
+    private function applyListSort(Builder $query, ?string $sort): void
+    {
+        $sort = $sort ?: '-entry_date';
+        $direction = str_starts_with($sort, '-') ? 'desc' : 'asc';
+        $field = ltrim($sort, '-');
+
+        if ($field === 'total') {
+            $query->orderByRaw($this->entryTotalSql()." {$direction}");
+        } elseif ($field === 'entry_kind') {
+            $query->orderByRaw(
+                "CASE WHEN reversal_of IS NOT NULL THEN 2 WHEN source_type = ? THEN 1 ELSE 0 END {$direction}",
+                [ManualJournal::class],
+            );
+        } elseif (in_array($field, ['number', 'entry_date', 'created_at'], true)) {
+            $query->orderBy($field, $direction);
+        } else {
+            $query->orderByDesc('entry_date');
+        }
+
+        $query->orderByDesc('id');
+    }
+
+    /** قيمة القيد المعروضة هي مجموع المدين بالهللات؛ الاستعلام لا يعتمد على float. */
+    private function entryTotalSql(): string
+    {
+        return '(SELECT COALESCE(SUM(journal_lines.debit), 0) FROM journal_lines WHERE journal_lines.journal_entry_id = journal_entries.id)';
+    }
+
+    private function moneyFilterToMinor(string $value): int
+    {
+        $normalized = trim($value);
+        [$whole, $fraction] = array_pad(explode('.', $normalized, 2), 2, '');
+        $fraction = substr(str_pad(preg_replace('/\\D/', '', $fraction) ?? '', 2, '0'), 0, 2);
+
+        return ((int) $whole * 100) + (int) $fraction;
     }
 
     private function mapEntry(JournalEntry $entry): array

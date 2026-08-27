@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { ReportColumnLayoutMenu } from '@/components/reports/report-column-layout-menu';
+import { ColumnLayoutMenu } from '@/components/data-explorer/column-layout-menu';
 
 export type ReportCellTone = 'positive' | 'negative' | 'neutral';
 
@@ -358,7 +358,7 @@ export function ReportDataTable({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <ReportColumnLayoutMenu
+          <ColumnLayoutMenu
             items={layoutItems}
             labels={{ columns: labels.columns, moveColumn: labels.moveColumn, moveUp: labels.moveUp, moveDown: labels.moveDown }}
             onReorder={(columnOrder) => updateViewState((current) => ({ ...current, columnOrder: normalizeColumnOrder(columnOrder, columns) }))}

@@ -1,9 +1,6 @@
 'use client';
-import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
 
-import { ActiveFilterChips } from './active-filter-chips';
-import { QuickFilters } from './quick-filters';
-import { SearchBar } from './search-bar';
+import { ListToolbar } from '@/components/nebrax/list-toolbar';
 import type { ActiveFilter, FilterDefinition } from '@/lib/data-explorer/types';
 
 interface DataExplorerToolbarProps {
@@ -20,49 +17,10 @@ interface DataExplorerToolbarProps {
   totalCount?: number;
 }
 
-export function DataExplorerToolbar({
-  search,
-  onSearchChange,
-  searchPlaceholder,
-  definitions,
-  filters,
-  onFilterChange,
-  onRemoveFilter,
-  onClearFilters,
-  onOpenAdvanced,
-  resultCount,
-  totalCount,
-}: DataExplorerToolbarProps) {
-  return (
-    <div className="space-y-3">
-      <SearchBar
-        value={search}
-        onChange={onSearchChange}
-        placeholder={searchPlaceholder}
-      />
-
-      <QuickFilters
-        definitions={definitions}
-        filters={filters}
-        onChange={onFilterChange}
-        onOpenAdvanced={onOpenAdvanced}
-      />
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <ActiveFilterChips
-          filters={filters}
-          onRemove={onRemoveFilter}
-          onClear={onClearFilters}
-        />
-
-        {typeof resultCount === 'number' ? (
-          <p className="ms-auto text-xs text-muted" aria-live="polite">
-            {typeof totalCount === 'number' && totalCount !== resultCount
-              ? `${resultCount.toLocaleString(ARABIC_DISPLAY_LOCALE)} من أصل ${totalCount.toLocaleString(ARABIC_DISPLAY_LOCALE)}`
-              : `${resultCount.toLocaleString(ARABIC_DISPLAY_LOCALE)} نتيجة`}
-          </p>
-        ) : null}
-      </div>
-    </div>
-  );
+/**
+ * واجهة توافق للصفحات التي سبقت `ListToolbar`.
+ * تبقى دلالات البحث والفلاتر ملكاً للصفحة، بينما يُوحّد العرض والعداد والترجمة.
+ */
+export function DataExplorerToolbar(props: DataExplorerToolbarProps) {
+  return <ListToolbar {...props} />;
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
@@ -19,6 +20,7 @@ export function QuickFilters({
   onChange,
   onOpenAdvanced,
 }: QuickFiltersProps) {
+  const t = useTranslations('nebrax');
   const quick = definitions.filter((definition) => definition.quick);
 
   return (
@@ -52,8 +54,8 @@ export function QuickFilters({
               options={options}
               placeholder={definition.label}
               clearLabel={definition.label}
-              searchPlaceholder={definition.searchPlaceholder ?? `ابحث في ${definition.label}`}
-              emptyText={definition.emptyText ?? 'لا توجد نتائج مطابقة'}
+              searchPlaceholder={definition.searchPlaceholder ?? t('searchWithin', { label: definition.label })}
+              emptyText={definition.emptyText ?? t('noMatchingResults')}
               aria-label={definition.label}
               className="w-auto min-w-40 max-w-full sm:min-w-48"
             />
@@ -96,7 +98,7 @@ export function QuickFilters({
           className="h-9 gap-1.5"
         >
           <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.7} />
-          فلترة متقدمة
+          {t('advancedFilters')}
         </Button>
       ) : null}
     </div>
