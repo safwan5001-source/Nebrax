@@ -31,6 +31,7 @@ import { PosPayment, type PaymentSummaryItem, type PosPaymentMethod, type PosTen
 import { PosExchangeDialog } from '@/components/pos/pos-exchange-dialog';
 import { PosHeldSalesDialog, type PosHeldSale } from '@/components/pos/pos-held-sales-dialog';
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
+import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
@@ -51,6 +52,7 @@ interface PosConfig extends PosFeedbackSettings {
   allow_discount: boolean;
   apply_customer_price_list: boolean;
   allow_unit_price_override: boolean;
+  show_onscreen_numeric_keypad: boolean;
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   enabled_payment_method_ids: string[];
   payment_methods_mode: 'all_active' | 'only' | 'none';
@@ -70,6 +72,8 @@ const POS_DEFAULTS: PosConfig = {
   allow_discount: true,
   apply_customer_price_list: true,
   allow_unit_price_override: false,
+  // لم تكن لوحة أرقام مساعدة في الكاشير سابقاً؛ نبقيها معطلة حتى يختارها المالك صراحةً.
+  show_onscreen_numeric_keypad: false,
   held_sale_close_policy: 'discard_on_session_close',
   enabled_payment_method_ids: [],
   payment_methods_mode: 'all_active',
@@ -190,6 +194,15 @@ export default function PosPage() {
   const [unsavedExitAction, setUnsavedExitAction] = useState<'close_session' | 'logout' | null>(null);
   const [lastScannedLineKey, setLastScannedLineKey] = useState<string | null>(null);
   const [scanFeedbackMessage, setScanFeedbackMessage] = useState('');
+  const numericEditorLabels = {
+    apply: t('numeric_keypad_apply'),
+    backspace: t('numeric_keypad_backspace'),
+    cancel: t('numeric_keypad_cancel'),
+    clear: t('numeric_keypad_clear'),
+    decimal: t('numeric_keypad_decimal'),
+    digit: (digit: string) => t('numeric_keypad_digit', { digit }),
+    value: t('numeric_keypad_value'),
+  };
 
   // اسم العميل الافتراضي (النقدي) من الإعداد؛ والمعروض = المختار أو الافتراضي.
   useEffect(() => {
@@ -419,6 +432,12 @@ export default function PosPage() {
     });
   };
   const setQty = (k: string, d: number) => setCart((c) => c.map((l) => (l.key === k ? { ...l, qty: Math.max(1, l.qty + d) } : l)));
+  const setQtyFromInput = (k: string, value: string) => {
+    if (!/^\d+$/.test(value)) return;
+    const quantity = Number(value);
+    if (!Number.isSafeInteger(quantity) || quantity < 1) return;
+    setCart((current) => current.map((line) => (line.key === k ? { ...line, qty: quantity } : line)));
+  };
   const setDiscount = (k: string, v: string) => {
     if (!posCfg.allow_discount) return;
     setCart((c) => c.map((l) => (l.key === k ? { ...l, discount: v } : l)));
@@ -431,11 +450,12 @@ export default function PosPage() {
     });
     setCart((c) => c.map((l) => (l.key === k ? { ...l, price: v } : l)));
   };
-  const normalizeUnitPrice = (k: string) => {
+  const normalizeUnitPrice = (k: string, value?: string) => {
     const line = cart.find((current) => current.key === k);
     if (!line) return;
 
-    const minor = riyalToMinor(line.price);
+    const price = value ?? line.price;
+    const minor = riyalToMinor(price);
     if (Number.isFinite(minor) && minor >= 0) {
       setPriceErrors((current) => {
         const { [k]: _cleared, ...rest } = current;
@@ -1132,17 +1152,51 @@ export default function PosPage() {
                     {posCfg.allow_unit_price_override && (
                       <label className="flex items-center gap-1 text-xs text-muted">
                         {t('unit_price')}
-                        <input value={line.price} onChange={(event) => setUnitPrice(line.key, event.target.value)} onBlur={() => normalizeUnitPrice(line.key)} inputMode="decimal" aria-invalid={Boolean(priceErrors[line.key])} className="num h-8 w-20 rounded border border-border bg-background px-2 text-end text-xs text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 aria-[invalid=true]:border-negative" />
+                        <PosNumericEditor
+                          allowDecimal
+                          className="h-8 w-20 px-2 text-xs"
+                          inputAriaLabel={t('unit_price')}
+                          labels={numericEditorLabels}
+                          onApply={(value) => normalizeUnitPrice(line.key, value)}
+                          onBlur={() => normalizeUnitPrice(line.key)}
+                          onChange={(value) => setUnitPrice(line.key, value)}
+                          showKeypad={posCfg.show_onscreen_numeric_keypad}
+                          title={t('numeric_keypad_edit_unit_price')}
+                          value={line.price}
+                        />
                       </label>
                     )}
-                    {posCfg.allow_discount && <label className="flex items-center gap-1 text-xs text-muted">{t('discount')}<input value={line.discount} onChange={(event) => setDiscount(line.key, event.target.value)} inputMode="decimal" placeholder="0" className="num h-8 w-16 rounded border border-border bg-background px-2 text-end text-xs text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" /></label>}
+                    {posCfg.allow_discount && (
+                      <label className="flex items-center gap-1 text-xs text-muted">
+                        {t('discount')}
+                        <PosNumericEditor
+                          allowDecimal
+                          className="h-8 w-16 px-2 text-xs"
+                          inputAriaLabel={t('discount')}
+                          labels={numericEditorLabels}
+                          onChange={(value) => setDiscount(line.key, value)}
+                          showKeypad={posCfg.show_onscreen_numeric_keypad}
+                          title={t('numeric_keypad_edit_discount')}
+                          value={line.discount}
+                        />
+                      </label>
+                    )}
                   </div>
                 )}
                 {priceErrors[line.key] && <p className="mt-1 text-xs text-negative">{priceErrors[line.key]}</p>}
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="flex h-10 items-center rounded-md border border-border bg-background">
                     <button type="button" onClick={() => setQty(line.key, -1)} className="grid h-10 w-10 place-items-center text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('return_decrease')}><Minus className="h-4 w-4" strokeWidth={1.7} /></button>
-                    <span className="num w-9 text-center text-sm font-semibold text-text">{line.qty}</span>
+                    <PosNumericEditor
+                      allowDecimal={false}
+                      className="h-10 w-9 text-sm font-semibold"
+                      inputAriaLabel={t('quantity')}
+                      labels={numericEditorLabels}
+                      onChange={(value) => setQtyFromInput(line.key, value)}
+                      showKeypad={posCfg.show_onscreen_numeric_keypad}
+                      title={t('numeric_keypad_edit_quantity')}
+                      value={String(line.qty)}
+                    />
                     <button type="button" onClick={() => setQty(line.key, 1)} className="grid h-10 w-10 place-items-center text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('return_increase')}><Plus className="h-4 w-4" strokeWidth={1.7} /></button>
                   </div>
                   <span className="num text-sm font-bold text-text">{formatRiyal(lineCalc(line).total / 100)}</span>

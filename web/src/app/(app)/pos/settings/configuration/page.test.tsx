@@ -31,6 +31,8 @@ const strings: Record<string, string> = {
   apply_customer_price_list_hint: 'Price list hint.',
   allow_unit_price_override: 'Allow override',
   allow_unit_price_override_hint: 'Override hint.',
+  show_onscreen_numeric_keypad: 'Show numeric keypad while editing',
+  show_onscreen_numeric_keypad_hint: 'Keypad hint.',
   allow_deferred_payment: 'Allow deferred payment',
   allow_deferred_payment_hint: 'Deferred hint.',
   print_receipt: 'Auto-print receipt',
@@ -104,6 +106,7 @@ const settings = {
   allow_discount: true,
   apply_customer_price_list: true,
   allow_unit_price_override: false,
+  show_onscreen_numeric_keypad: false,
   enabled_payment_method_ids: [],
   payment_methods_mode: 'all_active',
   default_payment_method_id: null as string | null,
@@ -210,6 +213,20 @@ describe('صفحة تهيئة POS بعد توحيد UX', () => {
     expect(screen.queryByRole('checkbox', { name: /Cash/ })).toBeNull();
   });
 
+  it('يحمّل مفتاح لوحة الأرقام ويحفظه ضمن عقد POS من دون إعادة Cash Drawer', async () => {
+    await renderLoaded({ show_onscreen_numeric_keypad: false });
+    const keypadSwitch = screen.getByRole('switch', { name: 'Show numeric keypad while editing' });
+    expect(keypadSwitch.getAttribute('aria-checked')).toBe('false');
+
+    fireEvent.click(keypadSwitch);
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => expect(api.mock.calls.some(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')).toBe(true));
+    const saved = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
+    expect(saved).toMatchObject({ show_onscreen_numeric_keypad: true, allow_discount: true });
+    expect(saved).not.toHaveProperty('cash_drawer_enabled');
+  });
+
   it('يعطل ضوابط الإيصال الثانوية دون فقد قيمتها عند إيقاف الطباعة', async () => {
     await renderLoaded();
     const printSwitch = screen.getByRole('switch', { name: 'Auto-print receipt' });
@@ -244,6 +261,7 @@ describe('صفحة تهيئة POS بعد توحيد UX', () => {
       allow_discount: false,
       receipt_footer: 'Thank you',
       sound_enabled: true,
+      show_onscreen_numeric_keypad: false,
     });
     expect(saved).not.toHaveProperty('cash_drawer_driver');
     expect(saved).not.toHaveProperty('cash_drawer_enabled');
