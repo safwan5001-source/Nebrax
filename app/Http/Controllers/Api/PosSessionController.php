@@ -90,8 +90,32 @@ class PosSessionController extends ApiController
             $request->user(),
             $data['reason'] ?? null,
         ));
+        $status = $result['status'] === 'opened' ? 200 : ($result['status'] === 'pending' ? 202 : 409);
+
+        return response()->json(['data' => $result], $status);
+    }
+
+    /** نتيجة الجسر الموقعة فقط هي التي تحوّل الأمر المعلّق إلى opened. */
+    public function completeCashDrawer(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'action_id' => ['required', 'uuid'],
+            'result' => ['required', 'array', 'max:12'],
+        ]);
+        $session = $this->visibleSession($id, $request);
+        $result = $this->domain(fn () => $this->cashDrawer->complete($session, $request->user(), $data['action_id'], $data['result']));
 
         return response()->json(['data' => $result], $result['status'] === 'opened' ? 200 : 409);
+    }
+
+    /** يستخدم عند تعذر fetch المحلي؛ لا يقبل نتيجة opened من المتصفح وحده. */
+    public function cashDrawerBridgeUnavailable(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate(['action_id' => ['required', 'uuid']]);
+        $session = $this->visibleSession($id, $request);
+        $result = $this->domain(fn () => $this->cashDrawer->markBridgeUnavailable($session, $request->user(), $data['action_id']));
+
+        return response()->json(['data' => $result], 409);
     }
 
     public function events(Request $request, string $id): JsonResponse
