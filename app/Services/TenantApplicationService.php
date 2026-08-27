@@ -264,12 +264,18 @@ class TenantApplicationService
             throw new RuntimeException('توابع مفعّلة تعتمد على هذه القدرة: ' . implode('، ', $dependents));
         }
 
-        // بيانات حقيقية موجودة → قراءة فقط بدل إيقاف كامل، فلا تُفقَد إمكانية
-        // مراجعة السجل التاريخي. القدرة الإلزامية والاعتماد المفعّل يُرفضان
-        // أعلاه قبل الوصول هنا؛ هذا القرار الثالث ينجح دوماً بحالة مختلفة.
-        $status = $this->hasOperationalData($key) ? 'suspended' : 'disabled';
+        return DB::transaction(function () use ($key, $actor, $reason) {
+            // القفل نفسه الذي يستخدمه حفظ بيانات اعتماد ZATCA: يمنع أن يرى
+            // التعطيل عدم وجود بيانات، ثم تُنشأ البيانات بعده مباشرة خلف 403.
+            $tenantId = app(TenantContext::class)->id();
+            if ($tenantId !== null) {
+                Tenant::whereKey($tenantId)->lockForUpdate()->firstOrFail();
+            }
 
-        return DB::transaction(function () use ($key, $actor, $reason, $status) {
+            // بيانات حقيقية موجودة → قراءة فقط بدل إيقاف كامل، فلا تُفقَد إمكانية
+            // مراجعة السجل التاريخي. يُعاد الفحص داخل المعاملة وبعد القفل.
+            $status = $this->hasOperationalData($key) ? 'suspended' : 'disabled';
+
             $state = TenantApplicationState::updateOrCreate(
                 ['application_key' => $key],
                 ['requested_enabled' => false, 'status' => $status, 'changed_by' => $actor?->id, 'reason' => $reason],

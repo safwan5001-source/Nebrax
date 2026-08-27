@@ -62,11 +62,14 @@ class ZatcaCredentialTest extends TestCase
             'secret' => 'PCSID-SECRET', 'private_key' => 'PCSID-PRIVATE-KEY',
         ]))->assertOk();
 
+        $expiresAt = ZatcaCredential::sole()->expires_at;
         $this->withToken($auth['token'])->putJson($url, [
             'stage' => 'production', 'current_password' => 'password123',
         ])->assertOk()->assertJsonPath('data.has_secret', true);
 
-        $this->assertSame('PCSID-SECRET', ZatcaCredential::sole()->credentials['secret']);
+        $credential = ZatcaCredential::sole();
+        $this->assertSame('PCSID-SECRET', $credential->credentials['secret']);
+        $this->assertTrue($credential->expires_at->equalTo($expiresAt));
     }
 
     /** @test */

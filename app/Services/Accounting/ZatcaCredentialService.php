@@ -64,7 +64,9 @@ class ZatcaCredentialService
                 'credentials' => $credentials,
                 'certificate_fingerprint' => hash('sha256', $credentials['binary_security_token']),
                 'configured_at' => now('UTC'),
-                'expires_at' => $validated['expires_at'] ?? null,
+                'expires_at' => array_key_exists('expires_at', $validated)
+                    ? $validated['expires_at']
+                    : $record->expires_at,
                 'updated_by' => $user->id,
             ])->save();
 
