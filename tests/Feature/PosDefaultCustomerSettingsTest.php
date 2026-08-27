@@ -92,4 +92,36 @@ class PosDefaultCustomerSettingsTest extends TestCase
             ->assertJsonPath('data.default_customer_id', null)
             ->assertJsonPath('data.default_customer', 'عميل نقدي (POS)');
     }
+
+    /** @test */
+    public function an_ambiguous_legacy_name_never_binds_to_one_of_the_matches_at_random(): void
+    {
+        ['token' => $token] = $this->registerTenant('pos-default-ambiguous', 'owner@pos-default-ambiguous.test');
+        // عميلان مرئيان صالحان يحملان الاسم القديم نفسه — الاسم ليس معرّفاً.
+        $this->withToken($token)->postJson('/api/partners', [
+            'name' => 'اسم مكرر',
+            'type' => 'customer',
+        ])->assertCreated();
+        $this->withToken($token)->postJson('/api/partners', [
+            'name' => 'اسم مكرر',
+            'type' => 'both',
+        ])->assertCreated();
+
+        // حفظ الاسم القديم الملتبس لا يختار أحدهما عشوائياً بل يعود للعميل النقدي.
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['default_customer' => 'اسم مكرر'],
+        ])->assertOk()
+            ->assertJsonPath('data.default_customer_id', null)
+            ->assertJsonPath('data.default_customer', 'عميل نقدي (POS)');
+
+        // القراءة اللاحقة تبقى نقدية أيضاً: لا ترقية صامتة إلى أحد المعرّفين.
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.default_customer_id', null)
+            ->assertJsonPath('data.default_customer', 'عميل نقدي (POS)');
+
+        // ولم يُنشأ أي طرف جديد بسبب الاسم الملتبس (يبقى العددان اثنين).
+        $partners = $this->withToken($token)->getJson('/api/partners')->assertOk()['data'];
+        $this->assertCount(2, $partners);
+    }
 }
