@@ -38,7 +38,7 @@ final class DocumentUsageReportingService
                 'input_tokens' => (int) $row->input_tokens,
                 'output_tokens' => (int) $row->output_tokens,
             ])->all();
-        $failed = $this->attempts($filters)->where('status', 'failed')->count();
+        $failed = $this->attempts($filters)->where('document_provider_attempts.status', 'failed')->count();
 
         return [
             'range' => ['from' => $filters['from']->toDateString(), 'to' => $filters['to']->toDateString()],

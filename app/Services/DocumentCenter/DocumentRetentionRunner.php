@@ -2,6 +2,7 @@
 
 namespace App\Services\DocumentCenter;
 
+use App\Models\DocumentBatch;
 use App\Models\DocumentFile;
 use App\Models\DocumentGovernanceEvent;
 use App\Models\DocumentRetentionPolicy;
@@ -29,7 +30,7 @@ final class DocumentRetentionRunner
         }
         $cutoff = CarbonImmutable::parse($value);
 
-        return preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', trim($value)) === 1 ? $cutoff->endOfDay() : $cutoff;
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($value)) === 1 ? $cutoff->endOfDay() : $cutoff;
     }
 
     /** @return array{run:DocumentRetentionRun,results:array{scanned:int,eligible:int,purged:int,skipped:int}} */
@@ -71,7 +72,7 @@ final class DocumentRetentionRunner
                     $counts['eligible']++;
                 }
                 if ($outcome['pending']) {
-                    $outcome = $this->purgePending($candidate->id, $policy, $run, $actor);
+                    $outcome = $this->purgePending($candidate->id, $policy, $cutoff, $run, $actor);
                 }
                 if ($outcome['purged']) {
                     $counts['purged']++;
@@ -111,12 +112,18 @@ final class DocumentRetentionRunner
     private function prepare(DocumentFile $candidate, DocumentRetentionPolicy $policy, CarbonImmutable $cutoff, bool $dryRun, DocumentRetentionRun $run, ?PlatformAdministrator $actor): array
     {
         return DB::transaction(function () use ($candidate, $policy, $cutoff, $dryRun, $run, $actor): array {
+            // ترتيب القفل batch ثم file يطابق إنشاء hold، فيمنع hold/purge المتزامنين من تجاوز planner.
+            $batch = DocumentBatch::query()->whereKey($candidate->document_batch_id)->lockForUpdate()->first();
             $file = DocumentFile::query()->whereKey($candidate->id)->lockForUpdate()->first();
-            if ($file === null) {
+            if ($batch === null || $file === null) {
                 return ['eligible' => false, 'pending' => false, 'purged' => false];
             }
+
             $decision = $this->planner->decide($file, $policy->retention_days, $cutoff);
             if (! $decision['eligible']) {
+                if ($file->purge_pending_at !== null) {
+                    $file->fill(['purge_pending_at' => null])->save();
+                }
                 $this->event($file, $run, $actor, DocumentGovernanceEvent::ACTION_RETENTION_SKIPPED, $decision['reason_code']);
 
                 return ['eligible' => false, 'pending' => false, 'purged' => false];
@@ -125,6 +132,9 @@ final class DocumentRetentionRunner
                 $this->event($file, $run, $actor, DocumentGovernanceEvent::ACTION_RETENTION_DRY_RUN_ELIGIBLE, 'eligible');
 
                 return ['eligible' => true, 'pending' => false, 'purged' => false];
+            }
+            if ($file->purge_pending_at !== null) {
+                return ['eligible' => true, 'pending' => true, 'purged' => false];
             }
 
             $file->fill(['purge_pending_at' => now('UTC')])->save();
@@ -135,13 +145,52 @@ final class DocumentRetentionRunner
     }
 
     /** @return array{eligible:bool,pending:bool,purged:bool} */
-    private function purgePending(string $fileId, DocumentRetentionPolicy $policy, DocumentRetentionRun $run, ?PlatformAdministrator $actor): array
+    private function purgePending(string $fileId, DocumentRetentionPolicy $policy, CarbonImmutable $cutoff, DocumentRetentionRun $run, ?PlatformAdministrator $actor): array
     {
+        // المرحلة الأولى قصيرة وقابلة لإعادة المحاولة: تقفل batch → file، تعيد planner، وتقرأ
+        // claim المحفوظ. لا توجد فيها عملية تخزين خارجية أو أثر غير قابل للـrollback.
+        $claim = DB::transaction(function () use ($fileId, $policy, $cutoff, $run, $actor): array {
+            $candidate = DocumentFile::query()->whereKey($fileId)->first();
+            if ($candidate === null) {
+                return ['action' => 'skip', 'outcome' => ['eligible' => false, 'pending' => false, 'purged' => false]];
+            }
+            $batch = DocumentBatch::query()->whereKey($candidate->document_batch_id)->lockForUpdate()->first();
+            $file = DocumentFile::query()->whereKey($fileId)->lockForUpdate()->first();
+            if ($batch === null || $file === null) {
+                return ['action' => 'skip', 'outcome' => ['eligible' => false, 'pending' => false, 'purged' => false]];
+            }
+            if ($file->purged_at !== null) {
+                return ['action' => 'skip', 'outcome' => ['eligible' => true, 'pending' => false, 'purged' => true]];
+            }
+
+            $decision = $this->planner->decide($file, $policy->retention_days, $cutoff);
+            if (! $decision['eligible']) {
+                $file->fill(['purge_pending_at' => null])->save();
+                $this->event($file, $run, $actor, DocumentGovernanceEvent::ACTION_RETENTION_SKIPPED, $decision['reason_code']);
+
+                return ['action' => 'skip', 'outcome' => ['eligible' => false, 'pending' => false, 'purged' => false]];
+            }
+            if ($file->purge_pending_at === null) {
+                return ['action' => 'skip', 'outcome' => ['eligible' => false, 'pending' => false, 'purged' => false]];
+            }
+
+            return [
+                'action' => 'delete',
+                'storage_profile' => $file->storage_profile,
+                'object_key' => $file->object_key,
+            ];
+        }, 3);
+
+        if ($claim['action'] === 'skip') {
+            return $claim['outcome'];
+        }
+
+        // لا نحتفظ بقفل DB أثناء I/O. يبقى claim durable، ورفض إنشاء hold جديد أثناءه يحمي
+        // القرار من السباق حتى يكتمل finalize أو تسترده المصالحة التالية.
         try {
-            $file = DocumentFile::query()->whereKey($fileId)->firstOrFail();
-            $objectWasPresent = $this->storage->exists($file->storage_profile, $file->object_key);
+            $objectWasPresent = $this->storage->exists($claim['storage_profile'], $claim['object_key']);
             if ($objectWasPresent) {
-                $this->storage->delete($file->storage_profile, $file->object_key);
+                $this->storage->delete($claim['storage_profile'], $claim['object_key']);
             }
         } catch (\Throwable) {
             $this->recordStorageFailure($fileId, $run, $actor);
@@ -149,11 +198,25 @@ final class DocumentRetentionRunner
             return ['eligible' => true, 'pending' => true, 'purged' => false];
         }
 
+        // المرحلة النهائية قابلة لإعادة المحاولة لأنها لا تعيد أثر التخزين. إن فشلت DB بعد
+        // نجاح الحذف يبقى claim، ويصالح التنفيذ التالي object الغائب دون حذف ثانٍ.
         return DB::transaction(function () use ($fileId, $policy, $run, $actor, $objectWasPresent): array {
-            $file = DocumentFile::query()->whereKey($fileId)->lockForUpdate()->first();
-            if ($file === null || $file->purged_at !== null) {
-                return ['eligible' => true, 'pending' => false, 'purged' => $file?->purged_at !== null];
+            $candidate = DocumentFile::query()->whereKey($fileId)->first();
+            if ($candidate === null) {
+                return ['eligible' => false, 'pending' => false, 'purged' => false];
             }
+            $batch = DocumentBatch::query()->whereKey($candidate->document_batch_id)->lockForUpdate()->first();
+            $file = DocumentFile::query()->whereKey($fileId)->lockForUpdate()->first();
+            if ($batch === null || $file === null) {
+                return ['eligible' => false, 'pending' => false, 'purged' => false];
+            }
+            if ($file->purged_at !== null) {
+                return ['eligible' => true, 'pending' => false, 'purged' => true];
+            }
+            if ($file->purge_pending_at === null) {
+                return ['eligible' => false, 'pending' => false, 'purged' => false];
+            }
+
             $reason = $objectWasPresent ? 'eligible' : 'object_missing_reconciled';
             $file->fill([
                 'purged_at' => now('UTC'),
@@ -170,8 +233,13 @@ final class DocumentRetentionRunner
     private function recordStorageFailure(string $fileId, DocumentRetentionRun $run, ?PlatformAdministrator $actor): void
     {
         DB::transaction(function () use ($fileId, $run, $actor): void {
+            $candidate = DocumentFile::query()->whereKey($fileId)->first();
+            if ($candidate === null) {
+                return;
+            }
+            $batch = DocumentBatch::query()->whereKey($candidate->document_batch_id)->lockForUpdate()->first();
             $file = DocumentFile::query()->whereKey($fileId)->lockForUpdate()->first();
-            if ($file === null || $file->purged_at !== null) {
+            if ($batch === null || $file === null || $file->purged_at !== null) {
                 return;
             }
             $this->event($file, $run, $actor, DocumentGovernanceEvent::ACTION_PURGE_STORAGE_FAILED, 'storage_delete_failed');

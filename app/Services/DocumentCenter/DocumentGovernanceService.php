@@ -3,22 +3,43 @@
 namespace App\Services\DocumentCenter;
 
 use App\Models\DocumentBatch;
+use App\Models\DocumentFile;
 use App\Models\DocumentGovernanceEvent;
 use App\Models\DocumentRedactionOverlay;
 use App\Models\DocumentRetentionHold;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class DocumentGovernanceService
 {
     public function createHold(?DocumentBatch $batch, ?string $fileId, string $reasonCode, ?User $actor): DocumentRetentionHold
     {
         return DB::transaction(function () use ($batch, $fileId, $reasonCode, $actor): DocumentRetentionHold {
+            $file = $fileId === null ? null : DocumentFile::query()->whereKey($fileId)->firstOrFail();
+            $batchId = $batch?->id ?? $file?->document_batch_id;
+            $lockedBatch = DocumentBatch::query()->whereKey($batchId)->lockForUpdate()->firstOrFail();
+            $lockedFile = $file === null ? null : DocumentFile::query()->whereKey($file->id)->lockForUpdate()->firstOrFail();
+            if ($batch !== null && $batch->id !== $lockedBatch->id) {
+                throw ValidationException::withMessages(['document_batch_id' => 'الحزمة لم تعد متاحة في النطاق الحالي.']);
+            }
+            if ($lockedFile !== null && $lockedFile->document_batch_id !== $lockedBatch->id) {
+                throw ValidationException::withMessages(['file_id' => 'الملف لا ينتمي إلى الحزمة المحددة.']);
+            }
+            $purgePending = $lockedFile?->purge_pending_at !== null
+                || ($lockedFile === null && DocumentFile::query()
+                    ->where('document_batch_id', $lockedBatch->id)
+                    ->whereNotNull('purge_pending_at')
+                    ->exists());
+            if ($purgePending) {
+                throw ValidationException::withMessages(['file_id' => 'الحذف المحكوم قيد الاستكمال؛ أعد محاولة إنشاء الحجز بعد المصالحة.']);
+            }
+
             $query = DocumentRetentionHold::query()->active()->where('reason_code', $reasonCode);
-            if ($fileId !== null) {
-                $query->where('document_file_id', $fileId);
-            } elseif ($batch !== null) {
-                $query->where('document_batch_id', $batch->id);
+            if ($lockedFile !== null) {
+                $query->where('document_file_id', $lockedFile->id);
+            } else {
+                $query->where('document_batch_id', $lockedBatch->id);
             }
             $existing = $query->first();
             if ($existing !== null) {
@@ -26,14 +47,14 @@ final class DocumentGovernanceService
             }
 
             $hold = DocumentRetentionHold::create([
-                'document_batch_id' => $batch?->id,
-                'document_file_id' => $fileId,
+                'document_batch_id' => $lockedBatch->id,
+                'document_file_id' => $lockedFile?->id,
                 'reason_code' => $reasonCode,
                 'created_by' => $actor?->id,
             ]);
             DocumentGovernanceEvent::create([
-                'document_batch_id' => $batch?->id,
-                'document_file_id' => $fileId,
+                'document_batch_id' => $lockedBatch->id,
+                'document_file_id' => $lockedFile?->id,
                 'document_retention_hold_id' => $hold->id,
                 'action' => DocumentGovernanceEvent::ACTION_HOLD_CREATED,
                 'reason_code' => $reasonCode,

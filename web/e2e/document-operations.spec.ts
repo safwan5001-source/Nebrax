@@ -27,6 +27,7 @@ test('renders tenant usage and governance as evidence-only surfaces', async ({ p
 test('renders separately scoped platform document operations', async ({ page }) => {
   await page.goto('/platform/document-operations');
   await expect(page.getByRole('heading', { name: /Document Center operations — platform|عمليات مركز المستندات — المنصة/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Back|رجوع|العودة إلى المنصة/ })).toHaveAttribute('href', '/platform');
   await expect(page.getByText(/Worker offline|العامل غير متصل/)).toBeVisible();
   await expect(page.getByText(/Provider network is locked|شبكة المزود مقفلة/).first()).toBeVisible();
   await expect(page.getByText(/Resume cursor|مؤشر الاستئناف/).first()).toBeVisible();

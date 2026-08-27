@@ -9,6 +9,7 @@ use App\Models\DocumentFile;
 use App\Models\DocumentGovernanceEvent;
 use App\Models\DocumentProcessingRun;
 use App\Models\DocumentProviderAttempt;
+use App\Models\DocumentRetentionHold;
 use App\Models\DocumentRetentionPolicy;
 use App\Models\DocumentReviewAction;
 use App\Models\PlatformAdministrator;
@@ -281,10 +282,120 @@ class DocumentOperationsGovernanceTest extends TestCase
     }
 
     /** @test */
+    public function retention_database_finalization_failure_preserves_pending_without_retrying_the_storage_effect(): void
+    {
+        $auth = $this->authorizedTenant('retention-finalization-failure');
+        [$batch, $file] = $this->batchWithFile($auth['token']);
+        $this->archiveForRetention($batch, $file, true);
+        $policy = DocumentRetentionPolicy::create(['policy_key' => DocumentRetentionPolicy::DEFAULT_KEY, 'retention_days' => 365, 'enabled' => true, 'purge_mode' => 'manual_governed']);
+        $storage = \Mockery::mock(DocumentStorageService::class);
+        $storage->shouldReceive('exists')->once()->andReturnTrue();
+        $storage->shouldReceive('delete')->once()->andReturnNull();
+
+        DB::unprepared(<<<'SQL'
+            CREATE TRIGGER document_files_abort_purge_finalization
+            BEFORE UPDATE OF purged_at ON document_files
+            WHEN NEW.purged_at IS NOT NULL
+            BEGIN
+                SELECT RAISE(ABORT, 'simulated purge finalization database failure');
+            END;
+        SQL);
+
+        try {
+            app(DocumentRetentionRunner::class, [
+                'planner' => app(DocumentRetentionPlanner::class),
+                'storage' => $storage,
+            ])->run($policy, false, now('UTC')->toImmutable(), 100);
+            $this->fail('Expected the simulated finalization failure to escape for safe recovery.');
+        } catch (\Throwable $exception) {
+            $this->assertStringContainsString('simulated purge finalization database failure', $exception->getMessage());
+        } finally {
+            DB::unprepared('DROP TRIGGER IF EXISTS document_files_abort_purge_finalization');
+        }
+
+        $this->assertNull($file->fresh()->purged_at);
+        $this->assertNotNull($file->fresh()->purge_pending_at);
+        $this->assertDatabaseHas('document_governance_events', ['document_file_id' => $file->id, 'action' => DocumentGovernanceEvent::ACTION_PURGE_PENDING]);
+        $this->assertDatabaseMissing('document_governance_events', ['document_file_id' => $file->id, 'action' => DocumentGovernanceEvent::ACTION_PURGED]);
+        $this->assertDatabaseMissing('document_governance_events', ['document_file_id' => $file->id, 'action' => DocumentGovernanceEvent::ACTION_PURGE_STORAGE_FAILED]);
+        $this->assertDatabaseCount('journal_entries', 0);
+    }
+
+    /** @test */
     public function retention_cutoff_keeps_an_iso_timestamp_exact_and_expands_a_date_only_value(): void
     {
         $this->assertSame('2026-08-27T10:00:00+00:00', DocumentRetentionRunner::cutoff('2026-08-27T10:00:00+00:00')->toIso8601String());
         $this->assertSame('2026-08-27T23:59:59+00:00', DocumentRetentionRunner::cutoff('2026-08-27')->toIso8601String());
+    }
+
+    /** @test */
+    public function a_hold_cannot_pair_a_batch_with_a_file_from_another_batch(): void
+    {
+        $auth = $this->authorizedTenant('hold-batch-file-integrity');
+        [$batch] = $this->batchWithFile($auth['token']);
+        [, $otherFile] = $this->batchWithFile(
+            $auth['token'],
+            'retention-other.png',
+            base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAQAAAB0L9bPAAAADUlEQVR42mP8z8BQDwAFgQH/q842WQAAAABJRU5ErkJggg==', true),
+        );
+
+        $this->withToken($auth['token'])->postJson('/api/document-retention-holds', [
+            'document_batch_id' => $batch->id,
+            'file_id' => $otherFile->id,
+            'reason_code' => 'legal_review',
+        ])->assertUnprocessable()->assertJsonValidationErrors('file_id');
+
+        $this->assertDatabaseCount('document_retention_holds', 0);
+        $this->assertDatabaseCount('document_governance_events', 0);
+        $this->assertDatabaseCount('journal_entries', 0);
+    }
+
+    /** @test */
+    public function a_new_file_or_batch_hold_is_rejected_while_a_purge_claim_is_pending(): void
+    {
+        $auth = $this->authorizedTenant('retention-pending-hold-rejected');
+        [$batch, $file] = $this->batchWithFile($auth['token']);
+        $this->archiveForRetention($batch, $file, true);
+        $file->fill(['purge_pending_at' => now('UTC')])->save();
+
+        $this->withToken($auth['token'])->postJson('/api/document-retention-holds', [
+            'document_batch_id' => $batch->id,
+            'file_id' => $file->id,
+            'reason_code' => 'legal_review',
+        ])->assertUnprocessable()->assertJsonValidationErrors('file_id');
+        $this->withToken($auth['token'])->postJson('/api/document-retention-holds', [
+            'document_batch_id' => $batch->id,
+            'reason_code' => 'legal_review',
+        ])->assertUnprocessable()->assertJsonValidationErrors('file_id');
+
+        $this->assertDatabaseCount('document_retention_holds', 0);
+        $this->assertDatabaseCount('journal_entries', 0);
+    }
+
+    /** @test */
+    public function an_active_hold_clears_a_recovered_purge_pending_state_without_storage_access(): void
+    {
+        $auth = $this->authorizedTenant('retention-pending-hold');
+        [$batch, $file] = $this->batchWithFile($auth['token']);
+        $this->archiveForRetention($batch, $file, true);
+        $file->fill(['purge_pending_at' => now('UTC')])->save();
+        DocumentRetentionHold::create([
+            'document_batch_id' => $batch->id,
+            'reason_code' => 'legal_review',
+        ]);
+        $policy = DocumentRetentionPolicy::create(['policy_key' => DocumentRetentionPolicy::DEFAULT_KEY, 'retention_days' => 365, 'enabled' => true, 'purge_mode' => 'manual_governed']);
+        $storage = \Mockery::mock(DocumentStorageService::class);
+        $storage->shouldReceive('exists')->never();
+        $storage->shouldReceive('delete')->never();
+
+        $result = (new DocumentRetentionRunner(app(DocumentRetentionPlanner::class), $storage))->run($policy, false, now('UTC')->toImmutable(), 100);
+
+        $this->assertSame(0, $result['results']['purged']);
+        $this->assertSame(1, $result['results']['skipped']);
+        $this->assertNull($file->fresh()->purge_pending_at);
+        $this->assertNull($file->fresh()->purged_at);
+        $this->assertDatabaseHas('document_governance_events', ['document_file_id' => $file->id, 'action' => DocumentGovernanceEvent::ACTION_RETENTION_SKIPPED, 'reason_code' => 'active_hold']);
+        $this->assertDatabaseCount('journal_entries', 0);
     }
 
     /** @test */
@@ -381,11 +492,11 @@ class DocumentOperationsGovernanceTest extends TestCase
     }
 
     /** @return array{0:DocumentBatch,1:DocumentFile} */
-    private function batchWithFile(string $token): array
+    private function batchWithFile(string $token, string $name = 'retention.png', ?string $contents = null): array
     {
         $batch = $this->withToken($token)->postJson('/api/document-batches', ['document_type' => 'purchase_invoice'])->assertCreated()->json('data');
         $this->withToken($token)->post("/api/document-batches/{$batch['id']}/files", [
-            'file' => UploadedFile::fake()->createWithContent('retention.png', $this->png),
+            'file' => UploadedFile::fake()->createWithContent($name, $contents ?? $this->png),
         ], ['Accept' => 'application/json'])->assertCreated();
 
         return [DocumentBatch::findOrFail($batch['id']), DocumentFile::query()->where('document_batch_id', $batch['id'])->firstOrFail()];

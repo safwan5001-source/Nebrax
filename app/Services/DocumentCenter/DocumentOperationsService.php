@@ -33,6 +33,7 @@ final class DocumentOperationsService
         $ids = collect($batches->items())->pluck('id')->all();
         $runsByBatch = DocumentProcessingRun::query()->whereIn('document_batch_id', $ids)->get()->groupBy('document_batch_id');
         $retention = $this->retention->effective();
+        $extractionReady = $this->extractionReady();
 
         return [
             'summary' => [
@@ -45,7 +46,7 @@ final class DocumentOperationsService
                 'purged_files' => DB::table('document_files')->where('branch_id', $branchId)->whereNotNull('purged_at')->count(),
             ],
             'retention' => $this->retentionProjection($retention),
-            'data' => collect($batches->items())->map(function (DocumentBatch $batch) use ($runsByBatch): array {
+            'data' => collect($batches->items())->map(function (DocumentBatch $batch) use ($runsByBatch, $extractionReady): array {
                 $file = $batch->files->sortBy('created_at')->first();
                 $runs = $runsByBatch->get($batch->id, collect());
 
@@ -61,7 +62,7 @@ final class DocumentOperationsService
                         'scan_status' => $file->scan_status->value,
                         'purged_at' => $file->purged_at?->toIso8601String(),
                     ],
-                    'processing_status' => $this->status->project($batch, $file, $runs, $this->extractionReady()),
+                    'processing_status' => $this->status->project($batch, $file, $runs, $extractionReady),
                     'runs' => $runs->map(fn (DocumentProcessingRun $run) => [
                         'id' => $run->id,
                         'stage' => $run->stage,

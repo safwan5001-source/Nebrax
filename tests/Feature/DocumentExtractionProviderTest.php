@@ -10,13 +10,14 @@ use App\Models\DocumentBatch;
 use App\Models\DocumentExtractionResult;
 use App\Models\DocumentProviderAttempt;
 use App\Models\Partner;
-use App\Models\Product;
-use App\Services\DocumentCenter\DocumentMatchingContext;
-use App\Services\DocumentCenter\DocumentMatchingService;
+use App\Models\PlatformAdministrator;
 use App\Models\PlatformIntegrationSetting;
+use App\Models\Product;
 use App\Models\Tenant;
 use App\Services\DocumentCenter\DocumentExtractionService;
 use App\Services\DocumentCenter\DocumentFileScanService;
+use App\Services\DocumentCenter\DocumentMatchingContext;
+use App\Services\DocumentCenter\DocumentMatchingService;
 use App\Services\DocumentCenter\DocumentProcessingService;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\EntitlementGrantService;
@@ -28,7 +29,9 @@ use App\Support\EntitlementSourceType;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -37,8 +40,8 @@ use Tests\TestCase;
 
 class DocumentExtractionProviderTest extends TestCase
 {
-    use RefreshDatabase;
     use InteractsWithApi;
+    use RefreshDatabase;
 
     private string $png;
 
@@ -69,7 +72,7 @@ class DocumentExtractionProviderTest extends TestCase
             ->assertJsonPath('data.integrations.3.configuration.providers.google_gemini.has_api_key', true)
             ->assertJsonMissing(['TOP-SECRET-OPENAI-KEY', 'TOP-SECRET-ANTHROPIC-KEY', 'TOP-SECRET-GEMINI-KEY']);
 
-        $raw = (string) \Illuminate\Support\Facades\DB::table('platform_integration_settings')->where('integration_key', 'document_ai')->value('configuration');
+        $raw = (string) DB::table('platform_integration_settings')->where('integration_key', 'document_ai')->value('configuration');
         $this->assertStringNotContainsString('TOP-SECRET-OPENAI-KEY', $raw);
         $this->assertStringNotContainsString('TOP-SECRET-ANTHROPIC-KEY', $raw);
         $this->assertStringNotContainsString('TOP-SECRET-GEMINI-KEY', $raw);
@@ -86,7 +89,7 @@ class DocumentExtractionProviderTest extends TestCase
         $this->withToken($token)->putJson('/api/platform/integrations/document_ai', $payload)
             ->assertOk()
             ->assertJsonMissingPath('data.integrations.3.configuration.providers.openai.has_api_key');
-        $raw = (string) \Illuminate\Support\Facades\DB::table('platform_integration_settings')->where('integration_key', 'document_ai')->value('configuration');
+        $raw = (string) DB::table('platform_integration_settings')->where('integration_key', 'document_ai')->value('configuration');
         $this->assertStringNotContainsString('OPENAI-KEY-TO-CLEAR', $raw);
     }
 
@@ -103,6 +106,20 @@ class DocumentExtractionProviderTest extends TestCase
         $scanJob->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentStorageService::class), app(DocumentSafetyScanner::class), app(DocumentFileScanService::class), app(PlatformIntegrationResolver::class), app(DocumentExtractionService::class));
 
         Queue::assertNotPushed(ExtractDocumentFile::class);
+        Http::assertNothingSent();
+    }
+
+    /** @test */
+    public function provider_connection_testing_is_network_silent_when_the_code_level_gate_is_locked(): void
+    {
+        config()->set('document_center.ai.provider_network_enabled', false);
+        Http::fake();
+        [, $token] = $this->platformToken(['platform:read', 'platform:manage']);
+
+        $this->withToken($token)->postJson('/api/platform/integrations/document_ai/test', [
+            'provider' => 'openai',
+        ])->assertOk()->assertJsonPath('data.ok', false);
+
         Http::assertNothingSent();
     }
 
@@ -190,7 +207,7 @@ class DocumentExtractionProviderTest extends TestCase
         $this->queuedExtractionJob()->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentExtractionService::class));
 
         $expectedUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent';
-        Http::assertSent(function (\Illuminate\Http\Client\Request $request) use ($geminiKey, $expectedUrl): bool {
+        Http::assertSent(function (Request $request) use ($geminiKey, $expectedUrl): bool {
             return $request->url() === $expectedUrl
                 && $request->hasHeader('x-goog-api-key', $geminiKey)
                 && ! str_contains($request->url(), $geminiKey)
@@ -202,7 +219,7 @@ class DocumentExtractionProviderTest extends TestCase
         $this->assertSame('google_gemini', $result->provider_key);
         $this->assertSame(10000, $result->normalized_payload['fields']['subtotal_minor']);
         $this->assertDatabaseHas('document_provider_usage_events', ['provider_key' => 'google_gemini', 'input_tokens' => 77, 'output_tokens' => 19]);
-        $raw = (string) \Illuminate\Support\Facades\DB::table('platform_integration_settings')->where('integration_key', 'document_ai')->value('configuration');
+        $raw = (string) DB::table('platform_integration_settings')->where('integration_key', 'document_ai')->value('configuration');
         $this->assertStringNotContainsString($geminiKey, $raw);
         $this->assertStringNotContainsString($geminiKey, json_encode($result->normalized_payload, JSON_THROW_ON_ERROR));
     }
@@ -285,7 +302,7 @@ class DocumentExtractionProviderTest extends TestCase
     }
 
     /** @test */
-    public function documentMatchingNormalizedEvidenceIsValidatedIdempotentlyWithoutCreatingBusinessRecords(): void
+    public function document_matching_normalized_evidence_is_validated_idempotently_without_creating_business_records(): void
     {
         $auth = $this->authorizedTenant('matching-validation');
         Partner::create(['type' => 'supplier', 'name' => 'مورد تجريبي', 'vat_number' => '310000000000003', 'is_active' => true]);
@@ -336,17 +353,33 @@ class DocumentExtractionProviderTest extends TestCase
 
     private function bindCleanScanner(): void
     {
-        $this->app->bind(DocumentSafetyScanner::class, fn () => new class implements DocumentSafetyScanner {
-            public function scan($stream): DocumentScanStatus { return DocumentScanStatus::CLEAN; }
-            public function ping(): bool { return true; }
-            public function providerName(): string { return 'test-clean-scanner'; }
+        $this->app->bind(DocumentSafetyScanner::class, fn () => new class implements DocumentSafetyScanner
+        {
+            public function scan($stream): DocumentScanStatus
+            {
+                return DocumentScanStatus::CLEAN;
+            }
+
+            public function ping(): bool
+            {
+                return true;
+            }
+
+            public function providerName(): string
+            {
+                return 'test-clean-scanner';
+            }
         });
     }
 
     private function queuedScanJob(): ScanDocumentFile
     {
         $job = null;
-        Queue::assertPushed(ScanDocumentFile::class, function (ScanDocumentFile $queued) use (&$job): bool { $job = $queued; return true; });
+        Queue::assertPushed(ScanDocumentFile::class, function (ScanDocumentFile $queued) use (&$job): bool {
+            $job = $queued;
+
+            return true;
+        });
 
         return $job;
     }
@@ -354,7 +387,11 @@ class DocumentExtractionProviderTest extends TestCase
     private function queuedExtractionJob(): ExtractDocumentFile
     {
         $job = null;
-        Queue::assertPushed(ExtractDocumentFile::class, function (ExtractDocumentFile $queued) use (&$job): bool { $job = $queued; return true; });
+        Queue::assertPushed(ExtractDocumentFile::class, function (ExtractDocumentFile $queued) use (&$job): bool {
+            $job = $queued;
+
+            return true;
+        });
 
         return $job;
     }
@@ -399,10 +436,10 @@ class DocumentExtractionProviderTest extends TestCase
         return ['enabled' => false, 'provider' => null, 'primary_provider' => null, 'fallback_enabled' => false, 'fallback_providers' => [], 'confidence_threshold_percent' => 0, 'default_language' => 'ar', 'max_files_per_batch' => 10, 'max_pages_per_file' => 100, 'max_file_size_bytes' => 10485760, 'test_mode' => true, 'providers' => ['openai' => $provider($openAiKey, 'gpt-test'), 'anthropic' => $provider($anthropicKey, 'claude-test'), 'google_gemini' => $provider($geminiKey, 'gemini-test')], 'current_password' => 'platform-password-123'];
     }
 
-    /** @return array{\App\Models\PlatformAdministrator,string} */
+    /** @return array{PlatformAdministrator,string} */
     private function platformToken(array $abilities): array
     {
-        $administrator = \App\Models\PlatformAdministrator::create([
+        $administrator = PlatformAdministrator::create([
             'name' => 'مدير تكاملات المنصة',
             'email' => 'pr4-integrations@nebrax.test',
             'password' => 'platform-password-123',
