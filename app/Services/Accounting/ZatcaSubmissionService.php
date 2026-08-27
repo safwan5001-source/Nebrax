@@ -2,8 +2,10 @@
 
 namespace App\Services\Accounting;
 
+use App\Exceptions\ZatcaSubmissionConflict;
 use App\Models\Invoice;
 use App\Models\ZatcaSubmissionAttempt;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -22,56 +24,64 @@ class ZatcaSubmissionService
             throw new RuntimeException('مفتاح Idempotency مطلوب وبحد أقصى 128 حرفاً.');
         }
 
-        return DB::transaction(function () use ($invoice, $key, $requestedBy): array {
-            $locked = Invoice::whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+        $keyHash = hash('sha256', $key);
 
-            if ($locked->status !== 'posted' || ! is_string($locked->zatca_xml) || $locked->zatca_xml === '') {
-                throw new RuntimeException('لا يمكن إرسال الفاتورة قبل ترحيلها وتوليد مستند ZATCA.');
-            }
+        try {
+            return DB::transaction(function () use ($invoice, $keyHash, $requestedBy): array {
+                $locked = Invoice::whereKey($invoice->id)->lockForUpdate()->firstOrFail();
 
-            $submissionType = match ($locked->zatca_document_type) {
-                'standard' => 'clearance',
-                'simplified' => 'reporting',
-                default => throw new RuntimeException('نوع مستند ZATCA غير مثبت على الفاتورة.'),
-            };
-
-            $keyHash = hash('sha256', $key);
-            $sameRequest = ZatcaSubmissionAttempt::where('idempotency_key_hash', $keyHash)->first();
-            if ($sameRequest) {
-                if ($sameRequest->invoice_id !== $locked->id) {
-                    abort(409, 'مفتاح Idempotency مستخدم لطلب آخر.');
+                if ($locked->status !== 'posted' || ! is_string($locked->zatca_xml) || $locked->zatca_xml === '') {
+                    throw new RuntimeException('لا يمكن إرسال الفاتورة قبل ترحيلها وتوليد مستند ZATCA.');
                 }
 
-                return ['attempt' => $sameRequest, 'created' => false];
+                $submissionType = match ($locked->zatca_document_type) {
+                    'standard' => 'clearance',
+                    'simplified' => 'reporting',
+                    default => throw new RuntimeException('نوع مستند ZATCA غير مثبت على الفاتورة.'),
+                };
+
+                $sameRequest = ZatcaSubmissionAttempt::where('idempotency_key_hash', $keyHash)->first();
+                if ($sameRequest) {
+                    return $this->resolveExistingKey($sameRequest, $locked->id);
+                }
+
+                $latest = ZatcaSubmissionAttempt::where('invoice_id', $locked->id)
+                    ->orderByDesc('attempt_number')
+                    ->first();
+
+                if ($latest?->status === 'accepted') {
+                    throw new ZatcaSubmissionConflict('الفاتورة مقبولة لدى ZATCA ولا تحتاج إعادة إرسال.');
+                }
+
+                if ($latest?->status === 'pending') {
+                    throw new ZatcaSubmissionConflict('توجد محاولة إرسال معلقة لهذه الفاتورة.');
+                }
+
+                $attempt = ZatcaSubmissionAttempt::create([
+                    'branch_id' => $locked->branch_id,
+                    'invoice_id' => $locked->id,
+                    'attempt_number' => ($latest?->attempt_number ?? 0) + 1,
+                    'submission_type' => $submissionType,
+                    'source' => 'manual',
+                    'status' => 'pending',
+                    'idempotency_key_hash' => $keyHash,
+                    'request_hash' => hash('sha256', $locked->zatca_xml),
+                    'requested_by' => $requestedBy,
+                    'requested_at' => now(),
+                ]);
+
+                return ['attempt' => $attempt, 'created' => true];
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            // سباق مفتاح واحد بين معاملتين يُحسم بعد rollback من السجل الفائز.
+            // إن لم يكن القيد هو مفتاح Idempotency فلا نخفي خطأ قاعدة آخر.
+            $winner = ZatcaSubmissionAttempt::where('idempotency_key_hash', $keyHash)->first();
+            if (! $winner) {
+                throw $exception;
             }
 
-            $latest = ZatcaSubmissionAttempt::where('invoice_id', $locked->id)
-                ->orderByDesc('attempt_number')
-                ->first();
-
-            if ($latest?->status === 'accepted') {
-                abort(409, 'الفاتورة مقبولة لدى ZATCA ولا تحتاج إعادة إرسال.');
-            }
-
-            if ($latest?->status === 'pending') {
-                abort(409, 'توجد محاولة إرسال معلقة لهذه الفاتورة.');
-            }
-
-            $attempt = ZatcaSubmissionAttempt::create([
-                'branch_id' => $locked->branch_id,
-                'invoice_id' => $locked->id,
-                'attempt_number' => ($latest?->attempt_number ?? 0) + 1,
-                'submission_type' => $submissionType,
-                'source' => 'manual',
-                'status' => 'pending',
-                'idempotency_key_hash' => $keyHash,
-                'request_hash' => hash('sha256', $locked->zatca_xml),
-                'requested_by' => $requestedBy,
-                'requested_at' => now(),
-            ]);
-
-            return ['attempt' => $attempt, 'created' => true];
-        });
+            return $this->resolveExistingKey($winner, $invoice->id);
+        }
     }
 
     /**
@@ -117,5 +127,15 @@ class ZatcaSubmissionService
 
             return $locked->refresh();
         });
+    }
+
+    /** @return array{attempt: ZatcaSubmissionAttempt, created: false} */
+    private function resolveExistingKey(ZatcaSubmissionAttempt $attempt, string $invoiceId): array
+    {
+        if ($attempt->invoice_id !== $invoiceId) {
+            throw new ZatcaSubmissionConflict('مفتاح Idempotency مستخدم لطلب آخر.');
+        }
+
+        return ['attempt' => $attempt, 'created' => false];
     }
 }
