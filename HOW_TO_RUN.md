@@ -6,7 +6,7 @@
 
 ## الطريقة A — تلقائي بأمر واحد (موصى بها)
 
-**المتطلبات:** PHP 8.2+ و Composer مثبتان.
+**المتطلبات:** PHP 8.2+ وComposer وإضافة PHP DOM وحزمة `libxml2-utils` (الأمر `xmllint`).
 
 ```bash
 cd nibras-erp
@@ -40,7 +40,9 @@ docker run --rm nibras-erp
 ## الطريقة C — يدوي (لفهم كل خطوة)
 
 ```bash
-# 1. أنشئ مشروع Laravel
+# 1. تأكد من PHP DOM وxmllint، ثم أنشئ مشروع Laravel
+php -m | grep -i '^dom$'
+xmllint --version
 composer create-project laravel/laravel nibras-app
 cd nibras-app
 composer require laravel/sanctum

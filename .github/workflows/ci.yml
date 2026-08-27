@@ -77,13 +77,13 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, pdo_sqlite, sqlite3, pgsql, pdo_pgsql, bcmath, intl, fileinfo, zip
+          extensions: mbstring, pdo_sqlite, sqlite3, pgsql, pdo_pgsql, bcmath, intl, fileinfo, zip, dom
           coverage: none
 
-      - name: تثبيت فاحص بنية PDF
+      - name: تثبيت محركات PDF وXML
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends poppler-utils
+          sudo apt-get install -y --no-install-recommends poppler-utils libxml2-utils
 
       # Laravel 11 دخل الدعم الأمني فقط، فصارت إصداراته تحمل تنبيهات أمنية
       # يحجبها Composer 2.10+ افتراضياً. نعطّل الحجب في بيئة CI المؤقتة فقط.
