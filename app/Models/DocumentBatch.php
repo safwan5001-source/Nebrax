@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
-use App\Support\DocumentWorkflowStatus;
 use App\Services\DocumentCenter\DocumentReviewMutationGate;
+use App\Support\DocumentWorkflowStatus;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchScoped;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 /** حزمة العمل الأساسية لمركز المستندات؛ بيانات تشغيلية معزولة بالمستأجر والفرع. */
@@ -105,5 +106,10 @@ class DocumentBatch extends BaseModel
     public function transactionLinks(): HasMany
     {
         return $this->hasMany(DocumentTransactionLink::class);
+    }
+
+    public function sourceReceipt(): HasOne
+    {
+        return $this->hasOne(DocumentSourceReceiptRecord::class);
     }
 }

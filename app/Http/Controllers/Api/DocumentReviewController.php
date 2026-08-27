@@ -6,9 +6,9 @@ use App\Contracts\DraftBuildContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignDocumentReviewerRequest;
 use App\Http\Requests\CompleteDocumentReviewRequest;
+use App\Http\Requests\ConfirmDocumentMatchRequest;
 use App\Http\Requests\CreateDocumentExpenseDraftRequest;
 use App\Http\Requests\CreateDocumentPurchaseDraftRequest;
-use App\Http\Requests\ConfirmDocumentMatchRequest;
 use App\Http\Requests\DocumentIssueActionRequest;
 use App\Http\Requests\RejectDocumentMatchRequest;
 use App\Http\Requests\RevalidateDocumentFinancialRequest;
@@ -30,15 +30,14 @@ use App\Services\DocumentCenter\PurchaseDocumentDraftBuilder;
 use App\Services\DocumentCenter\PurchaseDraftBuildOptions;
 use App\Services\DocumentCenter\ReviewedDocumentProjector;
 use App\Support\DocumentScanStatus;
+use App\Support\DocumentSourceChannel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 class DocumentReviewController extends Controller
 {
-    public function __construct(private readonly DocumentReviewService $review)
-    {
-    }
+    public function __construct(private readonly DocumentReviewService $review) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -54,6 +53,15 @@ class DocumentReviewController extends Controller
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->when($request->filled('document_type'), fn ($query) => $query->where('document_type', $request->string('document_type')->toString()))
             ->when($request->filled('source_type'), fn ($query) => $query->where('source_type', $request->string('source_type')->toString()))
+            ->when($request->filled('channel'), function ($query) use ($request): void {
+                $channel = DocumentSourceChannel::tryFrom($request->string('channel')->toString());
+                if ($channel === null) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->whereHas('sourceReceipt', fn ($receipt) => $receipt->where('channel', $channel->value));
+            })
             ->when($request->filled('reviewer_id'), fn ($query) => $query->where('review_assigned_to', $request->string('reviewer_id')->toString()))
             ->when($request->filled('from'), fn ($query) => $query->whereDate('created_at', '>=', $request->string('from')->toString()))
             ->when($request->filled('to'), fn ($query) => $query->whereDate('created_at', '<=', $request->string('to')->toString()))
@@ -69,7 +77,7 @@ class DocumentReviewController extends Controller
                         ->orWhere('source_type', 'like', "%{$term}%");
                 });
             })
-            ->with('reviewer:id,name')
+            ->with(['reviewer:id,name', 'sourceReceipt.identity:id,display_name,external_identity_masked'])
             ->withCount([
                 'files',
                 'issues as blocking_issues_count' => fn ($query) => $query
@@ -87,7 +95,7 @@ class DocumentReviewController extends Controller
 
     public function review(Request $request, DocumentBatch $batch): DocumentReviewResource
     {
-        $batch->load(['files', 'reviewer:id,name', 'transactionLinks.purchase', 'transactionLinks.expense']);
+        $batch->load(['files', 'reviewer:id,name', 'sourceReceipt.identity:id,display_name,external_identity_masked', 'transactionLinks.purchase', 'transactionLinks.expense']);
         $result = $this->resultFor($batch);
         $original = $result->normalized_payload;
         $reviewed = app(ReviewedDocumentProjector::class)->project($result);
