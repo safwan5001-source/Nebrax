@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\Branch;
+use App\Models\JournalEntry;
 use App\Services\Accounting\LedgerService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -55,6 +57,27 @@ class AccountManagementTest extends TestCase
                 'id'        => $account['id'],
                 'parent_id' => $this->expenseGroupId($auth['tenant_id']),
             ]);
+    }
+
+    /** @test */
+    public function owner_can_create_a_custom_root_group_without_an_accounting_entry(): void
+    {
+        $auth = $this->registerTenant();
+
+        $account = $this->withToken($auth['token'])->postJson('/api/accounts', [
+            'code' => '6',
+            'name' => 'تصنيف جذري مخصص',
+            'type' => 'expense',
+            'parent_id' => null,
+            'is_group' => true,
+            'is_active' => true,
+        ])->assertCreated()['data'];
+
+        $this->assertNull($account['parent_id']);
+        $this->assertTrue($account['is_group']);
+        $this->assertSame('debit', $account['normal_balance']);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame(0, JournalEntry::count());
     }
 
     /** @test */
@@ -184,6 +207,129 @@ class AccountManagementTest extends TestCase
             'parent_id' => $this->expenseGroupId($auth['tenant_id']),
             'is_group'  => false,
         ])->assertForbidden();
+    }
+
+    /** @test */
+    public function account_workspace_aggregates_descendants_and_filters_balances_by_branch(): void
+    {
+        $auth = $this->registerTenant();
+        $group = $this->createCustomAccount($auth['token'], $auth['tenant_id'], [
+            'code' => '5190',
+            'name' => 'مجموعة مصروفات الاختبار',
+            'is_group' => true,
+        ]);
+        $child = $this->createCustomAccount($auth['token'], $auth['tenant_id'], [
+            'code' => '519001',
+            'name' => 'مصروف اختبار فرعي',
+            'parent_id' => $group['id'],
+        ]);
+
+        $secondBranch = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع اختبار ثان'])
+            ->assertCreated()['data'];
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $mainBranch = Branch::where('is_main', true)->firstOrFail();
+        $cash = Account::where('code', '1110')->firstOrFail();
+
+        app(LedgerService::class)->post([
+            ['account_id' => $child['id'], 'debit' => 1200],
+            ['account_id' => $cash->id, 'credit' => 1200],
+        ], ['description' => 'حركة فرع رئيسي', 'branch_id' => $mainBranch->id]);
+        app(LedgerService::class)->post([
+            ['account_id' => $child['id'], 'debit' => 3400],
+            ['account_id' => $cash->id, 'credit' => 3400],
+        ], ['description' => 'حركة فرع ثان', 'branch_id' => $secondBranch['id']]);
+
+        $all = $this->withToken($auth['token'])->getJson('/api/accounts/workspace')->assertOk()['data'];
+        $allGroup = collect($all)->firstWhere('id', $group['id']);
+        $this->assertSame('46.00', $allGroup['balance']);
+        $this->assertSame('0.00', $allGroup['direct_balance']);
+        $this->assertSame('46.00', $allGroup['aggregated_balance']);
+        $this->assertSame(1, $allGroup['children_count']);
+
+        $main = $this->withToken($auth['token'])
+            ->getJson("/api/accounts/workspace?branch_id={$mainBranch->id}")
+            ->assertOk()['data'];
+        $mainGroup = collect($main)->firstWhere('id', $group['id']);
+        $this->assertSame('12.00', $mainGroup['balance']);
+
+        $second = $this->withToken($auth['token'])
+            ->getJson("/api/accounts/workspace?branch_id={$secondBranch['id']}")
+            ->assertOk()['data'];
+        $secondGroup = collect($second)->firstWhere('id', $group['id']);
+        $this->assertSame('34.00', $secondGroup['balance']);
+    }
+
+    /** @test */
+    public function code_suggestion_uses_existing_numeric_siblings_and_cross_tenant_parent_is_rejected(): void
+    {
+        $a = $this->registerTenant('acme', 'owner@acme.test');
+        $group = $this->createCustomAccount($a['token'], $a['tenant_id'], [
+            'code' => '5190',
+            'name' => 'مجموعة اقتراح الكود',
+            'is_group' => true,
+        ]);
+        $this->createCustomAccount($a['token'], $a['tenant_id'], [
+            'code' => '519001',
+            'parent_id' => $group['id'],
+        ]);
+        $this->createCustomAccount($a['token'], $a['tenant_id'], [
+            'code' => '519003',
+            'parent_id' => $group['id'],
+        ]);
+
+        $this->withToken($a['token'])
+            ->getJson("/api/accounts/code-suggestion?type=expense&parent_id={$group['id']}")
+            ->assertOk()
+            ->assertJsonPath('data.code', '519004');
+
+        $b = $this->registerTenant('globex', 'owner@globex.test');
+        $this->withToken($b['token'])->postJson('/api/accounts', [
+            'code' => '5190',
+            'name' => 'محاولة أب أجنبي',
+            'type' => 'expense',
+            'parent_id' => $group['id'],
+            'is_group' => false,
+        ])->assertStatus(422);
+    }
+
+    /** @test */
+    public function account_deletion_is_protected_for_children_and_financial_history(): void
+    {
+        $auth = $this->registerTenant();
+        $group = $this->createCustomAccount($auth['token'], $auth['tenant_id'], [
+            'code' => '5190',
+            'name' => 'مجموعة حماية الحذف',
+            'is_group' => true,
+        ]);
+        $child = $this->createCustomAccount($auth['token'], $auth['tenant_id'], [
+            'code' => '519001',
+            'parent_id' => $group['id'],
+        ]);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $groupModel = Account::findOrFail($group['id']);
+        try {
+            $groupModel->delete();
+            $this->fail('يجب منع حذف الحساب الذي لديه أبناء.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('حسابات فرعية', $exception->getMessage());
+        }
+
+        $cash = Account::where('code', '1110')->firstOrFail();
+        app(LedgerService::class)->post([
+            ['account_id' => $child['id'], 'debit' => 500],
+            ['account_id' => $cash->id, 'credit' => 500],
+        ], ['description' => 'حركة لاختبار حماية الحذف']);
+
+        try {
+            Account::findOrFail($child['id'])->delete();
+            $this->fail('يجب منع حذف الحساب ذي الحركات المالية.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('حركات مالية', $exception->getMessage());
+        }
+
+        $this->withToken($auth['token'])->deleteJson("/api/accounts/{$child['id']}")
+            ->assertStatus(405);
     }
 
     /** @test */

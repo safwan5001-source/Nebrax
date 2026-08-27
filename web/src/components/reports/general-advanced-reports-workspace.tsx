@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
 import { Download, Eye, EyeOff, Printer, Share2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +56,7 @@ function appendAccount(query: string, accountId: string): string {
 export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
   const t = useTranslations('reports');
   const g = useTranslations('reports.general');
+  const searchParams = useSearchParams();
   const tPrint = useTranslations('documentPrint');
   const tReport = useTranslations('reportDoc');
   const locale = useLocale();
@@ -67,7 +69,7 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
   const [comparisonFailed, setComparisonFailed] = useState(false);
   const requestGeneration = useRef(0);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [accountId, setAccountId] = useState('');
+  const [accountId, setAccountId] = useState(() => tab === 'ledger' ? searchParams.get('account_id') ?? '' : '');
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
@@ -81,6 +83,14 @@ export function GeneralAdvancedReportsWorkspace({ tab, heading }: Props) {
     if (tab !== 'ledger' || accounts.length > 0) return;
     api<{ data: Account[] }>('/accounts').then((response) => setAccounts(response.data)).catch(() => setAccounts([]));
   }, [accounts.length, tab]);
+
+  // رابط من دليل الحسابات يحمل سياق الحساب فقط؛ مرشحات التقرير تبقى مستقلة
+  // وقابلة للتغيير في مساحة التقرير نفسها.
+  useEffect(() => {
+    if (tab !== 'ledger') return;
+    const requested = searchParams.get('account_id');
+    if (requested) setAccountId(requested);
+  }, [searchParams, tab]);
 
   const cashFlowComparisonScope = useMemo(() => tab === 'cashflow' ? comparisonPeriod(comparisonMode, { from: filters.from, to: filters.to }) : null, [comparisonMode, filters, tab]);
 
