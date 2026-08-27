@@ -160,8 +160,30 @@ demo-unavailable لا يعرض success وهمي** · إبلاغ الفشل · ح
 
 ## J. CI
 
-<!-- CI-RESULT -->
-تُملأ بعد اكتمال الجولة على الفرع؛ لا تُدوَّن نتيجةٌ لم تُقرأ.
+**الوظائف الثلاث لم تُشغَّل — لسببٍ خارج هذا الـPR تماماً.** أعادت GitHub على كل وظيفة
+الرسالة نفسها حرفياً:
+
+> *"The job was not started because recent account payments have failed or your spending
+> limit needs to be increased. Please check the 'Billing & plans' section in your settings."*
+
+هذا **حدّ إنفاق/فوترة على حساب GitHub Actions**، لا فشلٌ في الكود: الوظائف لم تبدأ أصلاً
+(سجلّاتها 404). `Vercel Preview` **نجح** لأنه بنية منفصلة لا تستهلك دقائق Actions.
+
+المطلوب فعلٌ بشريّ لا يملكه هذا الـPR: رفع حدّ الإنفاق أو تسوية الفوترة من
+**Settings → Billing & plans** في GitHub، ثم إعادة تشغيل الوظائف. وهذا الحدّ يصيب **كل**
+فرع (بما فيه `main`)، لا هذا الفرع وحده.
+
+**ما تحقّق محلياً بديلاً** (وهو ما كانت CI ستشغّله):
+
+| الفحص | النتيجة المحلية |
+|---|---|
+| `php artisan test --filter=InventoryBalanceExportTest` | ✅ 17 (86 تأكيداً) |
+| `php artisan test` كاملة (SQLite) | 1527 ناجح · 25 فاشل مطابقة للأساس (Fuel/PDF من امتدادين غائبين محلياً ومثبَّتين في CI) |
+| `npx vitest run` | ✅ 113 ملفاً · 715 اختباراً |
+| `npx tsc --noEmit` · `npm run build` · `git diff --check` | ✅ الثلاثة نظيفة |
+
+> PostgreSQL يبقى مرجعه CI؛ لكن استعلامات هذا الـPR (`whereRaw`، `orderByRaw`،
+> `getCountForPagination`) قياسية ولا تعتمد دوالّ خاصة بمحرّك.
 
 ## K. المراجعة البصرية
 
