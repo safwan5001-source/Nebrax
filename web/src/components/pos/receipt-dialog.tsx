@@ -85,7 +85,7 @@ export function ReceiptDialog({
 
   return (
     <Dialog open={!!receipt} onClose={onClose} title={t('receipt')} className="max-w-xs">
-      <div className="max-h-[60vh] overflow-auto rounded-lg bg-gray-100 p-2 dark:bg-black/30">
+      <div className="max-h-[60vh] overflow-auto rounded-lg bg-background p-2">
         <DocumentScaler>
           <DocumentView
             model={receipt.model}

@@ -50,4 +50,10 @@ describe('مركز إعدادات POS', () => {
     expect(card.getAttribute('href')).toBe('/pos/settings/sound-feedback');
     expect(card.textContent).toContain('Configure barcode scan, alert, and payment sounds, volume, and vibration.');
   });
+
+  it('لا يعرض سطح طباعة مكرراً بعد دمج إعدادات الإيصال في التهيئة الموحدة', () => {
+    render(<PosSettingsPage />);
+
+    expect(screen.queryByRole('link', { name: /Receipts and printing/i })).toBeNull();
+  });
 });
