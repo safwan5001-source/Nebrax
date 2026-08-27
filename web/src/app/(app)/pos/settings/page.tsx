@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import {
+  Archive,
   ChevronLeft,
   Clock3,
   MonitorDown,
@@ -24,6 +25,7 @@ const ITEMS: PosSettingsItem[] = [
   { key: 'sound_feedback', href: '/pos/settings/sound-feedback', icon: Volume2 },
   { key: 'shifts', href: '/pos/sessions', icon: Clock3 },
   { key: 'devices', href: '/pos/settings/devices', icon: TabletSmartphone },
+  { key: 'cash_drawer', href: '/pos/settings/cash-drawer', icon: Archive },
   { key: 'printing', href: '/pos/settings/printing', icon: Printer },
   { key: 'desktop', href: null, icon: MonitorDown },
 ];
