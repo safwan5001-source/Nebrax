@@ -14,7 +14,7 @@ const { api, push, replace, translate } = vi.hoisted(() => {
     invoice_number: 'Invoice number', invoice_date: 'Invoice date', payment_terms: 'Payment terms',
     days: 'days', due_date: 'Due date', zatca_document_type: 'ZATCA document type',
     zatca_standard: 'Standard — Clearance', zatca_simplified: 'Simplified — Reporting',
-    zatca_document_type_hint: 'Saved on the invoice.',
+    zatca_document_type_pending: 'Classified when saved', zatca_document_type_hint: 'Saved on the invoice.',
     lines: 'Lines', items_section: 'Items', add_line: 'Add line', item: 'Item', description: 'Description',
     price: 'Unit price', qty: 'Qty', qty_placeholder: 'Quantity', unit: 'Unit',
     qty_required: 'Every line needs a positive quantity.',
@@ -595,6 +595,24 @@ describe('InvoiceForm — edit mode', () => {
     expect((screen.getByRole('checkbox', { name: /Paid already/ }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText('Payment reference') as HTMLInputElement).value).toBe('CARD-7');
     expect(screen.getByRole('heading', { name: 'Edit invoice' })).toBeTruthy();
+  });
+
+  it('preserves an unclassified legacy draft for backend VAT inference', async () => {
+    const legacyDraft = { ...draft, zatca_document_type: null };
+    respond({ '/invoices/inv-1': { data: legacyDraft } });
+    render(<InvoiceForm editId="inv-1" />);
+
+    await waitFor(async () => expect((await firstQty()).value).toBe('7'));
+    expect((screen.getByLabelText('ZATCA document type') as HTMLSelectElement).value).toBe('');
+
+    const save = screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+    await userEvent.click(save);
+
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices/inv-1', expect.objectContaining({
+      method: 'PUT',
+      body: expect.objectContaining({ zatca_document_type: null }),
+    })));
   });
 
   it('offers no number preview when editing', async () => {
