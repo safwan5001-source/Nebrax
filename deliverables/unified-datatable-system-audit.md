@@ -165,7 +165,7 @@ const columnVisibility = {
 | حزمة Laravel الكاملة | ناجح: 1,687 اختباراً، 10,815 assertion، وتخطي واحد | جرى تجهيز PHP 8.3 وSQLite وBCMath وGD في بيئة الاختبار |
 | بناء Next.js | ناجح في CI | التحويل البرمجي المحلي نجح خلال 43 ثانية ثم أنهت الحاوية العملية بإشارة 143 قبل توليد الصفحات؛ لكن فحصي `Web CI/web build (Next.js)` للـ push وPR نجحا على CI |
 | تدقيق الفروق | ناجح | `git diff --check main...HEAD` بلا أخطاء مسافات |
-| CI البعيد | 6 فحوصات ناجحة | Web CI وفحوصات Laravel على SQLite وPostgreSQL نجحت؛ الملاحظة الوحيدة تحذير Node.js 20 في `actions/checkout`، وهو خارج هذا التغيير |
+| CI البعيد | 5 فحوصات ناجحة | Web CI وفحوصات Laravel على SQLite وPostgreSQL نجحت؛ الملاحظة الوحيدة تحذير Node.js 20 في `actions/checkout`، وهو خارج هذا التغيير |
 
 ## المخاطر وخطة الإطلاق والتراجع
 
