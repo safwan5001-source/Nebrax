@@ -140,6 +140,12 @@ class ZatcaSubmissionAttemptTest extends TestCase
         $attempt = ZatcaSubmissionAttempt::findOrFail($response['data']['id']);
         app(ZatcaSubmissionService::class)->complete($attempt, 'accepted', 200, 'accepted');
 
+        $this->request($invoice, 'accepted-1')
+            ->assertOk()
+            ->assertJsonPath('data.status', 'accepted')
+            ->assertJsonPath('meta.dispatch_status', 'accepted')
+            ->assertJsonPath('meta.created', false);
+
         $this->request($invoice, 'accepted-2')->assertStatus(409);
         $this->assertDatabaseCount('zatca_submission_attempts', 1);
     }
