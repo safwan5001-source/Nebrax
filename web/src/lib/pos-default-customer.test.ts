@@ -13,16 +13,16 @@ describe('resolvePosDefaultCustomer', () => {
     expect(resolved).toEqual({ id: 'customer-1', name: 'شركة العميل المحدد' });
   });
 
-  it('يرجع null عند غياب المعرّف فيعود POS للعميل النقدي الآمن', () => {
-    // لا معرّف مثبت أصلاً.
+  it('يرجع null عند غياب المعرّف فيطلب POS اختيار عميل مسجل قبل التحصيل', () => {
+    // لا معرّف مثبت أصلاً؛ لا تُبنى هوية عميل من الاسم.
     expect(resolvePosDefaultCustomer({ default_customer_id: null, default_customer: WALKIN }, WALKIN)).toBeNull();
     // معرّف فارغ لا يُعامَل كمرجع.
     expect(resolvePosDefaultCustomer({ default_customer_id: '', default_customer: 'اسم' }, WALKIN)).toBeNull();
   });
 
-  it('لا مرجع صالح في الفرع الحالي: الخادم يعيد المعرّف null فيسقط للعميل النقدي', () => {
+  it('لا مرجع صالح في الفرع الحالي: الخادم يعيد المعرّف null فلا يصل ID غير صالح للكاشير', () => {
     // `normalizePosDefaultCustomerForRead` يعيد null لأي مرجع خارج النطاق،
-    // فلا يصل معرّف غير صالح إلى هذه الطبقة — والنتيجة الرجوع النقدي بلا تسريب.
+    // فلا يصل معرّف غير صالح إلى هذه الطبقة ولا يجري إنشاء صامت للعميل.
     expect(resolvePosDefaultCustomer({ default_customer_id: null, default_customer: 'اسم قديم' }, WALKIN)).toBeNull();
   });
 

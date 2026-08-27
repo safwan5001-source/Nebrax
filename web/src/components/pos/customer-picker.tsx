@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Search, UserPlus, User, Check } from 'lucide-react';
+import { Search, UserPlus } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,19 +13,17 @@ export interface PosCustomer { id: string; name: string }
 interface Partner { id: string; name: string; type: string; phone?: string | null }
 
 /**
- * منتقي عميل نقطة البيع: بحث في العملاء الحاليين + إضافة سريعة + خيار «عميل نقدي».
- * `onSelect(null)` يعني الرجوع للعميل الافتراضي (النقدي). مستقلّ عن شاشة البيع.
+ * منتقي عميل نقطة البيع: بحث في العملاء الحاليين وإضافة صريحة عند الحاجة.
+ * يعيد دائماً مرجع عميل حقيقياً إلى الكاشير؛ فلا يخلق تحصيل POS عميلاً ضمنياً.
  */
 export function CustomerPickerDialog({
   open,
-  walkinLabel,
   onClose,
   onSelect,
 }: {
   open: boolean;
-  walkinLabel: string;
   onClose: () => void;
-  onSelect: (customer: PosCustomer | null) => void;
+  onSelect: (customer: PosCustomer) => void;
 }) {
   const t = useTranslations('pos');
   const tc = useTranslations('common');
@@ -101,15 +99,6 @@ export function CustomerPickerDialog({
           </div>
 
           <div className="max-h-72 space-y-1 overflow-y-auto">
-            <button
-              type="button"
-              onClick={() => { onSelect(null); onClose(); }}
-              className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-start text-sm hover:border-primary hover:bg-primary-soft"
-            >
-              <User className="h-4 w-4 text-muted" strokeWidth={1.7} />
-              <span className="flex-1">{walkinLabel}</span>
-              <Check className="h-3.5 w-3.5 text-muted" strokeWidth={2} />
-            </button>
             {filtered.map((p) => (
               <button
                 key={p.id}

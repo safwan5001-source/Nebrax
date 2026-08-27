@@ -12,6 +12,8 @@ APP_DIR="$CORE_DIR/../nibras-app"           # مشروع Laravel الجديد
 echo "▶ 1/6  التحقق من المتطلبات..."
 command -v php      >/dev/null || { echo "✗ PHP غير مثبت. ثبّت PHP 8.2+"; exit 1; }
 command -v composer >/dev/null || { echo "✗ Composer غير مثبت."; exit 1; }
+command -v xmllint  >/dev/null || { echo "✗ xmllint غير مثبت (حزمة libxml2-utils مطلوبة لـ ZATCA C14N 1.1)."; exit 1; }
+php -m | grep -qi '^dom$' || { echo "✗ إضافة PHP DOM غير مفعّلة."; exit 1; }
 PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
 echo "  PHP $PHP_VER ✓"
 
