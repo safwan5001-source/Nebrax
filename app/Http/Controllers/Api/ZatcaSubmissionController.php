@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\ZatcaSubmissionConflict;
 use App\Models\Invoice;
 use App\Models\ZatcaSubmissionAttempt;
 use App\Services\Accounting\ZatcaSubmissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use PDOException;
+use RuntimeException;
 
 class ZatcaSubmissionController extends ApiController
 {
@@ -38,11 +41,19 @@ class ZatcaSubmissionController extends ApiController
             'idempotency_key' => ['required', 'string', 'max:128'],
         ])->validate();
 
-        $result = $this->domain(fn () => $this->submissions->requestManual(
-            $invoice,
-            $validated['idempotency_key'],
-            $request->user()?->id,
-        ));
+        try {
+            $result = $this->submissions->requestManual(
+                $invoice,
+                $validated['idempotency_key'],
+                $request->user()?->id,
+            );
+        } catch (ZatcaSubmissionConflict $exception) {
+            abort(409, $exception->getMessage());
+        } catch (PDOException $exception) {
+            throw $exception;
+        } catch (RuntimeException $exception) {
+            abort(422, $exception->getMessage());
+        }
 
         return response()->json([
             'data' => $this->payload($result['attempt']),
