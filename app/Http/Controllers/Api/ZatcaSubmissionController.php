@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Exceptions\ZatcaSubmissionConflict;
+use App\Support\ZatcaSubmissionConflict;
 use App\Models\Invoice;
 use App\Models\ZatcaSubmissionAttempt;
 use App\Services\Accounting\ZatcaSubmissionService;
