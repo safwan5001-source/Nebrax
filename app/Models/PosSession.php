@@ -23,6 +23,7 @@ class PosSession extends BaseModel
         'expected_balance', 'difference', 'opened_at', 'closed_at', 'notes', 'opened_by', 'closed_by',
         'pos_device_id', 'warehouse_id', 'shift_id',
         'difference_status', 'difference_acknowledged_by', 'difference_acknowledged_at', 'difference_acknowledgement_note',
+        'variance_journal_entry_id',
     ];
 
     protected $casts = [
@@ -93,6 +94,12 @@ class PosSession extends BaseModel
     public function differenceAcknowledgedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'difference_acknowledged_by');
+    }
+
+    /** قيد تسوية فرق الصندوق المثبّت؛ وجوده يعني أن الفرق سُوِّي محاسبياً مرة واحدة. */
+    public function varianceJournalEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntry::class, 'variance_journal_entry_id');
     }
 
     public function isOpen(): bool

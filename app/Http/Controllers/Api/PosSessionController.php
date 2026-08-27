@@ -139,6 +139,15 @@ class PosSessionController extends ApiController
         return (new PosSessionResource($acknowledged->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
     }
 
+    /** يسوّي فرق الصندوق المعتمد في دفتر الأستاذ مرّة واحدة؛ لا يمرّر الكاشير حساباً. */
+    public function settleVariance(Request $request, string $id): JsonResponse
+    {
+        $session = $this->visibleSession($id, $request);
+        $settled = $this->domain(fn () => $this->sessions->settleVariance($session, $request->user()));
+
+        return (new PosSessionResource($settled->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
+    }
+
     /** تقرير الوردية (X/Z): نقد البيع + حركات الدرج + المتوقّع + المطابقة. */
     public function report(Request $request, string $id): JsonResponse
     {
