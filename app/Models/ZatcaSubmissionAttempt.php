@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\BelongsToBranch;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
@@ -11,6 +12,8 @@ use LogicException;
  */
 class ZatcaSubmissionAttempt extends BaseModel
 {
+    use BelongsToBranch;
+
     protected $fillable = [
         'branch_id',
         'invoice_id',
@@ -92,10 +95,5 @@ class ZatcaSubmissionAttempt extends BaseModel
     public function requestedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by');
-    }
-
-    public function branch(): BelongsTo
-    {
-        return $this->belongsTo(Branch::class);
     }
 }
