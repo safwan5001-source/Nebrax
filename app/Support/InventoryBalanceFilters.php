@@ -84,13 +84,15 @@ class InventoryBalanceFilters
             $query->where('unit', $filters['unit']);
         }
 
-        // الكمية تُقارَن كما تقارنها الشاشة (`Number(...)` عشري) لا مبتورةً:
-        // `+ 0` يحوّل «5» إلى 5 و«5.5» إلى 5.5، فلا يختلف حدُّ 5.5 عند الكمية 5.
+        // الكمية عددٌ صحيح دائماً، لكن الشاشة تقارن بـ`Number(...)` العشري.
+        // مطابقتها مع **إبقاء المقارنة صحيحةً** (PostgreSQL يرفض ربط «5.5» بعمود
+        // integer، بخلاف SQLite المتساهل): حدٌّ عشري يكافئ `ceil` عند `>=`
+        // و`floor` عند `<=`. فحدُّ 5.5 يستبعد الكمية 5 (ceil→6) تماماً كالشاشة.
         if (filled($filters['qty_min'] ?? null)) {
-            $query->where('quantity_on_hand', '>=', $filters['qty_min'] + 0);
+            $query->where('quantity_on_hand', '>=', (int) ceil((float) $filters['qty_min']));
         }
         if (filled($filters['qty_max'] ?? null)) {
-            $query->where('quantity_on_hand', '<=', $filters['qty_max'] + 0);
+            $query->where('quantity_on_hand', '<=', (int) floor((float) $filters['qty_max']));
         }
 
         // المدى المالي: قيمة الفلتر بالريال، والمقارنة بالهللات — كما تفعل

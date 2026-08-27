@@ -279,10 +279,15 @@ class InventoryBalanceExportTest extends TestCase
         $this->stockedProduct($auth['tenant_id'], ['sku' => 'FIVE'], 5, 1000);
         $this->stockedProduct($auth['tenant_id'], ['sku' => 'SIX'], 6, 1000);
 
-        $rows = $this->readCsv($this->withToken($auth['token'])
+        // الحدّ الأدنى العشري 5.5 → ceil = 6، فيستبعد الكمية 5 (كالشاشة).
+        $min = $this->readCsv($this->withToken($auth['token'])
             ->get('/api/inventory/export?scope=filtered&format=csv&qty_min=5.5&sort=sku')->assertOk());
+        $this->assertSame(['SIX'], $this->column($min, 'رمز الصنف'), 'حدٌّ أدنى 5.5 يستبعد الكمية 5.');
 
-        $this->assertSame(['SIX'], $this->column($rows, 'رمز الصنف'), 'حدُّ 5.5 يستبعد الكمية 5.');
+        // الحدّ الأعلى العشري 5.5 → floor = 5، فيُبقي الكمية 5 (كالشاشة).
+        $max = $this->readCsv($this->withToken($auth['token'])
+            ->get('/api/inventory/export?scope=filtered&format=csv&qty_max=5.5&sort=sku')->assertOk());
+        $this->assertSame(['FIVE'], $this->column($max, 'رمز الصنف'), 'حدٌّ أعلى 5.5 يُبقي الكمية 5.');
     }
 
     // ═══════════════════════════ الرصيد الصفري ═══════════════════════════
