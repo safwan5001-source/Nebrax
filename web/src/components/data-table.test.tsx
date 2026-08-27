@@ -311,7 +311,7 @@ describe('DataTable row selection', () => {
   });
 
   it('shows the same selection in the table and in the mobile record', () => {
-    renderIntl(
+    const { container } = renderIntl(
       <DataTable
         columns={columns}
         data={sortRows}
@@ -321,9 +321,9 @@ describe('DataTable row selection', () => {
       />
     );
 
-    const checked = screen
-      .getAllByRole('checkbox', { name: nebraxText('ar', 'selectRow') })
-      .filter((box) => (box as HTMLInputElement).checked);
+    const checked = Array.from(
+      container.querySelectorAll<HTMLInputElement>(`input[aria-label="${nebraxText('ar', 'selectRow')}"]`)
+    ).filter((box) => box.checked);
     // صفٌّ واحد محدَّد، ظاهرٌ مرّتين: صفّ الجدول وبطاقة الجوال.
     expect(checked).toHaveLength(2);
   });
