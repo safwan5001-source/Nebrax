@@ -7,6 +7,7 @@ use App\Models\Partner;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
+use App\Services\Accounting\ZatcaInvoiceHasher;
 use App\Services\Accounting\ZatcaService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -101,11 +102,15 @@ class ZatcaPhase2Test extends TestCase
     }
 
     /** @test */
-    public function document_hash_matches_sha256_of_xml(): void
+    public function document_hash_uses_the_official_zatca_c14n11_transform(): void
     {
         $invoice = $this->postInvoice();
 
         $this->assertSame(
+            app(ZatcaInvoiceHasher::class)->hash($invoice->zatca_xml),
+            $invoice->zatca_hash
+        );
+        $this->assertNotSame(
             base64_encode(hash('sha256', $invoice->zatca_xml, true)),
             $invoice->zatca_hash
         );

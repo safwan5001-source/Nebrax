@@ -15,7 +15,7 @@ use RuntimeException;
  * ═══════════════════════════════════════════════════════════════
  *  المرحلة 1 (التوليد): رمز QR بصيغة TLV/Base64 بالحقول الخمسة.
  *  المرحلة 2 (الربط):   UUID + عدّاد ICV + سلسلة الهاش (PIH) + مستند UBL 2.1
- *                       + هاش المستند SHA-256.
+ *                       + هاش SHA-256 بعد تحويل ZATCA الرسمي وC14N 1.1.
  *
  *  المؤجَّل (يتطلب شهادات ZATCA وربطاً حياً): التوقيع التشفيري (secp256k1)،
  *  CSID/CSR، توسعة QR للوسوم 6–9، وإرسال Clearance/Reporting.
@@ -24,6 +24,10 @@ use RuntimeException;
  */
 class ZatcaService
 {
+    public function __construct(private readonly ZatcaInvoiceHasher $invoiceHasher)
+    {
+    }
+
     /**
      * بناء كامل بيانات الفاتورة الإلكترونية عند الترحيل.
      *
@@ -69,7 +73,7 @@ class ZatcaService
         $prev = $last->zatca_hash ?? $this->genesisHash();
 
         $xml  = $this->buildXml($invoice, $tenant, $uuid, $icv, $prev);
-        $hash = base64_encode(hash('sha256', $xml, true));
+        $hash = $this->invoiceHasher->hash($xml);
         $qr   = $this->qrFor($invoice, $tenant);
 
         return compact('uuid', 'icv', 'prev', 'xml', 'hash', 'qr');
