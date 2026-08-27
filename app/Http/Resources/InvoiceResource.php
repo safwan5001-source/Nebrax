@@ -96,7 +96,11 @@ class InvoiceResource extends JsonResource
                 'uuid' => $this->zatca_uuid,
                 'icv'  => $this->zatca_icv,
                 'document_type' => $this->zatca_document_type,
-                'submission_type' => $this->zatca_document_type === 'standard' ? 'clearance' : 'reporting',
+                'submission_type' => match ($this->zatca_document_type) {
+                    'standard' => 'clearance',
+                    'simplified' => 'reporting',
+                    default => null,
+                },
             ],
         ];
     }
