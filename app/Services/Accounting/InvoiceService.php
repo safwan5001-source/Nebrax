@@ -147,6 +147,7 @@ class InvoiceService
             if (! $invoice->isDraft()) {
                 throw new RuntimeException('لا يمكن تعديل فاتورة مرحّلة.');
             }
+            $this->assertDeliveryNoteSourcedDraftMutable($invoice, 'تعديل سطور');
 
             // مسوّدة: لا قيد ولا حركة مخزون، فحذف السطور وإعادة بنائها آمن.
             $invoice->lines()->delete();
@@ -205,6 +206,7 @@ class InvoiceService
     public function duplicate(Invoice $invoice, ?string $createdBy = null): Invoice
     {
         $invoice->loadMissing('lines.costCenterAllocations');
+        $this->assertDeliveryNoteSourcedDraftMutable($invoice, 'نسخ');
         $date = now()->toDateString();
 
         $data = [
@@ -308,9 +310,22 @@ class InvoiceService
             if (! $invoice->isDraft()) {
                 throw new RuntimeException('لا يمكن حذف فاتورة مرحّلة.');
             }
+            $this->assertDeliveryNoteSourcedDraftMutable($invoice, 'حذف');
             $invoice->lines()->delete();
             $invoice->delete();
         });
+    }
+
+    /**
+     * مسودة مبنية من سندات تسليم تحمل روابط تخصيص غير قابلة للتحرير؛ إعادة بناء
+     * السطور أو حذفها أو نسخها كفاتورة بلا روابط ستفك أصل الفوترة أو تسمح بتكرارها.
+     * لا يغيّر هذا الحارس قدرة `post()` على ترحيل المصدر بالطريقة القائمة.
+     */
+    private function assertDeliveryNoteSourcedDraftMutable(Invoice $invoice, string $action): void
+    {
+        if ($invoice->deliveryNoteAllocations()->exists()) {
+            throw new RuntimeException("لا يمكن {$action} مسودة فاتورة مرتبطة بسندات تسليم. استخدم مسار تصحيح موثقاً لاحقاً.");
+        }
     }
 
     /**
@@ -335,12 +350,24 @@ class InvoiceService
             // متوافقة مع السجلات القائمة ولا تُستعمل لحساب المال أو كمية ZATCA الجديدة.
             if ($precision !== null) {
                 $qty = 1;
-                $unitName = $item['unit'] ?? null;
-                if (! is_string($unitName) || trim($unitName) === '') {
+                $requestedUnit = $item['unit'] ?? null;
+                if (! is_string($requestedUnit) || trim($requestedUnit) === '') {
                     throw new RuntimeException('السطر النسبي يحتاج اسم وحدة عرض صريحاً.');
                 }
-                $unitName = trim($unitName);
-                $unitFactor = 1;
+                // السطر النسبي الجديد الذي يملك قالب وحدات يجب أن يحتفظ بعامل
+                // الوحدة الحقيقي؛ افتراض 1 لوحدة بديلة يخفض حد السعر الأدنى.
+                // الفواتير النسبية التاريخية بلا قالب لها عقد أقدم منفصل موضح أدناه.
+                $baseUnit = is_string($product?->unit) ? trim($product->unit) : null;
+                if (! $product?->unitTemplate) {
+                    // فواتير الوقود/ZATCA التاريخية سبقت قوالب الوحدات وتخزن وحدة
+                    // العرض الصريحة (`L` مثلاً) مع كسر الكمية؛ لا يمكن إعادة تفسير
+                    // معامل قديم من دون قالب. هذا التوافق لا يفتح PR-10: الباني
+                    // يتحقق من UnitConversion قبل استدعاء create().
+                    [$resolvedUnit, $unitFactor] = [trim($requestedUnit), 1];
+                } else {
+                    [$resolvedUnit, $unitFactor] = $this->units->resolve($product, trim($requestedUnit));
+                }
+                $unitName = $resolvedUnit ?? $baseUnit ?? trim($requestedUnit);
             } else {
                 $qty = (int) ($item['quantity'] ?? 1);
                 // الوحدة تُحلّ وتُنسَخ على السطر لقطةً — لا تُحوَّل النقود، الكمية وحدها.
@@ -397,6 +424,7 @@ class InvoiceService
                 lineNet: $lineNet,
                 quantity: $qty,
                 unitFactor: $unitFactor,
+                precision: $precision,
                 reason: $item['minimum_price_override_reason'] ?? null,
                 actorId: $data['minimum_price_override_actor_id'] ?? null,
                 tenantId: $invoice->tenant_id,
@@ -490,6 +518,7 @@ class InvoiceService
         int $lineNet,
         int $quantity,
         int $unitFactor,
+        ?array $precision,
         mixed $reason,
         ?string $actorId,
         string $tenantId,
@@ -503,9 +532,23 @@ class InvoiceService
             return [null, null, null];
         }
 
-        $minimumLineNet = $minimum * $quantity * $unitFactor;
-        if ($lineNet >= $minimumLineNet) {
-            return [$minimum, null, null];
+        if ($precision === null) {
+            $minimumLineNet = $minimum * $quantity * $unitFactor;
+            if ($lineNet >= $minimumLineNet) {
+                return [$minimum, null, null];
+            }
+        } else {
+            $numerator = (int) $precision['quantity_numerator'];
+            $denominator = (int) $precision['quantity_denominator'];
+            // lineNet / (numerator × factor / denominator) >= minimum
+            // ⇔ lineNet × denominator >= minimum × numerator × factor.
+            // المقارنة تبقى كاملة الدقة ولا تحوّل الكمية أو المال إلى float.
+            if ($lineNet <= intdiv(PHP_INT_MAX, $denominator)
+                && $numerator <= intdiv(PHP_INT_MAX, max(1, $minimum))
+                && ($minimum * $numerator) <= intdiv(PHP_INT_MAX, max(1, $unitFactor))
+                && ($lineNet * $denominator) >= ($minimum * $numerator * $unitFactor)) {
+                return [$minimum, null, null];
+            }
         }
 
         $reason = is_string($reason) ? trim($reason) : '';

@@ -144,6 +144,7 @@ interface MockDeliveryNote {
   created_by: string | null;
   confirmed_by: string | null;
   cancelled_by: string | null;
+  invoice_draft?: { allocation_id: string; invoice_id: string; number: string | null; status: string | null; line_count: number | null } | null;
 }
 
 /** بيانات fixture محلية فقط؛ لا تمثل سندات حقيقية ولا تتصل بأي API. */
@@ -160,9 +161,34 @@ export const mockDeliveryNotes: MockDeliveryNote[] = [
     id: 'dn-103', branch_id: 'br-1', number: 'DN-2026-00103', status: 'confirmed', version: 2,
     external_reference: null, delivery_date: '2026-08-22', notes: null,
     customer_id: 'p2', warehouse_id: 'wh-1', customer: { id: 'p2', name: 'شركة الواحة للمقاولات', type: 'customer' }, warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' },
-    lines: [{ id: 'dn-103-l1', line_number: 1, product_id: 'pr4', product_name: 'مواد تثبيت صناعية', product_sku: 'SKU-004', product_barcode: null, unit_name: 'box', unit_factor: 12, quantity: 4, quantity_numerator: null, quantity_denominator: null, description: null }],
+    lines: [{ id: 'dn-103-l1', line_number: 1, product_id: 'pr4', product_name: 'حبر طابعة ليزر', product_sku: 'SKU-004', product_barcode: null, unit_name: 'piece', unit_factor: 1, quantity: 4, quantity_numerator: null, quantity_denominator: null, description: null }],
     events: [{ id: 'dn-103-e1', event: 'created', from_status: null, to_status: 'draft', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: { line_count: 1 }, occurred_at: '2026-08-21T09:00:00Z' }, { id: 'dn-103-e2', event: 'confirmed', from_status: 'draft', to_status: 'confirmed', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: null, occurred_at: '2026-08-22T10:10:00Z' }],
     confirmed_at: '2026-08-22T10:10:00Z', cancelled_at: null, cancellation_reason: null, created_by: 'demo-user', confirmed_by: 'demo-user', cancelled_by: null,
+  },
+  {
+    id: 'dn-102', branch_id: 'br-1', number: 'DN-2026-00102', status: 'confirmed', version: 3,
+    external_reference: 'SO-182', delivery_date: '2026-08-21', notes: 'دفعة لاحقة لنفس العميل والمستودع.',
+    customer_id: 'p2', warehouse_id: 'wh-1', customer: { id: 'p2', name: 'شركة الواحة للمقاولات', type: 'customer' }, warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' },
+    lines: [{ id: 'dn-102-l1', line_number: 1, product_id: 'pr4', product_name: 'حبر طابعة ليزر', product_sku: 'SKU-004', product_barcode: null, unit_name: 'piece', unit_factor: 1, quantity: 2, quantity_numerator: null, quantity_denominator: null, description: null }],
+    events: [{ id: 'dn-102-e1', event: 'confirmed', from_status: 'draft', to_status: 'confirmed', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: null, occurred_at: '2026-08-21T11:20:00Z' }],
+    confirmed_at: '2026-08-21T11:20:00Z', cancelled_at: null, cancellation_reason: null, created_by: 'demo-user', confirmed_by: 'demo-user', cancelled_by: null,
+  },
+  {
+    id: 'dn-101', branch_id: 'br-1', number: 'DN-2026-00101', status: 'confirmed', version: 2,
+    external_reference: null, delivery_date: '2026-08-20', notes: 'يستعمل عمداً لعرض خطأ اختلاف العميل.',
+    customer_id: 'p1', warehouse_id: 'wh-1', customer: { id: 'p1', name: 'مؤسسة الخليج للتجارة', type: 'customer' }, warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' },
+    lines: [{ id: 'dn-101-l1', line_number: 1, product_id: 'pr2', product_name: 'جهاز قياس رقمي', product_sku: 'SKU-002', product_barcode: null, unit_name: 'piece', unit_factor: 1, quantity: 1, quantity_numerator: null, quantity_denominator: null, description: null }],
+    events: [{ id: 'dn-101-e1', event: 'confirmed', from_status: 'draft', to_status: 'confirmed', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: null, metadata: null, occurred_at: '2026-08-20T10:00:00Z' }],
+    confirmed_at: '2026-08-20T10:00:00Z', cancelled_at: null, cancellation_reason: null, created_by: 'demo-user', confirmed_by: 'demo-user', cancelled_by: null,
+  },
+  {
+    id: 'dn-100', branch_id: 'br-1', number: 'DN-2026-00100', status: 'confirmed', version: 4,
+    external_reference: null, delivery_date: '2026-08-19', notes: 'عيّنة مرتبطة تمنع إعادة الفوترة.',
+    customer_id: 'p2', warehouse_id: 'wh-1', customer: { id: 'p2', name: 'شركة الواحة للمقاولات', type: 'customer' }, warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' },
+    lines: [{ id: 'dn-100-l1', line_number: 1, product_id: 'pr4', product_name: 'حبر طابعة ليزر', product_sku: 'SKU-004', product_barcode: null, unit_name: 'piece', unit_factor: 1, quantity: 1, quantity_numerator: null, quantity_denominator: null, description: null }],
+    events: [{ id: 'dn-100-e1', event: 'sales_invoice_draft_created', from_status: 'confirmed', to_status: 'confirmed', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: 'عيّنة محلية فقط', metadata: { invoice_number: 'INV-2026-0115' }, occurred_at: '2026-08-20T13:00:00Z' }],
+    confirmed_at: '2026-08-19T10:00:00Z', cancelled_at: null, cancellation_reason: null, created_by: 'demo-user', confirmed_by: 'demo-user', cancelled_by: null,
+    invoice_draft: { allocation_id: 'fixture-allocation-100', invoice_id: 'inv-115', number: 'INV-2026-0115', status: 'draft', line_count: 1 },
   },
 ];
 
@@ -2041,6 +2067,66 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       const suffix = String(mockDeliveryNotes.length + 101).padStart(5, '0');
       return resolve({ data: { key: 'delivery_note', series_key: 'default', number: `DN-2026-${suffix}` } } as T);
     }
+  }
+  // PR-10 fixture فقط: لا يستدعي API حقيقياً ولا يرحّل فاتورة أو يلمس مخزوناً/دفتر أستاذ.
+  if (clean === '/delivery-notes/invoice-draft/preview' && m === 'POST') {
+    const input = (body ?? {}) as { delivery_note_ids?: string[]; price_list_id?: string | null };
+    const ids = [...new Set(input.delivery_note_ids ?? [])].sort();
+    const requestedList = input.price_list_id ? mockPriceLists.find((item) => item.id === input.price_list_id && item.is_active) ?? null : null;
+    const rows = ids.map((id) => {
+      const note = mockDeliveryNotes.find((item) => item.id === id);
+      if (!note) return { id, eligible: false, issues: ['not_available'] };
+      const issues: string[] = [];
+      if (note.status !== 'confirmed') issues.push(note.status === 'cancelled' ? 'cancelled' : 'not_confirmed');
+      if (note.invoice_draft) issues.push('already_invoiced');
+      return {
+        id: note.id, number: note.number, version: note.version, customer_id: note.customer_id, customer_name: note.customer.name,
+        warehouse_id: note.warehouse_id, warehouse_name: note.warehouse.name, delivery_date: note.delivery_date,
+        eligible: issues.length === 0, issues,
+        lines: note.lines.map((line) => {
+          const product = allMockProducts().find((item) => item.id === line.product_id);
+          const listPrice = requestedList ? mockPriceListItems[requestedList.id]?.[`${line.product_id}|${line.unit_name === product?.unit ? '' : line.unit_name}`] ?? null : null;
+          const suggested = listPrice ?? product?.sale_price ?? null;
+          return {
+            id: line.id, line_number: line.line_number, product_id: line.product_id, product_name: line.product_name,
+            unit_name: line.unit_name, unit_factor: line.unit_factor, quantity: line.quantity,
+            quantity_numerator: line.quantity_numerator, quantity_denominator: line.quantity_denominator,
+            suggested_unit_price: suggested === null ? null : Math.round(Number(suggested) * 100),
+            suggested_tax_rate: product?.tax_rate ?? 15, recommended_price_list_id: requestedList?.id ?? null,
+          };
+        }),
+      };
+    });
+    const eligible = rows.filter((row) => row.eligible && 'customer_id' in row);
+    const compatibilityIssues: string[] = [];
+    if (eligible.length === 0) compatibilityIssues.push('no_eligible_delivery_notes');
+    else if (eligible.some((row) => row.customer_id !== eligible[0].customer_id)) compatibilityIssues.push('mixed_customer');
+    else if (eligible.some((row) => row.warehouse_id !== eligible[0].warehouse_id)) compatibilityIssues.push('mixed_warehouse');
+    return resolve({ data: { delivery_notes: rows, compatible: compatibilityIssues.length === 0 && eligible.length === rows.length, compatibility_issues: compatibilityIssues, pricing_required: true, requested_price_list_id: requestedList?.id ?? null } } as T);
+  }
+  if (clean === '/delivery-notes/invoice-draft' && m === 'POST') {
+    const input = (body ?? {}) as { delivery_note_ids?: string[]; idempotency_key?: string; reason?: string; line_pricing?: Array<{ delivery_note_line_id: string; unit_price: number; tax_rate: number; discount: number }> };
+    const ids = [...new Set(input.delivery_note_ids ?? [])].sort();
+    const notes = ids.map((id) => mockDeliveryNotes.find((item) => item.id === id)).filter((note): note is MockDeliveryNote => !!note);
+    if (notes.length !== ids.length || notes.some((note) => note.status !== 'confirmed' || note.invoice_draft) || !input.reason?.trim()) return Promise.reject(new Error('تعذر إنشاء مسودة الفاتورة من الاختيار الحالي.'));
+    if (notes.some((note) => note.customer_id !== notes[0].customer_id)) return Promise.reject(new Error('يجب أن تشترك السندات في العميل نفسه.'));
+    if (notes.some((note) => note.warehouse_id !== notes[0].warehouse_id)) return Promise.reject(new Error('يجب أن تشترك السندات في المستودع نفسه.'));
+    const store = (globalThis as typeof globalThis & { __nebraxDeliveryDraftBuilds?: Record<string, { checksum: string; invoice: { id: string; number: string; status: string } }> }).__nebraxDeliveryDraftBuilds ?? {};
+    (globalThis as typeof globalThis & { __nebraxDeliveryDraftBuilds?: typeof store }).__nebraxDeliveryDraftBuilds = store;
+    const key = input.idempotency_key ?? '';
+    const checksum = JSON.stringify({ ids, reason: input.reason, pricing: input.line_pricing ?? [] });
+    if (key && store[key]) {
+      if (store[key].checksum !== checksum) return Promise.reject(new Error('تم استخدام مفتاح إعادة الطلب مع محتوى مختلف.'));
+      return resolve({ data: store[key].invoice, meta: { idempotent_replay: true } } as T);
+    }
+    const invoice = { id: `fixture-inv-${Date.now()}`, number: `INV-2026-${String(mockInvoices.length + 111).padStart(4, '0')}`, status: 'draft' };
+    if (key) store[key] = { checksum, invoice };
+    const now = new Date().toISOString();
+    notes.forEach((note) => {
+      note.invoice_draft = { allocation_id: `fixture-allocation-${note.id}`, invoice_id: invoice.id, number: invoice.number, status: 'draft', line_count: note.lines.length };
+      note.events.push({ id: `${note.id}-invoice-draft-${Date.now()}`, event: 'sales_invoice_draft_created', from_status: 'confirmed', to_status: 'confirmed', actor_id: 'demo-user', actor_name: 'مستخدم المعاينة', reason: input.reason ?? null, metadata: { invoice_id: invoice.id, invoice_number: invoice.number, fixture_local_only: true }, occurred_at: now });
+    });
+    return resolve({ data: invoice, meta: { idempotent_replay: false } } as T);
   }
   if (clean === '/delivery-notes' && m === 'GET') {
     const params = new URLSearchParams(path.split('?')[1] ?? '');

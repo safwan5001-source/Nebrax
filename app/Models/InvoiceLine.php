@@ -7,6 +7,7 @@ use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 /**
  * سطر فاتورة. المبالغ بالـ minor units (هللات) كـ bigint.
@@ -27,6 +28,20 @@ class InvoiceLine extends BaseModel implements CompanyWide
         'min_sale_price_snapshot', 'min_sale_price_override_reason', 'min_sale_price_overridden_by',
         'line_subtotal', 'line_discount', 'line_tax', 'line_total',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $line): void {
+            if ($line->deliveryNoteLineLinks()->exists()) {
+                throw new LogicException('لا يمكن تعديل سطر فاتورة مرتبط بسند تسليم.');
+            }
+        });
+        static::deleting(function (self $line): void {
+            if ($line->deliveryNoteLineLinks()->exists()) {
+                throw new LogicException('لا يمكن حذف سطر فاتورة مرتبط بسند تسليم.');
+            }
+        });
+    }
 
     protected $casts = [
         'quantity'      => 'integer',
@@ -59,5 +74,11 @@ class InvoiceLine extends BaseModel implements CompanyWide
     public function costCenterAllocations(): HasMany
     {
         return $this->hasMany(InvoiceLineCostCenterAllocation::class);
+    }
+
+    /** روابط مصادر سندات التسليم التي تثبت أن السطر لا يعاد بناؤه بصمت في MVP. */
+    public function deliveryNoteLineLinks(): HasMany
+    {
+        return $this->hasMany(DeliveryNoteLineInvoiceLink::class);
     }
 }
