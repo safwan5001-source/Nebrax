@@ -104,6 +104,7 @@ use App\Http\Controllers\Api\NumberPreviewController;
 use App\Http\Controllers\Api\NumberingSettingsController;
 use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Controllers\Api\ZatcaSettingsController;
+use App\Http\Controllers\Api\ZatcaSubmissionController;
 use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApplicationActive;
@@ -317,6 +318,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         // تقرير المخزون (قراءة فقط — لا أثر محاسبي)
         Route::get('inventory', [InventoryController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        Route::get('inventory/export', [InventoryController::class, 'export'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('inventory/{productId}/movements', [InventoryController::class, 'movements'])->middleware([$perm('products.view'), $app('inventory.core')]);
 
         // إعدادات المخزون (سياسة؛ تُقرأ فعلاً في حارس البيع بلا رصيد)
@@ -422,6 +424,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('invoices/{id}/notes', [InvoiceController::class, 'notes'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}/notes/{noteId}/attachments/{attachmentId}/download', [InvoiceController::class, 'downloadNoteAttachment'])->middleware($perm('invoices.view'));
         Route::get('invoices/{id}/zatca', [InvoiceController::class, 'zatca'])->middleware([$perm('zatca.view'), $app('compliance.zatca')]);
+        Route::get('invoices/{id}/zatca/submissions', [ZatcaSubmissionController::class, 'index'])
+            ->middleware([$perm('zatca.view'), $app('compliance.zatca')]);
+        Route::post('invoices/{id}/zatca/submissions', [ZatcaSubmissionController::class, 'store'])
+            ->middleware([$perm('invoices.manage'), $app('compliance.zatca'), 'throttle:10,1']);
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
         Route::post('invoices/{id}/notes', [InvoiceController::class, 'storeNote'])->middleware($perm('invoices.manage'));
         Route::post('invoices/{id}/duplicate', [InvoiceController::class, 'duplicate'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);

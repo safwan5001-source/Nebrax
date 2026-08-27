@@ -4,13 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { ChevronLeft, ChevronRight, History } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, History } from 'lucide-react';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { DataExplorerToolbar } from '@/components/data-explorer/data-explorer-toolbar';
 import { DataTable } from '@/components/data-table';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { MovementsDialog } from '@/components/inventory/movements-dialog';
+import { InventoryExportDialog } from '@/components/inventory/inventory-export-dialog';
+import type { InventoryExportState } from '@/modules/inventory/export-contract';
 import { api } from '@/lib/api';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
@@ -46,6 +48,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<{ id: string; name: string } | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [explorer, setExplorer] = useState<DataExplorerState>(() => {
     const parsed = parseExplorerState(new URLSearchParams(searchParams.toString()));
     return { ...parsed, perPage: parsed.perPage ?? 25, sort: parsed.sort ?? 'name' };
@@ -152,6 +155,17 @@ export default function InventoryPage() {
     return next;
   }, [explorer.sort, filtered]);
 
+  // حالة التصدير من نفس مرشّحات الشاشة — فما يُصدَّر هو ما يُعرض.
+  const exportState = useMemo<InventoryExportState>(() => ({
+    search: explorer.search,
+    sort: explorer.sort,
+    filters: Object.fromEntries(
+      explorer.filters
+        .filter((filter) => !Array.isArray(filter.value))
+        .map((filter) => [filter.key, String(filter.value)])
+    ),
+  }), [explorer.filters, explorer.search, explorer.sort]);
+
   const perPage = explorer.perPage ?? 25;
   const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
   const page = Math.min(explorer.page ?? 1, totalPages);
@@ -190,9 +204,15 @@ export default function InventoryPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-        <div className="rounded border border-border bg-surface px-4 py-2 text-sm">
-          <span className="text-muted">{t('total_value')}: </span>
-          <span className="num font-semibold text-text">{formatRiyal(totalValue)}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="rounded border border-border bg-surface px-4 py-2 text-sm">
+            <span className="text-muted">{t('total_value')}: </span>
+            <span className="num font-semibold text-text">{formatRiyal(totalValue)}</span>
+          </div>
+          <Button variant="outline" onClick={() => setExportOpen(true)}>
+            <Download className="h-4 w-4" strokeWidth={1.7} />
+            {t('export')}
+          </Button>
         </div>
       </div>
 
@@ -244,6 +264,14 @@ export default function InventoryPage() {
         definitions={definitions}
         filters={labelledFilters}
         onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))}
+      />
+
+      <InventoryExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        state={exportState}
+        filteredCount={sorted.length}
+        totalCount={items.length}
       />
 
       <MovementsDialog product={active} onClose={() => setActive(null)} />

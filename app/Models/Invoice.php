@@ -24,7 +24,7 @@ class Invoice extends BaseModel
 
     protected $fillable = [
         'branch_id', 'warehouse_id', 'price_list_id', 'pos_session_id',
-        'tenant_id', 'number', 'partner_id', 'type', 'payment_type',
+        'tenant_id', 'number', 'partner_id', 'type', 'payment_type', 'zatca_document_type',
         'invoice_date', 'due_date', 'cost_center_id', 'classification_id', 'salesperson_id', 'status',
         'subtotal', 'discount', 'shipping', 'adjustment', 'tax_amount', 'total',
         'tax_inclusive', 'paid_amount', 'payment_status',

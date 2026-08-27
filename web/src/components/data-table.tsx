@@ -312,7 +312,7 @@ export function DataTable<T>({
 
               return (
                 <li key={row.id}>
-                  {selection && rowId != null ? (
+                  {selection && !mobileRecord && rowId != null ? (
                     <div className="flex items-start gap-2">
                       <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center ps-2">
                         <input

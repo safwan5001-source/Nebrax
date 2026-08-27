@@ -35,10 +35,13 @@ describe('صفحة تهيئة POS بعد نقل إعدادات درج النقد
   afterEach(() => { cleanup(); api.mockReset(); success.mockReset(); });
 
   it('لا تعرض عناصر درج النقدية ولا تعيد إرسالها عند حفظ إعدادات التهيئة الأخرى', async () => {
+    // التحميل يجلب أيضاً /partners لمنتقي العميل الافتراضي (PR #515)، فترتيب
+    // النداءات تغيّر ولم يعد الحفظ هو النداء الرابع. نضبط تسلسل التحميل الأول
+    // (وأوّله إعدادات تحمل مفاتيح درج النقدية لنتحقق من تجريدها) ثم افتراضاً آمناً
+    // لإعادة التحميل بعد الحفظ، ونلتقط نداء الـPUT بمطابقته لا بموضعه.
+    api.mockResolvedValue({ data: [] });
     api.mockResolvedValueOnce({ data: settings });
     api.mockResolvedValueOnce({ data: [] });
-    api.mockResolvedValueOnce({ data: [] });
-    api.mockResolvedValueOnce({ data: settings });
     api.mockResolvedValueOnce({ data: [] });
     api.mockResolvedValueOnce({ data: [] });
     render(<PosConfigurationPage />);
@@ -47,8 +50,8 @@ describe('صفحة تهيئة POS بعد نقل إعدادات درج النقد
     expect(screen.queryByText('cash_drawer_contract')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(api).toHaveBeenNthCalledWith(4, '/sales-config/pos', expect.objectContaining({ method: 'PUT' })));
-    const saved = api.mock.calls[3][1].body.data;
+    await waitFor(() => expect(api.mock.calls.some(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')).toBe(true));
+    const saved = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
     expect(saved).not.toHaveProperty('cash_drawer_driver');
     expect(saved).not.toHaveProperty('cash_drawer_enabled');
     expect(saved).not.toHaveProperty('cash_drawer_auto_open_after_cash');

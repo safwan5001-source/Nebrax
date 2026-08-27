@@ -23,6 +23,7 @@ class InvoiceResource extends JsonResource
             'number'         => $this->number,
             'partner_id'     => $this->partner_id,
             'payment_type'   => $this->payment_type,
+            'zatca_document_type' => $this->zatca_document_type,
             'status'         => $this->status,
             'payment_status' => $this->payment_status,
             // «مدفوع بالفعل» وتفاصيله — نيّة السداد كما حُفظت على المسوّدة.
@@ -94,6 +95,12 @@ class InvoiceResource extends JsonResource
                 'hash' => $this->zatca_hash,
                 'uuid' => $this->zatca_uuid,
                 'icv'  => $this->zatca_icv,
+                'document_type' => $this->zatca_document_type,
+                'submission_type' => match ($this->zatca_document_type) {
+                    'standard' => 'clearance',
+                    'simplified' => 'reporting',
+                    default => null,
+                },
             ],
         ];
     }

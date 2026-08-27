@@ -56,7 +56,7 @@ interface ApiLine {
 interface ApiInvoice {
   status: string; partner_id: string; warehouse_id: string | null; price_list_id?: string | null; payment_type: string; invoice_date: string; due_date: string | null;
   cost_center_id: string | null; salesperson_id: string | null; discount: string; shipping: string;
-  adjustment: string; tax_inclusive: boolean; notes: string | null; lines: ApiLine[];
+  adjustment: string; tax_inclusive: boolean; zatca_document_type: 'standard' | 'simplified' | null; notes: string | null; lines: ApiLine[];
   is_paid?: boolean; payment_method?: string | null; payment_reference?: string | null; cash_account_id?: string | null;
 }
 interface TaxDef { name: string; rate: number; inclusive: boolean }
@@ -147,6 +147,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [shippingInput, setShippingInput] = useState('');
   const [adjustmentInput, setAdjustmentInput] = useState('');
   const [taxInclusive, setTaxInclusive] = useState(false);
+  const [zatcaDocumentType, setZatcaDocumentType] = useState<'standard' | 'simplified' | null>('simplified');
   // ═══ السداد الفوري («مدفوع بالفعل») ═══
   // الخانة وحدها تحكم **إرسال** التفاصيل؛ وقيم الحقول تعيش هنا مستقلّةً عنها،
   // فإخفاؤها لا يمسّها ورفعُ الإخفاء يُظهرها كما تُركت (نقطة الاختبار D).
@@ -171,6 +172,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     if (!editId) {
       const partner = availablePartners.find((candidate) => candidate.id === nextPartnerId);
       setPriceListId(partner?.default_price_list?.is_active ? partner.default_price_list.id : '');
+      setZatcaDocumentType(/^\d{15}$/.test(partner?.vat_number ?? '') ? 'standard' : 'simplified');
     }
   }, [editId, partners]);
 
@@ -248,6 +250,9 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         setShippingInput(Number(inv.shipping) > 0 ? inv.shipping : '');
         setAdjustmentInput(Number(inv.adjustment) !== 0 ? inv.adjustment : '');
         setTaxInclusive(!!inv.tax_inclusive);
+        // لا نحوّل المسودات السابقة ذات القيمة null إلى Simplified في الواجهة؛
+        // يبقى القرار غير محسوم كي يطبّق الخادم استدلال VAT الموحّد عند الحفظ.
+        setZatcaDocumentType(inv.zatca_document_type);
         setDiscountMode('amount'); // يُخزَّن الخصم كمبلغ مطلق
         setDiscountInput(Number(inv.discount) > 0 ? inv.discount : '');
         setLines(
@@ -563,7 +568,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       partner_id: partnerId, warehouse_id: warehouseId || null, price_list_id: priceListId || null, invoice_date: date || null, due_date: dueDate || null,
       cost_center_id: centerId || null, salesperson_id: salespersonId || null,
       discount: discountMinor, shipping: shippingMinor, adjustment: adjustmentMinor,
-      tax_inclusive: taxInclusive, notes: notes || null, items,
+      tax_inclusive: taxInclusive, zatca_document_type: zatcaDocumentType, notes: notes || null, items,
       is_paid: isPaid,
       payment_method: isPaid ? payMethod : null,
       payment_reference: isPaid ? payReference || null : null,
@@ -671,6 +676,19 @@ export function InvoiceForm({ editId }: { editId?: string }) {
           <div className="space-y-1.5">
             <Label htmlFor="date">{t('invoice_date')}</Label>
             <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => changeDate(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="zatca-document-type">{t('zatca_document_type')}</Label>
+            <Select
+              id="zatca-document-type"
+              value={zatcaDocumentType ?? ''}
+              onChange={(e) => setZatcaDocumentType(e.target.value as 'standard' | 'simplified')}
+            >
+              <option value="" disabled>{t('zatca_document_type_pending')}</option>
+              <option value="standard">{t('zatca_standard')}</option>
+              <option value="simplified">{t('zatca_simplified')}</option>
+            </Select>
+            <p className="text-xs text-muted">{t('zatca_document_type_hint')}</p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="terms">{t('payment_terms')}</Label>

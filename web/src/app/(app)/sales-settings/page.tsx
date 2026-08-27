@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import {
@@ -16,8 +17,9 @@ import {
   ChevronLeft,
   type LucideIcon,
 } from 'lucide-react';
+import { api } from '@/lib/api';
 
-interface Item { key: string; href: string | null; icon: LucideIcon }
+interface Item { key: string; href: string | null; icon: LucideIcon; appKey?: string }
 interface Group { title: string; items: Item[] }
 
 const GROUPS: Group[] = [
@@ -26,7 +28,7 @@ const GROUPS: Group[] = [
     items: [
       { key: 'c_invoices', href: '/sales-settings/invoices', icon: FileText },
       { key: 'c_statuses', href: '/sales-settings/statuses', icon: ListChecks },
-      { key: 'c_einvoice', href: '/sales-settings/einvoice', icon: QrCode },
+      { key: 'c_einvoice', href: '/sales-settings/einvoice', icon: QrCode, appKey: 'compliance.zatca' },
       { key: 'c_designs', href: '/sales-settings/designs', icon: LayoutTemplate },
       { key: 'c_fields', href: '/sales-settings/fields', icon: ListPlus },
       { key: 'c_pricelists', href: '/sales-settings/pricelists', icon: Tags },
@@ -48,6 +50,23 @@ export default function SalesSettingsHubPage() {
   const t = useTranslations('salesSettings');
   const tn = useTranslations('nav');
 
+  // تخفي الإعدادات التي يحميها تطبيق اختياري حتى يؤكد المصدر الخادمي إتاحتها.
+  // الفشل مغلق لهذه البطاقة وحدها؛ بقية إعدادات المبيعات تبقى قابلة للاستخدام.
+  const [appNavState, setAppNavState] = useState<Record<string, boolean> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api<{ data: Record<string, boolean> }>('/applications/nav-state')
+      .then((response) => {
+        if (!cancelled && !Array.isArray(response.data)) setAppNavState(response.data);
+      })
+      .catch(() => {
+        if (!cancelled) setAppNavState({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -59,7 +78,9 @@ export default function SalesSettingsHubPage() {
         <section key={group.title} className="space-y-3">
           <h2 className="text-sm font-medium text-muted">{t(group.title)}</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {group.items.map((item) => {
+            {group.items
+              .filter((item) => !item.appKey || appNavState?.[item.appKey] === true)
+              .map((item) => {
               const Icon = item.icon;
               const body = (
                 <>

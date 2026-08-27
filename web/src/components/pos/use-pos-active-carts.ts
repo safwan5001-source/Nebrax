@@ -82,6 +82,9 @@ export function usePosActiveCarts({ storageKey, defaultTaxInclusive }: { storage
   const [carts, setCarts] = useState<PosActiveCart[]>([initial]);
   const [activeCartId, setActiveCartId] = useState(initial.id);
   const loadedKeyRef = useRef<string | null>(null);
+  // المفتاح الذي اكتملت استعادته من التخزين المحلي؛ مصدر إشارة `hydrated`
+  // حتى لا يكتب مستهلك (كالعميل الافتراضي) فوق سلة قبل استبدالها بالمستعادة.
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!storageKey || loadedKeyRef.current === storageKey) return;
@@ -96,6 +99,7 @@ export function usePosActiveCarts({ storageKey, defaultTaxInclusive }: { storage
       setActiveCartId(fresh.id);
     }
     loadedKeyRef.current = storageKey;
+    setHydratedKey(storageKey);
   }, [defaultTaxInclusive, storageKey]);
 
   useEffect(() => {
@@ -143,6 +147,8 @@ export function usePosActiveCarts({ storageKey, defaultTaxInclusive }: { storage
     carts,
     activeCart,
     activeCartId,
+    // صحيح فقط بعد أن يستقر التخزين المحلي للمفتاح الحالي (وليس لمفتاح سابق).
+    hydrated: hydratedKey !== null && hydratedKey === storageKey,
     setActiveCartId,
     patchActive,
     updateActiveItems,

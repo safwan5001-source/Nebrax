@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 
 interface PosConfig {
+  default_customer_id: string | null;
   default_customer: string;
   receipt_footer: string;
   print_receipt: boolean;
@@ -47,8 +48,18 @@ interface PaymentMethod {
   is_active: boolean;
   is_default: boolean;
 }
+interface Partner {
+  id: string;
+  code?: string | null;
+  name: string;
+  type: 'customer' | 'supplier' | 'both';
+  phone?: string | null;
+  mobile?: string | null;
+  is_active: boolean;
+}
 
 const DEFAULTS: PosConfig = {
+  default_customer_id: null,
   default_customer: '',
   receipt_footer: '',
   print_receipt: true,
@@ -71,6 +82,7 @@ const DEFAULTS: PosConfig = {
 /** إعدادات تشغيل POS: السياسات ووسائل التحصيل الخادمية في مصدر إعداد واحد. */
 export default function PosSettingsPage() {
   const t = useTranslations('posSettings');
+  const tp = useTranslations('pos');
   const ts = useTranslations('salesSettings');
   const tc = useTranslations('common');
   const router = useRouter();
@@ -78,6 +90,7 @@ export default function PosSettingsPage() {
   const [config, setConfig] = useState<PosConfig | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [customers, setCustomers] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -85,10 +98,11 @@ export default function PosSettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [settings, paymentMethods, productCategories] = await Promise.all([
+      const [settings, paymentMethods, productCategories, partners] = await Promise.all([
         api<{ data: Partial<PosConfig> }>('/sales-config/pos'),
         api<{ data: PaymentMethod[] }>('/payment-methods'),
         api<{ data: ProductCategory[] }>('/product-categories'),
+        api<{ data: Partner[] }>('/partners'),
       ]);
       const configuration = { ...settings.data } as Partial<PosConfig> & Record<string, unknown>;
       delete configuration.cash_drawer_driver;
@@ -97,6 +111,7 @@ export default function PosSettingsPage() {
       setConfig({ ...DEFAULTS, ...configuration });
       setMethods(paymentMethods.data.filter((method) => method.is_active));
       setCategories(productCategories.data.filter((category) => category.is_active));
+      setCustomers(partners.data.filter((partner) => partner.is_active && ['customer', 'both'].includes(partner.type)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('load_failed'));
     } finally {
@@ -105,6 +120,13 @@ export default function PosSettingsPage() {
   }, [t]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const customerOptions = useMemo<ComboOption[]>(() => customers.map((customer) => ({
+    value: customer.id,
+    label: customer.name,
+    sub: [customer.code, customer.phone ?? customer.mobile].filter(Boolean).join(' · ') || undefined,
+    hint: customer.id,
+  })), [customers]);
 
   const enabledMethods = useMemo(() => {
     if (!config || config.payment_methods_mode === 'none') return [];
@@ -133,6 +155,18 @@ export default function PosSettingsPage() {
 
   function patch<K extends keyof PosConfig>(key: K, value: PosConfig[K]) {
     setConfig((current) => current ? { ...current, [key]: value } : current);
+  }
+
+  function setDefaultCustomer(customerId: string) {
+    setConfig((current) => {
+      if (!current) return current;
+      const customer = customers.find((candidate) => candidate.id === customerId);
+      return {
+        ...current,
+        default_customer_id: customer?.id ?? null,
+        default_customer: customer?.name ?? current.default_customer,
+      };
+    });
   }
 
   function toggleCategory(categoryId: string) {
@@ -221,8 +255,19 @@ export default function PosSettingsPage() {
           ) : (
             <form onSubmit={submit} className="space-y-5">
               <div className="space-y-1.5">
-                <Label htmlFor="default_customer">{t('default_customer')}</Label>
-                <Input id="default_customer" value={config.default_customer} onChange={(event) => patch('default_customer', event.target.value)} />
+                <Label htmlFor="default_customer_id">{t('default_customer')}</Label>
+                <Combobox
+                  id="default_customer_id"
+                  value={config.default_customer_id ?? ''}
+                  onChange={setDefaultCustomer}
+                  options={customerOptions}
+                  placeholder={tp('walkin_customer')}
+                  searchPlaceholder={tp('customer_search')}
+                  emptyText={tp('no_customers')}
+                  clearLabel={tp('walkin_customer')}
+                  aria-label={t('default_customer')}
+                />
+                <p className="text-xs leading-relaxed text-muted">{tp('customer_search')}</p>
               </div>
 
               <label className="flex items-center gap-2 text-sm text-text">

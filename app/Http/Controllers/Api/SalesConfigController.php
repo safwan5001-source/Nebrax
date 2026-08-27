@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Partner;
 use App\Models\PaymentMethod;
 use App\Models\ProductCategory;
 use App\Models\Tenant;
@@ -39,7 +40,7 @@ class SalesConfigController extends ApiController
         'einvoice'   => ['enabled' => false, 'phase' => '1', 'vat_number' => ''],
         'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'sections' => [], 'accent_color' => '#2563EB', 'footer_text' => '', 'terms_text' => '', 'bank_text' => '', 'stamp' => '', 'signature' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
-        'pos'        => ['default_customer' => 'عميل نقدي (POS)', 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'payment_methods_mode' => PosSettings::PAYMENT_METHODS_ALL_ACTIVE, 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true, 'cash_drawer_enabled' => false, 'cash_drawer_driver' => PosSettings::CASH_DRAWER_DRIVER_UNAVAILABLE, 'cash_drawer_auto_open_after_cash' => false, 'sound_enabled' => true, 'scan_sound_enabled' => true, 'error_sound_enabled' => true, 'payment_sound_enabled' => true, 'sound_volume' => 60, 'haptics_enabled' => true],
+        'pos'        => ['default_customer_id' => null, 'default_customer' => PosSettings::DEFAULT_WALKIN_CUSTOMER, 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'payment_methods_mode' => PosSettings::PAYMENT_METHODS_ALL_ACTIVE, 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true, 'cash_drawer_enabled' => false, 'cash_drawer_driver' => PosSettings::CASH_DRAWER_DRIVER_UNAVAILABLE, 'cash_drawer_auto_open_after_cash' => false, 'sound_enabled' => true, 'scan_sound_enabled' => true, 'error_sound_enabled' => true, 'payment_sound_enabled' => true, 'sound_volume' => 60, 'haptics_enabled' => true],
     ];
 
     public function show(string $section): JsonResponse
@@ -63,6 +64,8 @@ class SalesConfigController extends ApiController
         if ($section === 'pos') {
             $posInput = $data;
             $request->validate([
+                'data.default_customer_id' => ['nullable', 'uuid'],
+                'data.default_customer' => ['nullable', 'string', 'max:255'],
                 'data.cash_refund_policy' => ['nullable', Rule::in([
                     PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY,
                     PosSettings::CASH_REFUND_ALLOW_ANY_POS_SALE,
@@ -114,6 +117,7 @@ class SalesConfigController extends ApiController
             // نحفظ الكائن كاملاً لا قيمة السياسة وحدها، كي تبقى الاستجابة وشاشة
             // POS والقراءة الخادمية فوق الافتراضات نفسها للمستأجر القديم والجديد.
             $data = array_merge(PosSettings::group($tenant), $data);
+            $this->normalizePosDefaultCustomerForWrite($data, $posInput);
             // قبل هذا العقد كانت القائمة غير الفارغة تعني «المحدد فقط»؛ لا
             // تُحوّل تحديثات العميل القديمة إلى «كل الطرق» عند ترقية الخادم.
             if (array_key_exists('enabled_payment_method_ids', $posInput)
@@ -149,6 +153,72 @@ class SalesConfigController extends ApiController
         $tenant->update(['settings' => $settings]);
 
         return response()->json(['data' => $this->withCompanyLogo($section, $data)]);
+    }
+
+    /**
+     * العميل الافتراضي مرجع موجود فعلاً، لا نص حر. عند مسح الاختيار نعود
+     * للعميل النقدي النظامي. وللتوافق مع عملاء API القديمة نحل الاسم القديم
+     * فقط إن طابق عميلاً واحداً مرئياً؛ لا ننشئ طرفاً من خطأ كتابي.
+     */
+    private function normalizePosDefaultCustomerForWrite(array &$data, array $input): void
+    {
+        if (array_key_exists('default_customer_id', $input)) {
+            $id = $input['default_customer_id'];
+            if ($id === null || $id === '') {
+                $data['default_customer_id'] = null;
+                $data['default_customer'] = PosSettings::DEFAULT_WALKIN_CUSTOMER;
+
+                return;
+            }
+
+            $partner = $this->findEligiblePosCustomer((string) $id);
+            if ($partner === null) {
+                abort(422, 'العميل الافتراضي غير موجود أو معطل أو خارج نطاق الفرع المسموح.');
+            }
+
+            $data['default_customer_id'] = $partner->id;
+            $data['default_customer'] = $partner->name;
+
+            return;
+        }
+
+        if (! array_key_exists('default_customer', $input)) {
+            return;
+        }
+
+        $legacyName = trim((string) ($input['default_customer'] ?? ''));
+        if ($legacyName === '' || $legacyName === PosSettings::DEFAULT_WALKIN_CUSTOMER) {
+            $data['default_customer_id'] = null;
+            $data['default_customer'] = PosSettings::DEFAULT_WALKIN_CUSTOMER;
+
+            return;
+        }
+
+        $matches = Partner::query()
+            ->where('is_active', true)
+            ->whereIn('type', ['customer', 'both'])
+            ->where('name', $legacyName)
+            ->limit(2)
+            ->get();
+        if ($matches->count() !== 1) {
+            $data['default_customer_id'] = null;
+            $data['default_customer'] = PosSettings::DEFAULT_WALKIN_CUSTOMER;
+
+            return;
+        }
+
+        $data['default_customer_id'] = $matches->first()->id;
+        $data['default_customer'] = $matches->first()->name;
+    }
+
+    /** لا يتجاوز بحث الإعداد Tenant/Branch scopes ولا يقبل مورداً فقط. */
+    private function findEligiblePosCustomer(string $id): ?Partner
+    {
+        return Partner::query()
+            ->whereKey($id)
+            ->where('is_active', true)
+            ->whereIn('type', ['customer', 'both'])
+            ->first();
     }
 
     /**
@@ -213,7 +283,7 @@ class SalesConfigController extends ApiController
 
     /**
      * لا تُحفظ قائمة POS إلا من تصنيفات نشطة يراها سياق الفرع/المستأجر الحالي.
- */
+     */
     private function assertPosProductCategories(array $data): void
     {
         $ids = array_values(array_unique($data['product_category_ids'] ?? []));
@@ -262,9 +332,49 @@ class SalesConfigController extends ApiController
         // سياسة POS تُقرأ من خادم واحد أيضاً (`PosSettings`) لأنها تغيّر
         // صلاحية رد النقد الفعلية، لا مجرد تفضيل عرض في شاشة الكاشير.
         if ($section === 'pos') {
-            return PosSettings::group($tenant);
+            return $this->normalizePosDefaultCustomerForRead(PosSettings::group($tenant));
         }
 
         return $stored ?? self::DEFAULTS[$section];
+    }
+
+    /**
+     * يهاجر عقد الاسم القديم في القراءة بلا كتابة صامتة: إن كان الاسم يطابق
+     * عميلاً واحداً مرئياً نعيد معرفه، وإلا نعرض العميل النقدي النظامي. بذلك
+     * لا يستطيع POS إنشاء عميل اعتباطي من نص إعداد قديم أو خطأ مطبعي.
+     */
+    private function normalizePosDefaultCustomerForRead(array $data): array
+    {
+        $id = $data['default_customer_id'] ?? null;
+        if (is_string($id) && $id !== '') {
+            $partner = $this->findEligiblePosCustomer($id);
+            if ($partner !== null) {
+                $data['default_customer_id'] = $partner->id;
+                $data['default_customer'] = $partner->name;
+
+                return $data;
+            }
+        }
+
+        $legacyName = trim((string) ($data['default_customer'] ?? ''));
+        if ($legacyName !== '' && $legacyName !== PosSettings::DEFAULT_WALKIN_CUSTOMER) {
+            $matches = Partner::query()
+                ->where('is_active', true)
+                ->whereIn('type', ['customer', 'both'])
+                ->where('name', $legacyName)
+                ->limit(2)
+                ->get();
+            if ($matches->count() === 1) {
+                $data['default_customer_id'] = $matches->first()->id;
+                $data['default_customer'] = $matches->first()->name;
+
+                return $data;
+            }
+        }
+
+        $data['default_customer_id'] = null;
+        $data['default_customer'] = PosSettings::DEFAULT_WALKIN_CUSTOMER;
+
+        return $data;
     }
 }
