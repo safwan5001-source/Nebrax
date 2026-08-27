@@ -3225,7 +3225,7 @@
     "testing_cash_drawer": "Testing drawer…",
     "last_test": "Last result",
     "last_success": "Last success",
-    "cash_drawer_opened": "The drawer was physically opened through the bridge.",
+    "cash_drawer_opened": "Cash-drawer open command sent successfully.",
     "cash_drawer_test_failed": "The drawer could not be opened. Check the bridge and printer status.",
     "cash_drawer_session_required": "Testing requires an open POS session on this device."
   },

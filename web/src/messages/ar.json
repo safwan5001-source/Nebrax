@@ -3225,7 +3225,7 @@
     "testing_cash_drawer": "جارٍ اختبار الدرج…",
     "last_test": "آخر نتيجة",
     "last_success": "آخر نجاح",
-    "cash_drawer_opened": "فُتح الدرج فعلياً عبر الجسر.",
+    "cash_drawer_opened": "تم إرسال أمر فتح الدرج بنجاح.",
     "cash_drawer_test_failed": "تعذر فتح الدرج. تحقق من حالة الجسر والطابعة.",
     "cash_drawer_session_required": "يتطلب الاختبار جلسة POS مفتوحة على هذا الجهاز."
   },
