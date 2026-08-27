@@ -17,6 +17,7 @@ import { PrintTemplateAssignments } from './print-template-assignments';
 import { PrintTemplateCenter } from './print-template-center';
 import { PrintTemplateLibrary } from './print-template-library';
 import { PrintTemplateCreationWizard, type TemplateCreationSubmission } from './print-template-creation-wizard';
+import { TemplateLanguagePreview } from './template-language-preview';
 import {
   templateStudioValidationIssues,
   type TemplateStudioWorkspace,
@@ -28,11 +29,13 @@ import {
   type TemplateCenterLoadState,
   validateLayoutForDocumentTypes,
 } from '../template-center-state';
+import {
+  normalizeLanguageAwareTemplateDefinition,
+  type LanguageAwareTemplateDefinition,
+} from '../template-definition-language';
 import { BlockPropertiesEditor } from './block-properties-editor';
 import { TemplateRevisionHistory } from './template-revision-history';
 import { ApiError, api } from '@/lib/api';
-import { DocumentScaler } from '@/modules/documents/components/document-scaler';
-import { DocumentView } from '@/modules/documents/components/document-view';
 import { getDocumentPreviewModel } from '@/modules/documents/registry/document-samples';
 import {
   getDefaultDocumentLayout,
@@ -42,13 +45,7 @@ import { listTemplates } from '@/modules/documents/registry/templates';
 import { THEME_IDS } from '@/modules/documents/themes';
 import type { DocSectionKey, DocSectionLayoutItem, DocumentTypeId, ThemeId } from '@/modules/documents/types';
 
-interface TemplateDefinition {
-  template_id?: string;
-  theme_id?: ThemeId;
-  show_logo?: boolean;
-  layout?: DocSectionLayoutItem[];
-  footer_text?: string;
-}
+type TemplateDefinition = LanguageAwareTemplateDefinition;
 
 interface Revision {
   id: string;
@@ -95,15 +92,12 @@ function activeRevision(template: PrintTemplate): Revision {
   return template.draft_revision ?? template.published_revision ?? FALLBACK.draft_revision!;
 }
 
-function normalizeDefinition(revision: Revision, type: DocumentTypeId): Required<TemplateDefinition> {
-  const definition = revision.definition ?? {};
-  return {
-    template_id: definition.template_id ?? 'tax-invoice-classic',
-    theme_id: definition.theme_id ?? 'blue',
-    show_logo: definition.show_logo ?? true,
-    layout: definition.layout ?? getDefaultDocumentLayout(type),
-    footer_text: definition.footer_text ?? '',
-  };
+function normalizeDefinition(
+  revision: Revision,
+  type: DocumentTypeId,
+  fallbackLocale: string,
+): Required<TemplateDefinition> {
+  return normalizeLanguageAwareTemplateDefinition(revision.definition, type, fallbackLocale);
 }
 
 /**
@@ -157,7 +151,10 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   const documentTypes = documentTypesForDraftSave(revision.document_types, selected.document_types);
   const type = resolveActiveDocumentType(documentTypes, activeDocumentType);
   const documentType = getDocumentTypeDefinition(type);
-  const definition = useMemo(() => normalizeDefinition(revision, type), [revision, type]);
+  const definition = useMemo(
+    () => normalizeDefinition(revision, type, locale),
+    [locale, revision, type],
+  );
   const layoutValidation = useMemo(
     () => validateLayoutForDocumentTypes(documentTypes, definition.layout),
     [definition.layout, documentTypes],
@@ -260,6 +257,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
             document_types: [submission.documentType],
             definition: {
               ...FALLBACK.draft_revision!.definition,
+              language_mode: locale === 'en' ? 'en' : 'ar',
               layout: getDefaultDocumentLayout(submission.documentType),
             },
           },
@@ -292,7 +290,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
     setSaving(true);
     try {
       const documentTypes = documentTypesForDraftSave(revision.document_types, template.document_types);
-      const definition = normalizeDefinition(revision, documentType);
+      const definition = normalizeDefinition(revision, documentType, locale);
       const response = await api<{ data: PrintTemplate }>(`/print-templates/${template.id}/draft`, {
         method: 'PUT',
         body: { name: template.name, document_types: documentTypes, definition },
@@ -523,7 +521,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
           <CardContent className="p-4">
             {workspace === 'structure' && <TabPanel id="structure"><section id="template-structure-panel" tabIndex={-1} className="space-y-4 focus:outline-none"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Layers3 className="h-4 w-4 text-primary" aria-hidden="true" /><h2 className="text-base font-semibold text-text">{t('workspace_structure')}</h2></div><p className="mt-1 text-sm text-muted">{t('workspace_structure_hint')}</p></div>{!editorReadOnly && !layoutValidation.valid && <Button variant="ghost" size="sm" onClick={() => patch({}, { layout: getDefaultDocumentLayout(type) })}>{t('restore_default_layout')}</Button>}</div>{validationIssues.filter((issue) => issue.target === 'structure').map((issue, index) => <p key={`${issue.code}-${index}`} role="alert" className="rounded border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-text">{validationLabel(issue)}</p>)}{!editorReadOnly ? <SectionDesigner value={definition.layout} onChange={(layout) => patch({}, { layout })} allowedBlocks={documentType.allowedBlocks} requiredBlocks={documentType.requiredBlocks} /> : <p className="rounded border border-border bg-surface px-3 py-2 text-sm text-muted">{isPublishedOnly ? t('library_published_hint') : t('read_only')}</p>}</section></TabPanel>}
             {workspace === 'properties' && <TabPanel id="properties"><section id="template-properties-panel" tabIndex={-1} className="space-y-5 focus:outline-none"><div><div className="flex items-center gap-2"><Settings2 className="h-4 w-4 text-primary" aria-hidden="true" /><h2 className="text-base font-semibold text-text">{t('workspace_properties')}</h2></div><p className="mt-1 text-sm text-muted">{t('workspace_properties_hint')}</p></div>{validationIssues.filter((issue) => issue.target === 'properties').map((issue, index) => <p key={`${issue.code}-${index}`} role="alert" className="rounded border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-text">{validationLabel(issue)}</p>)}<div className="grid gap-4 lg:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="template-name">{t('template_name')}</Label><Input id="template-name" className="h-11" value={selected.name} disabled={editorReadOnly} onChange={(event) => patch({ name: event.target.value })} /></div><div className="space-y-1.5"><Label htmlFor="document-type">{t('document_type')}</Label><Select id="document-type" className="h-11" value={type} disabled={editorReadOnly} onChange={(event) => setActiveDocumentType(event.target.value as DocumentTypeId)}>{documentTypes.map((id) => <option key={id} value={id}>{tTypes(id)}</option>)}</Select></div><div className="space-y-1.5"><Label htmlFor="template-style">{t('display_style')}</Label><Select id="template-style" className="h-11" value={definition.template_id} disabled={editorReadOnly} onChange={(event) => patch({}, { template_id: event.target.value })}>{templatesCatalog.map((item) => <option key={item.id} value={item.id}>{tTemplates(item.nameKey)}</option>)}</Select></div><div className="space-y-1.5"><Label htmlFor="theme">{t('theme')}</Label><Select id="theme" className="h-11" value={definition.theme_id} disabled={editorReadOnly} onChange={(event) => patch({}, { theme_id: event.target.value as ThemeId })}>{THEME_IDS.map((id) => <option key={id} value={id}>{id}</option>)}</Select></div><div className="space-y-1.5 lg:col-span-2"><Label htmlFor="footer">{t('footer')}</Label><Input id="footer" className="h-11" value={definition.footer_text} disabled={editorReadOnly} onChange={(event) => patch({}, { footer_text: event.target.value })} placeholder={t('footer_placeholder')} /></div></div>{!editorReadOnly && <BlockPropertiesEditor value={definition.layout} onChange={(layout) => patch({}, { layout })} documentType={type} disabled={saving} />}<div className="flex justify-end"><Button variant="outline" onClick={() => setWorkspace('preview')}><Eye className="h-4 w-4" aria-hidden="true" />{t('workspace_view_preview')}</Button></div></section></TabPanel>}
-            {workspace === 'preview' && <TabPanel id="preview"><section className="space-y-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Eye className="h-4 w-4 text-primary" aria-hidden="true" /><h2 className="text-base font-semibold text-text">{t('workspace_preview')}</h2></div><p className="mt-1 text-sm text-muted">{t('preview_hint')}</p></div><Badge tone="neutral">{t('workspace_safe_preview')}</Badge></div><div className="min-h-[620px] rounded-lg border border-border bg-background p-3"><DocumentScaler><DocumentView model={preview} templateId={definition.template_id} themeId={definition.theme_id} showLogo={definition.show_logo} layout={definition.layout} rootId="print-template-preview" /></DocumentScaler></div></section></TabPanel>}
+            {workspace === 'preview' && <TabPanel id="preview"><section className="space-y-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Eye className="h-4 w-4 text-primary" aria-hidden="true" /><h2 className="text-base font-semibold text-text">{t('workspace_preview')}</h2></div><p className="mt-1 text-sm text-muted">{t('preview_hint')}</p></div><Badge tone="neutral">{t('workspace_safe_preview')}</Badge></div><TemplateLanguagePreview model={preview} languageMode={definition.language_mode} templateId={definition.template_id} themeId={definition.theme_id} showLogo={definition.show_logo} layout={definition.layout} readOnly={editorReadOnly} onLanguageChange={(language_mode) => patch({}, { language_mode })} /></section></TabPanel>}
             {workspace === 'governance' && <TabPanel id="governance"><section className="space-y-5"><div><div className="flex items-center gap-2"><GitBranch className="h-4 w-4 text-primary" aria-hidden="true" /><h2 className="text-base font-semibold text-text">{t('workspace_governance')}</h2></div><p className="mt-1 text-sm text-muted">{t('workspace_governance_hint')}</p></div><section id="template-revision-history" tabIndex={-1} className="scroll-mt-4 focus:outline-none"><TemplateRevisionHistory revisions={detailedSelected.revisions} loading={detailsLoading} failed={detailsFailed} /></section><section id="template-assignments" tabIndex={-1} className="scroll-mt-4 focus:outline-none"><PrintTemplateAssignments template={selected} canManage={canManage} /></section></section></TabPanel>}
           </CardContent>
         </Card>

@@ -22,7 +22,7 @@ class CompanyProfile
         'country',
     ];
 
-    /** مفاتيح company القابلة للحفظ والعرض في المستندات. */
+    /** مفاتيح company الموجودة في عقد Settings العام. */
     public const SETTINGS_FIELDS = [
         'logo',
         'phone',
@@ -36,6 +36,17 @@ class CompanyProfile
         'short_address',
     ];
 
+    /**
+     * حقول هوية المستند الموسعة. تحفظ في نفس `settings.company` لكن لا نضيفها
+     * إلى Settings::DEFAULTS حتى لا نوسّع عقد الإعدادات المركزي ضمن هذه المهمة.
+     */
+    public const EXTENDED_SETTINGS_FIELDS = [
+        'name_en',
+        'unified_number',
+        'email',
+        'website',
+    ];
+
     /** يصنع العقد الموحّد الذي تستهلكه القشرة وقوالب المستندات. */
     public static function payload(?Tenant $tenant): ?array
     {
@@ -44,25 +55,32 @@ class CompanyProfile
         }
 
         $company = Settings::group('company', $tenant);
+        $rawCompany = is_array($tenant->settings['company'] ?? null)
+            ? $tenant->settings['company']
+            : [];
 
         return [
             'name'           => $tenant->name,
+            'name_en'        => $rawCompany['name_en'] ?? null,
             'account_number' => $tenant->account_number,
             'support_number' => $tenant->support_number,
             'vat_number'     => $tenant->vat_number,
-            'cr_number'     => $tenant->cr_number,
-            'currency'      => $tenant->currency,
-            'country'       => $tenant->country,
-            'logo'          => $company['logo'],
-            'phone'         => $company['phone'],
-            'mobile'        => $company['mobile'],
-            'building_no'   => $company['building_no'],
-            'street'        => $company['street'],
-            'additional_no' => $company['additional_no'],
-            'district'      => $company['district'],
-            'city'          => $company['city'],
-            'postal_code'   => $company['postal_code'],
-            'short_address' => $company['short_address'],
+            'cr_number'      => $tenant->cr_number,
+            'unified_number' => $rawCompany['unified_number'] ?? null,
+            'currency'       => $tenant->currency,
+            'country'        => $tenant->country,
+            'email'          => $rawCompany['email'] ?? null,
+            'website'        => $rawCompany['website'] ?? null,
+            'logo'           => $company['logo'],
+            'phone'          => $company['phone'],
+            'mobile'         => $company['mobile'],
+            'building_no'    => $company['building_no'],
+            'street'         => $company['street'],
+            'additional_no'  => $company['additional_no'],
+            'district'       => $company['district'],
+            'city'           => $company['city'],
+            'postal_code'    => $company['postal_code'],
+            'short_address'  => $company['short_address'],
         ];
     }
 }

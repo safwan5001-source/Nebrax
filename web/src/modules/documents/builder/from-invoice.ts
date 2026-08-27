@@ -1,5 +1,6 @@
 import { riyalToMinor } from '@/lib/money';
 import type { DocumentModel } from '../types';
+import { buildDocumentSeller } from './company-seller';
 
 /**
  * أشكال المصدر (عقد الـ API للفاتورة) — المبالغ بالريال نصّاً كما يعيدها الـ backend.
@@ -30,12 +31,17 @@ export interface SourceInvoice {
 }
 export interface SourceCompany {
   name: string;
+  name_en?: string | null;
   vat_number?: string | null;
   cr_number?: string | null;
+  unified_number?: string | null;
   /** شعار هوية المنشأة كما يعيده /me؛ يُستخدم عند غياب شعار مخصص لتصميم الفاتورة. */
   logo?: string | null;
   phone?: string | null;
   mobile?: string | null;
+  email?: string | null;
+  website?: string | null;
+  support_number?: string | number | null;
   building_no?: string | null;
   street?: string | null;
   additional_no?: string | null;
@@ -48,25 +54,6 @@ export interface SourceCustomer {
   name: string;
   vat_number?: string | null;
   city?: string | null;
-}
-
-/**
- * يفضّل العنوان الوطني التفصيلي في المستند؛ ويظل العنوان المختصر احتياطاً حين
- * لا تكتمل عناصره. لا يُظهر صف عنوان فارغاً في الفواتير التاريخية.
- */
-function buildNationalAddress(company: SourceCompany | null): string | null {
-  if (!company) return null;
-
-  const parts = [
-    company.building_no?.trim(),
-    company.street?.trim(),
-    company.additional_no?.trim(),
-    company.district?.trim(),
-    company.city?.trim(),
-    company.postal_code?.trim(),
-  ].filter((part): part is string => Boolean(part));
-
-  return parts.length > 0 ? parts.join('، ') : (company.short_address?.trim() || null);
 }
 
 /**
@@ -91,25 +78,13 @@ export function buildInvoiceDocumentModel(input: {
   signatureUrl?: string | null;
 }): DocumentModel {
   const { invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
+  const seller = buildDocumentSeller(company, { logoUrl, logoHeight });
 
   return {
     type: 'tax_invoice',
     currency: 'SAR',
     direction: 'rtl',
-    seller: {
-      name: company?.name ?? '—',
-      vatNumber: company?.vat_number ?? null,
-      crNumber: company?.cr_number ?? null,
-      address: buildNationalAddress(company),
-      phone: company?.phone?.trim() || null,
-      mobile: company?.mobile?.trim() || null,
-      tagline: null,
-      logoText: null,
-      // أولوية الشعار: تصميم الفاتورة المخصص ثم شعار هوية المؤسسة. لا تُظهر علامة
-      // احتياطية ما دام الشعار المرفوع للشركة متوفراً عبر /me.
-      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : (company?.logo ?? null),
-      logoHeight: logoHeight ?? null,
-    },
+    seller,
     buyer: {
       name: customer?.name ?? '—',
       vatNumber: customer?.vat_number ?? null,

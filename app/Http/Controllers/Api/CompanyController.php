@@ -31,6 +31,21 @@ class CompanyController extends ApiController
             $companySettings['logo'] = '';
         }
         Settings::put('company', $companySettings, $tenant);
+
+        // هوية المستند الموسعة تعيش في نفس settings.company، لكن خارج قائمة
+        // DEFAULTS المركزية حتى لا توسّع هذه المهمة عقد الإعدادات العام.
+        $extended = Arr::only($validated, CompanyProfile::EXTENDED_SETTINGS_FIELDS);
+        if ($extended !== []) {
+            $settings = is_array($tenant->settings) ? $tenant->settings : [];
+            $company = is_array($settings['company'] ?? null) ? $settings['company'] : [];
+            foreach ($extended as $key => $value) {
+                $company[$key] = $value ?? '';
+            }
+            $settings['company'] = $company;
+            $tenant->settings = $settings;
+            $tenant->save();
+        }
+
         $tenant->refresh();
 
         return response()->json([

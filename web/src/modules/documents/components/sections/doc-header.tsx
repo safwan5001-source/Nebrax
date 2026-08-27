@@ -5,19 +5,39 @@ import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 
-/** ترويسة المستند: الهوية والعنوان ورقم المستند، باختلاف تركيبي محسوب لكل قالب. */
+type ExtendedSeller = DocumentModel['seller'] & {
+  nameEn?: string | null;
+  unifiedNumber?: string | null;
+};
+
+function clean(value: unknown): string | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized.length ? normalized : null;
+}
+
+/** ترويسة المستند: هوية الشركة القانونية + عنوان المستند ورقمه. */
 export function DocHeader({ model, showLogo = true }: { model: DocumentModel; showLogo?: boolean }) {
   const t = useTranslations('invoiceDoc');
   const tPrint = useTranslations('documentPrint');
   const dt = useTranslations('documentTypes');
   const dtAlt = useTranslations('documentTypesAlt');
   const style = useDocStyle();
-  const { seller, meta } = model;
+  const seller = model.seller as ExtendedSeller;
+  const { meta } = model;
   const numberLabel = model.type === 'tax_invoice' ? t('number') : tPrint('document_number');
   const isRedesignedComposition = style.composition === 'erp' || style.composition === 'modern' || style.composition === 'minimal';
 
+  const legalIdentity = [
+    clean(seller.vatNumber) ? `VAT ${clean(seller.vatNumber)}` : null,
+    clean(seller.crNumber) ? `CR ${clean(seller.crNumber)}` : null,
+    clean(seller.unifiedNumber) ? `Unified ${clean(seller.unifiedNumber)}` : null,
+    clean(seller.address) ?? clean(seller.city),
+  ].filter((value): value is string => Boolean(value));
+
   const identity = (
-    <div className="flex min-w-0 items-center gap-3">
+    <div className="flex min-w-0 items-start gap-3">
       {showLogo &&
         (seller.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- data URL؛ لا يناسبه next/image
@@ -37,6 +57,21 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
         ))}
       <div className="min-w-0">
         <div className="break-words text-lg font-bold leading-snug text-black">{seller.name || '—'}</div>
+        {clean(seller.nameEn) && (
+          <div className="mt-0.5 break-words text-[11px] font-medium text-black" dir="ltr">
+            {clean(seller.nameEn)}
+          </div>
+        )}
+        {legalIdentity.length > 0 && (
+          <div className="mt-1 flex max-w-[390px] flex-wrap gap-x-2 gap-y-0.5 text-[9px] leading-4 text-[color:var(--muted)]">
+            {legalIdentity.map((item, index) => (
+              <span key={`${item}-${index}`} className="inline-flex items-center gap-2">
+                {index > 0 && <span aria-hidden="true">•</span>}
+                <span>{item}</span>
+              </span>
+            ))}
+          </div>
+        )}
         {seller.tagline && <div className="mt-0.5 break-words text-[11px] text-[color:var(--muted)]">{seller.tagline}</div>}
       </div>
     </div>
