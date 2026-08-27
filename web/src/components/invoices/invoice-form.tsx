@@ -56,7 +56,7 @@ interface ApiLine {
 interface ApiInvoice {
   status: string; partner_id: string; warehouse_id: string | null; price_list_id?: string | null; payment_type: string; invoice_date: string; due_date: string | null;
   cost_center_id: string | null; salesperson_id: string | null; discount: string; shipping: string;
-  adjustment: string; tax_inclusive: boolean; zatca_document_type: 'standard' | 'simplified'; notes: string | null; lines: ApiLine[];
+  adjustment: string; tax_inclusive: boolean; zatca_document_type: 'standard' | 'simplified' | null; notes: string | null; lines: ApiLine[];
   is_paid?: boolean; payment_method?: string | null; payment_reference?: string | null; cash_account_id?: string | null;
 }
 interface TaxDef { name: string; rate: number; inclusive: boolean }
@@ -147,7 +147,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [shippingInput, setShippingInput] = useState('');
   const [adjustmentInput, setAdjustmentInput] = useState('');
   const [taxInclusive, setTaxInclusive] = useState(false);
-  const [zatcaDocumentType, setZatcaDocumentType] = useState<'standard' | 'simplified'>('simplified');
+  const [zatcaDocumentType, setZatcaDocumentType] = useState<'standard' | 'simplified' | null>('simplified');
   // ═══ السداد الفوري («مدفوع بالفعل») ═══
   // الخانة وحدها تحكم **إرسال** التفاصيل؛ وقيم الحقول تعيش هنا مستقلّةً عنها،
   // فإخفاؤها لا يمسّها ورفعُ الإخفاء يُظهرها كما تُركت (نقطة الاختبار D).
@@ -250,7 +250,9 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         setShippingInput(Number(inv.shipping) > 0 ? inv.shipping : '');
         setAdjustmentInput(Number(inv.adjustment) !== 0 ? inv.adjustment : '');
         setTaxInclusive(!!inv.tax_inclusive);
-        setZatcaDocumentType(inv.zatca_document_type ?? 'simplified');
+        // لا نحوّل المسودات السابقة ذات القيمة null إلى Simplified في الواجهة؛
+        // يبقى القرار غير محسوم كي يطبّق الخادم استدلال VAT الموحّد عند الحفظ.
+        setZatcaDocumentType(inv.zatca_document_type);
         setDiscountMode('amount'); // يُخزَّن الخصم كمبلغ مطلق
         setDiscountInput(Number(inv.discount) > 0 ? inv.discount : '');
         setLines(
@@ -679,9 +681,10 @@ export function InvoiceForm({ editId }: { editId?: string }) {
             <Label htmlFor="zatca-document-type">{t('zatca_document_type')}</Label>
             <Select
               id="zatca-document-type"
-              value={zatcaDocumentType}
+              value={zatcaDocumentType ?? ''}
               onChange={(e) => setZatcaDocumentType(e.target.value as 'standard' | 'simplified')}
             >
+              <option value="" disabled>{t('zatca_document_type_pending')}</option>
               <option value="standard">{t('zatca_standard')}</option>
               <option value="simplified">{t('zatca_simplified')}</option>
             </Select>
