@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,15 +31,22 @@ export interface ManagedAccount {
   depth?: number;
 }
 
+function normalBalanceFor(type: AccountType): 'debit' | 'credit' {
+  return ['asset', 'expense'].includes(type) ? 'debit' : 'credit';
+}
+
 export function AccountDialog({
   account,
   accounts,
+  initialParent,
   open,
   onClose,
   onSaved,
 }: {
   account: ManagedAccount | null;
   accounts: ManagedAccount[];
+  /** يحافظ إجراء «إضافة حساب فرعي» على الأب والنوع في سياق الحوار. */
+  initialParent?: ManagedAccount | null;
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -54,6 +61,8 @@ export function AccountDialog({
   const [parentId, setParentId] = useState('');
   const [isGroup, setIsGroup] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [codeEdited, setCodeEdited] = useState(false);
+  const [suggestingCode, setSuggestingCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -64,12 +73,13 @@ export function AccountDialog({
     setCode(account?.code ?? '');
     setName(account?.name ?? '');
     setNameEn(account?.name_en ?? '');
-    setType(account?.type ?? 'expense');
-    setParentId(account?.parent_id ?? '');
+    setType(account?.type ?? initialParent?.type ?? 'expense');
+    setParentId(account?.parent_id ?? initialParent?.id ?? '');
     setIsGroup(account?.is_group ?? false);
     setIsActive(account?.is_active ?? true);
+    setCodeEdited(!!account);
     setError(null);
-  }, [account, open]);
+  }, [account, initialParent, open]);
 
   const parentOptions = useMemo(
     () => accounts.filter((candidate) =>
@@ -80,6 +90,29 @@ export function AccountDialog({
     ),
     [account?.id, accounts, type],
   );
+
+  async function suggestCode() {
+    if (account) return;
+    setSuggestingCode(true);
+    try {
+      const query = new URLSearchParams({ type });
+      if (parentId) query.set('parent_id', parentId);
+      const response = await api<{ data: { code: string } }>(`/accounts/code-suggestion?${query.toString()}`);
+      setCode(response.data.code);
+      setCodeEdited(false);
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : tc('loadFailed'));
+    } finally {
+      setSuggestingCode(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!open || account || codeEdited) return;
+    void suggestCode();
+  // يستجيب الاقتراح للأب أو التصنيف فقط؛ لا يعيد التنفيذ عند تغير النص المقترح نفسه.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, account, parentId, type, codeEdited]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -127,18 +160,29 @@ export function AccountDialog({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="account-code">{t('code')}</Label>
-            <Input
-              id="account-code"
-              dir="ltr"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              disabled={hasEntries}
-              maxLength={50}
-              required
-            />
+            <div className="flex gap-2">
+              <Input
+                id="account-code"
+                dir="ltr"
+                value={code}
+                onChange={(event) => {
+                  setCode(event.target.value);
+                  setCodeEdited(true);
+                }}
+                disabled={hasEntries}
+                maxLength={50}
+                required
+              />
+              {!account && (
+                <Button type="button" size="icon" variant="outline" onClick={() => void suggestCode()} disabled={suggestingCode} aria-label={t('suggestCode')} title={t('suggestCode')}>
+                  <RefreshCw className={suggestingCode ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} strokeWidth={1.7} aria-hidden="true" />
+                </Button>
+              )}
+            </div>
+            {!account && <p className="text-[11px] text-muted">{t('suggestCodeHint')}</p>}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="account-type">{t('type')}</Label>
+            <Label htmlFor="account-type">{t('category')}</Label>
             <Select
               id="account-type"
               value={type}
@@ -154,14 +198,15 @@ export function AccountDialog({
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="account-name">{t('name')}</Label>
-          <Input id="account-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={255} required />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="account-name-en">{t('nameEn')}</Label>
-          <Input id="account-name-en" dir="ltr" value={nameEn} onChange={(event) => setNameEn(event.target.value)} maxLength={255} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="account-name">{t('name')}</Label>
+            <Input id="account-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={255} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="account-name-en">{t('nameEn')}</Label>
+            <Input id="account-name-en" dir="ltr" value={nameEn} onChange={(event) => setNameEn(event.target.value)} maxLength={255} />
+          </div>
         </div>
 
         <div className="space-y-1.5">
@@ -170,24 +215,31 @@ export function AccountDialog({
             id="account-parent"
             value={parentId}
             onChange={(event) => setParentId(event.target.value)}
-            disabled={hasEntries}
+            disabled={hasEntries || !!initialParent}
           >
             <option value="">{t('noParent')}</option>
             {parentOptions.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
-                {'— '.repeat(candidate.depth ?? 0)}{candidate.code} — {candidate.name}
+                {candidate.code} — {candidate.name}
               </option>
             ))}
           </Select>
+          {initialParent && !account && <p className="text-[11px] text-muted">{t('childOf', { name: initialParent.name })}</p>}
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="flex items-center justify-between rounded border border-border px-3 py-2.5">
-            <Label htmlFor="account-group">{t('group')}</Label>
+            <div>
+              <Label htmlFor="account-group">{t('group')}</Label>
+              <p className="mt-1 text-[11px] text-muted">{isGroup ? t('summaryHint') : t('postingHint')}</p>
+            </div>
             <Switch id="account-group" checked={isGroup} onCheckedChange={setIsGroup} disabled={(account?.children_count ?? 0) > 0} />
           </div>
           <div className="flex items-center justify-between rounded border border-border px-3 py-2.5">
-            <Label htmlFor="account-active">{t('active')}</Label>
+            <div>
+              <Label htmlFor="account-active">{t('active')}</Label>
+              <p className="mt-1 text-[11px] text-muted">{t('normalBalance')}: {normalBalanceFor(type) === 'debit' ? t('debit') : t('credit')}</p>
+            </div>
             <Switch id="account-active" checked={isActive} onCheckedChange={setIsActive} />
           </div>
         </div>
