@@ -80,6 +80,31 @@ class ZatcaCredentialTest extends TestCase
     }
 
     /** @test */
+    public function changing_csid_stage_requires_a_complete_new_credential_set(): void
+    {
+        $auth = $this->registerTenant('zatca-stage', 'zatca-stage@example.test');
+        $url = '/api/zatca-credentials/simulation';
+
+        $this->withToken($auth['token'])->putJson($url, $this->payload())->assertOk();
+
+        $this->withToken($auth['token'])->putJson($url, [
+            'stage' => 'production',
+            'current_password' => 'password123',
+        ])->assertUnprocessable()->assertJsonValidationErrors('binary_security_token');
+
+        $this->withToken($auth['token'])->putJson($url, $this->payload([
+            'stage' => 'production',
+            'binary_security_token' => 'PCSID-NEW-TOKEN',
+            'secret' => 'PCSID-NEW-SECRET',
+            'private_key' => 'PCSID-NEW-PRIVATE-KEY',
+        ]))->assertOk()->assertJsonPath('data.stage', 'production');
+
+        $credentials = ZatcaCredential::sole()->credentials;
+        $this->assertSame('PCSID-NEW-TOKEN', $credentials['binary_security_token']);
+        $this->assertSame('PCSID-NEW-SECRET', $credentials['secret']);
+    }
+
+    /** @test */
     public function credential_lists_are_isolated_between_tenants(): void
     {
         $first = $this->registerTenant('zatca-first', 'zatca-first@example.test');

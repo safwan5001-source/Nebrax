@@ -3,6 +3,7 @@
 namespace App\Services\Accounting;
 
 use App\Models\User;
+use App\Models\Tenant;
 use App\Models\ZatcaCredential;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -26,8 +27,22 @@ class ZatcaCredentialService
         unset($validated['current_password']);
 
         return DB::transaction(function () use ($user, $environment, $validated): ZatcaCredential {
+            // صف المستأجر موجود دائماً، لذلك يقفل أيضاً أول تهيئة حين لا يوجد
+            // بعد صف credential يمكن قفله. يمنع هذا إدراجين متزامنين لنفس البيئة.
+            Tenant::whereKey($user->tenant_id)->lockForUpdate()->firstOrFail();
+
             $record = ZatcaCredential::where('environment', $environment)->lockForUpdate()->first();
             $credentials = is_array($record?->credentials) ? $record->credentials : [];
+
+            if ($record !== null && $record->stage !== $validated['stage']) {
+                foreach (['binary_security_token', 'secret', 'private_key'] as $required) {
+                    if (! filled($validated[$required] ?? null)) {
+                        throw ValidationException::withMessages([
+                            $required => 'تغيير مرحلة CSID يتطلّب مجموعة بيانات اعتماد جديدة كاملة.',
+                        ]);
+                    }
+                }
+            }
 
             foreach (self::SECRET_FIELDS as $field) {
                 if (array_key_exists($field, $validated) && filled($validated[$field])) {
