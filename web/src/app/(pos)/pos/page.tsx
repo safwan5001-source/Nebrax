@@ -190,7 +190,7 @@ export default function PosPage() {
   }, [updateActiveItems]);
   const setSelectedCustomer = useCallback((customer: PosCustomer | null) => patchActive({ customer }), [patchActive]);
   const setTaxInclusive = useCallback((value: boolean) => patchActive({ taxInclusive: value }), [patchActive]);
-  // العميل المختار (null = العميل النقدي الافتراضي). منتقي عملاء حقيقي.
+  // العميل المختار مرجع حقيقي؛ قد تبقى السلة بلا مرجع حتى يختار الكاشير عميلاً مسجلاً قبل التحصيل.
   const [pickerOpen, setPickerOpen] = useState(false);
   const [heldCount, setHeldCount] = useState(0);
   const [holdBusy, setHoldBusy] = useState(false);
@@ -213,7 +213,7 @@ export default function PosPage() {
     value: t('numeric_keypad_value'),
   };
 
-  // اسم العميل الافتراضي (النقدي) من الإعداد؛ والمعروض = المختار أو الافتراضي.
+  // اسم إعداد العميل الافتراضي يبقى fallback لاسم مرجع صحيح فقط؛ غياب المرجع ظاهر ويطلب اختياراً صريحاً قبل التحصيل.
   useEffect(() => {
     updateCarts((current) => current.map((cartState) => (
       cartState.items.length === 0 && cartState.customer === null && cartState.note.trim() === ''
@@ -223,7 +223,7 @@ export default function PosPage() {
   }, [systemTaxInclusive, updateCarts]);
 
   const walkinName = posCfg.default_customer?.trim() || WALKIN;
-  const customerName = selectedCustomer?.name ?? walkinName;
+  const customerName = selectedCustomer?.name ?? t('select_customer');
   const playPosFeedback = useCallback((event: PosSoundEvent) => posSound.play(event, posCfg), [posCfg]);
 
   // العميل الافتراضي المُعدّ يصبح العميل المختار فعلياً عند بدء POS — لا مجرد
@@ -236,7 +236,7 @@ export default function PosPage() {
     if (!hydrated || !activeCartStorageKey) return;
     if (defaultCustomerKeyRef.current === activeCartStorageKey) return;
     const defaultCustomer = resolvePosDefaultCustomer(posCfg, walkinName);
-    if (!defaultCustomer) return; // لم تصل الإعدادات بعد أو لا مرجع صالح → الرجوع النقدي الآمن
+    if (!defaultCustomer) return; // لم تصل الإعدادات بعد أو لا مرجع صالح → يبقى الاختيار للمستخدم قبل التحصيل
     defaultCustomerKeyRef.current = activeCartStorageKey;
     if (!cartHasUnsavedData(activeCart)) {
       setSelectedCustomer(defaultCustomer);
@@ -801,14 +801,6 @@ export default function PosPage() {
     if (action === 'logout') await finishLogout();
   }
 
-  async function ensureWalkin(): Promise<string> {
-    const r = await api<{ data: { id: string; name: string }[] }>('/partners');
-    const found = r.data.find((p) => p.name === walkinName);
-    if (found) return found.id;
-    const created = await api<{ data: { id: string } }>('/partners', { method: 'POST', body: { name: walkinName, type: 'customer' } });
-    return created.data.id;
-  }
-
   const confirmPayment = useCallback(
     async (tenders: PosTender[]) => {
       if (catalogLoading) {
@@ -822,6 +814,13 @@ export default function PosPage() {
         playPosFeedback('warning');
         return;
       }
+      const customer = selectedCustomer;
+      if (!customer) {
+        setError(t('customer_required_for_payment'));
+        setPickerOpen(true);
+        playPosFeedback('warning');
+        return;
+      }
       if (paymentRequestRef.current) return;
       paymentRequestRef.current = true;
       setPaying(true);
@@ -829,8 +828,6 @@ export default function PosPage() {
       try {
         const result = await runPosCheckout({
           submitCheckout: async () => {
-            // العميل المختار إن وُجد، وإلا العميل النقدي الافتراضي.
-            const partnerId = selectedCustomer?.id ?? (await ensureWalkin());
             const items = cart.map((l) => ({
               product_id: l.productId,
               description: l.description,
@@ -843,7 +840,7 @@ export default function PosPage() {
             // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
             return api<PosCheckoutResponse>('/pos/checkout', {
               method: 'POST',
-              body: { partner_id: partnerId, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, notes: activeCart.note.trim() || null, items, tenders },
+              body: { partner_id: customer.id, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, notes: activeCart.note.trim() || null, items, tenders },
             });
           },
           // لحظة النجاح المالي هي استجابة checkout؛ نغلق السلة ونغادر شاشة الدفع
@@ -908,7 +905,7 @@ export default function PosPage() {
           const model = buildInvoiceDocumentModel({
             invoice: receiptInvoice,
             company,
-            customer: { name: selectedCustomer?.name ?? walkinName, vat_number: null, city: null },
+            customer: { name: customer.name, vat_number: null, city: null },
             qr: result.qr?.qr ?? null,
             footerText: posCfg.receipt_footer,
           });
@@ -927,7 +924,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [activeCart, cart, catalogLoading, closeCart, success, t, tc, toast, selectedCustomer, walkinName, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback],
+    [activeCart, cart, catalogLoading, closeCart, success, t, tc, toast, selectedCustomer, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -1373,7 +1370,6 @@ export default function PosPage() {
 
       <CustomerPickerDialog
         open={pickerOpen}
-        walkinLabel={walkinName}
         onClose={() => setPickerOpen(false)}
         onSelect={setSelectedCustomer}
       />

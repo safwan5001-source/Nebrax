@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   Clock3,
   MonitorDown,
-  Printer,
   Settings2,
   TabletSmartphone,
   Volume2,
@@ -26,7 +25,6 @@ const ITEMS: PosSettingsItem[] = [
   { key: 'shifts', href: '/pos/sessions', icon: Clock3 },
   { key: 'devices', href: '/pos/settings/devices', icon: TabletSmartphone },
   { key: 'cash_drawer', href: '/pos/settings/cash-drawer', icon: Archive },
-  { key: 'printing', href: '/pos/settings/printing', icon: Printer },
   { key: 'desktop', href: null, icon: MonitorDown },
 ];
 
