@@ -85,6 +85,7 @@ class InvoiceService
             $invoice = Invoice::create([
                 'number'            => $data['number'] ?? $this->nextNumber($date, $branchId),
                 'partner_id'        => $data['partner_id'],
+                'zatca_document_type' => $this->zatcaDocumentType($data, $data['partner_id']),
                 'branch_id'         => $branchId,
                 'warehouse_id'      => $data['warehouse_id'] ?? null,
                 'price_list_id'     => $priceListId,
@@ -172,6 +173,7 @@ class InvoiceService
 
             $invoice->update([
                 'partner_id'        => $data['partner_id'],
+                'zatca_document_type' => $this->zatcaDocumentType($data, $data['partner_id'], $invoice->zatca_document_type),
                 'warehouse_id'      => $keep('warehouse_id', $invoice->warehouse_id),
                 'price_list_id'     => $keep('price_list_id', $invoice->price_list_id),
                 'payment_type'      => $this->paymentType($keep('payment_type', $invoice->payment_type) ?? $invoice->payment_type, $isPaid),
@@ -211,6 +213,7 @@ class InvoiceService
 
         $data = [
             'partner_id'      => $invoice->partner_id,
+            'zatca_document_type' => $invoice->zatca_document_type,
             'warehouse_id'    => $invoice->warehouse_id,
             'price_list_id'   => $invoice->price_list_id,
             'payment_type'    => $invoice->payment_type,
@@ -292,6 +295,31 @@ class InvoiceService
     protected function paymentType(?string $requested, bool $isPaid): string
     {
         return $isPaid ? 'credit' : ($requested ?: 'credit');
+    }
+
+    /**
+     * يثبت قرار ZATCA على المسودة. القيمة الصريحة تتقدم، وإلا تُحفظ اللقطة
+     * الحالية، وللفاتورة الجديدة فقط يُقترح Standard عند وجود رقم VAT سعودي
+     * من 15 رقماً؛ وما عداه Simplified. لا يعاد اشتقاق القرار بعد حفظه.
+     */
+    protected function zatcaDocumentType(array $data, string $partnerId, ?string $current = null): string
+    {
+        if (array_key_exists('zatca_document_type', $data) && $data['zatca_document_type'] !== null) {
+            $requested = (string) $data['zatca_document_type'];
+            if (! in_array($requested, ['standard', 'simplified'], true)) {
+                throw new RuntimeException('نوع مستند ZATCA غير صالح.');
+            }
+
+            return $requested;
+        }
+
+        if (in_array($current, ['standard', 'simplified'], true)) {
+            return $current;
+        }
+
+        $vatNumber = (string) Partner::find($partnerId)?->vat_number;
+
+        return preg_match('/^\d{15}$/', $vatNumber) === 1 ? 'standard' : 'simplified';
     }
 
     /** أداة السداد المعروضة على البائع؛ المجهول يعود إلى النقد. */
@@ -781,6 +809,10 @@ class InvoiceService
                 ? $cogsResolver($invoice)
                 : $this->inventory->recordSaleCogs($invoice);
 
+            // لقطة نوع المستند ثابتة قبل بناء XML. للمسودات التاريخية فقط يُستنتج
+            // النوع مرة واحدة من رقم المشتري الضريبي ثم يُحفظ ولا يُعاد تفسيره.
+            $invoice->zatca_document_type = $this->zatcaDocumentType([], $invoice->partner_id, $invoice->zatca_document_type);
+
             // توليد بيانات ZATCA (المرحلة 1+2) من الإجماليات النهائية المشتقة من السطور
             $invoice->subtotal   = $subtotal;
             $invoice->tax_amount = $taxAmount;
@@ -795,6 +827,7 @@ class InvoiceService
 
             $invoice->update([
                 'status'              => 'posted',
+                'zatca_document_type' => $invoice->zatca_document_type,
                 'print_template_revision_id' => $printAssignment?->print_template_revision_id,
                 'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
                 'thermal_template_revision_id' => $thermalAssignment?->print_template_revision_id,

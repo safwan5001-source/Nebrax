@@ -12,7 +12,9 @@ const { api, push, replace, translate } = vi.hoisted(() => {
     search_partner: 'Search customers…', no_partner_found: 'No customer found',
     new_partner: 'New', new_partner_title: 'New customer',
     invoice_number: 'Invoice number', invoice_date: 'Invoice date', payment_terms: 'Payment terms',
-    days: 'days', due_date: 'Due date',
+    days: 'days', due_date: 'Due date', zatca_document_type: 'ZATCA document type',
+    zatca_standard: 'Standard — Clearance', zatca_simplified: 'Simplified — Reporting',
+    zatca_document_type_hint: 'Saved on the invoice.',
     lines: 'Lines', items_section: 'Items', add_line: 'Add line', item: 'Item', description: 'Description',
     price: 'Unit price', qty: 'Qty', qty_placeholder: 'Quantity', unit: 'Unit',
     qty_required: 'Every line needs a positive quantity.',
@@ -284,6 +286,16 @@ describe('InvoiceForm — customer selector', () => {
     expect(options[0].hint).toBe('0138012345');
   });
 
+  it('suggests Standard clearance for a customer with a VAT number', async () => {
+    respond();
+    render(<InvoiceForm />);
+    await firstQty();
+
+    await waitFor(() => expect(
+      (screen.getByLabelText('ZATCA document type') as HTMLSelectElement).value
+    ).toBe('standard'));
+  });
+
   it('keeps the create-mode auto-select of the first customer', async () => {
     respond();
     render(<InvoiceForm />);
@@ -522,6 +534,17 @@ describe('InvoiceForm — totals, saving and errors', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/invoices/inv-9'));
   });
 
+  it('sends an explicit ZATCA document type snapshot with the draft', async () => {
+    await ready();
+    await userEvent.selectOptions(screen.getByLabelText('ZATCA document type'), 'simplified');
+    await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices', expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({ zatca_document_type: 'simplified' }),
+    })));
+  });
+
   it('saves a draft without calling the post endpoint', async () => {
     await ready();
 
@@ -555,7 +578,7 @@ describe('InvoiceForm — edit mode', () => {
   const draft = {
     status: 'draft', partner_id: 'c1', warehouse_id: null, price_list_id: null, payment_type: 'credit',
     invoice_date: '2026-06-20', due_date: '2026-07-20', cost_center_id: null, salesperson_id: null,
-    discount: '0', shipping: '0', adjustment: '0', tax_inclusive: false, notes: 'Delivered to site',
+    discount: '0', shipping: '0', adjustment: '0', tax_inclusive: false, zatca_document_type: 'standard', notes: 'Delivered to site',
     is_paid: true, payment_method: 'card', payment_reference: 'CARD-7', cash_account_id: null,
     lines: [{
       product_id: 'pr1', description: 'A4 paper carton', quantity: 7, unit_name: null,

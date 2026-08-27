@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Partner;
 use App\Models\Tenant;
+use App\Http\Requests\StoreInvoiceRequest;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\ZatcaService;
@@ -137,6 +138,57 @@ class ZatcaTest extends TestCase
         $this->assertStringContainsString('<cbc:InvoicedQuantity>1.234</cbc:InvoicedQuantity>', $posted->zatca_xml);
         $this->assertStringContainsString('<cbc:PriceAmount currencyID="SAR">2.30</cbc:PriceAmount>', $posted->zatca_xml);
         $this->assertStringContainsString('<cbc:LineExtensionAmount currencyID="SAR">2.84</cbc:LineExtensionAmount>', $posted->zatca_xml);
+    }
+
+    /** @test */
+    public function a_customer_without_a_vat_number_is_snapshotted_as_simplified_reporting(): void
+    {
+        $posted = $this->postInvoice();
+
+        $this->assertSame('simplified', $posted->zatca_document_type);
+        $this->assertStringContainsString('<cbc:InvoiceTypeCode name="0200000">388</cbc:InvoiceTypeCode>', $posted->zatca_xml);
+    }
+
+    /** @test */
+    public function a_vat_registered_customer_is_snapshotted_as_standard_clearance(): void
+    {
+        $this->customer->update(['vat_number' => '311111111100003']);
+
+        $posted = $this->postInvoice();
+
+        $this->assertSame('standard', $posted->zatca_document_type);
+        $this->assertStringContainsString('<cbc:InvoiceTypeCode name="0100000">388</cbc:InvoiceTypeCode>', $posted->zatca_xml);
+    }
+
+    /** @test */
+    public function an_explicit_document_type_overrides_the_customer_suggestion(): void
+    {
+        $this->customer->update(['vat_number' => '311111111100003']);
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'zatca_document_type' => 'simplified'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $posted = app(InvoiceService::class)->post($invoice);
+
+        $this->assertSame('simplified', $posted->zatca_document_type);
+        $this->assertStringContainsString('name="0200000"', $posted->zatca_xml);
+    }
+
+    /** @test */
+    public function request_validation_rejects_an_unknown_zatca_document_type(): void
+    {
+        $validator = validator(
+            [
+                'partner_id' => $this->customer->id,
+                'zatca_document_type' => 'auto',
+                'items' => [['quantity' => 1, 'unit_price' => 100000]],
+            ],
+            (new StoreInvoiceRequest())->rules(),
+        );
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('zatca_document_type', $validator->errors()->toArray());
     }
 
     /** @test */
