@@ -29,7 +29,9 @@ const byCode = (left: WorkspaceAccount, right: WorkspaceAccount) =>
  * القديمة لا يختفي؛ يظهر كجذر قابل للمراجعة بدلاً من إسقاط بيانات العميل.
  */
 export function buildAccountTree(accounts: WorkspaceAccount[]): AccountTree {
-  const byId = new Map(accounts.map((account) => [account.id, { ...account, children: [] }]));
+  const byId = new Map<string, AccountTreeNode>(
+    accounts.map((account): [string, AccountTreeNode] => [account.id, { ...account, children: [] }]),
+  );
   const roots: AccountTreeNode[] = [];
 
   for (const node of byId.values()) {

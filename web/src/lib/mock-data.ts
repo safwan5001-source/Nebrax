@@ -382,7 +382,7 @@ export function mockAccountWorkspace() {
     let current: MockAccount | undefined = account;
     while (current) {
       path.unshift({ id: current.id, code: current.code, name: current.name });
-      const parentCode = mockAccountParentCodes[current.code];
+      const parentCode: string | null = mockAccountParentCodes[current.code] ?? null;
       current = parentCode ? byCode.get(parentCode) : undefined;
     }
     return path;
