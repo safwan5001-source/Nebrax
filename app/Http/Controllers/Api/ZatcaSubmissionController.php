@@ -59,7 +59,7 @@ class ZatcaSubmissionController extends ApiController
             'data' => $this->payload($result['attempt']),
             'meta' => [
                 'created' => $result['created'],
-                'dispatch_status' => 'pending',
+                'dispatch_status' => $result['attempt']->status,
                 'network_submission_performed' => false,
             ],
         ], $result['created'] ? 202 : 200);
