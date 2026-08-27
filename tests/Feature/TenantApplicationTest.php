@@ -10,6 +10,7 @@ use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\PosSession;
 use App\Models\TenantApplicationEvent;
+use App\Models\ZatcaCredential;
 use App\Services\Accounting\InvoiceService;
 use App\Services\TenantApplicationService;
 use App\Support\ApplicationCatalog;
@@ -218,7 +219,7 @@ class TenantApplicationTest extends TestCase
     }
 
     /** @test */
-    public function compliance_zatca_never_suspends_since_its_data_lives_on_the_mandatory_invoicing_capability(): void
+    public function compliance_zatca_suspends_only_when_independent_credentials_exist(): void
     {
         $auth = $this->registerTenant(autoEnableApplications: false);
         app(TenantContext::class)->set($auth['tenant_id']);
@@ -232,8 +233,29 @@ class TenantApplicationTest extends TestCase
         $posted = app(InvoiceService::class)->post($invoice);
         $this->assertNotNull($posted->zatca_qr);
 
+        // أعمدة ZATCA على الفاتورة تتبع المبيعات الإلزامية وحدها، فلا تعلق التطبيق.
         $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'compliance.zatca'])
             ->assertOk()->assertJsonPath('data.status', 'disabled');
+        $this->withToken($auth['token'])->postJson('/api/applications/enable', ['application_key' => 'compliance.zatca'])
+            ->assertOk();
+
+        ZatcaCredential::create([
+            'environment' => 'simulation',
+            'stage' => 'compliance',
+            'status' => 'configured',
+            'credentials' => [
+                'binary_security_token' => 'token',
+                'secret' => 'secret',
+                'private_key' => 'private-key',
+            ],
+            'certificate_fingerprint' => hash('sha256', 'token'),
+            'configured_at' => now(),
+        ]);
+
+        $this->withToken($auth['token'])->postJson('/api/applications/disable', ['application_key' => 'compliance.zatca'])
+            ->assertOk()->assertJsonPath('data.status', 'suspended');
+        $this->withToken($auth['token'])->getJson('/api/zatca-credentials')
+            ->assertOk()->assertJsonCount(1, 'data');
     }
 
     /** @test */

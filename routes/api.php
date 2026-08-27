@@ -103,6 +103,7 @@ use App\Http\Controllers\Api\UnitTemplateController;
 use App\Http\Controllers\Api\NumberPreviewController;
 use App\Http\Controllers\Api\NumberingSettingsController;
 use App\Http\Controllers\Api\WarehouseController;
+use App\Http\Controllers\Api\ZatcaCredentialController;
 use App\Http\Controllers\Api\ZatcaSettingsController;
 use App\Http\Controllers\Api\ZatcaSubmissionController;
 use App\Http\Middleware\EnforcePlanLimit;
@@ -927,6 +928,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('numbering-settings', [NumberingSettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // إعدادات الفوترة الإلكترونية (نطاق عدّاد ICV) — منفصلة عن بادئات ترقيم المستندات
+        Route::get('zatca-credentials', [ZatcaCredentialController::class, 'index'])->middleware([$perm('company.manage'), $app('compliance.zatca')]);
+        Route::put('zatca-credentials/{environment}', [ZatcaCredentialController::class, 'update'])
+            ->where('environment', 'developer|simulation|production')
+            ->middleware([$perm('company.manage'), $app('compliance.zatca'), 'throttle:5,1']);
         Route::get('zatca-settings', [ZatcaSettingsController::class, 'show'])->middleware([$perm('invoices.view'), $app('compliance.zatca')]);
         Route::put('zatca-settings', [ZatcaSettingsController::class, 'update'])->middleware([$perm('company.manage'), $app('compliance.zatca')]);
 

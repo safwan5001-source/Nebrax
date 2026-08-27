@@ -16,6 +16,7 @@ use App\Models\Tenant;
 use App\Models\TenantApplicationEvent;
 use App\Models\TenantApplicationState;
 use App\Models\User;
+use App\Models\ZatcaCredential;
 use App\Support\ApplicationCatalog;
 use App\Tenancy\TenantContext;
 use Closure;
@@ -47,9 +48,9 @@ class TenantApplicationService
     /**
      * "هل توجد بيانات تشغيلية حقيقية؟" لكل قدرة قابلة للإيقاف — تحوّل الإيقاف
      * إلى `suspended` (قراءة فقط) بدل `disabled` الكاملة. القدرات الإلزامية
-     * الثلاث لا تحتاج فحصاً (لا تُوقَف بتاتاً). `compliance.zatca` مستثناة
-     * عمداً: لا نموذج مستقل لبياناتها، فحقولها أعمدة على `Invoice` نفسها
-     * (ملك `sales.invoicing` الإلزامية) — تعليقها لا يجمّد شيئاً مستقلاً.
+     * الثلاث لا تحتاج فحصاً (لا تُوقَف بتاتاً). فواتير ZATCA نفسها تظل ملك
+     * `sales.invoicing` الإلزامية، لكن بيانات اعتماد CSID نموذج مستقل وحساس؛
+     * وجودها يجعل إيقاف `compliance.zatca` تعليقاً للقراءة بدل إخفائها.
      * `company.branches`: الفرع الرئيسي يُزرع تلقائياً لكل مستأجر عند
      * التسجيل، فـ`Branch::exists()` الخام سيكون صحيحاً دوماً ويُبطل الفحص —
      * يُفحص وجود فرع غير رئيسي تحديداً.
@@ -71,6 +72,7 @@ class TenantApplicationService
             // حتى قبل Cycle 1، إنشاء محطة قرار تشغيلي لا ينبغي أن يختفي معه
             // التاريخ عند إيقاف التطبيق؛ يصبح الوصول قراءة فقط مثل بقية المجالات.
             'fuel_stations.core' => fn () => FuelStation::query()->exists(),
+            'compliance.zatca' => fn () => ZatcaCredential::query()->exists(),
         ];
     }
 
@@ -262,12 +264,18 @@ class TenantApplicationService
             throw new RuntimeException('توابع مفعّلة تعتمد على هذه القدرة: ' . implode('، ', $dependents));
         }
 
-        // بيانات حقيقية موجودة → قراءة فقط بدل إيقاف كامل، فلا تُفقَد إمكانية
-        // مراجعة السجل التاريخي. القدرة الإلزامية والاعتماد المفعّل يُرفضان
-        // أعلاه قبل الوصول هنا؛ هذا القرار الثالث ينجح دوماً بحالة مختلفة.
-        $status = $this->hasOperationalData($key) ? 'suspended' : 'disabled';
+        return DB::transaction(function () use ($key, $actor, $reason) {
+            // القفل نفسه الذي يستخدمه حفظ بيانات اعتماد ZATCA: يمنع أن يرى
+            // التعطيل عدم وجود بيانات، ثم تُنشأ البيانات بعده مباشرة خلف 403.
+            $tenantId = app(TenantContext::class)->id();
+            if ($tenantId !== null) {
+                Tenant::whereKey($tenantId)->lockForUpdate()->firstOrFail();
+            }
 
-        return DB::transaction(function () use ($key, $actor, $reason, $status) {
+            // بيانات حقيقية موجودة → قراءة فقط بدل إيقاف كامل، فلا تُفقَد إمكانية
+            // مراجعة السجل التاريخي. يُعاد الفحص داخل المعاملة وبعد القفل.
+            $status = $this->hasOperationalData($key) ? 'suspended' : 'disabled';
+
             $state = TenantApplicationState::updateOrCreate(
                 ['application_key' => $key],
                 ['requested_enabled' => false, 'status' => $status, 'changed_by' => $actor?->id, 'reason' => $reason],
