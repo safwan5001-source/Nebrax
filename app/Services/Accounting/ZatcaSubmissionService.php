@@ -2,7 +2,7 @@
 
 namespace App\Services\Accounting;
 
-use App\Exceptions\ZatcaSubmissionConflict;
+use App\Support\ZatcaSubmissionConflict;
 use App\Models\Invoice;
 use App\Models\ZatcaSubmissionAttempt;
 use Illuminate\Database\UniqueConstraintViolationException;
