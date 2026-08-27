@@ -229,6 +229,62 @@ class InventoryBalanceExportTest extends TestCase
         $this->assertSame(['A', 'B'], $this->column($rows, 'رمز الصنف'));
     }
 
+    /**
+     * @test
+     *
+     * انحدار (مراجعة): البحث بلا حساسيةٍ للحالة كالشاشة. `LIKE` وحده حسّاسٌ في
+     * PostgreSQL فكان يصدّر صفراً حيث تُظهر الشاشة صفوفاً؛ `LOWER` على الطرفين
+     * يطابقها. (على SQLite يمرّ الطرفان، فالقيمة الحقيقية على PG في CI.)
+     */
+    public function the_search_is_case_insensitive_like_the_screen(): void
+    {
+        $auth = $this->registerTenant();
+        $this->stockedProduct($auth['tenant_id'], ['sku' => 'CEM-1', 'name' => 'Cement'], 100, 1000);
+        $this->stockedProduct($auth['tenant_id'], ['sku' => 'STL-1', 'name' => 'Steel'], 50, 3000);
+
+        foreach (['cem', 'CEM', 'Cem'] as $term) {
+            $rows = $this->readCsv($this->withToken($auth['token'])
+                ->get("/api/inventory/export?scope=filtered&format=csv&search={$term}")->assertOk());
+            $this->assertSame(['CEM-1'], $this->column($rows, 'رمز الصنف'), "«{$term}» يطابق CEM-1 بلا حساسية للحالة.");
+        }
+    }
+
+    /**
+     * @test
+     *
+     * انحدار (مراجعة): مصطلحٌ يمتدّ حقلين (الرمز ثم الاسم) يطابق السلسلة
+     * المضمومة كما تفعل الشاشة `[sku, name, unit].join(' ')`.
+     */
+    public function the_search_matches_a_term_spanning_sku_and_name(): void
+    {
+        $auth = $this->registerTenant();
+        $this->stockedProduct($auth['tenant_id'], ['sku' => 'AB', 'name' => 'CD'], 100, 1000);
+        $this->stockedProduct($auth['tenant_id'], ['sku' => 'XY', 'name' => 'ZW'], 50, 3000);
+
+        $rows = $this->readCsv($this->withToken($auth['token'])
+            ->get('/api/inventory/export?scope=filtered&format=csv&search=AB+CD')->assertOk());
+
+        $this->assertSame(['AB'], $this->column($rows, 'رمز الصنف'), 'المصطلح الممتدّ حقلين يطابق السلسلة المضمومة.');
+    }
+
+    /**
+     * @test
+     *
+     * انحدار (مراجعة): مرشّح الكمية عشريّ كالشاشة لا مبتورٌ. حدُّ 5.5 يستبعد
+     * الكمية 5 (بتر `(int)5.5=5` كان يُدرجها خلافاً للشاشة).
+     */
+    public function the_quantity_filter_keeps_decimals_like_the_screen(): void
+    {
+        $auth = $this->registerTenant();
+        $this->stockedProduct($auth['tenant_id'], ['sku' => 'FIVE'], 5, 1000);
+        $this->stockedProduct($auth['tenant_id'], ['sku' => 'SIX'], 6, 1000);
+
+        $rows = $this->readCsv($this->withToken($auth['token'])
+            ->get('/api/inventory/export?scope=filtered&format=csv&qty_min=5.5&sort=sku')->assertOk());
+
+        $this->assertSame(['SIX'], $this->column($rows, 'رمز الصنف'), 'حدُّ 5.5 يستبعد الكمية 5.');
+    }
+
     // ═══════════════════════════ الرصيد الصفري ═══════════════════════════
 
     /** @test */

@@ -64,27 +64,33 @@ class InventoryBalanceFilters
      */
     public static function apply(Builder $query, array $filters): Builder
     {
-        // البحث على الحقول الثلاثة التي تبحث فيها الشاشة: الرمز والاسم والوحدة.
-        // إضافة حقلٍ رابع هنا كانت ستجعل التصدير يطابق ما لا تعرضه الشاشة.
+        // البحث يطابق الشاشة **حرفياً**: هي تبني سلسلةً واحدة
+        // `[sku, name, unit].join(' ')` وتقارنها بلا حساسيةٍ للحالة
+        // (`toLocaleLowerCase().includes`). فنكرّر ذلك بالضبط:
+        //  • `LOWER(...)` على الطرفين — وإلا كان `LIKE` حسّاساً للحالة في
+        //    PostgreSQL (الإنتاج) فيصدّر صفراً حيث تُظهر الشاشة صفوفاً.
+        //  • ضمّ الأعمدة الثلاثة بمسافة — وإلا لم يطابق مصطلحٌ يمتدّ حقلين
+        //    (مثل «AB CD») ما تطابقه الشاشة على السلسلة المضمومة.
+        // الرمز يقبل NULL فيُغلَّف بـCOALESCE؛ الاسم والوحدة غير فارغين.
         if (filled($filters['search'] ?? null)) {
-            $needle = addcslashes(trim((string) $filters['search']), '%_\\');
-            $like = "%{$needle}%";
-            $query->where(function (Builder $search) use ($like): void {
-                $search->where('sku', 'like', $like)
-                    ->orWhere('name', 'like', $like)
-                    ->orWhere('unit', 'like', $like);
-            });
+            $needle = addcslashes(mb_strtolower(trim((string) $filters['search']), 'UTF-8'), '%_\\');
+            $query->whereRaw(
+                "LOWER(COALESCE(sku, '') || ' ' || name || ' ' || COALESCE(unit, '')) LIKE ?",
+                ['%'.$needle.'%']
+            );
         }
 
         if (filled($filters['unit'] ?? null)) {
             $query->where('unit', $filters['unit']);
         }
 
+        // الكمية تُقارَن كما تقارنها الشاشة (`Number(...)` عشري) لا مبتورةً:
+        // `+ 0` يحوّل «5» إلى 5 و«5.5» إلى 5.5، فلا يختلف حدُّ 5.5 عند الكمية 5.
         if (filled($filters['qty_min'] ?? null)) {
-            $query->where('quantity_on_hand', '>=', (int) $filters['qty_min']);
+            $query->where('quantity_on_hand', '>=', $filters['qty_min'] + 0);
         }
         if (filled($filters['qty_max'] ?? null)) {
-            $query->where('quantity_on_hand', '<=', (int) $filters['qty_max']);
+            $query->where('quantity_on_hand', '<=', $filters['qty_max'] + 0);
         }
 
         // المدى المالي: قيمة الفلتر بالريال، والمقارنة بالهللات — كما تفعل
