@@ -100,6 +100,35 @@ class SalesConfigTest extends TestCase
     }
 
     /** @test */
+    public function pos_onscreen_numeric_keypad_defaults_to_disabled_and_persists_a_boolean_without_losing_other_settings(): void
+    {
+        ['token' => $token] = $this->registerTenant('pos-keypad', 'owner@pos-keypad.test');
+
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.show_onscreen_numeric_keypad', false);
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['show_onscreen_numeric_keypad' => true],
+        ])->assertOk()
+            ->assertJsonPath('data.show_onscreen_numeric_keypad', true)
+            ->assertJsonPath('data.allow_discount', true);
+
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.show_onscreen_numeric_keypad', true);
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['show_onscreen_numeric_keypad' => false],
+        ])->assertOk()
+            ->assertJsonPath('data.show_onscreen_numeric_keypad', false);
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['show_onscreen_numeric_keypad' => 'enabled'],
+        ])->assertUnprocessable();
+    }
+
+    /** @test */
     public function pos_payment_modes_allow_an_explicitly_empty_set_and_reject_foreign_or_inconsistent_defaults(): void
     {
         ['token' => $token] = $this->registerTenant('payment-modes', 'owner@payment-modes.test');

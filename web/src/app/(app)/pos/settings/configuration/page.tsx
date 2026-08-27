@@ -24,6 +24,7 @@ interface PosConfig {
   allow_discount: boolean;
   apply_customer_price_list: boolean;
   allow_unit_price_override: boolean;
+  show_onscreen_numeric_keypad: boolean;
   enabled_payment_method_ids: string[];
   payment_methods_mode: 'all_active' | 'only' | 'none';
   default_payment_method_id: string | null;
@@ -71,6 +72,7 @@ const DEFAULTS: PosConfig = {
   allow_discount: true,
   apply_customer_price_list: true,
   allow_unit_price_override: false,
+  show_onscreen_numeric_keypad: false,
   enabled_payment_method_ids: [],
   payment_methods_mode: 'all_active',
   default_payment_method_id: null,
@@ -355,6 +357,16 @@ export default function PosSettingsPage() {
                     <p className="text-xs leading-relaxed text-muted">{t('allow_unit_price_override_hint')}</p>
                   </div>
                   <Switch checked={config.allow_unit_price_override} onCheckedChange={(checked) => patch('allow_unit_price_override', checked)} aria-labelledby="allow_unit_price_override_label" />
+                </div>
+              </div>
+
+              <div className="border-b border-border py-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 space-y-1">
+                    <p id="show_onscreen_numeric_keypad_label" className="text-sm font-medium text-text">{t('show_onscreen_numeric_keypad')}</p>
+                    <p className="text-xs leading-relaxed text-muted">{t('show_onscreen_numeric_keypad_hint')}</p>
+                  </div>
+                  <Switch checked={config.show_onscreen_numeric_keypad} onCheckedChange={(checked) => patch('show_onscreen_numeric_keypad', checked)} aria-labelledby="show_onscreen_numeric_keypad_label" />
                 </div>
               </div>
 
