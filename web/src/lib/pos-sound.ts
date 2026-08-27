@@ -39,8 +39,26 @@ interface VibrateNavigator {
   vibrate?: (pattern: number | number[]) => boolean;
 }
 
+/** واجهة Web Audio صغيرة قابلة للاختبار؛ لا تغيّر عقد تشغيل HTMLAudio القائم. */
+interface PosGainNode {
+  gain: { value: number };
+  connect: (destination: unknown) => unknown;
+}
+
+interface PosMediaElementSourceNode {
+  connect: (destination: PosGainNode) => unknown;
+}
+
+interface PosAudioContext {
+  readonly destination: unknown;
+  createGain: () => PosGainNode;
+  createMediaElementSource: (clip: PosAudioClip) => PosMediaElementSourceNode;
+  resume?: () => Promise<void>;
+}
+
 interface PosSoundManagerOptions {
   createAudio?: (source: string) => PosAudioClip | null;
+  createAudioContext?: () => PosAudioContext | null;
   getNavigator?: () => VibrateNavigator | undefined;
 }
 
@@ -96,6 +114,18 @@ function browserNavigator(): VibrateNavigator | undefined {
   return navigator;
 }
 
+function browserAudioContextFactory(): PosAudioContext | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const browserWindow = window as typeof window & { webkitAudioContext?: typeof AudioContext };
+    const AudioContextConstructor = browserWindow.AudioContext ?? browserWindow.webkitAudioContext;
+    return AudioContextConstructor ? new AudioContextConstructor() as unknown as PosAudioContext : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * طبقة POS مركزية خفيفة: تعيد استخدام عناصر الصوت، وتعيد الصوت إلى بدايته بدلاً
  * من إنشاء طابور جديد مع كل قراءة باركود. كل فشل في المتصفح أو الجهاز صامت ولا
@@ -103,12 +133,16 @@ function browserNavigator(): VibrateNavigator | undefined {
  */
 export class PosSoundManager {
   private readonly clips = new Map<PosSoundEvent, PosAudioClip>();
+  private readonly gainNodes = new Map<PosSoundEvent, PosGainNode>();
+  private audioContext: PosAudioContext | null | undefined;
   private playbackGeneration = 0;
   private readonly createAudio: (source: string) => PosAudioClip | null;
+  private readonly createAudioContext: () => PosAudioContext | null;
   private readonly getNavigator: () => VibrateNavigator | undefined;
 
   constructor(options: PosSoundManagerOptions = {}) {
     this.createAudio = options.createAudio ?? browserAudioFactory;
+    this.createAudioContext = options.createAudioContext ?? browserAudioContextFactory;
     this.getNavigator = options.getNavigator ?? browserNavigator;
   }
 
@@ -133,6 +167,10 @@ export class PosSoundManager {
     if (!clip) return;
 
     try {
+      const gain = this.gainFor('scan_success', clip);
+      if (gain) gain.gain.value = 0;
+      void this.audioContext?.resume?.().catch(() => {});
+
       const previousVolume = clip.volume;
       const playbackGeneration = this.playbackGeneration;
       clip.volume = 0;
@@ -141,10 +179,14 @@ export class PosSoundManager {
           if (this.playbackGeneration !== playbackGeneration) return;
           clip.pause();
           clip.currentTime = 0;
+          if (gain) gain.gain.value = 1;
           clip.volume = previousVolume;
         })
         .catch(() => {
-          if (this.playbackGeneration === playbackGeneration) clip.volume = previousVolume;
+          if (this.playbackGeneration === playbackGeneration) {
+            if (gain) gain.gain.value = 1;
+            clip.volume = previousVolume;
+          }
         });
     } catch {
       // المتصفح غير الداعم أو autoplay الممنوع لا يؤثر في بقية POS.
@@ -170,10 +212,39 @@ export class PosSoundManager {
       this.playbackGeneration += 1;
       clip.pause();
       clip.currentTime = 0;
-      clip.volume = normalizeVolume(volume);
+      const normalizedVolume = normalizeVolume(volume);
+      const gain = this.gainFor(event, clip);
+      if (gain) {
+        // Safari على iPhone يتجاهل HTMLMediaElement.volume؛ GainNode يبقي
+        // مستوى صوت POS قابلاً للتحكم مع بقاء عنصر الصوت نفسه ومساراته.
+        gain.gain.value = normalizedVolume;
+        clip.volume = 1;
+      } else {
+        clip.volume = normalizedVolume;
+      }
       void Promise.resolve(clip.play()).catch(() => {});
     } catch {
       // الصوت مكمل فقط؛ لا نرمي استثناءً ولا نقطع تدفق البيع.
+    }
+  }
+
+  private gainFor(event: PosSoundEvent, clip: PosAudioClip): PosGainNode | null {
+    const existing = this.gainNodes.get(event);
+    if (existing) return existing;
+
+    const context = this.contextFor();
+    if (!context) return null;
+
+    try {
+      const source = context.createMediaElementSource(clip);
+      const gain = context.createGain();
+      source.connect(gain);
+      gain.connect(context.destination);
+      this.gainNodes.set(event, gain);
+      return gain;
+    } catch {
+      // بعض البيئات تمنع ربط عنصر HTMLAudio بالسياق؛ نعود إلى volume القائم.
+      return null;
     }
   }
 
@@ -183,6 +254,11 @@ export class PosSoundManager {
     } catch {
       // الاهتزاز اختياري وقد يمنعه الجهاز أو المتصفح.
     }
+  }
+
+  private contextFor(): PosAudioContext | null {
+    if (this.audioContext === undefined) this.audioContext = this.createAudioContext();
+    return this.audioContext;
   }
 
   private clipFor(event: PosSoundEvent): PosAudioClip | null {
