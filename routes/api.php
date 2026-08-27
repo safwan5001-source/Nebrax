@@ -958,6 +958,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('print-templates/{id}/publish', [PrintTemplateController::class, 'publish'])->middleware($perm('company.manage'));
         Route::post('print-templates/{id}/duplicate', [PrintTemplateController::class, 'duplicate'])->middleware($perm('company.manage'));
         Route::put('print-templates/assignments/default', [PrintTemplateController::class, 'assign'])->middleware($perm('company.manage'));
+        Route::delete('print-templates/assignments/default', [PrintTemplateController::class, 'unassign'])->middleware($perm('company.manage'));
 
         // إعدادات العميل (تفضيلات غير محاسبية)
         Route::get('customer-settings', [CustomerSettingsController::class, 'show'])->middleware($perm('partners.view'));

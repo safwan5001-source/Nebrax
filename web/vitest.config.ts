@@ -18,6 +18,7 @@ export default defineConfig({
       ['src/components/reports/**/*.test.tsx', 'jsdom'],
       ['src/components/products/**/*.test.tsx', 'jsdom'],
       ['src/components/inventory/**/*.test.tsx', 'jsdom'],
+      ['src/components/pos/**/*.test.tsx', 'jsdom'],
       ['src/app/(app)/inventory/**/*.test.tsx', 'jsdom'],
       ['src/app/platform/tenants/**/*.test.tsx', 'jsdom'],
     ],

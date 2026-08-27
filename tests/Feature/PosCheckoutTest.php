@@ -98,6 +98,60 @@ class PosCheckoutTest extends TestCase
     }
 
     /** @test */
+    public function pos_checkout_returns_the_frozen_thermal_template_for_each_new_sale_only(): void
+    {
+        $auth = $this->registerTenant('pos-receipt-template', 'owner@pos-receipt-template.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل إيصال POS', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+
+        $templateA = $this->withToken($auth['token'])->postJson('/api/print-templates', [
+            'name' => 'إيصال حراري أ',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-thermal80', 'theme_id' => 'black'],
+        ])->assertCreated();
+        $revisionA = $this->withToken($auth['token'])
+            ->postJson('/api/print-templates/'.$templateA['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+        $this->withToken($auth['token'])->putJson('/api/print-templates/assignments/default', [
+            'document_type' => 'tax_invoice',
+            'usage' => 'thermal',
+            'print_template_revision_id' => $revisionA,
+        ])->assertOk();
+
+        $first = $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])
+            ->assertCreated()
+            ->assertJsonPath('data.thermal_template_revision_id', $revisionA)
+            ->assertJsonPath('data.thermal_template_revision.id', $revisionA)
+            ->assertJsonPath('data.thermal_template_revision.definition.template_id', 'tax-invoice-thermal80');
+        $firstInvoiceId = $first['data']['id'];
+
+        $templateB = $this->withToken($auth['token'])->postJson('/api/print-templates', [
+            'name' => 'إيصال حراري ب',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-thermal80', 'show_logo' => false],
+        ])->assertCreated();
+        $revisionB = $this->withToken($auth['token'])
+            ->postJson('/api/print-templates/'.$templateB['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+        $this->withToken($auth['token'])->putJson('/api/print-templates/assignments/default', [
+            'document_type' => 'tax_invoice',
+            'usage' => 'thermal',
+            'print_template_revision_id' => $revisionB,
+        ])->assertOk();
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])
+            ->assertCreated()
+            ->assertJsonPath('data.thermal_template_revision_id', $revisionB)
+            ->assertJsonPath('data.thermal_template_revision.definition.show_logo', false);
+
+        $this->assertSame($revisionA, Invoice::findOrFail($firstInvoiceId)->thermal_template_revision_id);
+    }
+
+    /** @test */
     public function customer_price_list_reprices_the_pos_catalog_and_is_enforced_before_checkout(): void
     {
         $auth = $this->registerTenant();

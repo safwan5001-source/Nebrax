@@ -110,7 +110,10 @@ class PosController extends ApiController
 
         $invoice = $this->domain(fn () => $this->pos->checkout($data));
 
-        $response = (new InvoiceResource($invoice->load('lines')))->response()->setStatusCode(201);
+        // تُحمّل لقطة الإيصال الحراري المثبّتة مع فاتورة البيع الجديد، كي تعرض
+        // واجهة POS المعاينة والطباعة من قرار المحرك وقت الترحيل لا من تعيين حي
+        // قد يتغير بعد إتمام البيع.
+        $response = (new InvoiceResource($invoice->load(['lines', 'thermalTemplateRevision'])))->response()->setStatusCode(201);
         $drawerAction = $invoice->getAttribute('cash_drawer_action');
         if (is_array($drawerAction)) {
             $payload = $response->getData(true);

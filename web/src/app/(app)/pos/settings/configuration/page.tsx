@@ -63,6 +63,35 @@ interface Partner {
   is_active: boolean;
 }
 
+interface ReceiptTemplateRevision {
+  id: string;
+  status: 'draft' | 'published' | 'superseded';
+  document_types: string[];
+  definition?: { template_id?: string } | Record<string, unknown>;
+}
+
+interface ReceiptTemplate {
+  id: string;
+  name: string;
+  status: 'draft' | 'published' | 'archived';
+  document_types: string[];
+  published_revision: ReceiptTemplateRevision | null;
+}
+
+interface ReceiptTemplateAssignment {
+  print_template_revision_id: string;
+}
+
+function isEligibleReceiptTemplate(template: ReceiptTemplate, paperSize: PosConfig['receipt_paper_size']): boolean {
+  const revision = template.published_revision;
+  const expectedTemplateId = paperSize === 'thermal_58' ? 'tax-invoice-thermal58' : 'tax-invoice-thermal80';
+  return template.status === 'published'
+    && template.document_types.includes('tax_invoice')
+    && revision?.status === 'published'
+    && revision.document_types.includes('tax_invoice')
+    && revision.definition?.template_id === expectedTemplateId;
+}
+
 const DEFAULTS: PosConfig = {
   default_customer_id: null,
   default_customer: '',
@@ -96,6 +125,9 @@ export default function PosSettingsPage() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [customers, setCustomers] = useState<Partner[]>([]);
+  const [receiptTemplates, setReceiptTemplates] = useState<ReceiptTemplate[]>([]);
+  const [receiptTemplateRevisionId, setReceiptTemplateRevisionId] = useState('');
+  const [savedReceiptTemplateRevisionId, setSavedReceiptTemplateRevisionId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -104,11 +136,13 @@ export default function PosSettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [settings, paymentMethods, productCategories, partners] = await Promise.all([
+      const [settings, paymentMethods, productCategories, partners, templates, receiptAssignment] = await Promise.all([
         api<{ data: Partial<PosConfig> }>('/sales-config/pos'),
         api<{ data: PaymentMethod[] }>('/payment-methods'),
         api<{ data: ProductCategory[] }>('/product-categories'),
         api<{ data: Partner[] }>('/partners'),
+        api<{ data: ReceiptTemplate[] }>('/print-templates'),
+        api<{ data: ReceiptTemplateAssignment | null }>('/print-templates/resolve?document_type=tax_invoice&usage=thermal'),
       ]);
       const configuration = { ...settings.data } as Partial<PosConfig> & Record<string, unknown>;
       // يبقى درج النقدية في مركزه المستقل؛ لا يظهر ولا يُعاد إرساله من هذه الشاشة.
@@ -119,6 +153,10 @@ export default function PosSettingsPage() {
       setMethods(paymentMethods.data.filter((method) => method.is_active));
       setCategories(productCategories.data.filter((category) => category.is_active));
       setCustomers(partners.data.filter((partner) => partner.is_active && ['customer', 'both'].includes(partner.type)));
+      setReceiptTemplates(templates.data);
+      const revisionId = receiptAssignment.data?.print_template_revision_id ?? '';
+      setReceiptTemplateRevisionId(revisionId);
+      setSavedReceiptTemplateRevisionId(revisionId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('load_failed'));
     } finally {
@@ -134,6 +172,11 @@ export default function PosSettingsPage() {
     sub: [customer.code, customer.phone ?? customer.mobile].filter(Boolean).join(' · ') || undefined,
     hint: customer.id,
   })), [customers]);
+
+  const eligibleReceiptTemplates = useMemo(
+    () => receiptTemplates.filter((template) => isEligibleReceiptTemplate(template, config?.receipt_paper_size ?? 'thermal_80')),
+    [config?.receipt_paper_size, receiptTemplates],
+  );
 
   const enabledMethods = useMemo(() => {
     if (!config || config.payment_methods_mode === 'none') return [];
@@ -253,6 +296,23 @@ export default function PosSettingsPage() {
           },
         },
       });
+      if (receiptTemplateRevisionId !== savedReceiptTemplateRevisionId) {
+        if (receiptTemplateRevisionId) {
+          await api('/print-templates/assignments/default', {
+            method: 'PUT',
+            body: {
+              document_type: 'tax_invoice',
+              usage: 'thermal',
+              print_template_revision_id: receiptTemplateRevisionId,
+            },
+          });
+        } else if (savedReceiptTemplateRevisionId) {
+          await api('/print-templates/assignments/default', {
+            method: 'DELETE',
+            body: { document_type: 'tax_invoice', usage: 'thermal' },
+          });
+        }
+      }
       success(tc('updated'));
       await load();
     } catch (err) {
@@ -516,12 +576,44 @@ export default function PosSettingsPage() {
                   id="receipt_paper_size"
                   value={config.receipt_paper_size}
                   disabled={!config.print_receipt}
-                  onChange={(event) => patch('receipt_paper_size', event.target.value as PosConfig['receipt_paper_size'])}
+                  onChange={(event) => {
+                    const paperSize = event.target.value as PosConfig['receipt_paper_size'];
+                    patch('receipt_paper_size', paperSize);
+                    setReceiptTemplateRevisionId((current) => receiptTemplates.some((template) => (
+                      template.published_revision?.id === current && isEligibleReceiptTemplate(template, paperSize)
+                    )) ? current : '');
+                  }}
                 >
                   <option value="thermal_80">{t('receipt_paper_80')}</option>
                   <option value="thermal_58">{t('receipt_paper_58')}</option>
                 </Select>
                 <p className="text-xs leading-relaxed text-muted">{t('receipt_paper_size_hint')}</p>
+              </div>
+
+              <div className={config.print_receipt ? 'space-y-1.5' : 'space-y-1.5 opacity-50'}>
+                <Label htmlFor="default_pos_receipt_template">{t('default_pos_receipt_template')}</Label>
+                <Select
+                  id="default_pos_receipt_template"
+                  value={receiptTemplateRevisionId}
+                  disabled={!config.print_receipt || eligibleReceiptTemplates.length === 0}
+                  onChange={(event) => setReceiptTemplateRevisionId(event.target.value)}
+                >
+                  <option value="">{t('default_pos_receipt_template_fallback')}</option>
+                  {eligibleReceiptTemplates.map((template) => (
+                    <option key={template.published_revision!.id} value={template.published_revision!.id}>{template.name}</option>
+                  ))}
+                </Select>
+                <p className="text-xs leading-relaxed text-muted">{t('default_pos_receipt_template_hint')}</p>
+                {eligibleReceiptTemplates.length === 0 ? (
+                  <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-relaxed text-text">
+                    {t('default_pos_receipt_template_empty')} <Link className="font-medium text-primary hover:underline" href="/document-design">{t('default_pos_receipt_template_manage')}</Link>
+                  </p>
+                ) : null}
+                {receiptTemplateRevisionId ? (
+                  <Button type="button" variant="ghost" size="sm" disabled={!config.print_receipt} onClick={() => setReceiptTemplateRevisionId('')}>
+                    {t('default_pos_receipt_template_reset')}
+                  </Button>
+                ) : null}
               </div>
 
               <div className={config.print_receipt ? 'space-y-1.5' : 'space-y-1.5 opacity-50'}>

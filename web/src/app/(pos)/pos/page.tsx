@@ -34,6 +34,7 @@ import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
+import type { LiveTemplateRevision } from '@/modules/print-templates/services/live-template-definition';
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
 import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 import { runPosCheckout } from '@/lib/pos-checkout';
@@ -109,7 +110,15 @@ interface Product {
 interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null; cash_drawer?: { configured: boolean } }
 interface WorkShift { id: string; name: string; is_active: boolean }
 interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
-interface PosCheckoutResponse { data: { id: string; number: string; total: string }; cash_drawer_action?: CashDrawerAction }
+interface PosCheckoutResponse {
+  data: {
+    id: string;
+    number: string;
+    total: string;
+    thermal_template_revision?: LiveTemplateRevision | null;
+  };
+  cash_drawer_action?: CashDrawerAction;
+}
 
 const FAV_KEY = 'nibras_pos_favs';
 
@@ -903,7 +912,13 @@ export default function PosPage() {
             qr: result.qr?.qr ?? null,
             footerText: posCfg.receipt_footer,
           });
-          setReceipt({ model, number: created.number });
+          // التذييل يبقى من إعداد POS القائم، بينما المراجعة الحرارية المثبتة
+          // تتحكم في هوية القالب/الثيمة/التخطيط. لا نعيد حلّ assignment حي بعد البيع.
+          setReceipt({
+            model,
+            number: created.number,
+            thermalTemplateRevision: created.thermal_template_revision ?? null,
+          });
         } catch {
           toast({ title: t('sale_done'), description: t('receipt_unavailable'), variant: 'warning' });
         }
