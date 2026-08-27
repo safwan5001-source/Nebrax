@@ -93,17 +93,8 @@ final class ZatcaInvoiceHasher
     private function canonicalizeWithLibxml(string $xml): string
     {
         $inputPath = tempnam(sys_get_temp_dir(), 'zatca-in-');
-        $outputPath = tempnam(sys_get_temp_dir(), 'zatca-out-');
-
-        if ($inputPath === false || $outputPath === false) {
-            if (is_string($inputPath)) {
-                @unlink($inputPath);
-            }
-            if (is_string($outputPath)) {
-                @unlink($outputPath);
-            }
-
-            throw new RuntimeException('تعذر إنشاء ملفات C14N المؤقتة الخاصة بـ ZATCA.');
+        if ($inputPath === false) {
+            throw new RuntimeException('تعذر إنشاء ملف C14N المؤقت الخاص بـ ZATCA.');
         }
 
         try {
@@ -111,10 +102,9 @@ final class ZatcaInvoiceHasher
                 throw new RuntimeException('تعذر تجهيز XML لحساب Hash الخاص بـ ZATCA.');
             }
             @chmod($inputPath, 0600);
-            @chmod($outputPath, 0600);
 
             $process = proc_open(
-                [$this->binary, '--nonet', '--c14n11', '--output', $outputPath, $inputPath],
+                [$this->binary, '--nonet', '--c14n11', $inputPath],
                 [
                     0 => ['pipe', 'r'],
                     1 => ['pipe', 'w'],
@@ -128,21 +118,20 @@ final class ZatcaInvoiceHasher
             }
 
             fclose($pipes[0]);
-            $stdout = stream_get_contents($pipes[1]);
+            $canonical = stream_get_contents($pipes[1]);
             $stderr = stream_get_contents($pipes[2]);
             fclose($pipes[1]);
             fclose($pipes[2]);
             $exitCode = proc_close($process);
 
             if ($exitCode !== 0) {
-                $detail = trim((string) ($stderr !== '' ? $stderr : $stdout));
+                $detail = trim($stderr === false ? '' : $stderr);
                 throw new RuntimeException(
                     'فشل محرك C14N 1.1 الخاص بـ ZATCA'
                     . ($detail !== '' ? ": {$detail}" : '.')
                 );
             }
 
-            $canonical = file_get_contents($outputPath);
             if ($canonical === false || $canonical === '') {
                 throw new RuntimeException('أعاد محرك C14N 1.1 ناتجاً فارغاً.');
             }
@@ -150,7 +139,7 @@ final class ZatcaInvoiceHasher
             return $canonical;
         } finally {
             @unlink($inputPath);
-            @unlink($outputPath);
         }
     }
+
 }

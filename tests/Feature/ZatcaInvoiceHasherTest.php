@@ -17,6 +17,7 @@ class ZatcaInvoiceHasherTest extends TestCase
         $sameBusinessInvoice = $this->invoiceXml('INV-1', 'extension-b', 'signature-b', 'qr-b');
 
         $this->assertSame($hasher->hash($first), $hasher->hash($sameBusinessInvoice));
+        $this->assertNotSame('', $hasher->canonicalize($first));
         $this->assertStringNotContainsString('comment-to-remove', $hasher->canonicalize($first));
     }
 
