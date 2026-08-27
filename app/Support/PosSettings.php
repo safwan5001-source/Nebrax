@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class PosSettings
 {
+    public const DEFAULT_WALKIN_CUSTOMER = 'عميل نقدي (POS)';
     public const CASH_REFUND_ORIGINAL_CASH_ONLY = 'original_cash_only';
     public const CASH_REFUND_ALLOW_ANY_POS_SALE = 'allow_any_pos_sale';
     public const EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY = 'customer_credit_only';
@@ -32,7 +33,10 @@ final class PosSettings
     public const CASH_DRAWER_DRIVER_LOCAL_BRIDGE = 'local_bridge';
 
     private const DEFAULTS = [
-        'default_customer'   => 'عميل نقدي (POS)',
+        // المعرّف هو المصدر المستقر للعميل الافتراضي. الاسم يبقى للتوافق مع
+        // الإصدارات القديمة من POS، ويُطبّع عند الحفظ من سجل العميل نفسه.
+        'default_customer_id' => null,
+        'default_customer'   => self::DEFAULT_WALKIN_CUSTOMER,
         'print_receipt'      => true,
         // قالبا الإيصال الحراري المعتمدان في محرّك المستندات. 80 مم يحافظ على
         // سلوك الكاشير القائم، بينما يتيح 58 مم للطابعات الضيقة بلا تغيير مالي.
