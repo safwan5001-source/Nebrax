@@ -54,7 +54,7 @@ class ZatcaSubmissionService
             }
 
             if ($latest?->status === 'pending') {
-                return ['attempt' => $latest, 'created' => false];
+                abort(409, 'توجد محاولة إرسال معلقة لهذه الفاتورة.');
             }
 
             $attempt = ZatcaSubmissionAttempt::create([
