@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\ZatcaSubmissionAttempt;
-use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\ZatcaSubmissionService;
 use App\Tenancy\TenantContext;
@@ -26,7 +25,6 @@ class ZatcaSubmissionAttemptTest extends TestCase
 
         $this->auth = $this->registerTenant('zatca-attempts', 'zatca-attempts@example.test');
         app(TenantContext::class)->set($this->auth['tenant_id']);
-        app(ChartOfAccountsSeeder::class)->seed($this->auth['tenant_id']);
         $this->customer = Partner::create(['name' => 'عميل ZATCA', 'type' => 'customer']);
     }
 
