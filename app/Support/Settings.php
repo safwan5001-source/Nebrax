@@ -204,7 +204,10 @@ class Settings
          *  **الافتراض `tenant` ولا يتغيّر تلقائياً لأي مستأجر — قائمٍ أو جديد.**
          */
         'zatca' => [
-            'icv_scope' => 'tenant', // tenant | branch — انظر ZatcaIcvScope
+            'icv_scope'       => 'tenant', // tenant | branch — انظر ZatcaIcvScope
+            // سياسة الإرسال لا تنفّذ اتصالاً وحدها. الوضع اليدوي افتراض آمن،
+            // و`automatic` ستقرأه طبقة orchestration عند إضافة النقل الحي.
+            'submission_mode' => 'manual', // manual | automatic
         ],
 
         /**

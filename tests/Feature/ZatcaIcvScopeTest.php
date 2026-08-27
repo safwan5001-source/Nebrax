@@ -72,6 +72,41 @@ class ZatcaIcvScopeTest extends TestCase
         $this->assertSame(ZatcaIcvScope::TENANT, ZatcaIcvScope::current());
     }
 
+    /** افتراض الإرسال يدوي وآمن، ويمكن حفظ التلقائي دون تغيير نطاق ICV. @test */
+    public function submission_mode_defaults_to_manual_and_persists_automatic(): void
+    {
+        $auth = $this->registerTenant();
+
+        $this->withToken($auth['token'])->getJson('/api/zatca-settings')
+            ->assertOk()
+            ->assertJsonPath('data.submission_mode', 'manual')
+            ->assertJsonPath('data.icv_scope', 'tenant');
+
+        $this->withToken($auth['token'])->putJson('/api/zatca-settings', [
+            'submission_mode' => 'automatic',
+        ])->assertOk()
+            ->assertJsonPath('data.submission_mode', 'automatic')
+            ->assertJsonPath('data.icv_scope', 'tenant');
+
+        $this->withToken($auth['token'])->getJson('/api/zatca-settings')
+            ->assertOk()
+            ->assertJsonPath('data.submission_mode', 'automatic');
+    }
+
+    /** لا تُقبل قيمة مبهمة قد تغيّر سلوك الإرسال لاحقاً بصمت. @test */
+    public function submission_mode_rejects_unknown_values(): void
+    {
+        $auth = $this->registerTenant();
+
+        $this->withToken($auth['token'])->putJson('/api/zatca-settings', [
+            'submission_mode' => 'sometimes',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('submission_mode');
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame('manual', Settings::get('zatca', 'submission_mode'));
+    }
+
     /**
      * تحت النطاق الافتراضي: العدّاد سلسلة واحدة متّصلة للمؤسسة مهما تعدّدت
      * الفروع — وسلسلة الهاش تتبعه.

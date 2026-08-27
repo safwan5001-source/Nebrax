@@ -16,7 +16,8 @@ class UpdateZatcaSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'icv_scope' => ['nullable', 'in:' . implode(',', ZatcaIcvScope::ALL)],
+            'icv_scope'       => ['nullable', 'in:' . implode(',', ZatcaIcvScope::ALL)],
+            'submission_mode' => ['nullable', 'in:manual,automatic'],
         ];
     }
 
