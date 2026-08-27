@@ -33,6 +33,8 @@ interface Session {
   difference: string | null;
   difference_status: 'pending' | 'acknowledged' | 'not_required' | null;
   difference_acknowledgement: { acknowledged_by: string; acknowledged_at: string; note: string } | null;
+  variance_type: 'shortage' | 'overage' | null;
+  variance_journal_entry_id: string | null;
   opened_at: string | null;
   closed_at: string | null;
 }
@@ -60,7 +62,7 @@ export default function PosSessionsPage() {
   const t = useTranslations('posSessions');
   const tp = useTranslations('pos');
   const tc = useTranslations('common');
-  const { success } = useToast();
+  const { success, error: errorToast } = useToast();
   const [data, setData] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -145,6 +147,18 @@ export default function PosSessionsPage() {
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
 
+  async function settleVariance(sessionId: string) {
+    setBusy(true);
+    try {
+      await api(`/pos-sessions/${sessionId}/settle-variance`, { method: 'POST' });
+      success(t('variance_settled_success')); load();
+    } catch (e) {
+      // خطأ التهيئة (حساب الفروق مفقود/معطّل) يعرض برسالة الخادم الواضحة عبر توست
+      // لأن الإجراء بلا حوار؛ لا يترك المستخدم بلا سبب ظاهر.
+      errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
+    } finally { setBusy(false); }
+  }
+
   async function openReport(session: Session) {
     setReportSession(session); setReport(null); setError(null); setReportLoading(true);
     try {
@@ -168,6 +182,7 @@ export default function PosSessionsPage() {
     exchange_recorded: t('event_exchange_recorded'),
     closing_difference_requires_acknowledgement: t('event_closing_difference_requires_acknowledgement'),
     closing_difference_acknowledged: t('event_closing_difference_acknowledged'),
+    closing_difference_settled: t('event_closing_difference_settled'),
   };
   const differenceLabels: Record<string, string> = {
     pending: t('difference_pending'),
@@ -193,9 +208,11 @@ export default function PosSessionsPage() {
         id: 'differenceStatus', header: t('status'),
         cell: ({ row }) => row.original.status === 'open'
           ? <Badge tone="warning">{t('open_status')}</Badge>
-          : row.original.difference_status
-            ? <Badge tone={row.original.difference_status === 'pending' ? 'warning' : 'positive'}>{differenceLabels[row.original.difference_status]}</Badge>
-            : <Badge tone="positive">{t('closed_status')}</Badge>,
+          : row.original.variance_journal_entry_id
+            ? <Badge tone="positive">{t('variance_settled')}</Badge>
+            : row.original.difference_status
+              ? <Badge tone={row.original.difference_status === 'pending' ? 'warning' : 'positive'}>{differenceLabels[row.original.difference_status]}</Badge>
+              : <Badge tone="positive">{t('closed_status')}</Badge>,
       },
       {
         id: 'actions', header: t('actions'),
@@ -220,11 +237,16 @@ export default function PosSessionsPage() {
                 <ClipboardCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('acknowledge_difference')}
               </Button>
             )}
+            {row.original.status === 'closed' && row.original.difference_status === 'acknowledged' && !row.original.variance_journal_entry_id && (
+              <Button variant="outline" size="sm" disabled={!canAcknowledgeDifference || busy} title={!canAcknowledgeDifference ? t('approver_only') : undefined} onClick={() => settleVariance(row.original.id)}>
+                <ClipboardCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('settle_variance')}
+              </Button>
+            )}
           </div>
         ),
       },
     ],
-    [canAcknowledgeDifference, differenceLabels, t, tp],
+    [busy, canAcknowledgeDifference, differenceLabels, t, tp],
   );
 
   return (

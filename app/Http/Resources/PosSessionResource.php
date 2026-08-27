@@ -17,12 +17,18 @@ class PosSessionResource extends JsonResource
             'pos_device_id'    => $this->pos_device_id,
             'warehouse_id'     => $this->warehouse_id,
             'shift_id'         => $this->shift_id,
+            // حساب خزينة الجلسة المثبّت وقت الفتح؛ للعرض والتتبّع فقط (يحلّه الخادم).
+            'cash_account_id'  => $this->cash_account_id,
             'status'           => $this->status,
             'opening_balance'  => Money::toRiyal($this->opening_balance),
             'closing_balance'  => $this->closing_balance !== null ? Money::toRiyal($this->closing_balance) : null,
             'expected_balance' => $this->expected_balance !== null ? Money::toRiyal($this->expected_balance) : null,
             'difference'       => $this->difference !== null ? Money::toRiyal($this->difference) : null,
             'difference_status' => $this->difference_status,
+            // نوع الفرق مشتق من إشارته: عجز/فائض/لا شيء — لا يخزّن، لعرض الواجهة فقط.
+            'variance_type'    => $this->varianceType(),
+            // رابط قيد التسوية المثبّت؛ وجوده يعني أن الفرق سُوِّي محاسبياً.
+            'variance_journal_entry_id' => $this->variance_journal_entry_id,
             'difference_acknowledgement' => $this->difference_acknowledged_at ? [
                 'acknowledged_by' => $this->difference_acknowledged_by,
                 'acknowledged_at' => $this->difference_acknowledged_at->toIso8601String(),
@@ -48,5 +54,15 @@ class PosSessionResource extends JsonResource
                 'name' => $this->shift->name,
             ] : null),
         ];
+    }
+
+    /** عجز إن كان المعدود أقل من المتوقّع، فائض إن كان أكبر، وإلا لا شيء. */
+    private function varianceType(): ?string
+    {
+        if ($this->difference === null || (int) $this->difference === 0) {
+            return null;
+        }
+
+        return (int) $this->difference < 0 ? 'shortage' : 'overage';
     }
 }

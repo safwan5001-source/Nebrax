@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Models\PosCashMovement;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
+use App\Services\Accounting\CashBankAccountService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -420,5 +423,253 @@ class PosSessionTest extends TestCase
         $this->withToken($b['token'])->getJson('/api/pos-sessions')->assertOk()->assertJsonCount(0, 'data');
         $this->withToken($b['token'])->getJson('/api/pos-devices')->assertOk()->assertJsonCount(0, 'data');
         $this->openSession($b, 2000);
+    }
+
+    /** يغلق جلسة برصيد معدود ثم يعتمد الفرق؛ يعيد معرّف الجلسة الجاهزة للتسوية. */
+    private function closedAcknowledgedSession(array $auth, int $opening, int $counted): string
+    {
+        $id = $this->openSession($auth, $opening);
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/close", ['closing_balance' => $counted])->assertOk();
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/acknowledge-difference", [
+            'note' => 'اعتماد الفرق قبل التسوية المحاسبية.',
+        ])->assertOk();
+
+        return $id;
+    }
+
+    /** @return array{account_id:string,debit:int,credit:int}[] */
+    private function varianceEntryLines(string $sessionId): array
+    {
+        $entry = JournalEntry::where('source_type', PosSession::class)->where('source_id', $sessionId)->sole();
+
+        return JournalLine::where('journal_entry_id', $entry->id)
+            ->get(['account_id', 'debit', 'credit'])
+            ->map(fn (JournalLine $line) => ['account_id' => $line->account_id, 'debit' => (int) $line->debit, 'credit' => (int) $line->credit])
+            ->all();
+    }
+
+    /** @test */
+    public function settling_a_shortage_debits_the_variance_account_and_credits_cash_in_one_balanced_entry(): void
+    {
+        $auth = $this->registerTenant('pos-shortage', 'owner@pos-shortage.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        // متوقّع 500.00، معدود 480.00 ⇒ عجز 20.00 (2000 هللة).
+        $id = $this->closedAcknowledgedSession($auth, 50000, 48000);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")
+            ->assertOk()
+            ->assertJsonPath('data.variance_type', 'shortage')
+            ->assertJsonPath('data.difference', '-20.00');
+
+        $session = PosSession::findOrFail($id);
+        $this->assertNotNull($session->variance_journal_entry_id);
+
+        $varianceAccountId = Account::where('code', '5170')->value('id');
+        // التسوية تضرب خزينة الجلسة المثبّتة، لا حساباً عاماً. في الإعداد الافتراضي
+        // خزينة وسيلة النقد هي الخزينة الرئيسية (1110).
+        $cashAccountId = $session->cash_account_id;
+        $this->assertNotNull($cashAccountId);
+        $this->assertSame(app(CashBankAccountService::class)->resolveForPayment(null, 'cash')->account_id, $cashAccountId);
+
+        $lines = $this->varianceEntryLines($id);
+        $this->assertSame(2000, collect($lines)->sum('debit'));
+        $this->assertSame(2000, collect($lines)->sum('credit'));
+        $variance = collect($lines)->firstWhere('account_id', $varianceAccountId);
+        $cash = collect($lines)->firstWhere('account_id', $cashAccountId);
+        $this->assertSame(['debit' => 2000, 'credit' => 0], ['debit' => $variance['debit'], 'credit' => $variance['credit']]);
+        $this->assertSame(['debit' => 0, 'credit' => 2000], ['debit' => $cash['debit'], 'credit' => $cash['credit']]);
+
+        $this->assertDatabaseHas('pos_session_events', [
+            'pos_session_id' => $id,
+            'type' => PosSessionEvent::TYPE_CLOSING_DIFFERENCE_SETTLED,
+        ]);
+    }
+
+    /** @test */
+    public function settling_an_overage_debits_cash_and_credits_the_variance_account(): void
+    {
+        $auth = $this->registerTenant('pos-overage', 'owner@pos-overage.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        // متوقّع 500.00، معدود 515.00 ⇒ فائض 15.00 (1500 هللة).
+        $id = $this->closedAcknowledgedSession($auth, 50000, 51500);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")
+            ->assertOk()
+            ->assertJsonPath('data.variance_type', 'overage')
+            ->assertJsonPath('data.difference', '15.00');
+
+        $varianceAccountId = Account::where('code', '5170')->value('id');
+        $cashAccountId = PosSession::findOrFail($id)->cash_account_id;
+
+        $lines = $this->varianceEntryLines($id);
+        $this->assertSame(1500, collect($lines)->sum('debit'));
+        $this->assertSame(1500, collect($lines)->sum('credit'));
+        $variance = collect($lines)->firstWhere('account_id', $varianceAccountId);
+        $cash = collect($lines)->firstWhere('account_id', $cashAccountId);
+        $this->assertSame(['debit' => 0, 'credit' => 1500], ['debit' => $variance['debit'], 'credit' => $variance['credit']]);
+        $this->assertSame(['debit' => 1500, 'credit' => 0], ['debit' => $cash['debit'], 'credit' => $cash['credit']]);
+    }
+
+    /** @test */
+    public function variance_settlement_is_idempotent_and_posts_exactly_one_journal_entry(): void
+    {
+        $auth = $this->registerTenant('pos-idem', 'owner@pos-idem.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->closedAcknowledgedSession($auth, 50000, 48000);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertOk();
+        // إعادة الطلب (تحديث/إعادة إرسال) لا تُنشئ قيداً ثانياً.
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+
+        $this->assertSame(1, JournalEntry::where('source_type', PosSession::class)->where('source_id', $id)->count());
+    }
+
+    /** @test */
+    public function settlement_requires_a_prior_acknowledgement_and_the_approval_permission(): void
+    {
+        $auth = $this->registerTenant('pos-gate', 'owner@pos-gate.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->openSession($auth, 50000);
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/close", ['closing_balance' => 48000])->assertOk();
+
+        // قبل الاعتماد: التسوية مرفوضة ولا تُنشئ قيداً.
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+        $this->assertSame(0, JournalEntry::where('source_type', PosSession::class)->count());
+
+        // كاشير بلا صلاحية الاعتماد لا يستطيع التسوية مباشرةً عبر المسار.
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/acknowledge-difference", [
+            'note' => 'اعتماد قبل اختبار الصلاحية.',
+        ])->assertOk();
+        $staff = $this->tokenForRole($auth['tenant_id'], 'accountant', 'settle-staff@pos-gate.test');
+        $this->withToken($staff)->postJson("/api/pos-sessions/{$id}/settle-variance")->assertForbidden();
+        $this->assertSame(0, JournalEntry::where('source_type', PosSession::class)->count());
+    }
+
+    /** @test */
+    public function a_missing_variance_account_blocks_settlement_cleanly_without_a_partial_journal(): void
+    {
+        $auth = $this->registerTenant('pos-noacct', 'owner@pos-noacct.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->closedAcknowledgedSession($auth, 50000, 48000);
+
+        // محاكاة تهيئة محاسبية ناقصة: تعطيل حساب فروق الصندوق.
+        Account::where('code', '5170')->update(['is_active' => false]);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+        $this->assertSame(0, JournalEntry::where('source_type', PosSession::class)->count());
+        $this->assertNull(PosSession::findOrFail($id)->variance_journal_entry_id);
+        // الجلسة تبقى معتمدة قابلة للتسوية بعد إصلاح الحساب — لا حالة تالفة.
+        $this->assertSame('acknowledged', PosSession::findOrFail($id)->difference_status);
+    }
+
+    /** @test */
+    public function a_zero_variance_session_cannot_be_settled_and_settlement_respects_tenant_isolation(): void
+    {
+        $auth = $this->registerTenant('pos-zero', 'owner@pos-zero.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->openSession($auth, 50000);
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/close", ['closing_balance' => 50000])
+            ->assertOk()->assertJsonPath('data.difference', '0.00')->assertJsonPath('data.difference_status', 'not_required');
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+        $this->assertSame(0, JournalEntry::where('source_type', PosSession::class)->count());
+
+        // مستأجر آخر لا يرى الجلسة ولا يسوّي فرقها.
+        $other = $this->registerTenant('pos-other', 'owner@pos-other.test');
+        $this->withToken($other['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertNotFound();
+    }
+
+    /** @return array{id:string,account_id:string} خزينة نقدية مسمّاة تحت مجموعة الخزائن. */
+    private function namedCashTreasury(array $auth, string $name): array
+    {
+        return $this->withToken($auth['token'])->postJson('/api/cash-bank-accounts', [
+            'type' => 'cash', 'name' => $name, 'currency' => 'SAR',
+            'deposit_scope' => 'all', 'withdraw_scope' => 'all',
+        ])->assertCreated()->json('data');
+    }
+
+    /** يوجّه وسيلة النقد الافتراضية إلى خزينة محددة، فتصير خزينة نقد POS. */
+    private function pointCashMethodToTreasury(array $auth, string $cashBankAccountId): void
+    {
+        $methods = $this->withToken($auth['token'])->getJson('/api/payment-methods')->assertOk()['data'];
+        $cash = collect($methods)->firstWhere('settlement_type', 'cash');
+        $this->withToken($auth['token'])->putJson("/api/payment-methods/{$cash['id']}", [
+            'name' => $cash['name'],
+            'settlement_type' => 'cash',
+            'cash_bank_account_id' => $cashBankAccountId,
+            'is_active' => true,
+            'is_default' => true,
+        ])->assertOk();
+    }
+
+    /** @test */
+    public function settlement_hits_the_actual_session_treasury_not_the_main_cashbox_when_they_differ(): void
+    {
+        $auth = $this->registerTenant('pos-treasury', 'owner@pos-treasury.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $mainCashAccountId = app(CashBankAccountService::class)->resolveForPayment(null, 'cash')->account_id;
+
+        // خزينة نقد ثانية (غير رئيسية) هي خزينة وسيلة النقد فعلياً.
+        $treasury = $this->namedCashTreasury($auth, 'خزينة المعرض');
+        $this->assertNotSame($mainCashAccountId, $treasury['account_id']);
+        $this->pointCashMethodToTreasury($auth, $treasury['id']);
+
+        $id = $this->closedAcknowledgedSession($auth, 50000, 48000); // عجز 2000
+        $session = PosSession::findOrFail($id);
+        // الجلسة تثبّت خزينتها الفعلية عند الفتح، لا الرئيسية العامة.
+        $this->assertSame($treasury['account_id'], $session->cash_account_id);
+        $this->assertNotSame($mainCashAccountId, $session->cash_account_id);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertOk();
+
+        $lines = $this->varianceEntryLines($id);
+        $treasuryLine = collect($lines)->firstWhere('account_id', $treasury['account_id']);
+        $this->assertSame(['debit' => 0, 'credit' => 2000], ['debit' => $treasuryLine['debit'], 'credit' => $treasuryLine['credit']]);
+        // لا سطر على الخزينة الرئيسية إطلاقاً.
+        $this->assertNull(collect($lines)->firstWhere('account_id', $mainCashAccountId));
+    }
+
+    /** @test */
+    public function the_session_treasury_is_frozen_at_opening_and_two_sessions_bind_to_their_own_treasuries(): void
+    {
+        $auth = $this->registerTenant('pos-drift', 'owner@pos-drift.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $treasuryA = $this->namedCashTreasury($auth, 'خزينة أ');
+        $this->pointCashMethodToTreasury($auth, $treasuryA['id']);
+        $first = $this->closedAcknowledgedSession($auth, 50000, 48000); // عجز 2000 على خزينة أ
+
+        // انجراف: تُغيَّر خزينة وسيلة النقد إلى خزينة ب بعد فتح الجلسة الأولى.
+        $treasuryB = $this->namedCashTreasury($auth, 'خزينة ب');
+        $this->pointCashMethodToTreasury($auth, $treasuryB['id']);
+        $second = $this->closedAcknowledgedSession($auth, 50000, 51000); // فائض 1000 على خزينة ب
+
+        $this->assertSame($treasuryA['account_id'], PosSession::findOrFail($first)->cash_account_id);
+        $this->assertSame($treasuryB['account_id'], PosSession::findOrFail($second)->cash_account_id);
+
+        // تسوية الجلسة الأولى تبقى على خزينة أ رغم تغيّر خزينة الطريقة — لا انجراف.
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$first}/settle-variance")->assertOk();
+        $firstLines = $this->varianceEntryLines($first);
+        $this->assertSame(2000, collect($firstLines)->firstWhere('account_id', $treasuryA['account_id'])['credit']);
+        $this->assertNull(collect($firstLines)->firstWhere('account_id', $treasuryB['account_id']));
+
+        // تسوية الجلسة الثانية تضرب خزينة ب.
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$second}/settle-variance")->assertOk();
+        $secondLines = $this->varianceEntryLines($second);
+        $this->assertSame(1000, collect($secondLines)->firstWhere('account_id', $treasuryB['account_id'])['debit']);
+    }
+
+    /** @test */
+    public function a_legacy_session_without_a_bound_treasury_blocks_settlement_cleanly(): void
+    {
+        $auth = $this->registerTenant('pos-legacy-treasury', 'owner@pos-legacy-treasury.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->closedAcknowledgedSession($auth, 50000, 48000);
+
+        // محاكاة جلسة سابقة للهجرة لا تحمل خزينة مثبتة.
+        PosSession::whereKey($id)->update(['cash_account_id' => null]);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+        $this->assertSame(0, JournalEntry::where('source_type', PosSession::class)->count());
+        $this->assertNull(PosSession::findOrFail($id)->variance_journal_entry_id);
     }
 }
