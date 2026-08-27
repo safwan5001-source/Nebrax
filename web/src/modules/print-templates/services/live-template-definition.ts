@@ -15,12 +15,14 @@ export interface LiveTemplateDefinition {
   signature?: string;
 }
 
+export interface LiveTemplateRevision {
+  id: string;
+  definition?: LiveTemplateDefinition | Record<string, unknown>;
+}
+
 export interface LivePrintTemplateAssignment {
   print_template_revision_id: string;
-  revision?: {
-    id: string;
-    definition?: LiveTemplateDefinition | Record<string, unknown>;
-  } | null;
+  revision?: LiveTemplateRevision | null;
 }
 
 export interface ResolvedLiveTemplate {
@@ -47,11 +49,12 @@ function isCurrentDefinition(value: unknown): value is LiveTemplateDefinition {
  * القديم (`legacy_sales_designs`) ليس عقداً حديثاً، لذلك يعود `null` صراحةً كي
  * تستخدم الصفحة عارضها الافتراضي الآمن بدلاً من تفسيره جزئياً أو إظهار قالب كاذب.
  */
-export function resolveLiveTemplateDefinition(
-  assignment: LivePrintTemplateAssignment | null | undefined,
+/** يحول snapshot مراجعة منشورة مباشرةً من مورد المستند إلى قيم العارض. */
+export function resolveTemplateRevisionDefinition(
+  revision: LiveTemplateRevision | null | undefined,
   documentType: DocumentTypeId,
 ): ResolvedLiveTemplate | null {
-  const definition = assignment?.revision?.definition;
+  const definition = revision?.definition;
   if (!isCurrentDefinition(definition)) return null;
 
   const template = getTemplate(definition.template_id);
@@ -71,4 +74,12 @@ export function resolveLiveTemplateDefinition(
     stampUrl: definition.stamp?.trim() || null,
     signatureUrl: definition.signature?.trim() || null,
   };
+}
+
+/** يحول التعيين الحي العام إلى قيم العارض، مع بقاء الواجهات القديمة متوافقة. */
+export function resolveLiveTemplateDefinition(
+  assignment: LivePrintTemplateAssignment | null | undefined,
+  documentType: DocumentTypeId,
+): ResolvedLiveTemplate | null {
+  return resolveTemplateRevisionDefinition(assignment?.revision, documentType);
 }

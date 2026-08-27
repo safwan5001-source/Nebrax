@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\Account;
 use App\Models\AccountBalance;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -22,28 +23,79 @@ class AccountManagementService
      */
     public function create(array $data): Account
     {
-        return DB::transaction(function () use ($data) {
-            $parent = $this->resolveParent($data['parent_id'] ?? null, $data['type']);
+        try {
+            return DB::transaction(function () use ($data) {
+                $parent = $this->resolveParent($data['parent_id'] ?? null, $data['type']);
 
-            $account = Account::create([
-                'parent_id'      => $parent?->id,
-                'code'           => $data['code'],
-                'name'           => $data['name'],
-                'name_en'        => $data['name_en'] ?? null,
-                'type'           => $data['type'],
-                'normal_balance' => $this->normalBalanceFor($data['type']),
-                'is_group'       => $data['is_group'],
-                'is_system'      => false,
-                'is_active'      => $data['is_active'] ?? true,
-            ]);
+                $account = Account::create([
+                    'parent_id'      => $parent?->id,
+                    'code'           => $data['code'],
+                    'name'           => $data['name'],
+                    'name_en'        => $data['name_en'] ?? null,
+                    'type'           => $data['type'],
+                    'normal_balance' => $this->normalBalanceFor($data['type']),
+                    'is_group'       => $data['is_group'],
+                    'is_system'      => false,
+                    'is_active'      => $data['is_active'] ?? true,
+                ]);
 
-            AccountBalance::firstOrCreate(
-                ['account_id' => $account->id],
-                ['balance' => 0, 'total_debit' => 0, 'total_credit' => 0]
-            );
+                AccountBalance::firstOrCreate(
+                    ['account_id' => $account->id],
+                    ['balance' => 0, 'total_debit' => 0, 'total_credit' => 0]
+                );
 
-            return $account->load(['balance'])->loadCount('children');
-        });
+                return $account->load(['balance'])->loadCount('children');
+            });
+        } catch (QueryException $exception) {
+            // تتحقق FormRequest في المسار العادي. يبقى القيد الفريد الحارس الأخير
+            // عند وصول طلبي إنشاء متزامنين بالكود نفسه، فنحوّل التعارض إلى خطأ مجال
+            // مفهوم بدل تسريب خطأ SQL أو جعله استجابة 500.
+            if ($this->isDuplicateCodeViolation($exception)) {
+                throw new RuntimeException('كود الحساب مستخدم بالفعل في دليل الحسابات. حدّث الكود وحاول مرة أخرى.');
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * يقترح كوداً أولياً قابلاً للتحرير، ولا يفرض إعادة ترقيم أو قاعدة جديدة
+     * على الأكواد القائمة. تعتمد الخوارزمية على أبناء الأب الفعلي لا على عددهم:
+     * أكبر لاحقة رقمية تحت البادئة نفسها ثم التالي؛ لذلك لا تعيد استخدام كود بعد
+     * حذف ابن ولا تفترض أن كل الأدلة التاريخية تستخدم طولاً أو تقسيمًا واحداً.
+     */
+    public function suggestNextCode(?string $parentId, string $type): string
+    {
+        $parent = $this->resolveParent($parentId, $type);
+
+        if ($parent === null) {
+            return $this->suggestRootCode();
+        }
+
+        $prefix = $parent->code;
+        $pattern = '/^' . preg_quote($prefix, '/') . '(\d+)$/';
+        $suffixes = Account::query()
+            ->where('parent_id', $parent->id)
+            ->pluck('code')
+            ->map(function (string $code) use ($pattern): ?string {
+                return preg_match($pattern, $code, $matches) === 1 ? $matches[1] : null;
+            })
+            ->filter(fn (?string $suffix) => $suffix !== null)
+            ->values();
+
+        // حين توجد أكواد قائمة نحافظ على طول لاحقتها؛ وعند عدم وجود ابن يبدأ
+        // الاقتراح بقطاع 001 واضح قابل للتمديد من دون إعادة تفسير أي كود تاريخي.
+        $width = $suffixes->isEmpty()
+            ? 3
+            : max(...$suffixes->map(fn (string $suffix) => strlen($suffix))->all());
+        $next = $suffixes->isEmpty() ? 1 : ((int) $suffixes->map(fn (string $suffix) => (int) $suffix)->max() + 1);
+
+        do {
+            $candidate = $prefix . str_pad((string) $next, $width, '0', STR_PAD_LEFT);
+            $next++;
+        } while (Account::where('code', $candidate)->exists());
+
+        return $candidate;
     }
 
     /**
@@ -103,6 +155,23 @@ class AccountManagementService
         });
     }
 
+    private function suggestRootCode(): string
+    {
+        $codes = Account::query()
+            ->whereNull('parent_id')
+            ->pluck('code')
+            ->filter(fn (string $code) => ctype_digit($code));
+
+        $next = $codes->isEmpty() ? 1 : ((int) $codes->map(fn (string $code) => (int) $code)->max() + 1);
+
+        do {
+            $candidate = (string) $next;
+            $next++;
+        } while (Account::where('code', $candidate)->exists());
+
+        return $candidate;
+    }
+
     private function resolveParent(?string $parentId, string $type): ?Account
     {
         if ($parentId === null) {
@@ -150,5 +219,11 @@ class AccountManagementService
     private function normalBalanceFor(string $type): string
     {
         return in_array($type, ['asset', 'expense'], true) ? 'debit' : 'credit';
+    }
+
+    private function isDuplicateCodeViolation(QueryException $exception): bool
+    {
+        return in_array((string) $exception->getCode(), ['23000', '23505'], true)
+            && str_contains($exception->getMessage(), 'accounts');
     }
 }

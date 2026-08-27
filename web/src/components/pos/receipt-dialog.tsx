@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,16 @@ import { DocumentView } from '@/modules/documents/components/document-view';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { printDocument } from '@/modules/documents/services/export';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
+import { getTemplate } from '@/modules/documents/registry/templates';
+import { resolveTemplateRevisionDefinition, type LiveTemplateRevision } from '@/modules/print-templates/services/live-template-definition';
 import type { DocumentModel } from '@/modules/documents/types';
 
 export interface Receipt {
   /** نموذج المستند للإيصال الحراري (يُبنى من السلة عبر محرّك المستندات). */
   model: DocumentModel;
   number: string;
+  /** لقطة مراجعة thermal التي ثبتها الخادم وقت ترحيل فاتورة البيع. */
+  thermalTemplateRevision?: LiveTemplateRevision | null;
 }
 
 type ReceiptPaperSize = 'thermal_58' | 'thermal_80';
@@ -48,7 +52,24 @@ export function ReceiptDialog({
 }) {
   const t = useTranslations('pos');
   const printedFor = useRef<string | null>(null);
-  const format = RECEIPT_FORMATS[paperSize];
+  const resolvedTemplate = useMemo(
+    () => resolveTemplateRevisionDefinition(receipt?.thermalTemplateRevision, 'tax_invoice'),
+    [receipt?.thermalTemplateRevision],
+  );
+  const format = useMemo(() => {
+    const fallback = RECEIPT_FORMATS[paperSize];
+    if (!resolvedTemplate || !getTemplate(resolvedTemplate.templateId).supportedPaper.includes(paperSize)) {
+      return fallback;
+    }
+
+    return {
+      ...fallback,
+      templateId: resolvedTemplate.templateId,
+      themeId: resolvedTemplate.themeId,
+      showLogo: resolvedTemplate.showLogo,
+      layout: resolvedTemplate.layout,
+    };
+  }, [paperSize, resolvedTemplate]);
 
   useEffect(() => {
     if (!receipt || !autoPrint) return;
@@ -64,9 +85,16 @@ export function ReceiptDialog({
 
   return (
     <Dialog open={!!receipt} onClose={onClose} title={t('receipt')} className="max-w-xs">
-      <div className="max-h-[60vh] overflow-auto rounded-lg bg-gray-100 p-2 dark:bg-black/30">
+      <div className="max-h-[60vh] overflow-auto rounded-lg bg-background p-2">
         <DocumentScaler>
-          <DocumentView model={receipt.model} templateId={format.templateId} rootId="print-root" />
+          <DocumentView
+            model={receipt.model}
+            templateId={format.templateId}
+            themeId={'themeId' in format ? format.themeId : undefined}
+            showLogo={'showLogo' in format ? format.showLogo : undefined}
+            layout={'layout' in format ? format.layout : undefined}
+            rootId="print-root"
+          />
         </DocumentScaler>
       </div>
       <div className="mt-4 flex justify-end gap-2 no-print">

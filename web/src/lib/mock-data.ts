@@ -3,6 +3,7 @@
 
 import { DEMO_USER } from './demo';
 import { handleDocumentReviewDemo } from './document-review-demo';
+import { handleDocumentOperationsDemo } from './document-operations-demo';
 import {
   deleteDemoProductMedia,
   demoId,
@@ -352,6 +353,60 @@ export const mockAccounts: MockAccount[] = [
   acc('5150', 'مصروفات عامة', 'General Expenses', 'expense', false, '9750.00'),
   acc('5160', 'الإهلاك', 'Depreciation', 'expense', false, '18500.00'),
 ];
+
+const mockAccountParentCodes: Record<string, string | null> = {
+  '1': null, '11': '1', '1110': '11', '1120': '11', '1130': '11', '1140': '11', '1150': '11',
+  '12': '1', '1210': '12', '1220': '12', '1230': '12',
+  '2': null, '21': '2', '2110': '21', '2120': '21', '2130': '21', '2140': '21', '2150': '21',
+  '3': null, '3110': '3', '3120': '3', '3130': '3',
+  '4': null, '4110': '4', '4120': '4',
+  '5': null, '5110': '5', '5120': '5', '5130': '5', '5140': '5', '5150': '5', '5160': '5',
+};
+
+/** يعيد عقد مساحة عمل الحسابات نفسه كي تبقى معاينة الواجهة وظيفية بلا خادم. */
+export function mockAccountWorkspace() {
+  const byCode = new Map(mockAccounts.map((account) => [account.code, account]));
+  const children = new Map<string, MockAccount[]>();
+  for (const account of mockAccounts) {
+    const parentCode = mockAccountParentCodes[account.code];
+    if (!parentCode) continue;
+    children.set(parentCode, [...(children.get(parentCode) ?? []), account]);
+  }
+
+  const aggregate = (account: MockAccount): number => {
+    const direct = Number(account.balance);
+    return direct + (children.get(account.code) ?? []).reduce((sum, child) => sum + aggregate(child), 0);
+  };
+
+  const pathFor = (account: MockAccount) => {
+    const path: Array<{ id: string; code: string; name: string }> = [];
+    let current: MockAccount | undefined = account;
+    while (current) {
+      path.unshift({ id: current.id, code: current.code, name: current.name });
+      const parentCode: string | null = mockAccountParentCodes[current.code] ?? null;
+      current = parentCode ? byCode.get(parentCode) : undefined;
+    }
+    return path;
+  };
+
+  return mockAccounts.map((account) => {
+    const childCount = (children.get(account.code) ?? []).length;
+    const directBalance = Number(account.balance);
+    const aggregatedBalance = aggregate(account);
+    return {
+      ...account,
+      parent_id: mockAccountParentCodes[account.code] ? `a${mockAccountParentCodes[account.code]}` : null,
+      is_system: true,
+      is_active: true,
+      children_count: childCount,
+      has_entries: !account.is_group && directBalance !== 0,
+      direct_balance: directBalance.toFixed(2),
+      aggregated_balance: aggregatedBalance.toFixed(2),
+      balance: (account.is_group ? aggregatedBalance : directBalance).toFixed(2),
+      path: pathFor(account),
+    };
+  });
+}
 
 export const mockCompany = {
   name: 'نبراس الطموح للتجارة',
@@ -2052,6 +2107,12 @@ const mockFuelShifts = [
 ];
 
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
+  const operationsResponse = handleDocumentOperationsDemo(path, method.toUpperCase(), body);
+  if (operationsResponse.handled) {
+    return 'error' in operationsResponse && operationsResponse.error
+      ? Promise.reject(operationsResponse.error)
+      : resolve(operationsResponse.response as T);
+  }
   const reviewResponse = handleDocumentReviewDemo(path, method.toUpperCase(), body);
   if (reviewResponse.handled) {
     return 'error' in reviewResponse
@@ -2336,14 +2397,27 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         usage?: 'print' | 'pdf' | 'thermal';
         print_template_revision_id?: string;
       };
-      const revisionId = input.print_template_revision_id ?? '';
-      const revision = mockRevisionForAssignment(revisionId);
       const documentType = input.document_type ?? '';
       const usage = input.usage ?? 'print';
-      if (!revision || revision.status !== 'published' || !revision.document_types.includes(documentType)) {
+      const branchId = input.branch_id ?? null;
+      if (m === 'DELETE') {
+        const index = mockPrintTemplateAssignments.findIndex((assignment) => (
+          assignment.branch_id === branchId
+          && assignment.document_type === documentType
+          && assignment.usage === usage
+        ));
+        if (index >= 0) mockPrintTemplateAssignments.splice(index, 1);
         return resolve({ data: null });
       }
-      const branchId = input.branch_id ?? null;
+      const revisionId = input.print_template_revision_id ?? '';
+      const revision = mockRevisionForAssignment(revisionId);
+      const expectedThermalTemplateId = usage === 'thermal'
+        ? ['tax-invoice-thermal58', 'tax-invoice-thermal80']
+        : null;
+      if (!revision || revision.status !== 'published' || !revision.document_types.includes(documentType)
+        || (expectedThermalTemplateId !== null && !expectedThermalTemplateId.includes(String(revision.definition.template_id ?? '')))) {
+        return resolve({ data: null });
+      }
       const now = new Date().toISOString();
       const index = mockPrintTemplateAssignments.findIndex((assignment) => (
         assignment.branch_id === branchId
@@ -2371,7 +2445,22 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     }
     // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
     if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
-    if (clean === '/pos/checkout') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body), payment_status: 'paid' } });
+    if (clean === '/pos/checkout') {
+      const thermalAssignment = mockPrintTemplateAssignments.find((assignment) => (
+        assignment.branch_id === null && assignment.document_type === 'tax_invoice' && assignment.usage === 'thermal'
+      ));
+      const thermalTemplateRevision = thermalAssignment
+        ? mockRevisionForAssignment(thermalAssignment.print_template_revision_id)
+        : null;
+      return resolve({ data: {
+        id: 'demo-inv',
+        number: 'INV-2026-0119',
+        total: invoiceTotalFromBody(body),
+        payment_status: 'paid',
+        thermal_template_revision_id: thermalTemplateRevision?.id ?? null,
+        thermal_template_revision: thermalTemplateRevision,
+      } });
+    }
     // إنشاء مصروف: نُعيد إجمالاً محسوباً من المبلغ والضريبة (مسودة).
     if (clean === '/expenses') {
       const b = (body ?? {}) as { amount?: number; tax_rate?: number };
@@ -2528,6 +2617,8 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/appointments') return resolve({ data: mockAppointments });
   if (clean === '/contacts') return resolve({ data: mockContacts });
   if (clean === '/crm-activities') return resolve({ data: mockCrmActivities });
+  if (clean === '/accounts/workspace') return resolve({ data: mockAccountWorkspace() });
+  if (clean === '/accounts/code-suggestion') return resolve({ data: { code: '5190' } });
   if (clean === '/accounts') return resolve({ data: mockAccounts });
   if (clean === '/expenses') return resolve({ data: mockExpenses });
   if (clean === '/assets') return resolve({ data: mockAssets });

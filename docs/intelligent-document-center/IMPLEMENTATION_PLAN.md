@@ -76,9 +76,11 @@ No partial allocation, remaining quantity, unlink/rebuild correction, source ret
 
 No public receive endpoint, API key, OAuth, webhook, provider, network connection, worker, polling, scheduler, or vendor channel is activated. `api` remains a known but unsupported contract value until a separate API-platform project provides scoped inbound credentials. Manual web upload remains `source_type=manual` and unchanged. Review list/detail now expose only real masked channel evidence and can filter by channel server-side; no management UI is added without a real external channel surface. The phase creates no Invoice, Purchase, Expense, DeliveryNote, journal, payment, stock movement, master data, extraction, or `post()` effect. See [ADR-011](ADR-011-CHANNELS-AND-INTEGRATIONS.md).
 
-### PR-12 — Operations, Usage, Retention, and Governance
+### PR-12 — Operations, Usage, Retention, and Governance — Implemented
 
-Complete dashboards, safe retry tools, usage/cost reporting, retention jobs, redaction, audit export, support diagnostics, and tenant-visible processing status without exposing secrets or provider payloads.
+تضيف المرحلة لوحات operations/usage/governance للمستأجر ولوحة platform محروسة، وحالة معالجة server-owned قابلة للرؤية، وretry مقيداً للحالات الفاشلة فقط مع أكواد رفض آمنة، وتقارير usage evidence-only تجمع cost منفصلاً بحسب العملة عند وجوده. تضيف سياسة retention عالمية محافظة بمدة config الافتراضية 365 يوماً، holds append-only، planner/runner يدويين محدودين يبدأان بـdry-run ويدعمان cursor resume، وpurge لا يحذف إلا object عبر `DocumentStorageService` ثم يثبت `purged_at` وmetadata آمنين مع إبقاء evidence/FK. تضيف redaction overlay display/export-only لا يغير extraction أو review أو draft builder، وتصدير CSV محدوداً ومحصناً ضد formula injection، وdiagnostics `document-diagnostics-v1` بقائمة سماح.
+
+لا تفعّل المرحلة AI أو provider network أو durable storage/R2/S3 أو Redis أو worker أو ClamAV أو Render أو scheduler/cron أو polling أو webhook أو inbound API أو credentials. لا توجد support impersonation أو bypass؛ diagnostics الدعم مؤجل حتى عقد مستقل محدد النطاق والموافقة والتدقيق. لا تنشئ المرحلة أي Invoice أو Purchase أو Expense أو DeliveryNote أو journal أو payment أو stock/master-data effect، ولا تستدعي `post()`. راجع [ADR-012](ADR-012-OPERATIONS-USAGE-RETENTION-GOVERNANCE.md).
 
 ### PR-13 — Hardening and Gradual Rollout
 

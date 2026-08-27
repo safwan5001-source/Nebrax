@@ -260,6 +260,9 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
             document_types: [submission.documentType],
             definition: {
               ...FALLBACK.draft_revision!.definition,
+              ...(submission.usage === 'thermal' && submission.documentType === 'tax_invoice'
+                ? { template_id: 'tax-invoice-thermal80' }
+                : {}),
               layout: getDefaultDocumentLayout(submission.documentType),
             },
           },

@@ -762,11 +762,16 @@ class ReportService
      * @return Collection<int, JournalLine>
      */
     /**
-     * يطبّع مرشّح الفرع: قيمة مفردة أو مصفوفة أو غياب.
-     * `null` = كل الفروع (مجمّع) — السلوك الافتراضي.
+     * نطاق الفروع الفعلي للتقرير أو لأي قراءة محاسبية مجمعة. يبقى تقرير
+     * ReportService مصدر الحقيقة لقاعدة تقاطع طلب المستخدم مع صلاحياته.
      *
      * @return array<int,string>|null
      */
+    public function resolvedBranchIds(array $filters): ?array
+    {
+        return $this->branchIds($filters);
+    }
+
     protected function branchIds(array $filters): ?array
     {
         $raw = $filters['branch_id'] ?? null;

@@ -6,6 +6,7 @@ use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use RuntimeException;
 
 /** @see design-system/foundations/multi-branch-architecture.md — مشترك: دليل الحسابات — بنية واحدة للمنشأة (التخصيص للفروع عبر account_branch) */
 class Account extends BaseModel implements CompanyWide
@@ -20,6 +21,23 @@ class Account extends BaseModel implements CompanyWide
         'is_system' => 'boolean',
         'is_active' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Account $account): void {
+            if ($account->is_system) {
+                throw new RuntimeException('لا يمكن حذف حساب نظامي. عطّل الحساب أو أنشئ حساباً مخصصاً عند الحاجة.');
+            }
+
+            if ($account->children()->exists()) {
+                throw new RuntimeException('لا يمكن حذف حساب يحتوي حسابات فرعية. عطّل الحسابات أو أعد تنظيمها أولاً.');
+            }
+
+            if ($account->lines()->exists()) {
+                throw new RuntimeException('لا يمكن حذف حساب له حركات مالية. عطّله للحفاظ على الأثر المحاسبي.');
+            }
+        });
+    }
 
     public function parent(): BelongsTo
     {

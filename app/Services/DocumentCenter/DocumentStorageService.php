@@ -11,9 +11,7 @@ use RuntimeException;
 /** عقد تخزين خاص محايد عن R2/S3؛ بيانات الاتصال لا تدخل صفوف التشغيل. */
 class DocumentStorageService
 {
-    public function __construct(private readonly PlatformIntegrationResolver $integrations)
-    {
-    }
+    public function __construct(private readonly PlatformIntegrationResolver $integrations) {}
 
     public function profile(): string
     {
@@ -51,13 +49,15 @@ class DocumentStorageService
 
     public function delete(string $profile, string $objectKey): void
     {
-        $this->filesystem($profile)->delete($objectKey);
+        if (! $this->filesystem($profile)->delete($objectKey)) {
+            throw new RuntimeException('Document storage delete failed.');
+        }
     }
 
     /** اختبار كتابة وقراءة وحذف لكائن مؤقت لا يتضمن أي بيانات عميل. */
     public function healthCheck(): bool
     {
-        $key = 'healthchecks/' . Str::uuid() . '.txt';
+        $key = 'healthchecks/'.Str::uuid().'.txt';
         $filesystem = $this->filesystem($this->profile());
         try {
             if (! $filesystem->put($key, 'nebrax-storage-health', ['visibility' => 'private'])) {

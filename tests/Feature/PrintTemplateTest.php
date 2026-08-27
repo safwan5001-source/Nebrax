@@ -181,6 +181,51 @@ class PrintTemplateTest extends TestCase
     }
 
     /** @test */
+    public function thermal_assignment_rejects_a_non_thermal_revision_and_can_return_to_engine_fallback(): void
+    {
+        ['token' => $token] = $this->registerTenant('thermal-assignment-guard', 'owner@thermal-assignment-guard.test');
+
+        $nonThermal = $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'قالب صفحة غير حراري',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-classic'],
+        ])->assertCreated();
+        $nonThermalRevisionId = $this->withToken($token)
+            ->postJson('/api/print-templates/'.$nonThermal['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+
+        $this->withToken($token)->putJson('/api/print-templates/assignments/default', [
+            'document_type' => 'tax_invoice',
+            'usage' => 'thermal',
+            'print_template_revision_id' => $nonThermalRevisionId,
+        ])->assertUnprocessable();
+
+        $thermal = $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'قالب حراري صالح',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-thermal80'],
+        ])->assertCreated();
+        $thermalRevisionId = $this->withToken($token)
+            ->postJson('/api/print-templates/'.$thermal['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+
+        $this->withToken($token)->putJson('/api/print-templates/assignments/default', [
+            'document_type' => 'tax_invoice',
+            'usage' => 'thermal',
+            'print_template_revision_id' => $thermalRevisionId,
+        ])->assertOk()->assertJsonPath('data.print_template_revision_id', $thermalRevisionId);
+        $this->withToken($token)->deleteJson('/api/print-templates/assignments/default', [
+            'document_type' => 'tax_invoice',
+            'usage' => 'thermal',
+        ])->assertOk()->assertJsonPath('data', null);
+
+        $this->withToken($token)
+            ->getJson('/api/print-templates/resolve?document_type=tax_invoice&usage=thermal')
+            ->assertOk()
+            ->assertJsonPath('data', null);
+    }
+
+    /** @test */
     public function a_branch_assignment_overrides_the_company_default_and_other_branches_fall_back(): void
     {
         ['token' => $token, 'tenant_id' => $tenantId] = $this->registerTenant('template-branches', 'owner@template-branches.test');
@@ -247,6 +292,28 @@ class PrintTemplateTest extends TestCase
         $this->withToken($bToken)->getJson('/api/print-templates')
             ->assertOk()
             ->assertJsonCount(0, 'data');
+    }
+
+    /** @test */
+    public function thermal_assignment_rejects_a_published_revision_from_another_tenant(): void
+    {
+        ['token' => $aToken] = $this->registerTenant('thermal-alpha', 'owner@thermal-alpha.test');
+        ['token' => $bToken] = $this->registerTenant('thermal-beta', 'owner@thermal-beta.test');
+
+        $template = $this->withToken($aToken)->postJson('/api/print-templates', [
+            'name' => 'إيصال ألفا الحراري',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-thermal80'],
+        ])->assertCreated();
+        $foreignRevisionId = $this->withToken($aToken)
+            ->postJson('/api/print-templates/'.$template['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+
+        $this->withToken($bToken)->putJson('/api/print-templates/assignments/default', [
+            'document_type' => 'tax_invoice',
+            'usage' => 'thermal',
+            'print_template_revision_id' => $foreignRevisionId,
+        ])->assertUnprocessable();
     }
 
     /** @test */
