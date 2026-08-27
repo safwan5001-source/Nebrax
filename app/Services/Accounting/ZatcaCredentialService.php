@@ -86,6 +86,7 @@ class ZatcaCredentialService
             }
 
             $material = $this->materialValidator->validate(
+                $environment,
                 (string) $credentials['binary_security_token'],
                 (string) $credentials['private_key'],
             );

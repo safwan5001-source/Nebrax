@@ -17,7 +17,7 @@ final class ZatcaCredentialMaterialValidator
     /**
      * @return array{public_key:string, curve_name:string, fingerprint:string, valid_from:int, expires_at:int}
      */
-    public function validate(string $binarySecurityToken, string $privateKey): array
+    public function validate(string $environment, string $binarySecurityToken, string $privateKey): array
     {
         $certificate = $this->readCertificate($binarySecurityToken);
         $signingKey = $this->readPrivateKey($privateKey);
@@ -26,8 +26,9 @@ final class ZatcaCredentialMaterialValidator
         if (! is_array($privateDetails)
             || ($privateDetails['type'] ?? null) !== OPENSSL_KEYTYPE_EC
             || ($privateDetails['bits'] ?? null) !== 256
+            || ($privateDetails['ec']['curve_name'] ?? null) !== 'secp256k1'
         ) {
-            $this->invalid('private_key', 'يجب أن يكون مفتاح ZATCA الخاص من نوع EC وبطول 256 بت.');
+            $this->invalid('private_key', 'يجب أن يكون مفتاح ZATCA الخاص من نوع EC على منحنى secp256k1.');
         }
 
         $certificateKey = openssl_pkey_get_public($certificate);
@@ -37,8 +38,9 @@ final class ZatcaCredentialMaterialValidator
         if (! is_array($certificateDetails)
             || ($certificateDetails['type'] ?? null) !== OPENSSL_KEYTYPE_EC
             || ($certificateDetails['bits'] ?? null) !== 256
+            || ($certificateDetails['ec']['curve_name'] ?? null) !== 'secp256k1'
         ) {
-            $this->invalid('binary_security_token', 'يجب أن تحتوي شهادة CSID على مفتاح EC عام بطول 256 بت.');
+            $this->invalid('binary_security_token', 'يجب أن تحتوي شهادة CSID على مفتاح EC عام على منحنى secp256k1.');
         }
 
         $privatePublicKey = $this->pemBody((string) ($privateDetails['key'] ?? ''));
@@ -48,6 +50,26 @@ final class ZatcaCredentialMaterialValidator
             || ! hash_equals($certificatePublicKey, $privatePublicKey)
         ) {
             $this->invalid('private_key', 'مفتاح ZATCA الخاص لا يطابق المفتاح العام في شهادة CSID.');
+        }
+
+        $trustAnchor = config("zatca.trust_anchors.{$environment}");
+        if (! is_string($trustAnchor) || $trustAnchor === '' || ! is_readable($trustAnchor)) {
+            $this->invalid(
+                'binary_security_token',
+                "حزمة ثقة ZATCA لبيئة {$environment} غير مهيأة أو غير قابلة للقراءة."
+            );
+        }
+
+        $trusted = @openssl_x509_checkpurpose(
+            $certificate,
+            X509_PURPOSE_ANY,
+            [$trustAnchor]
+        );
+        if ($trusted !== true && $trusted !== 1) {
+            $this->invalid(
+                'binary_security_token',
+                "شهادة CSID لا تتسلسل إلى مرجع ثقة ZATCA المهيأ لبيئة {$environment}."
+            );
         }
 
         $certificateData = openssl_x509_parse($certificate, false);
