@@ -1,5 +1,6 @@
 import createNextIntlPlugin from 'next-intl/plugin';
 
+// Keep the request-config path explicit so local CI and Vercel resolve the same next-intl entrypoint.
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 /** @type {import('next').NextConfig} */
