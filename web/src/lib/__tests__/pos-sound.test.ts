@@ -123,6 +123,29 @@ describe('مدير صوت POS', () => {
     expect(audio.playCalls).toBe(1);
   });
 
+  it('يطبق مستوى الصوت المحفوظ عبر Web Audio عندما لا يقبل Safari/iPhone خاصية volume', () => {
+    const audio = new FakeAudio();
+    const sourceConnect = vi.fn();
+    const gainConnect = vi.fn();
+    const gain = { gain: { value: 1 }, connect: gainConnect };
+    const createAudioContext = vi.fn(() => ({
+      destination: {},
+      createGain: () => gain,
+      createMediaElementSource: () => ({ connect: sourceConnect }),
+      resume: vi.fn().mockResolvedValue(undefined),
+    }));
+    const manager = new PosSoundManager({ createAudio: () => audio, createAudioContext });
+
+    manager.play('payment_success', { ...enabled, sound_volume: 35 });
+
+    expect(createAudioContext).toHaveBeenCalledTimes(1);
+    expect(sourceConnect).toHaveBeenCalledWith(gain);
+    expect(gainConnect).toHaveBeenCalledWith({});
+    expect(gain.gain.value).toBe(0.35);
+    expect(audio.volume).toBe(1);
+    expect(audio.playCalls).toBe(1);
+  });
+
   it('يتجاوز بيئة صوت أو اهتزاز غير مدعومة دون رمي استثناء', () => {
     const manager = new PosSoundManager({ createAudio: () => null, getNavigator: () => undefined });
 
