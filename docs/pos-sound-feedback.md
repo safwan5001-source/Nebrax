@@ -38,22 +38,22 @@
 
 إعدادات الصوت والاهتزاز تفضيلات واجهة غير محاسبية؛ لا تغيّر أي قيد أو تسعير أو سياسة مخزون أو صلاحية دفع. تُفتح من بطاقة مستقلة باسم **الأصوات والتنبيهات** في مركز `/pos/settings` إلى الصفحة `/pos/settings/sound-feedback`، مع master toggle، تحكمات الفئات، slider واضح، وخيار اهتزاز يظهر فقط عندما يكون `navigator.vibrate` متاحاً. لا يبقى قسم صوت داخل صفحة `/pos/settings/configuration`.
 
-## هوية Balanced Premium 3D
+## هوية Balanced Premium 3D المكانية
 
-تعتمد الحزمة طابع **Balanced Premium 3D**: transient رقمي واضح، body متزن في نطاق low-mid، وطبقات قليلة مضبوطة تصنع عمقاً مكانياً خفيفاً من دون reverb طويل أو اتساع stereo مبالغ فيه. تبقى النواة مسموعة في القناتين كي تعمل الحزمة جيداً في مكبرات POS الأحادية، بينما تضيف micro-delay أقصر من 2 ms وpan محافظ إلى الطبقات الثانوية فقط. لا توجد نغمة arcade أو retro أو جرس تقليدي أو chime طويل أو جملة موسيقية.
+تعتمد الحزمة طابع **Balanced Premium 3D** بوصفه عمقاً مكانياً ستيريو محافظاً، لا معالجة binaural أو HRTF: transient رقمي واضح، body متزن في نطاق low-mid، وطبقات قليلة مضبوطة تصنع إحساساً خفيفاً بالاتجاه من دون reverb طويل أو اتساع stereo مبالغ فيه. تبقى الطبقات الأساسية عالية الكسب في مركز القناتين، بينما تضيف طبقات ثانوية أهدأ فقط pan محافظاً وتأخير far-channel دون `0.2 ms`. بذلك يبقى cue كاملاً وواضحاً في سماعة POS أو iPhone الأحادية، مع فرق ستيريو مسموع برفق في سماعات الرأس. لا توجد نغمة arcade أو retro أو جرس تقليدي أو chime طويل أو جملة موسيقية.
 
 جميع الأصول WAV محلية، **Stereo PCM 16-bit بمعدل 44.1 kHz**. أُنشئت حتمياً عبر `web/scripts/generate-pos-audio-polish.py` من طبقات sine وharmonic وأغلفة cosine وsoft limiter؛ لا تحتوي تسجيلات أو عينات أو أصول طرف ثالث. لذلك فمصدر وترخيص كل ملف هو **محتوى مولّد ومملوك للمشروع** ولا يتطلب إسناداً خارجياً أو اتصال شبكة وقت التشغيل.
 
 | Event | Direction | Duration | File | Purpose |
 |---|---|---:|---|---|
-| `scan_success` | Punchy Tech 3D | 104 ms | `scan-success.wav` | تأكيد قراءة سريع، واضح ومناسب للتكرار الكثيف بلا beep تقليدي. |
-| `scan_not_found` | Punchy Tech 3D — Double Note | 194 ms | `scan-not-found.wav` | نبضتان قصيرتان تميزان قراءة رمز غير موجود من نجاح المسح بلا إنذار مبالغ. |
-| `scan_error` | Deep Spatial 3D | 174 ms | `scan-error.wav` | خطأ تقني أعمق وحازم بوزن low-mid متزن. |
+| `scan_success` | Punchy Tech Spatial | 104 ms | `scan-success.wav` | تأكيد قراءة سريع، واضح ومناسب للتكرار الكثيف بلا beep تقليدي. |
+| `scan_not_found` | Punchy Tech Spatial — Double Note | 194 ms | `scan-not-found.wav` | نبضتان قصيرتان تميزان قراءة رمز غير موجود من نجاح المسح بلا إنذار مبالغ. |
+| `scan_error` | Deep Spatial | 174 ms | `scan-error.wav` | خطأ تقني أعمق وحازم بوزن low-mid متزن. |
 | `warning` | Balanced Spatial Warning | 176 ms | `warning.wav` | تنبيه معلوماتي قصير بين عدم العثور والخطأ. |
-| `payment_success` | Crisp Glass 3D + Punchy Tech | 312 ms | `payment-success.wav` | تأكيد مالي واثق وأغنى من نجاح المسح، بلا jingle احتفالي. |
-| `payment_error` | Deep Spatial 3D | 256 ms | `payment-error.wav` | خطأ دفع واضح وحازم من مرحلتين، بلا siren أو buzzer. |
+| `payment_success` | Crisp Glass Spatial | 312 ms | `payment-success.wav` | تأكيد مالي واثق وأغنى من نجاح المسح، بلا jingle احتفالي. |
+| `payment_error` | Deep Spatial | 256 ms | `payment-error.wav` | خطأ دفع واضح وحازم من مرحلتين، بلا siren أو buzzer. |
 
-تستخدم الأصول attack من 1.2 إلى 4 ms وrelease من 11 إلى 38 ms، مع soft limiter يحفظ peak دون clipping. في القياس النهائي كانت RMS التقريبية: payment error `0.194`، payment success `0.190`، scan error `0.189`، scan not found `0.182`، scan success `0.168`، warning `0.126`؛ أي إن الإشارات المالية والأخطاء أوضح بلا قفزات مزعجة. تبقى قيمة `sound_volume` التي يحددها المستخدم هي التحكم النهائي النسبي لجميع الأحداث.
+تستخدم الأصول attack من 1.2 إلى 4 ms وrelease من 11 إلى 38 ms، مع soft limiter يحفظ peak دون clipping. يحرس اختبار عقد الأصول كل ملف بمعدل 44.1 kHz وPCM 16-bit ستيريو، وبـ`peak < 0.6`، وفارق ستيريو حقيقي، وارتباط قناتين أعلى من `0.98`، وside-to-mid أدنى من `10%`. لذلك يبقى العمق المكاني ثانوياً ولا يفرّغ الإشارة عند الجمع الأحادي. تبقى قيمة `sound_volume` التي يحددها المستخدم هي التحكم النهائي النسبي لجميع الأحداث.
 
 ## تجربة الأصوات في الإعدادات
 
