@@ -465,7 +465,11 @@ class PosSessionTest extends TestCase
         $this->assertNotNull($session->variance_journal_entry_id);
 
         $varianceAccountId = Account::where('code', '5170')->value('id');
-        $cashAccountId = app(CashBankAccountService::class)->resolveForPayment(null, 'cash')->account_id;
+        // التسوية تضرب خزينة الجلسة المثبّتة، لا حساباً عاماً. في الإعداد الافتراضي
+        // خزينة وسيلة النقد هي الخزينة الرئيسية (1110).
+        $cashAccountId = $session->cash_account_id;
+        $this->assertNotNull($cashAccountId);
+        $this->assertSame(app(CashBankAccountService::class)->resolveForPayment(null, 'cash')->account_id, $cashAccountId);
 
         $lines = $this->varianceEntryLines($id);
         $this->assertSame(2000, collect($lines)->sum('debit'));
@@ -495,7 +499,7 @@ class PosSessionTest extends TestCase
             ->assertJsonPath('data.difference', '15.00');
 
         $varianceAccountId = Account::where('code', '5170')->value('id');
-        $cashAccountId = app(CashBankAccountService::class)->resolveForPayment(null, 'cash')->account_id;
+        $cashAccountId = PosSession::findOrFail($id)->cash_account_id;
 
         $lines = $this->varianceEntryLines($id);
         $this->assertSame(1500, collect($lines)->sum('debit'));
@@ -572,5 +576,100 @@ class PosSessionTest extends TestCase
         // مستأجر آخر لا يرى الجلسة ولا يسوّي فرقها.
         $other = $this->registerTenant('pos-other', 'owner@pos-other.test');
         $this->withToken($other['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertNotFound();
+    }
+
+    /** @return array{id:string,account_id:string} خزينة نقدية مسمّاة تحت مجموعة الخزائن. */
+    private function namedCashTreasury(array $auth, string $name): array
+    {
+        return $this->withToken($auth['token'])->postJson('/api/cash-bank-accounts', [
+            'type' => 'cash', 'name' => $name, 'currency' => 'SAR',
+            'deposit_scope' => 'all', 'withdraw_scope' => 'all',
+        ])->assertCreated()->json('data');
+    }
+
+    /** يوجّه وسيلة النقد الافتراضية إلى خزينة محددة، فتصير خزينة نقد POS. */
+    private function pointCashMethodToTreasury(array $auth, string $cashBankAccountId): void
+    {
+        $methods = $this->withToken($auth['token'])->getJson('/api/payment-methods')->assertOk()['data'];
+        $cash = collect($methods)->firstWhere('settlement_type', 'cash');
+        $this->withToken($auth['token'])->putJson("/api/payment-methods/{$cash['id']}", [
+            'name' => $cash['name'],
+            'settlement_type' => 'cash',
+            'cash_bank_account_id' => $cashBankAccountId,
+            'is_active' => true,
+            'is_default' => true,
+        ])->assertOk();
+    }
+
+    /** @test */
+    public function settlement_hits_the_actual_session_treasury_not_the_main_cashbox_when_they_differ(): void
+    {
+        $auth = $this->registerTenant('pos-treasury', 'owner@pos-treasury.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $mainCashAccountId = app(CashBankAccountService::class)->resolveForPayment(null, 'cash')->account_id;
+
+        // خزينة نقد ثانية (غير رئيسية) هي خزينة وسيلة النقد فعلياً.
+        $treasury = $this->namedCashTreasury($auth, 'خزينة المعرض');
+        $this->assertNotSame($mainCashAccountId, $treasury['account_id']);
+        $this->pointCashMethodToTreasury($auth, $treasury['id']);
+
+        $id = $this->closedAcknowledgedSession($auth, 50000, 48000); // عجز 2000
+        $session = PosSession::findOrFail($id);
+        // الجلسة تثبّت خزينتها الفعلية عند الفتح، لا الرئيسية العامة.
+        $this->assertSame($treasury['account_id'], $session->cash_account_id);
+        $this->assertNotSame($mainCashAccountId, $session->cash_account_id);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertOk();
+
+        $lines = $this->varianceEntryLines($id);
+        $treasuryLine = collect($lines)->firstWhere('account_id', $treasury['account_id']);
+        $this->assertSame(['debit' => 0, 'credit' => 2000], ['debit' => $treasuryLine['debit'], 'credit' => $treasuryLine['credit']]);
+        // لا سطر على الخزينة الرئيسية إطلاقاً.
+        $this->assertNull(collect($lines)->firstWhere('account_id', $mainCashAccountId));
+    }
+
+    /** @test */
+    public function the_session_treasury_is_frozen_at_opening_and_two_sessions_bind_to_their_own_treasuries(): void
+    {
+        $auth = $this->registerTenant('pos-drift', 'owner@pos-drift.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $treasuryA = $this->namedCashTreasury($auth, 'خزينة أ');
+        $this->pointCashMethodToTreasury($auth, $treasuryA['id']);
+        $first = $this->closedAcknowledgedSession($auth, 50000, 48000); // عجز 2000 على خزينة أ
+
+        // انجراف: تُغيَّر خزينة وسيلة النقد إلى خزينة ب بعد فتح الجلسة الأولى.
+        $treasuryB = $this->namedCashTreasury($auth, 'خزينة ب');
+        $this->pointCashMethodToTreasury($auth, $treasuryB['id']);
+        $second = $this->closedAcknowledgedSession($auth, 50000, 51000); // فائض 1000 على خزينة ب
+
+        $this->assertSame($treasuryA['account_id'], PosSession::findOrFail($first)->cash_account_id);
+        $this->assertSame($treasuryB['account_id'], PosSession::findOrFail($second)->cash_account_id);
+
+        // تسوية الجلسة الأولى تبقى على خزينة أ رغم تغيّر خزينة الطريقة — لا انجراف.
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$first}/settle-variance")->assertOk();
+        $firstLines = $this->varianceEntryLines($first);
+        $this->assertSame(2000, collect($firstLines)->firstWhere('account_id', $treasuryA['account_id'])['credit']);
+        $this->assertNull(collect($firstLines)->firstWhere('account_id', $treasuryB['account_id']));
+
+        // تسوية الجلسة الثانية تضرب خزينة ب.
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$second}/settle-variance")->assertOk();
+        $secondLines = $this->varianceEntryLines($second);
+        $this->assertSame(1000, collect($secondLines)->firstWhere('account_id', $treasuryB['account_id'])['debit']);
+    }
+
+    /** @test */
+    public function a_legacy_session_without_a_bound_treasury_blocks_settlement_cleanly(): void
+    {
+        $auth = $this->registerTenant('pos-legacy-treasury', 'owner@pos-legacy-treasury.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->closedAcknowledgedSession($auth, 50000, 48000);
+
+        // محاكاة جلسة سابقة للهجرة لا تحمل خزينة مثبتة.
+        PosSession::whereKey($id)->update(['cash_account_id' => null]);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+        $this->assertSame(0, JournalEntry::where('source_type', PosSession::class)->count());
+        $this->assertNull(PosSession::findOrFail($id)->variance_journal_entry_id);
     }
 }

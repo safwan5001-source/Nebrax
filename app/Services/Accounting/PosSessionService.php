@@ -10,6 +10,7 @@ use App\Models\PosCashMovement;
 use App\Models\PosDevice;
 use App\Models\PosExchange;
 use App\Models\PosHeldSale;
+use App\Models\PaymentMethod;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
 use App\Models\ReturnDocument;
@@ -88,6 +89,9 @@ class PosSessionService
                 'pos_device_id'   => $device->id,
                 'warehouse_id'    => $warehouse->id,
                 'shift_id'        => $shift?->id,
+                // نثبّت خزينة الجلسة من مسار نقد POS نفسه وقت الفتح، فلا تنجرف
+                // تسوية الفرق لاحقاً إلى «الرئيسية» إن غُيّرت خزينة الطريقة.
+                'cash_account_id' => $this->resolveSessionCashAccountId(),
             ]);
         });
     }
@@ -290,7 +294,7 @@ class PosSessionService
                 throw new RuntimeException('فرق إغلاق الجلسة مسوّى محاسبياً بالفعل.');
             }
 
-            $cashAccountId = $this->cashBankAccounts->resolveForPayment(null, 'cash')->account_id;
+            $cashAccountId = $this->sessionCashAccountId($session);
             $varianceAccountId = $this->varianceAccountId();
 
             $amount = abs($difference);
@@ -330,6 +334,53 @@ class PosSessionService
 
             return $session->fresh();
         });
+    }
+
+    /**
+     * خزينة الجلسة وقت الفتح = خزينة وسيلة الدفع النقدية النشطة (المفضّل افتراضها)،
+     * وإلا الخزينة الرئيسية. يُحلّ عبر `resolveForPayment` نفسه الذي تسلكه سندات
+     * قبض POS النقدية، فتضرب التسوية الخزينة الفعلية لا حساباً عاماً. الخادم وحده
+     * يحلّه؛ لا يمرّر الكاشير خزينة أو حساباً.
+     */
+    private function resolveSessionCashAccountId(): string
+    {
+        $cashMethod = PaymentMethod::with('cashBankAccount')
+            ->where('settlement_type', 'cash')
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('created_at')
+            ->first();
+
+        // نمرّر حساب الأستاذ (account_id) لا معرّف الخزينة — مطابقةً لمسار سند
+        // القبض في PaymentService؛ الغياب يسقط على الخزينة الرئيسية بأمان.
+        return $this->cashBankAccounts
+            ->resolveForPayment($cashMethod?->cashBankAccount?->account_id, 'cash')
+            ->account_id;
+    }
+
+    /**
+     * حساب خزينة الجلسة المثبّت وقت الفتح. الجلسات القديمة السابقة للهجرة لا تحمله،
+     * فتُمنع تسويتها بخطأ واضح بدل تلفيق خزينة أو الوقوع على الرئيسية العامة.
+     */
+    private function sessionCashAccountId(PosSession $session): string
+    {
+        $accountId = $session->cash_account_id;
+        if ($accountId === null) {
+            throw new RuntimeException('الجلسة لا تحمل خزينة مثبتة (جلسة قديمة)؛ لا يمكن تسوية فرقها محاسبياً. راجع إعدادات الخزائن.');
+        }
+
+        $account = Account::whereKey($accountId)->first();
+        if (! $account) {
+            throw new RuntimeException('خزينة الجلسة غير موجودة في دليل الحسابات.');
+        }
+        if (! $account->is_active) {
+            throw new RuntimeException('خزينة الجلسة معطّلة في دليل الحسابات؛ فعّلها لتسوية الفرق.');
+        }
+        if ($account->is_group) {
+            throw new RuntimeException('خزينة الجلسة حساب تجميعي لا يقبل قيوداً مباشرة.');
+        }
+
+        return $account->id;
     }
 
     /** يحل حساب الفروق والتسويات من كوده؛ غيابه خطأ تهيئة صريح لا يُنشئ حساباً بصمت. */

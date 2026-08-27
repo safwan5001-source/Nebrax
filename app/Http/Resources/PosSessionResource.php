@@ -17,6 +17,8 @@ class PosSessionResource extends JsonResource
             'pos_device_id'    => $this->pos_device_id,
             'warehouse_id'     => $this->warehouse_id,
             'shift_id'         => $this->shift_id,
+            // حساب خزينة الجلسة المثبّت وقت الفتح؛ للعرض والتتبّع فقط (يحلّه الخادم).
+            'cash_account_id'  => $this->cash_account_id,
             'status'           => $this->status,
             'opening_balance'  => Money::toRiyal($this->opening_balance),
             'closing_balance'  => $this->closing_balance !== null ? Money::toRiyal($this->closing_balance) : null,
