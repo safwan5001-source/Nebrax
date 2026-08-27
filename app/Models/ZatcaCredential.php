@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ZatcaCredential extends BaseModel
+class ZatcaCredential extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'environment', 'stage', 'status', 'credentials',
