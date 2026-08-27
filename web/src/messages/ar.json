@@ -1706,6 +1706,7 @@
     "zatca_document_type": "نوع مستند ZATCA",
     "zatca_standard": "فاتورة ضريبية — Clearance",
     "zatca_simplified": "فاتورة ضريبية مبسطة — Reporting",
+    "zatca_document_type_pending": "سيحدده النظام عند الحفظ",
     "zatca_document_type_hint": "يُقترح من الرقم الضريبي للعميل ويُحفظ كلقطة ثابتة على الفاتورة عند الترحيل.",
     "title": "فاتورة مبيعات جديدة",
     "partner": "العميل",
