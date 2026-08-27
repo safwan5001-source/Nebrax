@@ -4,12 +4,18 @@ import { useEffect, useState } from 'react';
 import { Package } from 'lucide-react';
 import { api, fetchImageUrl, getToken } from '@/lib/api';
 
-type CachedCompanyLogo = {
-  sessionKey: string;
-  promise: Promise<{ url: string | null; objectUrl: boolean }>;
+type CompanyBrand = {
+  logoUrl: string | null;
+  logoObjectUrl: boolean;
+  name: string | null;
 };
 
-let cachedCompanyLogo: CachedCompanyLogo | null = null;
+type CachedCompanyBrand = {
+  sessionKey: string;
+  promise: Promise<CompanyBrand>;
+};
+
+let cachedCompanyBrand: CachedCompanyBrand | null = null;
 
 async function resolveCompanyLogo(rawLogo: string | null | undefined): Promise<{ url: string | null; objectUrl: boolean }> {
   const logo = rawLogo?.trim();
@@ -25,36 +31,44 @@ async function resolveCompanyLogo(rawLogo: string | null | undefined): Promise<{
   return { url, objectUrl: Boolean(url) };
 }
 
-function getCompanyLogo(): Promise<{ url: string | null; objectUrl: boolean }> {
+function getCompanyBrand(): Promise<CompanyBrand> {
   // Cache per authenticated session so a POS grid does not call /me once per card.
   // A tenant/session switch changes the token and invalidates the cached brand.
   const sessionKey = getToken() ?? 'anonymous';
-  if (cachedCompanyLogo?.sessionKey === sessionKey) return cachedCompanyLogo.promise;
+  if (cachedCompanyBrand?.sessionKey === sessionKey) return cachedCompanyBrand.promise;
 
-  const previous = cachedCompanyLogo;
+  const previous = cachedCompanyBrand;
   if (previous) {
     void previous.promise.then((value) => {
-      if (value.objectUrl && value.url) URL.revokeObjectURL(value.url);
+      if (value.logoObjectUrl && value.logoUrl) URL.revokeObjectURL(value.logoUrl);
     }).catch(() => {});
   }
 
-  const promise = api<{ company?: { logo?: string | null } }>('/me')
-    .then((response) => resolveCompanyLogo(response.company?.logo))
-    .catch(() => ({ url: null, objectUrl: false }));
+  const promise = api<{ company?: { logo?: string | null; name?: string | null } }>('/me')
+    .then(async (response) => {
+      const resolved = await resolveCompanyLogo(response.company?.logo);
+      return {
+        logoUrl: resolved.url,
+        logoObjectUrl: resolved.objectUrl,
+        name: response.company?.name?.trim() || null,
+      };
+    })
+    .catch(() => ({ logoUrl: null, logoObjectUrl: false, name: null }));
 
-  cachedCompanyLogo = { sessionKey, promise };
+  cachedCompanyBrand = { sessionKey, promise };
   return promise;
 }
 
 /**
  * صورة منتج POS مع تسلسل احتياطي موحّد:
- * صورة المنتج → شعار المنشأة الحالية → Package محايد.
+ * صورة المنتج → هوية المنشأة الحالية → Package محايد.
  * الشعار للعرض فقط ولا يُنسخ إلى سجل المنتج أو التخزين.
  */
 export function PosProductImage({ path, alt }: { path: string | null | undefined; alt: string }) {
   const [productUrl, setProductUrl] = useState<string | null>(null);
   const [productFailed, setProductFailed] = useState(false);
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState<string | null>(null);
   const [companyLogoFailed, setCompanyLogoFailed] = useState(false);
 
   useEffect(() => {
@@ -90,8 +104,10 @@ export function PosProductImage({ path, alt }: { path: string | null | undefined
     let live = true;
     setCompanyLogoFailed(false);
 
-    void getCompanyLogo().then((value) => {
-      if (live) setCompanyLogoUrl(value.url);
+    void getCompanyBrand().then((value) => {
+      if (!live) return;
+      setCompanyLogoUrl(value.logoUrl);
+      setCompanyName(value.name);
     });
 
     return () => {
@@ -113,21 +129,31 @@ export function PosProductImage({ path, alt }: { path: string | null | undefined
 
   if (companyLogoUrl && !companyLogoFailed) {
     return (
-      <span className="grid h-full w-full place-items-center bg-background" aria-hidden>
+      <span className="flex h-full w-full flex-col items-center justify-center gap-1.5 overflow-hidden bg-surface px-3 py-2" aria-hidden>
         <img
           src={companyLogoUrl}
           alt=""
           loading="lazy"
-          className="h-full w-full object-contain p-2"
+          className="max-h-[68%] max-w-[72%] object-contain"
           onError={() => setCompanyLogoFailed(true)}
         />
+        {companyName ? (
+          <span className="max-w-full truncate text-[10px] font-medium text-muted" dir="auto">
+            {companyName}
+          </span>
+        ) : null}
       </span>
     );
   }
 
   return (
-    <span className="grid h-full w-full place-items-center bg-background text-muted" aria-hidden>
+    <span className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-surface text-muted" aria-hidden>
       <Package className="h-5 w-5" strokeWidth={1.5} />
+      {companyName ? (
+        <span className="max-w-[80%] truncate text-[10px] font-medium" dir="auto">
+          {companyName}
+        </span>
+      ) : null}
     </span>
   );
 }
