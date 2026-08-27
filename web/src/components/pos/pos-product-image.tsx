@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Package } from 'lucide-react';
 import { api, fetchImageUrl, getToken } from '@/lib/api';
+import { hasMeaningfulLogoPixels } from './company-logo-quality';
 
 type CompanyBrand = {
   logoUrl: string | null;
@@ -31,6 +32,46 @@ async function resolveCompanyLogo(rawLogo: string | null | undefined): Promise<{
   return { url, objectUrl: Boolean(url) };
 }
 
+/**
+ * بعض الشعارات القديمة مخزنة كـPNG صالح تقنياً لكنه أبيض/فارغ بصرياً؛ لذلك
+ * onError لا يكتشفها. نفحص عينة صغيرة مرة واحدة لكل جلسة قبل اعتماد الشعار.
+ */
+async function isVisuallyUsableLogo(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const image = new Image();
+
+    image.onload = () => {
+      if (image.naturalWidth < 2 || image.naturalHeight < 2) {
+        resolve(false);
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 32;
+      canvas.height = 32;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) {
+        resolve(true);
+        return;
+      }
+
+      try {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        resolve(hasMeaningfulLogoPixels(pixels));
+      } catch {
+        // قد تمنع CORS قراءة بكسلات شعار خارجي. في هذه الحالة لا نحجب شعاراً
+        // صالحاً لمجرد أن Canvas لا يستطيع فحصه؛ يبقى onError حارس التحميل.
+        resolve(true);
+      }
+    };
+
+    image.onerror = () => resolve(false);
+    image.src = url;
+  });
+}
+
 function getCompanyBrand(): Promise<CompanyBrand> {
   // Cache per authenticated session so a POS grid does not call /me once per card.
   // A tenant/session switch changes the token and invalidates the cached brand.
@@ -47,9 +88,15 @@ function getCompanyBrand(): Promise<CompanyBrand> {
   const promise = api<{ company?: { logo?: string | null; name?: string | null } }>('/me')
     .then(async (response) => {
       const resolved = await resolveCompanyLogo(response.company?.logo);
+      const usable = resolved.url ? await isVisuallyUsableLogo(resolved.url) : false;
+
+      if (!usable && resolved.objectUrl && resolved.url) {
+        URL.revokeObjectURL(resolved.url);
+      }
+
       return {
-        logoUrl: resolved.url,
-        logoObjectUrl: resolved.objectUrl,
+        logoUrl: usable ? resolved.url : null,
+        logoObjectUrl: usable ? resolved.objectUrl : false,
         name: response.company?.name?.trim() || null,
       };
     })
@@ -61,7 +108,7 @@ function getCompanyBrand(): Promise<CompanyBrand> {
 
 /**
  * صورة منتج POS مع تسلسل احتياطي موحّد:
- * صورة المنتج → هوية المنشأة الحالية → Package محايد.
+ * صورة المنتج → شعار منشأة صالح بصرياً → Package + اسم المنشأة.
  * الشعار للعرض فقط ولا يُنسخ إلى سجل المنتج أو التخزين.
  */
 export function PosProductImage({ path, alt }: { path: string | null | undefined; alt: string }) {
