@@ -82,16 +82,13 @@ class ZatcaSubmissionAttemptTest extends TestCase
     }
 
     /** @test */
-    public function a_parallel_manual_request_reuses_the_existing_pending_attempt(): void
+    public function a_parallel_manual_request_with_a_different_key_is_rejected(): void
     {
         $invoice = $this->postedInvoice();
-        $first = $this->request($invoice, 'first-key')->assertStatus(202);
+        $this->request($invoice, 'first-key')->assertStatus(202);
 
-        $second = $this->request($invoice, 'different-key')
-            ->assertOk()
-            ->assertJsonPath('meta.created', false);
+        $this->request($invoice, 'different-key')->assertStatus(409);
 
-        $this->assertSame($first['data']['id'], $second['data']['id']);
         $this->assertDatabaseCount('zatca_submission_attempts', 1);
     }
 
