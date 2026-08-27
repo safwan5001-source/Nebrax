@@ -53,6 +53,7 @@ mkdir -p app/Services/Accounting app/Tenancy
 cp -r ../nibras-erp/app/Services/Accounting/*   app/Services/Accounting/
 cp -r ../nibras-erp/app/Tenancy/*               app/Tenancy/
 cp -r ../nibras-erp/app/Http/Middleware/*       app/Http/Middleware/
+cp ../nibras-erp/config/zatca.php                config/zatca.php
 cp -r ../nibras-erp/database/migrations/*       database/migrations/
 cp -r ../nibras-erp/tests/Feature/*             tests/Feature/
 
