@@ -32,6 +32,7 @@ use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Mockery;
@@ -261,17 +262,19 @@ class DocumentSourceChannelTest extends TestCase
         );
 
         try {
-            DocumentSourceReceiptRecord::create([
-                'document_channel_identity_id' => $identity->id,
-                'channel' => 'web',
-                'external_reference_fingerprint' => DocumentSourceEnvelope::fingerprint('message-projection-008'),
-                'external_reference_masked' => 'mess…-008',
-                'content_sha256' => $accepted->file->sha256,
-                'document_batch_id' => $accepted->batch->id,
-                'document_file_id' => $accepted->file->id,
-                'received_by' => $fixture['owner']->id,
-                'received_at' => now('UTC'),
-            ]);
+            DB::transaction(function () use ($identity, $accepted, $fixture): void {
+                DocumentSourceReceiptRecord::create([
+                    'document_channel_identity_id' => $identity->id,
+                    'channel' => 'web',
+                    'external_reference_fingerprint' => DocumentSourceEnvelope::fingerprint('message-projection-008'),
+                    'external_reference_masked' => 'mess…-008',
+                    'content_sha256' => $accepted->file->sha256,
+                    'document_batch_id' => $accepted->batch->id,
+                    'document_file_id' => $accepted->file->id,
+                    'received_by' => $fixture['owner']->id,
+                    'received_at' => now('UTC'),
+                ]);
+            });
             $this->fail('يلزم أن يمنع القيد الفريد receipt منافساً للمرجع نفسه.');
         } catch (QueryException) {
             $this->assertSame(1, DocumentSourceReceiptRecord::query()->count());
