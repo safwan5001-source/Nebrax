@@ -2,12 +2,15 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\Account;
 use App\Models\Invoice;
+use App\Models\JournalEntry;
 use App\Models\Payment;
 use App\Models\PosCashMovement;
 use App\Models\PosDevice;
 use App\Models\PosExchange;
 use App\Models\PosHeldSale;
+use App\Models\PaymentMethod;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
 use App\Models\ReturnDocument;
@@ -29,6 +32,17 @@ use RuntimeException;
  */
 class PosSessionService
 {
+    // فرق صندوق نقاط البيع (عجز/فائض) يُرحّل على حساب الفروق والتسويات العام
+    // القائم (5170) — الحساب ثنائي الاتجاه نفسه الذي تستعمله الفاتورة لفروق
+    // التسوية: العجز يُدينه (خسارة) والفائض يُدَيِّنه دائناً (يخفّض صافي المصروف).
+    // نعيد استخدام نمط حساب الفروق القائم بدل إنشاء حساب موازٍ.
+    private const ACC_CASH_VARIANCE = '5170';
+
+    public function __construct(
+        protected LedgerService $ledger,
+        protected CashBankAccountService $cashBankAccounts,
+    ) {}
+
     public function open(
         int $openingBalance,
         string $deviceId,
@@ -75,6 +89,9 @@ class PosSessionService
                 'pos_device_id'   => $device->id,
                 'warehouse_id'    => $warehouse->id,
                 'shift_id'        => $shift?->id,
+                // نثبّت خزينة الجلسة من مسار نقد POS نفسه وقت الفتح، فلا تنجرف
+                // تسوية الفرق لاحقاً إلى «الرئيسية» إن غُيّرت خزينة الطريقة.
+                'cash_account_id' => $this->resolveSessionCashAccountId(),
             ]);
         });
     }
@@ -242,6 +259,142 @@ class PosSessionService
 
             return $session->fresh();
         });
+    }
+
+    /**
+     * يسوّي فرق صندوق الجلسة في دفتر الأستاذ عبر المحرّك، بعد اعتماد الفرق فقط.
+     *
+     * القيد (المبالغ بالهللات، القيمة = |الفرق| المثبّت وقت الإغلاق):
+     *  • عجز (المعدود < المتوقّع): مدين 5190 فروق الصندوق / دائن حساب الصندوق الرئيسي.
+     *  • فائض (المعدود > المتوقّع): مدين حساب الصندوق الرئيسي / دائن 5190 فروق الصندوق.
+     *
+     * التسوية حدثٌ صريح منفصل عن الاعتماد التشغيلي: الاعتماد يقرّ الحالة، وهذه
+     * تُثبّت الأثر المحاسبي مرّة واحدة فقط (`variance_journal_entry_id`). كل الحسابات
+     * يحلّها الخادم؛ لا يمرّر الكاشير أي حساب أستاذ.
+     */
+    public function settleVariance(PosSession $session, User $actor): PosSession
+    {
+        if (! $actor->hasPermission('pos.variance.approve')) {
+            throw new RuntimeException('لا تملك صلاحية تسوية فرق إغلاق نقطة البيع.');
+        }
+
+        return DB::transaction(function () use ($session, $actor) {
+            $session = PosSession::lockForUpdate()->findOrFail($session->id);
+            if ($session->status !== 'closed') {
+                throw new RuntimeException('لا يمكن تسوية فرق جلسة لم تُغلق بعد.');
+            }
+            $difference = (int) $session->difference;
+            if ($difference === 0 || $session->difference_status === 'not_required') {
+                throw new RuntimeException('لا يوجد فرق إغلاق يتطلب تسوية محاسبية.');
+            }
+            if ($session->difference_status !== 'acknowledged') {
+                throw new RuntimeException('لا يمكن تسوية فرق قبل اعتماده إدارياً.');
+            }
+            if ($session->variance_journal_entry_id !== null) {
+                throw new RuntimeException('فرق إغلاق الجلسة مسوّى محاسبياً بالفعل.');
+            }
+
+            $cashAccountId = $this->sessionCashAccountId($session);
+            $varianceAccountId = $this->varianceAccountId();
+
+            $amount = abs($difference);
+            $isShortage = $difference < 0;
+            // عجز: خسارة على حساب الفروق مقابل نقص الصندوق. فائض: زيادة صندوق مقابل حساب الفروق.
+            $lines = $isShortage
+                ? [
+                    ['account_id' => $varianceAccountId, 'debit' => $amount, 'credit' => 0, 'description' => 'عجز صندوق نقاط البيع'],
+                    ['account_id' => $cashAccountId, 'debit' => 0, 'credit' => $amount, 'description' => 'نقص نقدية درج نقاط البيع'],
+                ]
+                : [
+                    ['account_id' => $cashAccountId, 'debit' => $amount, 'credit' => 0, 'description' => 'زيادة نقدية درج نقاط البيع'],
+                    ['account_id' => $varianceAccountId, 'debit' => 0, 'credit' => $amount, 'description' => 'فائض صندوق نقاط البيع'],
+                ];
+
+            $entry = $this->ledger->post($lines, [
+                // تاريخ الترحيل = تاريخ إغلاق الجلسة (تاريخ نشوء الفرق)، لا لحظة الاعتماد.
+                'entry_date'  => optional($session->closed_at)->toDateString() ?? now()->toDateString(),
+                'description' => "تسوية فرق صندوق جلسة نقاط البيع {$session->number}",
+                'source_type' => PosSession::class,
+                'source_id'   => $session->id,
+                'created_by'  => $actor->id,
+                'branch_id'   => $session->branch_id,
+            ]);
+
+            $session->update(['variance_journal_entry_id' => $entry->id]);
+
+            $this->recordEvent($session, PosSessionEvent::TYPE_CLOSING_DIFFERENCE_SETTLED, $actor, [
+                'expected_balance' => (int) $session->expected_balance,
+                'counted_balance' => (int) $session->closing_balance,
+                'difference' => $difference,
+                'variance_type' => $isShortage ? 'shortage' : 'overage',
+                'amount' => $amount,
+                'journal_entry_id' => $entry->id,
+                'journal_entry_number' => $entry->number,
+            ]);
+
+            return $session->fresh();
+        });
+    }
+
+    /**
+     * خزينة الجلسة وقت الفتح = خزينة وسيلة الدفع النقدية النشطة (المفضّل افتراضها)،
+     * وإلا الخزينة الرئيسية. يُحلّ عبر `resolveForPayment` نفسه الذي تسلكه سندات
+     * قبض POS النقدية، فتضرب التسوية الخزينة الفعلية لا حساباً عاماً. الخادم وحده
+     * يحلّه؛ لا يمرّر الكاشير خزينة أو حساباً.
+     */
+    private function resolveSessionCashAccountId(): string
+    {
+        $cashMethod = PaymentMethod::with('cashBankAccount')
+            ->where('settlement_type', 'cash')
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('created_at')
+            ->first();
+
+        // نمرّر حساب الأستاذ (account_id) لا معرّف الخزينة — مطابقةً لمسار سند
+        // القبض في PaymentService؛ الغياب يسقط على الخزينة الرئيسية بأمان.
+        return $this->cashBankAccounts
+            ->resolveForPayment($cashMethod?->cashBankAccount?->account_id, 'cash')
+            ->account_id;
+    }
+
+    /**
+     * حساب خزينة الجلسة المثبّت وقت الفتح. الجلسات القديمة السابقة للهجرة لا تحمله،
+     * فتُمنع تسويتها بخطأ واضح بدل تلفيق خزينة أو الوقوع على الرئيسية العامة.
+     */
+    private function sessionCashAccountId(PosSession $session): string
+    {
+        $accountId = $session->cash_account_id;
+        if ($accountId === null) {
+            throw new RuntimeException('الجلسة لا تحمل خزينة مثبتة (جلسة قديمة)؛ لا يمكن تسوية فرقها محاسبياً. راجع إعدادات الخزائن.');
+        }
+
+        $account = Account::whereKey($accountId)->first();
+        if (! $account) {
+            throw new RuntimeException('خزينة الجلسة غير موجودة في دليل الحسابات.');
+        }
+        if (! $account->is_active) {
+            throw new RuntimeException('خزينة الجلسة معطّلة في دليل الحسابات؛ فعّلها لتسوية الفرق.');
+        }
+        if ($account->is_group) {
+            throw new RuntimeException('خزينة الجلسة حساب تجميعي لا يقبل قيوداً مباشرة.');
+        }
+
+        return $account->id;
+    }
+
+    /** يحل حساب الفروق والتسويات من كوده؛ غيابه خطأ تهيئة صريح لا يُنشئ حساباً بصمت. */
+    private function varianceAccountId(): string
+    {
+        $account = Account::where('code', self::ACC_CASH_VARIANCE)->first();
+        if (! $account) {
+            throw new RuntimeException('حساب الفروق والتسويات (5170) غير موجود في دليل الحسابات. يرجى مراجعة إعدادات المحاسبة.');
+        }
+        if (! $account->is_active) {
+            throw new RuntimeException('حساب الفروق والتسويات (5170) معطّل. فعّله من دليل الحسابات لتسوية الفرق.');
+        }
+
+        return $account->id;
     }
 
     /**
