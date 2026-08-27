@@ -27,13 +27,52 @@ class ZatcaCredentialTest extends TestCase
         ], $overrides);
     }
 
-    /** @return array{certificate:\OpenSSLCertificate, private_key:\OpenSSLAsymmetricKey, path:string} */
+    /** @return array{certificate:\OpenSSLCertificate, private_key:\OpenSSLAsymmetricKey, path:string, config_path:string} */
     private function testAuthority(): array
     {
         static $authority = null;
 
         if ($authority === null) {
+            $opensslConfig = <<<'CONF'
+[ req ]
+distinguished_name = req_distinguished_name
+prompt = no
+
+[ req_distinguished_name ]
+CN = Nebrax ZATCA Test
+
+[ v3_ca ]
+basicConstraints = critical, CA:true
+keyUsage = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always, issuer
+
+[ zatca_leaf ]
+basicConstraints = critical, CA:false
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid, issuer
+
+[ tls_only_leaf ]
+basicConstraints = critical, CA:false
+keyUsage = critical, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid, issuer
+
+[ self_signed_leaf ]
+basicConstraints = critical, CA:false
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
+subjectKeyIdentifier = hash
+CONF;
+            $configPath = tempnam(sys_get_temp_dir(), 'zatca-openssl-');
+            $this->assertNotFalse($configPath);
+            $this->assertNotFalse(file_put_contents($configPath, $opensslConfig));
+
             $key = openssl_pkey_new([
+                'config' => $configPath,
                 'private_key_type' => OPENSSL_KEYTYPE_EC,
                 'curve_name' => 'secp256k1',
             ]);
@@ -42,11 +81,12 @@ class ZatcaCredentialTest extends TestCase
             $csr = openssl_csr_new(
                 ['commonName' => 'Nebrax Test ZATCA Root'],
                 $key,
-                ['digest_alg' => 'sha256']
+                ['config' => $configPath, 'digest_alg' => 'sha256']
             );
             $this->assertNotFalse($csr);
 
             $certificate = openssl_csr_sign($csr, null, $key, 3650, [
+                'config' => $configPath,
                 'digest_alg' => 'sha256',
                 'x509_extensions' => 'v3_ca',
             ]);
@@ -61,6 +101,7 @@ class ZatcaCredentialTest extends TestCase
                 'certificate' => $certificate,
                 'private_key' => $key,
                 'path' => $path,
+                'config_path' => $configPath,
             ];
         }
 
@@ -74,16 +115,18 @@ class ZatcaCredentialTest extends TestCase
     }
 
     /** @return array{binary_security_token:string, private_key:string, expires_at:string} */
-    private function certificateMaterial(string $label = 'default'): array
+    private function certificateMaterial(string $label = 'default', string $profile = 'zatca_leaf'): array
     {
         static $materials = [];
         $authority = $this->testAuthority();
+        $cacheKey = "{$label}:{$profile}";
 
-        if (isset($materials[$label])) {
-            return $materials[$label];
+        if (isset($materials[$cacheKey])) {
+            return $materials[$cacheKey];
         }
 
         $key = openssl_pkey_new([
+            'config' => $authority['config_path'],
             'private_key_type' => OPENSSL_KEYTYPE_EC,
             'curve_name' => 'secp256k1',
         ]);
@@ -92,7 +135,7 @@ class ZatcaCredentialTest extends TestCase
         $csr = openssl_csr_new(
             ['commonName' => "Nebrax ZATCA {$label}"],
             $key,
-            ['digest_alg' => 'sha256']
+            ['config' => $authority['config_path'], 'digest_alg' => 'sha256']
         );
         $this->assertNotFalse($csr);
 
@@ -101,7 +144,11 @@ class ZatcaCredentialTest extends TestCase
             $authority['certificate'],
             $authority['private_key'],
             365,
-            ['digest_alg' => 'sha256'],
+            [
+                'config' => $authority['config_path'],
+                'digest_alg' => 'sha256',
+                'x509_extensions' => $profile,
+            ],
             count($materials) + 100
         );
         $this->assertNotFalse($certificate);
@@ -116,7 +163,7 @@ class ZatcaCredentialTest extends TestCase
         $parsed = openssl_x509_parse($certificate, false);
         $this->assertIsArray($parsed);
 
-        return $materials[$label] = [
+        return $materials[$cacheKey] = [
             'binary_security_token' => $token,
             'private_key' => $privateKey,
             'expires_at' => gmdate('c', $parsed['validTo_time_t']),
@@ -126,14 +173,24 @@ class ZatcaCredentialTest extends TestCase
     /** @return array{binary_security_token:string, private_key:string, expires_at:string} */
     private function untrustedCertificateMaterial(): array
     {
+        $authority = $this->testAuthority();
         $key = openssl_pkey_new([
+            'config' => $authority['config_path'],
             'private_key_type' => OPENSSL_KEYTYPE_EC,
             'curve_name' => 'secp256k1',
         ]);
         $this->assertNotFalse($key);
-        $csr = openssl_csr_new(['commonName' => 'Untrusted CSID'], $key, ['digest_alg' => 'sha256']);
+        $csr = openssl_csr_new(
+            ['commonName' => 'Untrusted CSID'],
+            $key,
+            ['config' => $authority['config_path'], 'digest_alg' => 'sha256']
+        );
         $this->assertNotFalse($csr);
-        $certificate = openssl_csr_sign($csr, null, $key, 365, ['digest_alg' => 'sha256']);
+        $certificate = openssl_csr_sign($csr, null, $key, 365, [
+            'config' => $authority['config_path'],
+            'digest_alg' => 'sha256',
+            'x509_extensions' => 'self_signed_leaf',
+        ]);
         $this->assertNotFalse($certificate);
         $this->assertTrue(openssl_pkey_export($key, $privateKey));
         $this->assertTrue(openssl_x509_export($certificate, $certificatePem));
@@ -317,6 +374,11 @@ class ZatcaCredentialTest extends TestCase
         $this->withToken($auth['token'])->putJson(
             $url,
             $this->payload($this->untrustedCertificateMaterial())
+        )->assertUnprocessable()->assertJsonValidationErrors('binary_security_token');
+
+        $this->withToken($auth['token'])->putJson(
+            $url,
+            $this->payload($this->certificateMaterial('tls-only', 'tls_only_leaf'))
         )->assertUnprocessable()->assertJsonValidationErrors('binary_security_token');
 
         $this->assertDatabaseCount('zatca_credentials', 0);

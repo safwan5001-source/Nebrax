@@ -73,6 +73,29 @@ final class ZatcaCredentialMaterialValidator
         }
 
         $certificateData = openssl_x509_parse($certificate, false);
+        $extensions = is_array($certificateData)
+            && is_array($certificateData['extensions'] ?? null)
+                ? $certificateData['extensions']
+                : [];
+        $keyUsage = strtolower((string) ($extensions['keyUsage'] ?? ''));
+        if (! str_contains(str_replace([' ', '-'], '', $keyUsage), 'digitalsignature')) {
+            $this->invalid(
+                'binary_security_token',
+                'شهادة CSID غير مخولة للاستخدام digitalSignature.'
+            );
+        }
+
+        $extendedKeyUsage = strtolower((string) ($extensions['extendedKeyUsage'] ?? ''));
+        $clientAuth = str_contains($extendedKeyUsage, 'tls web client authentication')
+            || str_contains(str_replace([' ', '-'], '', $extendedKeyUsage), 'clientauth')
+            || str_contains($extendedKeyUsage, '1.3.6.1.5.5.7.3.2');
+        if (! $clientAuth) {
+            $this->invalid(
+                'binary_security_token',
+                'شهادة CSID لا تحتوي Extended Key Usage المطلوب clientAuth.'
+            );
+        }
+
         $validFrom = is_array($certificateData) ? ($certificateData['validFrom_time_t'] ?? null) : null;
         $expiresAt = is_array($certificateData) ? ($certificateData['validTo_time_t'] ?? null) : null;
         if (! is_int($validFrom) || ! is_int($expiresAt)) {
