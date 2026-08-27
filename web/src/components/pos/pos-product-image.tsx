@@ -27,8 +27,6 @@ async function resolveCompanyLogo(rawLogo: string | null | undefined): Promise<{
   const logo = rawLogo?.trim();
   if (!logo) return { url: null, objectUrl: false };
 
-  // Data/blob/public URLs can be rendered directly. Relative API media paths need
-  // the authenticated media helper, exactly like product images.
   if (/^(?:data:|blob:|https?:\/\/)/i.test(logo)) {
     return { url: logo, objectUrl: false };
   }
@@ -89,7 +87,6 @@ async function prepareCompanyLogo(url: string): Promise<PreparedLogo> {
           Math.max(1, Math.ceil(bounds.height / analysisScale)),
         );
 
-        // لا نعيد ترميز الصورة إن كانت الهوامش أصلاً صغيرة؛ نتجنب عملاً بلا فائدة.
         const retainedAreaRatio = (sourceWidth * sourceHeight) / (image.naturalWidth * image.naturalHeight);
         if (retainedAreaRatio >= 0.82) {
           resolve({ usable: true, displayUrl: url });
@@ -119,8 +116,6 @@ async function prepareCompanyLogo(url: string): Promise<PreparedLogo> {
 
         resolve({ usable: true, displayUrl: outputCanvas.toDataURL('image/png') });
       } catch {
-        // شعارات خارجية قد تمنع قراءة Canvas عبر CORS. في هذه الحالة نحافظ على
-        // الشعار الأصلي ويظل onError حارس التحميل بدلاً من إسقاط شعار صالح.
         resolve({ usable: true, displayUrl: url });
       }
     };
@@ -131,8 +126,6 @@ async function prepareCompanyLogo(url: string): Promise<PreparedLogo> {
 }
 
 function getCompanyBrand(): Promise<CompanyBrand> {
-  // Cache per authenticated session so a POS grid does not call /me once per card.
-  // A tenant/session switch changes the token and invalidates the cached brand.
   const sessionKey = getToken() ?? 'anonymous';
   if (cachedCompanyBrand?.sessionKey === sessionKey) return cachedCompanyBrand.promise;
 
@@ -156,8 +149,6 @@ function getCompanyBrand(): Promise<CompanyBrand> {
 
       return {
         logoUrl: prepared.usable ? prepared.displayUrl : null,
-        // النسخة المقصوصة Data URL لا تحتاج revoke. نحتفظ بالعلم فقط عندما
-        // نعرض Object URL الأصلي بلا إعادة معالجة.
         logoObjectUrl: prepared.usable && prepared.displayUrl === resolved.url ? resolved.objectUrl : false,
         name: response.company?.name?.trim() || null,
       };
@@ -238,12 +229,12 @@ export function PosProductImage({ path, alt }: { path: string | null | undefined
 
   if (companyLogoUrl && !companyLogoFailed) {
     return (
-      <span className="flex h-full w-full items-center justify-center overflow-hidden bg-surface px-4 py-3" aria-hidden>
+      <span className="flex h-full w-full items-center justify-center overflow-hidden bg-surface px-3 py-2" aria-hidden>
         <img
           src={companyLogoUrl}
           alt=""
           loading="lazy"
-          className="max-h-[78%] max-w-[78%] object-contain"
+          className="h-auto max-h-[88%] w-[56%] max-w-[220px] object-contain"
           onError={() => setCompanyLogoFailed(true)}
         />
       </span>
