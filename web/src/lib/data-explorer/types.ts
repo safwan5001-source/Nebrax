@@ -37,6 +37,8 @@ export interface FilterDefinition {
   operators?: FilterOperator[];
   options?: FilterOption[];
   placeholder?: string;
+  /** Label used by the empty/cleared value. Defaults to «الكل». */
+  emptyOptionLabel?: string;
   /** Search placeholder used by entity pickers. */
   searchPlaceholder?: string;
   /** Empty-state text used by entity pickers. */

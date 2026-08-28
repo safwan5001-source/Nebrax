@@ -14,7 +14,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { BranchViewToggle, type BranchView } from '@/components/ui/branch-view-toggle';
+import { useBranches } from '@/lib/branch';
+import { appendBranchFilter, branchFilterDefinition } from '@/lib/branch-filter';
+import { fetchBranchScopedLookup } from '@/lib/branch-scoped-lookup';
 import { formatRiyal } from '@/lib/money';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import {
@@ -80,6 +82,7 @@ export default function PurchasesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { success, error: errorToast } = useToast();
+  const { branches, active } = useBranches();
 
   const [explorer, setExplorer] = useState<DataExplorerState>(() => {
     const parsed = parseExplorerState(new URLSearchParams(searchParams.toString()));
@@ -93,7 +96,6 @@ export default function PurchasesPage() {
   const [meta, setMeta] = useState<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [view, setView] = useState<BranchView>('current');
   const [toDelete, setToDelete] = useState<Purchase | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -103,6 +105,7 @@ export default function PurchasesPage() {
   );
 
   const definitions = useMemo<FilterDefinition[]>(() => [
+    branchFilterDefinition(branches, active?.name),
     {
       key: 'status', label: t('status'), kind: 'select', quick: true,
       options: [
@@ -140,7 +143,7 @@ export default function PurchasesPage() {
     { key: 'due_date', label: t('due_date'), kind: 'dateRange' },
     { key: 'total', label: t('total'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
     { key: 'remaining', label: t('remaining'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
-  ], [classifications, partners, t, ts]);
+  ], [active?.name, branches, classifications, partners, t, ts]);
 
   const labelledFilters = useMemo(
     () => explorer.filters.map((filter) => ({
@@ -166,17 +169,17 @@ export default function PurchasesPage() {
 
   useEffect(() => {
     Promise.all([
-      api<{ data: Partner[] }>('/partners'),
+      fetchBranchScopedLookup<Partner>('/partners?type=supplier', explorer.filters, branches),
       api<{ data: Classification[] }>('/classifications?scope=purchase_invoice'),
     ]).then(([partnerResponse, classificationResponse]) => {
-      setPartners(partnerResponse.data);
+      setPartners(partnerResponse);
       setClassifications(classificationResponse.data.filter((classification) => classification.is_active !== false));
     }).catch(() => undefined);
-  }, []);
+  }, [branches, explorer.filters]);
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
-    if (view === 'all') params.set('branch', 'all');
+    appendBranchFilter(params, explorer.filters);
     if (explorer.search.trim()) params.set('search', explorer.search.trim());
     params.set('per_page', String(explorer.perPage ?? 25));
     params.set('page', String(explorer.page ?? 1));
@@ -215,7 +218,7 @@ export default function PurchasesPage() {
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : t('load_error')))
       .finally(() => setLoading(false));
-  }, [explorer, t, view]);
+  }, [explorer, t]);
 
   useEffect(() => load(), [load]);
 
@@ -326,16 +329,7 @@ export default function PurchasesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={t('title')}
-        context={
-          <BranchViewToggle
-            value={view}
-            onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }}
-          />
-        }
-        actions={headerActions}
-      />
+      <PageHeader title={t('title')} actions={headerActions} />
 
       <ListToolbar
         search={searchInput}

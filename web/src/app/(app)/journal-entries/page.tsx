@@ -10,10 +10,10 @@ import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter
 import { DataTable } from '@/components/data-table';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
-import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
 import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
-import { branchViewQuery, type BranchView } from '@/lib/branch-view';
+import { useBranches } from '@/lib/branch';
+import { branchFilterDefinition } from '@/lib/branch-filter';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { formatRiyal } from '@/lib/money';
@@ -60,6 +60,7 @@ export default function JournalEntriesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { error: toastError } = useToast();
+  const { branches, active } = useBranches();
 
   const [explorer, setExplorer] = useState<DataExplorerState>(() => {
     const parsed = parseExplorerState(new URLSearchParams(searchParams.toString()));
@@ -70,12 +71,16 @@ export default function JournalEntriesPage() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [view, setView] = useState<BranchView>('current');
+
+  const branchValue = useMemo(() => filterValue(explorer.filters.find((filter) => filter.key === 'branch')), [explorer.filters]);
 
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(null);
-    api<{ data: JournalEntry[] }>(`/journal-entries${branchViewQuery(view)}`)
+    const params = new URLSearchParams();
+    if (branchValue) params.set('branch', branchValue);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    api<{ data: JournalEntry[] }>(`/journal-entries${suffix}`)
       .then((response) => setEntries(response.data))
       .catch((err) => {
         const message = err instanceof ApiError ? err.message : tc('loadFailed');
@@ -83,7 +88,7 @@ export default function JournalEntriesPage() {
         toastError(message);
       })
       .finally(() => setLoading(false));
-  }, [tc, toastError, view]);
+  }, [branchValue, tc, toastError]);
 
   useEffect(() => load(), [load]);
 
@@ -107,6 +112,7 @@ export default function JournalEntriesPage() {
   }, [entries]);
 
   const definitions = useMemo<FilterDefinition[]>(() => [
+    branchFilterDefinition(branches, active?.name),
     {
       key: 'entry_kind',
       label: t('type'),
@@ -129,7 +135,7 @@ export default function JournalEntriesPage() {
     { key: 'date_to', label: t('filter_date_to'), kind: 'date' },
     { key: 'amount_min', label: t('filter_amount_min'), kind: 'money' },
     { key: 'amount_max', label: t('filter_amount_max'), kind: 'money' },
-  ], [sourceOptions, t]);
+  ], [active?.name, branches, sourceOptions, t]);
 
   const labelledFilters = useMemo(() => explorer.filters.map((filter) => ({
     ...filter,
@@ -230,14 +236,7 @@ export default function JournalEntriesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={t('title')}
-        description={t('subtitle')}
-        context={
-          <BranchViewToggle value={view} onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }} />
-        }
-        actions={headerActions}
-      />
+      <PageHeader title={t('title')} description={t('subtitle')} actions={headerActions} />
 
       <ListToolbar
         search={searchInput}
