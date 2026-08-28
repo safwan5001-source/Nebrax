@@ -36,6 +36,9 @@ import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/custome
 import { PosAuditReasonDialog } from '@/components/pos/pos-audit-reason-dialog';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
 import type { LiveTemplateRevision } from '@/modules/print-templates/services/live-template-definition';
+import { usePosBarcodeScanner } from '@/components/pos/interactions/use-pos-barcode-scanner';
+import { usePosFocusManager } from '@/components/pos/interactions/use-pos-focus-manager';
+import { usePosKeyboardShortcuts } from '@/components/pos/interactions/use-pos-keyboard-shortcuts';
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
 import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 import { runPosCheckout } from '@/lib/pos-checkout';
@@ -131,7 +134,7 @@ export default function PosPage() {
   const tprod = useTranslations('products');
   const router = useRouter();
   const { success, error: errorToast, toast } = useToast();
-  const searchRef = useRef<HTMLInputElement>(null);
+  const { registerSearchInput, focusSearch } = usePosFocusManager();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -720,53 +723,18 @@ export default function PosPage() {
       return false;
     }
   }
-  // مرجع حيّ لأحدث scanCode (يقرأ أحدث products) — يُستدعى من مستمع لوحة المفاتيح.
-  const scanRef = useRef(scanCode);
-  scanRef.current = scanCode;
 
-  // ماسح الباركود (keyboard-wedge): يكتب الكود سريعاً ثم Enter. نلتقط التسلسل
-  // السريع خارج حقول الإدخال، فالمسح يعمل دون تركيز حقل معيّن.
-  useEffect(() => {
-    let buf = '';
-    let last = 0;
-    function onKey(e: KeyboardEvent) {
-      const el = document.activeElement as HTMLElement | null;
-      const editable = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-      const now = Date.now();
-      if (e.key === 'Enter') {
-        if (!editable && buf.length >= 3) { e.preventDefault(); scanRef.current(buf); }
-        buf = '';
-        return;
-      }
-      if (editable) return; // لا نلتقط أثناء الكتابة اليدوية في الحقول
-      if (e.key.length === 1) {
-        if (now - last > 80) buf = ''; // فجوة طويلة = تسلسل بشري لا ماسح
-        buf += e.key;
-        last = now;
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  usePosBarcodeScanner({ onScan: scanCode });
 
   // اختصارات لوحة المفاتيح الفعلية (مفاتيح وظيفية لا تتعارض مع ماسح الباركود).
-  const cartRef = useRef(cart);
-  cartRef.current = cart;
-  const stepRef = useRef(step);
-  stepRef.current = step;
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const el = document.activeElement as HTMLElement | null;
-      const editable = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-      if (e.key === 'F2') { e.preventDefault(); setPickerOpen(true); }
-      else if (e.key === 'F4') { e.preventDefault(); searchRef.current?.focus(); }
-      else if (e.key === 'F8' && !editable) { e.preventDefault(); setCart((c) => c.slice(0, -1)); }
-      else if (e.key === 'F9') { e.preventDefault(); if (cartRef.current.length > 0 && stepRef.current === 'sale') setStep('payment'); }
-      else if (e.key === 'Escape' && stepRef.current === 'payment') { e.preventDefault(); setStep('sale'); }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  // Esc بلا معالج خارج شاشة الدفع، فيبقى متاحاً لإغلاق الحوارات كما هو اليوم.
+  usePosKeyboardShortcuts({
+    customer: () => setPickerOpen(true),
+    search: focusSearch,
+    delete: () => setCart((c) => c.slice(0, -1)),
+    payment: () => { if (cart.length > 0 && step === 'sale') setStep('payment'); },
+    back: step === 'payment' ? () => setStep('sale') : undefined,
+  });
 
   // حساب السطر حسب وضع الضريبة والخصم: الخصم يقلّل الأساس قبل الضريبة (مطابق للـ backend).
   const lineCalc = (l: PosCartLine) => {
@@ -1020,7 +988,7 @@ export default function PosPage() {
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => searchRef.current?.focus()}
+          onClick={focusSearch}
           className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-surface text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           aria-label={t('barcode_search')}
         >
@@ -1029,7 +997,7 @@ export default function PosPage() {
         <div className="flex h-11 flex-1 items-center gap-2 rounded-md border border-border bg-surface px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
           <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
           <input
-            ref={searchRef}
+            ref={registerSearchInput}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {

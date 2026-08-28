@@ -7032,6 +7032,7 @@
     "diagnosticsSubtitle": "Shows safe operational state without file content or infrastructure secrets.",
     "openDiagnostics": "View diagnostics",
     "platformTitle": "Document Center operations — platform",
+    "back": "Back to platform",
     "platformSubtitle": "Infrastructure readiness, processing state, and retention across the platform.",
     "runtime": "Runtime readiness",
     "networkLocked": "Provider network is locked",

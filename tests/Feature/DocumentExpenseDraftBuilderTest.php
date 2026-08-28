@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\CreatedDraftReference;
 use App\Contracts\DraftBuildContext;
 use App\Models\Account;
 use App\Models\Branch;
@@ -14,11 +15,11 @@ use App\Models\DocumentMatchCandidate;
 use App\Models\DocumentMatchResult;
 use App\Models\DocumentProcessingRun;
 use App\Models\DocumentProviderAttempt;
-use App\Models\DocumentTransactionLink;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\Partner;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\Accounting\ExpenseService;
 use App\Services\DocumentCenter\DocumentReviewMutationGate;
 use App\Services\DocumentCenter\DocumentWorkflowService;
@@ -36,13 +37,14 @@ use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class DocumentExpenseDraftBuilderTest extends TestCase
 {
-    use RefreshDatabase;
     use InteractsWithApi;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -60,6 +62,24 @@ class DocumentExpenseDraftBuilderTest extends TestCase
             'account_id' => '00000000-0000-0000-0000-000000000000',
             'payment_method' => 'cash',
         ])->assertUnauthorized();
+    }
+
+    /** @test */
+    public function expense_draft_rejects_a_pending_governed_purge_without_financial_side_effects(): void
+    {
+        $fixture = $this->readyFixture();
+        DocumentFile::query()->where('document_batch_id', $fixture['batch']->id)->update(['purge_pending_at' => now('UTC')]);
+
+        $this->withToken($fixture['token'])
+            ->postJson("/api/document-batches/{$fixture['batch']->id}/create-expense-draft", $this->payload($fixture))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('batch');
+
+        $this->assertNoDraftState($fixture);
+        $this->assertDatabaseCount('journal_entries', 0);
+        $this->assertDatabaseCount('journal_lines', 0);
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseCount('stock_movements', 0);
     }
 
     /** @test */
@@ -270,7 +290,7 @@ class DocumentExpenseDraftBuilderTest extends TestCase
             'is_group' => false,
             'is_active' => true,
         ]);
-        $branch->accounts()->attach($fixture['account']->id, ['id' => (string) \Illuminate\Support\Str::uuid(), 'tenant_id' => $fixture['tenant_id']]);
+        $branch->accounts()->attach($fixture['account']->id, ['id' => (string) Str::uuid(), 'tenant_id' => $fixture['tenant_id']]);
         $this->assertBuildFailsClosed($fixture, 'الحساب خارج تخصيص الفرع مرفوض.', accountId: $otherExpenseAccount->id);
     }
 
@@ -388,7 +408,7 @@ class DocumentExpenseDraftBuilderTest extends TestCase
     }
 
     /** @param array<string,mixed> $fixture */
-    private function buildDraft(array $fixture, string $reason, ?string $accountId = null, ?string $categoryId = null, ?string $costCenterId = null, string $paymentMethod = 'cash'): \App\Contracts\CreatedDraftReference
+    private function buildDraft(array $fixture, string $reason, ?string $accountId = null, ?string $categoryId = null, ?string $costCenterId = null, string $paymentMethod = 'cash'): CreatedDraftReference
     {
         return app(ExpenseDocumentDraftBuilder::class)->build(
             $fixture['batch'],
@@ -433,9 +453,9 @@ class DocumentExpenseDraftBuilderTest extends TestCase
         $branch = Branch::query()->where('tenant_id', $auth['tenant_id'])->firstOrFail();
         app(TenantContext::class)->set($auth['tenant_id']);
         app(BranchContext::class)->set($branch->id);
-        $entitlementGroup = (string) \Illuminate\Support\Str::uuid();
-        app(EntitlementGrantService::class)->grant(Tenant::findOrFail($auth['tenant_id']), 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::ADDON, now('UTC')->subMinute(), null, 'expense-draft-builder-test', (string) \Illuminate\Support\Str::uuid(), $entitlementGroup);
-        $actor = \App\Models\User::query()->where('tenant_id', $auth['tenant_id'])->where('email', $email)->firstOrFail();
+        $entitlementGroup = (string) Str::uuid();
+        app(EntitlementGrantService::class)->grant(Tenant::findOrFail($auth['tenant_id']), 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::ADDON, now('UTC')->subMinute(), null, 'expense-draft-builder-test', (string) Str::uuid(), $entitlementGroup);
+        $actor = User::query()->where('tenant_id', $auth['tenant_id'])->where('email', $email)->firstOrFail();
         $account = Account::query()->where('code', '5130')->firstOrFail();
         $partner = Partner::create(['type' => 'supplier', 'entity_type' => 'commercial', 'name' => 'مورد المصروف', 'is_active' => true]);
         $batch = DocumentBatch::create(['document_type' => $documentType, 'source_type' => 'manual', 'created_by' => $actor->id]);

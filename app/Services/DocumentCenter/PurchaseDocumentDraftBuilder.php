@@ -8,6 +8,7 @@ use App\Contracts\TransactionDraftBuilder;
 use App\Models\CostCenter;
 use App\Models\DocumentBatch;
 use App\Models\DocumentExtractionResult;
+use App\Models\DocumentFile;
 use App\Models\DocumentMatchResult;
 use App\Models\DocumentReviewAction;
 use App\Models\DocumentTransactionLink;
@@ -30,8 +31,7 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
         private readonly DocumentWorkflowService $workflow,
         private readonly ReviewedDocumentProjector $projector,
         private readonly DocumentReviewReadinessPolicy $readiness,
-    ) {
-    }
+    ) {}
 
     public function build(DocumentBatch $batch, DraftBuildContext $context): CreatedDraftReference
     {
@@ -50,9 +50,12 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
             if ($existing !== null) {
                 return $this->replay($batch, $existing);
             }
+            if (DocumentFile::query()->where('document_batch_id', $batch->id)->whereNotNull('purge_pending_at')->exists()) {
+                throw ValidationException::withMessages(['batch' => 'The governed purge claim is still reconciling; retry draft creation after recovery.']);
+            }
 
             if ($batch->version !== $context->expectedVersion) {
-                throw new StaleDocumentReviewVersion();
+                throw new StaleDocumentReviewVersion;
             }
             if ($batch->document_type !== 'purchase_invoice' || $batch->status !== DocumentWorkflowStatus::READY_FOR_DRAFT) {
                 throw ValidationException::withMessages(['batch' => 'Only a ready purchase invoice can create a purchase draft.']);

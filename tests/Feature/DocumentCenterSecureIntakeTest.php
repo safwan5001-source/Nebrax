@@ -5,15 +5,14 @@ namespace Tests\Feature;
 use App\Models\DocumentBatch;
 use App\Models\DocumentFile;
 use App\Models\Tenant;
-use App\Models\User;
 use App\Services\DocumentCenter\DocumentFileScanService;
 use App\Services\EntitlementGrantService;
 use App\Support\DocumentScanStatus;
 use App\Support\DocumentWorkflowStatus;
 use App\Support\EntitlementAccessMode;
 use App\Support\EntitlementSourceType;
-use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -22,8 +21,8 @@ use Tests\TestCase;
 
 class DocumentCenterSecureIntakeTest extends TestCase
 {
-    use RefreshDatabase;
     use InteractsWithApi;
+    use RefreshDatabase;
 
     private string $png;
 
@@ -106,8 +105,26 @@ class DocumentCenterSecureIntakeTest extends TestCase
         $this->upload(
             $auth['token'],
             $other['id'],
-            UploadedFile::fake()->createWithContent('too-many.pdf', $pdf . "\n"),
+            UploadedFile::fake()->createWithContent('too-many.pdf', $pdf."\n"),
         )->assertStatus(422);
+    }
+
+    /** @test */
+    public function unsafe_path_control_and_bidi_characters_are_removed_from_an_otherwise_valid_unicode_filename(): void
+    {
+        $auth = $this->authorizedTenant('secure-intake-safe-unicode-name');
+        $batch = $this->createBatch($auth['token']);
+        $unsafeName = "../مستند\u{202E}\r\nآمن.png";
+
+        $response = $this->upload($auth['token'], $batch['id'], $this->image($unsafeName))
+            ->assertCreated()
+            ->json('data');
+
+        $this->assertSame('مستندآمن.png', $response['original_name']);
+        $this->assertSame('مستندآمن.png', DocumentFile::findOrFail($response['id'])->original_name);
+        $this->assertStringNotContainsString("\r", $response['original_name']);
+        $this->assertStringNotContainsString("\n", $response['original_name']);
+        $this->assertStringNotContainsString("\u{202E}", $response['original_name']);
     }
 
     /** @test */
@@ -123,16 +140,27 @@ class DocumentCenterSecureIntakeTest extends TestCase
 
         $file = DocumentFile::findOrFail($fileId);
         app(DocumentFileScanService::class)->record($file, DocumentScanStatus::CLEAN, 'test-scanner');
-        $url = $this->withToken($auth['token'])->getJson("/api/document-files/{$fileId}/download-url")
+        $signed = $this->withToken($auth['token'])->getJson("/api/document-files/{$fileId}/download-url")
             ->assertOk()
-            ->assertJsonStructure(['url', 'expires_at'])
-            ->json('url');
-        $relative = (string) parse_url($url, PHP_URL_PATH) . '?' . (string) parse_url($url, PHP_URL_QUERY);
+            ->assertJsonStructure(['url', 'expires_at']);
+        $url = $signed->json('url');
+        $expiresAt = CarbonImmutable::parse($signed->json('expires_at'));
+        $remainingSeconds = now('UTC')->diffInSeconds($expiresAt, false);
+        $this->assertGreaterThan(0, $remainingSeconds);
+        $this->assertLessThanOrEqual(900, $remainingSeconds);
+        $this->assertStringContainsString($fileId, (string) parse_url($url, PHP_URL_PATH));
+        $this->assertStringNotContainsString($batch['id'], (string) parse_url($url, PHP_URL_PATH));
+        $relative = (string) parse_url($url, PHP_URL_PATH).'?'.(string) parse_url($url, PHP_URL_QUERY);
 
-        $this->withToken($auth['token'])->get($relative)
+        $download = $this->withToken($auth['token'])->get($relative)
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png')
+            ->assertHeader('Content-Disposition', 'attachment; filename=receipt.png')
             ->assertHeader('X-Content-Type-Options', 'nosniff');
+        $cacheControl = (string) $download->headers->get('Cache-Control');
+        $this->assertStringContainsString('private', $cacheControl);
+        $this->assertStringContainsString('no-store', $cacheControl);
+        $this->assertStringContainsString('max-age=0', $cacheControl);
         $this->withToken($auth['token'])->get("/api/document-files/{$fileId}/download")
             ->assertForbidden();
     }
@@ -221,6 +249,7 @@ class DocumentCenterSecureIntakeTest extends TestCase
     private function differentImage(string $name): UploadedFile
     {
         $bytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAQAAAB0L9bPAAAADUlEQVR42mP8z8BQDwAFgQH/q842WQAAAABJRU5ErkJggg==', true);
+
         return UploadedFile::fake()->createWithContent($name, $bytes);
     }
 }
