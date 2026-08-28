@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 final class ZatcaCredentialMaterialValidator
 {
     /**
-     * @return array{public_key:string, curve_name:string, fingerprint:string, valid_from:int, expires_at:int}
+     * @return array{public_key:string, curve_name:string, fingerprint:string, valid_from:int, expires_at:int, certificate_chain:list<string>}
      */
     public function validate(string $environment, string $binarySecurityToken, string $privateKey): array
     {
@@ -71,6 +71,8 @@ final class ZatcaCredentialMaterialValidator
                 "شهادة CSID لا تتسلسل إلى مرجع ثقة ZATCA المهيأ لبيئة {$environment}."
             );
         }
+
+        $certificateChain = $this->buildCertificateChain($certificate, $trustAnchor);
 
         $certificateData = openssl_x509_parse($certificate, false);
         $extensions = is_array($certificateData)
@@ -138,7 +140,177 @@ final class ZatcaCredentialMaterialValidator
             'fingerprint' => strtolower(str_replace(':', '', $fingerprint)),
             'valid_from' => $validFrom,
             'expires_at' => $expiresAt,
+            'certificate_chain' => $certificateChain,
         ];
+    }
+
+    /**
+     * يبني السلسلة من شهادة CSID إلى جذر الثقة، ويتحقق من توقيع كل وصلة.
+     *
+     * @return list<string> شهادات DER مرمّزة Base64، تبدأ بشهادة التوقيع
+     */
+    private function buildCertificateChain(OpenSSLCertificate $leaf, string $bundlePath): array
+    {
+        $bundle = file_get_contents($bundlePath);
+        if (! is_string($bundle)
+            || preg_match_all('/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/s', $bundle, $matches) < 1
+        ) {
+            $this->invalid('binary_security_token', 'حزمة ثقة ZATCA لا تحتوي شهادات PEM صالحة.');
+        }
+
+        /** @var array<string, OpenSSLCertificate> $authorities */
+        $authorities = [];
+        foreach ($matches[0] as $pem) {
+            $authority = @openssl_x509_read($pem);
+            $fingerprint = $authority === false ? false : openssl_x509_fingerprint($authority, 'sha256');
+            if ($authority === false || ! is_string($fingerprint) || $fingerprint === '') {
+                $this->invalid('binary_security_token', 'تعذر قراءة شهادة داخل حزمة ثقة ZATCA.');
+            }
+
+            $authorities[strtolower(str_replace(':', '', $fingerprint))] = $authority;
+        }
+
+        $leafFingerprint = openssl_x509_fingerprint($leaf, 'sha256');
+        if (! is_string($leafFingerprint) || $leafFingerprint === '') {
+            $this->invalid('binary_security_token', 'تعذر حساب بصمة شهادة CSID لبناء السلسلة.');
+        }
+
+        $leafFingerprint = strtolower(str_replace(':', '', $leafFingerprint));
+        $paths = $this->completePaths($leaf, $leafFingerprint, $authorities, [$leafFingerprint => true]);
+
+        if (count($paths) !== 1) {
+            $this->invalid(
+                'binary_security_token',
+                count($paths) === 0
+                    ? 'حزمة ثقة ZATCA لا تحتوي مساراً كاملاً حتى جذر الثقة.'
+                    : 'حزمة ثقة ZATCA تحتوي أكثر من مسار كامل صالح لشهادة CSID.'
+            );
+        }
+
+        $chain = [$this->certificateBody($leaf)];
+        foreach ($paths[0] as $certificate) {
+            $chain[] = $this->certificateBody($certificate);
+        }
+
+        return $chain;
+    }
+
+    /**
+     * @param array<string, OpenSSLCertificate> $authorities
+     * @param array<string, true> $seen
+     * @return list<list<OpenSSLCertificate>>
+     */
+    private function completePaths(
+        OpenSSLCertificate $current,
+        string $currentFingerprint,
+        array $authorities,
+        array $seen,
+    ): array {
+        $currentKey = openssl_pkey_get_public($current);
+        if (isset($authorities[$currentFingerprint])
+            && $currentKey !== false
+            && openssl_x509_verify($current, $currentKey) === 1
+        ) {
+            return [[]];
+        }
+
+        $currentData = openssl_x509_parse($current, false);
+        $issuer = is_array($currentData) ? ($currentData['issuer'] ?? null) : null;
+        $authorityKeyId = is_array($currentData)
+            ? $this->keyIdentifier($currentData['extensions']['authorityKeyIdentifier'] ?? null, true)
+            : null;
+
+        $paths = [];
+        foreach ($authorities as $fingerprint => $authority) {
+            if (isset($seen[$fingerprint])) {
+                continue;
+            }
+
+            $authorityData = openssl_x509_parse($authority, false);
+            $subject = is_array($authorityData) ? ($authorityData['subject'] ?? null) : null;
+            if (! $this->sameDistinguishedName($issuer, $subject)) {
+                continue;
+            }
+
+            $subjectKeyId = is_array($authorityData)
+                ? $this->keyIdentifier($authorityData['extensions']['subjectKeyIdentifier'] ?? null, false)
+                : null;
+            if ($authorityKeyId !== null
+                && $subjectKeyId !== null
+                && ! hash_equals($authorityKeyId, $subjectKeyId)
+            ) {
+                continue;
+            }
+
+            $authorityKey = openssl_pkey_get_public($authority);
+            if ($authorityKey === false || openssl_x509_verify($current, $authorityKey) !== 1) {
+                continue;
+            }
+
+            foreach ($this->completePaths(
+                $authority,
+                $fingerprint,
+                $authorities,
+                $seen + [$fingerprint => true],
+            ) as $tail) {
+                $paths[] = [$authority, ...$tail];
+            }
+        }
+
+        return $paths;
+    }
+
+    private function sameDistinguishedName(mixed $issuer, mixed $subject): bool
+    {
+        if (! is_array($issuer) || ! is_array($subject)) {
+            return false;
+        }
+
+        return $this->normalizeDistinguishedName($issuer) === $this->normalizeDistinguishedName($subject);
+    }
+
+    private function normalizeDistinguishedName(array $name): array
+    {
+        foreach ($name as &$value) {
+            if (is_array($value)) {
+                $value = $this->normalizeDistinguishedName($value);
+            }
+        }
+        unset($value);
+
+        ksort($name);
+
+        return $name;
+    }
+
+    private function keyIdentifier(mixed $value, bool $authority): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        $pattern = $authority
+            ? '/keyid:([0-9a-f:]+)/i'
+            : '/([0-9a-f]{2}(?::[0-9a-f]{2})+)/i';
+        if (preg_match($pattern, $value, $matches) !== 1) {
+            return null;
+        }
+
+        return strtolower(str_replace(':', '', $matches[1]));
+    }
+
+    private function certificateBody(OpenSSLCertificate $certificate): string
+    {
+        if (! openssl_x509_export($certificate, $pem)) {
+            $this->invalid('binary_security_token', 'تعذر تسلسل شهادة في سلسلة CSID.');
+        }
+
+        $body = preg_replace('/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\\s+/', '', $pem);
+        if (! is_string($body) || $body === '' || base64_decode($body, true) === false) {
+            $this->invalid('binary_security_token', 'تعذر ترميز شهادة في سلسلة CSID.');
+        }
+
+        return $body;
     }
 
     private function readCertificate(string $material): OpenSSLCertificate

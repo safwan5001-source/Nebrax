@@ -184,6 +184,17 @@ CONF;
         ];
     }
 
+    private function certificateBody(\OpenSSLCertificate $certificate): string
+    {
+        $this->assertTrue(openssl_x509_export($certificate, $pem));
+
+        return (string) preg_replace(
+            '/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\\s+/',
+            '',
+            $pem
+        );
+    }
+
     /** @return array{binary_security_token:string, private_key:string, expires_at:string} */
     private function untrustedCertificateMaterial(): array
     {
@@ -245,8 +256,18 @@ CONF;
         $this->assertSame('CCSID-BASIC-AUTH-SECRET', $credential->credentials['secret']);
         $this->assertSame('secp256k1', $credential->credentials['curve_name']);
         $this->assertStringContainsString('BEGIN PUBLIC KEY', $credential->credentials['public_key']);
+        $this->assertCount(2, $credential->credentials['certificate_chain']);
+        $this->assertSame(
+            $material['binary_security_token'],
+            $credential->credentials['certificate_chain'][0]
+        );
+        $this->assertSame(
+            $this->certificateBody($this->testAuthority()['certificate']),
+            $credential->credentials['certificate_chain'][1]
+        );
         $this->assertSame(64, strlen($response['data']['certificate_fingerprint']));
         $this->assertSame('secp256k1', $response['data']['public_key_curve']);
+        $this->assertSame(2, $response['data']['certificate_chain_length']);
     }
 
     /** @test */
@@ -364,6 +385,84 @@ CONF;
         }
 
         $this->assertDatabaseCount('zatca_credentials', 0);
+    }
+
+    /** @test */
+    public function a_same_key_certificate_with_a_different_subject_is_not_counted_as_a_parent(): void
+    {
+        $authority = $this->testAuthority();
+        $csr = openssl_csr_new(
+            ['commonName' => 'Renewed CA With Different Subject'],
+            $authority['private_key'],
+            ['config' => $authority['config_path'], 'digest_alg' => 'sha256']
+        );
+        $this->assertNotFalse($csr);
+
+        $otherSubject = openssl_csr_sign($csr, null, $authority['private_key'], 3650, [
+            'config' => $authority['config_path'],
+            'digest_alg' => 'sha256',
+            'x509_extensions' => 'v3_ca',
+        ]);
+        $this->assertNotFalse($otherSubject);
+        $missingIssuerKey = openssl_pkey_new([
+            'config' => $authority['config_path'],
+            'private_key_type' => OPENSSL_KEYTYPE_EC,
+            'curve_name' => 'secp256k1',
+        ]);
+        $this->assertNotFalse($missingIssuerKey);
+        $missingIssuerCsr = openssl_csr_new(
+            ['commonName' => 'Missing Cross Sign Issuer'],
+            $missingIssuerKey,
+            ['config' => $authority['config_path'], 'digest_alg' => 'sha256']
+        );
+        $this->assertNotFalse($missingIssuerCsr);
+        $missingIssuer = openssl_csr_sign($missingIssuerCsr, null, $missingIssuerKey, 3650, [
+            'config' => $authority['config_path'],
+            'digest_alg' => 'sha256',
+            'x509_extensions' => 'v3_ca',
+        ]);
+        $this->assertNotFalse($missingIssuer);
+
+        // نفس Subject والمفتاح العام للجذر الصحيح، لكن بتوقيع مُصدِر غير موجود في الحزمة.
+        $crossCsr = openssl_csr_new(
+            ['commonName' => 'Nebrax Test ZATCA Root'],
+            $authority['private_key'],
+            ['config' => $authority['config_path'], 'digest_alg' => 'sha256']
+        );
+        $this->assertNotFalse($crossCsr);
+        $deadEndCrossSigned = openssl_csr_sign(
+            $crossCsr,
+            $missingIssuer,
+            $missingIssuerKey,
+            3650,
+            [
+                'config' => $authority['config_path'],
+                'digest_alg' => 'sha256',
+                'x509_extensions' => 'v3_ca',
+            ]
+        );
+        $this->assertNotFalse($deadEndCrossSigned);
+
+        $this->assertTrue(openssl_x509_export($authority['certificate'], $rootPem));
+        $this->assertTrue(openssl_x509_export($otherSubject, $otherPem));
+        $this->assertTrue(openssl_x509_export($deadEndCrossSigned, $crossPem));
+
+        $bundlePath = tempnam(sys_get_temp_dir(), 'zatca-same-key-bundle-');
+        $this->assertNotFalse($bundlePath);
+        $this->assertNotFalse(file_put_contents($bundlePath, $rootPem.$otherPem.$crossPem));
+        $requestPayload = $this->payload();
+        config(['zatca.trust_anchors.developer' => $bundlePath]);
+
+        $auth = $this->registerTenant('zatca-same-key-ca', 'zatca-same-key-ca@example.test');
+        $this->withToken($auth['token'])->putJson(
+            '/api/zatca-credentials/developer',
+            $requestPayload
+        )->assertOk()->assertJsonPath('data.certificate_chain_length', 2);
+
+        $this->assertSame(
+            $this->certificateBody($authority['certificate']),
+            ZatcaCredential::sole()->credentials['certificate_chain'][1]
+        );
     }
 
     /** @test */

@@ -103,6 +103,7 @@ class ZatcaCredentialService
             // المشفرة كي لا يتكوّن مصدر حقيقة ثانٍ منفصل عن مجموعة CSID.
             $credentials['public_key'] = $material['public_key'];
             $credentials['curve_name'] = $material['curve_name'];
+            $credentials['certificate_chain'] = $material['certificate_chain'];
 
             $record ??= new ZatcaCredential(['environment' => $environment]);
             $record->fill([
@@ -134,6 +135,9 @@ class ZatcaCredentialService
             'has_private_key' => filled($secrets['private_key'] ?? null),
             'has_request_id' => filled($secrets['request_id'] ?? null),
             'public_key_curve' => $secrets['curve_name'] ?? null,
+            'certificate_chain_length' => is_array($secrets['certificate_chain'] ?? null)
+                ? count($secrets['certificate_chain'])
+                : 0,
             'certificate_fingerprint' => $credential->certificate_fingerprint,
             'configured_at' => $credential->configured_at?->toIso8601String(),
             'expires_at' => $credential->expires_at?->toIso8601String(),
