@@ -82,6 +82,9 @@ class Rbac
             // المراجعة والتصدير والاعتماد وإدارة سياسات الأدلة.
             'pos.audit.view', 'pos.audit.review', 'pos.audit.export',
             'pos.override.approve', 'pos.audit.settings.manage',
+            // Phase 2: إعادة حساب الذكاء الرقابي سلطة مستقلة عن العرض/المراجعة؛
+            // owner/admin يملكانها عبر `*`، وتُسند صراحةً لدور مخصص عند الحاجة.
+            'pos.audit.recalculate',
             'apps.view', 'apps.manage',
             // Fuel Stations: يمنحها المالك/المدير عبر `*`، ولا تُضاف للأدوار
             // المقيدة تلقائياً؛ تُسند فقط عبر دور مخصص أو قرار مستأجر صريح.

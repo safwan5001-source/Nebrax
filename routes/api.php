@@ -73,6 +73,7 @@ use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PosAuditController;
+use App\Http\Controllers\Api\PosLossPreventionController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\PosDeviceController;
 use App\Http\Controllers\Api\PosSessionController;
@@ -557,6 +558,20 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('pos/reason-codes', [PosAuditController::class, 'reasonCodes'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/reason-codes', [PosAuditController::class, 'storeReasonCode'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
         Route::put('pos/reason-codes/{id}', [PosAuditController::class, 'updateReasonCode'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
+
+        // Phase 2 — الذكاء الرقابي المشتقّ (استثناءات/درجات/علاقات/مراجعة/إعادة حساب).
+        // كلها قراءة/تجميع خادمي فوق أدلة Phase 1 الثابتة؛ لا قيد ولا مستند مالي.
+        Route::get('pos/audit/intelligence/overview', [PosLossPreventionController::class, 'overview'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/exceptions', [PosLossPreventionController::class, 'index'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/exceptions/{id}', [PosLossPreventionController::class, 'show'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/exceptions/{id}/evidence', [PosLossPreventionController::class, 'evidence'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/risk', [PosLossPreventionController::class, 'risk'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/risk/{userId}', [PosLossPreventionController::class, 'riskDetail'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/relationships', [PosLossPreventionController::class, 'relationships'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/rules', [PosLossPreventionController::class, 'rules'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::put('pos/audit/rules/{key}', [PosLossPreventionController::class, 'updateRule'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
+        Route::post('pos/audit/exceptions/{id}/review', [PosLossPreventionController::class, 'review'])->middleware([$perm('pos.audit.review'), $app('sales.pos')]);
+        Route::post('pos/audit/recalculate', [PosLossPreventionController::class, 'recalculate'])->middleware([$perm('pos.audit.recalculate'), $app('sales.pos')]);
 
         // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.
         Route::get('settings/finance', [FinanceSettingsController::class, 'show'])->middleware($perm('payments.view'));
