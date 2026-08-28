@@ -6,7 +6,7 @@ import { displayLocale } from '@/lib/formatting';
  * إلى بطاقات قابلة للمس على الجوال بينما يحتفظ سطح المكتب بالجدول المكتمل.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Download, FileText, Printer, Share2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -102,8 +102,11 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const requestGeneration = useRef(0);
 
   const load = useCallback(() => {
+    const generation = ++requestGeneration.current;
+    setReport(null);
     setLoading(true);
     setFailed(false);
     api<SalesReportResponse>(`/reports/sales${filtersToQuery(view, filters)}`)
@@ -111,10 +114,17 @@ export function SalesReportsWorkspace({ view }: { view: SalesReportView }) {
         // وضع المعاينة لا يملك مصدر API لتقارير المبيعات بعد؛ لا نحاول قراءة
         // استجابة ناقصة وكأنها تقرير حقيقي، بل نعرض حالة الخطأ الصريحة.
         if (!response?.totals || !Array.isArray(response.data)) throw new Error('invalid-sales-report-response');
+        if (generation !== requestGeneration.current) return;
         setReport(response);
       })
-      .catch(() => setFailed(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (generation !== requestGeneration.current) return;
+        setReport(null);
+        setFailed(true);
+      })
+      .finally(() => {
+        if (generation === requestGeneration.current) setLoading(false);
+      });
   }, [view, filters]);
 
   useEffect(() => load(), [load]);
