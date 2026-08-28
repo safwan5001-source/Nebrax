@@ -11,10 +11,33 @@ import {
 } from './document-review-access';
 
 describe('Document Center sidebar access', () => {
-  it('shows the entry only for an explicit view permission or an administrative fallback role', () => {
+  it('shows the entry for a normal user holding the explicit view permission', () => {
     expect(canViewDocumentCenter(['documents.center.view'], 'staff')).toBe(true);
+  });
+
+  it('hides the entry from a normal user without the permission', () => {
     expect(canViewDocumentCenter([], 'staff')).toBe(false);
+    expect(canViewDocumentCenter(['invoices.view'], 'staff')).toBe(false);
+  });
+
+  // الانحدار الأصلي: `/login` يرسل `['*']` للمالك والمدير، فكان `??` يقرأ
+  // `false` من `includes` ولا يسقط على الدور — فلم يرَ أي مالك الرابط قطّ.
+  it('shows the entry for an owner and an admin carrying the wildcard permission', () => {
+    expect(canViewDocumentCenter(['*'], 'owner')).toBe(true);
+    expect(canViewDocumentCenter(['*'], 'admin')).toBe(true);
+  });
+
+  it('shows the entry for an owner and an admin when the stored permissions are missing entirely', () => {
     expect(canViewDocumentCenter(undefined, 'owner')).toBe(true);
+    expect(canViewDocumentCenter(undefined, 'admin')).toBe(true);
+    expect(canViewDocumentCenter(undefined, 'staff')).toBe(false);
+  });
+
+  // قائمة فارغة ليست غياباً: الخادم أجاب «لا صلاحية»، فالدور لا ينقض جوابه —
+  // وإلا صار الرابط أوسع من `Rbac::allows` الذي يقرأ الجدول القابل للضبط.
+  it('follows the resolved permission list over the role name when the list is present', () => {
+    expect(canViewDocumentCenter([], 'owner')).toBe(false);
+    expect(canViewDocumentCenter(['invoices.view'], 'admin')).toBe(false);
   });
 });
 

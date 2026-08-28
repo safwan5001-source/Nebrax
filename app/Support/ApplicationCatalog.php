@@ -26,12 +26,28 @@ final class ApplicationCatalog
     public const MATURITY_RETIRED = 'retired';
 
     /**
+     * بوابة المسارات: حالة التطبيق وحدها تحسم الوصول (`EnsureApplicationActive`).
+     */
+    public const ACCESS_OPERATIONAL = 'operational';
+
+    /**
+     * بوابة المسارات: القرار المركّب يحسم الوصول (`EnsureCommercialApplicationAccess`)
+     * — استحقاق تجاري **و** حالة تطبيق، لا حالة تطبيق وحدها.
+     */
+    public const ACCESS_COMMERCIAL = 'commercial';
+
+    /**
      * كل قدرة لها مفتاح نقطة مستقل، حتى لو كانت مجموعة الأعمال نفسها مفعلة.
      *
      * `mandatory` يعني: لا ينبغي لمسار «إيقاف التطبيق» المستقبلي أن يعرض
      * إيقافها بعد تهيئة المؤسسة؛ وليس معناه أن صلاحيات المستخدم تتجاوز RBAC.
      *
-     * @var array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>}>
+     * `access` يعلن **أي بوابة تحرس مسارات القدرة فعلاً**، فيقرأها حساب الظهور
+     * الملاحي بدل تخمينه. غيابه يعني `operational` — وهي حال معظم القدرات. ولأن
+     * الافتراض قد يكذب على قدرةٍ جديدة تُحرَس تجارياً، يوازن `ApplicationAccessGateGuardTest`
+     * هذا الإعلان بالـ middleware المسجَّل على المسارات ويُفشل الـ CI عند الاختلاف.
+     *
+     * @var array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access?:string}>
      */
     private const APPLICATIONS = [
         // ────────────────────────── المبيعات ونقطة البيع ──────────────────────────
@@ -40,6 +56,8 @@ final class ApplicationCatalog
             'maturity' => self::MATURITY_BUILT,
             'mandatory' => true,
             'dependencies' => [],
+            // إلزامية، لكن مسارات إشعارات التسليم تُحرَس تجارياً.
+            'access' => self::ACCESS_COMMERCIAL,
         ],
         'sales.pos' => [
             'group' => 'pos',
@@ -255,6 +273,7 @@ final class ApplicationCatalog
             'maturity' => self::MATURITY_BUILT,
             'mandatory' => false,
             'dependencies' => [],
+            'access' => self::ACCESS_COMMERCIAL,
         ],
         'fuel_stations.inventory' => [
             'group' => 'fuel_stations',
@@ -279,18 +298,21 @@ final class ApplicationCatalog
             'maturity' => self::MATURITY_BUILT,
             'mandatory' => false,
             'dependencies' => ['fuel_stations.core'],
+            'access' => self::ACCESS_COMMERCIAL,
         ],
         'fuel_stations.maintenance' => [
             'group' => 'fuel_stations',
             'maturity' => self::MATURITY_BUILT,
             'mandatory' => false,
             'dependencies' => ['fuel_stations.core'],
+            'access' => self::ACCESS_COMMERCIAL,
         ],
         'fuel_stations.integrations' => [
             'group' => 'fuel_stations',
             'maturity' => self::MATURITY_BUILT,
             'mandatory' => false,
             'dependencies' => ['fuel_stations.core'],
+            'access' => self::ACCESS_COMMERCIAL,
         ],
 
         // مركز المستندات منتج تجاري اختياري مستقل. تكامله اللاحق مع خدمات
@@ -300,6 +322,7 @@ final class ApplicationCatalog
             'maturity' => self::MATURITY_BUILT,
             'mandatory' => false,
             'dependencies' => [],
+            'access' => self::ACCESS_COMMERCIAL,
         ],
 
         // ───────────────────────── البنية والإضافات ─────────────────────────
@@ -331,10 +354,13 @@ final class ApplicationCatalog
         ],
     ];
 
-    /** @return array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>}> */
+    /** @return array<string, array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string}> */
     public static function all(): array
     {
-        return self::APPLICATIONS;
+        return array_map(
+            static fn (array $application): array => self::withAccessDefault($application),
+            self::APPLICATIONS,
+        );
     }
 
     /** @return list<string> */
@@ -343,10 +369,34 @@ final class ApplicationCatalog
         return array_keys(self::APPLICATIONS);
     }
 
-    /** @return array{group:string,maturity:string,mandatory:bool,dependencies:list<string>}|null */
+    /** @return array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string}|null */
     public static function find(string $key): ?array
     {
-        return self::APPLICATIONS[$key] ?? null;
+        $application = self::APPLICATIONS[$key] ?? null;
+
+        return $application === null ? null : self::withAccessDefault($application);
+    }
+
+    /** أي بوابة تحرس مسارات هذه القدرة — `operational` أو `commercial`. */
+    public static function accessGateFor(string $key): string
+    {
+        return self::find($key)['access'] ?? self::ACCESS_OPERATIONAL;
+    }
+
+    public static function isCommerciallyGated(string $key): bool
+    {
+        return self::accessGateFor($key) === self::ACCESS_COMMERCIAL;
+    }
+
+    /**
+     * @param  array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access?:string}  $application
+     * @return array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string}
+     */
+    private static function withAccessDefault(array $application): array
+    {
+        $application['access'] ??= self::ACCESS_OPERATIONAL;
+
+        return $application;
     }
 
     public static function exists(string $key): bool
@@ -384,14 +434,24 @@ final class ApplicationCatalog
     {
         $errors = [];
         $maturities = [self::MATURITY_BUILT, self::MATURITY_COMING_SOON, self::MATURITY_RETIRED];
+        $gates = [self::ACCESS_OPERATIONAL, self::ACCESS_COMMERCIAL];
 
-        foreach (self::APPLICATIONS as $key => $application) {
+        foreach (self::all() as $key => $application) {
             if ($application['group'] === '') {
                 $errors[] = "{$key}: المجموعة مطلوبة.";
             }
 
             if (! in_array($application['maturity'], $maturities, true)) {
                 $errors[] = "{$key}: حالة نضج غير معروفة.";
+            }
+
+            if (! in_array($application['access'], $gates, true)) {
+                $errors[] = "{$key}: بوابة وصول غير معروفة.";
+            }
+
+            // القدرة غير المبنية لا مسارات لها تُحرَس، فإعلانها تجارياً وعدٌ لا سند له.
+            if ($application['access'] === self::ACCESS_COMMERCIAL && $application['maturity'] !== self::MATURITY_BUILT) {
+                $errors[] = "{$key}: بوابة تجارية على قدرة غير مبنية.";
             }
 
             if ($application['mandatory'] && $application['maturity'] !== self::MATURITY_BUILT) {

@@ -18,7 +18,9 @@ use App\Models\TenantApplicationState;
 use App\Models\User;
 use App\Models\ZatcaCredential;
 use App\Support\ApplicationCatalog;
+use App\Support\TenantApplicationEntitlementDecision;
 use App\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -30,7 +32,10 @@ use RuntimeException;
  */
 class TenantApplicationService
 {
-    public function __construct(private CommercialApplicationStatusService $commercialStatus) {}
+    public function __construct(
+        private CommercialApplicationStatusService $commercialStatus,
+        private TenantApplicationEntitlementResolver $entitlements,
+    ) {}
 
     /**
      * لحظة تفعيل الإنفاذ الفعلي. لا صف حالة = "معطّلة" منطقياً في `stateFor()`
@@ -155,9 +160,11 @@ class TenantApplicationService
 
     /**
      * أي قدرات قابلة للإيقاف (غير إلزامية، مبنية) **مرئية** اليوم لهذا المستأجر —
-     * تغذّي الشريط الجانبي وحده، لا صلاحيات ولا إنفاذ مسار. `enabled` و`suspended`
-     * كلاهما مرئي (المعلّقة تبقى قراءة فقط، فروابطها/تقاريرها تبقى متاحة)؛
-     * `disabled` وحدها تُخفي عناصر الشريط المرتبطة بالمفتاح.
+     * تغذّي الشريط الجانبي وحده، لا صلاحيات ولا إنفاذ مسار.
+     *
+     * للقدرات المعلَنة `ACCESS_COMMERCIAL` يُقيَّم الاستحقاق التجاري أيضاً — مساراتها
+     * تحرسها `EnsureCommercialApplicationAccess`، فبقاء الرابط بلا منحة كان يجعل
+     * الواجهة أوسع من الخادم. القدرات التشغيلية تبقى على حالة التطبيق وحدها.
      *
      * @return array<string, bool>
      */
@@ -166,18 +173,49 @@ class TenantApplicationService
         $rows = TenantApplicationState::query()->get()->keyBy('application_key');
         $grandfathered = $this->isGrandfatheredTenant();
 
-        $result = [];
-        foreach (ApplicationCatalog::all() as $key => $application) {
-            if ($application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
-                continue;
-            }
+        $navigable = array_filter(
+            ApplicationCatalog::all(),
+            fn (array $application) => ! $application['mandatory']
+                && $application['maturity'] === ApplicationCatalog::MATURITY_BUILT,
+        );
 
-            $row = $rows->get($key);
-            $status = $row?->status ?? ($grandfathered ? 'enabled' : 'disabled');
-            $result[$key] = $status !== 'disabled';
+        $commercialKeys = array_keys(array_filter(
+            $navigable,
+            fn (array $application) => $application['access'] === ApplicationCatalog::ACCESS_COMMERCIAL,
+        ));
+        $entitlements = $this->entitlementsFor($commercialKeys);
+
+        $result = [];
+        foreach ($navigable as $key => $application) {
+            $status = $rows->get($key)?->status ?? ($grandfathered ? 'enabled' : 'disabled');
+            $enabled = $status !== 'disabled';
+
+            $entitled = $application['access'] !== ApplicationCatalog::ACCESS_COMMERCIAL
+                || ($entitlements[$key] ?? TenantApplicationEntitlementDecision::DENIED) !== TenantApplicationEntitlementDecision::DENIED;
+
+            $result[$key] = $enabled && $entitled;
         }
 
         return $result;
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return array<string, TenantApplicationEntitlementDecision>
+     */
+    private function entitlementsFor(array $keys): array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($keys === [] || $tenantId === null) {
+            return [];
+        }
+
+        $tenant = Tenant::find($tenantId);
+        if ($tenant === null) {
+            return [];
+        }
+
+        return $this->entitlements->resolveMany($tenant, $keys, CarbonImmutable::now('UTC'));
     }
 
     /**
