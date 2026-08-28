@@ -57,6 +57,24 @@ class ZatcaSigningCredentialResolverTest extends TestCase
         $this->assertSame('compliance', $material->stage);
         $this->assertSame('developer-key', $material->privateKey);
         $this->assertSame([base64_encode('developer-certificate')], $material->certificateChain);
+
+        Settings::put('zatca', ['active_environment' => 'production']);
+        $material = app(ZatcaSigningCredentialResolver::class)->resolve();
+        $this->assertSame('production', $material->environment);
+        $this->assertSame('production-key', $material->privateKey);
+    }
+
+    /** @test */
+    public function it_fails_closed_outside_an_active_tenant_context(): void
+    {
+        $auth = $this->registerTenant('zatca-no-context', 'zatca-no-context@example.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->credential('developer', 'secret-that-must-not-leak');
+        app(TenantContext::class)->forget();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('سياق مستأجر نشط');
+        app(ZatcaSigningCredentialResolver::class)->resolve();
     }
 
     /** @test */

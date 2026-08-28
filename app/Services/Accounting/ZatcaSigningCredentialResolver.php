@@ -4,19 +4,28 @@ namespace App\Services\Accounting;
 
 use App\Models\ZatcaCredential;
 use App\Support\Settings;
+use App\Tenancy\TenantContext;
 use RuntimeException;
 
 /** يحل مادة التوقيع للبيئة المختارة صراحةً من دون fallback بين البيئات. */
 final class ZatcaSigningCredentialResolver
 {
-    public function resolve(?string $environment = null): ZatcaSigningMaterial
+    public function __construct(private readonly TenantContext $tenantContext) {}
+
+    public function resolve(): ZatcaSigningMaterial
     {
-        $environment ??= (string) Settings::get('zatca', 'active_environment');
+        $tenantId = $this->tenantContext->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا يمكن حل بيانات اعتماد ZATCA خارج سياق مستأجر نشط.');
+        }
+
+        $environment = (string) Settings::get('zatca', 'active_environment');
         if (! in_array($environment, ZatcaCredentialService::ENVIRONMENTS, true)) {
             throw new RuntimeException('بيئة توقيع ZATCA النشطة غير صالحة.');
         }
 
         $credential = ZatcaCredential::query()
+            ->where('tenant_id', $tenantId)
             ->where('environment', $environment)
             ->where('status', 'configured')
             ->first();
