@@ -13,6 +13,7 @@ import {
 import type { Warehouse as WarehouseType } from '@/lib/warehouse';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { logout } from '@/lib/auth';
+import { POS_RETURN_HREF } from '@/lib/pos-workspace';
 
 /** شريط تشغيلي لـ POS: يعرض السياق الفعلي والإجراءات المتاحة فقط. */
 export function PosTopbar({
@@ -95,7 +96,7 @@ export function PosTopbar({
   return (
     <header className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
       <Link
-        href="/dashboard"
+        href={POS_RETURN_HREF}
         className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         aria-label={t('return_to_system')}
       >
