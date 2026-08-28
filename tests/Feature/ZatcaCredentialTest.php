@@ -410,12 +410,13 @@ CONF;
         $bundlePath = tempnam(sys_get_temp_dir(), 'zatca-same-key-bundle-');
         $this->assertNotFalse($bundlePath);
         $this->assertNotFalse(file_put_contents($bundlePath, $rootPem.$otherPem));
+        $requestPayload = $this->payload();
         config(['zatca.trust_anchors.developer' => $bundlePath]);
 
         $auth = $this->registerTenant('zatca-same-key-ca', 'zatca-same-key-ca@example.test');
         $this->withToken($auth['token'])->putJson(
             '/api/zatca-credentials/developer',
-            $this->payload()
+            $requestPayload
         )->assertOk()->assertJsonPath('data.certificate_chain_length', 2);
 
         $this->assertSame(
