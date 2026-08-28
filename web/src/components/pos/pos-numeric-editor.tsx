@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Delete } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -113,7 +113,7 @@ export function PosNumericEditor({
         {value || '0'}
       </button>
 
-      <Dialog open={open} onClose={() => setOpen(false)} title={title} className="max-w-sm">
+      <PosDialog open={open} onClose={() => setOpen(false)} title={title} className="max-w-sm">
         <form
           className="space-y-4"
           onSubmit={(event) => {
@@ -182,7 +182,7 @@ export function PosNumericEditor({
             </div>
           </div>
         </form>
-      </Dialog>
+      </PosDialog>
     </>
   );
 }

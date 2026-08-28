@@ -91,10 +91,10 @@
 ## 8. Topbar والحوارات
 
 - [`pos-topbar.tsx`](web/src/components/pos/pos-topbar.tsx): held / recent / session / overflow `min-h-11`. قائمة المزيد القائمة لم تُستبدل.
-- [`dialog.tsx`](web/src/components/ui/dialog.tsx): إغلاق `min-h-11 min-w-11`؛ `max-h-[calc(100dvh-2rem)] overflow-y-auto`. Escape كما هو.
-- حوارات POS (عميل، معلّق، audit، سلات، ملاحظة، إغلاق وردية): أزرار أساسية/ثانوية `min-h-11`.
+- [`pos-dialog.tsx`](web/src/components/pos/pos-dialog.tsx): إغلاق `min-h-11 min-w-11` و`max-h-[calc(100dvh-2rem)]`. Escape كما في الحوار العام.
+- حوارات POS (عميل، معلّق، audit، سلات، ملاحظة، إغلاق وردية، مرتجع/استبدال/إيصال): تستخدم `PosDialog`؛ أزرار أساسية/ثانوية `min-h-11`.
 
-> تغيير `Dialog` مشترك يؤثر أيضاً على حوارات ERP — مقصود لأنه كان دون هدف لمس (≥40px في نظام التصميم).
+> **تصحيح مراجعة:** `components/ui/dialog` العام أُعيد كما كان. تحسينات اللمس للحوار لم تُطبَّق على ERP.
 
 ---
 
@@ -204,7 +204,7 @@ web/src/components/ui/dialog.tsx
 3. **حوارات متكدّسة + Esc** — سلوك قائم قبل PR-3.
 4. **Ctrl+N / Ctrl+Shift+O في Chrome** — من PR-2؛ البدائل `Ctrl+Alt+N/O` ما زالت قائمة.
 5. **لا كاميرا باركود** ولا لوحة أرقام لشاشة الدفع.
-6. تغيير `Dialog` المشترك يصل لحوارات ERP — مقصود كهدف لمس، ليس redesign.
+6. تغيير `Dialog` المشترك — **صُحّح:** الحوار العام أُعيد كما كان؛ اللمس عبر `PosDialog` فقط.
 
 ---
 

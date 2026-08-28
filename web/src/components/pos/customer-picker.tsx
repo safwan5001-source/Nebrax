@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Search, UserPlus } from 'lucide-react';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -68,7 +68,7 @@ export function CustomerPickerDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title={t('select_customer')} className="max-w-md">
+    <PosDialog open={open} onClose={onClose} title={t('select_customer')} className="max-w-md">
       {adding ? (
         <form onSubmit={quickAdd} className="space-y-3">
           <div className="space-y-1.5">
@@ -119,6 +119,6 @@ export function CustomerPickerDialog({
           </Button>
         </div>
       )}
-    </Dialog>
+    </PosDialog>
   );
 }

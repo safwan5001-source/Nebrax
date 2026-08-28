@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface DialogProps {
+interface PosDialogProps {
   open: boolean;
   onClose: () => void;
   title: string;
@@ -12,7 +12,11 @@ interface DialogProps {
   className?: string;
 }
 
-export function Dialog({ open, onClose, title, children, className }: DialogProps) {
+/**
+ * غلاف حوار خاص بنقطة البيع: أهداف لمس أوضح وارتفاع لا يتجاوز الشاشة.
+ * لا يغيّر `components/ui/dialog` العام ولا منطق Esc.
+ */
+export function PosDialog({ open, onClose, title, children, className }: PosDialogProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -30,13 +34,13 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative z-10 my-8 w-full max-w-lg rounded border border-border bg-surface',
-          className
+          'relative z-10 my-8 w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded border border-border bg-surface',
+          className,
         )}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-base font-semibold text-text">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="إغلاق">
+          <button type="button" onClick={onClose} className="grid min-h-11 min-w-11 place-items-center rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="إغلاق">
             <X className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>

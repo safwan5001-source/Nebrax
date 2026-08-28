@@ -10,7 +10,7 @@ import {
   Users, MoreHorizontal, PauseCircle, Archive, Trash,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -1603,7 +1603,7 @@ export default function PosPage() {
 
       <PosRecentInvoicesDialog open={recentInvoicesOpen} onClose={() => setRecentInvoicesOpen(false)} />
 
-      <Dialog open={openCartsOpen} onClose={() => setOpenCartsOpen(false)} title={t('open_carts')}>
+      <PosDialog open={openCartsOpen} onClose={() => setOpenCartsOpen(false)} title={t('open_carts')}>
         <div className="space-y-2">
           {carts.map((cartState) => {
             const itemCount = cartState.items.reduce((sum, item) => sum + item.qty, 0);
@@ -1620,7 +1620,7 @@ export default function PosPage() {
           })}
           <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => { createCart(); setOpenCartsOpen(false); setMobileTab('cart'); }}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('new_cart')}</Button>
         </div>
-      </Dialog>
+      </PosDialog>
 
       <PosAuditReasonDialog
         open={sensitiveAction !== null}
@@ -1630,23 +1630,23 @@ export default function PosPage() {
         onConfirm={confirmSensitiveAction}
       />
 
-      <Dialog open={cartToClose !== null} onClose={() => setCartToClose(null)} title={t('close_cart_confirm')}>
+      <PosDialog open={cartToClose !== null} onClose={() => setCartToClose(null)} title={t('close_cart_confirm')}>
         <p className="text-sm leading-relaxed text-muted">{t('close_cart_description')}</p>
         <div className="mt-5 flex justify-end gap-2">
           <Button type="button" variant="outline" className="min-h-11" onClick={() => setCartToClose(null)}>{ts('cancel')}</Button>
           <Button type="button" variant="danger" className="min-h-11" onClick={confirmCloseCart}>{t('close_cart')}</Button>
         </div>
-      </Dialog>
+      </PosDialog>
 
-      <Dialog open={clearCartOpen} onClose={() => setClearCartOpen(false)} title={t('clear_cart_confirm')}>
+      <PosDialog open={clearCartOpen} onClose={() => setClearCartOpen(false)} title={t('clear_cart_confirm')}>
         <p className="text-sm leading-relaxed text-muted">{t('clear_cart_description')}</p>
         <div className="mt-5 flex justify-end gap-2">
           <Button type="button" variant="outline" className="min-h-11" onClick={() => setClearCartOpen(false)}>{ts('cancel')}</Button>
           <Button type="button" variant="danger" className="min-h-11" onClick={confirmClearActiveCart}>{t('clear_cart')}</Button>
         </div>
-      </Dialog>
+      </PosDialog>
 
-      <Dialog open={noteOpen} onClose={() => setNoteOpen(false)} title={t('cart_note')}>
+      <PosDialog open={noteOpen} onClose={() => setNoteOpen(false)} title={t('cart_note')}>
         <div className="space-y-4">
           <textarea
             value={activeCart.note}
@@ -1657,10 +1657,10 @@ export default function PosPage() {
           />
           <div className="flex justify-end"><Button type="button" className="min-h-11" onClick={() => setNoteOpen(false)}>{ts('save')}</Button></div>
         </div>
-      </Dialog>
+      </PosDialog>
 
       {/* بوابة الوردية: لا بيع قبل فتح وردية — الإغلاق = مغادرة نقطة البيع. */}
-      <Dialog open={sessionReady && !session} onClose={() => router.push('/dashboard')} title={ts('open_title')}>
+      <PosDialog open={sessionReady && !session} onClose={() => router.push('/dashboard')} title={ts('open_title')}>
         <form onSubmit={openSession} className="space-y-3">
           <p className="text-xs text-muted">{t('open_to_start')}</p>
           <div className="space-y-1.5">
@@ -1688,18 +1688,18 @@ export default function PosPage() {
             <Button type="submit" className="min-h-11" disabled={sessionBusy || !deviceId}>{ts('open')}</Button>
           </div>
         </form>
-      </Dialog>
+      </PosDialog>
 
-      <Dialog open={unsavedExitAction !== null} onClose={() => setUnsavedExitAction(null)} title={t('unsaved_carts_exit_title')}>
+      <PosDialog open={unsavedExitAction !== null} onClose={() => setUnsavedExitAction(null)} title={t('unsaved_carts_exit_title')}>
         <p className="text-sm leading-relaxed text-muted">{t('unsaved_carts_exit_description')}</p>
         <div className="mt-5 flex justify-end gap-2">
           <Button type="button" variant="outline" className="min-h-11" onClick={() => setUnsavedExitAction(null)}>{ts('cancel')}</Button>
           <Button type="button" variant="danger" className="min-h-11" onClick={() => void confirmUnsavedExit()}>{t('unsaved_carts_exit_confirm')}</Button>
         </div>
-      </Dialog>
+      </PosDialog>
 
       {/* إغلاق الوردية: عدّ النقد → المتوقّع/الفرق يُحسبان في الخادم ثم نغادر. */}
-      <Dialog open={closeOpen} onClose={() => setCloseOpen(false)} title={ts('close_title')}>
+      <PosDialog open={closeOpen} onClose={() => setCloseOpen(false)} title={ts('close_title')}>
         <form onSubmit={closeSession} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="cb">{ts('counted')}</Label>
@@ -1711,7 +1711,7 @@ export default function PosPage() {
             <Button type="submit" className="min-h-11" disabled={sessionBusy}>{ts('close')}</Button>
           </div>
         </form>
-      </Dialog>
+      </PosDialog>
     </div>
   );
 }

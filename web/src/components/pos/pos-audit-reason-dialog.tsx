@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { api, ApiError } from '@/lib/api';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
@@ -46,7 +46,7 @@ export function PosAuditReasonDialog({
   const valid = code !== '' && (!selected?.requires_note || note.trim() !== '');
 
   return (
-    <Dialog open={open} onClose={() => (!busy ? onClose() : null)} title={title}>
+    <PosDialog open={open} onClose={() => (!busy ? onClose() : null)} title={title}>
       <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (valid) void onConfirm({ code, note: note.trim() }); }}>
         <div className="space-y-1.5">
           <Label htmlFor="pos-audit-reason">{t('selectReason')}</Label>
@@ -59,6 +59,6 @@ export function PosAuditReasonDialog({
         {error && <p role="alert" className="rounded border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" className="min-h-11" onClick={onClose} disabled={busy}>{tc('cancel')}</Button><Button type="submit" className="min-h-11" disabled={!valid || loading || busy}>{t('confirmAction')}</Button></div>
       </form>
-    </Dialog>
+    </PosDialog>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, Minus, Plus, Repeat2 } from 'lucide-react';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -144,7 +144,7 @@ export function PosExchangeDialog({
   const policyLabel = quote?.exchange_surplus_policy === 'allow_cash_refund' ? t('exchange_policy_allow_cash') : t('exchange_policy_credit_only');
 
   return (
-    <Dialog open={open} onClose={onClose} title={t('exchange_title')} className="max-w-4xl">
+    <PosDialog open={open} onClose={onClose} title={t('exchange_title')} className="max-w-4xl">
       <div className="space-y-4">
         <p className="rounded bg-primary-soft px-3 py-2 text-xs leading-relaxed text-text">{t('exchange_hint')}</p>
         {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
@@ -175,7 +175,7 @@ export function PosExchangeDialog({
           <div className="flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs text-muted">{t('exchange_action_total')}</p><p className="num text-xl font-bold text-text">{quoting ? t('return_calculating') : quote ? formatRiyal((surplusMinor || dueMinor) / 100) : '—'}</p></div><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>{tc('cancel')}</Button><Button type="button" onClick={submit} disabled={!canSubmit || submitting}><Repeat2 className="h-4 w-4" aria-hidden="true" />{submitting ? t('exchange_submitting') : t('exchange_confirm')}</Button></div></div>
         </>}
       </div>
-    </Dialog>
+    </PosDialog>
   );
 }
 

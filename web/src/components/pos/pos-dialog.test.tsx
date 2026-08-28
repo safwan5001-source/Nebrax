@@ -2,19 +2,19 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Dialog } from './dialog';
+import { PosDialog } from './pos-dialog';
 
 afterEach(() => cleanup());
 
-describe('Dialog touch close', () => {
+describe('PosDialog touch close', () => {
   it('يغلق بالضغط على هدف الإغلاق ويحافظ على Escape', () => {
     const onClose = vi.fn();
     render(
-      <Dialog open onClose={onClose} title="Held sales">
+      <PosDialog open onClose={onClose} title="Held sales">
         <p>content</p>
         <button type="button">Primary</button>
         <button type="button">Secondary</button>
-      </Dialog>,
+      </PosDialog>,
     );
 
     const close = screen.getByRole('button', { name: 'إغلاق' });
@@ -30,10 +30,10 @@ describe('Dialog touch close', () => {
 
   it('يبقي الإجراءات الأساسية والثانوية قابلة للضغط', () => {
     render(
-      <Dialog open onClose={vi.fn()} title="Confirm">
+      <PosDialog open onClose={vi.fn()} title="Confirm">
         <button type="button">Cancel</button>
         <button type="button">Confirm</button>
-      </Dialog>,
+      </PosDialog>,
     );
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeTruthy();

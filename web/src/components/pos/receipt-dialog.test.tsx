@@ -12,7 +12,7 @@ const { printDocument, documentView } = vi.hoisted(() => ({
 }));
 
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
-vi.mock('@/components/ui/dialog', () => ({ Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
+vi.mock('@/components/pos/pos-dialog', () => ({ Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, PosDialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock('@/components/ui/button', () => ({ Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => <button type="button" onClick={onClick}>{children}</button> }));
 vi.mock('@/modules/documents/components/document-view', () => ({ DocumentView: documentView }));
 vi.mock('@/modules/documents/components/document-scaler', () => ({ DocumentScaler: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));

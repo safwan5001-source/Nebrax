@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Archive, LoaderCircle, Play, ShoppingBag, Trash2 } from 'lucide-react';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, ApiError } from '@/lib/api';
@@ -90,7 +90,7 @@ export function PosHeldSalesDialog({ open, sessionId, onClose, onResumed, onChan
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title={t('held_title')}>
+    <PosDialog open={open} onClose={onClose} title={t('held_title')}>
       <div className="space-y-3">
         <p className="rounded bg-primary-soft px-3 py-2 text-xs text-text">{t('held_hint')}</p>
         {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
@@ -107,6 +107,6 @@ export function PosHeldSalesDialog({ open, sessionId, onClose, onResumed, onChan
           })}
         </div>}
       </div>
-    </Dialog>
+    </PosDialog>
   );
 }

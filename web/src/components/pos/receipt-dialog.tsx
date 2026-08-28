@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
@@ -84,7 +84,7 @@ export function ReceiptDialog({
   if (!receipt) return null;
 
   return (
-    <Dialog open={!!receipt} onClose={onClose} title={t('receipt')} className="max-w-xs">
+    <PosDialog open={!!receipt} onClose={onClose} title={t('receipt')} className="max-w-xs">
       <div className="max-h-[60vh] overflow-auto rounded-lg bg-background p-2">
         <DocumentScaler>
           <DocumentView
@@ -103,6 +103,6 @@ export function ReceiptDialog({
         </Button>
         <Button onClick={() => printDocument(format.paper)}>{t('print')}</Button>
       </div>
-    </Dialog>
+    </PosDialog>
   );
 }
