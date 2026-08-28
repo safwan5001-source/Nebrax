@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, CreditCard, Receipt, Settings2, Tag, Users } from 'lucide-react';
+import { ArrowLeft, CreditCard, Receipt, ShieldAlert, Settings2, Tag, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +15,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { FieldGrid, FieldSpan, FormSection } from '@/components/nebrax/form-section';
 import { api, ApiError } from '@/lib/api';
+
+type AuditOperationPolicy = 'allowed' | 'approval_required' | 'denied';
 
 interface PosConfig {
   default_customer_id: string | null;
@@ -36,7 +39,23 @@ interface PosConfig {
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   show_product_images: boolean;
   blind_cash_count_enabled: boolean;
+  audit_operation_policies: Record<string, AuditOperationPolicy>;
 }
+
+interface LossPreventionConfig {
+  self_approval_blocked_for_variance: boolean;
+  outside_hours_grace_minutes: number;
+}
+
+const LP_DEFAULTS: LossPreventionConfig = {
+  self_approval_blocked_for_variance: false,
+  outside_hours_grace_minutes: 30,
+};
+
+// عمليات Phase 4 الوحيدة القابلة للضبط من هذه الشاشة؛ البقية (item_remove،
+// price_override، discount_change، cart_cancel، cash_recount) رصد عميلي
+// بعد الفعل أو اعتماد دائم مفروض خادمياً، فلا حاجة لتحريرها هنا.
+const OPERATION_POLICY_ROWS: Array<'refund' | 'cash_out' | 'manual_drawer_open'> = ['refund', 'cash_out', 'manual_drawer_open'];
 
 interface ProductCategory {
   id: string;
@@ -114,6 +133,10 @@ const DEFAULTS: PosConfig = {
   held_sale_close_policy: 'discard_on_session_close',
   show_product_images: true,
   blind_cash_count_enabled: false,
+  audit_operation_policies: {
+    item_remove: 'allowed', price_override: 'allowed', discount_change: 'allowed', cart_cancel: 'allowed', cash_recount: 'approval_required',
+    refund: 'allowed', cash_out: 'allowed', manual_drawer_open: 'allowed',
+  },
 };
 
 /** إعدادات تشغيل POS: تبقى السياسات ووسائل التحصيل في مصدر إعداد واحد. */
@@ -124,6 +147,7 @@ export default function PosSettingsPage() {
   const tc = useTranslations('common');
   const { success } = useToast();
   const [config, setConfig] = useState<PosConfig | null>(null);
+  const [lpConfig, setLpConfig] = useState<LossPreventionConfig>(LP_DEFAULTS);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [customers, setCustomers] = useState<Partner[]>([]);
@@ -138,8 +162,9 @@ export default function PosSettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [settings, paymentMethods, productCategories, partners, templates, receiptAssignment] = await Promise.all([
+      const [settings, lossPrevention, paymentMethods, productCategories, partners, templates, receiptAssignment] = await Promise.all([
         api<{ data: Partial<PosConfig> }>('/sales-config/pos'),
+        api<{ data: Partial<LossPreventionConfig> }>('/sales-config/pos_loss_prevention'),
         api<{ data: PaymentMethod[] }>('/payment-methods'),
         api<{ data: ProductCategory[] }>('/product-categories'),
         api<{ data: Partner[] }>('/partners'),
@@ -151,7 +176,8 @@ export default function PosSettingsPage() {
       delete configuration.cash_drawer_driver;
       delete configuration.cash_drawer_enabled;
       delete configuration.cash_drawer_auto_open_after_cash;
-      setConfig({ ...DEFAULTS, ...configuration });
+      setConfig({ ...DEFAULTS, ...configuration, audit_operation_policies: { ...DEFAULTS.audit_operation_policies, ...(configuration.audit_operation_policies ?? {}) } });
+      setLpConfig({ ...LP_DEFAULTS, ...lossPrevention.data });
       setMethods(paymentMethods.data.filter((method) => method.is_active));
       setCategories(productCategories.data.filter((category) => category.is_active));
       setCustomers(partners.data.filter((partner) => partner.is_active && ['customer', 'both'].includes(partner.type)));
@@ -207,6 +233,14 @@ export default function PosSettingsPage() {
 
   function patch<K extends keyof PosConfig>(key: K, value: PosConfig[K]) {
     setConfig((current) => current ? { ...current, [key]: value } : current);
+  }
+
+  function patchAuditPolicy(operation: string, value: AuditOperationPolicy) {
+    setConfig((current) => current ? { ...current, audit_operation_policies: { ...current.audit_operation_policies, [operation]: value } } : current);
+  }
+
+  function patchLp<K extends keyof LossPreventionConfig>(key: K, value: LossPreventionConfig[K]) {
+    setLpConfig((current) => ({ ...current, [key]: value }));
   }
 
   function setDefaultCustomer(customerId: string) {
@@ -298,6 +332,7 @@ export default function PosSettingsPage() {
           },
         },
       });
+      await api('/sales-config/pos_loss_prevention', { method: 'PUT', body: { data: lpConfig } });
       if (receiptTemplateRevisionId !== savedReceiptTemplateRevisionId) {
         if (receiptTemplateRevisionId) {
           await api('/print-templates/assignments/default', {
@@ -669,6 +704,50 @@ export default function PosSettingsPage() {
                   <p className="text-xs leading-relaxed text-muted">{t('held_sale_close_policy_hint')}</p>
                 </div>
               </FieldSpan>
+            </FieldGrid>
+          </FormSection>
+
+          <FormSection title={t('section_loss_prevention')} description={t('section_loss_prevention_description')} icon={ShieldAlert} contentClassName="space-y-4">
+            <FieldGrid>
+              {OPERATION_POLICY_ROWS.map((operation) => (
+                <div key={operation} className="space-y-1.5">
+                  <Label htmlFor={`audit_operation_policy_${operation}`}>{t(`audit_operation_policy_${operation}`)}</Label>
+                  <Select
+                    id={`audit_operation_policy_${operation}`}
+                    value={config.audit_operation_policies[operation] ?? 'allowed'}
+                    onChange={(event) => patchAuditPolicy(operation, event.target.value as AuditOperationPolicy)}
+                  >
+                    <option value="allowed">{t('audit_policy_allowed')}</option>
+                    <option value="approval_required">{t('audit_policy_approval_required')}</option>
+                    <option value="denied">{t('audit_policy_denied')}</option>
+                  </Select>
+                  <p className="text-xs leading-relaxed text-muted">{t(`audit_operation_policy_${operation}_hint`)}</p>
+                </div>
+              ))}
+
+              <FieldSpan>
+                <div className="rounded border border-border bg-background p-3">
+                  <div className="flex items-center gap-2">
+                    <Switch id="self_approval_blocked_for_variance" checked={lpConfig.self_approval_blocked_for_variance} onCheckedChange={(checked) => patchLp('self_approval_blocked_for_variance', checked)} aria-labelledby="self-approval-blocked-label" />
+                    <Label id="self-approval-blocked-label" htmlFor="self_approval_blocked_for_variance">{t('self_approval_blocked_for_variance')}</Label>
+                  </div>
+                  <p className="mt-1 ps-8 text-xs leading-relaxed text-muted">{t('self_approval_blocked_for_variance_hint')}</p>
+                </div>
+              </FieldSpan>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="outside_hours_grace_minutes">{t('outside_hours_grace_minutes')}</Label>
+                <Input
+                  id="outside_hours_grace_minutes"
+                  type="number"
+                  min={0}
+                  max={240}
+                  className="num"
+                  value={lpConfig.outside_hours_grace_minutes}
+                  onChange={(event) => patchLp('outside_hours_grace_minutes', Math.min(240, Math.max(0, Number(event.target.value) || 0)))}
+                />
+                <p className="text-xs leading-relaxed text-muted">{t('outside_hours_grace_minutes_hint')}</p>
+              </div>
             </FieldGrid>
           </FormSection>
 

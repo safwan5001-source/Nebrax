@@ -22,6 +22,7 @@ import { RelationshipsPanel } from '@/modules/pos-audit/relationships-panel';
 import { RulesPanel } from '@/modules/pos-audit/rules-panel';
 import { CasesPanel } from '@/modules/pos-audit/cases-panel';
 import { DigestPanel } from '@/modules/pos-audit/digest-panel';
+import { NeedsAttentionPanel } from '@/modules/pos-audit/needs-attention-panel';
 
 interface AuditEvent {
   id: string; pos_session_id: string; branch_id: string | null; cart_id: string | null; correlation_id: string | null;
@@ -37,7 +38,7 @@ interface Approval { id: string; operation: string; status: string; reason_code:
 interface AuditUser { user_id: string; name: string; events_count: number; last_event_at: string | null }
 interface ReasonCode { id: string; code: string; name_ar: string; name_en: string; requires_note: boolean; is_active: boolean }
 
-type AuditTab = 'overview' | 'exceptions' | 'risk' | 'relationships' | 'cases' | 'digest' | 'sensitive' | 'carts' | 'cash' | 'users' | 'approvals' | 'settings';
+type AuditTab = 'overview' | 'attention' | 'exceptions' | 'risk' | 'relationships' | 'cases' | 'digest' | 'sensitive' | 'carts' | 'cash' | 'users' | 'approvals' | 'settings';
 
 function formatDate(value: string | null, locale: string): string {
   if (!value) return '—';
@@ -89,6 +90,7 @@ export default function PosAuditPage() {
   const tabs = useMemo<TabDef[]>(() => {
     const next: TabDef[] = [
       { id: 'overview', label: t('overview') },
+      { id: 'attention', label: t('attention.tabLabel') },
       { id: 'exceptions', label: t('exceptions') },
       { id: 'risk', label: t('riskIndicators') },
       { id: 'relationships', label: t('relationships') },
@@ -195,6 +197,19 @@ export default function PosAuditPage() {
           </div>
           <section><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold text-text">{t('sensitive')}</h2><Button variant="outline" size="sm" onClick={() => setTab('sensitive')}>{t('viewDetails')}</Button></div>{activity}</section>
         </section>}
+        {tab === 'attention' && (
+          <NeedsAttentionPanel
+            canReviewExceptions={can('pos.audit.review')}
+            canPromoteExceptions={can('pos.investigations.create')}
+            canApprove={can('pos.override.approve')}
+            canManageCases={can('pos.investigations.manage')}
+            canAssignCases={can('pos.investigations.assign')}
+            canResolveCases={can('pos.investigations.resolve')}
+            canCctv={can('pos.cctv.bookmark.manage')}
+            onOpenDigest={() => setTab('digest')}
+            onPromoted={(caseId) => { setFocusCaseId(caseId); setTab('cases'); }}
+          />
+        )}
         {tab === 'exceptions' && (
           <ExceptionsPanel
             canReview={can('pos.audit.review')}

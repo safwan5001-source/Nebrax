@@ -420,6 +420,13 @@ class PosLossPreventionController extends ApiController
     /** @return \Illuminate\Support\Collection<int,array<string,mixed>> */
     private function pendingApprovalItems(Request $request): \Illuminate\Support\Collection
     {
+        // `GET pos/audit/approvals` نفسه محكوم بـ`pos.audit.review`؛ نفس القيد هنا
+        // كي لا تُدرَج طلبات موافقة في قائمة من لا يراها أصلاً في تبويب الموافقات.
+        $user = $request->user();
+        if (! $user || (! $user->hasPermission('pos.audit.review') && ! $user->hasPermission('pos.override.approve'))) {
+            return collect();
+        }
+
         return $this->visibleApprovals($request)
             ->where('status', PosOverrideApproval::STATUS_PENDING)
             ->where(fn (Builder $q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
@@ -518,6 +525,13 @@ class PosLossPreventionController extends ApiController
     /** @return \Illuminate\Support\Collection<int,array<string,mixed>> */
     private function caseItems(Request $request): \Illuminate\Support\Collection
     {
+        // قضايا التحقيق محكومة بصلاحية أضيق من `pos.audit.view`؛ من لا يملك
+        // `pos.investigations.view` لا يرى تفاصيلها أصلاً (`GET pos/investigations/{id}`
+        // يرفضها 403)، فلا تُدرَج في القائمة كي لا يظهر عنصر لا يمكن فتحه.
+        if (! $request->user()?->hasPermission('pos.investigations.view')) {
+            return collect();
+        }
+
         $openStatuses = [
             PosInvestigationCase::STATUS_OPEN, PosInvestigationCase::STATUS_INVESTIGATING,
             PosInvestigationCase::STATUS_AWAITING_INFORMATION,
@@ -570,6 +584,12 @@ class PosLossPreventionController extends ApiController
      */
     private function digestHighlightItem(Request $request): \Illuminate\Support\Collection
     {
+        // نفس قيد `caseItems()`: الملخص اليومي محكوم بـ`pos.investigations.view`
+        // (`GET pos/lp-digests/*`)، فلا تُدرَج إشارته في القائمة لمن لا يملكها.
+        if (! $request->user()?->hasPermission('pos.investigations.view')) {
+            return collect();
+        }
+
         $digest = PosLpDigest::query()->orderByDesc('digest_date')->first();
         if ($digest === null) {
             return collect();
