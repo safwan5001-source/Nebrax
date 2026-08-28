@@ -5,9 +5,13 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\Partner;
+use App\Models\PosSession;
+use App\Models\PosSessionEvent;
 use App\Models\Purchase;
 use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
+use App\Models\User;
+use App\Services\Pos\PosAuditService;
 use App\Support\Money;
 use App\Support\Settings;
 use Carbon\Carbon;
@@ -60,7 +64,8 @@ class ReturnService
 
     public function __construct(
         protected LedgerService $ledger,
-        protected InventoryService $inventory
+        protected InventoryService $inventory,
+        protected PosAuditService $posAudit,
     ) {}
 
     /**
@@ -481,7 +486,61 @@ class ReturnService
             'cogs_entry_id'    => $cogsEntryId,
         ]);
 
+        $this->recordExternalPosEvidenceIfApplicable($return);
+
         return $return->fresh('lines');
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  دليل append-only إضافي — مرتجع بيع POS خارج جلسته الأصلية
+     * ═══════════════════════════════════════════════════════════════
+     *  المسار المقفل بالجلسة (`PosReturnService`) يسجّل دليله عبر
+     *  `PosSessionService::recordReturn` ويمرّر `pos_session_id` صريحاً؛ فلا يدخل
+     *  هذا الفرع أصلاً (الشرط الأول أدناه يستبعده). هذا الفرع يخصّ **فقط** شاشة
+     *  المرتجعات العامة حين يكون مصدر المرتجع فاتورة POS — أي كاشيرٍ آخر (أو مستخدم
+     *  خلفي) يُرجعها خارج أي جلسة نقطة بيع فعلية.
+     *
+     *  الحدث يُلحَق بجلسة **البيع الأصلي** لا بجلسة القائم بالإرجاع، لأن الأخيرة لا
+     *  وجود لها هنا؛ `pos_session_events.pos_session_id` عمود غير قابل للفراغ عمداً
+     *  (لا حدث بلا جلسة مرجعية) — إلحاقه بالجلسة الأصلية يحافظ على هذا الثابت
+     *  ويُتيح ربط الحدث بسجل تلك الجلسة نفسه. لا قيد جديد ولا رصيد يتغيّر؛ سطر
+     *  append-only واحد إضافي فقط، ومصدر أدلة `cross_cashier_refund` (Phase 4).
+     */
+    protected function recordExternalPosEvidenceIfApplicable(ReturnDocument $return): void
+    {
+        if ($return->pos_session_id !== null || $return->original_type !== Invoice::class || $return->original_id === null) {
+            return;
+        }
+
+        $invoice = BranchScope::reference(Invoice::class)->find($return->original_id);
+        if (! $invoice || $invoice->pos_session_id === null) {
+            return;
+        }
+
+        $originalSession = BranchScope::reference(PosSession::class)->find($invoice->pos_session_id);
+        if (! $originalSession) {
+            return;
+        }
+
+        $externalActor = $return->created_by ? User::find($return->created_by) : null;
+
+        $this->posAudit->auditEventForExistingOperation(
+            $originalSession,
+            PosSessionEvent::TYPE_RETURN_RECORDED_EXTERNAL,
+            $externalActor,
+            [
+                'return_id' => $return->id,
+                'return_number' => $return->number,
+                'original_id' => $invoice->id,
+                'amount' => (int) $return->total,
+                'performed_by' => $return->created_by,
+                // لا يُطلَق `cross_cashier_refund` أبداً حين يغيب أحد الطرفين — بيانات
+                // تاريخية/مفتقدة لا تُنتج نتيجة كاذبة (انظر مصفوفة فجوات Phase 4).
+                'original_sale_actor_id' => $invoice->created_by,
+                'return_actor_id' => $return->created_by,
+            ]
+        );
     }
 
     /**

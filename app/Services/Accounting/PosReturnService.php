@@ -9,6 +9,7 @@ use App\Models\PosSession;
 use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
 use App\Models\User;
+use App\Services\Pos\PosAuditService;
 use App\Support\PosSettings;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class PosReturnService
     public function __construct(
         protected PosSessionService $sessions,
         protected ReturnService $returns,
+        protected PosAuditService $audit,
     ) {}
 
     /**
@@ -73,6 +75,10 @@ class PosReturnService
             if ($data['payment_type'] === 'cash' && $quote['cash_block_reason'] !== null) {
                 throw new RuntimeException($quote['cash_block_reason']);
             }
+
+            // Phase 4 — سياسة `refund` (افتراضها «مسموح» يحفظ سلوك كل مستأجر
+            // قائم). تُستهلك قبل إنشاء أي مستند، لا بعده.
+            $this->audit->enforceOperationPolicy($session, $actor, 'refund', $data['approval_id'] ?? null);
 
             $return = $this->returns->create([
                 'type' => 'sales',

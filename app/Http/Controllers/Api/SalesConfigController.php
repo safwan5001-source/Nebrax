@@ -41,6 +41,9 @@ class SalesConfigController extends ApiController
         'designs'    => ['template' => 'classic', 'theme' => 'blue', 'show_logo' => true, 'logo' => '', 'logo_height' => 56, 'sections' => [], 'accent_color' => '#2563EB', 'footer_text' => '', 'terms_text' => '', 'bank_text' => '', 'stamp' => '', 'signature' => ''],
         'orders'     => ['auto_convert' => false, 'require_approval' => false, 'prefix' => 'SO'],
         'pos'        => ['default_customer_id' => null, 'default_customer' => PosSettings::DEFAULT_WALKIN_CUSTOMER, 'print_receipt' => true, 'receipt_paper_size' => PosSettings::RECEIPT_PAPER_THERMAL_80, 'allow_discount' => true, 'receipt_footer' => '', 'enabled_payment_method_ids' => [], 'payment_methods_mode' => PosSettings::PAYMENT_METHODS_ALL_ACTIVE, 'default_payment_method_id' => null, 'apply_customer_price_list' => true, 'allow_unit_price_override' => false, 'show_onscreen_numeric_keypad' => false, 'allow_deferred_payment' => true, 'product_category_visibility_mode' => PosSettings::PRODUCT_CATEGORY_VISIBILITY_ALL, 'product_category_ids' => [], 'cash_refund_policy' => PosSettings::CASH_REFUND_ORIGINAL_CASH_ONLY, 'exchange_surplus_policy' => PosSettings::EXCHANGE_SURPLUS_CUSTOMER_CREDIT_ONLY, 'held_sale_close_policy' => PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE, 'show_product_images' => true, 'cash_drawer_enabled' => false, 'cash_drawer_driver' => PosSettings::CASH_DRAWER_DRIVER_UNAVAILABLE, 'cash_drawer_auto_open_after_cash' => false, 'blind_cash_count_enabled' => false, 'audit_operation_policies' => ['item_remove' => PosSettings::AUDIT_POLICY_ALLOWED, 'price_override' => PosSettings::AUDIT_POLICY_ALLOWED, 'discount_change' => PosSettings::AUDIT_POLICY_ALLOWED, 'cart_cancel' => PosSettings::AUDIT_POLICY_ALLOWED, 'cash_recount' => PosSettings::AUDIT_POLICY_APPROVAL_REQUIRED], 'sound_enabled' => true, 'scan_sound_enabled' => true, 'error_sound_enabled' => true, 'payment_sound_enabled' => true, 'sound_volume' => 60, 'haptics_enabled' => true],
+        // Phase 4 — قسم مستقل عن `pos` القائم عمداً (انظر PosSettings::LP_DEFAULTS):
+        // إضافة مفتاح هنا لا تُعيد كتابة/تغيّر افتراضات قسم POS الأصلي لمستأجر قائم.
+        'pos_loss_prevention' => ['self_approval_blocked_for_variance' => false, 'outside_hours_grace_minutes' => 30],
     ];
 
     public function show(string $section): JsonResponse
@@ -102,7 +105,7 @@ class SalesConfigController extends ApiController
                 ])],
                 'data.cash_drawer_auto_open_after_cash' => ['nullable', 'boolean'],
                 'data.blind_cash_count_enabled' => ['nullable', 'boolean'],
-                'data.audit_operation_policies' => ['nullable', 'array:item_remove,price_override,discount_change,cart_cancel,cash_recount'],
+                'data.audit_operation_policies' => ['nullable', 'array:item_remove,price_override,discount_change,cart_cancel,cash_recount,refund,cash_out,manual_drawer_open'],
                 'data.audit_operation_policies.*' => ['string', Rule::in([
                     PosSettings::AUDIT_POLICY_ALLOWED,
                     PosSettings::AUDIT_POLICY_APPROVAL_REQUIRED,
@@ -138,6 +141,16 @@ class SalesConfigController extends ApiController
             $this->assertPosProductCategories($data);
             $this->assertCashDrawerContract($data);
             $this->assertAuditPolicies($data);
+        }
+
+        if ($section === 'pos_loss_prevention') {
+            $request->validate([
+                'data.self_approval_blocked_for_variance' => ['nullable', 'boolean'],
+                'data.outside_hours_grace_minutes' => ['nullable', 'integer', 'between:0,240'],
+            ]);
+            // نحفظ الكائن كاملاً كما في `pos`، فتبقى القراءة والكتابة فوق
+            // الافتراضات الحامية نفسها لمستأجر لم يضبط شيئاً بعد.
+            $data = array_merge(PosSettings::lossPreventionGroup($tenant), $data);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -354,6 +367,9 @@ class SalesConfigController extends ApiController
         // صلاحية رد النقد الفعلية، لا مجرد تفضيل عرض في شاشة الكاشير.
         if ($section === 'pos') {
             return $this->normalizePosDefaultCustomerForRead(PosSettings::group($tenant));
+        }
+        if ($section === 'pos_loss_prevention') {
+            return PosSettings::lossPreventionGroup($tenant);
         }
 
         return $stored ?? self::DEFAULTS[$section];

@@ -3251,7 +3251,15 @@
       "performer_approver_pair_concentration": "Performer–approver pair concentration",
       "approver_concentration": "Approver concentration",
       "override_approval_rate": "Override approval rate",
-      "near_close_concentration": "Near-close concentration"
+      "near_close_concentration": "Near-close concentration",
+      "repeated_hold_discard": "Repeated held-cart discards",
+      "repeated_cancel_before_checkout": "Repeated cancel before checkout",
+      "cross_cashier_refund": "Cross-cashier refund",
+      "refund_shortly_after_sale": "Refund shortly after sale",
+      "manual_drawer_without_transaction_proximity": "Manual drawer open without a nearby transaction",
+      "override_then_cancel": "Override followed by cancellation",
+      "approval_replay": "Repeated approval requests",
+      "outside_operating_hours": "Activity outside scheduled hours"
     },
     "categories": {
       "cart": "Cart & items",
@@ -3511,6 +3519,35 @@
         "no_activity": "No notable loss-prevention activity during this period.",
         "insufficient_sample_some_exceptions": "Some indicators in this period have an insufficient statistical sample."
       }
+    },
+    "operations": {
+      "item_remove": "Remove item",
+      "price_override": "Price override",
+      "discount_change": "Discount change",
+      "cart_cancel": "Cancel cart",
+      "cash_recount": "Cash recount",
+      "refund": "Refund",
+      "cash_out": "Cash out",
+      "manual_drawer_open": "Manual drawer open"
+    },
+    "attention": {
+      "tabLabel": "Needs attention",
+      "kind": "Type",
+      "summary": "Item",
+      "hint": "A unified, read-only queue of items that deserve priority review: pending approvals, priority exceptions, exceptions needing investigation, unassigned or overdue cases, and the latest digest highlight. It changes no review state on its own — open each item to act on it in its own screen.",
+      "empty": "Nothing needs attention right now",
+      "emptyHint": "No pending approvals, priority exceptions, or overdue cases in this scope.",
+      "kinds": {
+        "pending_approval": "Pending approval",
+        "priority_exception": "Priority exception",
+        "needs_investigation_exception": "Needs investigation",
+        "attention_case": "Case",
+        "digest_highlight": "Daily digest highlight"
+      },
+      "caseReasons": {
+        "unassigned": "Unassigned",
+        "overdue": "Overdue"
+      }
     }
   },
   "posSettings": {
@@ -3662,6 +3699,21 @@
     "held_sale_close_policy_hint": "Non-financial carts always remain tied to their cashier, branch, and warehouse. Choose whether to discard them at session close or keep them for the same cashier in a compatible later session.",
     "held_sale_discard_on_session_close": "Discard carts when the session closes",
     "held_sale_keep_for_next_session": "Keep carts to resume in a later session",
+    "section_loss_prevention": "Loss prevention controls",
+    "section_loss_prevention_description": "Preventive controls for real server-side actions, and segregation of duties for closing-variance decisions. Indicators and evidence remain separate under Control & audit.",
+    "audit_policy_allowed": "Allowed",
+    "audit_policy_approval_required": "Requires approval",
+    "audit_policy_denied": "Denied",
+    "audit_operation_policy_refund": "Refund policy",
+    "audit_operation_policy_refund_hint": "Applies before a POS refund is created, whether independent or as part of an exchange.",
+    "audit_operation_policy_cash_out": "Cash-out policy",
+    "audit_operation_policy_cash_out_hint": "Applies before recording a cash-out drawer movement during an open session.",
+    "audit_operation_policy_manual_drawer_open": "Manual drawer open policy",
+    "audit_operation_policy_manual_drawer_open_hint": "Applies before opening the cash drawer manually, outside a completed sale.",
+    "self_approval_blocked_for_variance": "Block self-approval of closing variance",
+    "self_approval_blocked_for_variance_hint": "When enabled, the cashier who closed a session cannot acknowledge or settle its own cash variance — another authorised user must do so. Off by default to preserve single-cashier branches.",
+    "outside_hours_grace_minutes": "Outside-hours grace period (minutes)",
+    "outside_hours_grace_minutes_hint": "Minutes of tolerance added before and after a scheduled shift before sensitive activity is flagged as outside operating hours. Only applies to users with a resolvable employee shift.",
     "sound_feedback": "Sounds and feedback",
     "sound_feedback_hint": "Lightweight POS cues. Visual and text feedback always remain available.",
     "sound_settings_subtitle": "Configure barcode scan, alert, and payment sounds, volume, and vibration.",

@@ -16,6 +16,11 @@ class PosSessionEvent extends BaseModel
     public const TYPE_CASH_IN_RECORDED = 'cash_in_recorded';
     public const TYPE_CASH_OUT_RECORDED = 'cash_out_recorded';
     public const TYPE_RETURN_RECORDED = 'return_recorded';
+    /**
+     * مرتجع فاتورة POS خارج جلستها الأصلية (شاشة المرتجعات العامة لا شاشة الكاشير).
+     * يُلحَق بجلسة **البيع الأصلي** لا بجلسة القائم بالإرجاع — لا جلسة قائمة له أصلاً.
+     */
+    public const TYPE_RETURN_RECORDED_EXTERNAL = 'return_recorded_external';
     public const TYPE_EXCHANGE_RECORDED = 'exchange_recorded';
     public const TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT = 'closing_difference_requires_acknowledgement';
     public const TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED = 'closing_difference_acknowledged';
@@ -50,6 +55,7 @@ class PosSessionEvent extends BaseModel
         self::TYPE_CASH_IN_RECORDED,
         self::TYPE_CASH_OUT_RECORDED,
         self::TYPE_RETURN_RECORDED,
+        self::TYPE_RETURN_RECORDED_EXTERNAL,
         self::TYPE_EXCHANGE_RECORDED,
         self::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT,
         self::TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED,
@@ -84,7 +90,8 @@ class PosSessionEvent extends BaseModel
     public $timestamps = false;
 
     protected $fillable = [
-        'tenant_id', 'branch_id', 'pos_session_id', 'cart_id', 'correlation_id', 'type', 'category',
+        'tenant_id', 'branch_id', 'pos_session_id', 'cart_id', 'correlation_id',
+        'client_event_id', 'client_event_payload_hash', 'type', 'category',
         'actor_id', 'amount', 'reason_code', 'reason_note', 'performed_by', 'approved_by', 'payload', 'created_at',
     ];
 

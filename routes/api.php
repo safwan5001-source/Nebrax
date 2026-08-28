@@ -570,6 +570,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('pos/audit/risk', [PosLossPreventionController::class, 'risk'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/risk/{userId}', [PosLossPreventionController::class, 'riskDetail'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/relationships', [PosLossPreventionController::class, 'relationships'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        // Phase 4 — قائمة موحّدة «تحتاج انتباهاً» (استثناءات أولوية/بانتظار تحقيق، اعتمادات
+        // معلَّقة، قضايا غير مسنَدة/متجاوزة عتبة نشاط، إشارة ملخّص يومي). نفس صلاحية القراءة
+        // القائمة — لا حاجة صلاحية جديدة لمجرد تجميع بالمرجع فوق بيانات مرئية أصلاً.
+        Route::get('pos/audit/needs-attention', [PosLossPreventionController::class, 'needsAttention'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/rules', [PosLossPreventionController::class, 'rules'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::put('pos/audit/rules/{key}', [PosLossPreventionController::class, 'updateRule'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
         Route::post('pos/audit/exceptions/{id}/review', [PosLossPreventionController::class, 'review'])->middleware([$perm('pos.audit.review'), $app('sales.pos')]);
@@ -1029,6 +1033,15 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             ->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::put('sales-config/pos', [SalesConfigController::class, 'update'])
             ->defaults('section', 'pos')
+            ->middleware([$perm('company.manage'), $app('sales.pos')]);
+
+        // Phase 4 — إعدادات منع الفقد (SoD، سماح ساعات العمل)؛ قسم مستقل عن
+        // `pos` كي لا يعيد كتابة افتراضاته، لكنه يخضع لنفس بوابة تطبيق POS.
+        Route::get('sales-config/pos_loss_prevention', [SalesConfigController::class, 'show'])
+            ->defaults('section', 'pos_loss_prevention')
+            ->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::put('sales-config/pos_loss_prevention', [SalesConfigController::class, 'update'])
+            ->defaults('section', 'pos_loss_prevention')
             ->middleware([$perm('company.manage'), $app('sales.pos')]);
 
         // أقسام إعدادات المبيعات المتعددة (حالات/تصميمات/قوائم أسعار/شحن…)

@@ -19,6 +19,8 @@ class StorePosCashMovementRequest extends FormRequest
             'type' => ['required', 'string', Rule::in(PosCashMovement::TYPES)],
             'amount' => ['required', 'integer', 'min:1'], // هللات
             'reason' => ['required', 'string', 'min:3', 'max:1000'],
+            // Phase 4 — مطلوب فقط حين تكون سياسة `cash_out` «تحتاج اعتماداً».
+            'approval_id' => ['nullable', 'uuid'],
         ];
     }
 }

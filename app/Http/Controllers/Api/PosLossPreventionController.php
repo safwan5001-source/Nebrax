@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\PosExceptionResource;
+use App\Models\PosCaseEvidenceLink;
 use App\Models\PosException;
 use App\Models\PosExceptionRule;
+use App\Models\PosInvestigationCase;
+use App\Models\PosLpDigest;
+use App\Models\PosOverrideApproval;
 use App\Models\PosRiskSnapshot;
 use App\Models\PosSessionEvent;
 use App\Models\User;
@@ -183,6 +187,51 @@ class PosLossPreventionController extends ApiController
         })->values()]);
     }
 
+    /**
+     * Phase 4 — قائمة موحّدة «تحتاج انتباهاً»: تجميع بالإشارة (لا نسخ) لأربعة مصادر أدلة
+     * قائمة فعلاً — استثناءات أولوية/جديدة، استثناءات بانتظار مراجعة (`needs_investigation`
+     * غير المرتبطة بقضية بعد)، طلبات اعتماد معلَّقة (تحجب عملية خادمية فعلية الآن)، وقضايا
+     * غير مسنَدة أو متجاوزة لعتبة نشاط. لا تُنشئ جدولاً جديداً ولا حالة مراجعة موازية؛ كل
+     * عنصر مرجعٌ لصفّه الأصلي (`reference.type`/`reference.id`) تفتحه الواجهة بشاشته القائمة.
+     *
+     * الترتيب بدرجة إلحاح (`urgency_rank`، الأصغر أعجل) ثم بالتوقيت الأقدم أولاً ضمن نفس
+     * الدرجة — طلب اعتماد يحجب كاشيراً الآن أعجل من قضية مفتوحة منذ أيام. **مؤشرات المراجعة
+     * والاستثناءات تساعد في ترتيب أولوية المراجعة والتحقيق، ولا تُثبت وحدها وجود مخالفة.**
+     */
+    public function needsAttention(Request $request): JsonResponse
+    {
+        $filters = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+        $perPage = min(max((int) ($filters['per_page'] ?? 25), 1), 100);
+        $page = max((int) ($filters['page'] ?? 1), 1);
+
+        $items = collect()
+            ->merge($this->pendingApprovalItems($request))
+            ->merge($this->priorityExceptionItems($request))
+            ->merge($this->needsInvestigationExceptionItems($request))
+            ->merge($this->caseItems($request))
+            ->merge($this->digestHighlightItem($request));
+
+        $items = $items->sortBy([
+            ['urgency_rank', 'asc'],
+            ['sort_at', 'asc'],
+        ])->values();
+
+        $total = $items->count();
+        $paged = $items->forPage($page, $perPage)->map(function (array $item) {
+            unset($item['sort_at']);
+
+            return $item;
+        })->values();
+
+        return response()->json([
+            'data' => $paged,
+            'meta' => ['total' => $total, 'per_page' => $perPage, 'current_page' => $page, 'last_page' => max(1, (int) ceil($total / $perPage))],
+        ]);
+    }
+
     /** رؤية إعداد القواعد (عرض) — يتطلب pos.audit.view. */
     public function rules(Request $request): JsonResponse
     {
@@ -268,6 +317,18 @@ class PosLossPreventionController extends ApiController
         return $this->scopeToActiveBranch(PosSessionEvent::query()->withoutGlobalScope(BranchScope::class), $request);
     }
 
+    /** @return Builder<PosOverrideApproval> */
+    private function visibleApprovals(Request $request): Builder
+    {
+        return $this->scopeToActiveBranch(PosOverrideApproval::query()->withoutGlobalScope(BranchScope::class), $request);
+    }
+
+    /** @return Builder<PosInvestigationCase> */
+    private function visibleCases(Request $request): Builder
+    {
+        return $this->scopeToActiveBranch(PosInvestigationCase::query()->withoutGlobalScope(BranchScope::class), $request);
+    }
+
     /** @return array<string,mixed> */
     private function filters(Request $request): array
     {
@@ -346,6 +407,223 @@ class PosLossPreventionController extends ApiController
 
         return (int) PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
             ->whereIn('id', array_keys($ids))->sum(DB::raw('ABS(amount)'));
+    }
+
+    /**
+     * حدّ «تجاوز عتبة نشاط» لقضية مفتوحة — ثابت موثَّق لا إعداد جديد: الخطة لم تطلب حقل
+     * إعداد لهذا (خلافاً لـ`outside_hours_grace_minutes`/`self_approval_blocked_for_variance`
+     * الصريحين)، وإضافته الآن كانت ستفرض سياسة غير مطلوبة. ٣ أيام بلا أي نشاط توثيقي
+     * (`last_activity_at`) اختيار متحفظ يفضّل عدم الإفراط في التنبيه على تفويت قضية راكدة.
+     */
+    private const CASE_OVERDUE_AFTER_DAYS = 3;
+
+    /** @return \Illuminate\Support\Collection<int,array<string,mixed>> */
+    private function pendingApprovalItems(Request $request): \Illuminate\Support\Collection
+    {
+        // `GET pos/audit/approvals` نفسه محكوم بـ`pos.audit.review`؛ نفس القيد هنا
+        // كي لا تُدرَج طلبات موافقة في قائمة من لا يراها أصلاً في تبويب الموافقات.
+        $user = $request->user();
+        if (! $user || (! $user->hasPermission('pos.audit.review') && ! $user->hasPermission('pos.override.approve'))) {
+            return collect();
+        }
+
+        return $this->visibleApprovals($request)
+            ->where('status', PosOverrideApproval::STATUS_PENDING)
+            ->where(fn (Builder $q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->with(['performedBy:id,name'])
+            ->orderBy('created_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (PosOverrideApproval $approval) => [
+                'id' => 'approval:' . $approval->id,
+                'kind' => 'pending_approval',
+                'urgency_rank' => 1,
+                'sort_at' => $approval->created_at?->toIso8601String(),
+                'branch_id' => $approval->branch_id,
+                'reference' => ['type' => 'approval', 'id' => $approval->id],
+                'operation' => $approval->operation,
+                'cart_id' => $approval->cart_id,
+                'pos_session_id' => $approval->pos_session_id,
+                'reason_code' => $approval->reason_code,
+                'performed_by' => $approval->performed_by,
+                'performed_by_name' => $approval->performedBy?->name ?? '—',
+                'created_at' => $approval->created_at?->toIso8601String(),
+                'expires_at' => $approval->expires_at?->toIso8601String(),
+            ]);
+    }
+
+    /** @return \Illuminate\Support\Collection<int,array<string,mixed>> */
+    private function priorityExceptionItems(Request $request): \Illuminate\Support\Collection
+    {
+        $openStates = [PosException::STATE_NEW, PosException::STATE_REVIEWING];
+
+        return $this->visibleExceptions($request)
+            ->where('severity', PosException::SEVERITY_PRIORITY)
+            ->whereIn('review_state', $openStates)
+            ->with(['subject:id,name'])
+            ->orderByDesc('detected_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (PosException $exception) => [
+                'id' => 'exception:' . $exception->id,
+                'kind' => 'priority_exception',
+                'urgency_rank' => 2,
+                'sort_at' => $exception->detected_at?->toIso8601String(),
+                'branch_id' => $exception->branch_id,
+                'reference' => ['type' => 'exception', 'id' => $exception->id],
+                'rule_key' => $exception->rule_key,
+                'category' => $exception->category,
+                'severity' => $exception->severity,
+                'review_state' => $exception->review_state,
+                'subject_user_id' => $exception->subject_user_id,
+                'subject_name' => $exception->subject?->name ?? '—',
+                'amount_under_review' => Money::toRiyal((int) $exception->amount_under_review),
+                'detected_at' => $exception->detected_at?->toIso8601String(),
+            ]);
+    }
+
+    /**
+     * استثناءات `needs_investigation` **غير المرتبطة بقضية نشطة بعد** — إن رُقّي استثناء
+     * إلى قضية بالفعل (`PosCaseEvidenceLink` غير مفكوك)، ظهوره هنا تكرار للعنصر في
+     * `caseItems()`؛ لا شيء يُخفى، فقط لا يُعرض مرتين بمصدرين مختلفين لنفس القرار البشري.
+     *
+     * @return \Illuminate\Support\Collection<int,array<string,mixed>>
+     */
+    private function needsInvestigationExceptionItems(Request $request): \Illuminate\Support\Collection
+    {
+        $linkedExceptionIds = PosCaseEvidenceLink::query()->withoutGlobalScope(BranchScope::class)
+            ->where('link_type', PosCaseEvidenceLink::TYPE_EXCEPTION)
+            ->whereNotNull('pos_exception_id')
+            ->whereNull('unlinked_at')
+            ->pluck('pos_exception_id');
+
+        return $this->visibleExceptions($request)
+            ->where('review_state', PosException::STATE_NEEDS_INVESTIGATION)
+            ->whereNotIn('id', $linkedExceptionIds)
+            ->with(['subject:id,name'])
+            ->orderByDesc('detected_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (PosException $exception) => [
+                'id' => 'exception:' . $exception->id,
+                'kind' => 'needs_investigation_exception',
+                'urgency_rank' => 2,
+                'sort_at' => $exception->detected_at?->toIso8601String(),
+                'branch_id' => $exception->branch_id,
+                'reference' => ['type' => 'exception', 'id' => $exception->id],
+                'rule_key' => $exception->rule_key,
+                'category' => $exception->category,
+                'severity' => $exception->severity,
+                'review_state' => $exception->review_state,
+                'subject_user_id' => $exception->subject_user_id,
+                'subject_name' => $exception->subject?->name ?? '—',
+                'amount_under_review' => Money::toRiyal((int) $exception->amount_under_review),
+                'detected_at' => $exception->detected_at?->toIso8601String(),
+            ]);
+    }
+
+    /** @return \Illuminate\Support\Collection<int,array<string,mixed>> */
+    private function caseItems(Request $request): \Illuminate\Support\Collection
+    {
+        // قضايا التحقيق محكومة بصلاحية أضيق من `pos.audit.view`؛ من لا يملك
+        // `pos.investigations.view` لا يرى تفاصيلها أصلاً (`GET pos/investigations/{id}`
+        // يرفضها 403)، فلا تُدرَج في القائمة كي لا يظهر عنصر لا يمكن فتحه.
+        if (! $request->user()?->hasPermission('pos.investigations.view')) {
+            return collect();
+        }
+
+        $openStatuses = [
+            PosInvestigationCase::STATUS_OPEN, PosInvestigationCase::STATUS_INVESTIGATING,
+            PosInvestigationCase::STATUS_AWAITING_INFORMATION,
+        ];
+        $overdueBefore = now()->subDays(self::CASE_OVERDUE_AFTER_DAYS);
+
+        return $this->visibleCases($request)
+            ->whereIn('status', $openStatuses)
+            ->where(fn (Builder $q) => $q->whereNull('owner_id')->orWhere('last_activity_at', '<=', $overdueBefore))
+            ->with(['owner:id,name', 'subject:id,name'])
+            ->orderBy('last_activity_at')
+            ->limit(100)
+            ->get()
+            ->map(function (PosInvestigationCase $case) use ($overdueBefore) {
+                $reasons = [];
+                if ($case->owner_id === null) $reasons[] = 'unassigned';
+                if ($case->last_activity_at !== null && $case->last_activity_at->lte($overdueBefore)) $reasons[] = 'overdue';
+
+                return [
+                    'id' => 'case:' . $case->id,
+                    'kind' => 'attention_case',
+                    'urgency_rank' => 3,
+                    'sort_at' => $case->last_activity_at?->toIso8601String() ?? $case->opened_at?->toIso8601String(),
+                    'branch_id' => $case->branch_id,
+                    'reference' => ['type' => 'case', 'id' => $case->id],
+                    'reasons' => $reasons,
+                    'number' => $case->number,
+                    'title' => $case->title,
+                    'status' => $case->status,
+                    'priority' => $case->priority,
+                    'owner_id' => $case->owner_id,
+                    'owner_name' => $case->owner?->name,
+                    'subject_user_id' => $case->subject_user_id,
+                    'subject_name' => $case->subject?->name ?? '—',
+                    'amount_under_review' => Money::toRiyal((int) $case->amount_under_review_minor),
+                    'opened_at' => $case->opened_at?->toIso8601String(),
+                    'last_activity_at' => $case->last_activity_at?->toIso8601String(),
+                ];
+            });
+    }
+
+    /**
+     * إشارة إلى أحدث ملخص يومي فيه ما يستحق الانتباه — بلا نسخ لأي رقم لا يراه المستخدم.
+     * `PosLpDigest` مصنَّف `CompanyWide`، فتُعاد الأرقام المشتقّة هنا من `branch_breakdown`
+     * المفصَّل فرعياً وحده للمستخدم المقيَّد بفروع — نفس مبدأ
+     * `PosLpDigestController::redactForAllowedBranches`، مُضيَّقاً لحاجة هذا العنصر فقط
+     * (عدد صحيح للقرار لا نسخة كاملة من الملخص).
+     *
+     * @return \Illuminate\Support\Collection<int,array<string,mixed>>
+     */
+    private function digestHighlightItem(Request $request): \Illuminate\Support\Collection
+    {
+        // نفس قيد `caseItems()`: الملخص اليومي محكوم بـ`pos.investigations.view`
+        // (`GET pos/lp-digests/*`)، فلا تُدرَج إشارته في القائمة لمن لا يملكها.
+        if (! $request->user()?->hasPermission('pos.investigations.view')) {
+            return collect();
+        }
+
+        $digest = PosLpDigest::query()->orderByDesc('digest_date')->first();
+        if ($digest === null) {
+            return collect();
+        }
+
+        $allowed = $request->user()?->allowedBranchIds();
+        if ($allowed === null) {
+            $priority = (int) $digest->priority_exceptions_count;
+            $highPriorityCases = (int) $digest->unresolved_high_priority_cases_count;
+            $confirmedLoss = (int) $digest->confirmed_loss_count;
+        } else {
+            $visible = collect($digest->branch_breakdown ?? [])
+                ->filter(fn (array $row) => $row['branch_id'] === null || in_array($row['branch_id'], $allowed, true));
+            $priority = (int) $visible->sum('priority_exceptions_count');
+            $highPriorityCases = (int) $visible->sum('unresolved_high_priority_cases_count');
+            $confirmedLoss = (int) $visible->sum('confirmed_loss_count');
+        }
+
+        if ($priority === 0 && $highPriorityCases === 0 && $confirmedLoss === 0) {
+            return collect();
+        }
+
+        return collect([[
+            'id' => 'digest:' . $digest->digest_date->toDateString(),
+            'kind' => 'digest_highlight',
+            'urgency_rank' => 4,
+            'sort_at' => $digest->generated_at?->toIso8601String() ?? $digest->digest_date->toDateString(),
+            'branch_id' => null,
+            'reference' => ['type' => 'digest', 'id' => $digest->digest_date->toDateString()],
+            'digest_date' => $digest->digest_date->toDateString(),
+            'priority_exceptions_count' => $priority,
+            'unresolved_high_priority_cases_count' => $highPriorityCases,
+            'confirmed_loss_count' => $confirmedLoss,
+        ]]);
     }
 
     /** @return array<string,mixed> */
