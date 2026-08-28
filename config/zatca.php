@@ -16,4 +16,19 @@ return [
         'simulation' => env('ZATCA_SIMULATION_CA_BUNDLE'),
         'production' => env('ZATCA_PRODUCTION_CA_BUNDLE'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | XAdES signature policy
+    |--------------------------------------------------------------------------
+    |
+    | Pin the exact identifier and SHA-256 digest published by the applicable
+    | ZATCA security standard. There is deliberately no default: signing must
+    | fail closed instead of embedding a guessed or stale policy.
+    |
+    */
+    'signature_policy' => [
+        'identifier' => env('ZATCA_SIGNATURE_POLICY_IDENTIFIER'),
+        'digest' => env('ZATCA_SIGNATURE_POLICY_DIGEST'),
+    ],
 ];
