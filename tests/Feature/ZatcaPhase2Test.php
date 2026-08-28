@@ -80,6 +80,28 @@ class ZatcaPhase2Test extends TestCase
     }
 
     /** @test */
+    public function qr_marker_text_in_business_data_does_not_block_posting(): void
+    {
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [[
+                'description' => '__NEBRAX_ZATCA_QR__',
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'tax_rate' => 15,
+            ]]
+        );
+
+        $posted = app(InvoiceService::class)->post($invoice);
+
+        $this->assertStringContainsString(
+            '<cbc:Name>__NEBRAX_ZATCA_QR__</cbc:Name>',
+            $posted->zatca_xml
+        );
+        $this->assertStringContainsString($posted->zatca_qr, $posted->zatca_xml);
+    }
+
+    /** @test */
     public function icv_counter_increments_per_invoice(): void
     {
         $first  = $this->postInvoice();

@@ -92,16 +92,18 @@ class ZatcaService
      */
     private function attachQr(string $xml, string $qr): string
     {
-        $placeholder = '__NEBRAX_ZATCA_QR__';
-        if (substr_count($xml, $placeholder) !== 1) {
+        $marker = '<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">'
+            . '__NEBRAX_ZATCA_QR__'
+            . '</cbc:EmbeddedDocumentBinaryObject>';
+        if (substr_count($xml, $marker) !== 1) {
             throw new RuntimeException('تعذر تثبيت QR داخل XML الخاص بـ ZATCA.');
         }
 
-        return str_replace(
-            $placeholder,
-            htmlspecialchars($qr, ENT_XML1 | ENT_QUOTES, 'UTF-8'),
-            $xml
-        );
+        $qrNode = '<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">'
+            . htmlspecialchars($qr, ENT_XML1 | ENT_QUOTES, 'UTF-8')
+            . '</cbc:EmbeddedDocumentBinaryObject>';
+
+        return str_replace($marker, $qrNode, $xml);
     }
 
     /**
