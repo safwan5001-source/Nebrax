@@ -73,8 +73,11 @@ const baseEntry = {
   source_type: 'App\\Models\\Invoice', source_id: 'inv-100', total: '1150.00',
 };
 
-function respondWith(entries: unknown[]) {
-  api.mockImplementation(() => Promise.resolve({ data: entries }));
+function respondWith(entries: unknown[], sourceTypes: string[] = []) {
+  api.mockImplementation(() => Promise.resolve({
+    data: entries,
+    facets: { source_types: sourceTypes },
+  }));
 }
 
 function respondWithError() {
@@ -126,6 +129,15 @@ describe('JournalEntriesPage', () => {
     render(<JournalEntriesPage />);
 
     expect(await screen.findByText('No posted journal entries in the selected scope.')).toBeTruthy();
+  });
+
+  it('offers source filters returned by server facets even when the current page lacks that source', async () => {
+    respondWith([baseEntry], ['App\\Models\\Invoice', 'App\\Models\\Purchase']);
+    render(<JournalEntriesPage />);
+
+    await screen.findAllByText('JE-2026-0001');
+    const sourceFilter = screen.getByRole('combobox', { name: 'Source & Description' });
+    expect(within(sourceFilter).getByRole('option', { name: 'Purchase' }).getAttribute('value')).toBe('App\\Models\\Purchase');
   });
 
   it('orders the mobile record: number, then description, then amount, then type', async () => {

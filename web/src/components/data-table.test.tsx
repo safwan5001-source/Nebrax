@@ -268,6 +268,43 @@ describe('DataTable server sorting', () => {
   });
 });
 
+describe('DataTable column visibility', () => {
+  it('offers hideable columns while protecting required columns and reports the controlled state', async () => {
+    const onChange = vi.fn();
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showToolbar={false}
+        columnVisibility={{ value: {}, onChange, protectedColumnIds: ['number'] }}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: nebraxText('ar', 'columns') }));
+    expect(screen.queryByRole('checkbox', { name: 'الرقم' })).toBeNull();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'العميل' }));
+    expect(onChange).toHaveBeenLastCalledWith({ partner: false });
+    expect(screen.queryByLabelText('تحريك العمود: العميل')).toBeNull();
+  });
+
+  it('does not offer the column menu on mobile custom-record layouts', () => {
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showToolbar={false}
+        mobileRecord={(row) => ({ title: row.number, subtitle: row.partner })}
+        columnVisibility={{ value: {}, onChange: vi.fn(), protectedColumnIds: ['number'] }}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: nebraxText('ar', 'columns') });
+    const responsiveContainer = trigger.closest('.hidden');
+    expect(responsiveContainer).not.toBeNull();
+    expect(responsiveContainer?.className).toContain('md:flex');
+  });
+});
+
 describe('DataTable row selection', () => {
   it('returns the checked row id to the caller', async () => {
     const onChange = vi.fn();
@@ -310,7 +347,7 @@ describe('DataTable row selection', () => {
     expect(onChange).toHaveBeenLastCalledWith([]);
   });
 
-  it('keeps the selected row checked in the desktop table while mobile records omit persistent selection controls', () => {
+  it('keeps the selected row checked in the desktop table and matching mobile record', () => {
     renderIntl(
       <DataTable
         columns={columns}
@@ -324,8 +361,8 @@ describe('DataTable row selection', () => {
     const checked = screen
       .getAllByRole('checkbox', { name: nebraxText('ar', 'selectRow') })
       .filter((box) => (box as HTMLInputElement).checked);
-    // مربع تحديد دائم واحد فقط في صف الجدول؛ بطاقة الجوال لا تكرر عنصر التحديد.
-    expect(checked).toHaveLength(1);
+    // يظهر التحكم في الجدول وبطاقة الجوال حتى لا تضيع عملية جماعية على الهاتف.
+    expect(checked).toHaveLength(2);
   });
 
   it('leaves no Arabic default in an English interface for the selection controls', () => {

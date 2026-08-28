@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import {
   type ColumnDef,
   type SortingState,
+  functionalUpdate,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -13,11 +14,13 @@ import {
 } from '@tanstack/react-table';
 import { ArrowUp, ArrowDown, ChevronsUpDown, Search, Download } from 'lucide-react';
 import { Table, THead, TBody, TR, TH, TD } from './ui/table';
+import { ColumnLayoutMenu } from '@/components/data-explorer/column-layout-menu';
 import { Button } from './ui/button';
 import { EmptyState, ErrorState, LoadingState } from './nebrax/states';
 import { MobileRecordItem, type MobileRecord } from './nebrax/mobile-record';
 import { toCsv, downloadCsv } from '@/lib/export';
 import { cn } from '@/lib/utils';
+import { normalizeProtectedColumns, type DataTableColumnVisibilityControl } from '@/lib/data-explorer/table-layout';
 
 /**
  * فرز خادميّ — حين تُمرَّر هذه الخاصية يصبح الخادم **مصدر الحقيقة الوحيد**
@@ -69,6 +72,10 @@ interface DataTableProps<T> {
   serverSort?: ServerSortControl;
   /** يضيف عمود تحديد للصفوف ويعيد المعرّفات المحدَّدة. */
   selection?: RowSelectionControl<T>;
+  /** يتحكم اختيارياً في ظهور الأعمدة؛ الأعمدة المحمية لا تُخفى. */
+  columnVisibility?: DataTableColumnVisibilityControl;
+  /** يثبت رأس الجدول داخل حاوية التمرير عند الحاجة إلى مسح قوائم كثيفة. */
+  stickyHeader?: boolean;
 }
 
 export function DataTable<T>({
@@ -89,6 +96,8 @@ export function DataTable<T>({
   retryLabel,
   serverSort,
   selection,
+  columnVisibility,
+  stickyHeader = false,
 }: DataTableProps<T>) {
   const t = useTranslations('nebrax');
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -104,13 +113,23 @@ export function DataTable<T>({
     const desc = value.startsWith('-');
     return [{ id: desc ? value.slice(1) : value, desc }];
   }, [serverSort?.value]);
+  const protectedColumnIds = columnVisibility?.protectedColumnIds;
+  const visibleColumns = useMemo(
+    () => normalizeProtectedColumns(columnVisibility?.value ?? {}, protectedColumnIds),
+    [columnVisibility?.value, protectedColumnIds]
+  );
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting: serverSort ? serverSorting : sorting, globalFilter },
+    state: { sorting: serverSort ? serverSorting : sorting, globalFilter, columnVisibility: visibleColumns },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      if (!columnVisibility) return;
+      const next = functionalUpdate(updater, visibleColumns);
+      columnVisibility.onChange(normalizeProtectedColumns(next, protectedColumnIds));
+    },
     manualSorting: Boolean(serverSort),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -139,6 +158,14 @@ export function DataTable<T>({
 
   const canSort = (id: string): boolean =>
     serverSort ? serverSort.columns.includes(id) : true;
+  const columnLayoutItems = columnVisibility
+    ? table.getAllLeafColumns().map((column) => ({
+        id: column.id,
+        label: columnVisibility.labels?.[column.id] ?? headerLabels[column.id] ?? column.id,
+        visible: column.getIsVisible(),
+        canHide: !protectedColumnIds?.includes(column.id),
+      }))
+    : [];
 
   function toggleSort(id: string): void {
     if (!serverSort) return;
@@ -183,10 +210,23 @@ export function DataTable<T>({
             placeholder={searchPlaceholder}
             className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
           />
+          {columnVisibility ? (
+            // بطاقة الجوال المخصصة تبني حقولها خارج خلايا الجدول، فلا يجوز أن
+            // نعرض لها متحكماً يوحي بأن إخفاء العمود سيخفي تلك الحقول.
+            <div className={mobileRecord ? 'hidden md:block' : undefined}>
+              <ColumnLayoutMenu
+                items={columnLayoutItems}
+                labels={{ columns: t('columns'), moveColumn: t('moveColumn'), moveUp: t('moveUp'), moveDown: t('moveDown') }}
+                onReorder={() => {}}
+                onVisibilityChange={(id, visible) => table.getColumn(id)?.toggleVisibility(visible)}
+                allowReorder={false}
+              />
+            </div>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
-            className="ms-auto"
+            className={columnVisibility ? '' : 'ms-auto'}
             onClick={exportCsv}
             disabled={loading || data.length === 0}
             title={t('exportCsv')}
@@ -194,6 +234,16 @@ export function DataTable<T>({
             <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
             CSV
           </Button>
+        </div>
+      ) : columnVisibility ? (
+        <div className={cn('flex justify-end border-b border-border p-2', mobileRecord && 'hidden md:flex')}>
+          <ColumnLayoutMenu
+            items={columnLayoutItems}
+            labels={{ columns: t('columns'), moveColumn: t('moveColumn'), moveUp: t('moveUp'), moveDown: t('moveDown') }}
+            onReorder={() => {}}
+            onVisibilityChange={(id, visible) => table.getColumn(id)?.toggleVisibility(visible)}
+            allowReorder={false}
+          />
         </div>
       ) : null}
 
@@ -209,7 +259,7 @@ export function DataTable<T>({
               أعمدته: رأسٌ مكسور على سطرين وتاريخٌ ينقسم ليسا كثافةً بل ضوضاء. */}
           <div className="hidden md:block">
             <Table className="[&_th]:whitespace-nowrap">
-              <THead>
+              <THead className={stickyHeader ? 'sticky top-0 z-10 bg-surface' : undefined}>
                 {table.getHeaderGroups().map((hg) => (
                   <TR key={hg.id}>
                     {selection ? (
@@ -312,7 +362,7 @@ export function DataTable<T>({
 
               return (
                 <li key={row.id}>
-                  {selection && !mobileRecord && rowId != null ? (
+                  {selection && rowId != null ? (
                     <div className="flex items-start gap-2">
                       <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center ps-2">
                         <input

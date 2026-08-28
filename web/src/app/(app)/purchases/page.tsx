@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { BranchViewToggle, type BranchView } from '@/components/ui/branch-view-toggle';
 import { formatRiyal } from '@/lib/money';
+import { useDataTableColumnVisibility } from '@/lib/data-explorer/table-layout';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import {
   parseExplorerState,
@@ -53,6 +54,7 @@ interface PurchaseResponse { data: Purchase[]; meta?: PaginationMeta }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = { posted: 'positive', draft: 'muted', cancelled: 'negative' };
 const payTone: Record<string, 'positive' | 'warning' | 'muted'> = { paid: 'positive', partial: 'warning', unpaid: 'muted' };
+const PURCHASE_SORT_COLUMNS = ['number', 'purchase_date', 'total', 'remaining'];
 
 function isEmptyFilter(filter: ActiveFilter): boolean {
   return Array.isArray(filter.value)
@@ -96,6 +98,12 @@ export default function PurchasesPage() {
   const [view, setView] = useState<BranchView>('current');
   const [toDelete, setToDelete] = useState<Purchase | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const storedColumnVisibility = useDataTableColumnVisibility('purchases');
+  const columnVisibility = useMemo(() => ({
+    ...storedColumnVisibility,
+    protectedColumnIds: ['number', 'actions'],
+    labels: { actions: t('actions') },
+  }), [storedColumnVisibility, t]);
 
   const partnerNames = useMemo(
     () => Object.fromEntries(partners.map((partner) => [partner.id, partner.name])),
@@ -274,7 +282,7 @@ export default function PurchasesPage() {
 
   const columns = useMemo<ColumnDef<Purchase, unknown>[]>(() => [
     {
-      accessorKey: 'number', header: t('number'), enableSorting: false,
+      accessorKey: 'number', header: t('number'),
       cell: ({ row }) => <Link href={`/purchases/${row.original.id}`} className="num text-primary hover:underline">{row.original.number}</Link>,
     },
     {
@@ -283,15 +291,15 @@ export default function PurchasesPage() {
       cell: ({ row }) => partnerNames[row.original.partner_id] ?? '—',
     },
     {
-      accessorKey: 'purchase_date', header: t('date'), enableSorting: false,
+      accessorKey: 'purchase_date', header: t('date'),
       cell: ({ row }) => <span className="num text-muted">{row.original.purchase_date}</span>,
     },
     {
-      accessorKey: 'total', header: t('total'), enableSorting: false,
+      accessorKey: 'total', header: t('total'),
       cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.total)}</div>,
     },
     {
-      accessorKey: 'remaining', header: t('remaining'), enableSorting: false,
+      accessorKey: 'remaining', header: t('remaining'),
       cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.remaining ?? '0.00')}</div>,
     },
     {
@@ -366,6 +374,13 @@ export default function PurchasesPage() {
         emptyLabel={t('empty')}
         exportName="purchases"
         showToolbar={false}
+        serverSort={{
+          value: explorer.sort ?? '-purchase_date',
+          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+          columns: PURCHASE_SORT_COLUMNS,
+        }}
+        columnVisibility={columnVisibility}
+        stickyHeader
         mobileRecord={(purchase) => ({
           title: (
             <Link href={`/purchases/${purchase.id}`} className="num text-primary hover:underline">

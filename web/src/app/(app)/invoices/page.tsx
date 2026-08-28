@@ -17,6 +17,7 @@ import { api, ApiError } from '@/lib/api';
 import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
 import { type BranchView } from '@/lib/branch-view';
 import { formatRiyal } from '@/lib/money';
+import { useDataTableColumnVisibility } from '@/lib/data-explorer/table-layout';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import {
   parseExplorerState,
@@ -61,6 +62,8 @@ const payTone: Record<string, 'positive' | 'warning' | 'muted'> = {
   partial: 'warning',
   unpaid: 'muted',
 };
+
+const INVOICE_SORT_COLUMNS = ['number', 'invoice_date', 'total', 'remaining'];
 
 const sortOptions: SortOption[] = [
   { value: '-invoice_date', label: 'الأحدث أولًا' },
@@ -114,6 +117,12 @@ export default function InvoicesPage() {
   const [toDelete, setToDelete] = useState<Invoice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [view, setView] = useState<BranchView>('current');
+  const storedColumnVisibility = useDataTableColumnVisibility('invoices');
+  const columnVisibility = useMemo(() => ({
+    ...storedColumnVisibility,
+    protectedColumnIds: ['number', 'actions'],
+    labels: { actions: t('actions') },
+  }), [storedColumnVisibility, t]);
 
   const partnerNames = useMemo(
     () => Object.fromEntries(partners.map((partner) => [partner.id, partner.name])),
@@ -282,7 +291,7 @@ export default function InvoicesPage() {
 
   const columns = useMemo<ColumnDef<Invoice, unknown>[]>(() => [
     {
-      accessorKey: 'number', header: t('number'), enableSorting: false,
+      accessorKey: 'number', header: t('number'),
       cell: ({ row }) => <Link href={`/invoices/${row.original.id}`} className="num whitespace-nowrap text-primary hover:underline">{row.original.number}</Link>,
     },
     {
@@ -296,15 +305,15 @@ export default function InvoicesPage() {
       },
     },
     {
-      accessorKey: 'invoice_date', header: t('date'), enableSorting: false,
+      accessorKey: 'invoice_date', header: t('date'),
       cell: ({ row }) => <span className="num whitespace-nowrap text-muted">{row.original.invoice_date}</span>,
     },
     {
-      accessorKey: 'total', header: t('total'), enableSorting: false,
+      accessorKey: 'total', header: t('total'),
       cell: ({ row }) => <div className="num whitespace-nowrap text-end">{formatRiyal(row.original.total)}</div>,
     },
     {
-      accessorKey: 'remaining', header: 'المتبقي', enableSorting: false,
+      accessorKey: 'remaining', header: 'المتبقي',
       cell: ({ row }) => <div className="num whitespace-nowrap text-end">{formatRiyal(row.original.remaining)}</div>,
     },
     {
@@ -367,6 +376,13 @@ export default function InvoicesPage() {
         emptyLabel={t('empty')}
         exportName="invoices"
         showToolbar={false}
+        serverSort={{
+          value: explorer.sort ?? '-invoice_date',
+          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+          columns: INVOICE_SORT_COLUMNS,
+        }}
+        columnVisibility={columnVisibility}
+        stickyHeader
         mobileRecord={(invoice) => ({
           title: (
             <Link href={`/invoices/${invoice.id}`} className="num text-primary hover:underline">

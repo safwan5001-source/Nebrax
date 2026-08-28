@@ -117,10 +117,12 @@ describe.each(TEST_LOCALES)('ListToolbar (%s)', (locale) => {
       locale
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'إزالة الفلتر الحالة: draft' }));
+    const activeFilter = locale === 'ar' ? 'إزالة الفلتر الحالة: draft' : 'Remove filter الحالة: draft';
+    const clearAll = locale === 'ar' ? 'مسح الكل' : 'Clear all';
+    await userEvent.click(screen.getByRole('button', { name: activeFilter }));
     expect(onRemoveFilter).toHaveBeenCalledWith('status');
 
-    await userEvent.click(screen.getByRole('button', { name: 'مسح الكل' }));
+    await userEvent.click(screen.getByRole('button', { name: clearAll }));
     expect(onClearFilters).toHaveBeenCalledOnce();
   });
 });

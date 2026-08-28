@@ -21,6 +21,7 @@ import { useToast } from '@/components/ui/toast';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { PRODUCT_SORT_COLUMNS, productFilterQuery, productQuery } from '@/modules/products/list-query';
+import { useDataTableColumnVisibility } from '@/lib/data-explorer/table-layout';
 
 interface ProductCategory {
   id: string;
@@ -78,6 +79,12 @@ export default function ProductsPage() {
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const storedColumnVisibility = useDataTableColumnVisibility('products');
+  const columnVisibility = useMemo(() => ({
+    ...storedColumnVisibility,
+    protectedColumnIds: ['name', 'actions'],
+    labels: { actions: t('actions') },
+  }), [storedColumnVisibility, t]);
 
   const loadProducts = useCallback(() => {
     setLoading(true);
@@ -276,7 +283,7 @@ export default function ProductsPage() {
     { accessorKey: 'barcode', header: t('barcode'), cell: ({ row }) => <span className="num whitespace-nowrap text-muted" dir="ltr">{row.original.barcode ?? '—'}</span> },
     ...(showStock
       ? [{
-          id: 'stock',
+          id: 'quantity_on_hand',
           header: t('stock'),
           accessorFn: (row: Product) => (row.track_inventory ? row.quantity_on_hand : ''),
           cell: ({ row }: { row: { original: Product } }) => (
@@ -354,6 +361,8 @@ export default function ProductsPage() {
           onChange: setSelectedIds,
           getRowId: (product) => product.id,
         }}
+        columnVisibility={columnVisibility}
+        stickyHeader
         mobileRecord={(product) => ({
           title: (
             <Link href={`/products/${product.id}`} className="text-primary hover:underline">
