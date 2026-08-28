@@ -18,12 +18,11 @@
 
 ## 3. base SHA
 
-`cc1bbe7fe3bdc5db6d6451ddb998c4fe5e6210f0` — `main` بعد دمج PR #547
+`82a26a66caccb226df8114c8fd33a5e8f882707d` — `main` بعد دمج PR #547 ثم PR #548 (hardening وقاية الخسارة). نُفّذ العمل أصلاً فوق #547 ثم أُعيد الأساس على أحدث `main` بلا تعارض.
 
 ## 4. HEAD SHA
 
-تنفيذ الكود: `b03cbbfdd7a71adea4d8b8a97263bf0fdc88519d`  
-رأس الفرع (يشمل هذا التقرير) يُحدَّث مع كل commit توثيقي؛ القيمة المعتمدة للمراجعة هي `git rev-parse HEAD` على `cursor/pos-hybrid-adaptive-2ebb`.
+تنفيذ الكود: `81ed66454fb4d399731d5afb16c870df1bc3d60a`
 
 ## 5. changed files
 
@@ -156,8 +155,8 @@ web/src/components/pos/interactions/shortcut-registry.test.ts
 - **PR #547 (Touch):** https://github.com/safwan5001-source/Nebrax/pull/547
 - **PR #545 (Keyboard):** https://github.com/safwan5001-source/Nebrax/pull/545
 - **PR #542 (Foundation):** https://github.com/safwan5001-source/Nebrax/pull/542
-- **Base:** `cc1bbe7fe3bdc5db6d6451ddb998c4fe5e6210f0`
-- **HEAD (كود):** `b03cbbfdd7a71adea4d8b8a97263bf0fdc88519d`
+- **Base:** `82a26a66caccb226df8114c8fd33a5e8f882707d`
+- **HEAD (كود):** `81ed66454fb4d399731d5afb16c870df1bc3d60a`
 
 ---
 
