@@ -138,7 +138,7 @@ export function PosReturnDialog({
   }
 
   return (
-    <PosDialog open={open} onClose={onClose} title={t('return_title')} className="max-w-3xl">
+    <PosDialog open={open} onClose={onClose} title={t('return_title')} className="max-w-[min(48rem,calc(100vw-2rem))]">
       <div className="space-y-4">
         <p className="rounded bg-primary-soft px-3 py-2 text-xs leading-relaxed text-text">{t('return_hint')}</p>
         {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}

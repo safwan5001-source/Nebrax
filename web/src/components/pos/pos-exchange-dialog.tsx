@@ -144,7 +144,7 @@ export function PosExchangeDialog({
   const policyLabel = quote?.exchange_surplus_policy === 'allow_cash_refund' ? t('exchange_policy_allow_cash') : t('exchange_policy_credit_only');
 
   return (
-    <PosDialog open={open} onClose={onClose} title={t('exchange_title')} className="max-w-4xl">
+    <PosDialog open={open} onClose={onClose} title={t('exchange_title')} className="max-w-[min(56rem,calc(100vw-2rem))]">
       <div className="space-y-4">
         <p className="rounded bg-primary-soft px-3 py-2 text-xs leading-relaxed text-text">{t('exchange_hint')}</p>
         {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}

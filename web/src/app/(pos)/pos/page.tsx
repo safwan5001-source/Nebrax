@@ -17,6 +17,15 @@ import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
 import { logout } from '@/lib/auth';
 import { POS_RETURN_HREF, decidePosUnsavedExit } from '@/lib/pos-workspace';
+import {
+  POS_CART_FAB_CLASS,
+  POS_CART_PAY_FOOTER_CLASS,
+  POS_MOBILE_NAV_CLASS,
+  POS_SALE_GRID_CLASS,
+  posCartPaneClass,
+  posProductGridPadClass,
+  posProductsPaneClass,
+} from '@/lib/pos-responsive';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { useBranches } from '@/lib/branch';
@@ -1145,7 +1154,7 @@ export default function PosPage() {
       </div>
 
       {/* تصنيفات POS على الجوال/التابلت: صور سريعة مع تمرير أفقي، ونفس الفلتر التشغيلي. */}
-      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 touch-pan-x sm:-mx-4 sm:px-4 lg:hidden" aria-label={t('categories')}>
+      <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto px-3 pb-1 touch-pan-x sm:-mx-4 sm:px-4 lg:hidden" aria-label={t('categories')}>
         {CATS.map(({ key, label, image, icon: Icon }, index) => {
           const on = cat === key;
           return (
@@ -1190,7 +1199,7 @@ export default function PosPage() {
       <div
         ref={registerProductsContainer}
         tabIndex={-1}
-        className={'grid gap-3 outline-none ' + (posCfg.show_product_images ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6') + (count > 0 ? ' pb-16 lg:pb-0' : '')}
+        className={'grid gap-3 outline-none ' + (posCfg.show_product_images ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6') + posProductGridPadClass(count > 0)}
       >
         {filtered.map((p, index) => {
           const tracked = p.track_inventory;
@@ -1309,9 +1318,9 @@ export default function PosPage() {
   }
 
   const cartPanel = (
-    <aside className="flex min-h-0 flex-col overflow-hidden border-border bg-surface lg:border-e">
+    <aside className="flex min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">
       <div className="border-b border-border p-3">
-        <div className="hidden items-center gap-1 overflow-x-auto pb-2 lg:flex" role="tablist" aria-label={t('open_carts')}>
+        <div className="hidden items-center gap-1 overflow-x-auto pb-2 md:flex" role="tablist" aria-label={t('open_carts')}>
           {carts.map((cartState) => {
             const itemCount = cartState.items.reduce((sum, item) => sum + item.qty, 0);
             const selected = cartState.id === activeCartId;
@@ -1333,7 +1342,7 @@ export default function PosPage() {
             <Plus className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
-        <div className="mb-2 flex items-center gap-2 lg:hidden">
+        <div className="mb-2 flex items-center gap-2 md:hidden">
           <button type="button" onClick={() => setOpenCartsOpen(true)} className="min-h-11 min-w-0 flex-1 rounded-md bg-background px-3 py-2 text-start text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <span className="block truncate">{selectedCustomer?.name ?? t('cart_named', { number: activeCart.number })}</span>
             <span className="num text-xs text-muted">{t('cart_count', { count: carts.length })} · {t('item_count', { count })}</span>
@@ -1467,7 +1476,7 @@ export default function PosPage() {
         <div className="flex items-baseline justify-between border-t border-border pt-2"><span className="font-semibold text-text">{t('total')}</span><span className="num text-xl font-bold text-text">{formatRiyal(totalMinor / 100)}</span></div>
       </div>
 
-      <div className="p-3 pt-0">
+      <div className={POS_CART_PAY_FOOTER_CLASS}>
         <button type="button" onClick={() => setStep('payment')} disabled={cart.length === 0 || catalogLoading} className="flex min-h-14 w-full touch-manipulation items-center justify-between rounded-md bg-primary px-4 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50">
           {t('pay')}<span className="num">{formatRiyal(totalMinor / 100)}<span className="hidden lg:inline"> · F9</span></span>
         </button>
@@ -1549,16 +1558,17 @@ export default function PosPage() {
         />
       ) : (
         <>
-          {/* ديسكتوب: 3 أعمدة (سلة · منتجات · أقسام) — جوال: تبويب واحد */}
-          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)_148px]">
-            <div className={mobileTab === 'cart' ? 'flex min-h-0' : 'hidden lg:flex lg:min-h-0'}>{cartPanel}</div>
-            <div className={mobileTab === 'products' ? 'relative flex min-h-0 flex-col' : 'hidden lg:flex lg:min-h-0 lg:flex-col'}>
+          {/* ديسكتوب lg+: 3 أعمدة. تابلت md: سلة+منتجات. جوال: تبويب واحد */}
+          <div className={POS_SALE_GRID_CLASS}>
+            <div className={posCartPaneClass(mobileTab)}>{cartPanel}</div>
+            <div className={posProductsPaneClass(mobileTab)}>
               {productsPanel}
-              {/* شريط سلة عائم (جوال فقط) */}
+              {/* شريط سلة عائم (جوال فقط — التابلت يعرض السلة بجانب المنتجات) */}
               {count > 0 && (
                 <button
+                  type="button"
                   onClick={() => setMobileTab('cart')}
-                  className="absolute inset-x-3 bottom-3 z-10 flex h-12 items-center gap-3 rounded-md bg-primary px-4 text-white touch-manipulation lg:hidden"
+                  className={POS_CART_FAB_CLASS}
                 >
                   <span className="num grid h-6 w-6 place-items-center rounded-lg bg-white/25 text-[13px] font-bold">{count}</span>
                   <span className="flex-1 text-start text-[13px] font-semibold">{t('view_cart')}</span>
@@ -1571,8 +1581,8 @@ export default function PosPage() {
 
           <PosShortcuts />
 
-          {/* تنقّل سفلي (جوال) */}
-          <nav className="grid min-h-16 shrink-0 grid-cols-4 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden">
+          {/* تنقّل سفلي (جوال فقط) */}
+          <nav className={POS_MOBILE_NAV_CLASS}>
             <button type="button" onClick={() => setRecentInvoicesOpen(true)} className="flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold text-muted touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><MoreHorizontal className="h-5 w-5" strokeWidth={1.8} />{t('nav_more')}</button>
             <button type="button" onClick={() => setPickerOpen(true)} className="flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold text-muted touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><Users className="h-5 w-5" strokeWidth={1.8} />{t('nav_customers')}</button>
             <button type="button" onClick={() => setMobileTab('products')} className={'flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold touch-manipulation ' + (mobileTab === 'products' ? 'text-primary' : 'text-muted')}>

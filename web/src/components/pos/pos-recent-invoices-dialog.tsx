@@ -56,7 +56,7 @@ export function PosRecentInvoicesDialog({ open, onClose }: { open: boolean; onCl
   }
 
   return (
-    <PosDialog open={open} onClose={onClose} title={t('recent_invoices_title')} className="max-w-2xl">
+    <PosDialog open={open} onClose={onClose} title={t('recent_invoices_title')} className="max-w-[min(42rem,calc(100vw-2rem))]">
       <div className="space-y-3">
         {loading && Array.from({ length: 4 }).map((_, index) => (
           <div key={index} className="h-20 animate-pulse rounded-lg border border-border bg-background" />
