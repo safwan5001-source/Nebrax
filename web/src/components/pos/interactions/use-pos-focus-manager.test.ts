@@ -2,6 +2,7 @@
 
 import { cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { shouldRestorePosFocus } from './use-pos-keyboard-active';
 import { usePosFocusManager } from './use-pos-focus-manager';
 
 afterEach(() => {
@@ -47,5 +48,19 @@ describe('مدير التركيز في نقطة البيع', () => {
     const dialogButton = document.querySelector('[role="dialog"] button') as HTMLButtonElement;
     dialogButton.focus();
     expect(result.current.restoreFocusSafe()).toBe(false);
+  });
+
+  it('لا يُفرض تركيز البحث بعد تفاعل pointer عندما تُحرس الاستعادة', () => {
+    const { result } = renderHook(() => usePosFocusManager());
+    const search = document.createElement('input');
+    const product = document.createElement('button');
+    document.body.append(search, product);
+    result.current.registerSearchInput(search);
+    result.current.registerProductButton(0, product);
+    result.current.focusZone('products', { productIndex: 0 });
+
+    expect(shouldRestorePosFocus('pointer')).toBe(false);
+    expect(document.activeElement).toBe(product);
+    expect(search).not.toBe(document.activeElement);
   });
 });

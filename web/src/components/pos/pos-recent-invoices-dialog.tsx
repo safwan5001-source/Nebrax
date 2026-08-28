@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { CalendarClock, ReceiptText, RotateCw, UserRound } from 'lucide-react';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
@@ -56,7 +56,7 @@ export function PosRecentInvoicesDialog({ open, onClose }: { open: boolean; onCl
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title={t('recent_invoices_title')} className="max-w-2xl">
+    <PosDialog open={open} onClose={onClose} title={t('recent_invoices_title')} className="max-w-2xl">
       <div className="space-y-3">
         {loading && Array.from({ length: 4 }).map((_, index) => (
           <div key={index} className="h-20 animate-pulse rounded-lg border border-border bg-background" />
@@ -100,6 +100,6 @@ export function PosRecentInvoicesDialog({ open, onClose }: { open: boolean; onCl
           </article>
         ))}
       </div>
-    </Dialog>
+    </PosDialog>
   );
 }

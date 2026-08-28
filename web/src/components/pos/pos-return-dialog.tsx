@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, Minus, Plus, RotateCcw } from 'lucide-react';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, ApiError } from '@/lib/api';
@@ -138,7 +138,7 @@ export function PosReturnDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title={t('return_title')} className="max-w-3xl">
+    <PosDialog open={open} onClose={onClose} title={t('return_title')} className="max-w-3xl">
       <div className="space-y-4">
         <p className="rounded bg-primary-soft px-3 py-2 text-xs leading-relaxed text-text">{t('return_hint')}</p>
         {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
@@ -208,6 +208,6 @@ export function PosReturnDialog({
           </>
         )}
       </div>
-    </Dialog>
+    </PosDialog>
   );
 }

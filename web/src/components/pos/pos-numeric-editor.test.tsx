@@ -68,6 +68,16 @@ describe('PosNumericEditor', () => {
     expect((screen.getByRole('textbox', { name: 'Numeric value' }) as HTMLInputElement).value).toBe('1.5');
   });
 
+  it('يبقي أزرار اللوحة والتأكيد والإلغاء مناسبة للمس', () => {
+    renderEditor({ value: '1' });
+    fireEvent.click(screen.getByRole('button', { name: 'Quantity' }));
+    expect(screen.getByRole('button', { name: 'Digit 5' }).className).toMatch(/min-h-12/);
+    expect(screen.getByRole('button', { name: 'Cancel' }).className).toMatch(/min-h-11/);
+    expect(screen.getByRole('button', { name: 'Apply' }).className).toMatch(/min-h-11/);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('يلغي المسودة عند Escape ولا يغير القيمة الأصلية', () => {
     const onChange = renderEditor({ value: '1' });
     fireEvent.click(screen.getByRole('button', { name: 'Quantity' }));

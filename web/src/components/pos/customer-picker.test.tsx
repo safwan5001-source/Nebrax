@@ -17,8 +17,8 @@ vi.mock('next-intl', () => ({
   })[key] ?? key,
 }));
 vi.mock('@/lib/api', () => ({ api: mocks.api, ApiError: class ApiError extends Error {} }));
-vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ open, title, children }: { open: boolean; title: string; children: React.ReactNode }) => open ? <section aria-label={title}>{children}</section> : null,
+vi.mock('@/components/pos/pos-dialog', () => ({
+  PosDialog: ({ open, title, children }: { open: boolean; title: string; children: React.ReactNode }) => open ? <section aria-label={title}>{children}</section> : null,
 }));
 
 import { CustomerPickerDialog } from './customer-picker';
