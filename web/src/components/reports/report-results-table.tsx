@@ -46,6 +46,17 @@ export function ReportResultsTable({
     cellTone: column.cellTone,
   }));
 
+  if (rows.length === 0) {
+    return (
+      <p
+        role="status"
+        className="rounded border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted"
+      >
+        {emptyText ?? labels.noResults}
+      </p>
+    );
+  }
+
   return (
     <>
       {reportKey && savedViews.loaded && <div className="no-print mb-3 flex justify-end md:hidden"><ReportSavedViewsMenu controller={savedViews} locale={locale} /></div>}
