@@ -69,7 +69,7 @@ describe('صفحة إعدادات درج النقدية', () => {
     vi.stubGlobal('fetch', fetchMock);
     render(<PosCashDrawerSettingsPage />);
 
-    await screen.findByRole('button', { name: /Counter two/i });
+    await waitFor(() => expect(screen.getByRole('button', { name: /Counter two/i }).getAttribute('aria-pressed')).toBe('true'));
     fireEvent.change(screen.getByLabelText('Pairing code'), { target: { value: 'PAIR-CODE' } });
     fireEvent.click(screen.getByRole('button', { name: 'Pair' }));
 
