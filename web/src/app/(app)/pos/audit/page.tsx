@@ -20,6 +20,8 @@ import { ExceptionsPanel } from '@/modules/pos-audit/exceptions-panel';
 import { RiskPanel } from '@/modules/pos-audit/risk-panel';
 import { RelationshipsPanel } from '@/modules/pos-audit/relationships-panel';
 import { RulesPanel } from '@/modules/pos-audit/rules-panel';
+import { CasesPanel } from '@/modules/pos-audit/cases-panel';
+import { DigestPanel } from '@/modules/pos-audit/digest-panel';
 
 interface AuditEvent {
   id: string; pos_session_id: string; branch_id: string | null; cart_id: string | null; correlation_id: string | null;
@@ -35,7 +37,7 @@ interface Approval { id: string; operation: string; status: string; reason_code:
 interface AuditUser { user_id: string; name: string; events_count: number; last_event_at: string | null }
 interface ReasonCode { id: string; code: string; name_ar: string; name_en: string; requires_note: boolean; is_active: boolean }
 
-type AuditTab = 'overview' | 'exceptions' | 'risk' | 'relationships' | 'sensitive' | 'carts' | 'cash' | 'users' | 'approvals' | 'settings';
+type AuditTab = 'overview' | 'exceptions' | 'risk' | 'relationships' | 'cases' | 'digest' | 'sensitive' | 'carts' | 'cash' | 'users' | 'approvals' | 'settings';
 
 function formatDate(value: string | null, locale: string): string {
   if (!value) return '—';
@@ -80,6 +82,9 @@ export default function PosAuditPage() {
   const [approving, setApproving] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({ from: '', to: '', pos_session_id: '', user_id: '', type: '', reason_code: '', amount_min: '', amount_max: '' });
+  const [focusCaseId, setFocusCaseId] = useState<string | null>(null);
+
+  const canInvestigationsView = can('pos.investigations.view');
 
   const tabs = useMemo<TabDef[]>(() => {
     const next: TabDef[] = [
@@ -87,13 +92,19 @@ export default function PosAuditPage() {
       { id: 'exceptions', label: t('exceptions') },
       { id: 'risk', label: t('riskIndicators') },
       { id: 'relationships', label: t('relationships') },
+    ];
+    if (canInvestigationsView) {
+      next.push({ id: 'cases', label: t('cases.tabLabel') });
+      next.push({ id: 'digest', label: t('digest.tabLabel') });
+    }
+    next.push(
       { id: 'sensitive', label: t('sensitive') },
       { id: 'carts', label: t('carts') }, { id: 'cash', label: t('cash') }, { id: 'users', label: t('users') },
-    ];
+    );
     if (can('pos.audit.review') || can('pos.override.approve')) next.push({ id: 'approvals', label: t('approvals'), count: overview?.pending_approvals_count });
     if (can('pos.audit.settings.manage')) next.push({ id: 'settings', label: t('settings') });
     return next;
-  }, [can, overview?.pending_approvals_count, t]);
+  }, [can, canInvestigationsView, overview?.pending_approvals_count, t]);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -184,9 +195,33 @@ export default function PosAuditPage() {
           </div>
           <section><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold text-text">{t('sensitive')}</h2><Button variant="outline" size="sm" onClick={() => setTab('sensitive')}>{t('viewDetails')}</Button></div>{activity}</section>
         </section>}
-        {tab === 'exceptions' && <ExceptionsPanel canReview={can('pos.audit.review')} />}
+        {tab === 'exceptions' && (
+          <ExceptionsPanel
+            canReview={can('pos.audit.review')}
+            canPromote={can('pos.investigations.create')}
+            onPromoted={(caseId) => { setFocusCaseId(caseId); setTab('cases'); }}
+          />
+        )}
         {tab === 'risk' && <RiskPanel />}
         {tab === 'relationships' && <RelationshipsPanel />}
+        {tab === 'cases' && canInvestigationsView && (
+          <CasesPanel
+            canCreate={can('pos.investigations.create')}
+            canManage={can('pos.investigations.manage')}
+            canAssign={can('pos.investigations.assign')}
+            canResolve={can('pos.investigations.resolve')}
+            canExport={can('pos.investigations.export')}
+            canCctv={can('pos.cctv.bookmark.manage')}
+            focusCaseId={focusCaseId}
+            onFocusHandled={() => setFocusCaseId(null)}
+          />
+        )}
+        {tab === 'digest' && canInvestigationsView && (
+          <DigestPanel
+            canManage={can('pos.investigations.manage')}
+            onOpenCase={(caseId) => { setFocusCaseId(caseId); setTab('cases'); }}
+          />
+        )}
         {tab === 'sensitive' && <section className="space-y-4"><details open={filtersOpen} onToggle={(event) => setFiltersOpen((event.currentTarget as HTMLDetailsElement).open)} className="rounded border border-border bg-surface"><summary className="flex cursor-pointer list-none items-center gap-2 p-3 text-sm font-medium text-text"><ListFilter className="h-4 w-4 text-muted" strokeWidth={1.6}/>{t('advancedFilters')}</summary><div className="grid gap-3 border-t border-border p-3 sm:grid-cols-2 xl:grid-cols-4"><label><Label htmlFor="audit-from">{t('dateFrom')}</Label><Input id="audit-from" type="datetime-local" value={filters.from} onChange={(e) => setFilters((v) => ({ ...v, from: e.target.value }))}/></label><label><Label htmlFor="audit-to">{t('dateTo')}</Label><Input id="audit-to" type="datetime-local" value={filters.to} onChange={(e) => setFilters((v) => ({ ...v, to: e.target.value }))}/></label><label><Label htmlFor="audit-session">{t('session')}</Label><Input id="audit-session" value={filters.pos_session_id} onChange={(e) => setFilters((v) => ({ ...v, pos_session_id: e.target.value }))}/></label><label><Label htmlFor="audit-user">{t('user')}</Label><Input id="audit-user" value={filters.user_id} onChange={(e) => setFilters((v) => ({ ...v, user_id: e.target.value }))}/></label><label><Label htmlFor="audit-type">{t('eventType')}</Label><Input id="audit-type" value={filters.type} onChange={(e) => setFilters((v) => ({ ...v, type: e.target.value }))}/></label><label><Label htmlFor="audit-reason">{t('reason')}</Label><Input id="audit-reason" value={filters.reason_code} onChange={(e) => setFilters((v) => ({ ...v, reason_code: e.target.value }))}/></label><label><Label htmlFor="audit-min">{t('amountMin')}</Label><Input id="audit-min" className="num" inputMode="numeric" value={filters.amount_min} onChange={(e) => setFilters((v) => ({ ...v, amount_min: e.target.value }))}/></label><label><Label htmlFor="audit-max">{t('amountMax')}</Label><Input id="audit-max" className="num" inputMode="numeric" value={filters.amount_max} onChange={(e) => setFilters((v) => ({ ...v, amount_max: e.target.value }))}/></label><div className="flex gap-2 sm:col-span-2 xl:col-span-4"><Button onClick={() => void loadCore()}>{t('applyFilters')}</Button><Button variant="outline" onClick={() => setFilters({ from: '', to: '', pos_session_id: '', user_id: '', type: '', reason_code: '', amount_min: '', amount_max: '' })}>{t('clearFilters')}</Button></div></div></details>{activity}</section>}
         {tab === 'carts' && <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{carts.length === 0 && !loading ? <p className="rounded border border-border bg-surface p-4 text-sm text-muted">{t('emptyCarts')}</p> : carts.map((cart) => <button key={cart.cart_id} onClick={() => void openCart(cart)} className="rounded border border-border bg-surface p-4 text-start transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><div className="flex items-start justify-between gap-3"><span className="text-sm font-medium text-text">{t('cartTimeline')}</span><span className="num text-xs text-muted">{t('cartEvents', { count: cart.event_count })}</span></div><p className="mt-4 text-sm text-text">{eventLabel(cart.last_event_type)}</p><p className="mt-1 text-xs text-muted">{t('lastEvent')}: {formatDate(cart.last_event_at, locale)}</p><p className="num mt-3 truncate text-xs text-muted" dir="ltr">{cart.cart_id}</p></button>)}</section>}
         {tab === 'cash' && <section className="space-y-3"><p className="text-sm text-muted">{t('cash')}</p><DataTable columns={eventColumns} data={events.filter((event) => ['cash_count', 'cash_movement', 'drawer'].includes(event.category ?? '') || event.type.includes('closing_') || event.type.includes('cash_'))} loading={loading} emptyLabel={t('emptyEvents')} mobileRecord={(row) => ({ title: eventLabel(row.type), subtitle: actorName(row), meta: [formatDate(row.created_at, locale)], actions: <button className="text-sm font-medium text-primary" onClick={() => setSelectedEvent(row)}>{t('viewDetails')}</button> })}/></section>}

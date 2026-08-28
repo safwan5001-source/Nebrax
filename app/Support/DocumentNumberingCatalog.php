@@ -22,6 +22,7 @@ use App\Models\JournalEntry;
 use App\Models\ManualJournal;
 use App\Models\Payment;
 use App\Models\PayrollRun;
+use App\Models\PosInvestigationCase;
 use App\Models\PosSession;
 use App\Models\Product;
 use App\Models\ProcurementDocument;
@@ -181,6 +182,11 @@ class DocumentNumberingCatalog
             'model'  => PosSession::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'POS']],
+        ],
+        'pos_investigation_case' => [
+            'model'  => PosInvestigationCase::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'LP']],
         ],
         'fuel_shift' => [
             'model'  => FuelShift::class,

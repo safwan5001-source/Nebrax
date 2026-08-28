@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ShieldQuestion } from 'lucide-react';
+import { FolderPlus, ShieldQuestion } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { Badge } from '@/components/ui/badge';
@@ -27,12 +27,14 @@ const REASON_REQUIRED: ReviewState[] = ['explained', 'dismissed', 'needs_investi
 interface Props {
   id: string | null;
   canReview: boolean;
+  canPromote?: boolean;
   onClose: () => void;
   onReviewed: () => void;
   onError: (message: string) => void;
+  onPromoted?: (caseId: string) => void;
 }
 
-export function ExceptionDetail({ id, canReview, onClose, onReviewed, onError }: Props) {
+export function ExceptionDetail({ id, canReview, canPromote, onClose, onReviewed, onError, onPromoted }: Props) {
   const t = useTranslations('posAudit');
   const locale = useLocale();
   const [exception, setException] = useState<PosExceptionRow | null>(null);
@@ -41,6 +43,7 @@ export function ExceptionDetail({ id, canReview, onClose, onReviewed, onError }:
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [promoting, setPromoting] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -83,6 +86,22 @@ export function ExceptionDetail({ id, canReview, onClose, onReviewed, onError }:
   const explanation = exception?.explanation;
   const nextStates = exception ? NEXT_STATES[exception.review_state] ?? [] : [];
 
+  async function promoteToCase() {
+    if (!exception) return;
+    setPromoting(true);
+    try {
+      const result = await api<{ data: { id: string } }>('/pos/investigations/promote-exception', {
+        method: 'POST',
+        body: { pos_exception_id: exception.id },
+      });
+      onPromoted?.(result.data.id);
+    } catch (error) {
+      onError(error instanceof ApiError ? error.message : t('loadFailed'));
+    } finally {
+      setPromoting(false);
+    }
+  }
+
   return (
     <Dialog open={id !== null} onClose={onClose} title={t('exceptionDetails')}>
       {loading && !exception ? (
@@ -101,6 +120,12 @@ export function ExceptionDetail({ id, canReview, onClose, onReviewed, onError }:
             </div>
             <p className="text-sm text-muted">{t('genericExplain')}</p>
             <p className="rounded border border-border bg-background p-2 text-xs text-muted">{t('notAccusation')}</p>
+            {canPromote && (
+              <Button size="sm" variant="outline" onClick={() => void promoteToCase()} disabled={promoting}>
+                <FolderPlus className="h-3.5 w-3.5" strokeWidth={1.6} />
+                {promoting ? t('saving') : t('cases.promoteToCase')}
+              </Button>
+            )}
           </section>
 
           {/* المرصود مقابل خط الأساس + مقام التطبيع + مساهمة الدرجة */}

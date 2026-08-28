@@ -24,11 +24,13 @@ const STATES = ['new', 'reviewing', 'explained', 'dismissed', 'needs_investigati
 
 interface Props {
   canReview: boolean;
+  canPromote?: boolean;
   subjectFilter?: string | null;
   onOpenSubject?: (userId: string) => void;
+  onPromoted?: (caseId: string) => void;
 }
 
-export function ExceptionsPanel({ canReview, subjectFilter }: Props) {
+export function ExceptionsPanel({ canReview, canPromote, subjectFilter, onPromoted }: Props) {
   const t = useTranslations('posAudit');
   const locale = useLocale();
   const { error: errorToast } = useToast();
@@ -268,9 +270,11 @@ export function ExceptionsPanel({ canReview, subjectFilter }: Props) {
       <ExceptionDetail
         id={selected?.id ?? null}
         canReview={canReview}
+        canPromote={canPromote}
         onClose={() => setSelected(null)}
         onReviewed={() => { setSelected(null); void load(); }}
         onError={(message) => errorToast(message)}
+        onPromoted={(caseId) => { setSelected(null); onPromoted?.(caseId); }}
       />
     </section>
   );

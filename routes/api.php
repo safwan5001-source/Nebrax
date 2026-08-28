@@ -74,6 +74,8 @@ use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PosAuditController;
 use App\Http\Controllers\Api\PosLossPreventionController;
+use App\Http\Controllers\Api\PosInvestigationCaseController;
+use App\Http\Controllers\Api\PosLpDigestController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\PosDeviceController;
 use App\Http\Controllers\Api\PosSessionController;
@@ -572,6 +574,34 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::put('pos/audit/rules/{key}', [PosLossPreventionController::class, 'updateRule'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
         Route::post('pos/audit/exceptions/{id}/review', [PosLossPreventionController::class, 'review'])->middleware([$perm('pos.audit.review'), $app('sales.pos')]);
         Route::post('pos/audit/recalculate', [PosLossPreventionController::class, 'recalculate'])->middleware([$perm('pos.audit.recalculate'), $app('sales.pos')]);
+
+        // Phase 3 — قضايا التحقيق (Investigation Cases). قراءة/كتابة متحكَّمة فوق أدلة/
+        // استثناءات Phase 1/2 الثابتة، بلا مصدر حقيقة موازٍ ولا أثر محاسبي.
+        Route::get('pos/investigations', [PosInvestigationCaseController::class, 'index'])->middleware([$perm('pos.investigations.view'), $app('sales.pos')]);
+        Route::get('pos/investigations/duplicate-check', [PosInvestigationCaseController::class, 'duplicateCheck'])->middleware([$perm('pos.investigations.view'), $app('sales.pos')]);
+        Route::get('pos/investigations/export', [PosInvestigationCaseController::class, 'export'])->middleware([$perm('pos.investigations.export'), $app('sales.pos')]);
+        Route::get('pos/investigations/{id}', [PosInvestigationCaseController::class, 'show'])->middleware([$perm('pos.investigations.view'), $app('sales.pos')]);
+        Route::get('pos/investigations/{id}/timeline', [PosInvestigationCaseController::class, 'timeline'])->middleware([$perm('pos.investigations.view'), $app('sales.pos')]);
+        Route::post('pos/investigations', [PosInvestigationCaseController::class, 'store'])->middleware([$perm('pos.investigations.create'), $app('sales.pos')]);
+        Route::post('pos/investigations/promote-exception', [PosInvestigationCaseController::class, 'promoteException'])->middleware([$perm('pos.investigations.create'), $app('sales.pos')]);
+        Route::post('pos/investigations/{id}/link-exception', [PosInvestigationCaseController::class, 'linkException'])->middleware([$perm('pos.investigations.manage'), $app('sales.pos')]);
+        Route::post('pos/investigations/{id}/link-event', [PosInvestigationCaseController::class, 'linkEvent'])->middleware([$perm('pos.investigations.manage'), $app('sales.pos')]);
+        Route::post('pos/investigations/{id}/evidence-links/{linkId}/unlink', [PosInvestigationCaseController::class, 'unlinkEvidence'])->middleware([$perm('pos.investigations.manage'), $app('sales.pos')]);
+        Route::post('pos/investigations/{id}/assign', [PosInvestigationCaseController::class, 'assign'])->middleware([$perm('pos.investigations.assign'), $app('sales.pos')]);
+        Route::put('pos/investigations/{id}/priority', [PosInvestigationCaseController::class, 'updatePriority'])->middleware([$perm('pos.investigations.manage'), $app('sales.pos')]);
+        Route::post('pos/investigations/{id}/notes', [PosInvestigationCaseController::class, 'addNote'])->middleware([$perm('pos.investigations.manage'), $app('sales.pos')]);
+        // حسم القضية (حالات الخسم) يفرض pos.investigations.resolve إضافيّاً داخل المتحكّم.
+        Route::post('pos/investigations/{id}/status', [PosInvestigationCaseController::class, 'updateStatus'])->middleware([$perm('pos.investigations.manage'), $app('sales.pos')]);
+        Route::post('pos/investigations/{id}/reopen', [PosInvestigationCaseController::class, 'reopen'])->middleware([$perm('pos.investigations.resolve'), $app('sales.pos')]);
+        Route::post('pos/investigations/{id}/cctv-bookmarks', [PosInvestigationCaseController::class, 'storeCctvBookmark'])->middleware([$perm('pos.cctv.bookmark.manage'), $app('sales.pos')]);
+        Route::put('pos/investigations/{id}/cctv-bookmarks/{bookmarkId}', [PosInvestigationCaseController::class, 'updateCctvBookmark'])->middleware([$perm('pos.cctv.bookmark.manage'), $app('sales.pos')]);
+        Route::delete('pos/investigations/{id}/cctv-bookmarks/{bookmarkId}', [PosInvestigationCaseController::class, 'destroyCctvBookmark'])->middleware([$perm('pos.cctv.bookmark.manage'), $app('sales.pos')]);
+
+        // Phase 3 — الملخص الرقابي اليومي (Daily LP Digest). قراءة/توليد يدوي فقط.
+        Route::get('pos/lp-digests', [PosLpDigestController::class, 'index'])->middleware([$perm('pos.investigations.view'), $app('sales.pos')]);
+        Route::get('pos/lp-digests/latest', [PosLpDigestController::class, 'latest'])->middleware([$perm('pos.investigations.view'), $app('sales.pos')]);
+        Route::get('pos/lp-digests/{date}', [PosLpDigestController::class, 'show'])->middleware([$perm('pos.investigations.view'), $app('sales.pos')]);
+        Route::post('pos/lp-digests/generate', [PosLpDigestController::class, 'generate'])->middleware([$perm('pos.investigations.manage'), $app('sales.pos')]);
 
         // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.
         Route::get('settings/finance', [FinanceSettingsController::class, 'show'])->middleware($perm('payments.view'));
