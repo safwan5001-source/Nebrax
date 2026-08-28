@@ -126,13 +126,36 @@ final class ZatcaXadesSignedPropertiesBuilder
                 .chunk_split(base64_encode($der), 64, "\n")
                 ."-----END CERTIFICATE-----\n";
 
-            if (@openssl_x509_read($pem) === false) {
+            $parsedCertificate = @openssl_x509_read($pem);
+            if ($parsedCertificate === false) {
                 throw new InvalidArgumentException(
                     'شهادة ZATCA رقم '.($index + 1).' ليست شهادة X.509 صالحة.'
                 );
             }
 
-            return base64_encode(hash('sha256', $der, true));
+            $normalizedPem = '';
+            if (! openssl_x509_export($parsedCertificate, $normalizedPem, false)) {
+                throw new InvalidArgumentException(
+                    'تعذر تطبيع شهادة ZATCA رقم '.($index + 1).'.'
+                );
+            }
+
+            $normalizedBody = preg_replace(
+                '/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\\s+/',
+                '',
+                $normalizedPem
+            );
+            $normalizedDer = is_string($normalizedBody)
+                ? base64_decode($normalizedBody, true)
+                : false;
+
+            if (! is_string($normalizedDer) || ! hash_equals($normalizedDer, $der)) {
+                throw new InvalidArgumentException(
+                    'شهادة ZATCA رقم '.($index + 1).' تحتوي بيانات خارج DER.'
+                );
+            }
+
+            return base64_encode(hash('sha256', $normalizedDer, true));
         }, $certificateChain, array_keys($certificateChain));
     }
 

@@ -72,11 +72,13 @@ class ZatcaXadesSignedPropertiesBuilderTest extends TestCase
     {
         $builder = app(ZatcaXadesSignedPropertiesBuilder::class);
         $digest = base64_encode(str_repeat('x', 32));
+        $validCertificate = $this->certificateDer('Trailing Bytes');
         $invalidChains = [
             [],
             [1 => 'certificate'],
             ['not-base64!'],
             [base64_encode('not-a-certificate')],
+            [base64_encode($validCertificate.'trailing-bytes')],
         ];
 
         foreach ($invalidChains as $chain) {
