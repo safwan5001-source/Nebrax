@@ -19,6 +19,7 @@ use App\Services\Pos\PosInvestigationCaseService;
 use App\Support\Money;
 use App\Support\Rbac;
 use App\Tenancy\BranchScope;
+use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -137,7 +138,10 @@ class PosInvestigationCaseController extends ApiController
         ]);
 
         if (! empty($data['owner_id'])) {
-            $this->assertTenantOwned(User::class, $data['owner_id'], 'المستخدم المسنَد إليه');
+            $this->assertUserInTenant($data['owner_id'], 'المستخدم المسنَد إليه');
+        }
+        if (! empty($data['subject_user_id'])) {
+            $this->assertUserInTenant($data['subject_user_id'], 'موضوع القضية');
         }
         if (! empty($data['pos_session_id'])) {
             $this->assertTenantOwned(\App\Models\PosSession::class, $data['pos_session_id'], 'جلسة نقطة البيع');
@@ -165,7 +169,7 @@ class PosInvestigationCaseController extends ApiController
 
         $exception = PosException::query()->withoutGlobalScope(BranchScope::class)->findOrFail($data['pos_exception_id']);
         if (! empty($data['owner_id'])) {
-            $this->assertTenantOwned(User::class, $data['owner_id'], 'المستخدم المسنَد إليه');
+            $this->assertUserInTenant($data['owner_id'], 'المستخدم المسنَد إليه');
         }
 
         $result = $this->domain(fn () => $this->cases->promoteException($request->user(), $exception, $data));
@@ -229,7 +233,7 @@ class PosInvestigationCaseController extends ApiController
         $case = $this->visibleCases($request)->findOrFail($id);
         $data = $request->validate(['owner_id' => ['nullable', 'uuid']]);
         if (! empty($data['owner_id'])) {
-            $this->assertTenantOwned(User::class, $data['owner_id'], 'المستخدم المسنَد إليه');
+            $this->assertUserInTenant($data['owner_id'], 'المستخدم المسنَد إليه');
         }
 
         $updated = $this->domain(fn () => $this->cases->assign($request->user(), $case, $data['owner_id'] ?? null));
@@ -360,6 +364,19 @@ class PosInvestigationCaseController extends ApiController
     }
 
     // ════════════════════════════ مساعدات ════════════════════════════
+
+    /**
+     * تحقق ملكية مرجع مستخدم داخل المستأجر. `User` لا يرث `BaseModel`/`TenantScope`
+     * (يستحيل تفعيله قبل حلّ المصادقة نفسها)، فـ`assertTenantOwned` العامة لا تفلتره
+     * فعلياً — التصفية الصريحة بـ`tenant_id` هنا إلزامية، بنفس نمط بقية المتحكّمات
+     * (`UserController`, `RoleController`) التي تستعلم `User` صراحةً لهذا السبب.
+     */
+    private function assertUserInTenant(?string $userId, string $label): void
+    {
+        if ($userId !== null && ! User::where('tenant_id', app(TenantContext::class)->id())->whereKey($userId)->exists()) {
+            abort(422, "{$label} غير موجود.");
+        }
+    }
 
     /** @return Builder<PosInvestigationCase> */
     private function visibleCases(Request $request): Builder

@@ -657,4 +657,92 @@ class PosLossPreventionInvestigationsTest extends TestCase
 
         $this->withToken($auth['token'])->deleteJson("/api/pos/investigations/{$case['id']}")->assertStatus(405);
     }
+
+    // ═══════════════════════ مراجعة Codex — إصلاحات مؤكَّدة ═══════════════════════
+
+    /** @test */
+    public function closing_a_resolved_case_preserves_its_original_outcome_and_resolved_at(): void
+    {
+        $auth = $this->fullAuth();
+        $case = $this->withToken($auth['token'])->postJson('/api/pos/investigations', ['title' => 'قضية خسارة ثم إغلاق'])->assertCreated()->json('data');
+
+        $resolved = $this->withToken($auth['token'])->postJson("/api/pos/investigations/{$case['id']}/status", [
+            'status' => 'confirmed_loss', 'reason' => 'تأكيد أولي', 'confirmed_loss_minor' => 30000,
+        ])->assertOk()->json('data');
+        $this->assertSame('confirmed_loss', $resolved['outcome']);
+        $originalResolvedAt = PosInvestigationCase::withoutGlobalScope(BranchScope::class)->findOrFail($case['id'])->resolved_at;
+
+        $closed = $this->withToken($auth['token'])->postJson("/api/pos/investigations/{$case['id']}/status", [
+            'status' => 'closed', 'reason' => 'اكتمل التحقيق',
+        ])->assertOk()->json('data');
+
+        // الإغلاق حالة نهائية لا تصنيف نتيجة بديل — النتيجة الأصلية ووقت حسمها يبقيان كما هما.
+        $this->assertSame('closed', $closed['status']);
+        $this->assertSame('confirmed_loss', $closed['outcome'], 'الإغلاق لا يطمس نتيجة سابقة.');
+        $this->assertSame(30000, $closed['confirmed_loss_minor']);
+        $fresh = PosInvestigationCase::withoutGlobalScope(BranchScope::class)->findOrFail($case['id']);
+        $this->assertTrue($originalResolvedAt->equalTo($fresh->resolved_at), 'وقت الحسم الأصلي لا يُستبدل بوقت الإغلاق.');
+    }
+
+    /** @test */
+    public function digest_day_boundary_is_half_open_and_does_not_double_count_the_next_days_midnight(): void
+    {
+        $auth = $this->fullAuth();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $tenant = Tenant::findOrFail($auth['tenant_id']);
+        $timezone = $tenant->timezone ?: 'Asia/Riyadh';
+
+        $targetDay = Carbon::now($timezone)->subDays(2)->startOfDay();
+        $periodEndUtc = $targetDay->copy()->addDay()->setTimezone('UTC');
+
+        // استثناء عند اللحظة الفاصلة تماماً (منتصف الليل) — يجب أن يُحسب لليوم التالي فقط.
+        $this->exception($auth['tenant_id'], ['detected_at' => $periodEndUtc]);
+
+        $digest = app(PosLpDigestService::class)->generate($tenant, $targetDay);
+
+        $this->assertSame(0, $digest->new_exceptions_count, 'لحظة الفاصل الزمني ملك اليوم التالي حصراً (نصف مفتوح).');
+    }
+
+    /** @test */
+    public function case_creation_rejects_a_foreign_tenant_subject_user(): void
+    {
+        $a = $this->fullAuth();
+        $b = $this->fullAuth();
+        $foreignUser = $this->cashier($b['tenant_id'], 'foreign-subject@x.test');
+
+        $this->withToken($a['token'])->postJson('/api/pos/investigations', [
+            'title' => 'قضية بموضوع خارجي', 'subject_user_id' => $foreignUser->id,
+        ])->assertStatus(422);
+    }
+
+    /** @test */
+    public function digest_redacts_branch_breakdown_and_totals_for_a_branch_restricted_user(): void
+    {
+        $auth = $this->fullAuth();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $branchA = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع أ', 'code' => 'DGA'])->assertCreated()->json('data.id');
+        $branchB = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع ب', 'code' => 'DGB'])->assertCreated()->json('data.id');
+
+        $this->exception($auth['tenant_id'], ['branch_id' => $branchA, 'detected_at' => Carbon::yesterday()->addHours(9)]);
+        $this->exception($auth['tenant_id'], ['branch_id' => $branchB, 'detected_at' => Carbon::yesterday()->addHours(9)]);
+
+        $tenant = Tenant::findOrFail($auth['tenant_id']);
+        app(PosLpDigestService::class)->generate($tenant, Carbon::yesterday());
+
+        // مستخدم مقيَّد بالفرع أ فقط.
+        $this->withToken($auth['token'])->postJson('/api/users', [
+            'name' => 'مقيَّد بفرع', 'email' => 'branch-restricted@x.test', 'password' => 'password123',
+            'role' => 'admin', 'branch_ids' => [$branchA],
+        ])->assertCreated();
+        $restrictedToken = $this->postJson('/api/login', ['email' => 'branch-restricted@x.test', 'password' => 'password123'])->assertOk()['token'];
+
+        $unrestricted = $this->withToken($auth['token'])->getJson('/api/pos/lp-digests/latest')->assertOk()->json('data');
+        $this->assertSame(2, $unrestricted['new_exceptions_count']);
+        $this->assertCount(2, $unrestricted['branch_breakdown']);
+
+        $restricted = $this->withToken($restrictedToken)->getJson('/api/pos/lp-digests/latest')->assertOk()->json('data');
+        $this->assertSame(1, $restricted['new_exceptions_count'], 'المستخدم المقيَّد يرى مساهمة فرعه فقط.');
+        $this->assertCount(1, $restricted['branch_breakdown']);
+        $this->assertSame($branchA, $restricted['branch_breakdown'][0]['branch_id']);
+    }
 }

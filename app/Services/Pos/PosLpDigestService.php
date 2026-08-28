@@ -38,30 +38,32 @@ final class PosLpDigestService
         $periodEnd = $localDay->copy()->addDay()->setTimezone('UTC');
 
         $exceptions = PosException::query()->withoutGlobalScope(BranchScope::class)
-            ->whereBetween('detected_at', [$periodStart, $periodEnd])->get();
+            ->where('detected_at', '>=', $periodStart)->where('detected_at', '<', $periodEnd)->get();
 
         $newExceptionsCount = $exceptions->count();
         $priorityExceptionsCount = $exceptions->where('severity', PosException::SEVERITY_PRIORITY)->count();
         $amountUnderReview = $this->dedupedAmount($exceptions);
 
         $cases = PosInvestigationCase::query()->withoutGlobalScope(BranchScope::class)
-            ->whereBetween('opened_at', [$periodStart, $periodEnd])->get();
+            ->where('opened_at', '>=', $periodStart)->where('opened_at', '<', $periodEnd)->get();
         $newCasesCount = $cases->count();
 
-        $unresolvedHighPriority = PosInvestigationCase::query()->withoutGlobalScope(BranchScope::class)
+        $unresolvedHighPriorityCases = PosInvestigationCase::query()->withoutGlobalScope(BranchScope::class)
             ->whereIn('status', [
                 PosInvestigationCase::STATUS_OPEN, PosInvestigationCase::STATUS_INVESTIGATING,
                 PosInvestigationCase::STATUS_AWAITING_INFORMATION,
             ])
             ->whereIn('priority', [PosInvestigationCase::PRIORITY_HIGH, PosInvestigationCase::PRIORITY_CRITICAL])
-            ->count();
+            ->get();
+        $unresolvedHighPriority = $unresolvedHighPriorityCases->count();
 
         $confirmedLossCases = PosInvestigationCase::query()->withoutGlobalScope(BranchScope::class)
             ->where('outcome', PosInvestigationCase::STATUS_CONFIRMED_LOSS)
-            ->whereBetween('resolved_at', [$periodStart, $periodEnd])->get();
-        $controlFailureCount = PosInvestigationCase::query()->withoutGlobalScope(BranchScope::class)
+            ->where('resolved_at', '>=', $periodStart)->where('resolved_at', '<', $periodEnd)->get();
+        $controlFailureCases = PosInvestigationCase::query()->withoutGlobalScope(BranchScope::class)
             ->where('outcome', PosInvestigationCase::STATUS_CONTROL_FAILURE)
-            ->whereBetween('resolved_at', [$periodStart, $periodEnd])->count();
+            ->where('resolved_at', '>=', $periodStart)->where('resolved_at', '<', $periodEnd)->get();
+        $controlFailureCount = $controlFailureCases->count();
 
         $materialVarianceSessions = $exceptions
             ->whereIn('rule_key', self::MATERIAL_VARIANCE_RULE_KEYS)
@@ -75,7 +77,12 @@ final class PosLpDigestService
 
         $ruleBreakdown = $exceptions->groupBy('rule_key')->map->count();
 
-        $branchBreakdown = $this->branchBreakdown($exceptions, $cases);
+        // كل مقياس مفصَّل بالفرع هنا أيضاً — لا فقط الثلاثة الأصلية — لأن `PosLpDigestController`
+        // يعيد اشتقاق كل الأرقام المعروضة لمستخدم مقيَّد بفروع من هذا التفصيل حصراً (بلا مصدر
+        // حقيقة موازٍ)، فحجب فرع لا يراه المستخدم يجب أن يُخفي مساهمته من كل مقياس لا بعضها.
+        $branchBreakdown = $this->branchBreakdown(
+            $exceptions, $cases, $unresolvedHighPriorityCases, $confirmedLossCases, $controlFailureCases,
+        );
 
         $caveats = [];
         if ($newExceptionsCount < self::MIN_MEANINGFUL_ACTIVITY && $newCasesCount < self::MIN_MEANINGFUL_ACTIVITY) {
@@ -155,17 +162,32 @@ final class PosLpDigestService
             ->whereIn('id', array_keys($ids))->sum(DB::raw('ABS(amount)'));
     }
 
-    private function branchBreakdown($exceptions, $cases): array
+    private function branchBreakdown($exceptions, $cases, $unresolvedHighPriorityCases, $confirmedLossCases, $controlFailureCases): array
     {
-        $branches = $exceptions->pluck('branch_id')->merge($cases->pluck('branch_id'))->unique();
+        $branches = $exceptions->pluck('branch_id')
+            ->merge($cases->pluck('branch_id'))
+            ->merge($unresolvedHighPriorityCases->pluck('branch_id'))
+            ->merge($confirmedLossCases->pluck('branch_id'))
+            ->merge($controlFailureCases->pluck('branch_id'))
+            ->unique();
         $breakdown = [];
         foreach ($branches as $branchId) {
+            $branchExceptions = $exceptions->where('branch_id', $branchId);
+            $branchConfirmedLoss = $confirmedLossCases->where('branch_id', $branchId);
             $key = $branchId ?? 'unassigned';
             $breakdown[$key] = [
                 'branch_id' => $branchId,
-                'new_exceptions_count' => $exceptions->where('branch_id', $branchId)->count(),
+                'new_exceptions_count' => $branchExceptions->count(),
+                'priority_exceptions_count' => $branchExceptions->where('severity', PosException::SEVERITY_PRIORITY)->count(),
                 'new_cases_count' => $cases->where('branch_id', $branchId)->count(),
-                'amount_under_review_minor' => $this->dedupedAmount($exceptions->where('branch_id', $branchId)),
+                'amount_under_review_minor' => $this->dedupedAmount($branchExceptions),
+                'unresolved_high_priority_cases_count' => $unresolvedHighPriorityCases->where('branch_id', $branchId)->count(),
+                'confirmed_loss_count' => $branchConfirmedLoss->count(),
+                'confirmed_loss_minor' => (int) $branchConfirmedLoss->sum('confirmed_loss_minor'),
+                'control_failure_count' => $controlFailureCases->where('branch_id', $branchId)->count(),
+                'material_variance_sessions_count' => $branchExceptions
+                    ->whereIn('rule_key', self::MATERIAL_VARIANCE_RULE_KEYS)
+                    ->pluck('pos_session_id')->filter()->unique()->count(),
             ];
         }
 

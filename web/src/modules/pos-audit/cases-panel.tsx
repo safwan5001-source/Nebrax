@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Eye, ListFilter, Plus } from 'lucide-react';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, downloadFile } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatRiyal } from '@/lib/money';
 import { DataTable } from '@/components/data-table';
@@ -198,7 +198,8 @@ export function CasesPanel({ canCreate, canManage, canAssign, canResolve, canExp
   );
 
   function exportCsv() {
-    window.open(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/pos/investigations/export`, '_blank', 'noopener,noreferrer');
+    void downloadFile('/pos/investigations/export', 'investigation-cases.csv')
+      .catch((error) => errorToast(error instanceof ApiError ? error.message : t('loadFailed')));
   }
 
   function resetFilters() {

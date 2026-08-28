@@ -326,10 +326,18 @@ final class PosInvestigationCaseService
                 $update['recovered_amount_minor'] = $recoveredAmountMinor;
             }
             if ($isOutcome) {
-                $update['outcome'] = $toStatus;
-                $update['resolution_reason'] = $normalizedReason !== '' ? substr($normalizedReason, 0, 80) : null;
-                $update['resolution_summary'] = $normalizedNote !== '' ? substr($normalizedNote, 0, 2000) : null;
-                $update['resolved_at'] = Carbon::now();
+                // إغلاق قضية محسومة سلفاً (confirmed_loss/control_failure/explained/dismissed
+                // → closed) لا يطمس تلك النتيجة ولا وقت حسمها: `closed` حالة نهائية لا تصنيف
+                // نتيجة بديل، والملخص اليومي يفلتر بـ `outcome`/`resolved_at` فتختفي الخسارة
+                // المؤكَّدة صامتاً من مقاييسه لو استُبدلت. سبب/ملاحظة الإغلاق نفسه يبقيان
+                // موثَّقين في نشاط resolution_recorded أدناه بلا فقدان معلومة.
+                $hasPriorOutcome = $isClosing && $fresh->outcome !== null;
+                if (! $hasPriorOutcome) {
+                    $update['outcome'] = $toStatus;
+                    $update['resolution_reason'] = $normalizedReason !== '' ? substr($normalizedReason, 0, 80) : null;
+                    $update['resolution_summary'] = $normalizedNote !== '' ? substr($normalizedNote, 0, 2000) : null;
+                    $update['resolved_at'] = Carbon::now();
+                }
             }
             if ($isClosing) {
                 $update['closed_at'] = Carbon::now();
