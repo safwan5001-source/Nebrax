@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   isPosKeyboardNavigationKey,
   shouldRestorePosFocus,
@@ -17,22 +17,35 @@ export function usePosKeyboardActive() {
   const [keyboardActive, setKeyboardActive] = useState(false);
   const [lastInput, setLastInput] = useState<PosInputModality>('keyboard');
   const [pointerType, setPointerType] = useState<string | null>(null);
+  const lastInputRef = useRef<PosInputModality>('keyboard');
+
+  const commitModality = useCallback((modality: PosInputModality) => {
+    lastInputRef.current = modality;
+    setLastInput(modality);
+    setKeyboardActive(modality === 'keyboard');
+  }, []);
 
   const onPointerDown = useCallback((event?: { pointerType?: string }) => {
-    setKeyboardActive(false);
-    setLastInput('pointer');
+    commitModality('pointer');
     if (event?.pointerType) setPointerType(event.pointerType);
-  }, []);
+  }, [commitModality]);
 
   const onKeyDown = useCallback((event?: PosKeyIdentity) => {
     if (event && !isPosKeyboardNavigationKey(event)) return;
-    setKeyboardActive(true);
-    setLastInput('keyboard');
-  }, []);
+    commitModality('keyboard');
+  }, [commitModality]);
 
   const markScanner = useCallback(() => {
-    setKeyboardActive(false);
-    setLastInput('scanner');
+    commitModality('scanner');
+  }, [commitModality]);
+
+  const getLastInput = useCallback(() => lastInputRef.current, []);
+
+  /** بعد إغلاق الحوار: يُؤجَّل حتى يُزال الـ dialog من الشجرة، ويقرأ الـ modality المتزامن. */
+  const restoreAfterUi = useCallback((restore: () => boolean) => {
+    if (!shouldRestorePosFocus(lastInputRef.current)) return false;
+    window.setTimeout(() => { restore(); }, 0);
+    return true;
   }, []);
 
   return {
@@ -44,5 +57,7 @@ export function usePosKeyboardActive() {
     onPointerDown,
     onKeyDown,
     markScanner,
+    getLastInput,
+    restoreAfterUi,
   };
 }

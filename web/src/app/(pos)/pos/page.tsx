@@ -40,7 +40,7 @@ import type { LiveTemplateRevision } from '@/modules/print-templates/services/li
 import { usePosBarcodeScanner } from '@/components/pos/interactions/use-pos-barcode-scanner';
 import { usePosCartLineSelection, usePosCartNavigation } from '@/components/pos/interactions/use-pos-cart-navigation';
 import { usePosFocusManager } from '@/components/pos/interactions/use-pos-focus-manager';
-import { shouldRestorePosFocus, usePosKeyboardActive } from '@/components/pos/interactions/use-pos-keyboard-active';
+import { usePosKeyboardActive } from '@/components/pos/interactions/use-pos-keyboard-active';
 import { usePosKeyboardShortcuts } from '@/components/pos/interactions/use-pos-keyboard-shortcuts';
 import { isPosDialogOpen, type PosDialogFlags } from '@/components/pos/interactions/pos-interaction-context';
 import { usePosProductNavigation, usePosProductSelection, usePosSearchFieldNavigation } from '@/components/pos/interactions/use-pos-product-navigation';
@@ -153,11 +153,8 @@ export default function PosPage() {
     focusZone,
     restoreFocusSafe,
   } = focusManager;
-  const { keyboardActive, lastInput, onPointerDown, onKeyDown: onKeyboardActiveKeyDown, markScanner } = usePosKeyboardActive();
-  const restoreFocusAfterUi = useCallback(() => {
-    if (!shouldRestorePosFocus(lastInput)) return false;
-    return restoreFocusSafe();
-  }, [lastInput, restoreFocusSafe]);
+  const { keyboardActive, onPointerDown, onKeyDown: onKeyboardActiveKeyDown, markScanner, restoreAfterUi } = usePosKeyboardActive();
+  const restoreFocusAfterUi = useCallback(() => restoreAfterUi(restoreFocusSafe), [restoreAfterUi, restoreFocusSafe]);
   const [desktopKeyboardNav, setDesktopKeyboardNav] = useState(false);
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)');

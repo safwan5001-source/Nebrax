@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { shouldRestorePosFocus, usePosKeyboardActive } from './use-pos-keyboard-active';
 
 afterEach(() => cleanup());
@@ -107,6 +107,42 @@ describe('usePosKeyboardActive', () => {
     expect(result.current.keyboardActive).toBe(true);
     expect(result.current.lastInput).toBe('keyboard');
     expect(result.current.isScannerSession).toBe(false);
+  });
+
+  it('getLastInput متزامن قبل إعادة الرسم حتى لا تُستعاد بعد لمس يغلق حواراً', () => {
+    const { result } = renderHook(() => usePosKeyboardActive());
+
+    act(() => {
+      result.current.onKeyDown({ key: 'F4' });
+    });
+    act(() => {
+      result.current.onPointerDown({ pointerType: 'touch' });
+    });
+
+    expect(result.current.getLastInput()).toBe('pointer');
+    expect(shouldRestorePosFocus(result.current.getLastInput())).toBe(false);
+  });
+
+  it('يؤجّل restoreAfterUi بعد الكيبورد ولا يستدعيه بعد pointer', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => usePosKeyboardActive());
+    const restore = vi.fn(() => true);
+
+    act(() => {
+      result.current.onPointerDown({ pointerType: 'mouse' });
+    });
+    expect(result.current.restoreAfterUi(restore)).toBe(false);
+    act(() => { vi.runAllTimers(); });
+    expect(restore).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.onKeyDown({ key: 'F2' });
+    });
+    expect(result.current.restoreAfterUi(restore)).toBe(true);
+    expect(restore).not.toHaveBeenCalled();
+    act(() => { vi.runAllTimers(); });
+    expect(restore).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });
 

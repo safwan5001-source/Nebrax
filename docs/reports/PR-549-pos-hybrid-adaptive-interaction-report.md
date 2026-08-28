@@ -32,7 +32,9 @@
 web/src/components/pos/interactions/pos-input-modality.ts
 web/src/components/pos/interactions/pos-input-modality.test.ts
 web/src/components/pos/interactions/pos-hybrid-modality.test.ts
+web/e2e/pos-hybrid-adaptive-visual.spec.ts
 docs/reports/PR-549-pos-hybrid-adaptive-interaction-report.md
+docs/visual-qa/pr-549/*.png
 ```
 
 ### محدّث
@@ -100,7 +102,7 @@ web/src/components/pos/interactions/shortcut-registry.test.ts
 | `use-pos-keyboard-shortcuts.test.ts` | حراسة الحوار والدفع كما هي |
 | تنقّل السلة/المنتجات | لم يُكسر |
 
-`npm run test`: **882** اختباراً في **151** ملفاً — كلها خضراء.
+`npm run test`: **884** اختباراً في **151** ملفاً — كلها خضراء (بعد بوابة QA).
 
 `npm run lint`: غير متاح كأمر مستقل غير تفاعلي بإعداد ESLint للمشروع؛ `next build` يتضمّن فحص الأنواع ونجح.
 
@@ -110,19 +112,39 @@ web/src/components/pos/interactions/shortcut-registry.test.ts
 
 ## 11. visual/responsive verification status
 
-**لم تُشغَّل معاينة متصفّح لنقطة البيع.** المسار `/pos` محمي بجلسة كاشير وبوابة وردية، والبيئة لا تملك بيانات دخول تشغيلية.
+فُحصت `/pos` فعلياً عبر Playwright/Chromium في وضع المعاينة المعتمد (`دخول تجريبي` → `mockApi`)، دون Backend وهمي موازٍ. المواصفات: `web/e2e/pos-hybrid-adaptive-visual.spec.ts`. اللقطات: `docs/visual-qa/pr-549/`.
 
-لم يُفحص بصرياً:
+| Viewport | AR/RTL Light | AR/RTL Dark | EN/LTR Light | EN/LTR Dark |
+|----------|--------------|-------------|--------------|-------------|
+| 1366×768 | ✓ `desktop-ar-rtl-light.png` | ✓ `desktop-ar-rtl-dark.png` | ✓ `desktop-en-ltr-light.png` | ✓ `desktop-en-ltr-dark.png` |
+| 1024×768 | ✓ `desktop-1024-ar-rtl-light.png` | — | — | — |
+| 834×1194 | ✓ `tablet-ar-rtl-light.png` | — | — | — |
+| 390×844 | — | ✓ `mobile-ar-rtl-dark.png` | ✓ `mobile-en-ltr-light.png` | — |
 
-- 1366×768 / 1024×768 / 834×1194 / 390×844
-- RTL + dark على جهاز حقيقي
+نتائج التفاعل (على 1366×768 ما لم يُذكر):
 
-ما يمكن تأكيده من الكود دون تخمين بصري:
+| الحالة | النتيجة |
+|--------|---------|
+| Pointer على منتج | `aria-selected` يبقى false — لا حلقة كيبورد |
+| ArrowDown بعد اللمس | Keyboard Mode من أول ضغطة؛ حلقة ظاهرة |
+| أحرف باركود + Enter | لا تفعّل حلقات الكيبورد |
+| سهم بعد المسح | يعيد Keyboard Mode فوراً |
+| إغلاق حوار بعد pointer | لا يُعاد التركيز إلى البحث |
+| إغلاق حوار بعد F4/F2 | يُعاد التركيز إلى البحث (بعد إصلاح التأجيل) |
+| F2 / F4 / F6 / F9 | تعمل |
+| Ctrl+Alt+O | يعمل (Ctrl+Shift+O قد يبتلعه Chrome كما في PR-2) |
+| تلميح F4 | ظاهر من `lg` (1024+) ومخفي على 834 و390 |
+| شريط الاختصارات | ظاهر على سطح المكتب ومخفي تحت `lg` |
+| overflow أفقي | لا (scrollWidth − clientWidth ≤ 1) |
+| FAB الجوال | يظهر مع السلة ولا يغطي الصف الأخير (`pb-16`) |
+| safe-area | `nav` يحمل `pb-[env(safe-area-inset-bottom)]` |
+| Console | لا أخطاء من هذا PR (مع تجاهل 404/_rsc المعروف لإطار Next) |
 
-- تلميح F4: `hidden lg:block` (كان `sm:block`)
-- الشريط السفلي: `pb-[env(safe-area-inset-bottom)]`
-- شبكة المنتجات: `pb-16 lg:pb-0` عند وجود سلة
-- لا توكنات hex خام ولا تدرجات في هذا التغيير
+**عيب اكتشف أثناء المعاينة وأُصلح:** `restoreFocusAfterUi` كانت تُستدعى والحوار ما زال في الشجرة، فيرفض `restoreFocusSafe` الاستعادة؛ و`lastInput` من state React كان متأخراً عن `pointerdown` في نفس الدورة. أُضيف `lastInputRef` + `restoreAfterUi` بتأجيل `setTimeout(0)`. لا تغيير بصري في التخطيط.
+
+أسماء المنتجات تبقى عربية في بيانات المعاينة حتى في الواجهة الإنجليزية — قيد عقد `mockApi` القائم، ليس عيباً في PR-4.
+
+شارة Next.js الدائرية «N» في الزاوية تظهر في `next dev` فقط وليست جزءاً من واجهة الإنتاج.
 
 ## 12. risks
 
@@ -135,8 +157,7 @@ web/src/components/pos/interactions/shortcut-registry.test.ts
 1. **PR-5** — بدء البيع في تبويب متصفح مستقل (خارج النطاق هنا).
 2. شاشة إعدادات أسلوب التفاعل (`auto|touch|keyboard`) إن طُلبت لاحقاً — ليست ضرورية اليوم.
 3. Bottom sheet / درج سلة للجوال إن رُغب بوصول أوضح من FAB — يحتاج بنية أوسع.
-4. تحقق بصري يدوي على جلسة كاشير حقيقية عبر الـ viewports أعلاه.
-5. كاميرا باركود للجوال — خارج نطاق طبقات التفاعل الحالية.
+4. كاميرا باركود للجوال — خارج نطاق طبقات التفاعل الحالية.
 
 ## 14. confirmation
 
