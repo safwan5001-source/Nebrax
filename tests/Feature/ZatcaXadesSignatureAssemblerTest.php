@@ -147,6 +147,7 @@ class ZatcaXadesSignatureAssemblerTest extends TestCase
         foreach ([
             '<!DOCTYPE Invoice [<!ELEMENT Invoice ANY>]><Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/>',
             '<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"/>',
+            '<Foo xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/>',
         ] as $xml) {
             try {
                 $assembler->assemble($xml, $chain, $privateKey, new DateTimeImmutable(), 'https://zatca.gov.sa/policy', $digest);

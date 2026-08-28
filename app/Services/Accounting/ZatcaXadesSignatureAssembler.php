@@ -221,7 +221,10 @@ final class ZatcaXadesSignatureAssembler
             if (! $loaded || $document->documentElement === null || $document->doctype !== null) {
                 throw new RuntimeException('XML غير صالح أو يحتوي DTD غير مسموح لتوقيع ZATCA.');
             }
-            if ($document->documentElement->namespaceURI !== 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2') {
+            if (
+                $document->documentElement->namespaceURI !== 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2'
+                || $document->documentElement->localName !== 'Invoice'
+            ) {
                 throw new InvalidArgumentException('المستند المطلوب توقيعه ليس فاتورة UBL 2.1.');
             }
 
