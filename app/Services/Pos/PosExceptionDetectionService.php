@@ -9,8 +9,10 @@ use App\Models\PosRiskSnapshot;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
 use App\Models\ReturnDocument;
+use App\Models\Tenant;
 use App\Support\PosSettings;
 use App\Tenancy\BranchScope;
+use App\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -498,8 +500,11 @@ final class PosExceptionDetectionService
             return [];
         }
 
-        $timezone = config('app.timezone', 'UTC');
-        $grace = PosSettings::outsideHoursGraceMinutes();
+        $tenant = $this->currentTenant();
+        // نفس مصدر المنطقة الزمنية المعتمَد في `PosLpDigestService::generate()`
+        // (`tenants.timezone`، افتراضها 'Asia/Riyadh')؛ لا مصدر ثانٍ موازٍ.
+        $timezone = $tenant?->timezone ?: 'Asia/Riyadh';
+        $grace = PosSettings::outsideHoursGraceMinutes($tenant);
 
         $out = [];
         foreach ($events as $event) {
@@ -512,6 +517,14 @@ final class PosExceptionDetectionService
         }
 
         return $out;
+    }
+
+    /** نفس نمط `PosSettings::tenant()` الخاص — لا مصدر تفكيك مستأجر ثانٍ. */
+    private function currentTenant(): ?Tenant
+    {
+        $id = app(TenantContext::class)->id();
+
+        return $id ? Tenant::find($id) : null;
     }
 
     /**
