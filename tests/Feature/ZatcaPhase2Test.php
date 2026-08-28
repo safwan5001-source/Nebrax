@@ -66,6 +66,17 @@ class ZatcaPhase2Test extends TestCase
         $this->assertStringContainsString($invoice->number, $invoice->zatca_xml);
         $this->assertStringContainsString($invoice->zatca_uuid, $invoice->zatca_xml);
         $this->assertStringContainsString('300000000000003', $invoice->zatca_xml); // الرقم الضريبي
+        $this->assertStringContainsString(
+            '<cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>',
+            $invoice->zatca_xml
+        );
+        $this->assertStringContainsString(
+            '<cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>',
+            $invoice->zatca_xml
+        );
+        $this->assertStringContainsString('<cbc:ID>QR</cbc:ID>', $invoice->zatca_xml);
+        $this->assertStringContainsString($invoice->zatca_qr, $invoice->zatca_xml);
+        $this->assertStringNotContainsString('__NEBRAX_ZATCA_QR__', $invoice->zatca_xml);
     }
 
     /** @test */
