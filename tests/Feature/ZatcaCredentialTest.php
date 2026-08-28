@@ -404,12 +404,52 @@ CONF;
             'x509_extensions' => 'v3_ca',
         ]);
         $this->assertNotFalse($otherSubject);
+        $missingIssuerKey = openssl_pkey_new([
+            'config' => $authority['config_path'],
+            'private_key_type' => OPENSSL_KEYTYPE_EC,
+            'curve_name' => 'secp256k1',
+        ]);
+        $this->assertNotFalse($missingIssuerKey);
+        $missingIssuerCsr = openssl_csr_new(
+            ['commonName' => 'Missing Cross Sign Issuer'],
+            $missingIssuerKey,
+            ['config' => $authority['config_path'], 'digest_alg' => 'sha256']
+        );
+        $this->assertNotFalse($missingIssuerCsr);
+        $missingIssuer = openssl_csr_sign($missingIssuerCsr, null, $missingIssuerKey, 3650, [
+            'config' => $authority['config_path'],
+            'digest_alg' => 'sha256',
+            'x509_extensions' => 'v3_ca',
+        ]);
+        $this->assertNotFalse($missingIssuer);
+
+        // نفس Subject والمفتاح العام للجذر الصحيح، لكن بتوقيع مُصدِر غير موجود في الحزمة.
+        $crossCsr = openssl_csr_new(
+            ['commonName' => 'Nebrax Test ZATCA Root'],
+            $authority['private_key'],
+            ['config' => $authority['config_path'], 'digest_alg' => 'sha256']
+        );
+        $this->assertNotFalse($crossCsr);
+        $deadEndCrossSigned = openssl_csr_sign(
+            $crossCsr,
+            $missingIssuer,
+            $missingIssuerKey,
+            3650,
+            [
+                'config' => $authority['config_path'],
+                'digest_alg' => 'sha256',
+                'x509_extensions' => 'v3_ca',
+            ]
+        );
+        $this->assertNotFalse($deadEndCrossSigned);
+
         $this->assertTrue(openssl_x509_export($authority['certificate'], $rootPem));
         $this->assertTrue(openssl_x509_export($otherSubject, $otherPem));
+        $this->assertTrue(openssl_x509_export($deadEndCrossSigned, $crossPem));
 
         $bundlePath = tempnam(sys_get_temp_dir(), 'zatca-same-key-bundle-');
         $this->assertNotFalse($bundlePath);
-        $this->assertNotFalse(file_put_contents($bundlePath, $rootPem.$otherPem));
+        $this->assertNotFalse(file_put_contents($bundlePath, $rootPem.$otherPem.$crossPem));
         $requestPayload = $this->payload();
         config(['zatca.trust_anchors.developer' => $bundlePath]);
 

@@ -175,70 +175,89 @@ final class ZatcaCredentialMaterialValidator
             $this->invalid('binary_security_token', 'تعذر حساب بصمة شهادة CSID لبناء السلسلة.');
         }
 
-        $current = $leaf;
-        $currentFingerprint = strtolower(str_replace(':', '', $leafFingerprint));
-        $seen = [$currentFingerprint => true];
+        $leafFingerprint = strtolower(str_replace(':', '', $leafFingerprint));
+        $paths = $this->completePaths($leaf, $leafFingerprint, $authorities, [$leafFingerprint => true]);
+
+        if (count($paths) !== 1) {
+            $this->invalid(
+                'binary_security_token',
+                count($paths) === 0
+                    ? 'حزمة ثقة ZATCA لا تحتوي مساراً كاملاً حتى جذر الثقة.'
+                    : 'حزمة ثقة ZATCA تحتوي أكثر من مسار كامل صالح لشهادة CSID.'
+            );
+        }
+
         $chain = [$this->certificateBody($leaf)];
-
-        while (true) {
-            $currentKey = openssl_pkey_get_public($current);
-            if (isset($authorities[$currentFingerprint])
-                && $currentKey !== false
-                && openssl_x509_verify($current, $currentKey) === 1
-            ) {
-                break;
-            }
-
-            $currentData = openssl_x509_parse($current, false);
-            $issuer = is_array($currentData) ? ($currentData['issuer'] ?? null) : null;
-            $authorityKeyId = is_array($currentData)
-                ? $this->keyIdentifier($currentData['extensions']['authorityKeyIdentifier'] ?? null, true)
-                : null;
-
-            $parents = [];
-            foreach ($authorities as $fingerprint => $authority) {
-                if (isset($seen[$fingerprint])) {
-                    continue;
-                }
-
-                $authorityData = openssl_x509_parse($authority, false);
-                $subject = is_array($authorityData) ? ($authorityData['subject'] ?? null) : null;
-                if (! $this->sameDistinguishedName($issuer, $subject)) {
-                    continue;
-                }
-
-                $subjectKeyId = is_array($authorityData)
-                    ? $this->keyIdentifier($authorityData['extensions']['subjectKeyIdentifier'] ?? null, false)
-                    : null;
-                if ($authorityKeyId !== null
-                    && $subjectKeyId !== null
-                    && ! hash_equals($authorityKeyId, $subjectKeyId)
-                ) {
-                    continue;
-                }
-
-                $authorityKey = openssl_pkey_get_public($authority);
-                if ($authorityKey !== false && openssl_x509_verify($current, $authorityKey) === 1) {
-                    $parents[$fingerprint] = $authority;
-                }
-            }
-
-            if (count($parents) !== 1) {
-                $this->invalid(
-                    'binary_security_token',
-                    count($parents) === 0
-                        ? 'حزمة ثقة ZATCA لا تحتوي سلسلة الشهادة كاملة حتى جذر الثقة.'
-                        : 'حزمة ثقة ZATCA تحتوي أكثر من مسار صالح لشهادة CSID.'
-                );
-            }
-
-            $currentFingerprint = array_key_first($parents);
-            $current = $parents[$currentFingerprint];
-            $seen[$currentFingerprint] = true;
-            $chain[] = $this->certificateBody($current);
+        foreach ($paths[0] as $certificate) {
+            $chain[] = $this->certificateBody($certificate);
         }
 
         return $chain;
+    }
+
+    /**
+     * @param array<string, OpenSSLCertificate> $authorities
+     * @param array<string, true> $seen
+     * @return list<list<OpenSSLCertificate>>
+     */
+    private function completePaths(
+        OpenSSLCertificate $current,
+        string $currentFingerprint,
+        array $authorities,
+        array $seen,
+    ): array {
+        $currentKey = openssl_pkey_get_public($current);
+        if (isset($authorities[$currentFingerprint])
+            && $currentKey !== false
+            && openssl_x509_verify($current, $currentKey) === 1
+        ) {
+            return [[]];
+        }
+
+        $currentData = openssl_x509_parse($current, false);
+        $issuer = is_array($currentData) ? ($currentData['issuer'] ?? null) : null;
+        $authorityKeyId = is_array($currentData)
+            ? $this->keyIdentifier($currentData['extensions']['authorityKeyIdentifier'] ?? null, true)
+            : null;
+
+        $paths = [];
+        foreach ($authorities as $fingerprint => $authority) {
+            if (isset($seen[$fingerprint])) {
+                continue;
+            }
+
+            $authorityData = openssl_x509_parse($authority, false);
+            $subject = is_array($authorityData) ? ($authorityData['subject'] ?? null) : null;
+            if (! $this->sameDistinguishedName($issuer, $subject)) {
+                continue;
+            }
+
+            $subjectKeyId = is_array($authorityData)
+                ? $this->keyIdentifier($authorityData['extensions']['subjectKeyIdentifier'] ?? null, false)
+                : null;
+            if ($authorityKeyId !== null
+                && $subjectKeyId !== null
+                && ! hash_equals($authorityKeyId, $subjectKeyId)
+            ) {
+                continue;
+            }
+
+            $authorityKey = openssl_pkey_get_public($authority);
+            if ($authorityKey === false || openssl_x509_verify($current, $authorityKey) !== 1) {
+                continue;
+            }
+
+            foreach ($this->completePaths(
+                $authority,
+                $fingerprint,
+                $authorities,
+                $seen + [$fingerprint => true],
+            ) as $tail) {
+                $paths[] = [$authority, ...$tail];
+            }
+        }
+
+        return $paths;
     }
 
     private function sameDistinguishedName(mixed $issuer, mixed $subject): bool
