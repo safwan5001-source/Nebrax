@@ -1329,8 +1329,10 @@ export const mockUsers = [
 ];
 
 type MockZatcaSubmissionMode = 'manual' | 'automatic';
+type MockZatcaEnvironment = 'developer' | 'simulation' | 'production';
 
 let mockZatcaSubmissionMode: MockZatcaSubmissionMode = 'manual';
+let mockZatcaEnvironment: MockZatcaEnvironment = 'developer';
 
 export const mockSalesConfig: Record<string, unknown> = {
   statuses: [
@@ -2124,9 +2126,17 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const m = method.toUpperCase();
   if (clean === '/zatca-settings') {
     if (m === 'PUT') {
-      const requestedMode = (body as { submission_mode?: unknown } | undefined)?.submission_mode;
+      const settings = body as {
+        submission_mode?: unknown;
+        active_environment?: unknown;
+      } | undefined;
+      const requestedMode = settings?.submission_mode;
       if (requestedMode === 'manual' || requestedMode === 'automatic') {
         mockZatcaSubmissionMode = requestedMode;
+      }
+      const requestedEnvironment = settings?.active_environment;
+      if (requestedEnvironment === 'developer' || requestedEnvironment === 'simulation' || requestedEnvironment === 'production') {
+        mockZatcaEnvironment = requestedEnvironment;
       }
     }
 
@@ -2134,6 +2144,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       data: {
         icv_scope: 'tenant',
         submission_mode: mockZatcaSubmissionMode,
+        active_environment: mockZatcaEnvironment,
       },
     });
   }
