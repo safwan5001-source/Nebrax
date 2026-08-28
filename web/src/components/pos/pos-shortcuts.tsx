@@ -1,29 +1,26 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { POS_SHORTCUTS } from '@/components/pos/interactions/shortcut-registry';
 
-/** شريط اختصارات لوحة المفاتيح السفلي (ديسكتوب) — ألوان دلالية للحذف/الدرج. */
+/**
+ * شريط اختصارات لوحة المفاتيح السفلي (ديسكتوب) — ألوان دلالية للحذف/الدفع.
+ * يقرأ الاختصارات من السجل نفسه الذي ينفّذها، فلا يعرض مفتاحاً لا يعمل.
+ */
 export function PosShortcuts() {
   const t = useTranslations('pos');
-  const keys: { k: string; label: string; tone?: 'danger' | 'positive' }[] = [
-    { k: 'F2', label: t('sc_new_customer') },
-    { k: 'F4', label: t('sc_search') },
-    { k: 'F8', label: t('sc_delete'), tone: 'danger' },
-    { k: 'F9', label: t('sc_pay'), tone: 'positive' },
-    { k: 'Esc', label: t('sc_back') },
-  ];
   return (
     <footer className="hidden h-11 shrink-0 items-center gap-1.5 overflow-x-auto border-t border-border bg-surface px-4 lg:flex">
-      {keys.map((s) => (
+      {POS_SHORTCUTS.map((shortcut) => (
         <div
-          key={s.k}
+          key={shortcut.id}
           className={
             'flex items-center gap-1.5 whitespace-nowrap border-e border-border px-2.5 text-[11.5px] last:border-0 ' +
-            (s.tone === 'danger' ? 'text-negative' : s.tone === 'positive' ? 'text-positive' : 'text-muted')
+            (shortcut.tone === 'danger' ? 'text-negative' : shortcut.tone === 'positive' ? 'text-positive' : 'text-muted')
           }
         >
-          <kbd className="num rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-bold text-text">{s.k}</kbd>
-          {s.label}
+          <kbd className="num rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-bold text-text">{shortcut.displayKey}</kbd>
+          {t(shortcut.translationKey)}
         </div>
       ))}
     </footer>
