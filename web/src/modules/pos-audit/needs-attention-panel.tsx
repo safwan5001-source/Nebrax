@@ -136,7 +136,7 @@ export function NeedsAttentionPanel({ canReviewExceptions, canPromoteExceptions,
           if (item.kind === 'pending_approval') {
             return (
               <div>
-                <span className="font-medium text-text">{t(`attention.operations.${item.operation}` as never, { fallback: item.operation ?? '' })}</span>
+                <span className="font-medium text-text">{t(`operations.${item.operation}` as never, { fallback: item.operation ?? '' })}</span>
                 <span className="mt-0.5 block text-xs text-muted">{item.performed_by_name ?? '—'}</span>
               </div>
             );
@@ -250,7 +250,7 @@ export function NeedsAttentionPanel({ canReviewExceptions, canPromoteExceptions,
         emptyDescription={t('attention.emptyHint')}
         showToolbar={false}
         mobileRecord={(row) => ({
-          title: row.kind === 'attention_case' ? (row.title ?? '') : row.kind === 'digest_highlight' ? t('digest.title') : row.kind === 'pending_approval' ? t(`attention.operations.${row.operation}` as never, { fallback: row.operation ?? '' }) : ruleLabel(row.rule_key ?? ''),
+          title: row.kind === 'attention_case' ? (row.title ?? '') : row.kind === 'digest_highlight' ? t('digest.title') : row.kind === 'pending_approval' ? t(`operations.${row.operation}` as never, { fallback: row.operation ?? '' }) : ruleLabel(row.rule_key ?? ''),
           subtitle: kindLabel(row.kind),
           meta: [formatDateTime(primaryTime(row), locale), row.amount_under_review ? formatRiyal(row.amount_under_review) : '—'],
           actions: row.kind === 'pending_approval'

@@ -1380,6 +1380,20 @@ export const mockSalesConfig: Record<string, unknown> = {
     payment_sound_enabled: true,
     sound_volume: 60,
     haptics_enabled: true,
+    audit_operation_policies: {
+      item_remove: 'allowed',
+      price_override: 'allowed',
+      discount_change: 'allowed',
+      cart_cancel: 'allowed',
+      cash_recount: 'approval_required',
+      refund: 'approval_required',
+      cash_out: 'denied',
+      manual_drawer_open: 'allowed',
+    },
+  },
+  pos_loss_prevention: {
+    self_approval_blocked_for_variance: true,
+    outside_hours_grace_minutes: 45,
   },
 };
 
@@ -1408,6 +1422,86 @@ export const mockPosSessions = [
   { id: 'ps-2', number: 'POS-2026-0002', status: 'open', opening_balance: '500.00', closing_balance: null, expected_balance: null, difference: null, opened_at: '2026-06-28T08:00:00', closed_at: null },
   { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00' },
 ];
+
+/** معاينة Phase 4 — عقد GET /pos/audit/needs-attention فقط، ليست مصدر حقيقة موازياً. */
+export const mockNeedsAttention = {
+  data: [
+    {
+      id: 'approval:appr-lp-1',
+      kind: 'pending_approval',
+      urgency_rank: 1,
+      branch_id: 'br-1',
+      reference: { type: 'approval', id: 'appr-lp-1' },
+      operation: 'refund',
+      cart_id: null,
+      pos_session_id: 'ps-2',
+      reason_code: 'manager_override',
+      performed_by: 'user-cashier',
+      performed_by_name: 'سارة الكاشير',
+      created_at: '2026-08-28T07:12:00Z',
+      expires_at: '2026-08-28T09:12:00Z',
+    },
+    {
+      id: 'exception:exc-lp-1',
+      kind: 'priority_exception',
+      urgency_rank: 2,
+      branch_id: 'br-1',
+      reference: { type: 'exception', id: 'exc-lp-1' },
+      rule_key: 'cross_cashier_refund',
+      category: 'returns',
+      severity: 'priority',
+      review_state: 'new',
+      subject_user_id: 'user-cashier',
+      subject_name: 'سارة الكاشير',
+      amount_under_review: '345.00',
+      detected_at: '2026-08-28T07:40:00Z',
+    },
+    {
+      id: 'exception:exc-lp-2',
+      kind: 'needs_investigation_exception',
+      urgency_rank: 3,
+      branch_id: 'br-1',
+      reference: { type: 'exception', id: 'exc-lp-2' },
+      rule_key: 'outside_operating_hours',
+      category: 'timing',
+      severity: 'review',
+      review_state: 'needs_investigation',
+      subject_user_id: 'user-cashier',
+      subject_name: 'سارة الكاشير',
+      amount_under_review: '0.00',
+      detected_at: '2026-08-28T02:05:00Z',
+    },
+    {
+      id: 'case:case-lp-1',
+      kind: 'attention_case',
+      urgency_rank: 4,
+      branch_id: 'br-1',
+      reference: { type: 'case', id: 'case-lp-1' },
+      reasons: ['unassigned', 'overdue'],
+      number: 'INV-LP-2026-0004',
+      title: 'تحقيق مرتجع خارج الجلسة',
+      status: 'open',
+      priority: 'high',
+      owner_id: null,
+      owner_name: null,
+      opened_at: '2026-08-25T09:00:00Z',
+      last_activity_at: '2026-08-25T09:00:00Z',
+      amount_under_review: '345.00',
+    },
+    {
+      id: 'digest:2026-08-27',
+      kind: 'digest_highlight',
+      urgency_rank: 5,
+      branch_id: null,
+      reference: { type: 'digest', id: 'digest-lp-1' },
+      digest_date: '2026-08-27',
+      priority_exceptions_count: 2,
+      unresolved_high_priority_cases_count: 1,
+      confirmed_loss_count: 0,
+    },
+  ],
+  meta: { total: 5, per_page: 25, current_page: 1, last_page: 1 },
+};
 
 export const mockCustomerSettings = {
   default_type: 'customer',
@@ -2481,6 +2575,19 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       const run = mockPayrollRuns.find((r) => r.id === runAction[1]) ?? mockPayrollRuns[0];
       return resolve({ data: run });
     }
+    const salesConfigWrite = clean.match(/^\/sales-config\/([^/]+)$/);
+    if (salesConfigWrite && m === 'PUT') {
+      const section = salesConfigWrite[1];
+      const payload = (body as { data?: Record<string, unknown> } | undefined)?.data;
+      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        const current = mockSalesConfig[section];
+        mockSalesConfig[section] = {
+          ...(current && typeof current === 'object' && !Array.isArray(current) ? current as Record<string, unknown> : {}),
+          ...payload,
+        };
+      }
+      return resolve({ data: mockSalesConfig[section] ?? payload });
+    }
     return resolve({ data: { id: 'demo-new' } });
   }
 
@@ -2923,6 +3030,60 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const found = mockPayrollRuns.find((r) => r.id === runMatch[1]) ?? mockPayrollRuns[0];
     return resolve({ data: found });
   }
+
+  if (clean === '/pos/audit/overview') {
+    return resolve({
+      data: {
+        review_activity_count: 18,
+        cart_cancellations_count: 4,
+        cash_variance_count: 1,
+        pending_approvals_count: 1,
+        range_started_at: '2026-08-27T08:00:00Z',
+      },
+    });
+  }
+  if (clean === '/pos/audit/intelligence/overview') {
+    return resolve({
+      data: {
+        needs_review_count: 6,
+        priority_count: 2,
+        review_count: 3,
+        watch_count: 1,
+        amount_under_review: '345.00',
+        subjects_needing_review: 2,
+        state_breakdown: { new: 3, reviewing: 1, needs_investigation: 1, explained: 1 },
+        band_breakdown: { normal: 4, watch: 1, review: 1, priority: 2 },
+      },
+    });
+  }
+  if (clean === '/pos/audit/needs-attention') return resolve(mockNeedsAttention);
+  if (clean === '/pos/audit/events') return resolve({ data: [] });
+  if (clean === '/pos/audit/carts') return resolve({ data: [] });
+  if (clean === '/pos/audit/users') return resolve({ data: [] });
+  if (clean === '/pos/audit/approvals') {
+    return resolve({
+      data: [{
+        id: 'appr-lp-1',
+        operation: 'refund',
+        status: 'pending',
+        reason_code: 'manager_override',
+        reason_note: null,
+        cart_id: null,
+        pos_session_id: 'ps-2',
+        performed_by_user: { id: 'user-cashier', name: 'سارة الكاشير' },
+        approved_by_user: null,
+        expires_at: '2026-08-28T09:12:00Z',
+        created_at: '2026-08-28T07:12:00Z',
+      }],
+    });
+  }
+  if (clean === '/pos/audit/exceptions') return resolve({ data: [], meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 } });
+  if (clean === '/pos/audit/risk') return resolve({ data: [], meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 } });
+  if (clean === '/pos/audit/relationships') return resolve({ data: [] });
+  if (clean === '/pos/audit/rules') return resolve({ data: [] });
+  if (clean === '/pos/audit/cases') return resolve({ data: [], meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 } });
+  if (clean === '/pos/audit/digest') return resolve({ data: [], meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 } });
+  if (clean === '/product-categories') return resolve({ data: [] });
 
   // افتراضي: لا بيانات بعد (حالة فارغة).
   return resolve({ data: [] });
