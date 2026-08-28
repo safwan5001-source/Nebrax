@@ -19,7 +19,7 @@ final class ZatcaSignaturePolicyResolver
         $digest = trim($digest);
 
         if (! $this->isValidPolicyIdentifier($identifier)) {
-            throw new RuntimeException('معرّف سياسة توقيع ZATCA غير مهيأ أو ليس URI مطلقاً.');
+            throw new RuntimeException('معرّف سياسة توقيع ZATCA يجب أن يكون رابط HTTPS صالحاً.');
         }
         if ($digest === '') {
             throw new RuntimeException('بصمة سياسة توقيع ZATCA غير مهيأة.');
@@ -39,14 +39,8 @@ final class ZatcaSignaturePolicyResolver
             return false;
         }
 
-        if (str_starts_with(strtolower($identifier), 'https://')) {
-            return filter_var($identifier, FILTER_VALIDATE_URL) !== false
-                && is_string(parse_url($identifier, PHP_URL_HOST));
-        }
-
-        return preg_match(
-            '/^urn:[A-Za-z0-9][A-Za-z0-9-]{0,31}:[A-Za-z0-9._~!$&\'()*+,;=:@\/?%#-]+$/D',
-            $identifier
-        ) === 1;
+        return str_starts_with(strtolower($identifier), 'https://')
+            && filter_var($identifier, FILTER_VALIDATE_URL) !== false
+            && is_string(parse_url($identifier, PHP_URL_HOST));
     }
 }

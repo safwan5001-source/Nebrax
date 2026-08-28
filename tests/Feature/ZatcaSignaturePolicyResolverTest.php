@@ -29,20 +29,20 @@ class ZatcaSignaturePolicyResolverTest extends TestCase
             app(ZatcaSignaturePolicyResolver::class)->resolve();
             $this->fail('كان يجب رفض معرّف سياسة نسبي.');
         } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('URI', $exception->getMessage());
+            $this->assertStringContainsString('HTTPS', $exception->getMessage());
         }
 
-        foreach (['https://', 'urn:%ZZ'] as $malformedIdentifier) {
+        foreach (['https://', 'urn:%ZZ', 'urn:ab-:x', 'urn:ab:#'] as $malformedIdentifier) {
             config()->set('zatca.signature_policy.identifier', $malformedIdentifier);
             try {
                 app(ZatcaSignaturePolicyResolver::class)->resolve();
                 $this->fail("كان يجب رفض معرّف السياسة غير الصالح: {$malformedIdentifier}");
             } catch (RuntimeException $exception) {
-                $this->assertStringContainsString('URI', $exception->getMessage());
+                $this->assertStringContainsString('HTTPS', $exception->getMessage());
             }
         }
 
-        config()->set('zatca.signature_policy.identifier', 'urn:zatca:signature-policy');
+        config()->set('zatca.signature_policy.identifier', 'https://zatca.gov.sa/signature-policy.pdf');
         config()->set('zatca.signature_policy.digest', base64_encode('not-32-bytes'));
 
         $this->expectException(RuntimeException::class);
@@ -61,11 +61,5 @@ class ZatcaSignaturePolicyResolverTest extends TestCase
 
         $this->assertSame('https://zatca.gov.sa/policy.pdf', $policy->identifier);
         $this->assertSame($digest, $policy->digest);
-
-        config()->set('zatca.signature_policy.identifier', 'urn:zatca:security-policy:v1');
-        $this->assertSame(
-            'urn:zatca:security-policy:v1',
-            app(ZatcaSignaturePolicyResolver::class)->resolve()->identifier
-        );
     }
 }
