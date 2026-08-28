@@ -22,11 +22,7 @@
 
 ## 4. HEAD SHA
 
-## 4. HEAD SHA
-
-تنفيذ الكود: `cac0f24820bc18fc6cf21b698a240f47262a652f`
-
-HEAD الفرع يشمل كذلك اختبار Playwright واللقطات وهذا التقرير على نفس السلسلة فوق `main` (`668b089c`).
+يُحدَّث بعد commit حارس العودة. تنفيذ الدخول الأول: `cac0f24820bc18fc6cf21b698a240f47262a652f`.
 
 ## 5. changed files
 
@@ -35,6 +31,7 @@ HEAD الفرع يشمل كذلك اختبار Playwright واللقطات وه�
 ```
 web/src/lib/pos-workspace.ts
 web/src/lib/__tests__/pos-workspace.test.ts
+web/src/components/pos/pos-topbar.test.tsx
 web/e2e/pos-dedicated-workspace.spec.ts
 docs/reports/PR-550-pos-dedicated-workspace-report.md
 docs/visual-qa/pr-550/erp-sidebar-start-selling.png
@@ -47,6 +44,9 @@ docs/visual-qa/pr-550/pos-tab-no-sidebar.png
 ```
 web/src/components/layout/sidebar.tsx
 web/src/components/pos/pos-topbar.tsx
+web/src/app/(pos)/pos/page.tsx
+web/src/messages/ar.json
+web/src/messages/en.json
 ```
 
 لا ملفات Laravel / API / migrations / RBAC.
@@ -100,15 +100,19 @@ web/src/components/pos/pos-topbar.tsx
 
 ## 11. exit/return behavior
 
-- «العودة للنظام»: `<Link href={POS_RETURN_HREF}>` → `/dashboard`. لا `window.close()`. لا إغلاق وردية.
-- حارس السلة غير المحفوظة يبقى `close_session` و`logout` فقط في [`page.tsx`](../../web/src/app/(pos)/pos/page.tsx). العودة للنظام لا تدخل هذا الحارس (السلوك الحالي، لم يُخترع حارس جديد).
+- «العودة للنظام»: زر يستدعي `requestReturnToSystem`. إن وُجدت سلة غير محفوظة يفتح حوار الحارس الحالي (`return_to_system`). بعد التأكيد ينتقل إلى `/dashboard` **دون** `POST .../close`.
+- سلة نظيفة: انتقال مباشر إلى `/dashboard` دون حوار.
+- حارس السلة يغطي الآن: `close_session` و`logout` و`return_to_system`.
 - إنهاء الوردية يبقى تدفقاً مستقلاً (`POST .../close`).
+- لا `window.close()`.
 
 ## 12. tests
 
 | الملف | التغطية |
 |-------|---------|
-| `pos-workspace.test.ts` (7) | props الدلالية؛ `posStart` وحده new-tab؛ ربط الشريط في موقعين؛ تخطيط POS بلا Sidebar؛ العودة بلا `window.close`؛ حارس السلة على الإغلاق/الخروج فقط |
+| `pos-workspace.test.ts` (7) | props الدلالية؛ `posStart` وحده new-tab؛ ربط الشريط؛ تخطيط POS؛ العودة زر؛ dirty cart → guard وclean → proceed بلا إنهاء وردية |
+| `pos-topbar.test.tsx` (2) | النقر يستدعي `onReturnToSystem` ولا ينتقل مباشرة عند وجود الحارس |
+| `pos-dedicated-workspace.spec.ts` | نقرة حقيقية: تبويب جديد + ERP يبقى + POS بلا قشرة الشريط |
 | `pos-dedicated-workspace.spec.ts` | نقرة حقيقية: تبويب جديد + ERP يبقى + POS بلا قشرة الشريط |
 | اختبارات PR-1–4 (interactions) | لم تُعدَّل وبقيت خضراء |
 
@@ -137,7 +141,7 @@ Playwright (محلي، desktop): **1 passed** — `e2e/pos-dedicated-workspace.s
 ## 15. known limitations
 
 - تبويبان POS على نفس الأصل يتشاركان `localStorage` للسلال المعلّقة (last-write-wins). ليس مصدر حقيقة محاسبية؛ حارس تكرار اختياري مؤجَّل.
-- «العودة للنظام» تنتقل داخل تبويب POS إلى `/dashboard` ولا تغلق التبويب.
+- «العودة للنظام» تنتقل داخل تبويب POS إلى `/dashboard` بعد الحارس عند الحاجة، ولا تغلق التبويب ولا الوردية.
 - `isActive('/pos')` في الشريط ما زال يطابق `/pos/sessions` عبر `startsWith` — قيد سابق خارج هذا PR.
 - اختبار Playwright غير جزء من Web CI (CI يشغّل Vitest + `next build` فقط).
 

@@ -31,7 +31,7 @@ test.describe('PR-550 dedicated POS workspace', () => {
     await expect(posPage).toHaveURL(/\/pos\/?$/);
     await expect(posPage.getByRole('button', { name: /طيّ الشريط|Collapse sidebar/ })).toHaveCount(0);
     await expect(posPage.getByRole('link', { name: /لوحة التحكم|Dashboard/ })).toHaveCount(0);
-    await expect(posPage.getByRole('link', { name: /العودة للنظام|Return to system/ })).toBeVisible();
+    await expect(posPage.getByRole('button', { name: /العودة للنظام|Return to system/ })).toBeVisible();
 
     await page.screenshot({ path: path.join(evidenceDir, 'erp-tab-stays-dashboard.png') });
     await posPage.screenshot({ path: path.join(evidenceDir, 'pos-tab-no-sidebar.png') });

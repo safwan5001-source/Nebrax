@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
@@ -30,6 +29,7 @@ export function PosTopbar({
   onOpenRecentInvoices,
   onOpenCashDrawer,
   onReturn,
+  onReturnToSystem,
   onExchange,
   onLogout,
   exchangeDisabled = false,
@@ -49,6 +49,8 @@ export function PosTopbar({
   onOpenRecentInvoices?: () => void;
   onOpenCashDrawer?: () => void;
   onReturn?: () => void;
+  /** العودة إلى ERP — تمر عبر حارس السلة غير المحفوظة في الصفحة، ولا تنهي الوردية. */
+  onReturnToSystem?: () => void;
   onExchange?: () => void;
   onLogout?: () => void;
   exchangeDisabled?: boolean;
@@ -95,14 +97,15 @@ export function PosTopbar({
 
   return (
     <header className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
-      <Link
-        href={POS_RETURN_HREF}
+      <button
+        type="button"
+        onClick={() => (onReturnToSystem ? onReturnToSystem() : router.push(POS_RETURN_HREF))}
         className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         aria-label={t('return_to_system')}
       >
         <RotateCcw className="h-4 w-4" strokeWidth={1.7} />
         <span className="hidden xl:inline">{t('return_to_system')}</span>
-      </Link>
+      </button>
 
       <div className="min-w-0 border-s border-border ps-2 sm:ps-3">
         <div className="truncate text-sm font-semibold text-text">{t('pos_title')}</div>

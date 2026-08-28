@@ -8,11 +8,15 @@ import {
   POS_SIDEBAR_LAUNCH_ITEMS,
   POS_START_HREF,
   POS_UNSAVED_EXIT_ACTIONS,
+  decidePosUnsavedExit,
   posNavNewTabAnchorProps,
   posReturnToNebraxProps,
   posSidebarItemsOpeningInNewTab,
   posStartNewTabProps,
+  posUnsavedExitEndsShift,
 } from '@/lib/pos-workspace';
+
+import { cartHasUnsavedData, type PosActiveCart } from '@/components/pos/use-pos-active-carts';
 
 function source(file: string) {
   return readFileSync(resolve(process.cwd(), file), 'utf8');
@@ -65,21 +69,36 @@ describe('فتح مساحة POS في تبويب مستقل', () => {
     expect(layout).toContain("router.replace('/login')");
   });
 
-  it('يجعل العودة إلى النظام انتقالاً إلى لوحة التحكم دون window.close', () => {
+  it('يجعل العودة إلى النظام زراً يمر عبر الصفحة دون window.close', () => {
     expect(posReturnToNebraxProps()).toEqual({ href: '/dashboard' });
     expect(POS_RETURN_HREF).toBe('/dashboard');
     const topbar = source('src/components/pos/pos-topbar.tsx');
-    expect(topbar).toContain('href={POS_RETURN_HREF}');
+    expect(topbar).toContain('onReturnToSystem');
+    expect(topbar).toContain('type="button"');
+    expect(topbar).not.toContain('href={POS_RETURN_HREF}');
     expect(topbar).not.toContain('window.close');
     expect(topbar).not.toContain('window.open');
   });
 
-  it('يبقي حارس السلة غير المحفوظة على إغلاق الجلسة والخروج فقط', () => {
-    expect(POS_UNSAVED_EXIT_ACTIONS).toEqual(['close_session', 'logout']);
+  it('يمرّر العودة للنظام عبر حارس السلة ولا ينهي الوردية', () => {
+    const clean: PosActiveCart = { id: 'c1', number: 1, items: [], customer: null, note: '', taxInclusive: false };
+    const dirty: PosActiveCart = { ...clean, id: 'c2', items: [{ key: 'l1', productId: 'p1', description: 'صنف', sku: null, unit: null, price: '1', qty: 1, tax: 15, discount: '0' }] };
+
+    expect(decidePosUnsavedExit(cartHasUnsavedData(dirty))).toBe('guard');
+    expect(decidePosUnsavedExit(cartHasUnsavedData(clean))).toBe('proceed');
+    expect(posUnsavedExitEndsShift('return_to_system')).toBe(false);
+    expect(posUnsavedExitEndsShift('logout')).toBe(false);
+    expect(posUnsavedExitEndsShift('close_session')).toBe(true);
+    expect(POS_UNSAVED_EXIT_ACTIONS).toEqual(['close_session', 'logout', 'return_to_system']);
+
     const page = source('src/app/(pos)/pos/page.tsx');
     expect(page).toContain("setUnsavedExitAction('close_session')");
     expect(page).toContain("setUnsavedExitAction('logout')");
-    expect(page).not.toMatch(/setUnsavedExitAction\(['"]return/);
+    expect(page).toContain("setUnsavedExitAction('return_to_system')");
+    expect(page).toContain('onReturnToSystem={requestReturnToSystem}');
+    expect(page).toContain('function finishReturnToSystem()');
+    expect(page).toContain('router.push(POS_RETURN_HREF)');
+    expect(page).not.toMatch(/finishReturnToSystem[\s\S]{0,200}pos-sessions\/.*\/close/);
     expect(page).not.toContain('window.close');
   });
 });
