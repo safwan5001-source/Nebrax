@@ -20,10 +20,6 @@ final class ZatcaXmlDsigSignedInfoBuilder
     private const CAC_NAMESPACE = 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2';
     private const CBC_NAMESPACE = 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2';
 
-    public function __construct(private readonly ZatcaXmlCanonicalizer $canonicalizer)
-    {
-    }
-
     public function build(
         string $invoiceDigest,
         string $signedPropertiesDigest,
@@ -92,22 +88,6 @@ final class ZatcaXmlDsigSignedInfoBuilder
         }
 
         return $xml;
-    }
-
-    public function buildCanonical(
-        string $invoiceDigest,
-        string $signedPropertiesDigest,
-        string $invoiceReferenceId = 'invoiceSignedData',
-        string $signedPropertiesId = 'xadesSignedProperties',
-    ): string {
-        return $this->canonicalizer->canonicalize(
-            $this->build(
-                $invoiceDigest,
-                $signedPropertiesDigest,
-                $invoiceReferenceId,
-                $signedPropertiesId,
-            )
-        );
     }
 
     private function assertSha256Digest(string $value, string $label): void

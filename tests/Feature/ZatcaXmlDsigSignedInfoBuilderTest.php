@@ -13,7 +13,7 @@ use Tests\TestCase;
 class ZatcaXmlDsigSignedInfoBuilderTest extends TestCase
 {
     /** @test */
-    public function it_builds_and_canonicalizes_the_two_required_zatca_references(): void
+    public function it_builds_the_two_required_zatca_references_without_detached_canonicalization(): void
     {
         $invoiceDigest = base64_encode(hash('sha256', 'invoice', true));
         $propertiesDigest = base64_encode(hash('sha256', 'properties', true));
@@ -25,18 +25,8 @@ class ZatcaXmlDsigSignedInfoBuilderTest extends TestCase
             'invoice-data-1',
             'signed-properties-1',
         );
-        $canonical = $builder->buildCanonical(
-            $invoiceDigest,
-            $propertiesDigest,
-            'invoice-data-1',
-            'signed-properties-1',
-        );
-
-        $this->assertSame($canonical, app(ZatcaXmlCanonicalizer::class)->canonicalize($xml));
-        $this->assertStringNotContainsString('<?xml', $canonical);
-
         $document = new DOMDocument();
-        $this->assertTrue($document->loadXML($canonical));
+        $this->assertTrue($document->loadXML($xml));
         $xpath = new DOMXPath($document);
         $xpath->registerNamespace('ds', ZatcaXmlDsigSignedInfoBuilder::XMLDSIG_NAMESPACE);
 
