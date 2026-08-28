@@ -15,12 +15,12 @@ const rows = [
   ['Noor Stores', '1', '400.00 𞸁'],
 ];
 
-function renderResults({ locale = 'en', rowHrefs, reportKey }: { locale?: 'en' | 'ar'; rowHrefs?: Array<string | null>; reportKey?: string } = {}) {
+function renderResults({ locale = 'en', rowHrefs, reportKey, resultRows = rows }: { locale?: 'en' | 'ar'; rowHrefs?: Array<string | null>; reportKey?: string; resultRows?: string[][] } = {}) {
   return render(
     <NextIntlClientProvider locale={locale} messages={{}}>
       <ReportResultsTable
         columns={columns}
-        rows={rows}
+        rows={resultRows}
         totalRow={['Total', '4', '1,650.00 𞸁']}
         emptyText="No report results"
         primaryIndex={0}
@@ -65,5 +65,14 @@ describe('ReportResultsTable drill-down', () => {
 
     expect(action.getAttribute('href')).toBe('/partners/customer-1');
     expect(within(mobile).queryByRole('link', { name: 'Noor Stores' })).toBeNull();
+  });
+
+  it('renders one explicit empty state without table controls, totals, or Saved Views', () => {
+    renderResults({ resultRows: [], reportKey: 'sales:customer' });
+
+    expect(screen.getByRole('status').textContent).toBe('No report results');
+    expect(screen.queryByRole('textbox', { name: 'Search results' })).toBeNull();
+    expect(screen.queryByText('1,650.00 𞸁')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Views' })).toBeNull();
   });
 });
