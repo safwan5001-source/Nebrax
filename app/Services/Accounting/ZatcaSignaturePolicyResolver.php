@@ -18,8 +18,7 @@ final class ZatcaSignaturePolicyResolver
         $identifier = trim($identifier);
         $digest = trim($digest);
 
-        if ($identifier === ''
-            || preg_match('/^[A-Za-z][A-Za-z0-9+.-]*:\S+$/', $identifier) !== 1) {
+        if (! $this->isValidPolicyIdentifier($identifier)) {
             throw new RuntimeException('معرّف سياسة توقيع ZATCA غير مهيأ أو ليس URI مطلقاً.');
         }
         if ($digest === '') {
@@ -32,5 +31,22 @@ final class ZatcaSignaturePolicyResolver
         }
 
         return new ZatcaSignaturePolicy($identifier, $digest);
+    }
+
+    private function isValidPolicyIdentifier(string $identifier): bool
+    {
+        if ($identifier === '' || preg_match('/%(?![0-9A-Fa-f]{2})/', $identifier) === 1) {
+            return false;
+        }
+
+        if (str_starts_with(strtolower($identifier), 'https://')) {
+            return filter_var($identifier, FILTER_VALIDATE_URL) !== false
+                && is_string(parse_url($identifier, PHP_URL_HOST));
+        }
+
+        return preg_match(
+            '/^urn:[A-Za-z0-9][A-Za-z0-9-]{0,31}:[A-Za-z0-9._~!$&\'()*+,;=:@\/?%#-]+$/D',
+            $identifier
+        ) === 1;
     }
 }
