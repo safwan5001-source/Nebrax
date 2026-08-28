@@ -3207,6 +3207,8 @@
     "band": "النطاق",
     "riskHint": "عرض تشغيلي مرتّب لأولوية المراجعة، لا تصنيف اتهامي للموظفين.",
     "emptyRisk": "لا مؤشرات مراجعة ضمن هذا النطاق.",
+    "emptyRules": "لا تتوفر قواعد كشف في هذا النطاق.",
+    "detailLoadFailed": "تعذّر تحميل هذا السجل. أغلق وحاول مجدداً.",
     "exceptionsCount": "{count} استثناء",
     "riskDetail": "تفصيل مؤشر المراجعة",
     "scoreDrivers": "سائقو الدرجة",
@@ -3251,7 +3253,15 @@
       "performer_approver_pair_concentration": "تركّز زوج المنفّذ والمعتمِد",
       "approver_concentration": "تركّز المعتمِد",
       "override_approval_rate": "معدّل الموافقة على الاستثناءات",
-      "near_close_concentration": "تركّز العمليات قرب الإغلاق"
+      "near_close_concentration": "تركّز العمليات قرب الإغلاق",
+      "repeated_hold_discard": "تكرار تجاهل سلات معلّقة",
+      "repeated_cancel_before_checkout": "تكرار الإلغاء قبل الدفع",
+      "cross_cashier_refund": "مرتجع من كاشير مختلف",
+      "refund_shortly_after_sale": "مرتجع بعد البيع بوقت قصير",
+      "manual_drawer_without_transaction_proximity": "فتح الدرج يدوياً بلا عملية قريبة",
+      "override_then_cancel": "تجاوز يتبعه إلغاء",
+      "approval_replay": "تكرار طلبات الموافقة",
+      "outside_operating_hours": "نشاط خارج ساعات الدوام المجدولة"
     },
     "categories": {
       "cart": "السلة والأصناف",
@@ -3511,6 +3521,35 @@
         "no_activity": "لا نشاط رقابي يُذكر خلال هذه الفترة.",
         "insufficient_sample_some_exceptions": "بعض المؤشرات المرصودة في هذه الفترة عينتها غير كافية إحصائياً."
       }
+    },
+    "operations": {
+      "item_remove": "حذف صنف",
+      "price_override": "تجاوز السعر",
+      "discount_change": "تغيير الخصم",
+      "cart_cancel": "إلغاء السلة",
+      "cash_recount": "إعادة عدّ النقدية",
+      "refund": "مرتجع",
+      "cash_out": "صرف نقدي",
+      "manual_drawer_open": "فتح الدرج يدوياً"
+    },
+    "attention": {
+      "tabLabel": "يحتاج انتباهاً",
+      "kind": "النوع",
+      "summary": "العنصر",
+      "hint": "قائمة موحّدة لأولويات المراجعة: طلبات موافقة معلّقة (يمكن اعتمادها هنا عند توفر الصلاحية)، استثناءات ذات أولوية، استثناءات تحتاج تحقيقاً، قضايا غير مسندة أو متأخرة، وأحدث ملخص يومي بارز. فتح العنصر ينقلك لشاشته الخاصة للمتابعة — هذه القائمة لا تنشئ حالة مراجعة موازية.",
+      "empty": "لا يوجد ما يحتاج انتباهاً الآن",
+      "emptyHint": "لا طلبات موافقة معلّقة ولا استثناءات ذات أولوية ولا استثناءات تحتاج تحقيقاً ولا قضايا متأخرة ولا ملخصاً بارزاً في هذا النطاق.",
+      "kinds": {
+        "pending_approval": "موافقة معلّقة",
+        "priority_exception": "استثناء ذو أولوية",
+        "needs_investigation_exception": "يحتاج تحقيقاً",
+        "attention_case": "قضية",
+        "digest_highlight": "أبرز ما في الملخص اليومي"
+      },
+      "caseReasons": {
+        "unassigned": "غير مسندة",
+        "overdue": "متأخرة"
+      }
     }
   },
   "posSettings": {
@@ -3662,6 +3701,21 @@
     "held_sale_close_policy_hint": "تظل السلال غير المالية مرتبطة دائماً بالكاشير والفرع والمخزن. اختر هل تُلغى عند إغلاق الجلسة أو تبقى متاحة للكاشير نفسه في جلسة لاحقة متوافقة.",
     "held_sale_discard_on_session_close": "إلغاء السلال عند إغلاق الجلسة",
     "held_sale_keep_for_next_session": "الاحتفاظ بها للاستئناف في جلسة لاحقة",
+    "section_loss_prevention": "ضوابط منع الفقد",
+    "section_loss_prevention_description": "ضوابط وقائية لعمليات خادمية حقيقية، وفصل مهام لقرارات فرق الإغلاق. تبقى المؤشرات والأدلة منفصلة ضمن «المراجعة والتدقيق».",
+    "audit_policy_allowed": "مسموح",
+    "audit_policy_approval_required": "يتطلب اعتماداً",
+    "audit_policy_denied": "ممنوع",
+    "audit_operation_policy_refund": "سياسة المرتجعات",
+    "audit_operation_policy_refund_hint": "تُطبَّق قبل إنشاء مرتجع نقطة بيع، سواء كان مستقلاً أو ضمن عملية استبدال.",
+    "audit_operation_policy_cash_out": "سياسة الصرف النقدي",
+    "audit_operation_policy_cash_out_hint": "تُطبَّق قبل تسجيل حركة صرف نقدي من الدرج أثناء جلسة مفتوحة.",
+    "audit_operation_policy_manual_drawer_open": "سياسة فتح الدرج يدوياً",
+    "audit_operation_policy_manual_drawer_open_hint": "تُطبَّق قبل فتح درج النقدية يدوياً، خارج سياق بيع مكتمل.",
+    "self_approval_blocked_for_variance": "منع اعتماد الكاشير فرق إغلاقه بنفسه",
+    "self_approval_blocked_for_variance_hint": "عند التفعيل، لا يستطيع الكاشير الذي أغلق الجلسة أن يقرّ أو يسوّي فرقها النقدي بنفسه — يجب أن يتولّى ذلك مستخدم آخر مخوَّل. معطّل افتراضياً للحفاظ على سلوك فروع الكاشير الواحد.",
+    "outside_hours_grace_minutes": "سماح خارج الدوام (بالدقائق)",
+    "outside_hours_grace_minutes_hint": "دقائق تسامح تُضاف قبل الوردية المجدولة وبعدها قبل وسم نشاط حسّاس بأنه خارج ساعات الدوام. لا تُطبَّق إلا على مستخدم له وردية موظف قابلة للحل.",
     "sound_feedback": "الأصوات والتنبيهات",
     "sound_feedback_hint": "تنبيهات خفيفة لعمليات نقطة البيع. تظل الرسائل المرئية والنصية متاحة دائماً.",
     "sound_settings_subtitle": "اضبط أصوات قراءة الباركود والتنبيهات والدفع ومستوى الصوت والاهتزاز.",

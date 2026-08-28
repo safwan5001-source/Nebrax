@@ -8,3 +8,6 @@ next-env.d.ts
 
 # إعادة تضمين lockfile الواجهة (الجذر يستثنيه عالمياً) — لازم لـ npm ci في CI
 !package-lock.json
+
+/playwright-report
+/test-results

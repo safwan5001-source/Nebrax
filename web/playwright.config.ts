@@ -1,4 +1,9 @@
+import { existsSync } from 'node:fs';
 import { defineConfig } from '@playwright/test';
+
+const chromiumExecutable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+  ?? ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome']
+    .find((candidate) => existsSync(candidate));
 
 export default defineConfig({
   testDir: './e2e',
@@ -11,7 +16,7 @@ export default defineConfig({
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
-    launchOptions: { executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] },
+    launchOptions: { executablePath: chromiumExecutable, args: ['--no-sandbox'] },
   },
   projects: [
     { name: 'desktop', use: { viewport: { width: 1440, height: 960 } } },

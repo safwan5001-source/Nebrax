@@ -46,3 +46,35 @@ describe('mockApi ZATCA settings', () => {
   });
 
 });
+
+describe('mockApi POS loss-prevention Phase 4', () => {
+  it('يعيد عقد Needs Attention المصفّح مع الأنواع الخمسة', async () => {
+    const response = await mockApi<{
+      data: Array<{ kind: string }>;
+      meta: { total: number; current_page: number; last_page: number; per_page: number };
+    }>('/pos/audit/needs-attention?per_page=25&page=1');
+
+    expect(response.meta).toEqual({ total: 5, per_page: 25, current_page: 1, last_page: 1 });
+    expect(response.data.map((row) => row.kind)).toEqual([
+      'pending_approval',
+      'priority_exception',
+      'needs_investigation_exception',
+      'attention_case',
+      'digest_highlight',
+    ]);
+  });
+
+  it('يحفظ ضوابط منع الفقد في قسم sales-config المستقل', async () => {
+    const previous = await mockApi<{ data: { self_approval_blocked_for_variance: boolean; outside_hours_grace_minutes: number } }>('/sales-config/pos_loss_prevention');
+
+    await mockApi('/sales-config/pos_loss_prevention', 'PUT', {
+      data: { self_approval_blocked_for_variance: false, outside_hours_grace_minutes: 15 },
+    });
+
+    await expect(mockApi<{ data: { self_approval_blocked_for_variance: boolean; outside_hours_grace_minutes: number } }>('/sales-config/pos_loss_prevention')).resolves.toEqual({
+      data: { self_approval_blocked_for_variance: false, outside_hours_grace_minutes: 15 },
+    });
+
+    await mockApi('/sales-config/pos_loss_prevention', 'PUT', { data: previous.data });
+  });
+});

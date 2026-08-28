@@ -123,8 +123,11 @@ class PosSessionService
     /**
      * يسجّل إدخالاً أو إخراجاً مادياً من درج الكاشير المفتوح. لا يمثل حركة مالية
      * خارج المنشأة ولا يعدّل حساب الصندوق؛ لذلك لا ينشئ قيداً أو سند دفع.
+     *
+     * `$approvalId` يُفحص فقط للصرف (`cash_out`) حين تكون سياسته «تحتاج
+     * اعتماداً» (Phase 4) — الإدخال النقدي أقل خطراً ولا يدخل بوابة السياسة.
      */
-    public function recordCashMovement(PosSession $session, string $type, int $amount, string $reason, User $actor): PosCashMovement
+    public function recordCashMovement(PosSession $session, string $type, int $amount, string $reason, User $actor, ?string $approvalId = null): PosCashMovement
     {
         if (! in_array($type, PosCashMovement::TYPES, true)) {
             throw new RuntimeException('نوع حركة الدرج غير صالح.');
@@ -137,12 +140,14 @@ class PosSessionService
             throw new RuntimeException('سبب حركة الدرج مطلوب.');
         }
 
-        return DB::transaction(function () use ($session, $type, $amount, $reason, $actor) {
+        return DB::transaction(function () use ($session, $type, $amount, $reason, $actor, $approvalId) {
             $session = PosSession::lockForUpdate()->findOrFail($session->id);
             $this->assertDrawerActor($session, $actor);
-            if ($type === PosCashMovement::TYPE_CASH_OUT
-                && $amount > $session->opening_balance + $this->cashMovement($session)['net']) {
-                throw new RuntimeException('لا يمكن إخراج مبلغ يتجاوز الرصيد المتوقع داخل درج الجلسة.');
+            if ($type === PosCashMovement::TYPE_CASH_OUT) {
+                if ($amount > $session->opening_balance + $this->cashMovement($session)['net']) {
+                    throw new RuntimeException('لا يمكن إخراج مبلغ يتجاوز الرصيد المتوقع داخل درج الجلسة.');
+                }
+                $this->audit->enforceOperationPolicy($session, $actor, 'cash_out', $approvalId);
             }
 
             $movement = PosCashMovement::create([
@@ -273,6 +278,7 @@ class PosSessionService
             if ($session->status !== 'closed') {
                 throw new RuntimeException('لا يمكن اعتماد فرق جلسة لم تُغلق بعد.');
             }
+            $this->assertVarianceSelfApprovalAllowed($session, $actor);
             if ((int) $session->difference === 0 || $session->difference_status === 'not_required') {
                 throw new RuntimeException('لا يوجد فرق إغلاق يتطلب اعتماداً.');
             }
@@ -380,6 +386,7 @@ class PosSessionService
             if ($session->status !== 'closed') {
                 throw new RuntimeException('لا يمكن تسوية فرق جلسة لم تُغلق بعد.');
             }
+            $this->assertVarianceSelfApprovalAllowed($session, $actor);
             $difference = (int) $session->difference;
             if ($difference === 0 || $session->difference_status === 'not_required') {
                 throw new RuntimeException('لا يوجد فرق إغلاق يتطلب تسوية محاسبية.');
@@ -431,6 +438,22 @@ class PosSessionService
 
             return $session->fresh();
         });
+    }
+
+    /**
+     * فصل مهام (SoD) اختياري Phase 4: لا يعتمد/يسوّي من أغلق الجلسة (وبالتالي
+     * أنشأ الفرق) فرقَه هو نفسه، حين يفعّل المالك `self_approval_blocked_for_variance`
+     * صراحةً. الافتراض معطّل — يحفظ سلوك المنشآت أحادية الكاشير التي لا يوجد
+     * فيها معتمِد ثانٍ أصلاً؛ نفس مبدأ منع الاعتماد الذاتي في `PosOverrideApproval::approve()`.
+     */
+    private function assertVarianceSelfApprovalAllowed(PosSession $session, User $actor): void
+    {
+        if (! PosSettings::selfApprovalBlockedForVariance()) {
+            return;
+        }
+        if ($session->closed_by !== null && $session->closed_by === $actor->id) {
+            throw new RuntimeException('سياسة فصل المهام تمنع من أغلق الجلسة من اعتماد أو تسوية فرقها.');
+        }
     }
 
     /**

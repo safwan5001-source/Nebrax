@@ -8,6 +8,7 @@ use App\Models\PosReasonCode;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
 use App\Services\Pos\PosAuditService;
+use App\Services\Pos\PosIdempotencyConflictException;
 use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -264,11 +265,21 @@ class PosAuditController extends ApiController
             'items' => ['nullable', 'array', 'max:200'],
             'customer' => ['nullable', 'array', 'max:20'],
             'tenders' => ['nullable', 'array', 'max:20'],
+            // idempotency اختيارية: إعادة إرسال بنفس المفتاح والحمولة تعيد السجل الأصلي
+            // بلا كتابة جديدة؛ نفس المفتاح بحمولة مختلفة تعارض حقيقي (409).
+            'client_event_id' => ['nullable', 'string', 'max:100'],
         ]);
         $session = $this->activeSession($data['pos_session_id'], $request);
-        $event = $this->domain(fn () => $this->audit->recordClientObservedCartEvent($session, $request->user(), $cartId, $data['type'], $data));
+        try {
+            $event = $this->audit->recordClientObservedCartEvent($session, $request->user(), $cartId, $data['type'], $data);
+        } catch (PosIdempotencyConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        } catch (\RuntimeException $exception) {
+            abort(422, $exception->getMessage());
+        }
 
-        return (new PosSessionEventResource($event->load(['actor', 'performedBy', 'approvedBy'])))->response()->setStatusCode(201);
+        return (new PosSessionEventResource($event->load(['actor', 'performedBy', 'approvedBy'])))
+            ->response()->setStatusCode($event->wasRecentlyCreated ? 201 : 200);
     }
 
     public function requestApproval(Request $request): JsonResponse
@@ -280,12 +291,20 @@ class PosAuditController extends ApiController
             'reason_code' => ['nullable', 'string', 'max:80'],
             'reason_note' => ['nullable', 'string', 'max:2000'],
             'context' => ['nullable', 'array', 'max:40'],
+            'client_event_id' => ['nullable', 'string', 'max:100'],
         ]);
         $session = $this->activeSession($data['pos_session_id'], $request);
-        $approval = $this->domain(fn () => $this->audit->requestApproval(
-            $session, $request->user(), $data['operation'], $data['cart_id'] ?? null,
-            $data['reason_code'] ?? null, $data['reason_note'] ?? null, $data['context'] ?? [],
-        ));
+        try {
+            $approval = $this->audit->requestApproval(
+                $session, $request->user(), $data['operation'], $data['cart_id'] ?? null,
+                $data['reason_code'] ?? null, $data['reason_note'] ?? null, $data['context'] ?? [],
+                $data['client_event_id'] ?? null,
+            );
+        } catch (PosIdempotencyConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        } catch (\RuntimeException $exception) {
+            abort(422, $exception->getMessage());
+        }
 
         return response()->json(['data' => $this->approvalData($approval)], 201);
     }

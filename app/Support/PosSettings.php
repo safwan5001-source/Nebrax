@@ -97,6 +97,12 @@ final class PosSettings
             'discount_change' => self::AUDIT_POLICY_ALLOWED,
             'cart_cancel' => self::AUDIT_POLICY_ALLOWED,
             'cash_recount' => self::AUDIT_POLICY_APPROVAL_REQUIRED,
+            // Phase 4 — امتداد للنموذج القائم على عمليات خادمية حقيقية (لا Telemetry
+            // بعد الفعل): إنشاء مرتجع، صرف نقدي، وفتح الدرج اليدوي. الافتراض «مسموح»
+            // يحفظ سلوك كل مستأجر قائم؛ التقييد قرار مالك صريح لاحق.
+            'refund' => self::AUDIT_POLICY_ALLOWED,
+            'cash_out' => self::AUDIT_POLICY_ALLOWED,
+            'manual_drawer_open' => self::AUDIT_POLICY_ALLOWED,
         ],
         // تفضيلات feedback محلية للواجهة؛ لا تدخل في البيع أو القيد ولا تعتمد
         // عليها الخدمة لتقرير صحة العملية. تظل مفعلة بالتوافق مع تجربة POS.
@@ -304,6 +310,42 @@ final class PosSettings
         return in_array($policy, [self::HELD_SALE_DISCARD_ON_SESSION_CLOSE, self::HELD_SALE_KEEP_FOR_NEXT_SESSION], true)
             ? $policy
             : self::HELD_SALE_DISCARD_ON_SESSION_CLOSE;
+    }
+
+    /**
+     * Phase 4 — إعدادات منفصلة عن `sales_config.pos` القائم (`sales_config.pos_loss_prevention`)
+     * حتى لا تتغيّر افتراضات القسم الأصلي لمستأجر قائم بإضافة مفتاح لم يطلبه.
+     */
+    private const LP_DEFAULTS = [
+        // فصل المهام (SoD) لمسارات تسوية فرق الإغلاق: افتراضه معطّل حمايةً
+        // للمنشآت أحادية الكاشير (لا معتمِد ثانٍ متاح أصلاً) — تفعيلٌ صريح فقط.
+        'self_approval_blocked_for_variance' => false,
+        // دقائق سماح حول حدود الوردية المعتمدة لقاعدة outside_operating_hours —
+        // يمتص فروقات الساعة/المزامنة الطبيعية، لا يغيّر منطق التغطية نفسه.
+        'outside_hours_grace_minutes' => 30,
+    ];
+
+    /** إعدادات منع الفقد (Phase 4) لهذا المستأجر، مدموجة فوق الافتراضات الحامية. */
+    public static function lossPreventionGroup(?Tenant $tenant = null): array
+    {
+        $tenant ??= self::tenant();
+        $stored = $tenant?->settings['sales_config']['pos_loss_prevention'] ?? [];
+
+        return array_merge(self::LP_DEFAULTS, array_intersect_key($stored, self::LP_DEFAULTS));
+    }
+
+    /** فصل مهام تسوية الفرق — اختياري صراحةً، لا يُفرض على منشأة كاشير واحد. */
+    public static function selfApprovalBlockedForVariance(?Tenant $tenant = null): bool
+    {
+        return self::lossPreventionGroup($tenant)['self_approval_blocked_for_variance'] === true;
+    }
+
+    /** دقائق سماح outside_operating_hours؛ قيمة خارج المدى المعقول تعود للافتراض. */
+    public static function outsideHoursGraceMinutes(?Tenant $tenant = null): int
+    {
+        $minutes = self::lossPreventionGroup($tenant)['outside_hours_grace_minutes'];
+
+        return is_int($minutes) && $minutes >= 0 && $minutes <= 240 ? $minutes : 30;
     }
 
     private static function tenant(): ?Tenant

@@ -38,7 +38,10 @@ class ReturnController extends ApiController
 
     public function store(StoreReturnRequest $request): JsonResponse
     {
-        $data = $request->validated();
+        // إصلاح خلل إسناد: كان `created_by` يبقى NULL دائماً على هذا المسار العام،
+        // فيفقد كل مرتجع مؤسسته الفعلية (المستخدم مصدرٌ خادمي هنا كما في POS::checkout
+        // — لا يقبل من العميل، ولا يتحقق منه StoreReturnRequest أصلاً).
+        $data = $request->validated() + ['created_by' => $request->user()?->id];
 
         Partner::findOrFail($data['partner_id']); // عزل الطرف
         $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $this->activeBranchId());

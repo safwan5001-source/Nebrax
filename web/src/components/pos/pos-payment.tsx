@@ -91,8 +91,9 @@ export function PosPayment({
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
         <button
+          type="button"
           onClick={onBack}
-          className="flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-[13px] font-semibold text-text hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-[13px] font-semibold text-text touch-manipulation hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <ArrowRight className="h-4 w-4" strokeWidth={2} />
           {t('back_to_cart')}
@@ -176,7 +177,8 @@ export function PosPayment({
                   return (
                     <div
                       key={method.id}
-                      className={'rounded-lg border-[1.5px] bg-surface p-3 sm:p-4 ' + (selected || applied ? 'border-primary bg-primary-soft' : 'border-border')}
+                      onClick={() => setSelectedMethodId(method.id)}
+                      className={'min-h-12 cursor-pointer rounded-lg border-[1.5px] bg-surface p-3 touch-manipulation sm:p-4 ' + (selected || applied ? 'border-primary bg-primary-soft' : 'border-border')}
                     >
                       <div className="mb-2 flex items-center justify-between sm:mb-2.5">
                         <div className={'grid h-8 w-8 place-items-center rounded-lg sm:h-9 sm:w-9 ' + (selected || applied ? 'bg-primary text-white' : 'bg-background text-muted')}>
@@ -196,7 +198,7 @@ export function PosPayment({
                         onChange={(event) => set(method.id, event.target.value)}
                         inputMode="decimal"
                         placeholder="0.00"
-                        className="num w-full rounded-lg border border-border bg-background px-2 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40"
+                        className="num min-h-12 w-full rounded-lg border border-border bg-background px-2 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40"
                       />
                     </div>
                   );
@@ -225,7 +227,7 @@ export function PosPayment({
                   onClick={() => selectedMethod && set(selectedMethod.id, amount.toFixed(2))}
                   disabled={!selectedMethod}
                   className={
-                    'num min-h-10 rounded-lg border px-2 py-2 text-[13px] font-bold focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 ' +
+                    'num min-h-11 rounded-lg border px-2 py-2 text-[13px] font-bold touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 ' +
                     (index === 0 ? 'col-span-2 sm:col-auto ' : '') +
                     (index === 0 ? 'border-primary bg-primary-soft text-primary-hover' : 'border-border bg-background text-text hover:border-primary')
                   }
@@ -257,9 +259,13 @@ export function PosPayment({
 
       <footer className="flex shrink-0 border-t border-border bg-surface px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:p-4">
         <button
-          onClick={() => onConfirm(tenderPayload())}
+          type="button"
+          onClick={() => {
+            if (!canConfirm || paying || paymentMethodsLoading) return;
+            onConfirm(tenderPayload());
+          }}
           disabled={!canConfirm || paying || paymentMethodsLoading}
-          className="flex min-h-12 flex-1 items-center justify-center gap-2.5 rounded-lg bg-primary px-4 py-3 text-base font-bold text-white focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+          className="flex min-h-12 flex-1 items-center justify-center gap-2.5 rounded-lg bg-primary px-4 py-3 text-base font-bold text-white touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Check className="h-5 w-5" strokeWidth={2.2} />
           {t('confirm_payment')}

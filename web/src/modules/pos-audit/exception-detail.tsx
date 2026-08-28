@@ -39,6 +39,7 @@ export function ExceptionDetail({ id, canReview, canPromote, onClose, onReviewed
   const locale = useLocale();
   const [exception, setException] = useState<PosExceptionRow | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toState, setToState] = useState<ReviewState | ''>('');
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
@@ -48,6 +49,7 @@ export function ExceptionDetail({ id, canReview, canPromote, onClose, onReviewed
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const result = await api<{ data: PosExceptionRow }>(`/pos/audit/exceptions/${id}`);
       setException(result.data);
@@ -55,7 +57,10 @@ export function ExceptionDetail({ id, canReview, canPromote, onClose, onReviewed
       setReason('');
       setNote('');
     } catch (error) {
-      onError(error instanceof ApiError ? error.message : t('loadFailed'));
+      setException(null);
+      const message = error instanceof ApiError ? error.message : t('loadFailed');
+      setLoadError(message);
+      onError(message);
     } finally {
       setLoading(false);
     }
@@ -63,7 +68,10 @@ export function ExceptionDetail({ id, canReview, canPromote, onClose, onReviewed
 
   useEffect(() => {
     if (id) void load();
-    else setException(null);
+    else {
+      setException(null);
+      setLoadError(null);
+    }
   }, [id, load]);
 
   async function submitReview() {
@@ -106,6 +114,11 @@ export function ExceptionDetail({ id, canReview, canPromote, onClose, onReviewed
     <Dialog open={id !== null} onClose={onClose} title={t('exceptionDetails')}>
       {loading && !exception ? (
         <p className="text-sm text-muted">{t('loading')}</p>
+      ) : loadError && !exception ? (
+        <div className="space-y-3" role="alert">
+          <p className="text-sm text-negative">{loadError || t('detailLoadFailed')}</p>
+          <Button size="sm" variant="outline" onClick={() => void load()}>{t('retry')}</Button>
+        </div>
       ) : exception ? (
         <div className="space-y-5">
           {/* ملخص بشري مقروء */}

@@ -87,6 +87,21 @@ const strings: Record<string, string> = {
   held_sale_discard_on_session_close: 'Discard',
   held_sale_keep_for_next_session: 'Keep',
   held_sale_close_policy_hint: 'Held hint.',
+  section_loss_prevention: 'Loss prevention controls',
+  section_loss_prevention_description: 'Loss prevention section description.',
+  audit_policy_allowed: 'Allowed',
+  audit_policy_approval_required: 'Requires approval',
+  audit_policy_denied: 'Denied',
+  audit_operation_policy_refund: 'Refund policy',
+  audit_operation_policy_refund_hint: 'Refund hint.',
+  audit_operation_policy_cash_out: 'Cash-out policy',
+  audit_operation_policy_cash_out_hint: 'Cash-out hint.',
+  audit_operation_policy_manual_drawer_open: 'Manual drawer open policy',
+  audit_operation_policy_manual_drawer_open_hint: 'Manual drawer hint.',
+  self_approval_blocked_for_variance: 'Block self-approval of closing variance',
+  self_approval_blocked_for_variance_hint: 'SoD hint.',
+  outside_hours_grace_minutes: 'Outside-hours grace period (minutes)',
+  outside_hours_grace_minutes_hint: 'Grace hint.',
   save: 'Save settings',
   saving: 'Saving…',
   updated: 'Updated',
@@ -127,6 +142,15 @@ const settings = {
   cash_drawer_driver: 'local_bridge',
   cash_drawer_enabled: true,
   cash_drawer_auto_open_after_cash: true,
+  audit_operation_policies: {
+    item_remove: 'allowed', price_override: 'allowed', discount_change: 'allowed', cart_cancel: 'allowed', cash_recount: 'approval_required',
+    refund: 'allowed', cash_out: 'allowed', manual_drawer_open: 'allowed',
+  },
+};
+
+const lossPrevention = {
+  self_approval_blocked_for_variance: false,
+  outside_hours_grace_minutes: 30,
 };
 
 const paymentMethods = [
@@ -161,6 +185,8 @@ function mockSuccessfulLoad(
   api.mockImplementation((url: string, options?: { method?: string; body?: { data: unknown } }) => {
     if (url === '/sales-config/pos' && options?.method === 'PUT') return Promise.resolve({ data: options.body?.data });
     if (url === '/sales-config/pos') return Promise.resolve({ data: responseSettings });
+    if (url === '/sales-config/pos_loss_prevention' && options?.method === 'PUT') return Promise.resolve({ data: options.body?.data });
+    if (url === '/sales-config/pos_loss_prevention') return Promise.resolve({ data: lossPrevention });
     if (url === '/payment-methods') return Promise.resolve({ data: paymentMethods });
     if (url === '/product-categories') return Promise.resolve({ data: productCategories });
     if (url === '/partners') return Promise.resolve({ data: customers });
@@ -369,5 +395,31 @@ describe('صفحة تهيئة POS بعد توحيد UX', () => {
     await waitFor(() => expect(api.mock.calls.some(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')).toBe(true));
     const saved = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
     expect(saved).toMatchObject({ payment_methods_mode: 'none', enabled_payment_method_ids: [], default_payment_method_id: null });
+  });
+
+  it('يحمّل ضوابط منع الفقد ويحفظها في قسمها المستقل من دون المساس بسياسات POS الأخرى', async () => {
+    await renderLoaded();
+
+    expect((screen.getByLabelText('Refund policy') as HTMLSelectElement).value).toBe('allowed');
+    expect((screen.getByLabelText('Cash-out policy') as HTMLSelectElement).value).toBe('allowed');
+    expect((screen.getByLabelText('Manual drawer open policy') as HTMLSelectElement).value).toBe('allowed');
+    expect(screen.getByRole('switch', { name: 'Block self-approval of closing variance' }).getAttribute('aria-checked')).toBe('false');
+    expect((screen.getByLabelText('Outside-hours grace period (minutes)') as HTMLInputElement).value).toBe('30');
+
+    fireEvent.change(screen.getByLabelText('Refund policy'), { target: { value: 'approval_required' } });
+    fireEvent.click(screen.getByRole('switch', { name: 'Block self-approval of closing variance' }));
+    fireEvent.change(screen.getByLabelText('Outside-hours grace period (minutes)'), { target: { value: '45' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => expect(api.mock.calls.some(([url, options]) => url === '/sales-config/pos_loss_prevention' && options?.method === 'PUT')).toBe(true));
+
+    const savedPos = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
+    expect(savedPos.audit_operation_policies).toMatchObject({
+      refund: 'approval_required', cash_out: 'allowed', manual_drawer_open: 'allowed',
+      item_remove: 'allowed', cash_recount: 'approval_required',
+    });
+
+    const savedLp = api.mock.calls.find(([url, options]) => url === '/sales-config/pos_loss_prevention' && options?.method === 'PUT')![1].body.data;
+    expect(savedLp).toEqual({ self_approval_blocked_for_variance: true, outside_hours_grace_minutes: 45 });
   });
 });

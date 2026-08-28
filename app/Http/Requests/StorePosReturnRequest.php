@@ -27,6 +27,8 @@ class StorePosReturnRequest extends FormRequest
             'items'              => ['required', 'array', 'min:1'],
             'items.*.source_line_id' => ['required', 'uuid', 'distinct'],
             'items.*.quantity'       => ['required', 'integer', 'min:1', 'max:1000000'],
+            // Phase 4 — مطلوب فقط حين تكون سياسة `refund` «تحتاج اعتماداً».
+            'approval_id'        => ['nullable', 'uuid'],
         ];
     }
 }

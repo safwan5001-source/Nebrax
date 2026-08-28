@@ -96,7 +96,7 @@ export function PosTopbar({
     <header className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
       <Link
         href="/dashboard"
-        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         aria-label={t('return_to_system')}
       >
         <RotateCcw className="h-4 w-4" strokeWidth={1.7} />
@@ -128,7 +128,7 @@ export function PosTopbar({
         <button
           type="button"
           onClick={onOpenRecentInvoices}
-          className="inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="inline-flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           aria-label={t('recent_pos_invoices')}
         >
           <ReceiptText className="h-4 w-4" strokeWidth={1.7} />
@@ -137,7 +137,7 @@ export function PosTopbar({
         <button
           type="button"
           onClick={onOpenHeld}
-          className="relative inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="relative inline-flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           aria-label={t('held')}
         >
           <Archive className="h-4 w-4" strokeWidth={1.7} />
@@ -148,7 +148,7 @@ export function PosTopbar({
         <button
           type="button"
           onClick={onManageSession}
-          className="hidden h-10 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:inline-flex"
+          className="hidden min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:inline-flex"
         >
           <Power className="h-4 w-4" strokeWidth={1.7} />
           <span>{t('manage_shift')}</span>
@@ -158,7 +158,7 @@ export function PosTopbar({
           align="end"
           menuLabel={t('more_actions')}
           triggerLabel={t('more_actions')}
-          triggerClassName="h-10 w-10 justify-center text-text hover:bg-primary-soft hover:text-primary"
+          triggerClassName="min-h-11 min-w-11 justify-center text-text hover:bg-primary-soft hover:text-primary"
           mobilePopover
           trigger={<MoreHorizontal className="h-5 w-5" strokeWidth={1.7} />}
         >
@@ -204,7 +204,7 @@ export function PosTopbar({
           align="end"
           menuLabel={tt('account')}
           triggerLabel={tt('account')}
-          triggerClassName="h-10 min-w-10 justify-center gap-1.5 px-1.5 hover:bg-primary-soft"
+          triggerClassName="min-h-11 min-w-11 justify-center gap-1.5 px-1.5 hover:bg-primary-soft"
           mobilePopover
           trigger={
             <>

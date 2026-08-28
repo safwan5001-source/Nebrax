@@ -259,6 +259,51 @@ export interface DigestBranchBreakdown {
   amount_under_review_minor: number;
 }
 
+// ═══════════════════════ Phase 4 — قائمة الانتباه ═══════════════════════
+
+export type NeedsAttentionKind = 'pending_approval' | 'priority_exception' | 'needs_investigation_exception' | 'attention_case' | 'digest_highlight';
+
+export interface NeedsAttentionRow {
+  id: string;
+  kind: NeedsAttentionKind;
+  urgency_rank: number;
+  branch_id: string | null;
+  reference: { type: string; id: string };
+  // pending_approval
+  operation?: string;
+  cart_id?: string | null;
+  pos_session_id?: string | null;
+  reason_code?: string | null;
+  performed_by?: string | null;
+  performed_by_name?: string;
+  created_at?: string | null;
+  expires_at?: string | null;
+  // priority_exception / needs_investigation_exception
+  rule_key?: string;
+  category?: string;
+  severity?: Severity;
+  review_state?: ReviewState;
+  subject_user_id?: string | null;
+  subject_name?: string;
+  amount_under_review?: string;
+  detected_at?: string | null;
+  // attention_case
+  reasons?: Array<'unassigned' | 'overdue'>;
+  number?: string;
+  title?: string;
+  status?: CaseStatus;
+  priority?: CasePriority;
+  owner_id?: string | null;
+  owner_name?: string | null;
+  opened_at?: string | null;
+  last_activity_at?: string | null;
+  // digest_highlight
+  digest_date?: string;
+  priority_exceptions_count?: number;
+  unresolved_high_priority_cases_count?: number;
+  confirmed_loss_count?: number;
+}
+
 export interface LpDigestRow {
   id: string;
   digest_date: string;

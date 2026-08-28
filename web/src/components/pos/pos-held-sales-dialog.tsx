@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Archive, LoaderCircle, Play, ShoppingBag, Trash2 } from 'lucide-react';
-import { Dialog } from '@/components/ui/dialog';
+import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, ApiError } from '@/lib/api';
@@ -90,7 +90,7 @@ export function PosHeldSalesDialog({ open, sessionId, onClose, onResumed, onChan
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title={t('held_title')}>
+    <PosDialog open={open} onClose={onClose} title={t('held_title')}>
       <div className="space-y-3">
         <p className="rounded bg-primary-soft px-3 py-2 text-xs text-text">{t('held_hint')}</p>
         {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
@@ -102,11 +102,11 @@ export function PosHeldSalesDialog({ open, sessionId, onClose, onResumed, onChan
             const count = sale.items.reduce((sum, item) => sum + item.quantity, 0);
             return <div key={sale.id} className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1"><b className="block truncate text-sm text-text">{sale.customer?.name ?? t('held_walkin_customer')}</b><span className="mt-0.5 flex items-center gap-1 text-xs text-muted"><ShoppingBag className="h-3.5 w-3.5" aria-hidden="true" />{t('held_summary', { count, items: sale.items.length })}</span><span className="num block pt-1 text-[11px] text-muted">{sale.created_at?.slice(0, 16).replace('T', ' ') ?? '—'}</span></div>
-              <div className="flex shrink-0 justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => discard(sale.id)} aria-label={t('held_discard')}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />{t('held_discard')}</Button><Button type="button" size="sm" disabled={busy} onClick={() => resume(sale.id)}>{busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Play className="h-3.5 w-3.5" aria-hidden="true" />}{t('held_resume')}</Button></div>
+              <div className="flex shrink-0 justify-end gap-2"><Button type="button" size="sm" variant="outline" className="min-h-11" disabled={busy} onClick={() => discard(sale.id)} aria-label={t('held_discard')}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />{t('held_discard')}</Button><Button type="button" size="sm" className="min-h-11" disabled={busy} onClick={() => resume(sale.id)}>{busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Play className="h-3.5 w-3.5" aria-hidden="true" />}{t('held_resume')}</Button></div>
             </div>;
           })}
         </div>}
       </div>
-    </Dialog>
+    </PosDialog>
   );
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { CalendarClock, Camera, ClipboardList, FileText, Link2, ShieldQuestion, UserCog } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { formatRiyal } from '@/lib/money';
+import { formatRiyal, riyalToMinor } from '@/lib/money';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -65,10 +65,12 @@ export function CaseDetail({ id, canManage, canAssign, canResolve, canCctv, onCl
   const [cctvEnd, setCctvEnd] = useState('');
   const [cctvRef, setCctvRef] = useState('');
   const [cctvNote, setCctvNote] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const [detail, tl] = await Promise.all([
         api<{ data: InvestigationCaseRow }>(`/pos/investigations/${id}`),
@@ -77,7 +79,11 @@ export function CaseDetail({ id, canManage, canAssign, canResolve, canCctv, onCl
       setRow(detail.data);
       setTimeline(tl.data);
     } catch (error) {
-      onError(error instanceof ApiError ? error.message : t('loadFailed'));
+      setRow(null);
+      setTimeline(null);
+      const message = error instanceof ApiError ? error.message : t('loadFailed');
+      setLoadError(message);
+      onError(message);
     } finally {
       setLoading(false);
     }
@@ -90,6 +96,7 @@ export function CaseDetail({ id, canManage, canAssign, canResolve, canCctv, onCl
     } else {
       setRow(null);
       setTimeline(null);
+      setLoadError(null);
     }
   }, [id, load]);
 
@@ -124,14 +131,20 @@ export function CaseDetail({ id, canManage, canAssign, canResolve, canCctv, onCl
 
   async function submitStatus() {
     if (!row || !toStatus) return;
+    const confirmedLossMinor = confirmedLoss ? riyalToMinor(confirmedLoss) : undefined;
+    const recoveredAmountMinor = recoveredAmount ? riyalToMinor(recoveredAmount) : undefined;
+    if ((confirmedLoss && !Number.isFinite(confirmedLossMinor)) || (recoveredAmount && !Number.isFinite(recoveredAmountMinor))) {
+      onError(t('loadFailed'));
+      return;
+    }
     setSubmitting(true);
     try {
       await api(`/pos/investigations/${row.id}/status`, {
         method: 'POST',
         body: {
           status: toStatus, reason: reason || undefined, note: note || undefined,
-          confirmed_loss_minor: confirmedLoss ? Math.round(Number(confirmedLoss) * 100) : undefined,
-          recovered_amount_minor: recoveredAmount ? Math.round(Number(recoveredAmount) * 100) : undefined,
+          confirmed_loss_minor: confirmedLossMinor,
+          recovered_amount_minor: recoveredAmountMinor,
         },
       });
       await refreshAfterAction('status');
@@ -217,6 +230,11 @@ export function CaseDetail({ id, canManage, canAssign, canResolve, canCctv, onCl
     <Dialog open={id !== null} onClose={onClose} title={row ? `${row.number} — ${row.title}` : t('cases.caseDetails')} className="max-w-3xl">
       {loading && !row ? (
         <p className="text-sm text-muted">{t('loading')}</p>
+      ) : loadError && !row ? (
+        <div className="space-y-3" role="alert">
+          <p className="text-sm text-negative">{loadError || t('detailLoadFailed')}</p>
+          <Button size="sm" variant="outline" onClick={() => void load()}>{t('retry')}</Button>
+        </div>
       ) : row ? (
         <div className="space-y-5">
           <section className="space-y-2">
