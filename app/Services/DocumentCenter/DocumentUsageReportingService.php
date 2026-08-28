@@ -22,7 +22,9 @@ final class DocumentUsageReportingService
     public function tenantSummary(array $filters): array
     {
         $events = $this->events($filters);
-        $totals = (clone $events)->selectRaw('COUNT(*) as operations, COALESCE(SUM(page_count), 0) as pages, COALESCE(SUM(input_tokens), 0) as input_tokens, COALESCE(SUM(output_tokens), 0) as output_tokens, COALESCE(SUM(processing_duration_ms), 0) as processing_duration_ms')->first();
+        // `select` لا `selectRaw`: الأخير يضيف إلى إسقاط events() (`events.*` + document_type)
+        // فينتج تجميعٌ بأعمدة عارية بلا GROUP BY — يتساهل معه SQLite ويرفضه PostgreSQL (42803).
+        $totals = (clone $events)->select(DB::raw('COUNT(*) as operations, COALESCE(SUM(page_count), 0) as pages, COALESCE(SUM(input_tokens), 0) as input_tokens, COALESCE(SUM(output_tokens), 0) as output_tokens, COALESCE(SUM(processing_duration_ms), 0) as processing_duration_ms'))->first();
         $cost = (clone $events)->whereNotNull('currency')->whereNotNull('cost_minor')
             ->select('currency', DB::raw('SUM(cost_minor) as cost_minor'))
             ->groupBy('currency')->orderBy('currency')->get()->map(fn ($row) => [
@@ -38,7 +40,7 @@ final class DocumentUsageReportingService
                 'input_tokens' => (int) $row->input_tokens,
                 'output_tokens' => (int) $row->output_tokens,
             ])->all();
-        $failed = $this->attempts($filters)->where('status', 'failed')->count();
+        $failed = $this->attempts($filters)->where('document_provider_attempts.status', 'failed')->count();
 
         return [
             'range' => ['from' => $filters['from']->toDateString(), 'to' => $filters['to']->toDateString()],

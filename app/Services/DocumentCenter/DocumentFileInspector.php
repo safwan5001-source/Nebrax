@@ -14,9 +14,7 @@ class DocumentFileInspector
         'image/webp' => ['webp'],
     ];
 
-    public function __construct(private readonly PdfPageCounter $pdfPages)
-    {
-    }
+    public function __construct(private readonly PdfPageCounter $pdfPages) {}
 
     public function inspect(UploadedFile $file): InspectedDocumentFile
     {
@@ -45,7 +43,9 @@ class DocumentFileInspector
             ? $this->pdfPages->count($path)
             : $this->inspectImage($path, $detected);
 
-        $name = trim(basename(str_replace('\\', '/', str_replace("\0", '', $file->getClientOriginalName()))));
+        $rawName = basename(str_replace('\\', '/', $file->getClientOriginalName()));
+        $name = preg_replace('/[\p{Cc}\p{Cf}]/u', '', $rawName);
+        $name = $name === null ? '' : trim($name);
         if ($name === '' || mb_strlen($name) > 255) {
             throw ValidationException::withMessages(['file' => 'اسم الملف غير صالح.']);
         }

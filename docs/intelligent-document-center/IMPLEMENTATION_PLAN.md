@@ -82,9 +82,11 @@ No public receive endpoint, API key, OAuth, webhook, provider, network connectio
 
 لا تفعّل المرحلة AI أو provider network أو durable storage/R2/S3 أو Redis أو worker أو ClamAV أو Render أو scheduler/cron أو polling أو webhook أو inbound API أو credentials. لا توجد support impersonation أو bypass؛ diagnostics الدعم مؤجل حتى عقد مستقل محدد النطاق والموافقة والتدقيق. لا تنشئ المرحلة أي Invoice أو Purchase أو Expense أو DeliveryNote أو journal أو payment أو stock/master-data effect، ولا تستدعي `post()`. راجع [ADR-012](ADR-012-OPERATIONS-USAGE-RETENTION-GOVERNANCE.md).
 
-### PR-13 — Hardening and Gradual Rollout
+### PR-13 — Hardening and Gradual Rollout — Implemented / Readiness Only
 
-Run security, isolation, recovery, performance, accessibility, and migration rehearsals. Roll out behind commercial assignment and application state, monitor fail-closed behavior, and document rollback/incident procedures.
+تثبت المرحلة قابلية الوثوق قبل الإنتاج ولا تضيف feature أو Activation. أُنجز Repository Audit وThreat Model وAuthorization Matrix؛ اختبارات tenant/branch/platform isolation وIDOR، signed download، redaction، CSV safety، provider zero-egress، source replay، stale review، draft idempotency، retry وretention/purge recovery؛ وتجربة SQLite محلية `fresh → rollback(step=1) → reapply`، مع بقاء توافق PostgreSQL فحصاً إلزامياً في CI. يعالج التحصين سباق hold/purge بترتيب قفل ثابت `batch → file` وإعادة eligibility تحت القفل، ثم ينظف pending إذا ظهر hold أو مانع قبل الوصول للتخزين. يضيف `documents:readiness --json` كفحص code/schema آمن لا يتصل بأي خدمة ولا يعرض secret، ويصرح أن external activation غير مضبوط عمداً.
+
+لم تُشغّل المرحلة أي rollout فعلي، ولم تغيّر provider-network gate أو durable storage أو R2/S3 أو Redis أو worker أو ClamAV أو scheduler أو webhook أو public API أو Render/billing. التفعيل الإنتاجي مشروع تشغيل مستقل بموافقة المالك عبر [ADR-013](ADR-013-HARDENING-AND-GRADUAL-ROLLOUT.md)، [ROLLOUT-PLAN.md](ROLLOUT-PLAN.md)، و[ACTIVATION-CHECKLIST.md](ACTIVATION-CHECKLIST.md). تظل مسودات المعاملات غير مرحّلة ولا يوجد Journal/Payment/Stock/Master-data أثر تلقائي.
 
 ## Global acceptance constraints
 

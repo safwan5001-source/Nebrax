@@ -59,24 +59,28 @@ final class DocumentOperationsExportService
      */
     private function auditRows(array $filters): \Generator
     {
-        $governance = DocumentGovernanceEvent::query()->whereBetween('occurred_at', [$filters['from'], $filters['to']])
-            ->orderBy('occurred_at')->cursor();
+        $governance = DocumentGovernanceEvent::query()
+            ->leftJoin('document_batches', 'document_batches.id', '=', 'document_governance_events.document_batch_id')
+            ->whereBetween('document_governance_events.occurred_at', [$filters['from'], $filters['to']])
+            ->select('document_governance_events.*', 'document_batches.source_type as batch_source_type')
+            ->orderBy('document_governance_events.occurred_at')->cursor();
         foreach ($governance as $event) {
-            $batch = $event->batch()->first();
             yield [
                 $event->occurred_at?->toIso8601String(), $event->document_batch_id, $event->action,
                 $event->stage, $event->status, $event->actor_type, $event->actor_id,
-                $event->reason_code, $event->reason_message_safe, $batch?->source_type,
+                $event->reason_code, $event->reason_message_safe, $event->batch_source_type,
             ];
         }
-        $workflow = DocumentWorkflowEvent::query()->whereBetween('occurred_at', [$filters['from'], $filters['to']])
-            ->orderBy('occurred_at')->cursor();
+        $workflow = DocumentWorkflowEvent::query()
+            ->join('document_batches', 'document_batches.id', '=', 'document_workflow_events.document_batch_id')
+            ->whereBetween('document_workflow_events.occurred_at', [$filters['from'], $filters['to']])
+            ->select('document_workflow_events.*', 'document_batches.source_type as batch_source_type')
+            ->orderBy('document_workflow_events.occurred_at')->cursor();
         foreach ($workflow as $event) {
-            $batch = $event->batch()->first();
             yield [
                 $event->occurred_at?->toIso8601String(), $event->document_batch_id, $event->event,
                 null, $event->to_status?->value, $event->actor_type, $event->actor_id,
-                null, $event->reason, $batch?->source_type,
+                null, $event->reason, $event->batch_source_type,
             ];
         }
     }

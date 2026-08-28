@@ -32,8 +32,7 @@ class PlatformIntegrationService
         private readonly DocumentStorageService $storage,
         private readonly DocumentSafetyScanner $scanner,
         private readonly DocumentExtractionProviderRegistry $documentProviders,
-    ) {
-    }
+    ) {}
 
     /** @return array<string, mixed> */
     public function overview(): array
@@ -222,8 +221,8 @@ class PlatformIntegrationService
     }
 
     /** @param array<string, mixed> $validated
-     *  @param array<string, mixed> $previous
-     *  @return array<string, mixed>
+     * @param  array<string, mixed>  $previous
+     * @return array<string, mixed>
      */
     private function normalizeDocumentAiConfiguration(array $validated, array $previous): array
     {
@@ -312,7 +311,7 @@ class PlatformIntegrationService
     }
 
     /** @param array<string, mixed> $configuration
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function upgradeLegacyAiConfiguration(array $configuration): array
     {
@@ -348,7 +347,7 @@ class PlatformIntegrationService
     }
 
     /** @return array<string, mixed> */
-    private function runtime(): array
+    public function runtime(): array
     {
         $heartbeat = PlatformRuntimeHeartbeat::query()
             ->where('component', 'document-worker')
@@ -394,13 +393,15 @@ class PlatformIntegrationService
         foreach ($configuration as $key => $value) {
             if (is_array($value)) {
                 $public[$key] = $this->maskConfiguration($value);
+
                 continue;
             }
             if (in_array($key, self::SECRETS, true)) {
                 if (filled($value)) {
-                    $public[$key . '_masked'] = $this->mask((string) $value);
-                    $public['has_' . $key] = true;
+                    $public[$key.'_masked'] = $this->mask((string) $value);
+                    $public['has_'.$key] = true;
                 }
+
                 continue;
             }
             $public[$key] = $value;
@@ -410,8 +411,8 @@ class PlatformIntegrationService
     }
 
     /** @param array<string, mixed> $before
-     *  @param array<string, mixed> $after
-     *  @return list<string>
+     * @param  array<string, mixed>  $after
+     * @return list<string>
      */
     private function changedKeys(array $before, array $after, ?bool $beforeEnabled, bool $afterEnabled, ?string $beforeProvider, ?string $afterProvider): array
     {
@@ -434,7 +435,7 @@ class PlatformIntegrationService
     }
 
     /** @param array<string, mixed> $configuration
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function flatten(array $configuration, string $prefix = ''): array
     {
@@ -464,7 +465,7 @@ class PlatformIntegrationService
 
     private function mask(string $value): string
     {
-        return '••••••••' . mb_substr($value, -4);
+        return '••••••••'.mb_substr($value, -4);
     }
 
     private function assertKey(string $key): void

@@ -181,7 +181,10 @@ test.describe('Document QA — scenarios, A4 and responsive preview', () => {
     await test.info().attach('responsive-preview.json', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
   });
 
-  test('ينتج PDF عبر مسار التصدير الحالي وطباعة Chromium على A4 لسيناريو متعدد الصفحات', async ({ page }) => {
+  test('ينتج PDF عبر مسار التصدير الحالي وطباعة Chromium على A4 لسيناريو متعدد الصفحات', async ({ page }, testInfo) => {
+    // هذا تحقق Chromium/A4 يفرض viewport سطح مكتب 1440px أدناه؛ الاستجابة المحمولة
+    // تُغطى باختبار A4/no-overflow المنفصل ولا تضيف إعادة print المحمولة دليلاً جديداً.
+    test.skip(testInfo.project.name === 'mobile', 'A4 Chromium print is validated in the desktop rendering context.');
     const cases = [
       ...commercialTypes.map((type, index) => ({ type, template: templates[index % templates.length] })),
       ...taxTypes.flatMap((type) => templates.map((template) => ({ type, template }))),
