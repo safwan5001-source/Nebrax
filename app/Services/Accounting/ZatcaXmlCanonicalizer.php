@@ -94,29 +94,36 @@ final class ZatcaXmlCanonicalizer
             array_unshift($lineage, $node);
         }
 
-        /** @var array<string, string> $namespaces */
-        $namespaces = [];
         foreach ($lineage as $node) {
+            if ($node === $element) {
+                continue;
+            }
+
             foreach ($node->attributes as $attribute) {
-                if (
-                    $node !== $element
-                    && $attribute->namespaceURI === self::XML_NAMESPACE
-                ) {
+                if ($attribute->namespaceURI === self::XML_NAMESPACE) {
                     throw new RuntimeException(
                         'خصائص xml:* الموروثة غير مدعومة في سياق توقيع ZATCA.'
                     );
                 }
-
-                if (
-                    $attribute->nodeName === 'xmlns'
-                    || $attribute->namespaceURI === self::XMLNS_NAMESPACE
-                ) {
-                    $prefix = $attribute->nodeName === 'xmlns'
-                        ? ''
-                        : $attribute->localName;
-                    $namespaces[$prefix] = $attribute->value;
-                }
             }
+        }
+
+        $xpath = new \DOMXPath($ownerDocument);
+        $namespaceNodes = $xpath->query('namespace::*', $element);
+        if ($namespaceNodes === false) {
+            throw new RuntimeException('تعذر قراءة namespace context لعنصر توقيع ZATCA.');
+        }
+
+        /** @var array<string, string> $namespaces */
+        $namespaces = [];
+        foreach ($namespaceNodes as $namespaceNode) {
+            $name = $namespaceNode->nodeName;
+            if ($name === 'xmlns:xml') {
+                continue;
+            }
+
+            $prefix = $name === 'xmlns' ? '' : substr($name, strlen('xmlns:'));
+            $namespaces[$prefix] = (string) $namespaceNode->nodeValue;
         }
 
         $temporary = new DOMDocument('1.0', 'UTF-8');
