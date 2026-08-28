@@ -77,6 +77,14 @@ final class ZatcaCredentialMaterialValidator
             && is_array($certificateData['extensions'] ?? null)
                 ? $certificateData['extensions']
                 : [];
+        $basicConstraints = strtolower((string) ($extensions['basicConstraints'] ?? ''));
+        if (str_contains(str_replace(' ', '', $basicConstraints), 'ca:true')) {
+            $this->invalid(
+                'binary_security_token',
+                'يجب أن تكون شهادة CSID شهادة نهائية وليست شهادة سلطة تصديق CA.'
+            );
+        }
+
         $keyUsage = strtolower((string) ($extensions['keyUsage'] ?? ''));
         if (! str_contains(str_replace([' ', '-'], '', $keyUsage), 'digitalsignature')) {
             $this->invalid(

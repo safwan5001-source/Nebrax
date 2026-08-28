@@ -68,6 +68,13 @@ extendedKeyUsage = 1.3.6.1.5.5.7.3.20
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid, issuer
 
+[ csid_ca_leaf ]
+basicConstraints = critical, CA:true
+keyUsage = critical, digitalSignature, keyCertSign
+extendedKeyUsage = clientAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid, issuer
+
 [ self_signed_leaf ]
 basicConstraints = critical, CA:false
 keyUsage = critical, digitalSignature, keyEncipherment
@@ -399,6 +406,19 @@ CONF;
         $this->withToken($auth['token'])->putJson(
             '/api/zatca-credentials/simulation',
             $this->payload($this->certificateMaterial('client-auth-prefix', 'client_auth_prefix_leaf'))
+        )->assertUnprocessable()->assertJsonValidationErrors('binary_security_token');
+
+        $this->assertDatabaseCount('zatca_credentials', 0);
+    }
+
+    /** @test */
+    public function a_certificate_authority_cannot_be_stored_as_a_csid_leaf(): void
+    {
+        $auth = $this->registerTenant('zatca-csid-ca', 'zatca-csid-ca@example.test');
+
+        $this->withToken($auth['token'])->putJson(
+            '/api/zatca-credentials/simulation',
+            $this->payload($this->certificateMaterial('csid-ca', 'csid_ca_leaf'))
         )->assertUnprocessable()->assertJsonValidationErrors('binary_security_token');
 
         $this->assertDatabaseCount('zatca_credentials', 0);
