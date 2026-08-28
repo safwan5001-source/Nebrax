@@ -22,9 +22,8 @@
 
 ## 4. HEAD SHA
 
-## 4. HEAD SHA
-
-`65b65bad4155aa012b8bab3454f0f4ce3e1d69de`
+تنفيذ الكود: `b03cbbfdd7a71adea4d8b8a97263bf0fdc88519d`  
+رأس الفرع (يشمل هذا التقرير) يُحدَّث مع كل commit توثيقي؛ القيمة المعتمدة للمراجعة هي `git rev-parse HEAD` على `cursor/pos-hybrid-adaptive-2ebb`.
 
 ## 5. changed files
 
@@ -158,7 +157,7 @@ web/src/components/pos/interactions/shortcut-registry.test.ts
 - **PR #545 (Keyboard):** https://github.com/safwan5001-source/Nebrax/pull/545
 - **PR #542 (Foundation):** https://github.com/safwan5001-source/Nebrax/pull/542
 - **Base:** `cc1bbe7fe3bdc5db6d6451ddb998c4fe5e6210f0`
-- **HEAD:** `65b65bad4155aa012b8bab3454f0f4ce3e1d69de`
+- **HEAD (كود):** `b03cbbfdd7a71adea4d8b8a97263bf0fdc88519d`
 
 ---
 
