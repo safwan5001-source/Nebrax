@@ -69,7 +69,7 @@ import { useCompany } from '@/lib/company';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
-import { canViewDocumentCenter } from '@/lib/document-review-access';
+import { hiddenApplicationKeys, isNavEntryVisible } from '@/components/layout/nav-visibility';
 import { POS_SIDEBAR_LAUNCH_ITEMS, posNavNewTabAnchorProps } from '@/lib/pos-workspace';
 
 interface NavItem {
@@ -80,11 +80,16 @@ interface NavItem {
   built?: boolean;
   /**
    * مفتاح `ApplicationCatalog` الذي يتحكم بظهور هذا العنصر وحده — يختفي إن
-   * أوقفه المالك من `/applications`. غياب المفتاح يعني ظهوراً دائماً (قدرة
+   * أوقفه المالك من `/applications` أو إن لم يكن للمؤسسة استحقاق تجاري نافذ
+   * للقدرة. القرار كامله يأتي محسوباً من `GET /applications/nav-state`؛ لا
+   * تحسب الواجهة استحقاقاً بنفسها. غياب المفتاح يعني ظهوراً دائماً (قدرة
    * إلزامية أو بلا مفتاح تفعيل مستقل).
    */
   appKey?: string;
-  /** صلاحية RBAC مطلوبة لإظهار عنصر تشغيلي حساس في الشريط. */
+  /**
+   * صلاحية RBAC مطلوبة لإظهار عنصر تشغيلي حساس في الشريط — تُفحَص بمرآة
+   * `Rbac::allows` نفسها (`hasPermission`)، فلا يظهر رابط يردّ مساره 403.
+   */
   permission?: string;
   /** يفتح الرابط في تبويب جديد (بدء البيع فقط). */
   openInNewTab?: boolean;
@@ -222,7 +227,14 @@ const GROUPS: NavGroup[] = [
     title: 'operations',
     icon: Workflow,
     items: [
-      { href: '/documents', icon: FileText, key: 'documentCenter', built: true, appKey: 'document_center.core' },
+      {
+        href: '/documents',
+        icon: FileText,
+        key: 'documentCenter',
+        built: true,
+        appKey: 'document_center.core',
+        permission: 'documents.center.view',
+      },
       { href: '/work-orders', icon: Wrench, key: 'workOrders' },
       { href: '/workflow', icon: Workflow, key: 'workflow' },
       { href: '/bookings', icon: CalendarCheck, key: 'bookings' },
@@ -333,10 +345,7 @@ export function Sidebar({
     api<{ data: Record<string, boolean> }>('/applications/nav-state')
       .then((res) => {
         if (cancelled || Array.isArray(res.data)) return;
-        const hidden = Object.entries(res.data)
-          .filter(([, visible]) => !visible)
-          .map(([key]) => key);
-        setHiddenAppKeys(new Set(hidden));
+        setHiddenAppKeys(hiddenApplicationKeys(res.data));
       })
       .catch(() => {});
     return () => {
@@ -345,18 +354,9 @@ export function Sidebar({
   }, []);
 
   const user = currentUser();
-  const canViewDocuments = canViewDocumentCenter(user?.permissions, user?.role);
-  const groupHidden = (group: NavGroup) => Boolean(group.appKey && hiddenAppKeys.has(group.appKey));
-  const canViewItem = (item: NavItem) => {
-    if (item.key === 'documentCenter' && !canViewDocuments) return false;
-    if (!item.permission) return true;
-    return user?.role === 'owner'
-      || user?.role === 'admin'
-      || user?.permissions?.includes('*') === true
-      || user?.permissions?.includes(item.permission) === true;
-  };
+  const groupHidden = (group: NavGroup) => !isNavEntryVisible({ appKey: group.appKey }, hiddenAppKeys, user);
   const visibleItems = (group: NavGroup) =>
-    group.items.filter((item) => (!item.appKey || !hiddenAppKeys.has(item.appKey)) && canViewItem(item));
+    group.items.filter((item) => isNavEntryVisible(item, hiddenAppKeys, user));
 
   // المجموعة التي انبثقت قائمتها في الحالة المطوية (flyout)، وموضعها الرأسي.
   const [flyout, setFlyout] = useState<{ title: string; top: number } | null>(null);

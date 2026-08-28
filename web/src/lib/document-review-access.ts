@@ -1,3 +1,5 @@
+import { hasPermission } from '@/lib/permissions';
+
 export type LinkedTransaction = {
   link_id: string;
   transaction_type: 'purchase' | 'expense';
@@ -21,8 +23,12 @@ export function shouldShowReviewReadinessBlocker(input: { isReviewMutable: boole
   return input.isReviewMutable && !input.canComplete;
 }
 
+/**
+ * ظهور مركز المستندات في التنقل = صلاحية العرض وحدها. أما الاستحقاق التجاري
+ * وحالة التطبيق فيحسمهما الخادم في `GET /applications/nav-state` ولا تُحسب هنا.
+ */
 export function canViewDocumentCenter(permissions?: string[], role?: string): boolean {
-  return permissions?.includes('documents.center.view') ?? ['owner', 'admin'].includes(role ?? '');
+  return hasPermission(permissions, role, 'documents.center.view');
 }
 
 export function canBuildDocumentDraft(input: {
