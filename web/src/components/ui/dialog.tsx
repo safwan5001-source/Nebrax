@@ -30,17 +30,17 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative z-10 my-8 w-full max-w-lg rounded border border-border bg-surface',
+          'relative z-10 my-8 flex max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-lg flex-col overflow-hidden rounded border border-border bg-surface sm:max-h-[calc(100dvh-4rem)]',
           className
         )}
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-base font-semibold text-text">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="إغلاق">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="min-w-0 truncate text-base font-semibold text-text">{title}</h2>
+          <button type="button" onClick={onClose} className="shrink-0 rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="إغلاق">
             <X className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="min-w-0 overflow-y-auto overflow-x-hidden p-4 [&_pre]:max-w-full [&_pre]:whitespace-pre-wrap [&_pre]:break-all">{children}</div>
       </div>
     </div>
   );
