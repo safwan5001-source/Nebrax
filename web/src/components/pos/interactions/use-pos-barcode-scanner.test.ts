@@ -144,4 +144,49 @@ describe('ماسح الباركود في نقطة البيع', () => {
 
     expect(onScan).not.toHaveBeenCalled();
   });
+
+  it('يبلّغ عن نشاط الماسح عند نمو المخزن واكتمال المسح دون الكتابة في حقل', () => {
+    const onScan = vi.fn();
+    const onScannerActivity = vi.fn();
+    renderHook(() => usePosBarcodeScanner({ onScan, onScannerActivity }));
+
+    scan('123');
+    expect(onScannerActivity).toHaveBeenCalledTimes(3);
+    press('Enter');
+    expect(onScannerActivity).toHaveBeenCalledTimes(4);
+    expect(onScan).toHaveBeenCalledWith('123');
+  });
+
+  it('لا يبلّغ عن نشاط ماسح عند التعطيل', () => {
+    const onScannerActivity = vi.fn();
+    renderHook(() => usePosBarcodeScanner({ onScan: vi.fn(), onScannerActivity, enabled: false }));
+    scan('123');
+    press('Enter');
+    expect(onScannerActivity).not.toHaveBeenCalled();
+  });
+
+  it('لا يبلّغ عن نشاط ماسح داخل حقل مركَّز', () => {
+    const onScannerActivity = vi.fn();
+    renderHook(() => usePosBarcodeScanner({ onScan: vi.fn(), onScannerActivity }));
+    focusInput();
+    scan('123');
+    press('Enter');
+    expect(onScannerActivity).not.toHaveBeenCalled();
+  });
+
+  it('يستدعي أحدث onScannerActivity بعد rerender فلا يضاعف المستمعين', () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const { rerender } = renderHook(
+      ({ onScannerActivity }) => usePosBarcodeScanner({ onScan: vi.fn(), onScannerActivity }),
+      { initialProps: { onScannerActivity: first } },
+    );
+
+    rerender({ onScannerActivity: second });
+    scan('123');
+    press('Enter');
+
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalled();
+  });
 });

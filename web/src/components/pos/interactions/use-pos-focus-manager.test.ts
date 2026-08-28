@@ -60,6 +60,7 @@ describe('مدير التركيز في نقطة البيع', () => {
     result.current.focusZone('products', { productIndex: 0 });
 
     expect(shouldRestorePosFocus('pointer')).toBe(false);
+    expect(shouldRestorePosFocus('scanner')).toBe(false);
     expect(document.activeElement).toBe(product);
     expect(search).not.toBe(document.activeElement);
   });
