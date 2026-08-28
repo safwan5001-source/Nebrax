@@ -23,6 +23,7 @@ const user: AuthUser = {
 describe('currentUser referential stability', () => {
   beforeEach(() => {
     store.clear();
+    vi.stubGlobal('window', {});
     vi.stubGlobal('localStorage', localStorageMock);
   });
 
