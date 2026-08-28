@@ -570,6 +570,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('pos/audit/risk', [PosLossPreventionController::class, 'risk'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/risk/{userId}', [PosLossPreventionController::class, 'riskDetail'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/relationships', [PosLossPreventionController::class, 'relationships'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        // Phase 4 — قائمة موحّدة «تحتاج انتباهاً» (استثناءات أولوية/بانتظار تحقيق، اعتمادات
+        // معلَّقة، قضايا غير مسنَدة/متجاوزة عتبة نشاط، إشارة ملخّص يومي). نفس صلاحية القراءة
+        // القائمة — لا حاجة صلاحية جديدة لمجرد تجميع بالمرجع فوق بيانات مرئية أصلاً.
+        Route::get('pos/audit/needs-attention', [PosLossPreventionController::class, 'needsAttention'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/rules', [PosLossPreventionController::class, 'rules'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::put('pos/audit/rules/{key}', [PosLossPreventionController::class, 'updateRule'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
         Route::post('pos/audit/exceptions/{id}/review', [PosLossPreventionController::class, 'review'])->middleware([$perm('pos.audit.review'), $app('sales.pos')]);
