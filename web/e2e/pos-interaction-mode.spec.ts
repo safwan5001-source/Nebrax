@@ -1,0 +1,200 @@
+import { expect, test, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
+
+const evidenceDir = path.resolve(process.cwd(), '../docs/visual-qa/pr-interaction-mode');
+/** ضوضاء Next/Chromium المعروفة فقط — لا تبتلع فشل موارد غير متوقع. */
+const KNOWN_CONSOLE_NOISE = /net::ERR_ABORTED|\.css\.map|[?&]_rsc=|\/favicon\.ico(?:\?|$)/;
+const UNEXPECTED_HTTP_STATUS = /status of (401|403|500)\b/;
+const SEARCH = /ابحث بالاسم|Search by name|ابحث في المنتجات|Search products/;
+const SESSION = /فتح جلسة جديدة|Open new session/;
+const SAVE = /حفظ الإعدادات|Save settings/;
+
+test.describe.configure({ mode: 'serial' });
+
+test.describe('PR-7 POS interaction mode settings', () => {
+  test('persist modes and apply policy on /pos', async ({ page, browser }) => {
+    test.skip(test.info().project.name !== 'desktop', 'captures are driven inside this test');
+    test.setTimeout(360_000);
+    await mkdir(evidenceDir, { recursive: true });
+    const consoleErrors: string[] = [];
+    attachConsole(page, consoleErrors);
+
+    await enterDemo(page);
+    await applyAppearance(page, { locale: 'ar', theme: 'light' });
+    await openConfiguration(page);
+    await expect(page.locator('#interaction_mode_AUTO')).toBeChecked();
+    await expect(page.getByText(/موصى به|Recommended/).first()).toBeVisible();
+    await page.screenshot({ path: path.join(evidenceDir, 'settings-ar-rtl-light.png'), fullPage: true });
+
+    await page.locator('#interaction_mode_TOUCH').check();
+    await saveConfiguration(page);
+    await expect(page.locator('#interaction_mode_TOUCH')).toBeChecked();
+    await page.reload({ waitUntil: 'load' });
+    await expect(page.getByTestId('pos-interaction-mode')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('#interaction_mode_TOUCH')).toBeChecked();
+
+    await openPos(page);
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await expectSaleShell(page);
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-interaction-mode', 'TOUCH');
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-shortcut-hints', 'off');
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-scanner-enabled', 'on');
+    await expect(page.getByTestId('pos-shortcut-footer')).toBeHidden();
+    await page.screenshot({ path: path.join(evidenceDir, 'pos-touch-desktop.png') });
+
+    await openConfiguration(page);
+    await page.locator('#interaction_mode_KEYBOARD_MOUSE').check();
+    await saveConfiguration(page);
+    await expect(page.locator('#interaction_mode_KEYBOARD_MOUSE')).toBeChecked();
+
+    await openPos(page);
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await expectSaleShell(page);
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-interaction-mode', 'KEYBOARD_MOUSE');
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-shortcut-hints', 'on');
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-scanner-enabled', 'on');
+    await expect(page.getByTestId('pos-shortcut-footer')).toBeVisible();
+    await page.keyboard.press('F4');
+    await expect(page.getByPlaceholder(SEARCH)).toBeFocused();
+    await page.screenshot({ path: path.join(evidenceDir, 'pos-keyboard-mouse-desktop.png') });
+
+    await openConfiguration(page);
+    await page.locator('#interaction_mode_HYBRID').check();
+    await saveConfiguration(page);
+    await expect(page.locator('#interaction_mode_HYBRID')).toBeChecked();
+
+    await openPos(page);
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await expectSaleShell(page);
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-interaction-mode', 'HYBRID');
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-scanner-enabled', 'on');
+    const product = page.locator('section button[aria-selected]').first();
+    await expect(product).toBeVisible();
+    await product.click();
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-keyboard-power', 'off');
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-keyboard-power', 'on');
+    await page.screenshot({ path: path.join(evidenceDir, 'pos-hybrid-desktop.png') });
+
+    await openConfiguration(page);
+    await page.locator('#interaction_mode_AUTO').check();
+    await saveConfiguration(page);
+    await expect(page.locator('#interaction_mode_AUTO')).toBeChecked();
+
+    await openPos(page);
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await expectSaleShell(page);
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-interaction-mode', 'AUTO');
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-shortcut-hints', 'on');
+    await expect(page.getByTestId('pos-shortcut-footer')).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectSaleShell(page);
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-shortcut-hints', 'off');
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-prefer-touch', 'on');
+    await expect(page.getByTestId('pos-sale-shell')).toHaveAttribute('data-scanner-enabled', 'on');
+
+    await applyAppearance(page, { locale: 'ar', theme: 'dark' });
+    await openConfiguration(page);
+    await page.screenshot({ path: path.join(evidenceDir, 'settings-ar-rtl-dark.png'), fullPage: true });
+
+    await applyAppearance(page, { locale: 'en', theme: 'light' });
+    await openConfiguration(page);
+    await expect(page.getByRole('radio', { name: /^Auto/i })).toBeVisible();
+    await expect(page.getByText('Recommended')).toBeVisible();
+    await page.screenshot({ path: path.join(evidenceDir, 'settings-en-ltr-light.png'), fullPage: true });
+
+    const mobile = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const mobileErrors: string[] = [];
+    attachConsole(mobile, mobileErrors);
+    await enterDemo(mobile);
+    await applyAppearance(mobile, { locale: 'ar', theme: 'light' });
+    await openConfiguration(mobile);
+    await expect(mobile.locator('#interaction_mode_AUTO')).toBeVisible();
+    await mobile.screenshot({ path: path.join(evidenceDir, 'settings-mobile-390.png'), fullPage: true });
+    await mobile.close();
+
+    expect(consoleErrors, `desktop console:\n${consoleErrors.join('\n')}`).toEqual([]);
+    expect(mobileErrors, `mobile console:\n${mobileErrors.join('\n')}`).toEqual([]);
+  });
+});
+
+function attachConsole(page: Page, bucket: string[]) {
+  page.on('console', (message) => {
+    const text = message.text();
+    if (message.type() !== 'error') return;
+    if (UNEXPECTED_HTTP_STATUS.test(text)) {
+      bucket.push(text);
+      return;
+    }
+    if (KNOWN_CONSOLE_NOISE.test(text)) return;
+    if (text.includes('Failed to load resource') && KNOWN_CONSOLE_NOISE.test(text)) return;
+    bucket.push(text);
+  });
+  page.on('pageerror', (error) => {
+    bucket.push(error.message);
+  });
+}
+
+async function enterDemo(page: Page) {
+  await page.goto('/login', { waitUntil: 'load' });
+  await page.getByRole('button', { name: /دخول تجريبي|Demo login/ }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  const closeBanner = page.getByRole('button', { name: /إغلاق|Close/ });
+  if (await closeBanner.isVisible().catch(() => false)) {
+    await closeBanner.click();
+  }
+}
+
+async function applyAppearance(page: Page, options: { locale: 'ar' | 'en'; theme: 'light' | 'dark' }) {
+  await page.evaluate(({ locale, theme }) => {
+    document.cookie = `locale=${locale};path=/;max-age=31536000;samesite=lax`;
+    localStorage.setItem('theme', theme);
+  }, options);
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('html')).toHaveAttribute('lang', options.locale);
+  await expect(page.locator('html')).toHaveAttribute('dir', options.locale === 'ar' ? 'rtl' : 'ltr');
+  if (options.theme === 'dark') {
+    await expect(page.locator('html')).toHaveClass(/dark/);
+  } else {
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+  }
+}
+
+async function saveConfiguration(page: Page) {
+  await page.getByRole('button', { name: SAVE }).click();
+  await expect(page.getByTestId('pos-interaction-mode')).toBeVisible({ timeout: 20_000 });
+}
+
+async function openConfiguration(page: Page) {
+  await page.goto('/pos/settings/configuration', { waitUntil: 'load' });
+  await expect(page.getByTestId('pos-interaction-mode')).toBeVisible({ timeout: 30_000 });
+}
+
+async function openPos(page: Page) {
+  await page.goto('/pos', { waitUntil: 'load' });
+  const search = page.getByPlaceholder(SEARCH);
+  const session = page.getByText(SESSION);
+  await expect(search.or(session)).toBeVisible({ timeout: 30_000 });
+  if (await session.isVisible().catch(() => false) && !(await search.isVisible().catch(() => false))) {
+    const device = page.locator('#pos-device');
+    if (await device.isEnabled().catch(() => false)) {
+      const options = await device.locator('option').allTextContents();
+      const firstReal = options.find((label) => label.trim() && !/select|اختر/i.test(label));
+      if (firstReal) await device.selectOption({ label: firstReal });
+    }
+    await page.locator('#ob').fill('100');
+    await page.getByRole('button', { name: /فتح جلسة|Open/ }).click();
+  }
+  await expect(page.getByPlaceholder(SEARCH)).toBeVisible({ timeout: 30_000 });
+}
+
+async function expectSaleShell(page: Page) {
+  await expect(page.getByPlaceholder(SEARCH)).toBeVisible();
+  await expect(page.getByTestId('pos-sale-shell')).toBeVisible();
+}

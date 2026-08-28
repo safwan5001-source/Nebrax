@@ -1373,6 +1373,7 @@ export const mockSalesConfig: Record<string, unknown> = {
     default_payment_method_id: 'pm-method-cash',
     allow_deferred_payment: true,
     show_product_images: true,
+    interaction_mode: 'AUTO',
     cash_drawer_enabled: false,
     cash_drawer_driver: 'unavailable',
     cash_drawer_auto_open_after_cash: false,
@@ -1398,6 +1399,39 @@ export const mockSalesConfig: Record<string, unknown> = {
     outside_hours_grace_minutes: 45,
   },
 };
+
+/** بقاء mock نقطة البيع عبر إعادة تحميل صفحة التجربة — نفس المصدر لا مخزن منتج ثانٍ. */
+const DEMO_POS_SETTINGS_KEY = 'nibras_demo_sales_config_pos';
+
+function readDemoPosSettings(): Record<string, unknown> | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(DEMO_POS_SETTINGS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDemoPosSettings(data: unknown): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(DEMO_POS_SETTINGS_KEY, JSON.stringify(data));
+  } catch { /* ignore quota */ }
+}
+
+function demoPosSettings(): Record<string, unknown> {
+  const current = mockSalesConfig.pos;
+  const base = current && typeof current === 'object' && !Array.isArray(current)
+    ? current as Record<string, unknown>
+    : {};
+  const stored = readDemoPosSettings();
+  return stored ? { ...base, ...stored } : { ...base };
+}
 
 export const mockBranches = [
   { id: 'br-1', code: '00001', name: 'الفرع الرئيسي', is_main: true, phone: '0138100000', mobile: '0550000000', address_line1: 'طريق الملك فهد', address_line2: '', city: 'الدمام', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: 'الأحد–الخميس ٩ص–٥م', latitude: 26.4207, longitude: 50.0888, is_active: true },
@@ -2596,8 +2630,9 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
           ...(current && typeof current === 'object' && !Array.isArray(current) ? current as Record<string, unknown> : {}),
           ...payload,
         };
+        if (section === 'pos') writeDemoPosSettings(mockSalesConfig.pos);
       }
-      return resolve({ data: mockSalesConfig[section] ?? payload });
+      return resolve({ data: section === 'pos' ? demoPosSettings() : mockSalesConfig[section] ?? payload });
     }
     return resolve({ data: { id: 'demo-new' } });
   }
@@ -2656,7 +2691,11 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/sales-settings') return resolve({ data: mockSalesSettings });
   if (clean === '/customer-settings') return resolve({ data: mockCustomerSettings });
   const salesConfigMatch = clean.match(/^\/sales-config\/([^/]+)$/);
-  if (salesConfigMatch) return resolve({ data: mockSalesConfig[salesConfigMatch[1]] ?? [] });
+  if (salesConfigMatch) {
+    const section = salesConfigMatch[1];
+    if (section === 'pos') return resolve({ data: demoPosSettings() });
+    return resolve({ data: mockSalesConfig[section] ?? [] });
+  }
   if (clean === '/users') return resolve({ data: mockUsers });
   if (clean === '/pos/products') {
     return resolve({

@@ -34,6 +34,18 @@ final class PosSettings
     public const AUDIT_POLICY_ALLOWED = 'allowed';
     public const AUDIT_POLICY_APPROVAL_REQUIRED = 'approval_required';
     public const AUDIT_POLICY_DENIED = 'denied';
+    public const INTERACTION_MODE_AUTO = 'AUTO';
+    public const INTERACTION_MODE_TOUCH = 'TOUCH';
+    public const INTERACTION_MODE_KEYBOARD_MOUSE = 'KEYBOARD_MOUSE';
+    public const INTERACTION_MODE_HYBRID = 'HYBRID';
+
+    /** أوضاع تفاعل الكاشير المعتمدة — سياسة تشغيل لا أثر مالي. */
+    public const INTERACTION_MODES = [
+        self::INTERACTION_MODE_AUTO,
+        self::INTERACTION_MODE_TOUCH,
+        self::INTERACTION_MODE_KEYBOARD_MOUSE,
+        self::INTERACTION_MODE_HYBRID,
+    ];
 
     private const DEFAULTS = [
         // المعرّف هو المصدر المستقر للعميل الافتراضي. الاسم يبقى للتوافق مع
@@ -63,6 +75,9 @@ final class PosSettings
         // لم يكن للكاشير محرر رقمي على الشاشة؛ يبقى المسار النصي القائم للمستأجرين
         // الحاليين حتى يفعّل المالك المساعد اللمسي صراحةً من تهيئة POS.
         'show_onscreen_numeric_keypad' => false,
+        // أسلوب التفاعل يوجّه طبقة /pos التكيفية فقط. AUTO يحفظ سلوك المستأجرين
+        // القائمين (تكيّف PR-4 + أهداف لمس PR-6) دون قفل نمط واحد.
+        'interaction_mode' => self::INTERACTION_MODE_AUTO,
         // الافتراض يحفظ سلوك POS السابق الذي كان يسمح ببيع جزئي/آجل.
         'allow_deferred_payment' => true,
         // الافتراض المتوافق: لا تتغير المنتجات الظاهرة للمستأجر القائم. يختار
@@ -127,7 +142,22 @@ final class PosSettings
                 : self::PAYMENT_METHODS_ONLY;
         }
 
-        return array_merge(self::DEFAULTS, array_intersect_key($stored, self::DEFAULTS));
+        $merged = array_merge(self::DEFAULTS, array_intersect_key($stored, self::DEFAULTS));
+        if (! in_array($merged['interaction_mode'] ?? null, self::INTERACTION_MODES, true)) {
+            $merged['interaction_mode'] = self::INTERACTION_MODE_AUTO;
+        }
+
+        return $merged;
+    }
+
+    /** أسلوب تفاعل الكاشير الصالح؛ القيمة الغائبة أو القديمة تعود لتلقائي. */
+    public static function interactionMode(?Tenant $tenant = null): string
+    {
+        $mode = self::group($tenant)['interaction_mode'];
+
+        return in_array($mode, self::INTERACTION_MODES, true)
+            ? $mode
+            : self::INTERACTION_MODE_AUTO;
     }
 
     /** قائمة معرّفات الوسائل المقيدة صراحةً؛ الفارغة تعني جميع الوسائل النشطة. */

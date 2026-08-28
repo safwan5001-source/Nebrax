@@ -17,4 +17,12 @@ describe('شريط اختصارات نقطة البيع', () => {
     }
     expect(document.querySelectorAll('kbd')).toHaveLength(POS_SHORTCUT_FOOTER.length);
   });
+
+  it('يخفي الشريط بالكامل عندما تمنع السياسة التلميحات', () => {
+    renderIntl(<PosShortcuts visible={false} />, 'ar');
+    const footer = document.querySelector('[data-testid="pos-shortcut-footer"]');
+    expect(footer).not.toBeNull();
+    expect(footer?.classList.contains('hidden')).toBe(true);
+    expect(footer?.getAttribute('data-visible')).toBe('false');
+  });
 });

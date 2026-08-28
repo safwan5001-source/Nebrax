@@ -57,6 +57,13 @@ import { usePosProductNavigation, usePosProductSelection, usePosSearchFieldNavig
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
 import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 import { runPosCheckout } from '@/lib/pos-checkout';
+import {
+  parsePosInteractionMode,
+  posInteractionViewportFromMedia,
+  resolvePosInteractionPolicy,
+  type PosInteractionMode,
+  type PosInteractionViewport,
+} from '@/lib/pos-interaction-policy';
 import { resolvePosDefaultCustomer } from '@/lib/pos-default-customer';
 import { executeCashDrawerAction, type CashDrawerAction, type CashDrawerBridgeResult } from '@/lib/cash-drawer-bridge';
 
@@ -73,6 +80,7 @@ interface PosConfig extends PosFeedbackSettings {
   apply_customer_price_list: boolean;
   allow_unit_price_override: boolean;
   show_onscreen_numeric_keypad: boolean;
+  interaction_mode: PosInteractionMode;
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   enabled_payment_method_ids: string[];
   payment_methods_mode: 'all_active' | 'only' | 'none';
@@ -95,6 +103,7 @@ const POS_DEFAULTS: PosConfig = {
   allow_unit_price_override: false,
   // لم تكن لوحة أرقام مساعدة في الكاشير سابقاً؛ نبقيها معطلة حتى يختارها المالك صراحةً.
   show_onscreen_numeric_keypad: false,
+  interaction_mode: 'AUTO',
   held_sale_close_policy: 'discard_on_session_close',
   enabled_payment_method_ids: [],
   payment_methods_mode: 'all_active',
@@ -163,15 +172,23 @@ export default function PosPage() {
     focusZone,
     restoreFocusSafe,
   } = focusManager;
-  const { keyboardActive, onPointerDown, onKeyDown: onKeyboardActiveKeyDown, markScanner, restoreAfterUi } = usePosKeyboardActive();
-  const restoreFocusAfterUi = useCallback(() => restoreAfterUi(restoreFocusSafe), [restoreAfterUi, restoreFocusSafe]);
+  const { keyboardActive, lastInput, onPointerDown, onKeyDown: onKeyboardActiveKeyDown, markScanner, restoreAfterUi } = usePosKeyboardActive();
   const [desktopKeyboardNav, setDesktopKeyboardNav] = useState(false);
+  const [viewport, setViewport] = useState<PosInteractionViewport>('desktop');
   useEffect(() => {
-    const media = window.matchMedia('(min-width: 1024px)');
-    const sync = () => setDesktopKeyboardNav(media.matches);
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const tablet = window.matchMedia('(min-width: 768px)');
+    const sync = () => {
+      setDesktopKeyboardNav(desktop.matches);
+      setViewport(posInteractionViewportFromMedia(desktop.matches, tablet.matches));
+    };
     sync();
-    media.addEventListener('change', sync);
-    return () => media.removeEventListener('change', sync);
+    desktop.addEventListener('change', sync);
+    tablet.addEventListener('change', sync);
+    return () => {
+      desktop.removeEventListener('change', sync);
+      tablet.removeEventListener('change', sync);
+    };
   }, []);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -198,6 +215,13 @@ export default function PosPage() {
   const paymentRequestRef = useRef(false);
   const auditCartRequestRef = useRef(new Map<string, Promise<string>>());
   const [posCfg, setPosCfg] = useState<PosConfig>(POS_DEFAULTS);
+  const interactionMode = parsePosInteractionMode(posCfg.interaction_mode);
+  const policy = resolvePosInteractionPolicy(interactionMode, { viewport, lastModality: lastInput });
+  const restoreFocusAfterUi = useCallback(() => {
+    if (!policy.restoreKeyboardFocus) return false;
+    return restoreAfterUi(restoreFocusSafe);
+  }, [policy.restoreKeyboardFocus, restoreAfterUi, restoreFocusSafe]);
+  const keyboardNavEnabled = desktopKeyboardNav && interactionMode !== 'TOUCH';
   const [paymentMethods, setPaymentMethods] = useState<PosPaymentMethod[]>([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
   const [paymentMethodsError, setPaymentMethodsError] = useState<string | null>(null);
@@ -405,7 +429,11 @@ export default function PosPage() {
       })
       .catch(() => {});
     api<{ data: Partial<PosConfig> }>('/sales-config/pos')
-      .then((r) => setPosCfg({ ...POS_DEFAULTS, ...r.data }))
+      .then((r) => setPosCfg({
+        ...POS_DEFAULTS,
+        ...r.data,
+        interaction_mode: parsePosInteractionMode(r.data.interaction_mode),
+      }))
       .catch(() => {});
     api<{ data: PosPaymentMethod[] }>('/payment-methods')
       .then((r) => setPaymentMethods(r.data.filter((method) => method.is_active)))
@@ -793,7 +821,7 @@ export default function PosPage() {
 
   usePosBarcodeScanner({
     onScan: scanCode,
-    enabled: step === 'sale' && !dialogOpen,
+    enabled: policy.scannerEnabled && step === 'sale' && !dialogOpen,
     onScannerActivity: markScanner,
   });
 
@@ -821,7 +849,7 @@ export default function PosPage() {
   }, { step, dialogFlags });
 
   usePosProductNavigation({
-    enabled: desktopKeyboardNav,
+    enabled: keyboardNavEnabled,
     rtl,
     step,
     dialogOpen,
@@ -844,7 +872,7 @@ export default function PosPage() {
   });
 
   usePosCartNavigation({
-    enabled: desktopKeyboardNav,
+    enabled: keyboardNavEnabled,
     step,
     dialogOpen,
     activeZone,
@@ -1149,7 +1177,9 @@ export default function PosPage() {
             placeholder={t('search_products')}
             className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-muted"
           />
-          <kbd className="num hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted lg:block">F4</kbd>
+          {policy.showShortcutHints ? (
+            <kbd className="num hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted lg:block">F4</kbd>
+          ) : null}
         </div>
       </div>
 
@@ -1204,7 +1234,7 @@ export default function PosPage() {
         {filtered.map((p, index) => {
           const tracked = p.track_inventory;
           const fav = favs.has(p.id);
-          const productSelected = keyboardActive && activeZone === 'products' && selectedIndex === index;
+          const productSelected = policy.allowKeyboardPowerMode && keyboardActive && activeZone === 'products' && selectedIndex === index;
           return (
             <PosProductTile
               key={p.id}
@@ -1376,7 +1406,7 @@ export default function PosPage() {
         {cart.length === 0 && <p className="py-10 text-center text-sm text-muted">{t('empty_cart')}</p>}
         {cart.map((line) => {
           const units = line.productId ? products.find((product) => product.id === line.productId)?.pos_units ?? [] : [];
-          const lineSelected = keyboardActive && activeZone === 'cart' && selectedLineKey === line.key;
+          const lineSelected = policy.allowKeyboardPowerMode && keyboardActive && activeZone === 'cart' && selectedLineKey === line.key;
           return (
             <PosCartLineFrame
               key={line.key}
@@ -1514,6 +1544,12 @@ export default function PosPage() {
   return (
     <div
       className="flex h-full flex-col overflow-hidden bg-background"
+      data-testid="pos-sale-shell"
+      data-interaction-mode={interactionMode}
+      data-keyboard-power={policy.allowKeyboardPowerMode ? 'on' : 'off'}
+      data-shortcut-hints={policy.showShortcutHints ? 'on' : 'off'}
+      data-prefer-touch={policy.preferTouchTargets ? 'on' : 'off'}
+      data-scanner-enabled={policy.scannerEnabled ? 'on' : 'off'}
       onPointerDown={onPointerDown}
       onKeyDown={onKeyboardActiveKeyDown}
     >
@@ -1579,7 +1615,7 @@ export default function PosPage() {
             {catsPanel}
           </div>
 
-          <PosShortcuts />
+          <PosShortcuts visible={policy.showShortcutHints} />
 
           {/* تنقّل سفلي (جوال فقط) */}
           <nav className={POS_MOBILE_NAV_CLASS}>

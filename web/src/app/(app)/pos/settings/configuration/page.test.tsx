@@ -11,6 +11,19 @@ const strings: Record<string, string> = {
   configuration_title: 'POS configuration',
   configuration_subtitle: 'Configure POS.',
   configuration_loading: 'Loading POS configuration…',
+  section_interaction: 'Interaction style',
+  section_interaction_description: 'Choose the default interaction style.',
+  interaction_mode: 'Interaction style',
+  interaction_mode_hint: 'Applies to every cashier.',
+  interaction_mode_auto: 'Auto',
+  interaction_mode_auto_badge: 'Recommended',
+  interaction_mode_auto_hint: 'Adapts automatically.',
+  interaction_mode_touch: 'Touch',
+  interaction_mode_touch_hint: 'Optimized for tablets.',
+  interaction_mode_keyboard_mouse: 'Keyboard & Mouse',
+  interaction_mode_keyboard_mouse_hint: 'Optimized for desktop cashiers.',
+  interaction_mode_hybrid: 'Hybrid',
+  interaction_mode_hybrid_hint: 'Seamless switching.',
   section_customer_sales: 'Customer and selling',
   section_customer_sales_description: 'Customer section description.',
   section_products_pricing: 'Products and pricing',
@@ -421,5 +434,47 @@ describe('صفحة تهيئة POS بعد توحيد UX', () => {
 
     const savedLp = api.mock.calls.find(([url, options]) => url === '/sales-config/pos_loss_prevention' && options?.method === 'PUT')![1].body.data;
     expect(savedLp).toEqual({ self_approval_blocked_for_variance: true, outside_hours_grace_minutes: 45 });
+  });
+
+  it('يعرض أنماط التفاعل الأربعة مع شارة موصى به على التلقائي', async () => {
+    await renderLoaded();
+
+    expect(screen.getByRole('heading', { name: 'Interaction style' })).not.toBeNull();
+    const auto = screen.getByRole('radio', { name: /Auto/ });
+    const touch = screen.getByRole('radio', { name: /Touch/ });
+    const keyboard = screen.getByRole('radio', { name: /Keyboard & Mouse/ });
+    const hybrid = screen.getByRole('radio', { name: /Hybrid/ });
+    expect(auto.getAttribute('aria-checked') ?? (auto as HTMLInputElement).checked).toBeTruthy();
+    expect((auto as HTMLInputElement).checked).toBe(true);
+    expect((touch as HTMLInputElement).checked).toBe(false);
+    expect((keyboard as HTMLInputElement).checked).toBe(false);
+    expect((hybrid as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText('Recommended')).not.toBeNull();
+    expect(screen.getByText('Adapts automatically.')).not.toBeNull();
+    expect(screen.getByText('Optimized for tablets.')).not.toBeNull();
+    expect(screen.getByText('Optimized for desktop cashiers.')).not.toBeNull();
+    expect(screen.getByText('Seamless switching.')).not.toBeNull();
+  });
+
+  it('يحفظ أسلوب اللمس ضمن عقد POS ويعيد القيمة المحفوظة', async () => {
+    await renderLoaded({ interaction_mode: 'AUTO' });
+    fireEvent.click(screen.getByRole('radio', { name: /Touch/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => expect(api.mock.calls.some(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')).toBe(true));
+    const saved = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
+    expect(saved).toMatchObject({ interaction_mode: 'TOUCH', show_onscreen_numeric_keypad: false });
+    expect(saved).not.toHaveProperty('cash_drawer_enabled');
+    expect(success).toHaveBeenCalledWith('Updated');
+  });
+
+  it('يسقط على AUTO عند غياب المفتاح ويعيد القيمة المحفوظة KEYBOARD_MOUSE', async () => {
+    await renderLoaded();
+    expect((screen.getByRole('radio', { name: /Auto/ }) as HTMLInputElement).checked).toBe(true);
+
+    cleanup();
+    await renderLoaded({ interaction_mode: 'KEYBOARD_MOUSE' });
+    expect((screen.getByRole('radio', { name: /Keyboard & Mouse/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('radio', { name: /Auto/ }) as HTMLInputElement).checked).toBe(false);
   });
 });
