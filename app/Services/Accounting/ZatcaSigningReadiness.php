@@ -3,6 +3,7 @@
 namespace App\Services\Accounting;
 
 use App\Support\Settings;
+use Illuminate\Contracts\Encryption\DecryptException;
 use RuntimeException;
 
 /** قراءة آمنة لجاهزية التوقيع؛ لا تعيد مادة اعتماد أو تفاصيل استثناءات. */
@@ -32,7 +33,7 @@ final class ZatcaSigningReadiness
 
         try {
             $stage = $this->credentials->resolve()->stage;
-        } catch (RuntimeException) {
+        } catch (DecryptException | RuntimeException) {
             $blockers[] = self::CREDENTIAL_UNAVAILABLE;
         }
 
