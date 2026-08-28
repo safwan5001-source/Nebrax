@@ -184,6 +184,17 @@ CONF;
         ];
     }
 
+    private function certificateBody(\OpenSSLCertificate $certificate): string
+    {
+        $this->assertTrue(openssl_x509_export($certificate, $pem));
+
+        return (string) preg_replace(
+            '/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\\s+/',
+            '',
+            $pem
+        );
+    }
+
     /** @return array{binary_security_token:string, private_key:string, expires_at:string} */
     private function untrustedCertificateMaterial(): array
     {
@@ -245,8 +256,18 @@ CONF;
         $this->assertSame('CCSID-BASIC-AUTH-SECRET', $credential->credentials['secret']);
         $this->assertSame('secp256k1', $credential->credentials['curve_name']);
         $this->assertStringContainsString('BEGIN PUBLIC KEY', $credential->credentials['public_key']);
+        $this->assertCount(2, $credential->credentials['certificate_chain']);
+        $this->assertSame(
+            $material['binary_security_token'],
+            $credential->credentials['certificate_chain'][0]
+        );
+        $this->assertSame(
+            $this->certificateBody($this->testAuthority()['certificate']),
+            $credential->credentials['certificate_chain'][1]
+        );
         $this->assertSame(64, strlen($response['data']['certificate_fingerprint']));
         $this->assertSame('secp256k1', $response['data']['public_key_curve']);
+        $this->assertSame(2, $response['data']['certificate_chain_length']);
     }
 
     /** @test */
