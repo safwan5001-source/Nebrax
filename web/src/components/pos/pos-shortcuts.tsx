@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { POS_SHORTCUTS } from '@/components/pos/interactions/shortcut-registry';
+import { POS_SHORTCUT_FOOTER } from '@/components/pos/interactions/shortcut-registry';
 
 /**
  * شريط اختصارات لوحة المفاتيح السفلي (ديسكتوب) — ألوان دلالية للحذف/الدفع.
@@ -11,9 +11,9 @@ export function PosShortcuts() {
   const t = useTranslations('pos');
   return (
     <footer className="hidden h-11 shrink-0 items-center gap-1.5 overflow-x-auto border-t border-border bg-surface px-4 lg:flex">
-      {POS_SHORTCUTS.map((shortcut) => (
+      {POS_SHORTCUT_FOOTER.map((shortcut) => (
         <div
-          key={shortcut.id}
+          key={`${shortcut.id}-${shortcut.displayKey}`}
           className={
             'flex items-center gap-1.5 whitespace-nowrap border-e border-border px-2.5 text-[11.5px] last:border-0 ' +
             (shortcut.tone === 'danger' ? 'text-negative' : shortcut.tone === 'positive' ? 'text-positive' : 'text-muted')

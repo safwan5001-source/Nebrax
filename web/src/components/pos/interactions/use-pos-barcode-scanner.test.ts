@@ -134,4 +134,14 @@ describe('ماسح الباركود في نقطة البيع', () => {
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledWith('123');
   });
+
+  it('لا يلتقط مسحاً عندما يكون معطّلاً (دفع/حوار)', () => {
+    const onScan = vi.fn();
+    renderHook(() => usePosBarcodeScanner({ onScan, enabled: false }));
+
+    scan('6281000012345');
+    press('Enter');
+
+    expect(onScan).not.toHaveBeenCalled();
+  });
 });
