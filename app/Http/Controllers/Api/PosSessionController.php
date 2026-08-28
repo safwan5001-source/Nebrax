@@ -93,6 +93,7 @@ class PosSessionController extends ApiController
             (int) $data['amount'],
             $data['reason'],
             $request->user(),
+            $data['approval_id'] ?? null,
         ));
 
         return (new PosCashMovementResource($movement))->response()->setStatusCode(201);
@@ -101,12 +102,17 @@ class PosSessionController extends ApiController
     /** يحاول الموصل المحلي فقط بعد تحقق RBAC والجلسة؛ لا ينشئ أثراً مالياً. */
     public function openCashDrawer(Request $request, string $id): JsonResponse
     {
-        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+            // Phase 4 — مطلوب فقط حين تكون سياسة `manual_drawer_open` «تحتاج اعتماداً».
+            'approval_id' => ['nullable', 'uuid'],
+        ]);
         $session = $this->visibleSession($id, $request);
         $result = $this->domain(fn () => $this->cashDrawer->openManually(
             $session,
             $request->user(),
             $data['reason'] ?? null,
+            $data['approval_id'] ?? null,
         ));
         $status = $result['status'] === 'opened' ? 200 : ($result['status'] === 'pending' ? 202 : 409);
 

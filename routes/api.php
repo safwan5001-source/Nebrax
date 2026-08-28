@@ -1031,6 +1031,15 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             ->defaults('section', 'pos')
             ->middleware([$perm('company.manage'), $app('sales.pos')]);
 
+        // Phase 4 — إعدادات منع الفقد (SoD، سماح ساعات العمل)؛ قسم مستقل عن
+        // `pos` كي لا يعيد كتابة افتراضاته، لكنه يخضع لنفس بوابة تطبيق POS.
+        Route::get('sales-config/pos_loss_prevention', [SalesConfigController::class, 'show'])
+            ->defaults('section', 'pos_loss_prevention')
+            ->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::put('sales-config/pos_loss_prevention', [SalesConfigController::class, 'update'])
+            ->defaults('section', 'pos_loss_prevention')
+            ->middleware([$perm('company.manage'), $app('sales.pos')]);
+
         // أقسام إعدادات المبيعات المتعددة (حالات/تصميمات/قوائم أسعار/شحن…)
         Route::get('sales-config/{section}', [SalesConfigController::class, 'show'])->middleware($perm('invoices.view'));
         Route::put('sales-config/{section}', [SalesConfigController::class, 'update'])->middleware($perm('company.manage'));

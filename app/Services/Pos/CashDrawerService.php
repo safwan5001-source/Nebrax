@@ -31,12 +31,18 @@ final class CashDrawerService
         private readonly ?PosAuditService $auditTrail = null,
     ) {}
 
-    /** @return array<string, mixed> */
-    public function openManually(PosSession $session, User $actor, ?string $reason = null): array
+    /**
+     * `$approvalId` مطلوب فقط حين تكون سياسة `manual_drawer_open` «تحتاج
+     * اعتماداً» (Phase 4، افتراضها «مسموح» يحفظ سلوك كل مستأجر قائم).
+     *
+     * @return array<string, mixed>
+     */
+    public function openManually(PosSession $session, User $actor, ?string $reason = null, ?string $approvalId = null): array
     {
         if (! $actor->hasPermission('pos.cash_drawer.open')) {
             throw new RuntimeException('لا تملك صلاحية فتح درج نقطة البيع.');
         }
+        ($this->auditTrail ?? app(PosAuditService::class))->enforceOperationPolicy($session, $actor, 'manual_drawer_open', $approvalId);
 
         return $this->prepare($session, $actor, 'manual', null, $reason);
     }

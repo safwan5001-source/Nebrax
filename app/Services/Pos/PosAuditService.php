@@ -338,6 +338,20 @@ final class PosAuditService
         });
     }
 
+    /**
+     * Phase 4 — بوّابة سياسة موحّدة لعملية خادمية فعلية تُنفَّذ فوراً (لا حدث
+     * سلة عميلي): `refund`، `cash_out`، `manual_drawer_open`. تعامل السياسات
+     * الثلاث بلا استثناء عبر آلية الاعتماد القائمة نفسها التي تخدم أحداث السلة:
+     * «مسموح» تمرّ بلا أثر إضافي (سلوك كل مستأجر قائم لم يقيّد العملية)، «ممنوع»
+     * تُرفض فوراً، و«يحتاج اعتماداً» تستهلك اعتماداً موافقاً مسبقاً وتُلحق حدث
+     * `override_consumed` — فلا يُنفَّذ الإجراء الحقيقي (الاسترداد/الصرف/فتح
+     * الدرج) قبل نجاح هذا الاستدعاء، لا بعده.
+     */
+    public function enforceOperationPolicy(PosSession $session, User $actor, string $operation, ?string $approvalId = null): void
+    {
+        $this->consumeApprovalIfNeeded($session, $actor, null, (string) Str::uuid(), $operation, $approvalId);
+    }
+
     public function approve(PosOverrideApproval $approval, User $actor): PosOverrideApproval
     {
         if (! $actor->hasPermission('pos.override.approve')) {
