@@ -81,13 +81,13 @@ export function CustomerPickerDialog({
           </div>
           {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={() => setAdding(false)}>{t('back')}</Button>
-            <Button type="submit" disabled={busy}>{t('add_and_select')}</Button>
+            <Button type="button" variant="outline" className="min-h-11" onClick={() => setAdding(false)}>{t('back')}</Button>
+            <Button type="submit" className="min-h-11" disabled={busy}>{t('add_and_select')}</Button>
           </div>
         </form>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+          <div className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
             <Search className="h-4 w-4 text-muted" strokeWidth={1.8} />
             <input
               value={q}
@@ -104,7 +104,7 @@ export function CustomerPickerDialog({
                 key={p.id}
                 type="button"
                 onClick={() => { onSelect({ id: p.id, name: p.name }); onClose(); }}
-                className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-start text-sm hover:border-primary hover:bg-primary-soft"
+                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-start text-sm touch-manipulation hover:border-primary hover:bg-primary-soft active:bg-primary-soft"
               >
                 <span className="truncate">{p.name}</span>
                 {p.phone && <span className="num shrink-0 text-[11px] text-muted">{p.phone}</span>}
@@ -113,7 +113,7 @@ export function CustomerPickerDialog({
             {filtered.length === 0 && <p className="py-6 text-center text-xs text-muted">{t('no_customers')}</p>}
           </div>
 
-          <Button type="button" variant="outline" className="w-full" onClick={() => setAdding(true)}>
+          <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => setAdding(true)}>
             <UserPlus className="h-4 w-4" strokeWidth={1.8} />
             {t('add_customer')}
           </Button>

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import {
-  Search, Barcode, Star, Package, Plus, Minus, Trash2,
+  Search, Barcode, Star, Package, Plus, Trash2,
   User, UserPlus, StickyNote, LayoutGrid, ShoppingCart,
   Users, MoreHorizontal, PauseCircle, Archive, Trash,
 } from 'lucide-react';
@@ -23,7 +23,6 @@ import type { Warehouse } from '@/lib/warehouse';
 import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosRecentInvoicesDialog } from '@/components/pos/pos-recent-invoices-dialog';
-import { PosProductImage } from '@/components/pos/pos-product-image';
 import { PosCategoryImage } from '@/components/pos/pos-category-image';
 import { cartHasUnsavedData, createPosActiveCart, usePosActiveCarts, type PosCartLine } from '@/components/pos/use-pos-active-carts';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
@@ -32,6 +31,8 @@ import { PosExchangeDialog } from '@/components/pos/pos-exchange-dialog';
 import { PosHeldSalesDialog, type PosHeldSale } from '@/components/pos/pos-held-sales-dialog';
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
+import { PosProductTile } from '@/components/pos/pos-product-tile';
+import { PosCartLineFrame, PosCartQtyControls, PosCartRemoveButton } from '@/components/pos/pos-cart-line-controls';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 import { PosAuditReasonDialog } from '@/components/pos/pos-audit-reason-dialog';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
@@ -39,7 +40,7 @@ import type { LiveTemplateRevision } from '@/modules/print-templates/services/li
 import { usePosBarcodeScanner } from '@/components/pos/interactions/use-pos-barcode-scanner';
 import { usePosCartLineSelection, usePosCartNavigation } from '@/components/pos/interactions/use-pos-cart-navigation';
 import { usePosFocusManager } from '@/components/pos/interactions/use-pos-focus-manager';
-import { usePosKeyboardActive } from '@/components/pos/interactions/use-pos-keyboard-active';
+import { shouldRestorePosFocus, usePosKeyboardActive } from '@/components/pos/interactions/use-pos-keyboard-active';
 import { usePosKeyboardShortcuts } from '@/components/pos/interactions/use-pos-keyboard-shortcuts';
 import { isPosDialogOpen, type PosDialogFlags } from '@/components/pos/interactions/pos-interaction-context';
 import { usePosProductNavigation, usePosProductSelection, usePosSearchFieldNavigation } from '@/components/pos/interactions/use-pos-product-navigation';
@@ -152,7 +153,11 @@ export default function PosPage() {
     focusZone,
     restoreFocusSafe,
   } = focusManager;
-  const { keyboardActive, onPointerDown, onKeyDown: onKeyboardActiveKeyDown } = usePosKeyboardActive();
+  const { keyboardActive, lastInput, onPointerDown, onKeyDown: onKeyboardActiveKeyDown } = usePosKeyboardActive();
+  const restoreFocusAfterUi = useCallback(() => {
+    if (!shouldRestorePosFocus(lastInput)) return false;
+    return restoreFocusSafe();
+  }, [lastInput, restoreFocusSafe]);
   const [desktopKeyboardNav, setDesktopKeyboardNav] = useState(false);
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)');
@@ -707,7 +712,7 @@ export default function PosPage() {
       closeCart(activeCart.id);
       setHeldCount((current) => current + 1);
       success(t('held_done'));
-      restoreFocusSafe();
+      restoreFocusAfterUi();
     } catch (err) {
       errorToast(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
@@ -742,7 +747,7 @@ export default function PosPage() {
     setMobileTab('cart');
     setHeldCount((current) => Math.max(0, current - 1));
     success(t('held_resumed'));
-    restoreFocusSafe();
+    restoreFocusAfterUi();
   }
 
   // مسح باركود: الأساسي/SKU يبيع وحدة الأساس، أما البديل فيحمل وحدته من
@@ -990,7 +995,7 @@ export default function PosPage() {
             closeCart(activeCart.id);
             setStep('sale');
             setMobileTab('products');
-            restoreFocusSafe();
+            restoreFocusAfterUi();
             // عملية الدرج تبدأ بعد النجاح المالي والتنظيف؛ لا تنتظرها ولا تسمح
             // لخطئها بإعادة شاشة الدفع أو إظهار فشل للفاتورة المكتملة.
             const action = checkout.cash_drawer_action;
@@ -1125,8 +1130,8 @@ export default function PosPage() {
       </div>
 
       {/* تصنيفات POS على الجوال/التابلت: صور سريعة مع تمرير أفقي، ونفس الفلتر التشغيلي. */}
-      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden" aria-label={t('categories')}>
-        {CATS.map(({ key, label, image, icon: Icon }) => {
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 touch-pan-x sm:-mx-4 sm:px-4 lg:hidden" aria-label={t('categories')}>
+        {CATS.map(({ key, label, image, icon: Icon }, index) => {
           const on = cat === key;
           return (
             <button
@@ -1134,7 +1139,7 @@ export default function PosPage() {
               type="button"
               aria-pressed={on}
               onClick={() => setCat(key)}
-              className={'flex w-[72px] shrink-0 flex-col items-center gap-1.5 rounded-lg border p-1.5 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-text')}
+              className={'flex w-[76px] shrink-0 touch-manipulation flex-col items-center gap-1.5 rounded-lg border p-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (index === 0 ? 'ms-0 ' : '') + (index === CATS.length - 1 ? 'me-1 ' : '') + (on ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-text')}
             >
               <span className="h-11 w-11 overflow-hidden rounded-md bg-background">
                 {key === 'all' ? (
@@ -1158,7 +1163,7 @@ export default function PosPage() {
               key={qt.key}
               type="button"
               onClick={() => setTab(qt.key)}
-              className={'inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface hover:text-text')}
+              className={'inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface hover:text-text')}
             >
               {Icon && <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />}
               {qt.label}
@@ -1177,45 +1182,35 @@ export default function PosPage() {
           const fav = favs.has(p.id);
           const productSelected = keyboardActive && activeZone === 'products' && selectedIndex === index;
           return (
-            <div key={p.id} className="relative min-w-0">
-              <button
-                type="button"
-                ref={(element) => {
-                  registerProductButton(index, element);
-                  if (element) productElementsRef.current.set(index, element);
-                  else productElementsRef.current.delete(index);
-                }}
-                aria-selected={productSelected}
-                tabIndex={productSelected ? 0 : -1}
-                onClick={() => addProduct(p)}
-                onFocus={() => {
-                  setSelectedIndex(index);
-                  focusZone('products', { productIndex: index });
-                }}
-                className={'flex w-full flex-col rounded-lg border bg-surface p-2.5 text-start hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (productSelected ? 'border-primary ring-2 ring-primary/40 ' : 'border-border ') + (posCfg.show_product_images ? '' : 'min-h-28 justify-between')}
-              >
-                {posCfg.show_product_images && (
-                  <div className={'mb-2.5 overflow-hidden rounded-md bg-background ' + (p.pos_image?.download_url ? 'aspect-[4/3]' : 'h-10')}>
-                    <PosProductImage path={p.pos_image?.download_url} alt={p.name} />
-                  </div>
-                )}
-                <span className="line-clamp-2 min-h-10 text-sm font-semibold leading-snug text-text">{p.name}</span>
-                {p.sku && <span className="num mt-1 truncate text-[11px] text-muted">{p.sku}</span>}
-                <div className="mt-2 flex items-end justify-between gap-2">
-                  <span className="num text-sm font-bold text-primary">{formatRiyal(p.sale_price)}</span>
-                  {tracked && <span className="num text-[11px] text-muted">{t('available')}: {p.quantity_on_hand}</span>}
-                </div>
-                <span className="mt-0.5 text-[10px] text-muted">{taxInclusive ? tprod('tax_incl_tag') : tprod('tax_excl_tag')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleFav(p.id)}
-                className={'absolute end-2 top-2 grid h-8 w-8 place-items-center rounded-md bg-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (fav ? 'text-warning' : 'text-muted hover:text-primary')}
-                aria-label={t('tab_favorites')}
-              >
-                <Star className="h-4 w-4" strokeWidth={1.7} fill={fav ? 'currentColor' : 'none'} />
-              </button>
-            </div>
+            <PosProductTile
+              key={p.id}
+              product={{
+                id: p.id,
+                name: p.name,
+                sku: p.sku,
+                sale_price_label: formatRiyal(p.sale_price),
+                pos_image: p.pos_image,
+                track_inventory: tracked,
+                quantity_on_hand: p.quantity_on_hand,
+              }}
+              showImage={posCfg.show_product_images}
+              selected={productSelected}
+              isFavorite={fav}
+              taxLabel={taxInclusive ? tprod('tax_incl_tag') : tprod('tax_excl_tag')}
+              availableLabel={t('available')}
+              favoriteLabel={t('tab_favorites')}
+              onAdd={() => addProduct(p)}
+              onToggleFavorite={() => toggleFav(p.id)}
+              onFocus={() => {
+                setSelectedIndex(index);
+                focusZone('products', { productIndex: index });
+              }}
+              buttonRef={(element) => {
+                registerProductButton(index, element);
+                if (element) productElementsRef.current.set(index, element);
+                else productElementsRef.current.delete(index);
+              }}
+            />
           );
         })}
         {filtered.length === 0 && <p className="col-span-full rounded-lg border border-dashed border-border bg-background py-10 text-center text-sm text-muted">{t('no_products')}</p>}
@@ -1275,7 +1270,7 @@ export default function PosPage() {
           before: { items: target.items.map(auditLine), customer: target.customer }, after: { status: 'cancelled' },
         }, target);
         setStep('sale');
-        restoreFocusSafe();
+        restoreFocusAfterUi();
       } else {
         await recordCartForensics('cart_cancelled', {
           reason_code: reason.code, reason_note: reason.note,
@@ -1312,23 +1307,23 @@ export default function PosPage() {
                 role="tab"
                 aria-selected={selected}
                 onClick={() => setActiveCartId(cartState.id)}
-                className={'num inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (selected ? 'bg-primary-soft text-primary' : 'bg-background text-muted hover:text-text')}
+                className={'num inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (selected ? 'bg-primary-soft text-primary' : 'bg-background text-muted hover:text-text')}
               >
                 {cartState.customer?.name ?? t('cart_named', { number: cartState.number })}
                 <span className="rounded bg-surface px-1.5 py-0.5 text-[10px]">{itemCount}</span>
               </button>
             );
           })}
-          <button type="button" onClick={createCart} className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-dashed border-border text-muted hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('new_cart')}>
+          <button type="button" onClick={createCart} className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-md border border-dashed border-border text-muted hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('new_cart')}>
             <Plus className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
         <div className="mb-2 flex items-center gap-2 lg:hidden">
-          <button type="button" onClick={() => setOpenCartsOpen(true)} className="min-w-0 flex-1 rounded-md bg-background px-3 py-2 text-start text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <button type="button" onClick={() => setOpenCartsOpen(true)} className="min-h-11 min-w-0 flex-1 rounded-md bg-background px-3 py-2 text-start text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <span className="block truncate">{selectedCustomer?.name ?? t('cart_named', { number: activeCart.number })}</span>
             <span className="num text-xs text-muted">{t('cart_count', { count: carts.length })} · {t('item_count', { count })}</span>
           </button>
-          <button type="button" onClick={createCart} className="grid h-10 w-10 place-items-center rounded-md border border-border text-text hover:bg-primary-soft hover:text-primary" aria-label={t('new_cart')}>
+          <button type="button" onClick={createCart} className="grid min-h-11 min-w-11 place-items-center rounded-md border border-border text-text hover:bg-primary-soft hover:text-primary" aria-label={t('new_cart')}>
             <Plus className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
@@ -1336,18 +1331,18 @@ export default function PosPage() {
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className={'flex h-10 min-w-0 flex-1 items-center justify-between gap-2 rounded-md border bg-background px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (selectedCustomer ? 'border-primary text-primary' : 'border-border text-text')}
+            className={'flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-md border bg-background px-3 text-sm font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (selectedCustomer ? 'border-primary text-primary' : 'border-border text-text')}
           >
             <span className="truncate">{customerName}</span>
             <User className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
           </button>
-          <button type="button" onClick={() => setPickerOpen(true)} className="grid h-10 w-10 place-items-center rounded-md border border-border text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('add_customer')}>
+          <button type="button" onClick={() => setPickerOpen(true)} className="grid min-h-11 min-w-11 place-items-center rounded-md border border-border text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('add_customer')}>
             <UserPlus className="h-4 w-4" strokeWidth={1.7} />
           </button>
-          <button type="button" onClick={() => setClearCartOpen(true)} disabled={cart.length === 0} className="grid h-10 w-10 place-items-center rounded-md border border-border text-muted hover:bg-negative/10 hover:text-negative disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('clear_cart')}>
+          <button type="button" onClick={() => setClearCartOpen(true)} disabled={cart.length === 0} className="grid min-h-11 min-w-11 place-items-center rounded-md border border-border text-muted hover:bg-negative/10 hover:text-negative disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('clear_cart')}>
             <Trash className="h-4 w-4" strokeWidth={1.7} />
           </button>
-          <button type="button" onClick={() => requestCloseCart(activeCart.id)} className="grid h-10 w-10 place-items-center rounded-md border border-border text-muted hover:bg-negative/10 hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('close_cart')}>
+          <button type="button" onClick={() => requestCloseCart(activeCart.id)} className="grid min-h-11 min-w-11 place-items-center rounded-md border border-border text-muted hover:bg-negative/10 hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('close_cart')}>
             <Trash2 className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
@@ -1359,40 +1354,36 @@ export default function PosPage() {
           const units = line.productId ? products.find((product) => product.id === line.productId)?.pos_units ?? [] : [];
           const lineSelected = keyboardActive && activeZone === 'cart' && selectedLineKey === line.key;
           return (
-            <div
+            <PosCartLineFrame
               key={line.key}
-              ref={(element) => registerCartLine(line.key, element)}
-              role="option"
-              aria-selected={lineSelected}
-              tabIndex={lineSelected ? 0 : -1}
-              onFocus={() => {
+              selected={lineSelected}
+              scanned={lastScannedLineKey === line.key}
+              onSelect={() => {
                 setSelectedLineKey(line.key);
                 focusZone('cart', { cartLineKey: line.key });
               }}
-              className={'flex gap-2 border-b py-3 transition-colors motion-reduce:transition-none last:border-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (lastScannedLineKey === line.key ? 'border-primary bg-primary-soft' : lineSelected ? 'border-primary bg-primary-soft' : 'border-border')}
+              register={(element) => registerCartLine(line.key, element)}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-text">{line.description}</div>
                     {line.productId !== null && units.length > 1 ? (
-                      <select aria-label={tprod('unit')} value={line.unit ?? ''} onChange={(event) => setUnit(line.key, event.target.value)} className="mt-1 h-7 max-w-28 rounded border border-border bg-background px-1.5 text-xs text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                      <select aria-label={tprod('unit')} value={line.unit ?? ''} onChange={(event) => setUnit(line.key, event.target.value)} onClick={(event) => event.stopPropagation()} className="mt-1 min-h-10 max-w-28 rounded border border-border bg-background px-1.5 text-xs text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                         {units.map((unit) => <option key={unit.name} value={unit.name}>{unit.name}</option>)}
                       </select>
                     ) : line.unit ? <div className="mt-1 text-xs text-muted">{line.unit}</div> : null}
                   </div>
-                  <button type="button" onClick={() => remove(line.key)} className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-muted hover:bg-negative/10 hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('remove')}>
-                    <Trash2 className="h-4 w-4" strokeWidth={1.7} />
-                  </button>
+                  <PosCartRemoveButton label={t('remove')} onRemove={() => remove(line.key)} />
                 </div>
                 {(posCfg.allow_unit_price_override || posCfg.allow_discount) && (
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                     {posCfg.allow_unit_price_override && (
                       <label className="flex items-center gap-1 text-xs text-muted">
                         {t('unit_price')}
                         <PosNumericEditor
                           allowDecimal
-                          className="h-8 w-20 px-2 text-xs"
+                          className="h-11 w-20 px-2 text-xs"
                           inputAriaLabel={t('unit_price')}
                           labels={numericEditorLabels}
                           onApply={(value) => normalizeUnitPrice(line.key, value)}
@@ -1409,7 +1400,7 @@ export default function PosPage() {
                         {t('discount')}
                         <PosNumericEditor
                           allowDecimal
-                          className="h-8 w-16 px-2 text-xs"
+                          className="h-11 w-16 px-2 text-xs"
                           inputAriaLabel={t('discount')}
                           labels={numericEditorLabels}
                           onChange={(value) => setDiscount(line.key, value)}
@@ -1423,34 +1414,32 @@ export default function PosPage() {
                 )}
                 {priceErrors[line.key] && <p className="mt-1 text-xs text-negative">{priceErrors[line.key]}</p>}
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <div className="flex h-10 items-center rounded-md border border-border bg-background">
-                    <button type="button" onClick={() => setQty(line.key, -1)} className="grid h-10 w-10 place-items-center text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('return_decrease')}><Minus className="h-4 w-4" strokeWidth={1.7} /></button>
-                    <PosNumericEditor
-                      allowDecimal={false}
-                      className="h-10 w-9 text-sm font-semibold"
-                      inputAriaLabel={t('quantity')}
-                      labels={numericEditorLabels}
-                      onChange={(value) => setQtyFromInput(line.key, value)}
-                      showKeypad={posCfg.show_onscreen_numeric_keypad}
-                      title={t('numeric_keypad_edit_quantity')}
-                      value={String(line.qty)}
-                    />
-                    <button type="button" onClick={() => setQty(line.key, 1)} className="grid h-10 w-10 place-items-center text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('return_increase')}><Plus className="h-4 w-4" strokeWidth={1.7} /></button>
-                  </div>
+                  <PosCartQtyControls
+                    qty={line.qty}
+                    decreaseLabel={t('return_decrease')}
+                    increaseLabel={t('return_increase')}
+                    quantityLabel={t('quantity')}
+                    keypadTitle={t('numeric_keypad_edit_quantity')}
+                    showKeypad={posCfg.show_onscreen_numeric_keypad}
+                    labels={numericEditorLabels}
+                    onDecrease={() => setQty(line.key, -1)}
+                    onIncrease={() => setQty(line.key, 1)}
+                    onQtyChange={(value) => setQtyFromInput(line.key, value)}
+                  />
                   <span className="num text-sm font-bold text-text">{formatRiyal(lineCalc(line).total / 100)}</span>
                 </div>
               </div>
-            </div>
+            </PosCartLineFrame>
           );
         })}
       </div>
 
       <div className="space-y-2 border-t border-border p-3">
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={holdSale} disabled={cart.length === 0 || !session || holdBusy || catalogLoading} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-semibold text-text hover:border-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <button type="button" onClick={holdSale} disabled={cart.length === 0 || !session || holdBusy || catalogLoading} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-semibold text-text touch-manipulation hover:border-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <PauseCircle className="h-4 w-4" strokeWidth={1.7} />{t('hold')}
           </button>
-          <button type="button" onClick={() => setNoteOpen(true)} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-semibold text-text hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <button type="button" onClick={() => setNoteOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-semibold text-text touch-manipulation hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <StickyNote className="h-4 w-4" strokeWidth={1.7} />{t('cart_note')}
           </button>
         </div>
@@ -1464,8 +1453,8 @@ export default function PosPage() {
       </div>
 
       <div className="p-3 pt-0">
-        <button onClick={() => setStep('payment')} disabled={cart.length === 0 || catalogLoading} className="flex h-12 w-full items-center justify-between rounded-md bg-primary px-4 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50">
-          {t('pay')}<span className="num">{formatRiyal(totalMinor / 100)} · F9</span>
+        <button type="button" onClick={() => setStep('payment')} disabled={cart.length === 0 || catalogLoading} className="flex min-h-14 w-full touch-manipulation items-center justify-between rounded-md bg-primary px-4 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50">
+          {t('pay')}<span className="num">{formatRiyal(totalMinor / 100)}<span className="hidden lg:inline"> · F9</span></span>
         </button>
       </div>
     </aside>
@@ -1482,7 +1471,7 @@ export default function PosPage() {
             type="button"
             aria-pressed={on}
             onClick={() => setCat(key)}
-            className={'flex w-full flex-col items-center gap-2 rounded-lg border p-2 text-center text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'border-primary bg-primary-soft text-primary' : 'border-transparent text-text hover:bg-background')}
+            className={'flex min-h-12 w-full touch-manipulation flex-col items-center gap-2 rounded-lg border p-2 text-center text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'border-primary bg-primary-soft text-primary' : 'border-transparent text-text hover:bg-background')}
           >
             <span className="h-12 w-12 overflow-hidden rounded-md bg-background">
               {key === 'all' ? (
@@ -1600,7 +1589,7 @@ export default function PosPage() {
 
       <CustomerPickerDialog
         open={pickerOpen}
-        onClose={() => { setPickerOpen(false); restoreFocusSafe(); }}
+        onClose={() => { setPickerOpen(false); restoreFocusAfterUi(); }}
         onSelect={setSelectedCustomer}
       />
 
@@ -1621,15 +1610,15 @@ export default function PosPage() {
             const selected = cartState.id === activeCartId;
             return (
               <div key={cartState.id} className={'flex items-center gap-2 rounded-lg border p-3 ' + (selected ? 'border-primary bg-primary-soft' : 'border-border bg-surface')}>
-                <button type="button" onClick={() => { setActiveCartId(cartState.id); setOpenCartsOpen(false); setMobileTab('cart'); }} className="min-w-0 flex-1 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                <button type="button" onClick={() => { setActiveCartId(cartState.id); setOpenCartsOpen(false); setMobileTab('cart'); }} className="min-h-11 min-w-0 flex-1 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                   <div className="truncate text-sm font-semibold text-text">{cartState.customer?.name ?? t('cart_named', { number: cartState.number })}</div>
                   <div className="num mt-1 text-xs text-muted">{t('item_count', { count: itemCount })}</div>
                 </button>
-                <Button type="button" variant="ghost" size="icon" onClick={() => requestCloseCart(cartState.id)} aria-label={t('close_cart')}><Trash2 className="h-4 w-4" strokeWidth={1.7} /></Button>
+                <Button type="button" variant="ghost" size="icon" className="min-h-11 min-w-11" onClick={() => requestCloseCart(cartState.id)} aria-label={t('close_cart')}><Trash2 className="h-4 w-4" strokeWidth={1.7} /></Button>
               </div>
             );
           })}
-          <Button type="button" variant="outline" className="w-full" onClick={() => { createCart(); setOpenCartsOpen(false); setMobileTab('cart'); }}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('new_cart')}</Button>
+          <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => { createCart(); setOpenCartsOpen(false); setMobileTab('cart'); }}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('new_cart')}</Button>
         </div>
       </Dialog>
 
@@ -1644,16 +1633,16 @@ export default function PosPage() {
       <Dialog open={cartToClose !== null} onClose={() => setCartToClose(null)} title={t('close_cart_confirm')}>
         <p className="text-sm leading-relaxed text-muted">{t('close_cart_description')}</p>
         <div className="mt-5 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => setCartToClose(null)}>{ts('cancel')}</Button>
-          <Button type="button" variant="danger" onClick={confirmCloseCart}>{t('close_cart')}</Button>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => setCartToClose(null)}>{ts('cancel')}</Button>
+          <Button type="button" variant="danger" className="min-h-11" onClick={confirmCloseCart}>{t('close_cart')}</Button>
         </div>
       </Dialog>
 
       <Dialog open={clearCartOpen} onClose={() => setClearCartOpen(false)} title={t('clear_cart_confirm')}>
         <p className="text-sm leading-relaxed text-muted">{t('clear_cart_description')}</p>
         <div className="mt-5 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => setClearCartOpen(false)}>{ts('cancel')}</Button>
-          <Button type="button" variant="danger" onClick={confirmClearActiveCart}>{t('clear_cart')}</Button>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => setClearCartOpen(false)}>{ts('cancel')}</Button>
+          <Button type="button" variant="danger" className="min-h-11" onClick={confirmClearActiveCart}>{t('clear_cart')}</Button>
         </div>
       </Dialog>
 
@@ -1666,7 +1655,7 @@ export default function PosPage() {
             rows={4}
             className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
-          <div className="flex justify-end"><Button type="button" onClick={() => setNoteOpen(false)}>{ts('save')}</Button></div>
+          <div className="flex justify-end"><Button type="button" className="min-h-11" onClick={() => setNoteOpen(false)}>{ts('save')}</Button></div>
         </div>
       </Dialog>
 
@@ -1695,8 +1684,8 @@ export default function PosPage() {
           </div>
           {sessionError && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{sessionError}</p>}
           <div className="flex justify-end gap-2 pt-2">
-            <Button asChild type="button" variant="outline"><Link href='/dashboard'>{t('leave')}</Link></Button>
-            <Button type="submit" disabled={sessionBusy || !deviceId}>{ts('open')}</Button>
+            <Button asChild type="button" variant="outline" className="min-h-11"><Link href='/dashboard'>{t('leave')}</Link></Button>
+            <Button type="submit" className="min-h-11" disabled={sessionBusy || !deviceId}>{ts('open')}</Button>
           </div>
         </form>
       </Dialog>
@@ -1704,8 +1693,8 @@ export default function PosPage() {
       <Dialog open={unsavedExitAction !== null} onClose={() => setUnsavedExitAction(null)} title={t('unsaved_carts_exit_title')}>
         <p className="text-sm leading-relaxed text-muted">{t('unsaved_carts_exit_description')}</p>
         <div className="mt-5 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => setUnsavedExitAction(null)}>{ts('cancel')}</Button>
-          <Button type="button" variant="danger" onClick={() => void confirmUnsavedExit()}>{t('unsaved_carts_exit_confirm')}</Button>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => setUnsavedExitAction(null)}>{ts('cancel')}</Button>
+          <Button type="button" variant="danger" className="min-h-11" onClick={() => void confirmUnsavedExit()}>{t('unsaved_carts_exit_confirm')}</Button>
         </div>
       </Dialog>
 
@@ -1718,8 +1707,8 @@ export default function PosPage() {
           </div>
           {sessionError && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{sessionError}</p>}
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setCloseOpen(false)}>{ts('cancel')}</Button>
-            <Button type="submit" disabled={sessionBusy}>{ts('close')}</Button>
+            <Button type="button" variant="outline" className="min-h-11" onClick={() => setCloseOpen(false)}>{ts('cancel')}</Button>
+            <Button type="submit" className="min-h-11" disabled={sessionBusy}>{ts('close')}</Button>
           </div>
         </form>
       </Dialog>

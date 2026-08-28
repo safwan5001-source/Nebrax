@@ -50,14 +50,14 @@ export function PosAuditReasonDialog({
       <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (valid) void onConfirm({ code, note: note.trim() }); }}>
         <div className="space-y-1.5">
           <Label htmlFor="pos-audit-reason">{t('selectReason')}</Label>
-          <select id="pos-audit-reason" value={code} disabled={loading || busy} onChange={(event) => setCode(event.target.value)} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <select id="pos-audit-reason" value={code} disabled={loading || busy} onChange={(event) => setCode(event.target.value)} className="min-h-11 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <option value="">—</option>
             {codes.map((entry) => <option key={entry.id} value={entry.code}>{locale === 'ar' ? entry.name_ar : entry.name_en}</option>)}
           </select>
         </div>
         {selected?.requires_note && <div className="space-y-1.5"><Label htmlFor="pos-audit-reason-note">{t('additionalReason')}</Label><textarea id="pos-audit-reason-note" value={note} onChange={(event) => setNote(event.target.value)} disabled={busy} rows={3} placeholder={t('additionalReasonPlaceholder')} className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" /></div>}
         {error && <p role="alert" className="rounded border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>{tc('cancel')}</Button><Button type="submit" disabled={!valid || loading || busy}>{t('confirmAction')}</Button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" className="min-h-11" onClick={onClose} disabled={busy}>{tc('cancel')}</Button><Button type="submit" className="min-h-11" disabled={!valid || loading || busy}>{t('confirmAction')}</Button></div>
       </form>
     </Dialog>
   );
