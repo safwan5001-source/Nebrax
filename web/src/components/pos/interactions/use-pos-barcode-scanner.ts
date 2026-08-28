@@ -14,6 +14,8 @@ export interface PosBarcodeScannerOptions {
   maxGapMs?: number;
   /** عند false لا يُجمَّع المخزن ولا يُستدعى callback — مثلاً أثناء الدفع أو حوار. */
   enabled?: boolean;
+  /** نشاط مسح حقيقي (نمو المخزن أو اكتمال المسح) — لا يغيّر عتبات الفجوة. */
+  onScannerActivity?: () => void;
 }
 
 export function usePosBarcodeScanner({
@@ -21,11 +23,14 @@ export function usePosBarcodeScanner({
   minLength = POS_SCANNER_MIN_LENGTH,
   maxGapMs = POS_SCANNER_MAX_GAP_MS,
   enabled = true,
+  onScannerActivity,
 }: PosBarcodeScannerOptions): void {
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  const onScannerActivityRef = useRef(onScannerActivity);
+  onScannerActivityRef.current = onScannerActivity;
 
   useEffect(() => {
     let buffer = '';
@@ -37,6 +42,7 @@ export function usePosBarcodeScanner({
       if (event.key === 'Enter') {
         if (!editable && buffer.length >= minLength) {
           event.preventDefault();
+          onScannerActivityRef.current?.();
           onScanRef.current(buffer);
         }
         buffer = '';
@@ -48,6 +54,7 @@ export function usePosBarcodeScanner({
         if (now - lastKeyAt > maxGapMs) buffer = '';
         buffer += event.key;
         lastKeyAt = now;
+        onScannerActivityRef.current?.();
       }
     }
 

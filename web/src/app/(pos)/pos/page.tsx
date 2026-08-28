@@ -40,7 +40,7 @@ import type { LiveTemplateRevision } from '@/modules/print-templates/services/li
 import { usePosBarcodeScanner } from '@/components/pos/interactions/use-pos-barcode-scanner';
 import { usePosCartLineSelection, usePosCartNavigation } from '@/components/pos/interactions/use-pos-cart-navigation';
 import { usePosFocusManager } from '@/components/pos/interactions/use-pos-focus-manager';
-import { shouldRestorePosFocus, usePosKeyboardActive } from '@/components/pos/interactions/use-pos-keyboard-active';
+import { usePosKeyboardActive } from '@/components/pos/interactions/use-pos-keyboard-active';
 import { usePosKeyboardShortcuts } from '@/components/pos/interactions/use-pos-keyboard-shortcuts';
 import { isPosDialogOpen, type PosDialogFlags } from '@/components/pos/interactions/pos-interaction-context';
 import { usePosProductNavigation, usePosProductSelection, usePosSearchFieldNavigation } from '@/components/pos/interactions/use-pos-product-navigation';
@@ -153,11 +153,8 @@ export default function PosPage() {
     focusZone,
     restoreFocusSafe,
   } = focusManager;
-  const { keyboardActive, lastInput, onPointerDown, onKeyDown: onKeyboardActiveKeyDown } = usePosKeyboardActive();
-  const restoreFocusAfterUi = useCallback(() => {
-    if (!shouldRestorePosFocus(lastInput)) return false;
-    return restoreFocusSafe();
-  }, [lastInput, restoreFocusSafe]);
+  const { keyboardActive, onPointerDown, onKeyDown: onKeyboardActiveKeyDown, markScanner, restoreAfterUi } = usePosKeyboardActive();
+  const restoreFocusAfterUi = useCallback(() => restoreAfterUi(restoreFocusSafe), [restoreAfterUi, restoreFocusSafe]);
   const [desktopKeyboardNav, setDesktopKeyboardNav] = useState(false);
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)');
@@ -784,7 +781,11 @@ export default function PosPage() {
     }
   }
 
-  usePosBarcodeScanner({ onScan: scanCode, enabled: step === 'sale' && !dialogOpen });
+  usePosBarcodeScanner({
+    onScan: scanCode,
+    enabled: step === 'sale' && !dialogOpen,
+    onScannerActivity: markScanner,
+  });
 
   const handleSearchKeyDown = usePosSearchFieldNavigation({
     onMoveToProducts: () => {
@@ -1125,7 +1126,7 @@ export default function PosPage() {
             placeholder={t('search_products')}
             className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-muted"
           />
-          <kbd className="num hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted sm:block">F4</kbd>
+          <kbd className="num hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted lg:block">F4</kbd>
         </div>
       </div>
 
@@ -1175,7 +1176,7 @@ export default function PosPage() {
       <div
         ref={registerProductsContainer}
         tabIndex={-1}
-        className={'grid gap-3 outline-none ' + (posCfg.show_product_images ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6')}
+        className={'grid gap-3 outline-none ' + (posCfg.show_product_images ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6') + (count > 0 ? ' pb-16 lg:pb-0' : '')}
       >
         {filtered.map((p, index) => {
           const tracked = p.track_inventory;
@@ -1542,7 +1543,7 @@ export default function PosPage() {
               {count > 0 && (
                 <button
                   onClick={() => setMobileTab('cart')}
-                  className="absolute inset-x-3 bottom-3 flex h-12 items-center gap-3 rounded-md bg-primary px-4 text-white lg:hidden"
+                  className="absolute inset-x-3 bottom-3 z-10 flex h-12 items-center gap-3 rounded-md bg-primary px-4 text-white touch-manipulation lg:hidden"
                 >
                   <span className="num grid h-6 w-6 place-items-center rounded-lg bg-white/25 text-[13px] font-bold">{count}</span>
                   <span className="flex-1 text-start text-[13px] font-semibold">{t('view_cart')}</span>
@@ -1556,13 +1557,13 @@ export default function PosPage() {
           <PosShortcuts />
 
           {/* تنقّل سفلي (جوال) */}
-          <nav className="grid h-16 shrink-0 grid-cols-4 border-t border-border bg-surface lg:hidden">
-            <button type="button" onClick={() => setRecentInvoicesOpen(true)} className="flex flex-col items-center justify-center gap-1 text-[10.5px] font-semibold text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><MoreHorizontal className="h-5 w-5" strokeWidth={1.8} />{t('nav_more')}</button>
-            <button type="button" onClick={() => setPickerOpen(true)} className="flex flex-col items-center justify-center gap-1 text-[10.5px] font-semibold text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><Users className="h-5 w-5" strokeWidth={1.8} />{t('nav_customers')}</button>
-            <button onClick={() => setMobileTab('products')} className={'flex flex-col items-center justify-center gap-1 text-[10.5px] font-semibold ' + (mobileTab === 'products' ? 'text-primary' : 'text-muted')}>
+          <nav className="grid min-h-16 shrink-0 grid-cols-4 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden">
+            <button type="button" onClick={() => setRecentInvoicesOpen(true)} className="flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold text-muted touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><MoreHorizontal className="h-5 w-5" strokeWidth={1.8} />{t('nav_more')}</button>
+            <button type="button" onClick={() => setPickerOpen(true)} className="flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold text-muted touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><Users className="h-5 w-5" strokeWidth={1.8} />{t('nav_customers')}</button>
+            <button type="button" onClick={() => setMobileTab('products')} className={'flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold touch-manipulation ' + (mobileTab === 'products' ? 'text-primary' : 'text-muted')}>
               <LayoutGrid className="h-5 w-5" strokeWidth={1.8} />{t('nav_products')}
             </button>
-            <button onClick={() => setMobileTab('cart')} className={'relative flex flex-col items-center justify-center gap-1 text-[10.5px] font-semibold ' + (mobileTab === 'cart' ? 'text-primary' : 'text-muted')}>
+            <button type="button" onClick={() => setMobileTab('cart')} className={'relative flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold touch-manipulation ' + (mobileTab === 'cart' ? 'text-primary' : 'text-muted')}>
               <ShoppingCart className="h-5 w-5" strokeWidth={1.8} />{t('cart')}
               {count > 0 && <span className="num absolute end-[calc(50%-18px)] top-2 grid h-4 min-w-4 place-items-center rounded-lg bg-negative px-1 text-[9px] font-bold text-white">{count}</span>}
             </button>

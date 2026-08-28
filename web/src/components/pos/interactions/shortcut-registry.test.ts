@@ -23,6 +23,13 @@ describe('سجل اختصارات نقطة البيع', () => {
     ]);
   });
 
+  it('يثبّت خريطة المفاتيح (F2–F9 وCtrl+N وCtrl+Shift+O وEsc)', () => {
+    expect(POS_SHORTCUT_BINDINGS.map(posShortcutBindingKey)).toEqual([
+      'F2', 'F4', 'F6', 'F7', 'F8', 'F9',
+      'ctrl+n', 'ctrl+alt+n', 'ctrl+shift+o', 'ctrl+alt+o', 'Escape',
+    ]);
+  });
+
   it('يترجم كل اختصار ظاهر في الشريط بالعربية والإنجليزية', () => {
     for (const shortcut of POS_SHORTCUT_FOOTER) {
       const ar = (arMessages.pos as Record<string, string>)[shortcut.translationKey];

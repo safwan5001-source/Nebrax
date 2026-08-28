@@ -1,29 +1,51 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import {
+  isPosKeyboardNavigationKey,
+  shouldRestorePosFocus,
+  type PosInputModality,
+  type PosKeyIdentity,
+  type PosLastInput,
+} from '@/components/pos/interactions/pos-input-modality';
 
-export type PosLastInput = 'keyboard' | 'pointer';
+export type { PosInputModality, PosLastInput };
+export { shouldRestorePosFocus };
 
-/** لا تُعد استعادة التركيز بعد تفاعل لمس حتى لا يُسحب الكاشير إلى حقل البحث. */
-export function shouldRestorePosFocus(lastInput: PosLastInput): boolean {
-  return lastInput !== 'pointer';
-}
-
-/** يميّز التفاعل بلوحة المفاتيح عن اللمس لإظهار حالات التحديد بصرياً. */
+/** يميّز التفاعل بلوحة المفاتيح عن اللمس والمسح لإظهار حالات التحديد بصرياً. */
 export function usePosKeyboardActive() {
   const [keyboardActive, setKeyboardActive] = useState(false);
-  const [lastInput, setLastInput] = useState<PosLastInput>('keyboard');
+  const [lastInput, setLastInput] = useState<PosInputModality>('keyboard');
   const [pointerType, setPointerType] = useState<string | null>(null);
+  const lastInputRef = useRef<PosInputModality>('keyboard');
 
-  const onPointerDown = useCallback((event?: { pointerType?: string }) => {
-    setKeyboardActive(false);
-    setLastInput('pointer');
-    if (event?.pointerType) setPointerType(event.pointerType);
+  const commitModality = useCallback((modality: PosInputModality) => {
+    lastInputRef.current = modality;
+    setLastInput(modality);
+    setKeyboardActive(modality === 'keyboard');
   }, []);
 
-  const onKeyDown = useCallback(() => {
-    setKeyboardActive(true);
-    setLastInput('keyboard');
+  const onPointerDown = useCallback((event?: { pointerType?: string }) => {
+    commitModality('pointer');
+    if (event?.pointerType) setPointerType(event.pointerType);
+  }, [commitModality]);
+
+  const onKeyDown = useCallback((event?: PosKeyIdentity) => {
+    if (event && !isPosKeyboardNavigationKey(event)) return;
+    commitModality('keyboard');
+  }, [commitModality]);
+
+  const markScanner = useCallback(() => {
+    commitModality('scanner');
+  }, [commitModality]);
+
+  const getLastInput = useCallback(() => lastInputRef.current, []);
+
+  /** بعد إغلاق الحوار: يُؤجَّل حتى يُزال الـ dialog من الشجرة، ويقرأ الـ modality المتزامن. */
+  const restoreAfterUi = useCallback((restore: () => boolean) => {
+    if (!shouldRestorePosFocus(lastInputRef.current)) return false;
+    window.setTimeout(() => { restore(); }, 0);
+    return true;
   }, []);
 
   return {
@@ -31,7 +53,11 @@ export function usePosKeyboardActive() {
     lastInput,
     pointerType,
     isPointerSession: lastInput === 'pointer',
+    isScannerSession: lastInput === 'scanner',
     onPointerDown,
     onKeyDown,
+    markScanner,
+    getLastInput,
+    restoreAfterUi,
   };
 }
