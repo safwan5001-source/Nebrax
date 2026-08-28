@@ -13,7 +13,7 @@ interface PosDialogProps {
 }
 
 /**
- * غلاف حوار خاص بنقطة البيع: أهداف لمس أوضح وارتفاع لا يتجاوز الشاشة.
+ * غلاف حوار خاص بنقطة البيع: رأس ثابت وجسم يتمرّر داخل 100dvh.
  * لا يغيّر `components/ui/dialog` العام ولا منطق Esc.
  */
 export function PosDialog({ open, onClose, title, children, className }: PosDialogProps) {
@@ -27,24 +27,29 @@ export function PosDialog({ open, onClose, title, children, className }: PosDial
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto p-4 sm:items-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative z-10 my-8 w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded border border-border bg-surface',
+          'relative z-10 my-8 flex max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-lg flex-col overflow-hidden rounded border border-border bg-surface',
           className,
         )}
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-base font-semibold text-text">{title}</h2>
-          <button type="button" onClick={onClose} className="grid min-h-11 min-w-11 place-items-center rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="إغلاق">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="min-w-0 truncate text-base font-semibold text-text">{title}</h2>
+          <button type="button" onClick={onClose} className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="إغلاق">
             <X className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div
+          data-testid="pos-dialog-body"
+          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [&_pre]:max-w-full [&_pre]:whitespace-pre-wrap [&_pre]:break-all"
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

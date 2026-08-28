@@ -96,11 +96,11 @@ export function PosTopbar({
   }
 
   return (
-    <header className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
+    <header className="no-print flex min-h-14 shrink-0 items-center gap-1 border-b border-border bg-surface px-2 pt-[env(safe-area-inset-top)] sm:gap-2 sm:px-4">
       <button
         type="button"
         onClick={() => (onReturnToSystem ? onReturnToSystem() : router.push(POS_RETURN_HREF))}
-        className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border border-border px-2 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:px-2.5"
         aria-label={t('return_to_system')}
       >
         <RotateCcw className="h-4 w-4" strokeWidth={1.7} />
@@ -108,7 +108,14 @@ export function PosTopbar({
       </button>
 
       <div className="min-w-0 border-s border-border ps-2 sm:ps-3">
-        <div className="truncate text-sm font-semibold text-text">{t('pos_title')}</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <div className="truncate text-sm font-semibold text-text">{t('pos_title')}</div>
+          <CircleDot
+            className={'h-3.5 w-3.5 shrink-0 md:hidden ' + (online ? 'text-positive' : 'text-negative')}
+            strokeWidth={1.8}
+            aria-label={online ? t('network_connected') : t('network_offline')}
+          />
+        </div>
         <div className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
           <Building2 className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} />
           <span className="truncate">{branch}</span>
@@ -122,17 +129,17 @@ export function PosTopbar({
       </div>
 
       {sessionLabel && (
-        <div className="hidden min-w-0 items-center gap-1.5 rounded-md bg-background px-2 py-1 text-xs text-muted lg:flex" title={t('session')}>
+        <div className="hidden min-w-0 items-center gap-1.5 rounded-md bg-background px-2 py-1 text-xs text-muted md:flex" title={t('session')}>
           <span className="text-text">{t('session')}</span>
           <span className="num truncate font-semibold text-text">{sessionLabel}</span>
         </div>
       )}
 
-      <div className="ms-auto flex shrink-0 items-center gap-1">
+      <div className="ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
         <button
           type="button"
           onClick={onOpenRecentInvoices}
-          className="inline-flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="hidden min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:inline-flex"
           aria-label={t('recent_pos_invoices')}
         >
           <ReceiptText className="h-4 w-4" strokeWidth={1.7} />
@@ -141,7 +148,7 @@ export function PosTopbar({
         <button
           type="button"
           onClick={onOpenHeld}
-          className="relative inline-flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="relative hidden min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:inline-flex"
           aria-label={t('held')}
         >
           <Archive className="h-4 w-4" strokeWidth={1.7} />
@@ -166,13 +173,20 @@ export function PosTopbar({
           mobilePopover
           trigger={<MoreHorizontal className="h-5 w-5" strokeWidth={1.7} />}
         >
-          <div className="border-b border-border px-2.5 py-2 lg:hidden">
+          <div className="border-b border-border px-2.5 py-2 md:hidden">
             <div className="text-sm font-semibold text-text">{t('pos_title')}</div>
+            <div className="truncate text-xs text-muted">{branch}</div>
             <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
               <CircleDot className={'h-3.5 w-3.5 ' + (online ? 'text-positive' : 'text-negative')} strokeWidth={1.8} />
               {online ? t('network_connected') : t('network_offline')}
               {sessionLabel && <><span aria-hidden>·</span><span className="num">{sessionLabel}</span></>}
             </div>
+          </div>
+          <div className="md:hidden">
+            <DropdownItem icon={ReceiptText} onClick={onOpenRecentInvoices}>{t('recent_pos_invoices')}</DropdownItem>
+            <DropdownItem icon={Archive} onClick={onOpenHeld}>
+              {heldCount > 0 ? `${t('held')} (${heldCount})` : t('held')}
+            </DropdownItem>
           </div>
           <div className="lg:hidden">
             <DropdownItem icon={Power} onClick={onManageSession}>{t('manage_shift')}</DropdownItem>

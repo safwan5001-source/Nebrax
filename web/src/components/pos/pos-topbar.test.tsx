@@ -47,3 +47,27 @@ describe('العودة للنظام في شريط POS', () => {
     expect(router.push).toHaveBeenCalledWith('/dashboard');
   });
 });
+
+describe('فيض شريط POS على الجوال', () => {
+  it('يستدعي نفس callbacks الفواتير الأخيرة والمعلّقة من قائمة الإجراءات الإضافية', () => {
+    const onOpenRecentInvoices = vi.fn();
+    const onOpenHeld = vi.fn();
+    renderIntl(
+      <PosTopbar
+        cashier="كاشير"
+        branch="الفرع الرئيسي"
+        heldCount={2}
+        onOpenRecentInvoices={onOpenRecentInvoices}
+        onOpenHeld={onOpenHeld}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'إجراءات إضافية' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'آخر الفواتير' }));
+    expect(onOpenRecentInvoices).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole('button', { name: 'إجراءات إضافية' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'المعلّقة (2)' }));
+    expect(onOpenHeld).toHaveBeenCalledOnce();
+  });
+});
