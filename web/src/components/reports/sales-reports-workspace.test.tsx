@@ -10,7 +10,7 @@ vi.mock('@/lib/company', () => ({ useCompany: () => null }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
 vi.mock('@/components/reports/sales-report-filters', () => ({
   EMPTY_SALES_REPORT_FILTERS: { from: '', to: '', branchIds: [], interval: 'month', customerId: '', customerClassificationId: '', productId: '', productCategoryId: '', classificationId: '', salespersonId: '', paymentStatus: '', receiptMethod: '' },
-  SalesReportFilters: () => <div data-testid="sales-filters" />,
+  SalesReportFilters: ({ onChange }: { onChange: (value: unknown) => void }) => <button type="button" onClick={() => onChange({ from: '2026-08-01', to: '2026-08-31', branchIds: [], interval: 'month', customerId: '', customerClassificationId: '', productId: '', productCategoryId: '', classificationId: '', salespersonId: '', paymentStatus: '', receiptMethod: '' })}>change filters</button>,
 }));
 vi.mock('@/components/reports/report-workspace-ui', () => ({
   ReportScreenHeader: () => <div data-testid="sales-header" />,
@@ -58,5 +58,27 @@ describe('SalesReportsWorkspace presentation modes', () => {
     await waitFor(() => expect(screen.getByRole('radiogroup', { name: 'presentationMode' })).toBeTruthy());
     fireEvent.click(screen.getByRole('radio', { name: 'detail' }));
     expect(screen.getByTestId('sales-detail-unavailable')).toBeTruthy();
+  });
+
+  it('ignores a stale request that resolves after the latest filters request', async () => {
+    let resolveFirst!: (value: typeof response) => void;
+    let resolveSecond!: (value: typeof response) => void;
+    apiMock
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+
+    render(<SalesReportsWorkspace view="customer" />);
+    fireEvent.click(screen.getByRole('button', { name: 'change filters' }));
+
+    resolveSecond({
+      ...response,
+      data: [{ key: 'customer-2', label: 'Latest Customer', invoices: 3, amount: '300.00' }],
+      totals: { invoices: 3, net_sales: '300.00', tax: '0.00', amount: '300.00' },
+    });
+    await waitFor(() => expect(screen.getByTestId('sales-summary-table').textContent).toContain('Latest Customer'));
+
+    resolveFirst(response);
+    await waitFor(() => expect(screen.getByTestId('sales-summary-table').textContent).toContain('Latest Customer'));
+    expect(screen.getByTestId('sales-summary-table').textContent).not.toContain('Customer A');
   });
 });
