@@ -5,7 +5,6 @@ namespace App\Services\Accounting;
 use DateTimeInterface;
 use DOMDocument;
 use DOMElement;
-use DOMNode;
 use DOMXPath;
 use InvalidArgumentException;
 use RuntimeException;
@@ -54,6 +53,7 @@ final class ZatcaXadesSignatureAssembler
     ): string {
         $this->assertDistinctXmlIds($signatureId, $invoiceReferenceId, $signedPropertiesId);
         $document = $this->parseSecurely($invoiceXml);
+        $this->assertIdsUnused($document, $signatureId, $invoiceReferenceId, $signedPropertiesId);
         $xpath = $this->xpath($document);
 
         if ($this->query($xpath, '//ds:Signature')->length !== 0) {
@@ -289,6 +289,25 @@ final class ZatcaXadesSignatureAssembler
         }
         if (count(array_unique($ids)) !== count($ids)) {
             throw new InvalidArgumentException('معرّفات عناصر توقيع ZATCA يجب أن تكون فريدة.');
+        }
+    }
+
+    private function assertIdsUnused(DOMDocument $document, string ...$ids): void
+    {
+        $reserved = array_fill_keys($ids, true);
+
+        foreach ($document->getElementsByTagName('*') as $element) {
+            foreach ($element->attributes as $attribute) {
+                $isPlainId = $attribute->namespaceURI === null && $attribute->nodeName === 'Id';
+                $isXmlId = $attribute->namespaceURI === 'http://www.w3.org/XML/1998/namespace'
+                    && $attribute->localName === 'id';
+
+                if (($isPlainId || $isXmlId) && isset($reserved[$attribute->nodeValue])) {
+                    throw new InvalidArgumentException(
+                        'معرّف عنصر توقيع ZATCA مستخدم مسبقاً داخل الفاتورة.'
+                    );
+                }
+            }
         }
     }
 

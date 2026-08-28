@@ -109,6 +109,34 @@ class ZatcaXadesSignatureAssemblerTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_plain_or_xml_ids_that_collide_with_generated_signature_ids(): void
+    {
+        [$privateKey, $leaf] = $this->certificate('Leaf Device');
+        $assembler = app(ZatcaXadesSignatureAssembler::class);
+
+        foreach ([
+            '<cbc:Note Id="signature">existing</cbc:Note>',
+            '<cbc:Note xml:id="xadesSignedProperties">existing</cbc:Note>',
+        ] as $existingId) {
+            $invoice = str_replace('<cbc:ID>INV-1</cbc:ID>', $existingId.'<cbc:ID>INV-1</cbc:ID>', $this->invoiceXml());
+
+            try {
+                $assembler->assemble(
+                    $invoice,
+                    [base64_encode($leaf)],
+                    $privateKey,
+                    new DateTimeImmutable(),
+                    'https://zatca.gov.sa/policy',
+                    base64_encode(hash('sha256', 'policy', true)),
+                );
+                $this->fail('كان يجب رفض معرّف XML المتعارض مع التوقيع.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('مستخدم مسبقاً', $exception->getMessage());
+            }
+        }
+    }
+
+    /** @test */
     public function it_rejects_dtd_non_invoice_documents_and_colliding_ids(): void
     {
         [$privateKey, $leaf] = $this->certificate('Leaf Device');
