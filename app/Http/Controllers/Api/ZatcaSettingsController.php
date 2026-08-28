@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\UpdateZatcaSettingsRequest;
+use App\Services\Accounting\ZatcaSigningReadiness;
 use App\Support\Settings;
 use App\Support\ZatcaIcvScope;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,8 @@ use Illuminate\Http\JsonResponse;
  */
 class ZatcaSettingsController extends ApiController
 {
+    public function __construct(private readonly ZatcaSigningReadiness $signingReadiness) {}
+
     public function show(): JsonResponse
     {
         return response()->json([
@@ -30,6 +33,7 @@ class ZatcaSettingsController extends ApiController
                 'effective_icv_scope'   => ZatcaIcvScope::current(),
                 'branch_scope_available' => ZatcaIcvScope::branchAvailable(),
                 'branch_scope_blocker'   => ZatcaIcvScope::unavailableReason(),
+                'signing_readiness'       => $this->signingReadiness->inspect(),
             ],
         ]);
     }
