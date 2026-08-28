@@ -388,8 +388,16 @@ CONF;
             $this->payload($this->certificateMaterial('tls-only', 'tls_only_leaf'))
         )->assertUnprocessable()->assertJsonValidationErrors('binary_security_token');
 
+        $this->assertDatabaseCount('zatca_credentials', 0);
+    }
+
+    /** @test */
+    public function a_client_auth_oid_prefix_is_not_accepted_as_client_auth(): void
+    {
+        $auth = $this->registerTenant('zatca-client-auth-prefix', 'zatca-client-auth-prefix@example.test');
+
         $this->withToken($auth['token'])->putJson(
-            $url,
+            '/api/zatca-credentials/simulation',
             $this->payload($this->certificateMaterial('client-auth-prefix', 'client_auth_prefix_leaf'))
         )->assertUnprocessable()->assertJsonValidationErrors('binary_security_token');
 
