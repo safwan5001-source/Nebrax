@@ -500,6 +500,9 @@ final class PosAuditService
             'error_code', 'mode', 'operation', 'approval_id', 'context', 'counted_balance',
             'expected_balance', 'difference', 'pos_device_id', 'shift_id', 'cash_movement_id',
             'recount_after_approval', 'note',
+            // تفصيل الاستبدال المالي: يبقى في الحمولة للتدقيق والشرح إلى جانب عمود
+            // amount المشتقّ منه (قيمة الإرجاع). لا يغيّر أي قيد أو رصيد.
+            'original_invoice_id', 'replacement_invoice_id', 'applied_credit_amount', 'cash_refund_amount',
         ];
         $result = [];
         foreach ($allowed as $key) {

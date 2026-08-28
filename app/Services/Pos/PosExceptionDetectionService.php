@@ -212,9 +212,43 @@ final class PosExceptionDetectionService
 
         if ($full) {
             $result['amount_events'] = $this->amountEvents($start, $end, $sessionOwner);
+            $result['near_close'] = $this->nearCloseCounts($start, $end, $sessionOwner);
         }
 
         return $result;
+    }
+
+    /**
+     * عدّ العمليات الحساسة الواقعة ضمن آخر `window_minutes` قبل إغلاق جلستها،
+     * منسوبةً إلى منفّذها. إسقاط محدود بالأنواع الحساسة فقط (لا الحمولات الكاملة).
+     * التوقيت مقارنةٌ لطوابع زمنية مطلقة (UTC) فلا يتأثر بالمنطقة الزمنية.
+     *
+     * @return array<string,array<string,int>> [branch][performer] => count
+     */
+    private function nearCloseCounts(Carbon $start, Carbon $end, array $sessionOwner): array
+    {
+        $rule = PosExceptionRuleCatalog::rule('near_close_concentration');
+        $windowMinutes = (int) ($rule['config']['window_minutes'] ?? 30);
+        $near = [];
+        PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
+            ->whereIn('type', PosExceptionRuleCatalog::sensitiveOpTypes())
+            ->whereNotNull('performed_by')->whereNotNull('pos_session_id')
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+            ->get(['branch_id', 'performed_by', 'pos_session_id', 'created_at'])
+            ->each(function (PosSessionEvent $event) use (&$near, $sessionOwner, $windowMinutes) {
+                $owner = $sessionOwner[$event->pos_session_id] ?? null;
+                if ($owner === null || $owner['closed_at'] === null) {
+                    return;
+                }
+                $secondsBeforeClose = $owner['closed_at']->getTimestamp() - $event->created_at->getTimestamp();
+                if ($secondsBeforeClose < 0 || $secondsBeforeClose > $windowMinutes * 60) {
+                    return;
+                }
+                $branch = $event->branch_id ?? '_';
+                $near[$branch][$event->performed_by] = ($near[$branch][$event->performed_by] ?? 0) + 1;
+            });
+
+        return $near;
     }
 
     /**
@@ -413,15 +447,16 @@ final class PosExceptionDetectionService
         ];
     }
 
-    /** تقدير قاعدة ثابتة (تركّز/مقدار مطلق). */
+    /** تقدير قاعدة ثابتة: مقدار مطلق (متوسط بالهللات) أو تركّز/نسبة مطبّعة. */
     private function assessStatic(array $rule, string $branch, string $subject, int $numerator, int $denominator, int $observed, array $current, bool $sessionScoped): ?array
     {
-        // مقدار مطلق (مثل مقدار فرق الإغلاق): متوسط بالهللات مقابل config.absolute.
+        // مقدار مطلق (مقدار فرق الإغلاق): متوسط الجلسة بالهللات مقابل العتبة
+        // القابلة للضبط `threshold` (لا رقم ثابت مخفيّ).
         if (($rule['amount_abs'] ?? false) && ($rule['numerator_mode'] ?? null) !== 'amount') {
-            $absolute = $rule['config']['absolute'] ?? $rule['threshold'];
+            $absolute = (int) $rule['threshold'];
             $totalAmount = $this->amountSum($rule, $branch, $subject, $current, $sessionScoped);
             $avg = $denominator > 0 ? intdiv($totalAmount['total'], $denominator) : 0;
-            if ($avg < $absolute) {
+            if ($absolute <= 0 || $avg < $absolute) {
                 return null;
             }
 
@@ -433,7 +468,18 @@ final class PosExceptionDetectionService
             ];
         }
 
-        return null;
+        // تركّز/نسبة ثابتة (مثل near_close): المعدّل المطبّع المرصود مقابل العتبة.
+        $threshold = (int) $rule['threshold'];
+        if ($threshold <= 0 || $observed < $threshold) {
+            return null;
+        }
+
+        return [
+            'observed_count' => $numerator, 'denominator' => $denominator, 'observed_rate' => $observed,
+            'baseline_rate' => $threshold, 'baseline_type' => 'static', 'sample_size' => $denominator,
+            'severity' => $this->staticSeverity($observed, $threshold), 'sample_sufficient' => true,
+            'amount_under_review' => 0, 'amount_event_ids' => [],
+        ];
     }
 
     // ════════════════════════════ الإنهاء ════════════════════════════
@@ -445,7 +491,10 @@ final class PosExceptionDetectionService
     private function finalizeFinding(array $rule, string $branch, string $subjectUser, string $performedBy, ?string $approvedBy, array $finding, array $current, Carbon $now, int $windowDays, bool $sessionScoped): array
     {
         $branchValue = $branch === '_' ? null : $branch;
-        $key = $rule['rule_key'] . ':' . ($branchValue ?? 'null') . ':' . $subjectUser . ($approvedBy ? ':' . $approvedBy : '');
+        // يدخل إصدار القاعدة في الهوية: تغيير الضبط (weight/threshold/window) يرفع
+        // الإصدار فينشأ استثناء بهوية جديدة، ويبقى القديم مجمّداً بلقطته ومقاييسه
+        // المتّسقة معها — فلا تُعرض مقاييس بإعداد جديد فوق لقطة قديمة.
+        $key = $rule['rule_key'] . ':v' . $rule['version'] . ':' . ($branchValue ?? 'null') . ':' . $subjectUser . ($approvedBy ? ':' . $approvedBy : '');
 
         // قواعد المبلغ (نسبة المرتجع): المبلغ قيد المراجعة من أحداث البسط.
         $amount = $finding['amount_under_review'];
@@ -531,9 +580,9 @@ final class PosExceptionDetectionService
             return max(0, ($counts[PosSessionEvent::TYPE_CHECKOUT_STARTED] ?? 0) - ($counts[PosSessionEvent::TYPE_CHECKOUT_COMPLETED] ?? 0));
         }
         if ($types === ['@near_close_sensitive']) {
-            // متغيّر التوقيت: يُقارب بعدد العمليات الحساسة (تقريب محافظ يتجنّب
-            // تحميل أحداث كل جلسة؛ التطبيق الكامل لنافذة الدقائق مؤجَّل لـPhase 3).
-            return $this->sensitiveOps($data, $branch, $subject);
+            // العمليات الحساسة الواقعة فعلاً ضمن نافذة الدقائق قبل الإغلاق
+            // (محسوبة في التجميع). المقام هو كل العمليات الحساسة للمنفّذ.
+            return $data['near_close'][$branch][$subject] ?? 0;
         }
 
         $source = $sessionScoped ? ($data['by_session_owner'][$branch][$subject] ?? []) : ($data['counts'][$branch][$subject] ?? []);
@@ -731,10 +780,10 @@ final class PosExceptionDetectionService
             ];
 
             if ($existing) {
-                // idempotent: يحدّث المقاييس ويحافظ على حالة المراجعة وسجلّها
-                // ولقطة القاعدة الأصلية (لا يُعاد كتابتها بعد تغيير الإعداد).
-                $attributes['rule_snapshot'] = $existing->rule_snapshot ?? $finding['rule_snapshot'];
-                $attributes['rule_version'] = $existing->rule_version;
+                // idempotent: مفتاح التكرار يشمل الإصدار، فالصفّ الموجود من نفس
+                // الإصدار حتماً؛ تحديث المقاييس يبقى متّسقاً مع لقطته وإصداره،
+                // مع الحفاظ على حالة المراجعة وسجلّها (لا تُمَسّ). أمّا استثناءات
+                // الإصدار السابق فتبقى مجمّدةً كما هي (خارج تشغيل هذا الإصدار).
                 $existing->forceFill($attributes)->save();
                 $persisted[] = $existing;
             } else {
@@ -761,6 +810,9 @@ final class PosExceptionDetectionService
             $bySubject[$branchKey][$exception->subject_user_id][] = $exception;
         }
 
+        // هوية اللقطة هي (branch_id, subject_user_id) نفسها المستعملة في الـupsert،
+        // لا معرّف المستخدم وحده: مستخدمٌ لم يعد موسوماً في فرعٍ يجب أن تُزال لقطته
+        // في ذلك الفرع حتى لو بقي موسوماً في فرعٍ آخر.
         $seen = [];
         $built = 0;
         foreach ($bySubject as $branch => $subjects) {
@@ -768,17 +820,19 @@ final class PosExceptionDetectionService
             foreach ($subjects as $subjectId => $items) {
                 $snapshot = $this->buildSnapshot($branchValue, (string) $subjectId, $items, $now);
                 $this->upsertSnapshot($snapshot);
-                $seen[] = $subjectId;
+                $seen[$branch . '|' . $subjectId] = true;
                 $built++;
             }
         }
 
-        // يزيل لقطات المواضيع التي لم تعد تنتج استثناءات (تصحيح الوضع الحالي).
+        // يزيل لقطات (فرع+موضوع) التي لم تعد تنتج استثناءات في هذا التشغيل.
         $stale = PosRiskSnapshot::query()->withoutGlobalScope(BranchScope::class)
-            ->when($seen !== [], fn ($q) => $q->whereNotIn('subject_user_id', $seen))
-            ->get();
+            ->get(['id', 'branch_id', 'subject_user_id']);
         foreach ($stale as $snapshot) {
-            $snapshot->delete();
+            $key = ($snapshot->branch_id ?? '_') . '|' . $snapshot->subject_user_id;
+            if (! isset($seen[$key])) {
+                $snapshot->delete();
+            }
         }
 
         return $built;

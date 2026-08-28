@@ -79,11 +79,11 @@ class PosLossPreventionIntelligenceTest extends TestCase
         }
     }
 
-    private function detect(string $tenantId): array
+    private function detect(string $tenantId, ?Carbon $now = null): array
     {
         app(TenantContext::class)->set($tenantId);
 
-        return app(PosExceptionDetectionService::class)->run();
+        return app(PosExceptionDetectionService::class)->run($now);
     }
 
     private function exceptionsFor(string $ruleKey, ?string $subject = null)
@@ -543,5 +543,220 @@ class PosLossPreventionIntelligenceTest extends TestCase
         $this->assertGreaterThanOrEqual(3, $total);
         $response = $this->withToken($owner['token'])->getJson('/api/pos/audit/exceptions?per_page=2&page=1')->assertOk();
         $response->assertJsonPath('meta.total', $total)->assertJsonCount(2, 'data');
+    }
+
+    // ═══════════════════════ اختبارات انحدار مراجعة Codex ═══════════════════════
+
+    /** @test P1: قيمة الاستبدال تُشتق خادمياً وتغذّي refund_amount_rate والمبلغ قيد المراجعة. */
+    public function exchange_recording_carries_server_amount_and_feeds_refund_amount_metrics(): void
+    {
+        $auth = $this->registerTenant();
+        $tenant = $auth['tenant_id'];
+        app(TenantContext::class)->set($tenant);
+        $owner = User::query()->where('email', 'owner@acme.test')->firstOrFail();
+
+        // مسار الكتابة الحقيقي: recordExchange يجب أن يسم الحدث بمبلغ = الرصيد المطبّق + النقد المصروف.
+        $open = PosSession::create([
+            'tenant_id' => $tenant, 'branch_id' => null, 'number' => 'POS-EX-OPEN', 'status' => 'open',
+            'opening_balance' => 0, 'opened_at' => Carbon::now()->subHours(2), 'opened_by' => $owner->id,
+        ]);
+        // recordExchange يقرأ خصائص الاستبدال فقط (لا يحتاج صفاً محفوظاً)، فنتفادى
+        // قيود مستند فاتورة/مرتجع كاملة غير المعنيّة بهذا الاختبار الرقابي.
+        $exchange = new \App\Models\PosExchange([
+            'pos_session_id' => $open->id, 'status' => 'posted',
+            'applied_credit_amount' => 40000, 'cash_refund_amount' => 20000,
+        ]);
+        $exchange->id = (string) Str::uuid();
+        $exchange->tenant_id = $tenant;
+        app(\App\Services\Accounting\PosSessionService::class)->recordExchange($open, $exchange, $owner);
+        $exchangeEvent = PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
+            ->where('type', PosSessionEvent::TYPE_EXCHANGE_RECORDED)->sole();
+        $this->assertSame(60000, (int) $exchangeEvent->amount);
+        $this->assertSame(40000, (int) $exchangeEvent->payload['applied_credit_amount']);
+
+        // الكشف: مبيعات + استبدالات بقيم فعلية تتجاوز عتبة نسبة مبلغ المرتجع.
+        $closed = $this->posSession($tenant, $owner->id);
+        $this->repeat(20, fn () => $this->event($tenant, $closed->id, $owner->id, PosSessionEvent::TYPE_CHECKOUT_COMPLETED, ['amount' => 100000]));
+        $this->repeat(4, fn () => $this->event($tenant, $closed->id, $owner->id, PosSessionEvent::TYPE_EXCHANGE_RECORDED, ['amount' => 60000]));
+
+        // نهاية النافذة بعد لحظة إنشاء حدث recordExchange الحيّ (الحدّ `< now`).
+        $this->detect($tenant, Carbon::now()->addMinute());
+
+        $amountRule = $this->exceptionsFor('refund_amount_rate', $owner->id)->sole();
+        // 5 استبدالات × 60000 = 300000 قيمة إرجاع فعلية (لا صفر، ولا اختلاق، ولا ازدواج).
+        $this->assertSame(300000, (int) $amountRule->amount_under_review);
+        $this->assertCount(5, $amountRule->amount_event_ids);
+    }
+
+    /** @test P1: تنظيف اللقطات القديمة يجب أن يكون بهوية (فرع+موضوع) لا الموضوع وحده. */
+    public function stale_snapshot_cleanup_is_scoped_by_branch_and_subject(): void
+    {
+        $auth = $this->registerTenant();
+        $tenant = $auth['tenant_id'];
+        app(TenantContext::class)->set($tenant);
+        $branchA = \App\Models\Branch::create(['tenant_id' => $tenant, 'code' => 'BR-A', 'name' => 'فرع أ']);
+        $branchB = \App\Models\Branch::create(['tenant_id' => $tenant, 'code' => 'BR-B', 'name' => 'فرع ب']);
+        $user = $this->cashier($tenant, 'multibranch@x.test');
+
+        // دليل حقيقي يوسم المستخدم في الفرع أ فقط.
+        $session = PosSession::create([
+            'tenant_id' => $tenant, 'branch_id' => $branchA->id, 'number' => 'POS-BRA', 'status' => 'closed',
+            'opening_balance' => 0, 'opened_at' => Carbon::now()->subDays(1), 'closed_at' => Carbon::now()->subDays(1)->addHours(6), 'opened_by' => $user->id,
+        ]);
+        $this->repeat(100, fn () => $this->event($tenant, $session->id, $user->id, PosSessionEvent::TYPE_ITEM_ADDED, ['branch_id' => $branchA->id, 'source' => 'client_observed']));
+        $this->repeat(40, fn () => $this->event($tenant, $session->id, $user->id, PosSessionEvent::TYPE_ITEM_REMOVED, ['branch_id' => $branchA->id, 'source' => 'client_observed']));
+
+        // لقطة قديمة لنفس المستخدم في الفرع ب (لم يعد موسوماً فيه).
+        PosRiskSnapshot::create([
+            'tenant_id' => $tenant, 'branch_id' => $branchB->id, 'scope' => 'user', 'subject_user_id' => $user->id,
+            'total_score' => 80, 'band' => 'priority', 'exception_count' => 3, 'amount_under_review' => 500000,
+            'sample_size' => 50, 'sample_sufficient' => true, 'components' => [], 'calculated_at' => Carbon::now()->subDay(),
+        ]);
+
+        $this->detect($tenant);
+
+        // الفرع أ: لقطة حيّة. الفرع ب: أُزيلت رغم أن الموضوع نفسه ما زال موسوماً في أ.
+        $this->assertTrue(PosRiskSnapshot::query()->withoutGlobalScope(BranchScope::class)
+            ->where('branch_id', $branchA->id)->where('subject_user_id', $user->id)->exists());
+        $this->assertFalse(PosRiskSnapshot::query()->withoutGlobalScope(BranchScope::class)
+            ->where('branch_id', $branchB->id)->where('subject_user_id', $user->id)->exists());
+    }
+
+    /** @test P2: near_close_concentration يشتعل عند تركّز العمليات قرب الإغلاق ولا يشتعل بعيداً عنه. */
+    public function near_close_concentration_triggers_only_when_sensitive_ops_cluster_before_close(): void
+    {
+        $auth = $this->registerTenant();
+        $tenant = $auth['tenant_id'];
+
+        // مستخدم أ: 12 عملية حساسة كلها خلال 10 دقائق قبل الإغلاق ⇒ يشتعل.
+        $near = $this->cashier($tenant, 'near@x.test');
+        $closeAt = Carbon::now()->subDays(1);
+        $nearSession = PosSession::create([
+            'tenant_id' => $tenant, 'branch_id' => null, 'number' => 'POS-NEAR', 'status' => 'closed',
+            'opening_balance' => 0, 'opened_at' => $closeAt->copy()->subHours(6), 'closed_at' => $closeAt, 'opened_by' => $near->id,
+        ]);
+        $this->repeat(12, fn () => $this->event($tenant, $nearSession->id, $near->id, PosSessionEvent::TYPE_ITEM_REMOVED, ['at' => $closeAt->copy()->subMinutes(10), 'source' => 'client_observed']));
+
+        // مستخدم ب: 12 عملية حساسة قبل الإغلاق بساعتين ⇒ لا يشتعل.
+        $far = $this->cashier($tenant, 'far@x.test');
+        $farSession = PosSession::create([
+            'tenant_id' => $tenant, 'branch_id' => null, 'number' => 'POS-FAR', 'status' => 'closed',
+            'opening_balance' => 0, 'opened_at' => $closeAt->copy()->subHours(6), 'closed_at' => $closeAt, 'opened_by' => $far->id,
+        ]);
+        $this->repeat(12, fn () => $this->event($tenant, $farSession->id, $far->id, PosSessionEvent::TYPE_ITEM_REMOVED, ['at' => $closeAt->copy()->subHours(2), 'source' => 'client_observed']));
+
+        $this->detect($tenant);
+
+        $this->assertSame(1, $this->exceptionsFor('near_close_concentration', $near->id)->count());
+        $this->assertSame(0, $this->exceptionsFor('near_close_concentration', $far->id)->count());
+    }
+
+    /** @test P2: تغيير إصدار القاعدة ينشئ استثناءً بهوية جديدة ويُبقي القديم مجمّداً ومتّسقاً. */
+    public function bumping_rule_version_creates_a_new_exception_and_freezes_the_old_one(): void
+    {
+        $auth = $this->registerTenant();
+        $tenant = $auth['tenant_id'];
+        $cashier = $this->cashier($tenant, 'version@x.test');
+        $session = $this->posSession($tenant, $cashier->id);
+        $this->repeat(100, fn () => $this->event($tenant, $session->id, $cashier->id, PosSessionEvent::TYPE_ITEM_ADDED, ['source' => 'client_observed']));
+        $this->repeat(40, fn () => $this->event($tenant, $session->id, $cashier->id, PosSessionEvent::TYPE_ITEM_REMOVED, ['source' => 'client_observed']));
+
+        $this->detect($tenant);
+        $v1 = $this->exceptionsFor('item_removal_rate', $cashier->id)->sole();
+        $originalContribution = $v1->risk_contribution;
+        $this->assertSame(1, $v1->rule_version);
+        $this->assertSame(12, $v1->rule_snapshot['weight']);
+
+        // مضاعفة الوزن ورفع الإصدار (كما يفعل updateRule عند تغيير الضبط).
+        app(TenantContext::class)->set($tenant);
+        PosExceptionRule::query()->where('rule_key', 'item_removal_rate')->update(['weight' => 24, 'version' => 2]);
+
+        $this->detect($tenant);
+
+        // القديم (v1) مجمّد: نفس المساهمة واللقطة والإصدار — لا مقاييس بإعداد جديد فوق لقطة قديمة.
+        $frozen = PosException::query()->withoutGlobalScope(BranchScope::class)->find($v1->id);
+        $this->assertSame(1, $frozen->rule_version);
+        $this->assertSame(12, $frozen->rule_snapshot['weight']);
+        $this->assertSame($originalContribution, $frozen->risk_contribution);
+
+        // الجديد (v2): هوية مستقلة، مساهمة مبنية على الوزن الجديد ولقطته توافقه.
+        $v2 = PosException::query()->withoutGlobalScope(BranchScope::class)
+            ->where('rule_key', 'item_removal_rate')->where('rule_version', 2)->sole();
+        $this->assertNotSame($v1->id, $v2->id);
+        $this->assertSame(24, $v2->rule_snapshot['weight']);
+        $this->assertGreaterThan($originalContribution, $v2->risk_contribution);
+
+        // اللقطة تعكس الإصدار الجديد.
+        $snapshot = PosRiskSnapshot::query()->withoutGlobalScope(BranchScope::class)->where('subject_user_id', $cashier->id)->sole();
+        $this->assertSame($v2->risk_contribution, $snapshot->components['cart']['raw_points']);
+    }
+
+    /** @test P2: قائمة السلال المفلترة تشتق آخر حدث من نفس المجموعة المفلترة. */
+    public function filtered_cart_list_derives_latest_event_from_the_same_filtered_set(): void
+    {
+        $auth = $this->registerTenant();
+        $tenant = $auth['tenant_id'];
+        app(TenantContext::class)->set($tenant);
+        $cashier = $this->cashier($tenant, 'carts@x.test');
+        $sessionOne = $this->posSession($tenant, $cashier->id);
+        $sessionTwo = PosSession::create([
+            'tenant_id' => $tenant, 'branch_id' => null, 'number' => 'POS-CART2', 'status' => 'closed',
+            'opening_balance' => 0, 'opened_at' => Carbon::now()->subHours(3), 'closed_at' => Carbon::now()->subHours(1), 'opened_by' => $cashier->id,
+        ]);
+        $cart = (string) Str::uuid();
+        $early = Carbon::now()->subHours(5);
+        $late = Carbon::now()->subMinutes(30);
+        $this->event($tenant, $sessionOne->id, $cashier->id, PosSessionEvent::TYPE_CART_CREATED, ['cart_id' => $cart, 'at' => $early]);
+        // حدث لاحق لنفس السلة في جلسة أخرى وخارج المدى.
+        $this->event($tenant, $sessionTwo->id, $cashier->id, PosSessionEvent::TYPE_CART_CANCELLED, ['cart_id' => $cart, 'at' => $late, 'source' => 'client_observed']);
+
+        // تصفية بالجلسة الأولى: آخر حدث يجب أن يكون من الجلسة الأولى لا الثانية.
+        $bySession = $this->withToken($auth['token'])->getJson("/api/pos/audit/carts?pos_session_id={$sessionOne->id}")->assertOk();
+        $bySession->assertJsonPath('data.0.pos_session_id', $sessionOne->id);
+        $bySession->assertJsonPath('data.0.last_event_type', PosSessionEvent::TYPE_CART_CREATED);
+        $bySession->assertJsonPath('data.0.event_count', 1);
+
+        // تصفية زمنية تستبعد الحدث اللاحق: آخر حدث هو الأول لا الإلغاء.
+        $to = $early->copy()->addHour()->toDateTimeString();
+        $byDate = $this->withToken($auth['token'])->getJson('/api/pos/audit/carts?to=' . urlencode($to))->assertOk();
+        $byDate->assertJsonPath('data.0.last_event_type', PosSessionEvent::TYPE_CART_CREATED);
+        $byDate->assertJsonPath('data.0.event_count', 1);
+    }
+
+    /** @test P2: closing_variance_magnitude يستخدم العتبة المخزّنة القابلة للضبط لا رقماً ثابتاً. */
+    public function closing_variance_magnitude_honors_the_tunable_threshold(): void
+    {
+        $auth = $this->registerTenant();
+        $tenant = $auth['tenant_id'];
+        $cashier = $this->cashier($tenant, 'magthreshold@x.test');
+        $sessions = [];
+        $this->repeat(4, function () use ($tenant, $cashier, &$sessions) {
+            $sessions[] = $this->posSession($tenant, $cashier->id, Carbon::now()->subDays(2), Carbon::now()->subDays(2)->addHours(6));
+        });
+        // متوسط الفرق = 10000 هللة لكل جلسة.
+        foreach ($sessions as $session) {
+            $this->event($tenant, $session->id, $cashier->id, PosSessionEvent::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT, ['amount' => 10000, 'at' => Carbon::now()->subDays(2)]);
+        }
+
+        // التشغيل الأول (العتبة الافتراضية 5000) يزرع صفوف القواعد ويشتعل.
+        $this->detect($tenant);
+        $default = $this->exceptionsFor('closing_variance_magnitude', $cashier->id)->sole();
+        $this->assertSame(5000, $default->baseline_rate_milli);
+
+        // رفع العتبة فوق المتوسط ⇒ إصدار جديد لا يشتعل (لو كان الرقم ثابتاً 5000 لاشتعل).
+        app(TenantContext::class)->set($tenant);
+        PosExceptionRule::query()->where('rule_key', 'closing_variance_magnitude')->update(['threshold' => 20000, 'version' => 2]);
+        $this->detect($tenant);
+        $this->assertSame(0, PosException::query()->withoutGlobalScope(BranchScope::class)
+            ->where('rule_key', 'closing_variance_magnitude')->where('rule_version', 2)->count());
+
+        // خفض العتبة تحت المتوسط ⇒ يشتعل، فالكشف يستهلك العتبة المخزّنة فعلاً.
+        app(TenantContext::class)->set($tenant);
+        PosExceptionRule::query()->where('rule_key', 'closing_variance_magnitude')->update(['threshold' => 8000, 'version' => 3]);
+        $this->detect($tenant);
+        $fired = PosException::query()->withoutGlobalScope(BranchScope::class)
+            ->where('rule_key', 'closing_variance_magnitude')->where('rule_version', 3)->sole();
+        $this->assertSame(8000, $fired->baseline_rate_milli);
+        $this->assertSame(10000, $fired->observed_rate_milli);
     }
 }

@@ -585,6 +585,9 @@ class PosSessionService
             throw new RuntimeException('استبدال POS المرحّل لا يخص جلسة الكاشير المحددة.');
         }
 
+        // المبلغ الرقابي للاستبدال = قيمة البضاعة المرتجعة الفعلية = الرصيد المطبّق
+        // على البديل + النقد المصروف. مصدرٌ خادمي من صفّ الاستبدال، لا اختلاق ولا
+        // ازدواج (قيمة الإرجاع مرة واحدة)، فيتّسق مع مرتجعات POS التي تحمل amount.
         $this->recordEvent($session, PosSessionEvent::TYPE_EXCHANGE_RECORDED, $actor, [
             'exchange_id' => $exchange->id,
             'original_invoice_id' => $exchange->original_invoice_id,
@@ -592,6 +595,7 @@ class PosSessionService
             'replacement_invoice_id' => $exchange->replacement_invoice_id,
             'applied_credit_amount' => (int) $exchange->applied_credit_amount,
             'cash_refund_amount' => (int) $exchange->cash_refund_amount,
+            'amount' => (int) $exchange->applied_credit_amount + (int) $exchange->cash_refund_amount,
         ]);
     }
 

@@ -86,13 +86,19 @@ class PosAuditController extends ApiController
         $perPage = min(max((int) ($filters['per_page'] ?? 50), 1), 200);
         $page = max((int) ($request->integer('page') ?: 1), 1);
 
-        $base = $this->visibleEvents($request)->whereNotNull('cart_id');
-        if (! empty($filters['from'])) $base->where('created_at', '>=', $filters['from']);
-        if (! empty($filters['to'])) $base->where('created_at', '<=', $filters['to']);
-        if (! empty($filters['pos_session_id'])) $base->where('pos_session_id', $filters['pos_session_id']);
+        // مصدر واحد للفلاتر: البسط، والعدّ، وآخر حدث — كلها من نفس المجموعة
+        // المفلترة، فلا يُقرن last_event_* بحدثٍ خارج المدى/الجلسة المطلوبة.
+        $filtered = function () use ($request, $filters) {
+            $query = $this->visibleEvents($request)->whereNotNull('cart_id');
+            if (! empty($filters['from'])) $query->where('created_at', '>=', $filters['from']);
+            if (! empty($filters['to'])) $query->where('created_at', '<=', $filters['to']);
+            if (! empty($filters['pos_session_id'])) $query->where('pos_session_id', $filters['pos_session_id']);
 
-        $total = (clone $base)->distinct()->count('cart_id');
-        $aggregates = (clone $base)
+            return $query;
+        };
+
+        $total = $filtered()->distinct()->count('cart_id');
+        $aggregates = $filtered()
             ->selectRaw('cart_id, MIN(created_at) as created_at, MAX(created_at) as last_event_at, COUNT(*) as event_count')
             ->groupBy('cart_id')
             ->orderByDesc('last_event_at')
@@ -102,7 +108,8 @@ class PosAuditController extends ApiController
         $cartIds = $aggregates->pluck('cart_id')->all();
         $latest = collect();
         if ($cartIds !== []) {
-            $latest = $this->visibleEvents($request)
+            // آخر حدث **ضمن نفس الفلاتر** التي أنتجت العدّ وlast_event_at.
+            $latest = $filtered()
                 ->whereIn('cart_id', $cartIds)
                 ->orderBy('cart_id')->orderByDesc('created_at')->orderByDesc('id')
                 ->get(['id', 'cart_id', 'pos_session_id', 'branch_id', 'type', 'reason_code', 'created_at'])

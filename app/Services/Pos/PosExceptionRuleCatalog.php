@@ -183,13 +183,13 @@ final class PosExceptionRuleCatalog
             ],
             'closing_variance_magnitude' => [
                 'category' => self::CATEGORY_CASH,
-                'weight' => 15, 'min_sample' => 3, 'window_days' => 60, 'threshold' => 150,
-                // عتبة مطلقة بالهللات: متوسط فرق الجلسة يتجاوز `config.absolute` (افتراضاً 5000 هللة = 50 ريال).
+                // العتبة هي المقدار المطلق بالهللات (متوسط فرق الجلسة)، وهي القيمة
+                // القابلة للضبط عبر `updateRule`؛ 5000 هللة = 50 ريال افتراضاً.
+                'weight' => 15, 'min_sample' => 3, 'window_days' => 60, 'threshold' => 5000,
                 'compare' => self::COMPARE_STATIC, 'subject' => self::SUBJECT_USER,
                 'numerator_types' => [PosSessionEvent::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT],
                 'denominator' => self::DENOM_SESSIONS, 'per' => 1,
                 'confidence' => self::CONFIDENCE_SERVER, 'amount' => true, 'amount_abs' => true,
-                'config' => ['absolute' => 5000],
             ],
             'recount_usage_rate' => [
                 'category' => self::CATEGORY_CASH,
