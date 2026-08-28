@@ -21,15 +21,19 @@ export function RulesPanel({ canManage, canRecalculate }: Props) {
   const { success, error: errorToast } = useToast();
   const [rules, setRules] = useState<RuleRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const result = await api<{ data: RuleRow[] }>('/pos/audit/rules');
       setRules(result.data);
     } catch (error) {
+      setRules([]);
+      setLoadError(error instanceof ApiError ? error.message : t('loadFailed'));
       errorToast(error instanceof ApiError ? error.message : t('loadFailed'));
     } finally {
       setLoading(false);
@@ -76,6 +80,19 @@ export function RulesPanel({ canManage, canRecalculate }: Props) {
     return <div className="h-40 animate-pulse rounded border border-border bg-surface" />;
   }
 
+  if (loadError) {
+    return (
+      <div className="rounded border border-border bg-surface p-4" role="alert">
+        <p className="text-sm text-negative">{loadError}</p>
+        <Button className="mt-3" size="sm" variant="outline" onClick={() => void load()}>{t('retry')}</Button>
+      </div>
+    );
+  }
+
+  if (rules.length === 0) {
+    return <p className="rounded border border-border bg-surface p-4 text-sm text-muted">{t('emptyRules')}</p>;
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -90,7 +107,7 @@ export function RulesPanel({ canManage, canRecalculate }: Props) {
 
       {Object.entries(grouped).map(([category, categoryRules]) => (
         <details key={category} className="rounded border border-border bg-surface" open>
-          <summary className="cursor-pointer list-none p-3 text-sm font-semibold text-text">
+          <summary className="cursor-pointer list-none p-3 text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             {t(`categories.${category}` as never, { fallback: category })}
           </summary>
           <ul className="divide-y divide-border border-t border-border">

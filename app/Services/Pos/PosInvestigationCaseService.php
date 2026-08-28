@@ -94,6 +94,8 @@ final class PosInvestigationCaseService
     /** ترقية استثناء إلى قضية جديدة: يُنشئ القضية بسياق الاستثناء ويربطه مباشرة. لا يعدّل الاستثناء. */
     public function promoteException(User $actor, PosException $exception, array $data): array
     {
+        $this->assertActorCanAccessEvidenceBranch($actor, $exception->branch_id, 'استثناء');
+
         return DB::transaction(function () use ($actor, $exception, $data) {
             $payload = array_merge([
                 'title' => $data['title'] ?? $this->defaultTitleFor($exception),
@@ -116,6 +118,7 @@ final class PosInvestigationCaseService
         if ($exception->tenant_id !== $case->tenant_id) {
             throw new RuntimeException('لا يمكن ربط استثناء من مستأجر آخر.');
         }
+        $this->assertActorCanAccessEvidenceBranch($actor, $exception->branch_id, 'استثناء');
 
         return DB::transaction(function () use ($actor, $case, $exception, $rationale, $linkType) {
             $existing = PosCaseEvidenceLink::query()->withoutGlobalScope(BranchScope::class)
@@ -155,6 +158,7 @@ final class PosInvestigationCaseService
         if ($event->tenant_id !== $case->tenant_id) {
             throw new RuntimeException('لا يمكن ربط حدث من مستأجر آخر.');
         }
+        $this->assertActorCanAccessEvidenceBranch($actor, $event->branch_id, 'حدث');
 
         return DB::transaction(function () use ($actor, $case, $event, $rationale) {
             $existing = PosCaseEvidenceLink::query()->withoutGlobalScope(BranchScope::class)
@@ -460,6 +464,18 @@ final class PosInvestigationCaseService
     private function defaultTitleFor(PosException $exception): string
     {
         return trim(sprintf('%s — %s', $exception->rule_key, $exception->category));
+    }
+
+    /**
+     * مستخدم مقيَّد بفروع لا يُسمح له بربط/ترقية دليل من فرع خارج نطاقه —
+     * وإلا يصل إلى تفاصيل رقابية عبر timeline لا يراها عبر مسارات القراءة المعزولة.
+     * غير المقيَّد (`allowedBranchIds() === null`) يمرّ لكل فروع المستأجر.
+     */
+    private function assertActorCanAccessEvidenceBranch(User $actor, ?string $branchId, string $label): void
+    {
+        if ($branchId !== null && ! $actor->canAccessBranch($branchId)) {
+            throw new RuntimeException("لا يمكن ربط {$label} خارج نطاق فروعك.");
+        }
     }
 
     private function recordActivity(PosInvestigationCase $case, User $actor, string $action, array $meta = [], ?string $note = null): void

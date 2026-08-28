@@ -90,7 +90,7 @@ async function captureAttention(page: Page, filename: string) {
   const tab = page.locator('#tab-attention');
   await expect(tab).toBeVisible();
   await tab.evaluate((element) => (element as HTMLButtonElement).click());
-  await expect(page.getByText(/قائمة موحّدة للقراءة فقط|read-only queue of items/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/قائمة موحّدة لأولويات المراجعة|unified priority-review queue/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/مرتجع من كاشير مختلف|Cross-cashier refund/).filter({ visible: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/مؤشرات المراجعة تُرتّب أولوية المراجعة|Review indicators prioritize review/).filter({ visible: true })).toBeVisible();
   await page.screenshot({ path: path.join(evidenceDir, filename), fullPage: true });
