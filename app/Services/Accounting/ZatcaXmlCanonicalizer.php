@@ -3,11 +3,15 @@
 namespace App\Services\Accounting;
 
 use DOMDocument;
+use DOMElement;
 use RuntimeException;
 
 final class ZatcaXmlCanonicalizer
 {
     public const ALGORITHM = 'http://www.w3.org/2006/12/xml-c14n11';
+
+    private const XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/';
+    private const XML_NAMESPACE = 'http://www.w3.org/XML/1998/namespace';
 
     public function __construct(private readonly string $binary = 'xmllint')
     {
@@ -65,6 +69,84 @@ final class ZatcaXmlCanonicalizer
         } finally {
             @unlink($inputPath);
         }
+    }
+
+    /**
+     * يطبّع عنصراً بعد تثبيت namespace context الموروث عليه.
+     *
+     * C14N شامل، لذلك يجب أن تظهر جميع namespace nodes الموجودة في نطاق العنصر
+     * على جذر النسخة المؤقتة كما ستظهر عند التحقق من العنصر داخل المستند النهائي.
+     */
+    public function canonicalizeElementInContext(DOMElement $element): string
+    {
+        $ownerDocument = $element->ownerDocument;
+        if (
+            $ownerDocument === null
+            || $ownerDocument->documentElement === null
+            || $ownerDocument->doctype !== null
+        ) {
+            throw new RuntimeException('سياق XML غير صالح لتطبيع عنصر توقيع ZATCA.');
+        }
+
+        /** @var list<DOMElement> $lineage */
+        $lineage = [];
+        for ($node = $element; $node instanceof DOMElement; $node = $node->parentNode) {
+            array_unshift($lineage, $node);
+        }
+
+        foreach ($lineage as $node) {
+            if ($node === $element) {
+                continue;
+            }
+
+            foreach ($node->attributes as $attribute) {
+                if ($attribute->namespaceURI === self::XML_NAMESPACE) {
+                    throw new RuntimeException(
+                        'خصائص xml:* الموروثة غير مدعومة في سياق توقيع ZATCA.'
+                    );
+                }
+            }
+        }
+
+        $xpath = new \DOMXPath($ownerDocument);
+        $namespaceNodes = $xpath->query('namespace::*', $element);
+        if ($namespaceNodes === false) {
+            throw new RuntimeException('تعذر قراءة namespace context لعنصر توقيع ZATCA.');
+        }
+
+        /** @var array<string, string> $namespaces */
+        $namespaces = [];
+        foreach ($namespaceNodes as $namespaceNode) {
+            $name = $namespaceNode->nodeName;
+            if ($name === 'xmlns:xml') {
+                continue;
+            }
+
+            $prefix = $name === 'xmlns' ? '' : substr($name, strlen('xmlns:'));
+            $namespaces[$prefix] = (string) $namespaceNode->nodeValue;
+        }
+
+        $temporary = new DOMDocument('1.0', 'UTF-8');
+        $clone = $temporary->importNode($element, true);
+        if (! $clone instanceof DOMElement) {
+            throw new RuntimeException('تعذر نسخ عنصر توقيع ZATCA للتطبيع.');
+        }
+        $temporary->appendChild($clone);
+
+        foreach ($namespaces as $prefix => $namespace) {
+            $clone->setAttributeNS(
+                self::XMLNS_NAMESPACE,
+                $prefix === '' ? 'xmlns' : 'xmlns:'.$prefix,
+                $namespace
+            );
+        }
+
+        $xml = $temporary->saveXML($clone);
+        if ($xml === false) {
+            throw new RuntimeException('تعذر تسلسل عنصر توقيع ZATCA للتطبيع.');
+        }
+
+        return $this->canonicalize($xml);
     }
 
     private function assertSafeXml(string $xml): void
