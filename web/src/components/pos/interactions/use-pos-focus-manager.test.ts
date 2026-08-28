@@ -9,58 +9,43 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-function mountSearchInput(): HTMLInputElement {
-  const input = document.createElement('input');
-  document.body.appendChild(input);
-  return input;
-}
-
 describe('مدير التركيز في نقطة البيع', () => {
-  it('يركّز حقل البحث المسجَّل عند طلب صريح من المستخدم', () => {
+  it('يركّز مناطق البحث والمنتجات والسلة', () => {
     const { result } = renderHook(() => usePosFocusManager());
-    const input = mountSearchInput();
-    result.current.registerSearchInput(input);
+    const search = document.createElement('input');
+    const product = document.createElement('button');
+    const cartLine = document.createElement('div');
+    cartLine.tabIndex = -1;
+    document.body.append(search, product, cartLine);
 
-    result.current.focusSearch();
+    result.current.registerSearchInput(search);
+    result.current.registerProductButton(0, product);
+    result.current.registerCartLine('line-a', cartLine);
 
-    expect(document.activeElement).toBe(input);
+    result.current.focusZone('search');
+    expect(document.activeElement).toBe(search);
+
+    result.current.focusZone('products', { productIndex: 0 });
+    expect(document.activeElement).toBe(product);
+
+    result.current.focusZone('cart', { cartLineKey: 'line-a' });
+    expect(document.activeElement).toBe(cartLine);
   });
 
-  it('لا ينكسر حين لا يكون حقل البحث معروضاً بعد', () => {
+  it('لا يسرق restoreFocusSafe التركيز من حوار أو حقل', () => {
     const { result } = renderHook(() => usePosFocusManager());
+    const search = document.createElement('input');
+    document.body.appendChild(search);
+    result.current.registerSearchInput(search);
 
-    expect(() => result.current.focusSearch()).not.toThrow();
-    expect(result.current.restoreSearchFocus()).toBe(false);
-  });
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    textarea.focus();
+    expect(result.current.restoreFocusSafe()).toBe(false);
 
-  it('لا يسرق الاستعادة الآمنة التركيز من حقل يكتب فيه المستخدم', () => {
-    const { result } = renderHook(() => usePosFocusManager());
-    result.current.registerSearchInput(mountSearchInput());
-    const note = document.createElement('textarea');
-    document.body.appendChild(note);
-    note.focus();
-
-    expect(result.current.restoreSearchFocus()).toBe(false);
-    expect(document.activeElement).toBe(note);
-  });
-
-  it('لا تسحب الاستعادة الآمنة التركيز من داخل حوار مفتوح', () => {
-    const { result } = renderHook(() => usePosFocusManager());
-    result.current.registerSearchInput(mountSearchInput());
-    document.body.insertAdjacentHTML('beforeend', '<div role="dialog"><button type="button">تأكيد</button></div>');
+    document.body.insertAdjacentHTML('beforeend', '<div role="dialog"><button type="button">ok</button></div>');
     const dialogButton = document.querySelector('[role="dialog"] button') as HTMLButtonElement;
     dialogButton.focus();
-
-    expect(result.current.restoreSearchFocus()).toBe(false);
-    expect(document.activeElement).toBe(dialogButton);
-  });
-
-  it('يستعيد التركيز إلى البحث حين لا يكون التركيز في حقل ولا حوار', () => {
-    const { result } = renderHook(() => usePosFocusManager());
-    const input = mountSearchInput();
-    result.current.registerSearchInput(input);
-
-    expect(result.current.restoreSearchFocus()).toBe(true);
-    expect(document.activeElement).toBe(input);
+    expect(result.current.restoreFocusSafe()).toBe(false);
   });
 });

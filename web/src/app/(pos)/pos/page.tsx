@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Search, Barcode, Star, Package, Plus, Minus, Trash2,
   User, UserPlus, StickyNote, LayoutGrid, ShoppingCart,
@@ -37,8 +37,12 @@ import { PosAuditReasonDialog } from '@/components/pos/pos-audit-reason-dialog';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
 import type { LiveTemplateRevision } from '@/modules/print-templates/services/live-template-definition';
 import { usePosBarcodeScanner } from '@/components/pos/interactions/use-pos-barcode-scanner';
+import { usePosCartLineSelection, usePosCartNavigation } from '@/components/pos/interactions/use-pos-cart-navigation';
 import { usePosFocusManager } from '@/components/pos/interactions/use-pos-focus-manager';
+import { usePosKeyboardActive } from '@/components/pos/interactions/use-pos-keyboard-active';
 import { usePosKeyboardShortcuts } from '@/components/pos/interactions/use-pos-keyboard-shortcuts';
+import { isPosDialogOpen, type PosDialogFlags } from '@/components/pos/interactions/pos-interaction-context';
+import { usePosProductNavigation, usePosProductSelection, usePosSearchFieldNavigation } from '@/components/pos/interactions/use-pos-product-navigation';
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
 import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 import { runPosCheckout } from '@/lib/pos-checkout';
@@ -132,9 +136,31 @@ export default function PosPage() {
   const t = useTranslations('pos');
   const tc = useTranslations('common');
   const tprod = useTranslations('products');
+  const locale = useLocale();
+  const rtl = locale === 'ar';
   const router = useRouter();
   const { success, error: errorToast, toast } = useToast();
-  const { registerSearchInput, focusSearch } = usePosFocusManager();
+  const focusManager = usePosFocusManager();
+  const {
+    registerSearchInput,
+    registerProductsContainer,
+    registerProductButton,
+    registerCartContainer,
+    registerCartLine,
+    activeZone,
+    focusSearch,
+    focusZone,
+    restoreFocusSafe,
+  } = focusManager;
+  const { keyboardActive, onPointerDown, onKeyDown: onKeyboardActiveKeyDown } = usePosKeyboardActive();
+  const [desktopKeyboardNav, setDesktopKeyboardNav] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const sync = () => setDesktopKeyboardNav(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -247,6 +273,26 @@ export default function PosPage() {
     digit: (digit: string) => t('numeric_keypad_digit', { digit }),
     value: t('numeric_keypad_value'),
   };
+
+  const dialogFlags = useMemo<PosDialogFlags>(() => ({
+    pickerOpen,
+    retrieveOpen,
+    returnOpen,
+    exchangeOpen,
+    recentInvoicesOpen,
+    openCartsOpen,
+    clearCartOpen,
+    noteOpen,
+    sensitiveActionOpen: sensitiveAction !== null,
+    closeOpen,
+    unsavedExitOpen: unsavedExitAction !== null,
+    sessionGateOpen: sessionReady && !session,
+  }), [
+    pickerOpen, retrieveOpen, returnOpen, exchangeOpen, recentInvoicesOpen,
+    openCartsOpen, clearCartOpen, noteOpen, sensitiveAction, closeOpen,
+    unsavedExitAction, sessionReady, session,
+  ]);
+  const dialogOpen = isPosDialogOpen(dialogFlags);
 
   // اسم إعداد العميل الافتراضي يبقى fallback لاسم مرجع صحيح فقط؛ غياب المرجع ظاهر ويطلب اختياراً صريحاً قبل التحصيل.
   useEffect(() => {
@@ -416,6 +462,13 @@ export default function PosPage() {
       return true;
     });
   }, [products, search, cat, tab, favs]);
+
+  const { selectedIndex, setSelectedIndex } = usePosProductSelection(filtered.length);
+  const { selectedLineKey, setSelectedLineKey } = usePosCartLineSelection(
+    cart.map((line) => ({ key: line.key })),
+    false,
+  );
+  const productElementsRef = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   function pricedUnit(product: Product, unitName: string | null): PosUnit | undefined {
     return product.pos_units.find((unit) => unit.name === unitName) ?? product.pos_units[0];
@@ -654,6 +707,7 @@ export default function PosPage() {
       closeCart(activeCart.id);
       setHeldCount((current) => current + 1);
       success(t('held_done'));
+      restoreFocusSafe();
     } catch (err) {
       errorToast(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
@@ -688,6 +742,7 @@ export default function PosPage() {
     setMobileTab('cart');
     setHeldCount((current) => Math.max(0, current - 1));
     success(t('held_resumed'));
+    restoreFocusSafe();
   }
 
   // مسح باركود: الأساسي/SKU يبيع وحدة الأساس، أما البديل فيحمل وحدته من
@@ -724,16 +779,69 @@ export default function PosPage() {
     }
   }
 
-  usePosBarcodeScanner({ onScan: scanCode });
+  usePosBarcodeScanner({ onScan: scanCode, enabled: step === 'sale' && !dialogOpen });
 
-  // اختصارات لوحة المفاتيح الفعلية (مفاتيح وظيفية لا تتعارض مع ماسح الباركود).
-  // Esc بلا معالج خارج شاشة الدفع، فيبقى متاحاً لإغلاق الحوارات كما هو اليوم.
+  const handleSearchKeyDown = usePosSearchFieldNavigation({
+    onMoveToProducts: () => {
+      setSelectedIndex(0);
+      focusZone('products', { productIndex: 0 });
+    },
+    onExitSearch: () => focusZone('search'),
+  });
+
   usePosKeyboardShortcuts({
     customer: () => setPickerOpen(true),
     search: focusSearch,
-    delete: () => setCart((c) => c.slice(0, -1)),
+    heldSales: () => setRetrieveOpen(true),
+    holdSale: () => { void holdSale(); },
+    delete: () => {
+      const key = selectedLineKey ?? cart[cart.length - 1]?.key;
+      if (key) remove(key);
+    },
     payment: () => { if (cart.length > 0 && step === 'sale') setStep('payment'); },
-    back: step === 'payment' ? () => setStep('sale') : undefined,
+    newCart: () => { createCart(); },
+    openCarts: () => setOpenCartsOpen(true),
+    back: step === 'payment' ? requestPaymentCancel : undefined,
+  }, { step, dialogFlags });
+
+  usePosProductNavigation({
+    enabled: desktopKeyboardNav,
+    rtl,
+    step,
+    dialogOpen,
+    activeZone,
+    products: filtered,
+    getProductElement: (index) => productElementsRef.current.get(index) ?? null,
+    onSelectIndex: setSelectedIndex,
+    selectedIndex,
+    onAddProduct: (product) => { addProduct(product); },
+    onEnterCartZone: () => {
+      const lastKey = cart[cart.length - 1]?.key;
+      if (lastKey) {
+        setSelectedLineKey(lastKey);
+        focusZone('cart', { cartLineKey: lastKey });
+      } else {
+        focusZone('cart');
+      }
+    },
+    focusManager,
+  });
+
+  usePosCartNavigation({
+    enabled: desktopKeyboardNav,
+    step,
+    dialogOpen,
+    activeZone,
+    lines: cart.map((line) => ({ key: line.key })),
+    selectedLineKey,
+    onSelectLineKey: setSelectedLineKey,
+    onAdjustQty: (lineKey, delta) => setQty(lineKey, delta),
+    onRemoveLine: remove,
+    onEnterProductsZone: () => {
+      setSelectedIndex(0);
+      focusZone('products', { productIndex: 0 });
+    },
+    focusManager,
   });
 
   // حساب السطر حسب وضع الضريبة والخصم: الخصم يقلّل الأساس قبل الضريبة (مطابق للـ backend).
@@ -882,6 +990,7 @@ export default function PosPage() {
             closeCart(activeCart.id);
             setStep('sale');
             setMobileTab('products');
+            restoreFocusSafe();
             // عملية الدرج تبدأ بعد النجاح المالي والتنظيف؛ لا تنتظرها ولا تسمح
             // لخطئها بإعادة شاشة الدفع أو إظهار فشل للفاتورة المكتملة.
             const action = checkout.cash_drawer_action;
@@ -1001,6 +1110,8 @@ export default function PosPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
+              handleSearchKeyDown(e);
+              if (e.defaultPrevented) return;
               if (e.key === 'Enter' && search.trim()) {
                 e.preventDefault();
                 if (scanCode(search.trim())) setSearch('');
@@ -1056,16 +1167,32 @@ export default function PosPage() {
         })}
       </div>
 
-      <div className={'grid gap-3 ' + (posCfg.show_product_images ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6')}>
-        {filtered.map((p) => {
+      <div
+        ref={registerProductsContainer}
+        tabIndex={-1}
+        className={'grid gap-3 outline-none ' + (posCfg.show_product_images ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6')}
+      >
+        {filtered.map((p, index) => {
           const tracked = p.track_inventory;
           const fav = favs.has(p.id);
+          const productSelected = keyboardActive && activeZone === 'products' && selectedIndex === index;
           return (
             <div key={p.id} className="relative min-w-0">
               <button
                 type="button"
+                ref={(element) => {
+                  registerProductButton(index, element);
+                  if (element) productElementsRef.current.set(index, element);
+                  else productElementsRef.current.delete(index);
+                }}
+                aria-selected={productSelected}
+                tabIndex={productSelected ? 0 : -1}
                 onClick={() => addProduct(p)}
-                className={'flex w-full flex-col rounded-lg border border-border bg-surface p-2.5 text-start hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (posCfg.show_product_images ? '' : 'min-h-28 justify-between')}
+                onFocus={() => {
+                  setSelectedIndex(index);
+                  focusZone('products', { productIndex: index });
+                }}
+                className={'flex w-full flex-col rounded-lg border bg-surface p-2.5 text-start hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (productSelected ? 'border-primary ring-2 ring-primary/40 ' : 'border-border ') + (posCfg.show_product_images ? '' : 'min-h-28 justify-between')}
               >
                 {posCfg.show_product_images && (
                   <div className={'mb-2.5 overflow-hidden rounded-md bg-background ' + (p.pos_image?.download_url ? 'aspect-[4/3]' : 'h-10')}>
@@ -1148,6 +1275,7 @@ export default function PosPage() {
           before: { items: target.items.map(auditLine), customer: target.customer }, after: { status: 'cancelled' },
         }, target);
         setStep('sale');
+        restoreFocusSafe();
       } else {
         await recordCartForensics('cart_cancelled', {
           reason_code: reason.code, reason_note: reason.note,
@@ -1225,12 +1353,24 @@ export default function PosPage() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3">
+      <div ref={registerCartContainer} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto px-3 outline-none">
         {cart.length === 0 && <p className="py-10 text-center text-sm text-muted">{t('empty_cart')}</p>}
         {cart.map((line) => {
           const units = line.productId ? products.find((product) => product.id === line.productId)?.pos_units ?? [] : [];
+          const lineSelected = keyboardActive && activeZone === 'cart' && selectedLineKey === line.key;
           return (
-            <div key={line.key} className={'flex gap-2 border-b py-3 transition-colors motion-reduce:transition-none last:border-0 ' + (lastScannedLineKey === line.key ? 'border-primary bg-primary-soft' : 'border-border')}>
+            <div
+              key={line.key}
+              ref={(element) => registerCartLine(line.key, element)}
+              role="option"
+              aria-selected={lineSelected}
+              tabIndex={lineSelected ? 0 : -1}
+              onFocus={() => {
+                setSelectedLineKey(line.key);
+                focusZone('cart', { cartLineKey: line.key });
+              }}
+              className={'flex gap-2 border-b py-3 transition-colors motion-reduce:transition-none last:border-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (lastScannedLineKey === line.key ? 'border-primary bg-primary-soft' : lineSelected ? 'border-primary bg-primary-soft' : 'border-border')}
+            >
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -1359,7 +1499,11 @@ export default function PosPage() {
   );
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
+    <div
+      className="flex h-full flex-col overflow-hidden bg-background"
+      onPointerDown={onPointerDown}
+      onKeyDown={onKeyboardActiveKeyDown}
+    >
       <p className="sr-only" aria-live="polite">{scanFeedbackMessage}</p>
 
       <PosTopbar
@@ -1456,7 +1600,7 @@ export default function PosPage() {
 
       <CustomerPickerDialog
         open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        onClose={() => { setPickerOpen(false); restoreFocusSafe(); }}
         onSelect={setSelectedCustomer}
       />
 
