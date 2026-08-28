@@ -134,7 +134,7 @@ final class ZatcaXadesSignedPropertiesBuilder
             }
 
             $normalizedPem = '';
-            if (! openssl_x509_export($parsedCertificate, $normalizedPem, false)) {
+            if (! openssl_x509_export($parsedCertificate, $normalizedPem, true)) {
                 throw new InvalidArgumentException(
                     'تعذر تطبيع شهادة ZATCA رقم '.($index + 1).'.'
                 );
