@@ -1,29 +1,30 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it } from 'vitest';
 import arMessages from '@/messages/ar.json';
 import enMessages from '@/messages/en.json';
-import { POS_SHORTCUTS, findPosShortcutByKey } from './shortcut-registry';
+import {
+  POS_SHORTCUT_BINDINGS,
+  POS_SHORTCUT_FOOTER,
+  matchPosShortcut,
+  posShortcutBindingKey,
+} from './shortcut-registry';
 
 describe('سجل اختصارات نقطة البيع', () => {
-  it('لا يحمل مفتاحاً مكرراً ولا معرّفاً مكرراً فلا يتنازع اختصاران على ضغطة واحدة', () => {
-    const keys = POS_SHORTCUTS.map((shortcut) => shortcut.key);
-    const ids = POS_SHORTCUTS.map((shortcut) => shortcut.id);
-
+  it('لا يحمل ربط مفتاح مكرراً', () => {
+    const keys = POS_SHORTCUT_BINDINGS.map(posShortcutBindingKey);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('يحفظ الاختصارات القائمة كما هي بلا إضافة اختصار جديد', () => {
-    expect(POS_SHORTCUTS.map((shortcut) => [shortcut.id, shortcut.key])).toEqual([
-      ['customer', 'F2'],
-      ['search', 'F4'],
-      ['delete', 'F8'],
-      ['payment', 'F9'],
-      ['back', 'Escape'],
+  it('يشمل اختصارات وضع لوحة المفاتيح الجديدة', () => {
+    const ids = POS_SHORTCUT_FOOTER.map((binding) => binding.id);
+    expect(ids).toEqual([
+      'customer', 'search', 'heldSales', 'holdSale', 'delete', 'payment', 'newCart', 'openCarts', 'back',
     ]);
   });
 
-  it('يترجم كل اختصار في العربية والإنجليزية بلا نص مكتوب في الكود', () => {
-    for (const shortcut of POS_SHORTCUTS) {
+  it('يترجم كل اختصار ظاهر في الشريط بالعربية والإنجليزية', () => {
+    for (const shortcut of POS_SHORTCUT_FOOTER) {
       const ar = (arMessages.pos as Record<string, string>)[shortcut.translationKey];
       const en = (enMessages.pos as Record<string, string>)[shortcut.translationKey];
       expect(ar, `ar.pos.${shortcut.translationKey}`).toBeTruthy();
@@ -31,9 +32,14 @@ describe('سجل اختصارات نقطة البيع', () => {
     }
   });
 
-  it('يبحث بقيمة `KeyboardEvent.key` لا بالتسمية المعروضة', () => {
-    expect(findPosShortcutByKey('Escape')?.id).toBe('back');
-    expect(findPosShortcutByKey('Esc')).toBeUndefined();
-    expect(findPosShortcutByKey('F5')).toBeUndefined();
+  it('يطابق اختصارات الم modifiers', () => {
+    const ctrlN = new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true, cancelable: true });
+    expect(matchPosShortcut(ctrlN)?.id).toBe('newCart');
+
+    const ctrlShiftO = new KeyboardEvent('keydown', { key: 'o', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true });
+    expect(matchPosShortcut(ctrlShiftO)?.id).toBe('openCarts');
+
+    const ctrlAltN = new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, altKey: true, bubbles: true, cancelable: true });
+    expect(matchPosShortcut(ctrlAltN)?.id).toBe('newCart');
   });
 });
