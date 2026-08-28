@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use App\Http\Requests\StoreInvoiceRequest;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
+use App\Services\Accounting\ZatcaInvoiceHasher;
 use App\Services\Accounting\ZatcaService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -192,12 +193,11 @@ class ZatcaTest extends TestCase
     }
 
     /** @test */
-    public function stored_hash_is_the_sha256_of_the_stored_xml(): void
+    public function stored_hash_is_the_zatca_c14n11_sha256_of_the_stored_xml(): void
     {
         $posted = $this->postInvoice();
 
-        // الهاش المخزَّن = Base64 لـ SHA-256 لمستند UBL المخزَّن
-        $expected = base64_encode(hash('sha256', $posted->zatca_xml, true));
+        $expected = app(ZatcaInvoiceHasher::class)->hash($posted->zatca_xml);
         $this->assertSame($expected, $posted->zatca_hash);
         $this->assertSame(44, strlen($posted->zatca_hash)); // SHA-256 Base64
     }

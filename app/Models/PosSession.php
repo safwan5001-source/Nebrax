@@ -22,8 +22,9 @@ class PosSession extends BaseModel
         'tenant_id', 'number', 'status', 'opening_balance', 'closing_balance',
         'counted_balance_locked_at', 'closing_count_revealed_at', 'recounted_by', 'recounted_at',
         'expected_balance', 'difference', 'opened_at', 'closed_at', 'notes', 'opened_by', 'closed_by',
-        'pos_device_id', 'warehouse_id', 'shift_id',
+        'pos_device_id', 'warehouse_id', 'shift_id', 'cash_account_id',
         'difference_status', 'difference_acknowledged_by', 'difference_acknowledged_at', 'difference_acknowledgement_note',
+        'variance_journal_entry_id',
     ];
 
     protected $casts = [
@@ -99,9 +100,22 @@ class PosSession extends BaseModel
         return $this->belongsTo(User::class, 'difference_acknowledged_by');
     }
 
+    /** مستخدم إعادة العد؛ يظل مستقلاً عن معتمد الاستثناء. */
     public function recountedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recounted_by');
+    }
+
+    /** قيد تسوية فرق الصندوق المثبّت؛ وجوده يعني أن الفرق سُوِّي محاسبياً مرة واحدة. */
+    public function varianceJournalEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntry::class, 'variance_journal_entry_id');
+    }
+
+    /** حساب خزينة الجلسة المثبّت وقت الفتح؛ عليه تُرحّل تسوية الفرق لا على الرئيسية. */
+    public function cashAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'cash_account_id');
     }
 
     public function isOpen(): bool

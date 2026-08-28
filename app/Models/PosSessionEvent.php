@@ -19,6 +19,7 @@ class PosSessionEvent extends BaseModel
     public const TYPE_EXCHANGE_RECORDED = 'exchange_recorded';
     public const TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT = 'closing_difference_requires_acknowledgement';
     public const TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED = 'closing_difference_acknowledged';
+    public const TYPE_CLOSING_DIFFERENCE_SETTLED = 'closing_difference_settled';
     public const TYPE_CASH_DRAWER_OPEN_ATTEMPT = 'cash_drawer_open_attempt';
     public const TYPE_CART_CREATED = 'cart_created';
     public const TYPE_ITEM_ADDED = 'item_added';
@@ -52,7 +53,8 @@ class PosSessionEvent extends BaseModel
         self::TYPE_EXCHANGE_RECORDED,
         self::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT,
         self::TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED,
-            self::TYPE_CASH_DRAWER_OPEN_ATTEMPT,
+        self::TYPE_CLOSING_DIFFERENCE_SETTLED,
+        self::TYPE_CASH_DRAWER_OPEN_ATTEMPT,
             self::TYPE_CART_CREATED,
             self::TYPE_ITEM_ADDED,
             self::TYPE_ITEM_REMOVED,

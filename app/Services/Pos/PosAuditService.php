@@ -55,6 +55,7 @@ final class PosAuditService
         PosSessionEvent::TYPE_EXCHANGE_RECORDED => 'exchange',
         PosSessionEvent::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT => 'cash_count',
         PosSessionEvent::TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED => 'cash_count',
+        PosSessionEvent::TYPE_CLOSING_DIFFERENCE_SETTLED => 'cash_count',
         PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT => 'drawer',
     ];
 
@@ -229,7 +230,16 @@ final class PosAuditService
         ?string $reasonNote,
         array $context = [],
     ): PosOverrideApproval {
-        $this->assertSessionContext($session, $actor, true);
+        // إعادة العد استثناء ما بعد الإغلاق حصراً: لا يمكن طلبها إلا بعد تثبيت
+        // العد وكشف نتيجته. تبقى كل عمليات السلة والاستثناءات الأخرى داخل جلسة مفتوحة.
+        $isCashRecount = $operation === 'cash_recount';
+        $this->assertSessionContext($session, $actor, ! $isCashRecount);
+        if ($isCashRecount && ($session->status !== 'closed'
+            || $session->counted_balance_locked_at === null
+            || $session->closing_count_revealed_at === null)) {
+            throw new RuntimeException('لا يمكن طلب اعتماد إعادة العد قبل تثبيت عد الإغلاق وكشف نتيجته.');
+        }
+
         $policy = PosSettings::auditOperationPolicy($operation);
         if ($policy === PosOverrideApproval::POLICY_DENIED) {
             throw new RuntimeException('سياسة الرقابة تمنع هذه العملية.');

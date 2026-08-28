@@ -7,12 +7,12 @@ FROM php:8.3-cli
 
 # اعتماديات النظام: libonig-dev(mbstring) · libpq-dev(pgsql) · libzip-dev(zip) · libsqlite3-dev(pdo_sqlite)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git unzip zip poppler-utils libpq-dev libzip-dev libonig-dev libsqlite3-dev \
+        git unzip zip poppler-utils libpq-dev libzip-dev libonig-dev libsqlite3-dev libxml2-dev libxml2-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # إضافات PHP — pdo مضمّن أصلاً. mbstring إلزامي لـ Laravel وغير مضمّن.
 # pdo_sqlite لأوامر الترحيل وقت البناء (Laravel skeleton يفترض sqlite افتراضياً).
-RUN docker-php-ext-install pdo_pgsql pdo_sqlite mbstring bcmath zip opcache
+RUN docker-php-ext-install pdo_pgsql pdo_sqlite mbstring bcmath zip opcache dom
 
 # composer 2.7: يسبق حجب Composer 2.8 للحزم المُعلَّمة بتنبيهات أمنية
 # (كل إصدارات laravel/framework 11.x مُعلَّمة حالياً، فـ 2.8 يرفض تثبيتها ويفشل البناء)

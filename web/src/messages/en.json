@@ -3132,6 +3132,10 @@
     "event_exchange_recorded": "POS exchange posted and linked to the session",
     "event_closing_difference_requires_acknowledgement": "Closing difference awaiting management acknowledgement",
     "event_closing_difference_acknowledged": "Closing difference acknowledged",
+    "event_closing_difference_settled": "Closing difference settled to the ledger",
+    "settle_variance": "Settle to ledger",
+    "variance_settled": "Settled",
+    "variance_settled_success": "The cash variance was settled to the general ledger.",
     "difference_pending": "Awaiting management acknowledgement",
     "difference_acknowledged": "Difference acknowledged",
     "difference_not_required": "Matched",
@@ -3246,6 +3250,7 @@
       "closing_count_recounted": "Cash recounted",
       "closing_difference_requires_acknowledgement": "Variance awaiting acknowledgement",
       "closing_difference_acknowledged": "Closing variance acknowledged",
+      "closing_difference_settled": "Closing variance settled in the ledger",
       "override_requested": "Override requested",
       "override_approved": "Override approved",
       "override_consumed": "Override consumed"

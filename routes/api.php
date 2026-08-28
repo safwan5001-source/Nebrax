@@ -543,6 +543,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('pos-sessions/{id}/cash-drawer/complete', [PosSessionController::class, 'completeCashDrawer'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-drawer/unavailable', [PosSessionController::class, 'cashDrawerBridgeUnavailable'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/acknowledge-difference', [PosSessionController::class, 'acknowledgeDifference'])->middleware([$perm('pos.variance.approve'), $app('sales.pos')]);
+        Route::post('pos-sessions/{id}/settle-variance', [PosSessionController::class, 'settleVariance'])->middleware([$perm('pos.variance.approve'), $app('sales.pos')]);
 
         // Workspace موحد للرقابة والتدقيق؛ القراءة مؤمنة خادمياً ولا تعتمد على إخفاء الواجهة.
         Route::get('pos/audit/overview', [PosAuditController::class, 'overview'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
