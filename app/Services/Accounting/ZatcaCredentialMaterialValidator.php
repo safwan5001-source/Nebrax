@@ -85,10 +85,19 @@ final class ZatcaCredentialMaterialValidator
             );
         }
 
-        $extendedKeyUsage = strtolower((string) ($extensions['extendedKeyUsage'] ?? ''));
-        $clientAuth = str_contains($extendedKeyUsage, 'tls web client authentication')
-            || str_contains(str_replace([' ', '-'], '', $extendedKeyUsage), 'clientauth')
-            || str_contains($extendedKeyUsage, '1.3.6.1.5.5.7.3.2');
+        $extendedKeyUsages = preg_split(
+            '/\\s*,\\s*/',
+            strtolower((string) ($extensions['extendedKeyUsage'] ?? '')),
+            -1,
+            PREG_SPLIT_NO_EMPTY
+        );
+        $extendedKeyUsages = array_map(
+            static fn (string $usage): string => trim($usage),
+            is_array($extendedKeyUsages) ? $extendedKeyUsages : []
+        );
+        $clientAuth = in_array('tls web client authentication', $extendedKeyUsages, true)
+            || in_array('clientauth', $extendedKeyUsages, true)
+            || in_array('1.3.6.1.5.5.7.3.2', $extendedKeyUsages, true);
         if (! $clientAuth) {
             $this->invalid(
                 'binary_security_token',

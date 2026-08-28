@@ -61,6 +61,13 @@ extendedKeyUsage = serverAuth
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid, issuer
 
+[ client_auth_prefix_leaf ]
+basicConstraints = critical, CA:false
+keyUsage = critical, digitalSignature
+extendedKeyUsage = 1.3.6.1.5.5.7.3.20
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid, issuer
+
 [ self_signed_leaf ]
 basicConstraints = critical, CA:false
 keyUsage = critical, digitalSignature, keyEncipherment
@@ -379,6 +386,11 @@ CONF;
         $this->withToken($auth['token'])->putJson(
             $url,
             $this->payload($this->certificateMaterial('tls-only', 'tls_only_leaf'))
+        )->assertUnprocessable()->assertJsonValidationErrors('binary_security_token');
+
+        $this->withToken($auth['token'])->putJson(
+            $url,
+            $this->payload($this->certificateMaterial('client-auth-prefix', 'client_auth_prefix_leaf'))
         )->assertUnprocessable()->assertJsonValidationErrors('binary_security_token');
 
         $this->assertDatabaseCount('zatca_credentials', 0);
