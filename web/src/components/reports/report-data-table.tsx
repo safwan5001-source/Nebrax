@@ -525,10 +525,10 @@ export function ReportDataTable({
           <span>{labels.page} {pageNumber} {labels.of} {pageCount}</span>
           <div className="flex items-center gap-1">
             <Button variant="outline" size="sm" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()} aria-label={labels.previous}>
-              <ChevronRight className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />
+              <ChevronLeft className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />
             </Button>
             <Button variant="outline" size="sm" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()} aria-label={labels.next}>
-              <ChevronLeft className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />
+              <ChevronRight className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />
             </Button>
           </div>
         </div>
