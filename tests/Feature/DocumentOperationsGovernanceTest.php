@@ -292,14 +292,7 @@ class DocumentOperationsGovernanceTest extends TestCase
         $storage->shouldReceive('exists')->once()->andReturnTrue();
         $storage->shouldReceive('delete')->once()->andReturnNull();
 
-        DB::unprepared(<<<'SQL'
-            CREATE TRIGGER document_files_abort_purge_finalization
-            BEFORE UPDATE OF purged_at ON document_files
-            WHEN NEW.purged_at IS NOT NULL
-            BEGIN
-                SELECT RAISE(ABORT, 'simulated purge finalization database failure');
-            END;
-        SQL);
+        $this->createPurgeFinalizationAbortTrigger();
 
         try {
             app(DocumentRetentionRunner::class, [
@@ -310,7 +303,7 @@ class DocumentOperationsGovernanceTest extends TestCase
         } catch (\Throwable $exception) {
             $this->assertStringContainsString('simulated purge finalization database failure', $exception->getMessage());
         } finally {
-            DB::unprepared('DROP TRIGGER IF EXISTS document_files_abort_purge_finalization');
+            $this->dropPurgeFinalizationAbortTrigger();
         }
 
         $this->assertNull($file->fresh()->purged_at);
@@ -464,6 +457,52 @@ class DocumentOperationsGovernanceTest extends TestCase
         $this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
         $this->assertStringContainsString("'=SUM(1,1)", $csv);
         $this->assertDatabaseCount('journal_entries', 0);
+    }
+
+    /**
+     * يحقن فشل DB وقت finalization بمحفّز يرفض كتابة purged_at. المجموعة تعمل على SQLite
+     * وPostgreSQL معاً، وصيغة المحفّز خاصة بكل محرك: SQLite يرفع RAISE(ABORT) من جسم المحفّز
+     * مباشرة، وPostgreSQL يوجب دالة plpgsql مستقلة ترفع EXCEPTION.
+     */
+    private function createPurgeFinalizationAbortTrigger(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::unprepared(<<<'SQL'
+                CREATE FUNCTION document_files_abort_purge_finalization() RETURNS trigger AS $$
+                BEGIN
+                    RAISE EXCEPTION 'simulated purge finalization database failure';
+                END;
+                $$ LANGUAGE plpgsql;
+
+                CREATE TRIGGER document_files_abort_purge_finalization
+                BEFORE UPDATE OF purged_at ON document_files
+                FOR EACH ROW WHEN (NEW.purged_at IS NOT NULL)
+                EXECUTE FUNCTION document_files_abort_purge_finalization();
+            SQL);
+
+            return;
+        }
+
+        DB::unprepared(<<<'SQL'
+            CREATE TRIGGER document_files_abort_purge_finalization
+            BEFORE UPDATE OF purged_at ON document_files
+            WHEN NEW.purged_at IS NOT NULL
+            BEGIN
+                SELECT RAISE(ABORT, 'simulated purge finalization database failure');
+            END;
+        SQL);
+    }
+
+    private function dropPurgeFinalizationAbortTrigger(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::unprepared('DROP TRIGGER IF EXISTS document_files_abort_purge_finalization ON document_files');
+            DB::unprepared('DROP FUNCTION IF EXISTS document_files_abort_purge_finalization()');
+
+            return;
+        }
+
+        DB::unprepared('DROP TRIGGER IF EXISTS document_files_abort_purge_finalization');
     }
 
     private function archiveForRetention(DocumentBatch $batch, DocumentFile $file, bool $due): void
