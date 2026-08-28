@@ -189,9 +189,31 @@ final class ZatcaCredentialMaterialValidator
                 break;
             }
 
+            $currentData = openssl_x509_parse($current, false);
+            $issuer = is_array($currentData) ? ($currentData['issuer'] ?? null) : null;
+            $authorityKeyId = is_array($currentData)
+                ? $this->keyIdentifier($currentData['extensions']['authorityKeyIdentifier'] ?? null, true)
+                : null;
+
             $parents = [];
             foreach ($authorities as $fingerprint => $authority) {
                 if (isset($seen[$fingerprint])) {
+                    continue;
+                }
+
+                $authorityData = openssl_x509_parse($authority, false);
+                $subject = is_array($authorityData) ? ($authorityData['subject'] ?? null) : null;
+                if (! $this->sameDistinguishedName($issuer, $subject)) {
+                    continue;
+                }
+
+                $subjectKeyId = is_array($authorityData)
+                    ? $this->keyIdentifier($authorityData['extensions']['subjectKeyIdentifier'] ?? null, false)
+                    : null;
+                if ($authorityKeyId !== null
+                    && $subjectKeyId !== null
+                    && ! hash_equals($authorityKeyId, $subjectKeyId)
+                ) {
                     continue;
                 }
 
@@ -217,6 +239,45 @@ final class ZatcaCredentialMaterialValidator
         }
 
         return $chain;
+    }
+
+    private function sameDistinguishedName(mixed $issuer, mixed $subject): bool
+    {
+        if (! is_array($issuer) || ! is_array($subject)) {
+            return false;
+        }
+
+        return $this->normalizeDistinguishedName($issuer) === $this->normalizeDistinguishedName($subject);
+    }
+
+    private function normalizeDistinguishedName(array $name): array
+    {
+        foreach ($name as &$value) {
+            if (is_array($value)) {
+                $value = $this->normalizeDistinguishedName($value);
+            }
+        }
+        unset($value);
+
+        ksort($name);
+
+        return $name;
+    }
+
+    private function keyIdentifier(mixed $value, bool $authority): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        $pattern = $authority
+            ? '/keyid:([0-9a-f:]+)/i'
+            : '/([0-9a-f]{2}(?::[0-9a-f]{2})+)/i';
+        if (preg_match($pattern, $value, $matches) !== 1) {
+            return null;
+        }
+
+        return strtolower(str_replace(':', '', $matches[1]));
     }
 
     private function certificateBody(OpenSSLCertificate $certificate): string

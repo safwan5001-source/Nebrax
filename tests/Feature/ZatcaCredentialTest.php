@@ -388,6 +388,43 @@ CONF;
     }
 
     /** @test */
+    public function a_same_key_certificate_with_a_different_subject_is_not_counted_as_a_parent(): void
+    {
+        $authority = $this->testAuthority();
+        $csr = openssl_csr_new(
+            ['commonName' => 'Renewed CA With Different Subject'],
+            $authority['private_key'],
+            ['config' => $authority['config_path'], 'digest_alg' => 'sha256']
+        );
+        $this->assertNotFalse($csr);
+
+        $otherSubject = openssl_csr_sign($csr, null, $authority['private_key'], 3650, [
+            'config' => $authority['config_path'],
+            'digest_alg' => 'sha256',
+            'x509_extensions' => 'v3_ca',
+        ]);
+        $this->assertNotFalse($otherSubject);
+        $this->assertTrue(openssl_x509_export($authority['certificate'], $rootPem));
+        $this->assertTrue(openssl_x509_export($otherSubject, $otherPem));
+
+        $bundlePath = tempnam(sys_get_temp_dir(), 'zatca-same-key-bundle-');
+        $this->assertNotFalse($bundlePath);
+        $this->assertNotFalse(file_put_contents($bundlePath, $rootPem.$otherPem));
+        config(['zatca.trust_anchors.developer' => $bundlePath]);
+
+        $auth = $this->registerTenant('zatca-same-key-ca', 'zatca-same-key-ca@example.test');
+        $this->withToken($auth['token'])->putJson(
+            '/api/zatca-credentials/developer',
+            $this->payload()
+        )->assertOk()->assertJsonPath('data.certificate_chain_length', 2);
+
+        $this->assertSame(
+            $this->certificateBody($authority['certificate']),
+            ZatcaCredential::sole()->credentials['certificate_chain'][1]
+        );
+    }
+
+    /** @test */
     public function invalid_or_mismatched_cryptographic_material_is_rejected(): void
     {
         $auth = $this->registerTenant('zatca-material', 'zatca-material@example.test');
