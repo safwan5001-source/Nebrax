@@ -1,4 +1,4 @@
-import type { Band, Severity } from './types';
+import type { Band, CasePriority, CaseStatus, Severity } from './types';
 
 /** المعدّل المطبّع من مقياس ×1000 إلى قيمة معروضة بخانتين. */
 export function fromMilli(milli: number | null | undefined): string {
@@ -44,6 +44,40 @@ export function reviewStateTone(state: string): 'neutral' | 'muted' | 'positive'
 export function formatDateTime(value: string | null | undefined, locale: string): string {
   if (!value) return '—';
   return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+export function caseStatusTone(status: CaseStatus): 'neutral' | 'muted' | 'positive' | 'warning' | 'negative' {
+  switch (status) {
+    case 'open':
+      return 'neutral';
+    case 'investigating':
+    case 'awaiting_information':
+      return 'warning';
+    case 'explained':
+    case 'closed':
+      return 'positive';
+    case 'dismissed':
+      return 'muted';
+    case 'control_failure':
+      return 'warning';
+    case 'confirmed_loss':
+      return 'negative';
+    default:
+      return 'muted';
+  }
+}
+
+export function casePriorityTone(priority: CasePriority): 'muted' | 'neutral' | 'warning' | 'negative' {
+  switch (priority) {
+    case 'critical':
+      return 'negative';
+    case 'high':
+      return 'warning';
+    case 'normal':
+      return 'neutral';
+    default:
+      return 'muted';
+  }
 }
 
 /** يبني سلسلة استعلام من قيم غير فارغة، مع دعم المصفوفات (category[]، severity[]). */

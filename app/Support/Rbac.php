@@ -85,6 +85,13 @@ class Rbac
             // Phase 2: إعادة حساب الذكاء الرقابي سلطة مستقلة عن العرض/المراجعة؛
             // owner/admin يملكانها عبر `*`، وتُسند صراحةً لدور مخصص عند الحاجة.
             'pos.audit.recalculate',
+            // Phase 3: إدارة قضايا التحقيق مساحة مستقلة عن مراجعة الاستثناءات الخفيفة —
+            // العرض والإنشاء والإدارة والتعيين والحسم والتصدير سلطات منفصلة، ومرجع
+            // الكاميرا صلاحية مستقلة بذاتها لا يرثها من `manage` العامة. لا تُضاف لمصفوفتَي
+            // accountant/staff تلقائياً (نفس نمط pos.audit.*)؛ owner/admin عبر `*`.
+            'pos.investigations.view', 'pos.investigations.create', 'pos.investigations.manage',
+            'pos.investigations.assign', 'pos.investigations.resolve', 'pos.investigations.export',
+            'pos.cctv.bookmark.manage',
             'apps.view', 'apps.manage',
             // Fuel Stations: يمنحها المالك/المدير عبر `*`، ولا تُضاف للأدوار
             // المقيدة تلقائياً؛ تُسند فقط عبر دور مخصص أو قرار مستأجر صريح.
