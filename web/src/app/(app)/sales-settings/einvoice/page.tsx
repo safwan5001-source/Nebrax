@@ -12,10 +12,12 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 
 type SubmissionMode = 'manual' | 'automatic';
+type ZatcaEnvironment = 'developer' | 'simulation' | 'production';
 
 interface ZatcaSettingsResponse {
   data: {
     submission_mode: SubmissionMode;
+    active_environment: ZatcaEnvironment;
   };
 }
 
@@ -33,6 +35,7 @@ export default function EInvoiceSettingsPage() {
   const { success } = useToast();
   const [zatcaAvailable, setZatcaAvailable] = useState<boolean | null>(null);
   const [mode, setMode] = useState<SubmissionMode | null>(null);
+  const [environment, setEnvironment] = useState<ZatcaEnvironment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -50,7 +53,11 @@ export default function EInvoiceSettingsPage() {
         if (!available) return;
 
         const response = await api<ZatcaSettingsResponse>('/zatca-settings');
-        if (!cancelled) setMode(response.data.submission_mode);
+        if (!cancelled) {
+          setMode(response.data.submission_mode);
+      setEnvironment(response.data.active_environment);
+          setEnvironment(response.data.active_environment);
+        }
       } catch (requestError) {
         if (!cancelled) {
           setError(requestError instanceof ApiError ? requestError.message : tc('loadFailed'));
@@ -66,14 +73,14 @@ export default function EInvoiceSettingsPage() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (mode === null || zatcaAvailable !== true) return;
+    if (mode === null || environment === null || zatcaAvailable !== true) return;
 
     setSaving(true);
     setError(null);
     try {
       const response = await api<ZatcaSettingsResponse>('/zatca-settings', {
         method: 'PUT',
-        body: { submission_mode: mode },
+        body: { submission_mode: mode, active_environment: environment },
       });
       setMode(response.data.submission_mode);
       success(tc('updated'));
@@ -108,12 +115,33 @@ export default function EInvoiceSettingsPage() {
                 {t('zatca_open_applications')}
               </Link>
             </div>
-          ) : mode === null ? (
+          ) : mode === null || environment === null ? (
             <p className="rounded bg-negative/10 px-3 py-2 text-sm text-negative">
               {error ?? tc('loadFailed')}
             </p>
           ) : (
             <form onSubmit={submit} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="active-environment">{t('zatca_active_environment')}</Label>
+                <Select
+                  id="active-environment"
+                  value={environment}
+                  disabled={saving}
+                  onChange={(event) => setEnvironment(event.target.value as ZatcaEnvironment)}
+                >
+                  <option value="developer">{t('zatca_environment_developer')}</option>
+                  <option value="simulation">{t('zatca_environment_simulation')}</option>
+                  <option value="production">{t('zatca_environment_production')}</option>
+                </Select>
+                <p className="text-xs leading-relaxed text-muted">{t('zatca_environment_hint')}</p>
+              </div>
+
+              {environment === 'production' && (
+                <p className="rounded bg-warning/10 px-3 py-2 text-xs leading-relaxed text-warning">
+                  {t('zatca_environment_production_warning')}
+                </p>
+              )}
+
               <div className="space-y-1.5">
                 <Label htmlFor="submission-mode">{t('zatca_submission_mode')}</Label>
                 <Select

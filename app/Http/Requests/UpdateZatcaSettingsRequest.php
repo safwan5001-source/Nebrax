@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\Accounting\ZatcaCredentialService;
 use App\Support\ZatcaIcvScope;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -17,7 +18,8 @@ class UpdateZatcaSettingsRequest extends FormRequest
     {
         return [
             'icv_scope'       => ['nullable', 'in:' . implode(',', ZatcaIcvScope::ALL)],
-            'submission_mode' => ['nullable', 'in:manual,automatic'],
+            'submission_mode'   => ['nullable', 'in:manual,automatic'],
+            'active_environment' => ['nullable', 'in:' . implode(',', ZatcaCredentialService::ENVIRONMENTS)],
         ];
     }
 

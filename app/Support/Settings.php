@@ -207,7 +207,10 @@ class Settings
             'icv_scope'       => 'tenant', // tenant | branch — انظر ZatcaIcvScope
             // سياسة الإرسال لا تنفّذ اتصالاً وحدها. الوضع اليدوي افتراض آمن،
             // و`automatic` ستقرأه طبقة orchestration عند إضافة النقل الحي.
-            'submission_mode' => 'manual', // manual | automatic
+            'submission_mode'   => 'manual', // manual | automatic
+            // مصدر بيانات الاعتماد محدد صراحةً ولا ينتقل إلى بيئة أخرى عند الغياب.
+            // هذا المفتاح لا يبدأ توقيعاً أو اتصالاً خارجياً بمفرده.
+            'active_environment' => 'developer', // developer | simulation | production
         ],
 
         /**
