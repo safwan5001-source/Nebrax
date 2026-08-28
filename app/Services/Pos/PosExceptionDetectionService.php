@@ -2,11 +2,14 @@
 
 namespace App\Services\Pos;
 
+use App\Models\Invoice;
 use App\Models\PosException;
 use App\Models\PosExceptionRule;
 use App\Models\PosRiskSnapshot;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
+use App\Models\ReturnDocument;
+use App\Support\PosSettings;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +43,41 @@ final class PosExceptionDetectionService
         PosSessionEvent::TYPE_EXCHANGE_RECORDED,
         PosSessionEvent::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT,
     ];
+
+    /**
+     * Phase 4 — أنواع العمليات الحساسة لقاعدة `outside_operating_hours` فقط
+     * (مجموعة مستقلة عن `sensitiveOpTypes()` الذي تستعمله قواعد Phase 2 القائمة
+     * لمقام مختلف تماماً — لا يجوز دمجهما فيغيّر سلوك قواعد قديمة بلا قصد).
+     * مرتجع/استبدال، فتح درج، طلب تجاوز، تغيير خصم، إلغاء — تطابق نص المهمة حرفياً.
+     */
+    private const OUTSIDE_HOURS_SENSITIVE_TYPES = [
+        PosSessionEvent::TYPE_RETURN_RECORDED,
+        PosSessionEvent::TYPE_RETURN_RECORDED_EXTERNAL,
+        PosSessionEvent::TYPE_EXCHANGE_RECORDED,
+        PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT,
+        PosSessionEvent::TYPE_OVERRIDE_REQUESTED,
+        PosSessionEvent::TYPE_DISCOUNT_APPLIED,
+        PosSessionEvent::TYPE_DISCOUNT_CHANGED,
+        PosSessionEvent::TYPE_CART_CANCELLED,
+        PosSessionEvent::TYPE_PAYMENT_CANCELLED,
+    ];
+
+    /**
+     * يربط مفتاح البسط المشتقّ (`@...`) بحقل نتيجة `aggregate()` المطابق —
+     * مصدر واحد يمنع سلسلة `if` متكررة لكل قاعدة Phase 4 جديدة.
+     */
+    private const PHASE4_DERIVED_KEYS = [
+        '@cross_cashier_refund' => 'cross_cashier_refund',
+        '@refund_shortly_after_sale' => 'refund_shortly_after_sale',
+        '@manual_drawer_without_transaction' => 'manual_drawer_without_transaction',
+        '@override_then_cancel' => 'override_then_cancel',
+        '@approval_replay' => 'approval_replay',
+        '@outside_operating_hours' => 'outside_operating_hours',
+    ];
+
+    public function __construct(
+        private readonly PosEmployeeScheduleResolver $scheduleResolver,
+    ) {}
 
     /**
      * يشغّل الكشف للمستأجر النشط عبر كل فروعه، ويعيد ملخّصاً بالأرقام.
@@ -213,9 +251,267 @@ final class PosExceptionDetectionService
         if ($full) {
             $result['amount_events'] = $this->amountEvents($start, $end, $sessionOwner);
             $result['near_close'] = $this->nearCloseCounts($start, $end, $sessionOwner);
+            // Phase 4 — استثناءات حتمية إضافية؛ تُحسب للنافذة الحالية فقط (لا
+            // مقارنة أساس، الحدوث نفسه هو الإشارة عبر DENOM_FIXED_UNIT).
+            $result['cross_cashier_refund'] = $this->crossCashierRefundCounts($start, $end);
+            $result['refund_shortly_after_sale'] = $this->refundShortlyAfterSaleCounts($start, $end);
+            $result['manual_drawer_without_transaction'] = $this->manualDrawerWithoutTransactionCounts($start, $end);
+            $result['override_then_cancel'] = $this->overrideThenCancelCounts($start, $end);
+            $result['approval_replay'] = $this->approvalReplayCounts($start, $end);
+            $result['outside_operating_hours'] = $this->outsideOperatingHoursCounts($start, $end);
         }
 
         return $result;
+    }
+
+    /**
+     * مرتجعات POS خارج الجلسة (`return_recorded_external`) بفاعلٍ مختلف عن
+     * البائع الأصلي، مستخرَجة من حمولة الحدث المحفوظة وقت التسجيل (لا استعلام
+     * إضافي). غياب أيّ من الطرفين أو تطابقهما = **لا إشارة إطلاقاً**.
+     *
+     * @return array<string,array<string,int>> [branch][performed_by] => count
+     */
+    private function crossCashierRefundCounts(Carbon $start, Carbon $end): array
+    {
+        $out = [];
+        PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
+            ->where('type', PosSessionEvent::TYPE_RETURN_RECORDED_EXTERNAL)
+            ->whereNotNull('performed_by')
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+            ->get(['branch_id', 'performed_by', 'payload'])
+            ->each(function (PosSessionEvent $event) use (&$out) {
+                $originalActor = $event->payload['original_sale_actor_id'] ?? null;
+                $returnActor = $event->payload['return_actor_id'] ?? null;
+                if ($originalActor === null || $returnActor === null || $originalActor === $returnActor) {
+                    return;
+                }
+                $branch = $event->branch_id ?? '_';
+                $out[$branch][$event->performed_by] = ($out[$branch][$event->performed_by] ?? 0) + 1;
+            });
+
+        return $out;
+    }
+
+    /**
+     * مرتجعات مبيعات مرحّلة لفاتورة POS ضمن نافذة قصيرة (`config.window_minutes`)
+     * من تسجيل الفاتورة نفسها — من `return_documents`/`invoices` مباشرةً (مصدر
+     * حقيقة خادمي، لا حمولة حدث)، بلا اعتماد على وجود دليل POS للمرتجع.
+     *
+     * @return array<string,array<string,int>> [branch][created_by] => count
+     */
+    private function refundShortlyAfterSaleCounts(Carbon $start, Carbon $end): array
+    {
+        $rule = PosExceptionRuleCatalog::rule('refund_shortly_after_sale');
+        $windowSeconds = (int) ($rule['config']['window_minutes'] ?? 60) * 60;
+
+        $returns = ReturnDocument::query()->withoutGlobalScope(BranchScope::class)
+            ->where('type', 'sales')->where('status', 'posted')
+            ->where('original_type', Invoice::class)->whereNotNull('original_id')
+            ->whereNotNull('created_by')
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+            ->get(['id', 'branch_id', 'created_by', 'original_id', 'created_at']);
+        if ($returns->isEmpty()) {
+            return [];
+        }
+
+        // نطاق POS فقط — فاتورة بلا جلسة POS خارج نطاق هذه الوحدة.
+        $invoices = Invoice::query()->withoutGlobalScope(BranchScope::class)
+            ->whereIn('id', $returns->pluck('original_id')->unique())
+            ->whereNotNull('pos_session_id')
+            ->get(['id', 'created_at'])->keyBy('id');
+
+        $out = [];
+        foreach ($returns as $return) {
+            $invoice = $invoices->get($return->original_id);
+            if ($invoice === null) {
+                continue;
+            }
+            $elapsed = $return->created_at->getTimestamp() - $invoice->created_at->getTimestamp();
+            if ($elapsed < 0 || $elapsed > $windowSeconds) {
+                continue; // سالب = ترتيب بيانات غير منطقي؛ لا يُحتسب دليلاً حتمياً.
+            }
+            $branch = $return->branch_id ?? '_';
+            $out[$branch][$return->created_by] = ($out[$branch][$return->created_by] ?? 0) + 1;
+        }
+
+        return $out;
+    }
+
+    /**
+     * فتح درج يدوي (`mode=manual`) بلا أي checkout مكتمل أو حركة نقدية على نفس
+     * الجلسة خلال `config.window_minutes` من الفتح (قبله أو بعده). يمثّل فتحاً
+     * غير مبرَّر بمعاملة قريبة.
+     *
+     * @return array<string,array<string,int>> [branch][performed_by] => count
+     */
+    private function manualDrawerWithoutTransactionCounts(Carbon $start, Carbon $end): array
+    {
+        $rule = PosExceptionRuleCatalog::rule('manual_drawer_without_transaction_proximity');
+        $windowSeconds = (int) ($rule['config']['window_minutes'] ?? 15) * 60;
+
+        $opens = PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
+            ->where('type', PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT)
+            ->whereNotNull('performed_by')->whereNotNull('pos_session_id')
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+            ->get(['id', 'branch_id', 'performed_by', 'pos_session_id', 'payload', 'created_at'])
+            ->filter(fn (PosSessionEvent $e) => ($e->payload['mode'] ?? null) === 'manual');
+        if ($opens->isEmpty()) {
+            return [];
+        }
+
+        $nearby = PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
+            ->whereIn('pos_session_id', $opens->pluck('pos_session_id')->unique())
+            ->whereIn('type', [
+                PosSessionEvent::TYPE_CHECKOUT_COMPLETED,
+                PosSessionEvent::TYPE_CASH_IN_RECORDED,
+                PosSessionEvent::TYPE_CASH_OUT_RECORDED,
+            ])
+            ->get(['pos_session_id', 'created_at'])
+            ->groupBy('pos_session_id');
+
+        $out = [];
+        foreach ($opens as $open) {
+            $candidates = $nearby->get($open->pos_session_id, collect());
+            $hasProximity = $candidates->contains(fn (PosSessionEvent $e) => abs(
+                $e->created_at->getTimestamp() - $open->created_at->getTimestamp()
+            ) <= $windowSeconds);
+            if ($hasProximity) {
+                continue;
+            }
+            $branch = $open->branch_id ?? '_';
+            $out[$branch][$open->performed_by] = ($out[$branch][$open->performed_by] ?? 0) + 1;
+        }
+
+        return $out;
+    }
+
+    /**
+     * `override_consumed` يتبعه `cart_cancelled`/`payment_cancelled` على نفس
+     * السلة خلال `config.window_minutes` — تجاوزٌ استُهلك ثم أُلغيت العملية.
+     *
+     * @return array<string,array<string,int>> [branch][performed_by] => count
+     */
+    private function overrideThenCancelCounts(Carbon $start, Carbon $end): array
+    {
+        $rule = PosExceptionRuleCatalog::rule('override_then_cancel');
+        $windowSeconds = (int) ($rule['config']['window_minutes'] ?? 10) * 60;
+
+        $consumed = PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
+            ->where('type', PosSessionEvent::TYPE_OVERRIDE_CONSUMED)
+            ->whereNotNull('performed_by')->whereNotNull('cart_id')
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+            ->get(['branch_id', 'performed_by', 'cart_id', 'created_at']);
+        if ($consumed->isEmpty()) {
+            return [];
+        }
+
+        $cancels = PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
+            ->whereIn('type', [PosSessionEvent::TYPE_CART_CANCELLED, PosSessionEvent::TYPE_PAYMENT_CANCELLED])
+            ->whereIn('cart_id', $consumed->pluck('cart_id')->unique())
+            ->get(['cart_id', 'created_at'])->groupBy('cart_id');
+
+        $out = [];
+        foreach ($consumed as $event) {
+            $followups = $cancels->get($event->cart_id, collect());
+            $hasFollowup = $followups->contains(function (PosSessionEvent $cancel) use ($event, $windowSeconds) {
+                $delta = $cancel->created_at->getTimestamp() - $event->created_at->getTimestamp();
+
+                return $delta >= 0 && $delta <= $windowSeconds;
+            });
+            if (! $hasFollowup) {
+                continue;
+            }
+            $branch = $event->branch_id ?? '_';
+            $out[$branch][$event->performed_by] = ($out[$branch][$event->performed_by] ?? 0) + 1;
+        }
+
+        return $out;
+    }
+
+    /**
+     * طلبات تجاوز متكرّرة لنفس (المنفّذ + السلة + العملية) بعدد يتجاوز
+     * `config.min_repeats` ضمن نافذة `config.window_minutes` — يتحقّق أيضاً من
+     * سلامة عمل idempotency (إعادة إرسال حقيقية بنفس المفتاح لا تُنتج صفاً
+     * إضافياً أصلاً، فهذا الرصد يلتقط فقط طلبات **متمايزة** فعلاً).
+     *
+     * @return array<string,array<string,int>> [branch][performed_by] => observed count
+     */
+    private function approvalReplayCounts(Carbon $start, Carbon $end): array
+    {
+        $rule = PosExceptionRuleCatalog::rule('approval_replay');
+        $windowSeconds = (int) ($rule['config']['window_minutes'] ?? 15) * 60;
+        $minRepeats = max(2, (int) ($rule['config']['min_repeats'] ?? 3));
+
+        $requests = PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
+            ->where('type', PosSessionEvent::TYPE_OVERRIDE_REQUESTED)
+            ->whereNotNull('performed_by')->whereNotNull('cart_id')
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+            ->get(['branch_id', 'performed_by', 'cart_id', 'payload', 'created_at']);
+        if ($requests->count() < $minRepeats) {
+            return [];
+        }
+
+        $groups = $requests->groupBy(fn (PosSessionEvent $e) => $e->performed_by . '|' . $e->cart_id . '|' . ($e->payload['operation'] ?? ''));
+
+        $out = [];
+        foreach ($groups as $group) {
+            if ($group->count() < $minRepeats) {
+                continue;
+            }
+            $sorted = $group->sortBy(fn (PosSessionEvent $e) => $e->created_at->getTimestamp())->values();
+            $windowStart = $sorted->first()->created_at->getTimestamp();
+            $countInWindow = $sorted->filter(
+                fn (PosSessionEvent $e) => $e->created_at->getTimestamp() - $windowStart <= $windowSeconds
+            )->count();
+            if ($countInWindow < $minRepeats) {
+                continue;
+            }
+            $first = $sorted->first();
+            $branch = $first->branch_id ?? '_';
+            $out[$branch][$first->performed_by] = ($out[$branch][$first->performed_by] ?? 0) + $countInWindow;
+        }
+
+        return $out;
+    }
+
+    /**
+     * عمليات حساسة (انظر `OUTSIDE_HOURS_SENSITIVE_TYPES`) وقعت خارج نافذة وردية
+     * منفّذها المعتمَدة (+دقائق سماح `PosSettings::outsideHoursGraceMinutes()`).
+     * **لا حكم إطلاقاً** لمنفّذ بلا وردية `User→Employee→Shift` محلولة — لا
+     * تخمين نمط عمل افتراضي (راجع `PosEmployeeScheduleResolver`).
+     *
+     * @return array<string,array<string,int>> [branch][performed_by] => count
+     */
+    private function outsideOperatingHoursCounts(Carbon $start, Carbon $end): array
+    {
+        $events = PosSessionEvent::query()->withoutGlobalScope(BranchScope::class)
+            ->whereIn('type', self::OUTSIDE_HOURS_SENSITIVE_TYPES)
+            ->whereNotNull('performed_by')
+            ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+            ->get(['branch_id', 'performed_by', 'created_at']);
+        if ($events->isEmpty()) {
+            return [];
+        }
+
+        $shifts = $this->scheduleResolver->resolveMany($events->pluck('performed_by')->unique()->values()->all());
+        if ($shifts === []) {
+            return [];
+        }
+
+        $timezone = config('app.timezone', 'UTC');
+        $grace = PosSettings::outsideHoursGraceMinutes();
+
+        $out = [];
+        foreach ($events as $event) {
+            $shift = $shifts[$event->performed_by] ?? null;
+            if ($shift === null || $this->scheduleResolver->covers($shift, $event->created_at, $timezone, $grace)) {
+                continue;
+            }
+            $branch = $event->branch_id ?? '_';
+            $out[$branch][$event->performed_by] = ($out[$branch][$event->performed_by] ?? 0) + 1;
+        }
+
+        return $out;
     }
 
     /**
@@ -584,6 +880,13 @@ final class PosExceptionDetectionService
             // (محسوبة في التجميع). المقام هو كل العمليات الحساسة للمنفّذ.
             return $data['near_close'][$branch][$subject] ?? 0;
         }
+        // Phase 4 — كل هذه المفاتيح محسوبة مسبقاً في aggregate() (استثناءات
+        // حتمية بمقام ثابت DENOM_FIXED_UNIT)؛ لا حساب إضافي هنا.
+        if (count($types) === 1 && str_starts_with($types[0], '@') && isset(self::PHASE4_DERIVED_KEYS[$types[0]])) {
+            $bucket = self::PHASE4_DERIVED_KEYS[$types[0]];
+
+            return $data[$bucket][$branch][$subject] ?? 0;
+        }
 
         $source = $sessionScoped ? ($data['by_session_owner'][$branch][$subject] ?? []) : ($data['counts'][$branch][$subject] ?? []);
         $sum = 0;
@@ -630,6 +933,9 @@ final class PosExceptionDetectionService
             PosExceptionRuleCatalog::DENOM_WORKED_SECONDS => $sessions['worked_seconds'] ?? 0,
             PosExceptionRuleCatalog::DENOM_SALES_AMOUNT => $amounts[PosSessionEvent::TYPE_CHECKOUT_COMPLETED] ?? 0,
             PosExceptionRuleCatalog::DENOM_SENSITIVE_OPS => $this->sensitiveOps($data, $branch, $subject),
+            // Phase 4 — استثناءات حتمية: المقام ثابت=1 دائماً (الحدوث نفسه هو
+            // الإشارة، لا نسبته لنشاط آخر). آمن دوماً ضد بوابة `min_sample`.
+            PosExceptionRuleCatalog::DENOM_FIXED_UNIT => 1,
             default => 0,
         };
     }

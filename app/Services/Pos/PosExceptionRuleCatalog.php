@@ -48,6 +48,14 @@ final class PosExceptionRuleCatalog
     public const DENOM_APPROVALS_FOR_PERFORMER = 'approvals_for_performer';
     public const DENOM_APPROVALS_IN_BRANCH = 'approvals_in_branch';
     public const DENOM_OVERRIDE_REQUESTS = 'override_requests';
+    /**
+     * Phase 4 — مقام ثابت = 1 لكل موضوع. يستعمله قواعد «العلامة الحتمية»
+     * (مثل `cross_cashier_refund`) حين يكون **حدوث الحالة نفسه** هو الإشارة،
+     * لا معدّلها نسبةً إلى نشاط آخر. يحوّل `rateMilli()` إلى عدّاد خام
+     * مطبَّع (observed = count × 1000)، فتبقى نفس آلة الشدّة/العتبة الثابتة
+     * تعمل بلا استثناء أو مسار حساب موازٍ.
+     */
+    public const DENOM_FIXED_UNIT = 'fixed_unit';
 
     // ═══ ثوابت الدرجة والنطاقات (مصدر واحد) ═══
     /** أسقف الفئة تمنع فئة واحدة (عدة قواعد متشابهة) من تفجير الدرجة. */
@@ -86,6 +94,8 @@ final class PosExceptionRuleCatalog
         'variance_settlement_frequency' => 20000,
         'refund_frequency' => 10000,         // 10 لكل 100 عملية مكتملة
         'refund_amount_rate' => 50000,       // 50 مبلغ مرتجع لكل 1000 مبيعات (٥٪)
+        'repeated_hold_discard' => 20000,    // 20 تجاهل لكل 100 سلة
+        'repeated_cancel_before_checkout' => 15000, // 15 لكل 100 checkout مبدوء
     ];
 
     /**
@@ -273,6 +283,85 @@ final class PosExceptionRuleCatalog
                 'denominator' => self::DENOM_SENSITIVE_OPS, 'per' => 100,
                 'confidence' => self::CONFIDENCE_CLIENT, 'amount' => false,
                 'config' => ['window_minutes' => 30],
+            ],
+
+            // ═══ G. Phase 4 — منع الفقد المتقدّم (استثناءات حتمية إضافية) ═══
+            // معدّلات تكرار قياسية — بنية القاعدة الحالية بلا أي كود جديد.
+            'repeated_hold_discard' => [
+                'category' => self::CATEGORY_CART,
+                'weight' => 10, 'min_sample' => 10, 'window_days' => 30, 'threshold' => 150,
+                'compare' => self::COMPARE_BASELINE, 'subject' => self::SUBJECT_USER,
+                'numerator_types' => [PosSessionEvent::TYPE_CART_DISCARDED],
+                'denominator' => self::DENOM_CARTS, 'per' => 100,
+                'confidence' => self::CONFIDENCE_SERVER, 'amount' => false,
+            ],
+            'repeated_cancel_before_checkout' => [
+                'category' => self::CATEGORY_PAYMENT,
+                'weight' => 10, 'min_sample' => 10, 'window_days' => 30, 'threshold' => 150,
+                'compare' => self::COMPARE_BASELINE, 'subject' => self::SUBJECT_USER,
+                'numerator_types' => [PosSessionEvent::TYPE_CART_CANCELLED, PosSessionEvent::TYPE_PAYMENT_CANCELLED],
+                'denominator' => self::DENOM_CHECKOUTS_STARTED, 'per' => 100,
+                'confidence' => self::CONFIDENCE_CLIENT, 'amount' => false,
+            ],
+
+            // استثناءات حتمية — الرصد ذاته هو الإشارة (مقام ثابت=1، عتبة=1000
+            // ملّي أي «حدوث واحد»). الشدّة تتصاعد سريعاً مع كل تكرار إضافي.
+            'cross_cashier_refund' => [
+                'category' => self::CATEGORY_RETURNS,
+                'weight' => 18, 'min_sample' => 1, 'window_days' => 30, 'threshold' => 1000,
+                'compare' => self::COMPARE_STATIC, 'subject' => self::SUBJECT_USER,
+                'numerator_types' => ['@cross_cashier_refund'],
+                'denominator' => self::DENOM_FIXED_UNIT, 'per' => 1,
+                'confidence' => self::CONFIDENCE_SERVER, 'amount' => false,
+            ],
+            'refund_shortly_after_sale' => [
+                'category' => self::CATEGORY_RETURNS,
+                'weight' => 15, 'min_sample' => 1, 'window_days' => 30, 'threshold' => 1000,
+                'compare' => self::COMPARE_STATIC, 'subject' => self::SUBJECT_USER,
+                'numerator_types' => ['@refund_shortly_after_sale'],
+                'denominator' => self::DENOM_FIXED_UNIT, 'per' => 1,
+                'confidence' => self::CONFIDENCE_SERVER, 'amount' => false,
+                // النافذة الزمنية بين إتمام البيع وتسجيل المرتجع (بالدقائق).
+                'config' => ['window_minutes' => 60],
+            ],
+            'manual_drawer_without_transaction_proximity' => [
+                'category' => self::CATEGORY_CASH,
+                'weight' => 12, 'min_sample' => 1, 'window_days' => 30, 'threshold' => 1000,
+                'compare' => self::COMPARE_STATIC, 'subject' => self::SUBJECT_USER,
+                'numerator_types' => ['@manual_drawer_without_transaction'],
+                'denominator' => self::DENOM_FIXED_UNIT, 'per' => 1,
+                'confidence' => self::CONFIDENCE_SERVER, 'amount' => false,
+                'config' => ['window_minutes' => 15],
+            ],
+            'override_then_cancel' => [
+                'category' => self::CATEGORY_APPROVAL,
+                'weight' => 15, 'min_sample' => 1, 'window_days' => 30, 'threshold' => 1000,
+                'compare' => self::COMPARE_STATIC, 'subject' => self::SUBJECT_USER,
+                'numerator_types' => ['@override_then_cancel'],
+                'denominator' => self::DENOM_FIXED_UNIT, 'per' => 1,
+                // يمزج دليلاً خادمياً (override_consumed) بحدث سلة عميلي الوسم
+                // (cart_cancelled/payment_cancelled) — نفس سابقة payment_failure_rate.
+                'confidence' => self::CONFIDENCE_CLIENT, 'amount' => false,
+                'config' => ['window_minutes' => 10],
+            ],
+            'approval_replay' => [
+                'category' => self::CATEGORY_APPROVAL,
+                'weight' => 14, 'min_sample' => 1, 'window_days' => 30, 'threshold' => 1000,
+                'compare' => self::COMPARE_STATIC, 'subject' => self::SUBJECT_USER,
+                'numerator_types' => ['@approval_replay'],
+                'denominator' => self::DENOM_FIXED_UNIT, 'per' => 1,
+                'confidence' => self::CONFIDENCE_SERVER, 'amount' => false,
+                'config' => ['window_minutes' => 15, 'min_repeats' => 3],
+            ],
+            'outside_operating_hours' => [
+                'category' => self::CATEGORY_TIMING,
+                'weight' => 12, 'min_sample' => 1, 'window_days' => 30, 'threshold' => 1000,
+                'compare' => self::COMPARE_STATIC, 'subject' => self::SUBJECT_USER,
+                'numerator_types' => ['@outside_operating_hours'],
+                'denominator' => self::DENOM_FIXED_UNIT, 'per' => 1,
+                // لا يُقيَّم إلا لموضوعٍ له وردية معتمَدة محلولة (User→Employee→Shift)؛
+                // غيابها = لا إشارة إطلاقاً (لا تخمين نمط عمل افتراضي).
+                'confidence' => self::CONFIDENCE_SERVER, 'amount' => false,
             ],
         ];
     }
