@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
 import { logout } from '@/lib/auth';
+import { POS_RETURN_HREF, decidePosUnsavedExit } from '@/lib/pos-workspace';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { useBranches } from '@/lib/branch';
@@ -263,7 +264,7 @@ export default function PosPage() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [sensitiveAction, setSensitiveAction] = useState<{ type: 'item_removed' | 'cart_cancelled' | 'payment_cancelled'; line?: PosCartLine; cartId: string } | null>(null);
   const [sensitiveBusy, setSensitiveBusy] = useState(false);
-  const [unsavedExitAction, setUnsavedExitAction] = useState<'close_session' | 'logout' | null>(null);
+  const [unsavedExitAction, setUnsavedExitAction] = useState<'close_session' | 'logout' | 'return_to_system' | null>(null);
   const [lastScannedLineKey, setLastScannedLineKey] = useState<string | null>(null);
   const [scanFeedbackMessage, setScanFeedbackMessage] = useState('');
   const numericEditorLabels = {
@@ -916,7 +917,7 @@ export default function PosPage() {
   function closeSession(e: React.FormEvent) {
     e.preventDefault();
     if (!session) return;
-    if (carts.some(cartHasUnsavedData)) {
+    if (decidePosUnsavedExit(carts.some(cartHasUnsavedData)) === 'guard') {
       setUnsavedExitAction('close_session');
       return;
     }
@@ -924,11 +925,23 @@ export default function PosPage() {
   }
 
   function requestLogout() {
-    if (carts.some(cartHasUnsavedData)) {
+    if (decidePosUnsavedExit(carts.some(cartHasUnsavedData)) === 'guard') {
       setUnsavedExitAction('logout');
       return;
     }
     void finishLogout();
+  }
+
+  function requestReturnToSystem() {
+    if (decidePosUnsavedExit(carts.some(cartHasUnsavedData)) === 'guard') {
+      setUnsavedExitAction('return_to_system');
+      return;
+    }
+    finishReturnToSystem();
+  }
+
+  function finishReturnToSystem() {
+    router.push(POS_RETURN_HREF);
   }
 
   async function finishLogout() {
@@ -941,6 +954,7 @@ export default function PosPage() {
     setUnsavedExitAction(null);
     if (action === 'close_session') await finishCloseSession();
     if (action === 'logout') await finishLogout();
+    if (action === 'return_to_system') finishReturnToSystem();
   }
 
   const confirmPayment = useCallback(
@@ -1512,6 +1526,7 @@ export default function PosPage() {
         cashDrawerDisabled={!session || !sessionDrawerConfigured || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable' || drawerBusy}
         cashDrawerBusy={drawerBusy}
         onReturn={() => setReturnOpen(true)}
+        onReturnToSystem={requestReturnToSystem}
         onExchange={() => setExchangeOpen(true)}
         onLogout={requestLogout}
         exchangeDisabled={cart.length === 0 || step === 'payment' || paying}

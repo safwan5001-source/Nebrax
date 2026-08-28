@@ -2965,7 +2965,7 @@
     "clear_cart": "Clear cart",
     "clear_cart_confirm": "Clear every item from the active cart?",
     "unsaved_carts_exit_title": "There are unsaved carts",
-    "unsaved_carts_exit_description": "One or more carts contain items, a customer, or a note that has not been held or paid. Continuing to close the session or sign out leaves these drafts only on this device and they may not be available under another context.",
+    "unsaved_carts_exit_description": "One or more carts contain items, a customer, or a note that has not been held or paid. Continuing to close the session, sign out, or return to the system leaves these drafts only on this device and they may not be available under another context.",
     "unsaved_carts_exit_confirm": "Continue anyway",
     "clear_cart_description": "Only the active cart will be cleared. Held sales and other open carts are not affected.",
     "cart_note": "Cart note",

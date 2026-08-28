@@ -70,6 +70,7 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { canViewDocumentCenter } from '@/lib/document-review-access';
+import { POS_SIDEBAR_LAUNCH_ITEMS, posNavNewTabAnchorProps } from '@/lib/pos-workspace';
 
 interface NavItem {
   href: string;
@@ -85,6 +86,8 @@ interface NavItem {
   appKey?: string;
   /** صلاحية RBAC مطلوبة لإظهار عنصر تشغيلي حساس في الشريط. */
   permission?: string;
+  /** يفتح الرابط في تبويب جديد (بدء البيع فقط). */
+  openInNewTab?: boolean;
 }
 
 interface NavGroup {
@@ -96,6 +99,14 @@ interface NavGroup {
   /** بديل `appKey` على مستوى المجموعة كاملة — يخفيها بعناصرها دفعة واحدة. */
   appKey?: string;
 }
+
+const POS_NAV_ICONS: Record<(typeof POS_SIDEBAR_LAUNCH_ITEMS)[number]['key'], LucideIcon> = {
+  posStart: Store,
+  posSessions: Clock,
+  posReport: Receipt,
+  posAudit: ClipboardCheck,
+  posSettings: SlidersHorizontal,
+};
 
 const GROUPS: NavGroup[] = [
   {
@@ -118,13 +129,12 @@ const GROUPS: NavGroup[] = [
     title: 'pos',
     icon: Store,
     appKey: 'sales.pos',
-    items: [
-      { href: '/pos', icon: Store, key: 'posStart', built: true },
-      { href: '/pos/sessions', icon: Clock, key: 'posSessions', built: true },
-      { href: '/pos/report', icon: Receipt, key: 'posReport', built: true },
-      { href: '/pos/audit', icon: ClipboardCheck, key: 'posAudit', built: true, permission: 'pos.audit.view' },
-      { href: '/pos/settings', icon: SlidersHorizontal, key: 'posSettings', built: true },
-    ],
+    items: POS_SIDEBAR_LAUNCH_ITEMS.map((item) => ({
+      ...item,
+      icon: POS_NAV_ICONS[item.key],
+      built: true,
+      ...(item.key === 'posAudit' ? { permission: 'pos.audit.view' } : {}),
+    })),
   },
   {
     title: 'customers',
@@ -589,6 +599,7 @@ export function Sidebar({
                         <Link
                           key={item.key}
                           href={item.href}
+                          {...posNavNewTabAnchorProps(item.openInNewTab)}
                           aria-current={active ? 'page' : undefined}
                           onClick={onClose}
                           className={cn(
@@ -644,6 +655,7 @@ export function Sidebar({
               <Link
                 key={item.key}
                 href={item.href}
+                {...posNavNewTabAnchorProps(item.openInNewTab)}
                 role="menuitem"
                 aria-current={active ? 'page' : undefined}
                 onClick={() => setFlyout(null)}
