@@ -126,7 +126,7 @@ final class ZatcaXadesSignedPropertiesBuilder
                 .chunk_split(base64_encode($der), 64, "\n")
                 ."-----END CERTIFICATE-----\n";
 
-            if (openssl_x509_read($pem) === false) {
+            if (@openssl_x509_read($pem) === false) {
                 throw new InvalidArgumentException(
                     'شهادة ZATCA رقم '.($index + 1).' ليست شهادة X.509 صالحة.'
                 );
