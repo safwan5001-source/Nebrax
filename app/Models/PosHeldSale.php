@@ -21,6 +21,7 @@ class PosHeldSale extends BaseModel
         'tenant_id',
         'branch_id',
         'pos_session_id',
+        'cart_id',
         'resumed_pos_session_id',
         'warehouse_id',
         'customer_id',

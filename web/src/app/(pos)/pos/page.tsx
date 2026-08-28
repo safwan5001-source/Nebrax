@@ -33,6 +33,7 @@ import { PosHeldSalesDialog, type PosHeldSale } from '@/components/pos/pos-held-
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
+import { PosAuditReasonDialog } from '@/components/pos/pos-audit-reason-dialog';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
 import type { LiveTemplateRevision } from '@/modules/print-templates/services/live-template-definition';
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
@@ -63,6 +64,7 @@ interface PosConfig extends PosFeedbackSettings {
   cash_drawer_enabled: boolean;
   cash_drawer_driver: string;
   cash_drawer_auto_open_after_cash: boolean;
+  blind_cash_count_enabled: boolean;
 }
 const POS_DEFAULTS: PosConfig = {
   default_customer_id: null,
@@ -84,6 +86,7 @@ const POS_DEFAULTS: PosConfig = {
   cash_drawer_enabled: false,
   cash_drawer_driver: 'unavailable',
   cash_drawer_auto_open_after_cash: false,
+  blind_cash_count_enabled: false,
   ...POS_FEEDBACK_DEFAULTS,
 };
 
@@ -152,6 +155,7 @@ export default function PosPage() {
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const paymentRequestRef = useRef(false);
+  const auditCartRequestRef = useRef(new Map<string, Promise<string>>());
   const [posCfg, setPosCfg] = useState<PosConfig>(POS_DEFAULTS);
   const [paymentMethods, setPaymentMethods] = useState<PosPaymentMethod[]>([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
@@ -188,7 +192,33 @@ export default function PosPage() {
   const setCart = useCallback((updater: PosCartLine[] | ((current: PosCartLine[]) => PosCartLine[])) => {
     updateActiveItems((current) => typeof updater === 'function' ? updater(current) : updater);
   }, [updateActiveItems]);
-  const setSelectedCustomer = useCallback((customer: PosCustomer | null) => patchActive({ customer }), [patchActive]);
+  const ensureAuditCart = useCallback(async (cartState = activeCart): Promise<string | null> => {
+    if (!session) return null;
+    if (cartState.auditCartId) return cartState.auditCartId;
+    const pending = auditCartRequestRef.current.get(cartState.id);
+    if (pending) return pending;
+    const request = api<{ data: { cart_id: string } }>('/pos/carts', {
+      method: 'POST',
+      body: { pos_session_id: session.id, snapshot: { items: cartState.items, customer: cartState.customer, note: cartState.note, tax_inclusive: cartState.taxInclusive } },
+    }).then((created) => {
+      updateCarts((current) => current.map((entry) => entry.id === cartState.id ? { ...entry, auditCartId: created.data.cart_id } : entry));
+      return created.data.cart_id;
+    }).finally(() => { auditCartRequestRef.current.delete(cartState.id); });
+    auditCartRequestRef.current.set(cartState.id, request);
+    return request;
+  }, [activeCart, session, updateCarts]);
+  const recordCartForensics = useCallback(async (type: string, data: Record<string, unknown>, cartState = activeCart) => {
+    if (!session) return null;
+    const auditCartId = await ensureAuditCart(cartState);
+    if (!auditCartId) return null;
+    return api(`/pos/carts/${auditCartId}/events`, { method: 'POST', body: { pos_session_id: session.id, type, ...data } });
+  }, [activeCart, ensureAuditCart, session]);
+  const setSelectedCustomer = useCallback((customer: PosCustomer | null) => {
+    const before = activeCart.customer ? { id: activeCart.customer.id, name: activeCart.customer.name } : null;
+    const after = customer ? { id: customer.id, name: customer.name } : null;
+    patchActive({ customer });
+    if (before?.id !== after?.id) void recordCartForensics('customer_changed', { before: { customer: before }, after: { customer: after }, customer: after });
+  }, [activeCart, patchActive, recordCartForensics]);
   const setTaxInclusive = useCallback((value: boolean) => patchActive({ taxInclusive: value }), [patchActive]);
   // العميل المختار مرجع حقيقي؛ قد تبقى السلة بلا مرجع حتى يختار الكاشير عميلاً مسجلاً قبل التحصيل.
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -200,6 +230,8 @@ export default function PosPage() {
   const [cartToClose, setCartToClose] = useState<string | null>(null);
   const [clearCartOpen, setClearCartOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [sensitiveAction, setSensitiveAction] = useState<{ type: 'item_removed' | 'cart_cancelled' | 'payment_cancelled'; line?: PosCartLine; cartId: string } | null>(null);
+  const [sensitiveBusy, setSensitiveBusy] = useState(false);
   const [unsavedExitAction, setUnsavedExitAction] = useState<'close_session' | 'logout' | null>(null);
   const [lastScannedLineKey, setLastScannedLineKey] = useState<string | null>(null);
   const [scanFeedbackMessage, setScanFeedbackMessage] = useState('');
@@ -416,11 +448,17 @@ export default function PosPage() {
     const unit = pricedUnit(p, unitName);
     if (!unit) return null;
     const lineKey = `${p.id}:${unit.name}`;
+    const before = cart.find((line) => line.key === lineKey);
     setCart((current) => appendPosCartProduct(current, p, unit, quantity));
+    void recordCartForensics('item_added', {
+      item: { product_id: p.id, description: p.name, sku: p.sku, quantity, unit: unit.name, unit_price: riyalToMinor(unit.price) },
+      before: { item: before ? auditLine(before) : null }, after: { item: { product_id: p.id, quantity: (before?.qty ?? 0) + quantity, unit: unit.name } },
+    });
     return lineKey;
   }
 
   const setUnit = (key: string, unitName: string) => {
+    const before = cart.find((line) => line.key === key);
     setCart((current) => {
       const line = current.find((item) => item.key === key);
       if (!line || line.productId === null) return current;
@@ -439,17 +477,30 @@ export default function PosPage() {
         ? { ...item, key: `${line.productId}:${unit.name}`, unit: unit.name, price: unit.price }
         : item);
     });
+    if (before) void recordCartForensics('item_quantity_changed', { before: { item: auditLine(before) }, after: { item: { ...auditLine(before), unit: unitName } } });
   };
-  const setQty = (k: string, d: number) => setCart((c) => c.map((l) => (l.key === k ? { ...l, qty: Math.max(1, l.qty + d) } : l)));
+  const setQty = (k: string, d: number) => {
+    const before = cart.find((line) => line.key === k);
+    if (!before) return;
+    const after = { ...before, qty: Math.max(1, before.qty + d) };
+    setCart((c) => c.map((line) => line.key === k ? after : line));
+    if (after.qty !== before.qty) void recordCartForensics('item_quantity_changed', { before: { item: auditLine(before) }, after: { item: auditLine(after) } });
+  };
   const setQtyFromInput = (k: string, value: string) => {
     if (!/^\d+$/.test(value)) return;
     const quantity = Number(value);
     if (!Number.isSafeInteger(quantity) || quantity < 1) return;
-    setCart((current) => current.map((line) => (line.key === k ? { ...line, qty: quantity } : line)));
+    const before = cart.find((line) => line.key === k);
+    if (!before || before.qty === quantity) return;
+    const after = { ...before, qty: quantity };
+    setCart((current) => current.map((line) => line.key === k ? after : line));
+    void recordCartForensics('item_quantity_changed', { before: { item: auditLine(before) }, after: { item: auditLine(after) } });
   };
   const setDiscount = (k: string, v: string) => {
     if (!posCfg.allow_discount) return;
+    const before = cart.find((line) => line.key === k);
     setCart((c) => c.map((l) => (l.key === k ? { ...l, discount: v } : l)));
+    if (before && before.discount !== v) void recordCartForensics('discount_changed', { reason_code: 'wrong_price', item: auditLine(before), before: { item: auditLine(before) }, after: { item: { ...auditLine(before), discount: riyalToMinor(v) } } });
   };
   const setUnitPrice = (k: string, v: string) => {
     if (!posCfg.allow_unit_price_override) return;
@@ -457,7 +508,9 @@ export default function PosPage() {
       const { [k]: _cleared, ...rest } = current;
       return rest;
     });
+    const before = cart.find((line) => line.key === k);
     setCart((c) => c.map((l) => (l.key === k ? { ...l, price: v } : l)));
+    if (before && before.price !== v) void recordCartForensics('price_overridden', { reason_code: 'wrong_price', item: auditLine(before), before: { item: auditLine(before) }, after: { item: { ...auditLine(before), unit_price: riyalToMinor(v) } } });
   };
   const normalizeUnitPrice = (k: string, value?: string) => {
     const line = cart.find((current) => current.key === k);
@@ -481,7 +534,10 @@ export default function PosPage() {
     const fallback = product ? pricedUnit(product, line.unit)?.price ?? '0.00' : '0.00';
     setCart((current) => current.map((item) => (item.key === k ? { ...item, price: fallback } : item)));
   };
-  const remove = (k: string) => setCart((c) => c.filter((l) => l.key !== k));
+  const remove = (k: string) => {
+    const line = cart.find((entry) => entry.key === k);
+    if (line) setSensitiveAction({ type: 'item_removed', line, cartId: activeCart.id });
+  };
 
   // عدد المسودات قراءة تشغيلية فقط؛ فتح الحوار يعيد تحميل القائمة الكاملة من الخادم.
   const refreshHeldCount = useCallback(async () => {
@@ -571,10 +627,13 @@ export default function PosPage() {
     }
     setHoldBusy(true);
     try {
+      const auditCartId = await ensureAuditCart(activeCart);
+      if (!auditCartId) throw new Error(t('open_to_start'));
       await api('/pos/held-sales', {
         method: 'POST',
         body: {
           pos_session_id: session.id,
+          cart_id: auditCartId,
           customer_id: selectedCustomer?.id ?? null,
           tax_inclusive: taxInclusive,
           items: cart.map((line) => ({
@@ -602,6 +661,7 @@ export default function PosPage() {
   function retrieveSale(held: PosHeldSale) {
     const nextNumber = Math.max(0, ...carts.map((cartState) => cartState.number)) + 1;
     const restored = createPosActiveCart(nextNumber, held.tax_inclusive);
+    restored.auditCartId = held.cart_id ?? null;
     restored.items = held.items.map((item, index) => ({
       key: `${restored.id}:${held.id}-${index}`,
       productId: item.product_id,
@@ -825,7 +885,10 @@ export default function PosPage() {
       paymentRequestRef.current = true;
       setPaying(true);
       setError(null);
+      let auditCartId: string | null = null;
       try {
+        auditCartId = await ensureAuditCart(activeCart);
+        if (!auditCartId) throw new Error(t('open_to_start'));
         const result = await runPosCheckout({
           submitCheckout: async () => {
             const items = cart.map((l) => ({
@@ -840,7 +903,7 @@ export default function PosPage() {
             // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
             return api<PosCheckoutResponse>('/pos/checkout', {
               method: 'POST',
-              body: { partner_id: customer.id, pos_session_id: session.id, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, notes: activeCart.note.trim() || null, items, tenders },
+              body: { partner_id: customer.id, pos_session_id: session.id, cart_id: auditCartId, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, notes: activeCart.note.trim() || null, items, tenders },
             });
           },
           // لحظة النجاح المالي هي استجابة checkout؛ نغلق السلة ونغادر شاشة الدفع
@@ -868,7 +931,10 @@ export default function PosPage() {
           },
           fetchQr: (created) => api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`),
           onPaymentError: (error) => {
-            setError(error instanceof ApiError ? error.message : tc('saveFailed'));
+            // فشل الدفع يسجله PosService من مسار checkout نفسه بمصدر server؛
+            // الواجهة تعرض النتيجة فقط ولا تنشئ دليلاً نهائياً قابلاً للتزوير.
+            const reason = error instanceof ApiError ? error.message : tc('saveFailed');
+            setError(reason);
             playPosFeedback('payment_error');
           },
           onQrUnavailable: () => {
@@ -924,7 +990,7 @@ export default function PosPage() {
         setPaying(false);
       }
     },
-    [activeCart, cart, catalogLoading, closeCart, success, t, tc, toast, selectedCustomer, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback],
+    [activeCart, cart, catalogLoading, closeCart, success, t, tc, toast, selectedCustomer, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback, ensureAuditCart, totalMinor],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -1066,22 +1132,74 @@ export default function PosPage() {
     const target = carts.find((cartState) => cartState.id === cartId);
     if (!target) return;
     if (cartHasUnsavedData(target)) {
-      setCartToClose(cartId);
+      setSensitiveAction({ type: 'cart_cancelled', cartId });
       return;
     }
     closeCart(cartId);
   }
 
   function confirmCloseCart() {
-    if (cartToClose) closeCart(cartToClose);
+    if (cartToClose) requestCloseCart(cartToClose);
     setCartToClose(null);
   }
 
   function confirmClearActiveCart() {
-    setCart([]);
-    patchActive({ customer: null, note: '', taxInclusive: systemTaxInclusive });
-    setPriceErrors({});
     setClearCartOpen(false);
+    if (cart.length > 0) setSensitiveAction({ type: 'cart_cancelled', cartId: activeCart.id });
+  }
+
+  function requestPaymentCancel() {
+    if (cart.length === 0) { setStep('sale'); return; }
+    setSensitiveAction({ type: 'payment_cancelled', cartId: activeCart.id });
+  }
+
+  const auditLine = (line: PosCartLine) => ({
+    product_id: line.productId, description: line.description, sku: line.sku,
+    quantity: line.qty, unit: line.unit, unit_price: riyalToMinor(line.price),
+    tax_rate: line.tax, discount: riyalToMinor(line.discount),
+  });
+
+  async function confirmSensitiveAction(reason: { code: string; note: string }) {
+    const action = sensitiveAction;
+    const target = action ? carts.find((cartState) => cartState.id === action.cartId) : null;
+    if (!action || !target) { setSensitiveAction(null); return; }
+    setSensitiveBusy(true);
+    try {
+      if (action.type === 'item_removed' && action.line) {
+        const before = auditLine(action.line);
+        await recordCartForensics('item_removed', {
+          reason_code: reason.code, reason_note: reason.note, item: before,
+          before: { item: before }, after: { items: target.items.filter((line) => line.key !== action.line?.key).map(auditLine) },
+        }, target);
+        updateCarts((current) => current.map((cartState) => cartState.id === target.id
+          ? { ...cartState, items: cartState.items.filter((line) => line.key !== action.line?.key) }
+          : cartState));
+      } else if (action.type === 'payment_cancelled') {
+        await recordCartForensics('payment_cancelled', {
+          reason_code: reason.code, reason_note: reason.note,
+          before: { items: target.items.map(auditLine), customer: target.customer }, after: { status: 'cancelled' },
+        }, target);
+        setStep('sale');
+      } else {
+        await recordCartForensics('cart_cancelled', {
+          reason_code: reason.code, reason_note: reason.note,
+          before: { items: target.items.map(auditLine), customer: target.customer, note: target.note },
+          after: { status: 'cancelled' },
+        }, target);
+        if (target.id === activeCart.id) {
+          updateCarts((current) => current.map((cartState) => cartState.id === target.id
+            ? { ...cartState, items: [], customer: null, note: '', taxInclusive: systemTaxInclusive }
+            : cartState));
+          setPriceErrors({});
+        } else {
+          closeCart(target.id);
+        }
+      }
+      success(t('reasonSaved'));
+      setSensitiveAction(null);
+    } catch (err) {
+      errorToast(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally { setSensitiveBusy(false); }
   }
 
   const cartPanel = (
@@ -1309,7 +1427,7 @@ export default function PosPage() {
           paymentMethodsLoadError={paymentMethodsError}
           paying={paying}
           error={error}
-          onBack={() => setStep('sale')}
+          onBack={requestPaymentCancel}
           onConfirm={confirmPayment}
         />
       ) : (
@@ -1402,6 +1520,14 @@ export default function PosPage() {
           <Button type="button" variant="outline" className="w-full" onClick={() => { createCart(); setOpenCartsOpen(false); setMobileTab('cart'); }}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('new_cart')}</Button>
         </div>
       </Dialog>
+
+      <PosAuditReasonDialog
+        open={sensitiveAction !== null}
+        title={sensitiveAction?.type === 'item_removed' ? t('remove') : sensitiveAction?.type === 'payment_cancelled' ? t('payment') : t('clear_cart')}
+        busy={sensitiveBusy}
+        onClose={() => setSensitiveAction(null)}
+        onConfirm={confirmSensitiveAction}
+      />
 
       <Dialog open={cartToClose !== null} onClose={() => setCartToClose(null)} title={t('close_cart_confirm')}>
         <p className="text-sm leading-relaxed text-muted">{t('close_cart_description')}</p>

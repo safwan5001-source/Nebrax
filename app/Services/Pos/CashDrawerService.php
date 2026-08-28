@@ -11,6 +11,7 @@ use App\Services\Pos\Hardware\CashDrawerAdapter;
 use App\Services\Pos\Hardware\LocalBridgeCashDrawerAdapter;
 use App\Services\Pos\Hardware\UnavailableCashDrawerAdapter;
 use App\Support\PosSettings;
+use App\Services\Pos\PosAuditService;
 use App\Tenancy\BranchContext;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -25,7 +26,10 @@ final class CashDrawerService
 {
     private const ACTION_TTL_SECONDS = 60;
 
-    public function __construct(private readonly ?CashDrawerAdapter $overrideAdapter = null) {}
+    public function __construct(
+        private readonly ?CashDrawerAdapter $overrideAdapter = null,
+        private readonly ?PosAuditService $auditTrail = null,
+    ) {}
 
     /** @return array<string, mixed> */
     public function openManually(PosSession $session, User $actor, ?string $reason = null): array
@@ -188,21 +192,15 @@ final class CashDrawerService
     /** @param array<string, mixed> $result */
     private function audit(PosSession $session, ?User $actor, string $mode, ?Invoice $invoice, ?string $reason, array $result, ?string $invoiceId = null): void
     {
-        PosSessionEvent::create([
-            'branch_id' => $session->branch_id,
-            'pos_session_id' => $session->id,
-            'type' => PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT,
-            'actor_id' => $actor?->id,
-            'payload' => [
-                'mode' => $mode,
-                'pos_device_id' => $session->pos_device_id,
-                'shift_id' => $session->shift_id,
-                'invoice_id' => $invoice?->id ?? $invoiceId,
-                'reason' => $reason,
-                'status' => $result['status'] ?? 'failed',
-                'error_code' => $result['error_code'] ?? null,
-            ],
-            'created_at' => now(),
+        ($this->auditTrail ?? app(PosAuditService::class))->auditEventForExistingOperation($session, PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT, $actor, [
+            'correlation_id' => $invoice?->id ?? $invoiceId,
+            'mode' => $mode,
+            'pos_device_id' => $session->pos_device_id,
+            'shift_id' => $session->shift_id,
+            'invoice_id' => $invoice?->id ?? $invoiceId,
+            'reason_note' => $reason,
+            'status' => $result['status'] ?? 'failed',
+            'error_code' => $result['error_code'] ?? null,
         ]);
     }
 

@@ -18,6 +18,7 @@ use App\Models\Shift;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\PosSettings;
+use App\Services\Pos\PosAuditService;
 use App\Tenancy\BranchContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -33,14 +34,13 @@ use RuntimeException;
 class PosSessionService
 {
     // فرق صندوق نقاط البيع (عجز/فائض) يُرحّل على حساب الفروق والتسويات العام
-    // القائم (5170) — الحساب ثنائي الاتجاه نفسه الذي تستعمله الفاتورة لفروق
-    // التسوية: العجز يُدينه (خسارة) والفائض يُدَيِّنه دائناً (يخفّض صافي المصروف).
-    // نعيد استخدام نمط حساب الفروق القائم بدل إنشاء حساب موازٍ.
+    // القائم (5170) عبر LedgerService، لا عبر كتابة مباشرة لقيود أو حساب موازٍ.
     private const ACC_CASH_VARIANCE = '5170';
 
     public function __construct(
         protected LedgerService $ledger,
         protected CashBankAccountService $cashBankAccounts,
+        private readonly PosAuditService $audit,
     ) {}
 
     public function open(
@@ -184,33 +184,68 @@ class PosSessionService
             $cash = $this->cashMovement($session);
             $expected = $session->opening_balance + $cash['net'];
             if (PosSettings::heldSaleClosePolicy() === PosSettings::HELD_SALE_DISCARD_ON_SESSION_CLOSE) {
-                // سلال التشغيل لا تملك قيداً أو مخزوناً لعكسه؛ تنتقل فقط إلى
-                // حالة منتهية كي لا تُستأنف في وردية أو درج مختلفين بالخطأ.
+                // سلال التشغيل لا تملك قيداً أو مخزوناً لعكسه، لكن لا يجوز أن
+                // يختفي أثر إتلافها مع الإغلاق؛ يسجّل حدث مستقل لكل سلة.
+                $actor = $userId ? User::find($userId) : null;
                 PosHeldSale::where('pos_session_id', $session->id)
                     ->where('status', PosHeldSale::STATUS_HELD)
-                    ->update([
-                        'status' => PosHeldSale::STATUS_DISCARDED,
-                        'discarded_at' => now(),
-                    ]);
+                    ->lockForUpdate()
+                    ->get()
+                    ->each(function (PosHeldSale $held) use ($session, $actor): void {
+                        $cartId = $held->cart_id;
+                        if (! is_string($cartId) || $cartId === '') {
+                            $cartId = $actor ? $this->audit->createCart($session, $actor)->cart_id : null;
+                        }
+                        $held->update([
+                            'cart_id' => $cartId,
+                            'status' => PosHeldSale::STATUS_DISCARDED,
+                            'discarded_at' => now(),
+                        ]);
+                        if ($cartId !== null) {
+                            $this->audit->auditEventForExistingOperation($session, PosSessionEvent::TYPE_CART_DISCARDED, $actor, [
+                                'cart_id' => $cartId,
+                                'held_sale_id' => $held->id,
+                                'items' => $held->payload['items'] ?? [],
+                                'status' => 'discarded_on_session_close',
+                            ]);
+                        }
+                    });
             }
             $difference = $countedBalance - $expected;
             $requiresAcknowledgement = $difference !== 0;
+            $closedAt = now();
+
+            $this->audit->auditEventForExistingOperation($session, PosSessionEvent::TYPE_CLOSING_COUNT_SUBMITTED, $userId ? User::find($userId) : null, [
+                'counted_balance' => $countedBalance,
+                'amount' => $countedBalance,
+                'status' => PosSettings::blindCashCountEnabled() ? 'blind_locked' : 'submitted',
+            ]);
 
             $session->update([
                 'status'                           => 'closed',
                 'closing_balance'                  => $countedBalance,
+                'counted_balance_locked_at'         => $closedAt,
+                'closing_count_revealed_at'         => $closedAt,
                 'expected_balance'                 => $expected,
                 'difference'                       => $difference,
                 'difference_status'                => $requiresAcknowledgement ? 'pending' : 'not_required',
                 'difference_acknowledged_by'       => null,
                 'difference_acknowledged_at'       => null,
                 'difference_acknowledgement_note'  => null,
-                'closed_at'                        => now(),
+                'closed_at'                        => $closedAt,
                 'closed_by'                        => $userId,
             ]);
 
+            $actor = $userId ? User::find($userId) : null;
+            $this->audit->auditEventForExistingOperation($session, PosSessionEvent::TYPE_CLOSING_COUNT_REVEALED, $actor, [
+                'counted_balance' => $countedBalance,
+                'expected_balance' => $expected,
+                'difference' => $difference,
+                'amount' => $difference,
+                'status' => PosSettings::blindCashCountEnabled() ? 'revealed_after_lock' : 'calculated',
+            ]);
+
             if ($requiresAcknowledgement) {
-                $actor = $userId ? User::find($userId) : null;
                 $this->recordEvent($session, PosSessionEvent::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT, $actor, [
                     'counted_balance' => $countedBalance,
                     'expected_balance' => $expected,
@@ -256,6 +291,68 @@ class PosSessionService
                 'difference' => (int) $session->difference,
                 'note' => $note,
             ]);
+
+            return $session->fresh();
+        });
+    }
+
+    /**
+     * إعادة العد لا تعدل الإدخال الأصلي بصمت: تحتاج اعتماداً مستقلاً بعد كشف
+     * الفرق، وتكتب before/after في حدث جديد، ولا تمس قيداً أو حركة مخزون.
+     */
+    public function recount(PosSession $session, int $countedBalance, User $actor, string $approvalId): PosSession
+    {
+        if ($countedBalance < 0) {
+            throw new RuntimeException('الرصيد المعاد عده لا يكون سالباً.');
+        }
+
+        return DB::transaction(function () use ($session, $countedBalance, $actor, $approvalId) {
+            $session = PosSession::lockForUpdate()->findOrFail($session->id);
+            if ($session->status !== 'closed' || $session->counted_balance_locked_at === null || $session->closing_count_revealed_at === null) {
+                throw new RuntimeException('إعادة العد متاحة فقط بعد تثبيت العد وكشف نتيجة الإغلاق.');
+            }
+            if ($session->variance_journal_entry_id !== null) {
+                throw new RuntimeException('لا يمكن إعادة عد فرق سُوِّي محاسبياً؛ أنشئ تسوية تصحيحية معتمدة بدلاً من تغيير أساس القيد.');
+            }
+            $approvedBy = $this->audit->consumeApprovedOperation($session, $actor, 'cash_recount', $approvalId);
+            $expected = $this->report($session)['expected'];
+            $previous = [
+                'counted_balance' => (int) $session->closing_balance,
+                'expected_balance' => (int) $session->expected_balance,
+                'difference' => (int) $session->difference,
+            ];
+            $difference = $countedBalance - $expected;
+            $requiresAcknowledgement = $difference !== 0;
+
+            $session->update([
+                'closing_balance' => $countedBalance,
+                'expected_balance' => $expected,
+                'difference' => $difference,
+                'difference_status' => $requiresAcknowledgement ? 'pending' : 'not_required',
+                'difference_acknowledged_by' => null,
+                'difference_acknowledged_at' => null,
+                'difference_acknowledgement_note' => null,
+                'recounted_by' => $actor->id,
+                'recounted_at' => now(),
+            ]);
+            $this->audit->auditEventForExistingOperation($session, PosSessionEvent::TYPE_CLOSING_COUNT_RECOUNTED, $actor, [
+                'before' => $previous,
+                'after' => ['counted_balance' => $countedBalance, 'expected_balance' => $expected, 'difference' => $difference],
+                'counted_balance' => $countedBalance,
+                'expected_balance' => $expected,
+                'difference' => $difference,
+                'amount' => $difference,
+                'approved_by' => $approvedBy->id,
+                'status' => 'recounted_after_approval',
+            ]);
+            if ($requiresAcknowledgement) {
+                $this->recordEvent($session, PosSessionEvent::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT, $actor, [
+                    'counted_balance' => $countedBalance,
+                    'expected_balance' => $expected,
+                    'difference' => $difference,
+                    'recount_after_approval' => true,
+                ]);
+            }
 
             return $session->fresh();
         });
@@ -519,14 +616,7 @@ class PosSessionService
     /** @param array<string,mixed> $payload */
     private function recordEvent(PosSession $session, string $type, ?User $actor, array $payload): PosSessionEvent
     {
-        return PosSessionEvent::create([
-            'branch_id' => $session->branch_id,
-            'pos_session_id' => $session->id,
-            'type' => $type,
-            'actor_id' => $actor?->id,
-            'payload' => $payload,
-            'created_at' => now(),
-        ]);
+        return $this->audit->auditEventForExistingOperation($session, $type, $actor, $payload);
     }
 
     private function resolveShift(?string $shiftId, ?string $branchId): ?Shift

@@ -56,6 +56,24 @@ class PosSessionController extends ApiController
         return (new PosSessionResource($closed->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
     }
 
+    /** يعيد العد بعد كشف النتيجة فقط، باعتماد منفصل محفوظ في سجل الأدلة. */
+    public function recount(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'closing_balance' => ['required', 'integer', 'min:0'],
+            'approval_id' => ['required', 'uuid'],
+        ]);
+        $session = $this->visibleSession($id, $request);
+        $recounted = $this->domain(fn () => $this->sessions->recount(
+            $session,
+            (int) $data['closing_balance'],
+            $request->user(),
+            $data['approval_id'],
+        ));
+
+        return (new PosSessionResource($recounted->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
+    }
+
     public function cashMovements(Request $request, string $id): JsonResponse
     {
         $session = $this->visibleSession($id, $request);

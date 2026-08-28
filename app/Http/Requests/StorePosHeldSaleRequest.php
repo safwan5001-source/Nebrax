@@ -15,6 +15,7 @@ class StorePosHeldSaleRequest extends FormRequest
     {
         return [
             'pos_session_id' => ['required', 'uuid'],
+            'cart_id' => ['nullable', 'uuid'],
             'customer_id' => ['nullable', 'uuid'],
             'tax_inclusive' => ['nullable', 'boolean'],
             'items' => ['required', 'array', 'min:1', 'max:500'],

@@ -72,6 +72,7 @@ use App\Http\Controllers\Api\PriceListController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\PosAuditController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\PosDeviceController;
 use App\Http\Controllers\Api\PosSessionController;
@@ -512,6 +513,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('pos-devices/{id}/cash-drawer/test/unavailable', [PosDeviceController::class, 'drawerBridgeUnavailable'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
         Route::delete('pos-devices/{id}', [PosDeviceController::class, 'destroy'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::get('pos/products', [PosController::class, 'products'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        // الأدلة التشغيلية للسلة تُسجل في PosSessionEvent القائم ولا تنشئ مستنداً أو قيداً.
+        Route::post('pos/carts', [PosAuditController::class, 'createCart'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/carts/{cartId}/events', [PosAuditController::class, 'recordCartEvent'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/approval-requests', [PosAuditController::class, 'requestApproval'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos/recent-invoices', [PosController::class, 'recentInvoices'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos/held-sales', [PosController::class, 'heldSales'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
@@ -530,6 +535,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('pos-sessions/{id}/events', [PosSessionController::class, 'events'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::post('pos-sessions/open', [PosSessionController::class, 'open'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos-sessions/{id}/recount', [PosSessionController::class, 'recount'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-movements', [PosSessionController::class, 'recordCashMovement'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-drawer/open', [PosSessionController::class, 'openCashDrawer'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
         // الإكمال لا يفتح شيئاً بذاته: يقبل فقط action قصير العمر موقّعاً أنشأه
@@ -538,6 +544,19 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('pos-sessions/{id}/cash-drawer/unavailable', [PosSessionController::class, 'cashDrawerBridgeUnavailable'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/acknowledge-difference', [PosSessionController::class, 'acknowledgeDifference'])->middleware([$perm('pos.variance.approve'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/settle-variance', [PosSessionController::class, 'settleVariance'])->middleware([$perm('pos.variance.approve'), $app('sales.pos')]);
+
+        // Workspace موحد للرقابة والتدقيق؛ القراءة مؤمنة خادمياً ولا تعتمد على إخفاء الواجهة.
+        Route::get('pos/audit/overview', [PosAuditController::class, 'overview'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/events', [PosAuditController::class, 'index'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/events/export', [PosAuditController::class, 'export'])->middleware([$perm('pos.audit.export'), $app('sales.pos')]);
+        Route::get('pos/audit/carts', [PosAuditController::class, 'carts'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/carts/{cartId}', [PosAuditController::class, 'cart'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/users', [PosAuditController::class, 'users'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/approvals', [PosAuditController::class, 'approvals'])->middleware([$perm('pos.audit.review'), $app('sales.pos')]);
+        Route::post('pos/audit/approvals/{id}/approve', [PosAuditController::class, 'approve'])->middleware([$perm('pos.override.approve'), $app('sales.pos')]);
+        Route::get('pos/reason-codes', [PosAuditController::class, 'reasonCodes'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/reason-codes', [PosAuditController::class, 'storeReasonCode'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
+        Route::put('pos/reason-codes/{id}', [PosAuditController::class, 'updateReasonCode'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
 
         // إعدادات المالية: سياسة السماح أو المنع للتحويل عند الرصيد غير الكافي.
         Route::get('settings/finance', [FinanceSettingsController::class, 'show'])->middleware($perm('payments.view'));

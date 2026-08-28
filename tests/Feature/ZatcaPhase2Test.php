@@ -66,6 +66,39 @@ class ZatcaPhase2Test extends TestCase
         $this->assertStringContainsString($invoice->number, $invoice->zatca_xml);
         $this->assertStringContainsString($invoice->zatca_uuid, $invoice->zatca_xml);
         $this->assertStringContainsString('300000000000003', $invoice->zatca_xml); // الرقم الضريبي
+        $this->assertStringContainsString(
+            '<cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>',
+            $invoice->zatca_xml
+        );
+        $this->assertStringContainsString(
+            '<cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>',
+            $invoice->zatca_xml
+        );
+        $this->assertStringContainsString('<cbc:ID>QR</cbc:ID>', $invoice->zatca_xml);
+        $this->assertStringContainsString($invoice->zatca_qr, $invoice->zatca_xml);
+        $this->assertStringNotContainsString('__NEBRAX_ZATCA_QR__', $invoice->zatca_xml);
+    }
+
+    /** @test */
+    public function qr_marker_text_in_business_data_does_not_block_posting(): void
+    {
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [[
+                'description' => '__NEBRAX_ZATCA_QR__',
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'tax_rate' => 15,
+            ]]
+        );
+
+        $posted = app(InvoiceService::class)->post($invoice);
+
+        $this->assertStringContainsString(
+            '<cbc:Name>__NEBRAX_ZATCA_QR__</cbc:Name>',
+            $posted->zatca_xml
+        );
+        $this->assertStringContainsString($posted->zatca_qr, $posted->zatca_xml);
     }
 
     /** @test */

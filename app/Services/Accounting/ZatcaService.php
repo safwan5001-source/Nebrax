@@ -72,11 +72,38 @@ class ZatcaService
         $icv  = ($last->zatca_icv ?? 0) + 1;
         $prev = $this->previousInvoiceHash($last);
 
-        $xml  = $this->buildXml($invoice, $tenant, $uuid, $icv, $prev);
-        $hash = $this->invoiceHasher->hash($xml);
+        // يُبنى مرجع QR داخل XML أولاً، لكن بقيمة مؤقتة. تحويل ZATCA
+        // يستبعد عقدة QR ومرجع التوقيع، لذلك يبقى Hash هو نفسه بعد تثبيت
+        // قيمة QR الفعلية في المستند المجمّد.
+        $unsignedXml = $this->buildXml($invoice, $tenant, $uuid, $icv, $prev);
+        $hash = $this->invoiceHasher->hash($unsignedXml);
         $qr   = $this->qrFor($invoice, $tenant);
+        $xml  = $this->attachQr($unsignedXml, $qr);
 
         return compact('uuid', 'icv', 'prev', 'xml', 'hash', 'qr');
+    }
+
+    /**
+     * يثبّت QR داخل موضعه النظامي من دون إعادة تسلسل بقية XML.
+     *
+     * إعادة تسلسل المستند كاملاً قد تغيّر البايتات الداخلة في C14N خارج
+     * العقدة المستبعدة؛ لذلك يُستبدل موضع وحيد معلوم ثم يُعاد التحقق من
+     * الهاش على XML النهائي في الاختبارات.
+     */
+    private function attachQr(string $xml, string $qr): string
+    {
+        $marker = '<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">'
+            . '__NEBRAX_ZATCA_QR__'
+            . '</cbc:EmbeddedDocumentBinaryObject>';
+        if (substr_count($xml, $marker) !== 1) {
+            throw new RuntimeException('تعذر تثبيت QR داخل XML الخاص بـ ZATCA.');
+        }
+
+        $qrNode = '<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">'
+            . htmlspecialchars($qr, ENT_XML1 | ENT_QUOTES, 'UTF-8')
+            . '</cbc:EmbeddedDocumentBinaryObject>';
+
+        return str_replace($marker, $qrNode, $xml);
     }
 
     /**
@@ -205,8 +232,14 @@ LINE;
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+         xmlns:sig="urn:oasis:names:specification:ubl:schema:xsd:CommonSignatureComponents-2"
+         xmlns:sac="urn:oasis:names:specification:ubl:schema:xsd:SignatureAggregateComponents-2"
+         xmlns:sbc="urn:oasis:names:specification:ubl:schema:xsd:SignatureBasicComponents-2"
+         xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+         xmlns:xades="http://uri.etsi.org/01903/v1.3.2#">
   <cbc:ProfileID>reporting:1.0</cbc:ProfileID>
   <cbc:ID>{$e($invoice->number)}</cbc:ID>
   <cbc:UUID>{$e($uuid)}</cbc:UUID>
@@ -224,6 +257,16 @@ LINE;
       <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">{$e($prev)}</cbc:EmbeddedDocumentBinaryObject>
     </cac:Attachment>
   </cac:AdditionalDocumentReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>QR</cbc:ID>
+    <cac:Attachment>
+      <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">__NEBRAX_ZATCA_QR__</cbc:EmbeddedDocumentBinaryObject>
+    </cac:Attachment>
+  </cac:AdditionalDocumentReference>
+  <cac:Signature>
+    <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
+    <cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>
+  </cac:Signature>
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cac:PartyTaxScheme><cbc:CompanyID>{$e($tenant?->vat_number ?? '')}</cbc:CompanyID></cac:PartyTaxScheme>

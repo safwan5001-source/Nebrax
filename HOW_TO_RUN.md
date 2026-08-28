@@ -53,6 +53,7 @@ mkdir -p app/Services/Accounting app/Tenancy
 cp -r ../nibras-erp/app/Services/Accounting/*   app/Services/Accounting/
 cp -r ../nibras-erp/app/Tenancy/*               app/Tenancy/
 cp -r ../nibras-erp/app/Http/Middleware/*       app/Http/Middleware/
+cp ../nibras-erp/config/zatca.php                config/zatca.php
 cp -r ../nibras-erp/database/migrations/*       database/migrations/
 cp -r ../nibras-erp/tests/Feature/*             tests/Feature/
 
@@ -70,6 +71,22 @@ php artisan test --filter=LedgerTest
 # 6. شغّل الخادم
 php artisan serve   # → http://127.0.0.1:8000
 ```
+
+---
+
+## حزم ثقة ZATCA
+
+قبل حفظ بيانات CSID، اضبط مسار حزمة CA الرسمية الخاصة بكل بيئة. يجب أن
+يكون الملف PEM مقروءاً من عملية PHP، ويبقى خارج المستودع:
+
+```dotenv
+ZATCA_DEVELOPER_CA_BUNDLE=/run/secrets/zatca/developer-ca.pem
+ZATCA_SIMULATION_CA_BUNDLE=/run/secrets/zatca/simulation-ca.pem
+ZATCA_PRODUCTION_CA_BUNDLE=/run/secrets/zatca/production-ca.pem
+```
+
+يرفض النظام الشهادة إذا غابت حزمة البيئة، أو لم تتسلسل شهادة CSID إلى
+مرجع الثقة المهيأ. لا تستخدم شهادات اختبار أو شهادات ذاتية في الإنتاج.
 
 ---
 
