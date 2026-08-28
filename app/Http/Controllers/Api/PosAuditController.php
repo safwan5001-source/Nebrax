@@ -77,29 +77,65 @@ class PosAuditController extends ApiController
 
     public function carts(Request $request): JsonResponse
     {
+        // ═══ تصحيح انحدار Phase 1 (بند 11 من مهمة Phase 2) ═══
+        // كان هذا المسار يحمّل **كل** الأحداث المرئية في الذاكرة ثم يجمّع ويقسّم،
+        // ويحسب `total` بعد `take()` — فيعيد عدداً خاطئاً ولا يتوسّع مع نمو السجل.
+        // الآن: التجميع والترقيم والعدّ خادمي (قاعدة البيانات)، والصف اللاحق يجلب
+        // آخر حدث لسلال الصفحة وحدها (محدود بحجم الصفحة).
         $filters = $this->filters($request);
-        $events = $this->visibleEvents($request)
-            ->whereNotNull('cart_id')
-            ->orderByDesc('created_at')
-            ->get(['id', 'cart_id', 'pos_session_id', 'branch_id', 'type', 'reason_code', 'created_at']);
         $perPage = min(max((int) ($filters['per_page'] ?? 50), 1), 200);
-        $carts = $events->groupBy('cart_id')->map(function ($events, string $cartId): array {
-            $first = $events->last();
-            $latest = $events->first();
+        $page = max((int) ($request->integer('page') ?: 1), 1);
+
+        // مصدر واحد للفلاتر: البسط، والعدّ، وآخر حدث — كلها من نفس المجموعة
+        // المفلترة، فلا يُقرن last_event_* بحدثٍ خارج المدى/الجلسة المطلوبة.
+        $filtered = function () use ($request, $filters) {
+            $query = $this->visibleEvents($request)->whereNotNull('cart_id');
+            if (! empty($filters['from'])) $query->where('created_at', '>=', $filters['from']);
+            if (! empty($filters['to'])) $query->where('created_at', '<=', $filters['to']);
+            if (! empty($filters['pos_session_id'])) $query->where('pos_session_id', $filters['pos_session_id']);
+
+            return $query;
+        };
+
+        $total = $filtered()->distinct()->count('cart_id');
+        $aggregates = $filtered()
+            ->selectRaw('cart_id, MIN(created_at) as created_at, MAX(created_at) as last_event_at, COUNT(*) as event_count')
+            ->groupBy('cart_id')
+            ->orderByDesc('last_event_at')
+            ->forPage($page, $perPage)
+            ->get();
+
+        $cartIds = $aggregates->pluck('cart_id')->all();
+        $latest = collect();
+        if ($cartIds !== []) {
+            // آخر حدث **ضمن نفس الفلاتر** التي أنتجت العدّ وlast_event_at.
+            $latest = $filtered()
+                ->whereIn('cart_id', $cartIds)
+                ->orderBy('cart_id')->orderByDesc('created_at')->orderByDesc('id')
+                ->get(['id', 'cart_id', 'pos_session_id', 'branch_id', 'type', 'reason_code', 'created_at'])
+                ->groupBy('cart_id')
+                ->map(fn ($events) => $events->first());
+        }
+
+        $carts = $aggregates->map(function ($aggregate) use ($latest): array {
+            $last = $latest->get($aggregate->cart_id);
 
             return [
-                'cart_id' => $cartId,
-                'pos_session_id' => $latest->pos_session_id,
-                'branch_id' => $latest->branch_id,
-                'created_at' => $first->created_at?->toIso8601String(),
-                'last_event_at' => $latest->created_at?->toIso8601String(),
-                'last_event_type' => $latest->type,
-                'event_count' => $events->count(),
-                'reason_code' => $latest->reason_code,
+                'cart_id' => $aggregate->cart_id,
+                'pos_session_id' => $last?->pos_session_id,
+                'branch_id' => $last?->branch_id,
+                'created_at' => optional($aggregate->created_at instanceof \DateTimeInterface ? $aggregate->created_at : \Illuminate\Support\Carbon::parse($aggregate->created_at))->toIso8601String(),
+                'last_event_at' => optional($aggregate->last_event_at instanceof \DateTimeInterface ? $aggregate->last_event_at : \Illuminate\Support\Carbon::parse($aggregate->last_event_at))->toIso8601String(),
+                'last_event_type' => $last?->type,
+                'event_count' => (int) $aggregate->event_count,
+                'reason_code' => $last?->reason_code,
             ];
-        })->values()->take($perPage);
+        })->values();
 
-        return response()->json(['data' => $carts, 'meta' => ['total' => $carts->count(), 'per_page' => $perPage]]);
+        return response()->json(['data' => $carts, 'meta' => [
+            'total' => $total, 'per_page' => $perPage, 'current_page' => $page,
+            'last_page' => max(1, (int) ceil($total / $perPage)),
+        ]]);
     }
 
     public function cart(Request $request, string $cartId): JsonResponse
