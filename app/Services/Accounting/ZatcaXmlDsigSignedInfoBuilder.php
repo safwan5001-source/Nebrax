@@ -30,6 +30,9 @@ final class ZatcaXmlDsigSignedInfoBuilder
         $this->assertSha256Digest($signedPropertiesDigest, 'بصمة SignedProperties');
         $this->assertXmlId($invoiceReferenceId, 'معرّف مرجع الفاتورة');
         $this->assertXmlId($signedPropertiesId, 'معرّف SignedProperties');
+        if (hash_equals($invoiceReferenceId, $signedPropertiesId)) {
+            throw new InvalidArgumentException('معرّفات عناصر توقيع ZATCA يجب أن تكون فريدة.');
+        }
 
         $document = new DOMDocument('1.0', 'UTF-8');
         $document->formatOutput = false;

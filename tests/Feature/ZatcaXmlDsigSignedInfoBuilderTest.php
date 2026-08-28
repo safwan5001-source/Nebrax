@@ -98,6 +98,7 @@ class ZatcaXmlDsigSignedInfoBuilderTest extends TestCase
             [$digest, base64_encode(str_repeat('x', 33)), 'invoice', 'properties'],
             [$digest, $digest, '1 invoice', 'properties'],
             [$digest, $digest, 'invoice', '1 properties'],
+            [$digest, $digest, 'same-id', 'same-id'],
         ];
 
         foreach ($invalid as [$invoiceDigest, $propertiesDigest, $invoiceId, $propertiesId]) {
