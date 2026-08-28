@@ -6,6 +6,7 @@ use App\Models\ZatcaCredential;
 use App\Services\Accounting\ZatcaSigningReadiness;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ZatcaSigningReadinessTest extends TestCase
@@ -63,5 +64,40 @@ class ZatcaSigningReadinessTest extends TestCase
 
         $this->assertStringNotContainsString('server-only-private-key', $response->getContent());
         $this->assertStringNotContainsString('leaf-certificate', $response->getContent());
+    }
+
+    /** @test */
+    public function damaged_encrypted_credentials_are_reported_as_a_stable_blocker(): void
+    {
+        $digest = base64_encode(hash('sha256', 'pinned-policy', true));
+        config()->set('zatca.signature_policy.identifier', 'https://zatca.gov.sa/policy.pdf');
+        config()->set('zatca.signature_policy.digest', $digest);
+        $auth = $this->registerTenant('zatca-damaged-credential', 'zatca-damaged@example.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $credential = ZatcaCredential::create([
+            'environment' => 'developer',
+            'stage' => 'compliance',
+            'status' => 'configured',
+            'credentials' => [
+                'private_key' => 'server-only-private-key',
+                'certificate_chain' => [base64_encode('leaf-certificate')],
+            ],
+            'certificate_fingerprint' => str_repeat('b', 64),
+            'configured_at' => now(),
+            'expires_at' => now()->addDay(),
+        ]);
+
+        DB::table('zatca_credentials')->where('id', $credential->id)->update([
+            'credentials' => 'damaged-ciphertext',
+        ]);
+
+        $this->withToken($auth['token'])->getJson('/api/zatca-settings')
+            ->assertOk()
+            ->assertJsonPath('meta.signing_readiness.ready', false)
+            ->assertJsonPath('meta.signing_readiness.credential_stage', null)
+            ->assertJsonPath('meta.signing_readiness.blockers.0', ZatcaSigningReadiness::CREDENTIAL_UNAVAILABLE)
+            ->assertJsonCount(1, 'meta.signing_readiness.blockers')
+            ->assertJsonMissingPath('meta.signing_readiness.error');
     }
 }
