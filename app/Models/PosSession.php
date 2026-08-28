@@ -20,6 +20,7 @@ class PosSession extends BaseModel
     protected $fillable = [
         'branch_id',
         'tenant_id', 'number', 'status', 'opening_balance', 'closing_balance',
+        'counted_balance_locked_at', 'closing_count_revealed_at', 'recounted_by', 'recounted_at',
         'expected_balance', 'difference', 'opened_at', 'closed_at', 'notes', 'opened_by', 'closed_by',
         'pos_device_id', 'warehouse_id', 'shift_id', 'cash_account_id',
         'difference_status', 'difference_acknowledged_by', 'difference_acknowledged_at', 'difference_acknowledgement_note',
@@ -34,6 +35,9 @@ class PosSession extends BaseModel
         'opened_at'        => 'datetime',
         'closed_at'        => 'datetime',
         'difference_acknowledged_at' => 'datetime',
+        'counted_balance_locked_at' => 'datetime',
+        'closing_count_revealed_at' => 'datetime',
+        'recounted_at' => 'datetime',
     ];
 
     protected $attributes = [
@@ -94,6 +98,12 @@ class PosSession extends BaseModel
     public function differenceAcknowledgedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'difference_acknowledged_by');
+    }
+
+    /** مستخدم إعادة العد؛ يظل مستقلاً عن معتمد الاستثناء. */
+    public function recountedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recounted_by');
     }
 
     /** قيد تسوية فرق الصندوق المثبّت؛ وجوده يعني أن الفرق سُوِّي محاسبياً مرة واحدة. */

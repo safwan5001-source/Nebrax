@@ -17,6 +17,8 @@ export interface PosCartLine {
 
 export interface PosActiveCart {
   id: string;
+  /** هوية الخادم للسجل append-only؛ تبقى مستقلة عن مفتاح الواجهة المحلي. */
+  auditCartId?: string | null;
   number: number;
   items: PosCartLine[];
   customer: PosCustomer | null;
@@ -31,7 +33,7 @@ function id(): string {
 }
 
 export function createPosActiveCart(number: number, taxInclusive: boolean): PosActiveCart {
-  return { id: id(), number, items: [], customer: null, note: '', taxInclusive };
+  return { id: id(), auditCartId: null, number, items: [], customer: null, note: '', taxInclusive };
 }
 
 export function cartHasUnsavedData(cart: PosActiveCart): boolean {

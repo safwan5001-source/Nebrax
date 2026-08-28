@@ -425,6 +425,104 @@ class PosSessionTest extends TestCase
         $this->openSession($b, 2000);
     }
 
+    /** @test */
+    public function blind_count_does_not_expose_or_settle_expected_cash_before_the_count_is_locked(): void
+    {
+        $auth = $this->registerTenant('pos-blind-gate', 'owner@pos-blind-gate.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($auth['token'])->putJson('/api/sales-config/pos', [
+            'data' => ['blind_cash_count_enabled' => true, 'audit_operation_policies' => [
+                'item_remove' => 'allowed', 'price_override' => 'allowed', 'discount_change' => 'allowed', 'cart_cancel' => 'allowed', 'cash_recount' => 'approval_required',
+            ]],
+        ])->assertOk();
+
+        $id = $this->openSession($auth, 50000);
+        $open = PosSession::findOrFail($id);
+        $this->assertNull($open->expected_balance);
+        $this->assertNull($open->counted_balance_locked_at);
+        $this->assertNull($open->closing_count_revealed_at);
+
+        // لا يتيح مسار التسوية إظهار المتوقّع أو إنشاء أثر محاسبي قبل تثبيت العد وإغلاق الجلسة.
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+        $open->refresh();
+        $this->assertNull($open->expected_balance);
+        $this->assertNull($open->variance_journal_entry_id);
+        $this->assertSame(0, PosSessionEvent::where('pos_session_id', $id)
+            ->where('type', PosSessionEvent::TYPE_CLOSING_DIFFERENCE_SETTLED)->count());
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/close", ['closing_balance' => 48000])
+            ->assertOk()
+            ->assertJsonPath('data.expected_balance', '500.00');
+        $closed = PosSession::findOrFail($id);
+        $this->assertNotNull($closed->counted_balance_locked_at);
+        $this->assertNotNull($closed->closing_count_revealed_at);
+    }
+
+    /** @test */
+    public function blind_recount_remains_approval_gated_and_a_settlement_locks_the_recount_basis_once(): void
+    {
+        $owner = $this->registerTenant('pos-blind-recount', 'owner@pos-blind-recount.test');
+        app(TenantContext::class)->set($owner['tenant_id']);
+        $requester = $this->tokenForRole($owner['tenant_id'], 'accountant', 'recount-requester@pos-blind-recount.test');
+        $approver = $this->tokenForRole($owner['tenant_id'], 'admin', 'recount-approver@pos-blind-recount.test');
+        $this->withToken($owner['token'])->putJson('/api/sales-config/pos', [
+            'data' => ['blind_cash_count_enabled' => true, 'audit_operation_policies' => [
+                'item_remove' => 'allowed', 'price_override' => 'allowed', 'discount_change' => 'allowed', 'cart_cancel' => 'allowed', 'cash_recount' => 'approval_required',
+            ]],
+        ])->assertOk();
+
+        $device = $this->device($owner);
+        $id = $this->withToken($requester)->postJson('/api/pos-sessions/open', [
+            'opening_balance' => 50000, 'pos_device_id' => $device['id'],
+        ])->assertCreated()->json('data.id');
+        $this->withToken($requester)->postJson("/api/pos-sessions/{$id}/close", ['closing_balance' => 48000])->assertOk();
+
+        $approval = $this->withToken($requester)->postJson('/api/pos/approval-requests', [
+            'pos_session_id' => $id,
+            'operation' => 'cash_recount',
+            'reason_code' => 'other',
+            'reason_note' => 'تدقيق يدوي ثانٍ لعد النقد.',
+        ])->assertCreated()->json('data');
+        $this->withToken($approver)->postJson("/api/pos/audit/approvals/{$approval['id']}/approve")->assertOk();
+
+        $this->withToken($requester)->postJson("/api/pos-sessions/{$id}/recount", [
+            'closing_balance' => 49000,
+            'approval_id' => $approval['id'],
+        ])->assertOk()
+            ->assertJsonPath('data.closing_balance', '490.00')
+            ->assertJsonPath('data.expected_balance', '500.00')
+            ->assertJsonPath('data.difference', '-10.00')
+            ->assertJsonPath('data.difference_status', 'pending');
+
+        $recounted = PosSession::findOrFail($id);
+        $this->assertSame(49000, (int) $recounted->closing_balance);
+        $this->assertSame(-1000, (int) $recounted->difference);
+        $this->assertNotNull($recounted->recounted_at);
+        $this->assertDatabaseHas('pos_session_events', [
+            'pos_session_id' => $id,
+            'type' => PosSessionEvent::TYPE_CLOSING_COUNT_RECOUNTED,
+        ]);
+
+        $this->withToken($owner['token'])->postJson("/api/pos-sessions/{$id}/acknowledge-difference", [
+            'note' => 'اعتماد فرق العد المعاد قبل التسوية.',
+        ])->assertOk();
+        $this->withToken($owner['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertOk();
+
+        $settled = PosSessionEvent::where('pos_session_id', $id)
+            ->where('type', PosSessionEvent::TYPE_CLOSING_DIFFERENCE_SETTLED)
+            ->sole();
+        $this->assertSame('server', $settled->payload['provenance']['source'] ?? null);
+        $this->assertSame('server_authoritative', $settled->payload['provenance']['trust_level'] ?? null);
+        $this->assertSame(1, JournalEntry::where('source_type', PosSession::class)->where('source_id', $id)->count());
+
+        // القيد المرحّل يجعل أساسه ثابتاً: لا يعاد العد بعد التسوية ولا ينشأ قيد ثانٍ.
+        $this->withToken($requester)->postJson("/api/pos-sessions/{$id}/recount", [
+            'closing_balance' => 50000,
+            'approval_id' => $approval['id'],
+        ])->assertStatus(422);
+        $this->assertSame(1, JournalEntry::where('source_type', PosSession::class)->where('source_id', $id)->count());
+    }
+
     /** يغلق جلسة برصيد معدود ثم يعتمد الفرق؛ يعيد معرّف الجلسة الجاهزة للتسوية. */
     private function closedAcknowledgedSession(array $auth, int $opening, int $counted): string
     {

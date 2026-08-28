@@ -122,6 +122,7 @@ const GROUPS: NavGroup[] = [
       { href: '/pos', icon: Store, key: 'posStart', built: true },
       { href: '/pos/sessions', icon: Clock, key: 'posSessions', built: true },
       { href: '/pos/report', icon: Receipt, key: 'posReport', built: true },
+      { href: '/pos/audit', icon: ClipboardCheck, key: 'posAudit', built: true, permission: 'pos.audit.view' },
       { href: '/pos/settings', icon: SlidersHorizontal, key: 'posSettings', built: true },
     ],
   },

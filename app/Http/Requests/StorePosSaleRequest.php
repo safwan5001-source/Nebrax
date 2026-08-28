@@ -16,6 +16,8 @@ class StorePosSaleRequest extends FormRequest
         $rules = [
             'partner_id'          => ['required', 'uuid'],
             'pos_session_id'      => ['required', 'uuid'],
+            // اختياري للتوافق مع محطات POS/تكاملات قديمة؛ الواجهة الجديدة تنشئه خادمياً.
+            'cart_id'             => ['nullable', 'uuid'],
             // يثبت مخزن الإخراج على الفاتورة الناتجة من عملية نقطة البيع.
             'warehouse_id'        => ['nullable', 'uuid'],
             'tax_inclusive'       => ['nullable', 'boolean'],

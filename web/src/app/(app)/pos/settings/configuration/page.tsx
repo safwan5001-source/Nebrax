@@ -35,6 +35,7 @@ interface PosConfig {
   exchange_surplus_policy: 'customer_credit_only' | 'allow_cash_refund';
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   show_product_images: boolean;
+  blind_cash_count_enabled: boolean;
 }
 
 interface ProductCategory {
@@ -112,6 +113,7 @@ const DEFAULTS: PosConfig = {
   exchange_surplus_policy: 'customer_credit_only',
   held_sale_close_policy: 'discard_on_session_close',
   show_product_images: true,
+  blind_cash_count_enabled: false,
 };
 
 /** إعدادات تشغيل POS: تبقى السياسات ووسائل التحصيل في مصدر إعداد واحد. */
@@ -649,6 +651,13 @@ export default function PosSettingsPage() {
                 </Select>
                 <p className="text-xs leading-relaxed text-muted">{t('exchange_surplus_policy_hint')}</p>
               </div>
+
+              <FieldSpan>
+                <div className="rounded border border-border bg-background p-3">
+                  <div className="flex items-center gap-2"><Switch id="blind_cash_count_enabled" checked={config.blind_cash_count_enabled} onCheckedChange={(checked) => patch('blind_cash_count_enabled', checked)} aria-labelledby="blind-cash-count-label" /><Label id="blind-cash-count-label" htmlFor="blind_cash_count_enabled">{t('blind_cash_count_enabled')}</Label></div>
+                  <p className="mt-1 ps-8 text-xs leading-relaxed text-muted">{t('blind_cash_count_enabled_hint')}</p>
+                </div>
+              </FieldSpan>
 
               <FieldSpan>
                 <div className="space-y-1.5">

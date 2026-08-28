@@ -8,6 +8,7 @@ use App\Models\PriceList;
 use App\Models\Product;
 use App\Support\PosSettings;
 use App\Services\Pos\CashDrawerService;
+use App\Services\Pos\PosAuditService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -31,6 +32,7 @@ class PosService
         protected CashBankAccountService $cashBankAccounts,
         protected PosCustomerPriceListResolver $customerPriceLists,
         protected CashDrawerService $cashDrawer,
+        protected PosAuditService $audit,
     ) {}
 
     /**
@@ -44,7 +46,24 @@ class PosService
         }
 
         $drawerAttempt = null;
-        $invoice = DB::transaction(function () use ($data, &$drawerAttempt) {
+        $paymentIds = [];
+        $cartId = $data['cart_id'] ?? null;
+        $auditSession = null;
+
+        try {
+            // يبدأ هذا الحدث من نفس الخدمة التي تنفذ البيع، لا من واجهة العميل.
+            if (is_string($cartId) && $cartId !== '') {
+                $auditSession = $this->sessions->requireOpenForCheckout(
+                    $data['pos_session_id'],
+                    $data['created_by'] ?? null,
+                    $data['actor'] ?? null,
+                );
+                $this->audit->recordCheckout($auditSession, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_PAYMENT_STARTED, [
+                    'status' => 'checkout_requested',
+                ]);
+            }
+
+            $invoice = DB::transaction(function () use ($data, &$drawerAttempt, &$paymentIds, $cartId) {
             // تُقفل الجلسة وتتحقق قبل إنشاء أي مستند: لا بيع يُلحق بورديّة مغلقة
             // أو بكاشير/فرع آخر، ويظل القفل قائماً حتى اكتمال الفاتورة وسنداتها.
             $session = $this->sessions->requireOpenForCheckout(
@@ -66,6 +85,14 @@ class PosService
             $this->assertPosPaymentMethodsAvailable();
             $tenders = $this->normalizedTenders($data['tenders'] ?? []);
             $methods = $this->configuredPaymentMethods($tenders);
+
+            // بدء الإتمام دليل خادمي من داخل المعاملة الفعلية؛ لا يعتمد على
+            // before/after أو مبلغ مرسل من العميل.
+            if (is_string($cartId) && $cartId !== '') {
+                $this->audit->recordCheckout($session, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_CHECKOUT_STARTED, [
+                    'status' => 'validated_for_checkout',
+                ]);
+            }
 
             // الجلسات الجديدة تلتقط مخزن الجهاز عند الافتتاح؛ لا يقبل البيع أن
             // يستبدله بطلب عميل. تبقى الجلسات التاريخية بلا مخزن على سلوكها السابق.
@@ -110,7 +137,7 @@ class PosService
 
                 // 2) سند قبض بالوسيلة المهيأة: PaymentService يلتقط الحساب
                 // المقابل واسم الوسيلة ثم يرحّل القيد المتوازن عبر LedgerService.
-                $this->payments->post($this->payments->create([
+                $payment = $this->payments->post($this->payments->create([
                     'partner_id'        => $invoice->partner_id,
                     'invoice_id'        => $invoice->id,
                     'pos_session_id'    => $session->id,
@@ -120,6 +147,7 @@ class PosService
                     'notes'             => "{$method->name} — بيع {$invoice->number}",
                     'created_by'        => $data['created_by'] ?? null,
                 ]));
+                $paymentIds[] = $payment->id;
 
                 $remaining -= $applied;
             }
@@ -138,8 +166,32 @@ class PosService
                 $drawerAttempt = [$session, $data['actor'] ?? null, $invoice];
             }
 
-            return $invoice->fresh(['lines']);
-        });
+            if (is_string($cartId) && $cartId !== '') {
+                $this->audit->recordCheckout($session, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_CHECKOUT_COMPLETED, [
+                    'invoice_id' => $invoice->id,
+                    'invoice_number' => $invoice->number,
+                    'payment_ids' => $paymentIds,
+                    'amount' => (int) $invoice->total,
+                ]);
+            }
+
+                return $invoice->fresh(['lines']);
+            });
+        } catch (\Throwable $exception) {
+            // الفشل مثبت بواسطة مسار checkout الخادمي، ولا تعتمد قيمته أو سببه
+            // على client telemetry. لا يخفي تعثر كتابة الدليل سبب فشل العملية الأصلي.
+            if ($auditSession !== null && is_string($cartId) && $cartId !== '') {
+                try {
+                    $this->audit->recordCheckout($auditSession, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_PAYMENT_FAILED, [
+                        'status' => 'checkout_failed',
+                        'error_code' => $exception instanceof \Illuminate\Validation\ValidationException ? 'validation_failed' : 'checkout_failed',
+                    ]);
+                } catch (\Throwable) {
+                    // الدليل تكميلي في مسار الاستثناء ولا يجوز أن يطمس خطأ البيع.
+                }
+            }
+            throw $exception;
+        }
 
         if ($drawerAttempt !== null) {
             [$session, $actor, $drawerInvoice] = $drawerAttempt;
