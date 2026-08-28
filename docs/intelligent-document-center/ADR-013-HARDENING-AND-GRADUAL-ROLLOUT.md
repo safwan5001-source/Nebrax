@@ -17,7 +17,7 @@
 | الخطر | القرار المنفذ |
 |---|---|
 | IDOR وcross-tenant/branch | bindings وscopes موروثة من السياق؛ اختبار مصفوفة سلبي يغطي review/download/retry/hold/redaction/diagnostics/export. |
-| سباق hold مع retention purge | ترتيب قفل ثابت `batch → file` في المسارين، وإعادة قرار planner تحت القفل قبل حذف object؛ hold جديد يلغي pending بدلاً من الحذف. |
+| سباق hold مع retention purge | ترتيب قفل ثابت `batch → file` في المسارين، وإعادة قرار planner تحت القفل قبل حذف object؛ hold جديد **يُرفض** ما دام `purge_pending_at` قائماً حتى تتم المصالحة، وhold سابق للـclaim يمنع الحذف عند إعادة التخطيط تحت القفل فيُلغى pending ويُسجّل skip. |
 | تسرب secrets أو raw evidence | projections وdiagnostics وexports تسمح فقط بالحقول الآمنة؛ readiness لا يطبع configuration. |
 | تشغيل provider غير مقصود | `DocumentProviderNetworkGate` افتراضه false، ويختبر direct connection-test وjob path انعدام HTTP حين القفل. |
 | فقدان purge عند failure | pending durable أولاً، ثم حذف حصري عبر `DocumentStorageService`، و`storage_failed`/reconciliation أو skip بأثر append-only. |
