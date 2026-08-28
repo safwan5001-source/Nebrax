@@ -25,6 +25,7 @@ export function RiskPanel() {
   const [rows, setRows] = useState<RiskSnapshotRow[]>([]);
   const [meta, setMeta] = useState({ total: 0, per_page: 25, current_page: 1, last_page: 1 });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [band, setBand] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
@@ -32,6 +33,7 @@ export function RiskPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const search = new URLSearchParams();
       if (band) search.set('band', band);
@@ -41,6 +43,8 @@ export function RiskPanel() {
       setRows(result.data);
       setMeta(result.meta);
     } catch (error) {
+      setRows([]);
+      setLoadError(error instanceof ApiError ? error.message : t('loadFailed'));
       errorToast(error instanceof ApiError ? error.message : t('loadFailed'));
     } finally {
       setLoading(false);
@@ -82,6 +86,11 @@ export function RiskPanel() {
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="h-28 animate-pulse rounded border border-border bg-surface" />
           ))}
+        </div>
+      ) : loadError ? (
+        <div className="rounded border border-border bg-surface p-4" role="alert">
+          <p className="text-sm text-negative">{loadError}</p>
+          <Button className="mt-3" size="sm" variant="outline" onClick={() => void load()}>{t('retry')}</Button>
         </div>
       ) : rows.length === 0 ? (
         <p className="rounded border border-border bg-surface p-4 text-sm text-muted">{t('emptyRisk')}</p>

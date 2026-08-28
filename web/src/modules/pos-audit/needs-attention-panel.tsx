@@ -185,7 +185,7 @@ export function NeedsAttentionPanel({ canReviewExceptions, canPromoteExceptions,
               </span>
             );
           }
-          return <Badge tone="negative">{t('attention.kinds.digest_highlight')}</Badge>;
+          return <Badge tone="muted">{t('attention.kinds.digest_highlight')}</Badge>;
         },
       },
       {
@@ -249,14 +249,55 @@ export function NeedsAttentionPanel({ canReviewExceptions, canPromoteExceptions,
         emptyLabel={t('attention.empty')}
         emptyDescription={t('attention.emptyHint')}
         showToolbar={false}
-        mobileRecord={(row) => ({
-          title: row.kind === 'attention_case' ? (row.title ?? '') : row.kind === 'digest_highlight' ? t('digest.title') : row.kind === 'pending_approval' ? t(`operations.${row.operation}` as never, { fallback: row.operation ?? '' }) : ruleLabel(row.rule_key ?? ''),
-          subtitle: kindLabel(row.kind),
-          meta: [formatDateTime(primaryTime(row), locale), row.amount_under_review ? formatRiyal(row.amount_under_review) : '—'],
-          actions: row.kind === 'pending_approval'
-            ? (canApprove && <button className="text-sm font-medium text-primary" onClick={() => void approve(row.reference.id)}>{t('approve')}</button>)
-            : <button className="text-sm font-medium text-primary" onClick={() => openReference(row)}>{t('viewDetails')}</button>,
-        })}
+        mobileRecord={(row) => {
+          const statusLabel = row.kind === 'pending_approval'
+            ? t('pendingApprovals')
+            : row.kind === 'priority_exception' && row.severity
+              ? t(`severities.${row.severity}` as never, { fallback: row.severity })
+              : row.kind === 'needs_investigation_exception' && row.review_state
+                ? t(`states.${row.review_state}` as never, { fallback: row.review_state })
+                : row.kind === 'attention_case' && row.status
+                  ? t(`cases.statuses.${row.status}` as never, { fallback: row.status })
+                  : row.kind === 'digest_highlight'
+                    ? t('attention.kinds.digest_highlight')
+                    : undefined;
+          const amountLabel = row.kind === 'digest_highlight'
+            ? `${row.priority_exceptions_count ?? 0} / ${row.confirmed_loss_count ?? 0}`
+            : row.amount_under_review
+              ? formatRiyal(row.amount_under_review)
+              : undefined;
+
+          return {
+            title: row.kind === 'attention_case' ? (row.title ?? '') : row.kind === 'digest_highlight' ? t('digest.title') : row.kind === 'pending_approval' ? t(`operations.${row.operation}` as never, { fallback: row.operation ?? '' }) : ruleLabel(row.rule_key ?? ''),
+            subtitle: kindLabel(row.kind),
+            status: statusLabel,
+            amount: amountLabel,
+            meta: [
+              formatDateTime(primaryTime(row), locale),
+              ...(row.kind === 'attention_case' ? (row.reasons ?? []).map((reason) => t(`attention.caseReasons.${reason}` as never, { fallback: reason })) : []),
+            ],
+            actions: row.kind === 'pending_approval'
+              ? (canApprove && (
+                <button
+                  type="button"
+                  className="text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => void approve(row.reference.id)}
+                  disabled={approving === row.reference.id}
+                >
+                  {approving === row.reference.id ? t('approving') : t('approve')}
+                </button>
+              ))
+              : (
+                <button
+                  type="button"
+                  className="text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => openReference(row)}
+                >
+                  {t('viewDetails')}
+                </button>
+              ),
+          };
+        }}
       />
 
       <Pagination

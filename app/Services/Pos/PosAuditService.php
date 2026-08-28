@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\PosSettings;
 use App\Tenancy\BranchContext;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -164,29 +165,44 @@ final class PosAuditService
         $reason = $this->resolveReason($data['reason_code'] ?? null, $data['reason_note'] ?? null, in_array($type, self::REASON_REQUIRED, true));
         $correlationId = $this->validUuidOr($data['correlation_id'] ?? null, $cartId);
         $operation = $this->operationFor($type);
-        $approvedBy = $this->consumeApprovalIfNeeded(
-            $session,
-            $actor,
-            $cartId,
-            $correlationId,
-            $operation,
-            $data['approval_id'] ?? null,
-        );
 
-        return $this->append($session, $type, $actor, [
-            'cart_id' => $cartId,
-            'correlation_id' => $correlationId,
-            'client_event_id' => $clientEventId,
-            'client_event_payload_hash' => $clientEventHash,
-            'reason_code' => $reason['code'],
-            'reason_note' => $reason['note'],
-            'performed_by' => $actor->id,
-            'approved_by' => $approvedBy?->id,
-            'payload' => [
-                'provenance' => ['source' => 'client_observed', 'trust_level' => 'secondary_telemetry'],
-                'client_observed' => $this->payload($data),
-            ],
-        ]);
+        try {
+            return DB::transaction(function () use ($session, $actor, $cartId, $type, $data, $reason, $correlationId, $operation, $clientEventId, $clientEventHash) {
+                $approvedBy = $this->consumeApprovalIfNeeded(
+                    $session,
+                    $actor,
+                    $cartId,
+                    $correlationId,
+                    $operation,
+                    $data['approval_id'] ?? null,
+                );
+
+                return $this->append($session, $type, $actor, [
+                    'cart_id' => $cartId,
+                    'correlation_id' => $correlationId,
+                    'client_event_id' => $clientEventId,
+                    'client_event_payload_hash' => $clientEventHash,
+                    'reason_code' => $reason['code'],
+                    'reason_note' => $reason['note'],
+                    'performed_by' => $actor->id,
+                    'approved_by' => $approvedBy?->id,
+                    'payload' => [
+                        'provenance' => ['source' => 'client_observed', 'trust_level' => 'secondary_telemetry'],
+                        'client_observed' => $this->payload($data),
+                    ],
+                ]);
+            });
+        } catch (QueryException $e) {
+            // سباق متزامن على نفس client_event_id: القيد الفريد يمنع الصف المكرر؛
+            // نعيد السجل الفائز بدل 500 كي تبقى إعادة المحاولة Idempotent.
+            if ($clientEventId !== null && $clientEventHash !== null && $this->isUniqueConstraintViolation($e)) {
+                $existing = $this->resolveClientEventIdempotency($clientEventId, $clientEventHash);
+                if ($existing !== null) {
+                    return $existing;
+                }
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -303,39 +319,52 @@ final class PosAuditService
         $reason = $this->resolveReason($reasonCode, $reasonNote, true);
         $correlationId = (string) Str::uuid();
 
-        return DB::transaction(function () use ($session, $actor, $operation, $cartId, $reason, $context, $correlationId, $policy, $normalizedClientEventId, $clientEventHash) {
-            $approval = PosOverrideApproval::create([
-                'branch_id' => $session->branch_id,
-                'pos_session_id' => $session->id,
-                'cart_id' => $cartId,
-                'correlation_id' => $correlationId,
-                'operation' => $operation,
-                'policy' => $policy,
-                'status' => PosOverrideApproval::STATUS_PENDING,
-                'reason_code' => $reason['code'],
-                'reason_note' => $reason['note'],
-                'performed_by' => $actor->id,
-                'context' => $this->payload($context),
-                'expires_at' => now()->addMinutes(15),
-            ]);
-
-            $this->append($session, PosSessionEvent::TYPE_OVERRIDE_REQUESTED, $actor, [
-                'cart_id' => $cartId,
-                'correlation_id' => $correlationId,
-                'client_event_id' => $normalizedClientEventId,
-                'client_event_payload_hash' => $clientEventHash,
-                'reason_code' => $reason['code'],
-                'reason_note' => $reason['note'],
-                'performed_by' => $actor->id,
-                'payload' => [
-                    'approval_id' => $approval->id,
+        try {
+            return DB::transaction(function () use ($session, $actor, $operation, $cartId, $reason, $context, $correlationId, $policy, $normalizedClientEventId, $clientEventHash) {
+                $approval = PosOverrideApproval::create([
+                    'branch_id' => $session->branch_id,
+                    'pos_session_id' => $session->id,
+                    'cart_id' => $cartId,
+                    'correlation_id' => $correlationId,
                     'operation' => $operation,
+                    'policy' => $policy,
+                    'status' => PosOverrideApproval::STATUS_PENDING,
+                    'reason_code' => $reason['code'],
+                    'reason_note' => $reason['note'],
+                    'performed_by' => $actor->id,
                     'context' => $this->payload($context),
-                ],
-            ]);
+                    'expires_at' => now()->addMinutes(15),
+                ]);
 
-            return $approval;
-        });
+                $this->append($session, PosSessionEvent::TYPE_OVERRIDE_REQUESTED, $actor, [
+                    'cart_id' => $cartId,
+                    'correlation_id' => $correlationId,
+                    'client_event_id' => $normalizedClientEventId,
+                    'client_event_payload_hash' => $clientEventHash,
+                    'reason_code' => $reason['code'],
+                    'reason_note' => $reason['note'],
+                    'performed_by' => $actor->id,
+                    'payload' => [
+                        'approval_id' => $approval->id,
+                        'operation' => $operation,
+                        'context' => $this->payload($context),
+                    ],
+                ]);
+
+                return $approval;
+            });
+        } catch (QueryException $e) {
+            if ($normalizedClientEventId !== null && $clientEventHash !== null && $this->isUniqueConstraintViolation($e)) {
+                $existingEvent = $this->resolveClientEventIdempotency($normalizedClientEventId, $clientEventHash);
+                $existingApproval = $existingEvent !== null
+                    ? PosOverrideApproval::find($existingEvent->payload['approval_id'] ?? null)
+                    : null;
+                if ($existingApproval !== null) {
+                    return $existingApproval;
+                }
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -473,25 +502,39 @@ final class PosAuditService
         if ($policy !== PosOverrideApproval::POLICY_APPROVAL_REQUIRED) return null;
         if (! is_string($approvalId) || $approvalId === '') throw new RuntimeException('هذه العملية تحتاج اعتماداً مسجلاً قبل تنفيذها.');
 
-        $approval = PosOverrideApproval::lockForUpdate()->findOrFail($approvalId);
-        if ($approval->status !== PosOverrideApproval::STATUS_APPROVED || $approval->expires_at?->isPast()
-            || $approval->pos_session_id !== $session->id || $approval->cart_id !== $cartId
-            || $approval->operation !== $operation || $approval->performed_by !== $actor->id) {
-            throw new RuntimeException('الاعتماد المقدم لا يطابق العملية أو لم يعد صالحاً.');
-        }
+        // المعاملة داخلياً إلزامية: `lockForUpdate` بلا معاملة يُحرَّر فوراً بعد SELECT
+        // (مستدعي مثل CashDrawerService::openManually لم يكن يلفّ الاستهلاك)، فيسمح
+        // باستهلاك اعتماد واحد مرتين تحت تزامن/إعادة محاولة.
+        return DB::transaction(function () use ($session, $actor, $cartId, $correlationId, $operation, $approvalId) {
+            $approval = PosOverrideApproval::lockForUpdate()->findOrFail($approvalId);
+            if ($approval->status !== PosOverrideApproval::STATUS_APPROVED || $approval->expires_at?->isPast()
+                || $approval->pos_session_id !== $session->id || $approval->cart_id !== $cartId
+                || $approval->operation !== $operation || $approval->performed_by !== $actor->id) {
+                throw new RuntimeException('الاعتماد المقدم لا يطابق العملية أو لم يعد صالحاً.');
+            }
 
-        $approval->update(['status' => PosOverrideApproval::STATUS_CONSUMED, 'consumed_at' => now()]);
-        $this->append($session, PosSessionEvent::TYPE_OVERRIDE_CONSUMED, $actor, [
-            'cart_id' => $cartId,
-            'correlation_id' => $approval->correlation_id ?: $correlationId,
-            'reason_code' => $approval->reason_code,
-            'reason_note' => $approval->reason_note,
-            'performed_by' => $actor->id,
-            'approved_by' => $approval->approved_by,
-            'payload' => ['approval_id' => $approval->id, 'operation' => $operation],
-        ]);
+            $approval->update(['status' => PosOverrideApproval::STATUS_CONSUMED, 'consumed_at' => now()]);
+            $this->append($session, PosSessionEvent::TYPE_OVERRIDE_CONSUMED, $actor, [
+                'cart_id' => $cartId,
+                'correlation_id' => $approval->correlation_id ?: $correlationId,
+                'reason_code' => $approval->reason_code,
+                'reason_note' => $approval->reason_note,
+                'performed_by' => $actor->id,
+                'approved_by' => $approval->approved_by,
+                'payload' => ['approval_id' => $approval->id, 'operation' => $operation],
+            ]);
 
-        return $approval->approvedBy;
+            return $approval->approvedBy;
+        });
+    }
+
+    private function isUniqueConstraintViolation(QueryException $e): bool
+    {
+        $sqlState = (string) ($e->errorInfo[0] ?? '');
+        $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+        // PostgreSQL unique_violation = 23505 · SQLite constraint = 19
+        return $sqlState === '23505' || $driverCode === 19 || str_contains(strtolower($e->getMessage()), 'unique');
     }
 
     /** @param array<string,mixed> $attributes */

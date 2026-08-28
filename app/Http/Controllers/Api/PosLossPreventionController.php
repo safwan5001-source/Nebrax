@@ -200,6 +200,10 @@ class PosLossPreventionController extends ApiController
      */
     public function needsAttention(Request $request): JsonResponse
     {
+        // يضمن وجود صفوف القواعد الحالية قبل تصفية طابور الانتباه على الإصدار —
+        // بدونها تختفي استثناءات fixture ذات `rule_version` صحيحة لأن whereExists يفشل.
+        $this->detection->syncRules();
+
         $filters = $request->validate([
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
@@ -460,6 +464,7 @@ class PosLossPreventionController extends ApiController
         return $this->visibleExceptions($request)
             ->where('severity', PosException::SEVERITY_PRIORITY)
             ->whereIn('review_state', $openStates)
+            ->where(fn (Builder $q) => $this->constrainToCurrentRuleVersion($q))
             ->with(['subject:id,name'])
             ->orderByDesc('detected_at')
             ->limit(100)
@@ -500,6 +505,7 @@ class PosLossPreventionController extends ApiController
         return $this->visibleExceptions($request)
             ->where('review_state', PosException::STATE_NEEDS_INVESTIGATION)
             ->whereNotIn('id', $linkedExceptionIds)
+            ->where(fn (Builder $q) => $this->constrainToCurrentRuleVersion($q))
             ->with(['subject:id,name'])
             ->orderByDesc('detected_at')
             ->limit(100)
@@ -624,6 +630,25 @@ class PosLossPreventionController extends ApiController
             'unresolved_high_priority_cases_count' => $highPriorityCases,
             'confirmed_loss_count' => $confirmedLoss,
         ]]);
+    }
+
+    /**
+     * طابور Needs Attention يعرض فقط استثناءات إصدار القاعدة الحالي.
+     * بعد bump لـ`version` تبقى صفوف الإصدار السابق مجمّدةً للتدقيق التاريخي،
+     * لكن ظهورها بجانب النسخة الجديدة في طابور الانتباه يكرّر نفس الإشارة تشغيلياً.
+     *
+     * @param  Builder<PosException>  $query
+     * @return Builder<PosException>
+     */
+    private function constrainToCurrentRuleVersion(Builder $query): Builder
+    {
+        return $query->whereExists(function ($sub) {
+            $sub->select(DB::raw(1))
+                ->from('pos_exception_rules')
+                ->whereColumn('pos_exception_rules.tenant_id', 'pos_exceptions.tenant_id')
+                ->whereColumn('pos_exception_rules.rule_key', 'pos_exceptions.rule_key')
+                ->whereColumn('pos_exception_rules.version', 'pos_exceptions.rule_version');
+        });
     }
 
     /** @return array<string,mixed> */
