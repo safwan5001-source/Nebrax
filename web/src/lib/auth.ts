@@ -78,23 +78,45 @@ export async function logout(): Promise<void> {
   clearSessionPreferences();
 }
 
+let cachedUserRaw: string | null = null;
+let cachedUser: AuthUser | null = null;
+
 export function persistUser(user: AuthUser): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('user', JSON.stringify(user));
+  const raw = JSON.stringify(user);
+  localStorage.setItem('user', raw);
+  cachedUserRaw = raw;
+  cachedUser = user;
   const locale = user.preferences?.locale;
   if (locale) document.cookie = `locale=${locale}; path=/; max-age=31536000; samesite=lax`;
   const theme = user.preferences?.theme;
   if (theme) localStorage.setItem('theme', theme);
 }
 
+/**
+ * يعيد نفس مرجع المستخدم ما دامت قيمة `localStorage` نفسها لم تتغير.
+ * هذا مهم لمستدعي React الذين يضعون `permissions` أو دوال مشتقة منها ضمن
+ * dependency arrays؛ إعادة `JSON.parse` في كل render كانت تنشئ مصفوفة جديدة
+ * وتعيد تشغيل effects بلا نهاية (ظهر إنتاجياً في POS Audit كحلقة طلبات API).
+ */
 export function currentUser(): AuthUser | null {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem('user');
-  if (!raw) return null;
+  if (!raw) {
+    cachedUserRaw = null;
+    cachedUser = null;
+    return null;
+  }
+  if (raw === cachedUserRaw && cachedUser) return cachedUser;
   try {
-    return JSON.parse(raw) as AuthUser;
+    const parsed = JSON.parse(raw) as AuthUser;
+    cachedUserRaw = raw;
+    cachedUser = parsed;
+    return parsed;
   } catch {
     // قيمة تالفة في localStorage — ننظّفها بدل انهيار العرض
+    cachedUserRaw = null;
+    cachedUser = null;
     clearToken();
     return null;
   }
