@@ -25,3 +25,19 @@
 سيكون أي ترحيل جديد إضافياً ولا يعيد كتابة بيانات تاريخية. تبقى الأحداث السابقة قابلة للقراءة من `payload` الحالي، بينما تستفيد الأحداث الجديدة من المراجع المفهرسة. لا يلزم backfill للفواتير أو السلال التاريخية في هذه المرحلة؛ فاختلاق تاريخ تحقيقي غير مسجل سيكون غير أمين رقابياً.
 
 [Issue #525](https://github.com/safwan5001-source/Nebrax/issues/525)
+
+## P1 — نموذج الثقة ومصدر الحقيقة
+
+> **الدليل الخادمي Server-authoritative هو مصدر الحقيقة. Telemetry العميل Client-observed ثانوي وموسوم صراحة، ولا يستخدم أساساً لقرار مالي أو أمني دون تحقق خادمي مستقل.**
+
+| فئة الحدث | التصنيف بعد P1 | مسار الإنشاء | قاعدة الثقة |
+| --- | --- | --- | --- |
+| `cart_created` | Hybrid | API ينشئ UUID خادمياً، واللقطة الأولية من العميل | هوية السلة خادمية؛ اللقطة موسومة `client_observed_snapshot`. |
+| `item_added`, `item_removed`, `item_quantity_changed` | Client-observed only | واجهة POS المحلية | لا توجد حالياً حالة سلة خادمية كاملة يمكن منها اشتقاق before/after؛ تحفظ فقط داخل `client_observed`. |
+| `price_overridden`, `discount_applied/changed/removed`, `customer_changed` | Client-observed only | واجهة POS المحلية | يظل السبب والاعتماد خادميي التحقق، أما صورة تعديل السلة فـ telemetry ثانوي. |
+| `payment_cancelled` | Client-observed only | واجهة POS قبل إتمام checkout | إلغاء واجهة الدفع لا ينتج مستنداً مالياً؛ يسجل telemetry فقط. |
+| `payment_started`, `payment_failed`, `checkout_started`, `checkout_completed` | Server-authoritative | `PosService::checkout()` | لا يسمح endpoint العميل بها. تسجلها الخدمة التي تنفذ البيع بعد تحقق الجلسة، وبمراجع الفاتورة/السداد الواقعية عند الاكتمال. |
+| `cart_held`, `cart_resumed`, `cart_discarded` | Server-authoritative | `PosHeldSaleService` ومسار إغلاق الجلسة | تكتب الخدمة التنفيذية الحدث بعد نجاح العملية، ولا يسمح endpoint العميل بها. |
+| `override_requested/approved/consumed`, `closing_count_*`, `cash_in/out`, `drawer`, `return`, `exchange` | Server-authoritative | الخدمات التشغيلية القائمة | جميعها تسجل من المسار الذي يغير الحالة أو ينفذ العملية الفعلية. |
+
+يحمل كل حدث جديد `payload.provenance.source` و`trust_level`، ويظهران أيضاً في مورد API. القيم الممكنة هي `server` و`client_observed` و`hybrid`؛ أما السجل التاريخي بلا ختم فهو `legacy_unknown`. لم يُنشأ Server Cart Engine جديد عمداً: يلزم ذلك مرحلة لاحقة قبل ترقية before/after الخاصين بتعديل السلة إلى دليل خادمي كامل.

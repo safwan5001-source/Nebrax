@@ -889,10 +889,6 @@ export default function PosPage() {
       try {
         auditCartId = await ensureAuditCart(activeCart);
         if (!auditCartId) throw new Error(t('open_to_start'));
-        await api(`/pos/carts/${auditCartId}/events`, {
-          method: 'POST',
-          body: { pos_session_id: session.id, type: 'payment_started', amount: totalMinor, tenders },
-        });
         const result = await runPosCheckout({
           submitCheckout: async () => {
             const items = cart.map((l) => ({
@@ -935,11 +931,9 @@ export default function PosPage() {
           },
           fetchQr: (created) => api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`),
           onPaymentError: (error) => {
+            // فشل الدفع يسجله PosService من مسار checkout نفسه بمصدر server؛
+            // الواجهة تعرض النتيجة فقط ولا تنشئ دليلاً نهائياً قابلاً للتزوير.
             const reason = error instanceof ApiError ? error.message : tc('saveFailed');
-            if (auditCartId) void api(`/pos/carts/${auditCartId}/events`, {
-              method: 'POST',
-              body: { pos_session_id: session.id, type: 'payment_failed', amount: totalMinor, reason_code: 'payment_failed', reason_note: reason, error_code: error instanceof ApiError ? String(error.status) : 'checkout_error' },
-            }).catch(() => {});
             setError(reason);
             playPosFeedback('payment_error');
           },

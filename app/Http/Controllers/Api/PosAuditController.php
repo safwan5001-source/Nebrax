@@ -220,18 +220,17 @@ class PosAuditController extends ApiController
             'reason_note' => ['nullable', 'string', 'max:2000'],
             'approval_id' => ['nullable', 'uuid'],
             'correlation_id' => ['nullable', 'uuid'],
-            'amount' => ['nullable', 'integer'],
+            // before/after العميلية telemetry فقط؛ لا تقبل قيمة أو حالة نهائية
+            // لأنها لا تشكل دليلاً خادمياً ولا تستخدم قراراً مالياً أو أمنياً.
             'before' => ['nullable', 'array', 'max:40'],
             'after' => ['nullable', 'array', 'max:40'],
             'item' => ['nullable', 'array', 'max:30'],
             'items' => ['nullable', 'array', 'max:200'],
             'customer' => ['nullable', 'array', 'max:20'],
             'tenders' => ['nullable', 'array', 'max:20'],
-            'status' => ['nullable', 'string', 'max:80'],
-            'error_code' => ['nullable', 'string', 'max:120'],
         ]);
         $session = $this->activeSession($data['pos_session_id'], $request);
-        $event = $this->domain(fn () => $this->audit->recordCartEvent($session, $request->user(), $cartId, $data['type'], $data));
+        $event = $this->domain(fn () => $this->audit->recordClientObservedCartEvent($session, $request->user(), $cartId, $data['type'], $data));
 
         return (new PosSessionEventResource($event->load(['actor', 'performedBy', 'approvedBy'])))->response()->setStatusCode(201);
     }
@@ -295,8 +294,7 @@ class PosAuditController extends ApiController
             PosSessionEvent::TYPE_ITEM_QUANTITY_CHANGED, PosSessionEvent::TYPE_PRICE_OVERRIDDEN,
             PosSessionEvent::TYPE_DISCOUNT_APPLIED, PosSessionEvent::TYPE_DISCOUNT_CHANGED,
             PosSessionEvent::TYPE_DISCOUNT_REMOVED, PosSessionEvent::TYPE_CUSTOMER_CHANGED,
-            PosSessionEvent::TYPE_PAYMENT_STARTED, PosSessionEvent::TYPE_PAYMENT_CANCELLED,
-            PosSessionEvent::TYPE_PAYMENT_FAILED, PosSessionEvent::TYPE_CART_CANCELLED,
+            PosSessionEvent::TYPE_PAYMENT_CANCELLED, PosSessionEvent::TYPE_CART_CANCELLED,
         ];
     }
 

@@ -66,9 +66,28 @@ final class PosAuditService
         PosSessionEvent::TYPE_DISCOUNT_CHANGED,
         PosSessionEvent::TYPE_DISCOUNT_REMOVED,
         PosSessionEvent::TYPE_PAYMENT_CANCELLED,
-        PosSessionEvent::TYPE_PAYMENT_FAILED,
-        PosSessionEvent::TYPE_CART_DISCARDED,
         PosSessionEvent::TYPE_CART_CANCELLED,
+    ];
+
+    /** أحداث لا يعرفها الخادم حالياً إلا كملاحظة من واجهة السلة المحلية. */
+    private const CLIENT_OBSERVED_CART_EVENT_TYPES = [
+        PosSessionEvent::TYPE_ITEM_ADDED,
+        PosSessionEvent::TYPE_ITEM_REMOVED,
+        PosSessionEvent::TYPE_ITEM_QUANTITY_CHANGED,
+        PosSessionEvent::TYPE_PRICE_OVERRIDDEN,
+        PosSessionEvent::TYPE_DISCOUNT_APPLIED,
+        PosSessionEvent::TYPE_DISCOUNT_CHANGED,
+        PosSessionEvent::TYPE_DISCOUNT_REMOVED,
+        PosSessionEvent::TYPE_CUSTOMER_CHANGED,
+        PosSessionEvent::TYPE_PAYMENT_CANCELLED,
+        PosSessionEvent::TYPE_CART_CANCELLED,
+    ];
+
+    /** أحداث سلة ينشئها مسار تشغيل خادمي فعلي فقط. */
+    private const SERVER_CART_EVENT_TYPES = [
+        PosSessionEvent::TYPE_CART_HELD,
+        PosSessionEvent::TYPE_CART_RESUMED,
+        PosSessionEvent::TYPE_CART_DISCARDED,
     ];
 
     /** @return array<int, PosReasonCode> */
@@ -93,23 +112,31 @@ final class PosAuditService
         return $this->append($session, PosSessionEvent::TYPE_CART_CREATED, $actor, [
             'cart_id' => $cartId,
             'correlation_id' => $cartId,
-            'payload' => ['cart' => ['id' => $cartId, 'snapshot' => $this->payload($snapshot)]],
+            'payload' => [
+                'provenance' => [
+                    'source' => 'hybrid',
+                    'trust_level' => 'server_authoritative_identity',
+                    'client_observed_snapshot' => true,
+                ],
+                'cart' => ['id' => $cartId],
+                'client_observed_snapshot' => $this->payload($snapshot),
+            ],
         ]);
     }
 
     /**
-     * يضيف دليلاً منظماً لتغيير سلة. لا يقبل العميل نوعاً مجهولاً أو payload غير
-     * محصور، ويثبت before/after عند توفيره من واجهة POS.
+     * Telemetry ثانوي من واجهة السلة المحلية. لا يمثل before/after أو المبلغ
+     * حقيقة خادمية، ولا يجوز استخدامه قراراً مالياً أو أمنياً دون تحقق لاحق.
      *
      * @param array<string,mixed> $data
      */
-    public function recordCartEvent(PosSession $session, User $actor, string $cartId, string $type, array $data, bool $allowPriorSessionCart = false): PosSessionEvent
+    public function recordClientObservedCartEvent(PosSession $session, User $actor, string $cartId, string $type, array $data): PosSessionEvent
     {
-        if (! isset(self::CATEGORIES[$type]) || $type === PosSessionEvent::TYPE_CART_CREATED) {
-            throw new RuntimeException('نوع حدث سلة POS غير مدعوم.');
+        if (! in_array($type, self::CLIENT_OBSERVED_CART_EVENT_TYPES, true)) {
+            throw new RuntimeException('هذا الحدث غير مسموح من عميل نقطة البيع.');
         }
         $this->assertSessionContext($session, $actor, true);
-        $this->assertKnownCart($session, $cartId, $allowPriorSessionCart);
+        $this->assertKnownCart($session, $cartId);
 
         $reason = $this->resolveReason($data['reason_code'] ?? null, $data['reason_note'] ?? null, in_array($type, self::REASON_REQUIRED, true));
         $correlationId = $this->validUuidOr($data['correlation_id'] ?? null, $cartId);
@@ -126,11 +153,34 @@ final class PosAuditService
         return $this->append($session, $type, $actor, [
             'cart_id' => $cartId,
             'correlation_id' => $correlationId,
-            'amount' => $this->amount($data['amount'] ?? null),
             'reason_code' => $reason['code'],
             'reason_note' => $reason['note'],
             'performed_by' => $actor->id,
             'approved_by' => $approvedBy?->id,
+            'payload' => [
+                'provenance' => ['source' => 'client_observed', 'trust_level' => 'secondary_telemetry'],
+                'client_observed' => $this->payload($data),
+            ],
+        ]);
+    }
+
+    /**
+     * يسجل حدث سلة من مسار تشغيل خادمي فقط؛ لا تستدعيه طبقة HTTP العميلية.
+     *
+     * @param array<string,mixed> $data
+     */
+    public function recordCartEvent(PosSession $session, User $actor, string $cartId, string $type, array $data, bool $allowPriorSessionCart = false): PosSessionEvent
+    {
+        if (! in_array($type, self::SERVER_CART_EVENT_TYPES, true)) {
+            throw new RuntimeException('هذا الحدث محصور في خدمة تشغيل نقطة البيع.');
+        }
+        $this->assertSessionContext($session, $actor, true);
+        $this->assertKnownCart($session, $cartId, $allowPriorSessionCart);
+
+        return $this->append($session, $type, $actor, [
+            'cart_id' => $cartId,
+            'correlation_id' => $this->validUuidOr($data['correlation_id'] ?? null, $cartId),
+            'performed_by' => $actor->id,
             'payload' => $this->payload($data),
         ]);
     }
@@ -143,7 +193,12 @@ final class PosAuditService
      */
     public function recordCheckout(PosSession $session, ?User $actor, string $cartId, string $type, array $payload = []): PosSessionEvent
     {
-        if (! in_array($type, [PosSessionEvent::TYPE_CHECKOUT_STARTED, PosSessionEvent::TYPE_CHECKOUT_COMPLETED], true)) {
+        if (! in_array($type, [
+            PosSessionEvent::TYPE_PAYMENT_STARTED,
+            PosSessionEvent::TYPE_PAYMENT_FAILED,
+            PosSessionEvent::TYPE_CHECKOUT_STARTED,
+            PosSessionEvent::TYPE_CHECKOUT_COMPLETED,
+        ], true)) {
             throw new RuntimeException('نوع حدث الإتمام غير صالح.');
         }
         $this->assertKnownCart($session, $cartId);
@@ -153,7 +208,9 @@ final class PosAuditService
             'correlation_id' => $cartId,
             'performed_by' => $actor?->id,
             'amount' => $this->amount($payload['amount'] ?? null),
-            'payload' => $this->payload($payload),
+            'payload' => array_merge($this->payload($payload), [
+                'provenance' => ['source' => 'server', 'trust_level' => 'server_authoritative'],
+            ]),
         ]);
     }
 
@@ -307,7 +364,9 @@ final class PosAuditService
             'amount' => $this->amount($payload['amount'] ?? $payload['difference'] ?? null),
             'reason_code' => $payload['reason_code'] ?? null,
             'reason_note' => $payload['reason_note'] ?? $payload['reason'] ?? $payload['note'] ?? null,
-            'payload' => $this->payload($payload),
+            'payload' => array_merge($this->payload($payload), [
+                'provenance' => ['source' => 'server', 'trust_level' => 'server_authoritative'],
+            ]),
         ]);
     }
 
@@ -364,6 +423,13 @@ final class PosAuditService
     {
         if (! isset(self::CATEGORIES[$type])) throw new RuntimeException('نوع سجل تدقيق POS غير معروف.');
 
+        $payload = is_array($attributes['payload'] ?? null) ? $attributes['payload'] : [];
+        // أي مسار خدمة لا يحدد مصدراً صراحة هو عملية خادمية؛ لا يسمح هذا
+        // الافتراض أبداً بتجاوز ختم client_observed أو hybrid المنشأين أعلاه.
+        if (! isset($payload['provenance'])) {
+            $payload['provenance'] = ['source' => 'server', 'trust_level' => 'server_authoritative'];
+        }
+
         return PosSessionEvent::create([
             'branch_id' => $session->branch_id,
             'pos_session_id' => $session->id,
@@ -377,7 +443,7 @@ final class PosAuditService
             'reason_note' => $attributes['reason_note'] ?? null,
             'performed_by' => $attributes['performed_by'] ?? $actor?->id,
             'approved_by' => $attributes['approved_by'] ?? null,
-            'payload' => $attributes['payload'] ?? [],
+            'payload' => $payload,
             'created_at' => now(),
         ]);
     }

@@ -58,7 +58,14 @@ class PosLossPreventionTest extends TestCase
         $this->withToken($auth['token'])->postJson("/api/pos/carts/{$created['cart_id']}/events", [
             'pos_session_id' => $session, 'type' => 'item_removed', 'reason_code' => 'other',
             'reason_note' => 'تمت إزالة صنف أضيف بالخطأ', 'before' => ['item' => ['quantity' => 1]], 'after' => ['items' => []],
-        ])->assertCreated()->assertJsonPath('data.type', 'item_removed')->assertJsonPath('data.reason_code', 'other');
+            // لا يصبح المبلغ أو الحالة المرسلان من العميل حقائق رقابية.
+            'amount' => 999999, 'status' => 'forged',
+        ])->assertCreated()
+            ->assertJsonPath('data.type', 'item_removed')
+            ->assertJsonPath('data.reason_code', 'other')
+            ->assertJsonPath('data.source', 'client_observed')
+            ->assertJsonPath('data.trust_level', 'secondary_telemetry')
+            ->assertJsonPath('data.amount', null);
 
         $this->withToken($auth['token'])->postJson("/api/pos/carts/{$created['cart_id']}/events", [
             'pos_session_id' => $session, 'type' => 'cart_cancelled', 'reason_code' => 'customer_changed_mind',
@@ -69,6 +76,29 @@ class PosLossPreventionTest extends TestCase
         $this->assertCount(3, $timeline->json('data.timeline'));
         $this->assertSame('item_removed', $timeline->json('data.timeline.1.type'));
         $this->assertSame('cart_cancelled', $timeline->json('data.timeline.2.type'));
+    }
+
+    /** @test */
+    public function a_client_cannot_forge_server_only_cart_or_checkout_events(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $session = $this->openPosSession($auth);
+        $cart = $this->withToken($auth['token'])->postJson('/api/pos/carts', ['pos_session_id' => $session])
+            ->assertCreated()->json('data.cart_id');
+
+        foreach ([PosSessionEvent::TYPE_CHECKOUT_COMPLETED, PosSessionEvent::TYPE_PAYMENT_FAILED, PosSessionEvent::TYPE_CART_DISCARDED] as $type) {
+            $this->withToken($auth['token'])->postJson("/api/pos/carts/{$cart}/events", [
+                'pos_session_id' => $session,
+                'type' => $type,
+                'amount' => 999999,
+                'status' => 'forged',
+            ])->assertStatus(422);
+        }
+
+        $this->assertDatabaseMissing('pos_session_events', ['cart_id' => $cart, 'type' => PosSessionEvent::TYPE_CHECKOUT_COMPLETED]);
+        $this->assertDatabaseMissing('pos_session_events', ['cart_id' => $cart, 'type' => PosSessionEvent::TYPE_PAYMENT_FAILED]);
+        $this->assertDatabaseMissing('pos_session_events', ['cart_id' => $cart, 'type' => PosSessionEvent::TYPE_CART_DISCARDED]);
     }
 
     /** @test */
@@ -98,9 +128,18 @@ class PosLossPreventionTest extends TestCase
             'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]], 'tenders' => ['cash' => 115000],
         ])->assertCreated();
 
+        $this->assertDatabaseHas('pos_session_events', ['cart_id' => $cart, 'type' => PosSessionEvent::TYPE_PAYMENT_STARTED]);
         $this->assertDatabaseHas('pos_session_events', ['cart_id' => $cart, 'type' => PosSessionEvent::TYPE_CHECKOUT_STARTED]);
         $this->assertDatabaseHas('pos_session_events', ['cart_id' => $cart, 'type' => PosSessionEvent::TYPE_CHECKOUT_COMPLETED]);
         $this->assertSame(2, PosSessionEvent::where('cart_id', $cart)->whereIn('type', [PosSessionEvent::TYPE_CHECKOUT_STARTED, PosSessionEvent::TYPE_CHECKOUT_COMPLETED])->count());
+        PosSessionEvent::where('cart_id', $cart)->whereIn('type', [
+            PosSessionEvent::TYPE_PAYMENT_STARTED,
+            PosSessionEvent::TYPE_CHECKOUT_STARTED,
+            PosSessionEvent::TYPE_CHECKOUT_COMPLETED,
+        ])->each(function (PosSessionEvent $event): void {
+            $this->assertSame('server', $event->payload['provenance']['source'] ?? null);
+            $this->assertSame('server_authoritative', $event->payload['provenance']['trust_level'] ?? null);
+        });
     }
 
     /** @test */
@@ -156,6 +195,11 @@ class PosLossPreventionTest extends TestCase
         $this->assertNotNull($event->performed_by);
         $this->assertNotNull($event->approved_by);
         $this->assertNotSame($event->performed_by, $event->approved_by);
+        $this->assertSame('client_observed', $event->payload['provenance']['source'] ?? null);
+
+        $consumed = PosSessionEvent::where('cart_id', $cart)->where('type', PosSessionEvent::TYPE_OVERRIDE_CONSUMED)->sole();
+        $this->assertSame('server', $consumed->payload['provenance']['source'] ?? null);
+        $this->assertSame('server_authoritative', $consumed->payload['provenance']['trust_level'] ?? null);
     }
 
     /** @test */
