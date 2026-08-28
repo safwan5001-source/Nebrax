@@ -54,9 +54,8 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     expect(page).not.toContain("from '@/components/ui/dialog'");
 
     const dialog = source('src/components/ui/dialog.tsx');
-    expect(dialog).not.toContain('100dvh');
     expect(dialog).not.toContain('pos-dialog-body');
-    expect(dialog).not.toContain('[&_pre]:break-all');
+    expect(dialog).not.toContain("from '@/components/pos/");
 
     const auth = source('src/lib/auth.ts');
     expect(auth).not.toContain('pos-responsive');

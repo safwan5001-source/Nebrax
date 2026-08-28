@@ -13,7 +13,7 @@ interface PosDialogProps {
 }
 
 /**
- * غلاف حوار خاص بنقطة البيع: رأس ثابت وجسم يتمرّر داخل 100dvh.
+ * غلاف حوار خاص بنقطة البيع: رأس ثابت وجسم يتمرّر داخل نافذة العرض.
  * لا يغيّر `components/ui/dialog` العام ولا منطق Esc.
  */
 export function PosDialog({ open, onClose, title, children, className }: PosDialogProps) {
@@ -27,14 +27,14 @@ export function PosDialog({ open, onClose, title, children, className }: PosDial
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto p-4 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative z-10 my-8 flex max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-lg flex-col overflow-hidden rounded border border-border bg-surface',
+          'relative z-10 flex max-h-[calc(100dvh-2rem)] w-full min-h-0 min-w-0 max-w-lg flex-col overflow-hidden rounded border border-border bg-surface',
           className,
         )}
       >

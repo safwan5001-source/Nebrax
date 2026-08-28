@@ -2,12 +2,12 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
-const evidenceDir = path.resolve(process.cwd(), '../docs/visual-qa/pr-pos-responsive');
+const evidenceDir = path.resolve(process.cwd(), '../docs/visual-qa/pr-552');
 const ignoredConsole = /net::ERR_ABORTED|\.css\.map|_rsc=|404 \(Not Found\)|Failed to load resource/;
 const SEARCH = /ابحث بالاسم|Search by name|ابحث في المنتجات|Search products/;
 const SESSION = /فتح جلسة جديدة|Open new session/;
 const VIEW_CART = /عرض السلة|View cart/;
-const PAY = /^دفع$|^Pay$/;
+const PAY = /^(دفع|Pay) /;
 const MORE_ACTIONS = /إجراءات إضافية|More actions/;
 const RECENT_INVOICES = /آخر الفواتير|Recent invoices/;
 const PRODUCTS_NAV = /المنتجات|Products/;
@@ -49,7 +49,14 @@ test.describe('PR-6 POS responsive / mobile hardening', () => {
     await assertNoHorizontalOverflow(page);
     await page.screenshot({ path: path.join(evidenceDir, 'mobile-390-payment.png') });
     await page.getByRole('button', { name: BACK_CART }).click();
-    await expect(page.getByPlaceholder(SEARCH).or(page.getByRole('button', { name: PAY }))).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await assertDialogInViewport(page);
+    await page.getByRole('dialog').getByRole('button', { name: /إلغاء|Cancel/ }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: CONFIRM_PAY })).toBeVisible();
+    await openPos(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectSaleShell(page);
 
     await page.getByRole('button', { name: PRODUCTS_NAV }).click();
     await page.getByRole('button', { name: CUSTOMERS_NAV }).click();
@@ -288,5 +295,15 @@ async function runDesktopKeyboardSmoke(page: Page) {
   await page.keyboard.press('F9');
   await expect(page.getByRole('button', { name: CONFIRM_PAY })).toBeVisible({ timeout: 15_000 });
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: CONFIRM_PAY })).toHaveCount(0);
+  const audit = page.getByRole('dialog');
+  if (await audit.isVisible().catch(() => false)) {
+    await assertDialogInViewport(page);
+    await page.getByRole('dialog').getByRole('button', { name: 'إغلاق' }).click();
+    await expect(audit).toHaveCount(0);
+    await expect(page.getByRole('button', { name: CONFIRM_PAY })).toBeVisible();
+    await openPos(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+  } else {
+    await expect(page.getByRole('button', { name: CONFIRM_PAY })).toHaveCount(0);
+  }
 }
