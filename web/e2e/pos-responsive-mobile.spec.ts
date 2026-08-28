@@ -3,7 +3,9 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const evidenceDir = path.resolve(process.cwd(), '../docs/visual-qa/pr-552');
-const ignoredConsole = /net::ERR_ABORTED|\.css\.map|_rsc=|404 \(Not Found\)|Failed to load resource/;
+/** ضوضاء Next/Chromium المعروفة فقط — لا تبتلع Failed to load resource ولا 401/403/500. */
+const KNOWN_CONSOLE_NOISE = /net::ERR_ABORTED|\.css\.map|[?&]_rsc=|\/favicon\.ico(?:\?|$)/;
+const UNEXPECTED_HTTP_STATUS = /status of (401|403|500)\b/;
 const SEARCH = /ابحث بالاسم|Search by name|ابحث في المنتجات|Search products/;
 const SESSION = /فتح جلسة جديدة|Open new session/;
 const VIEW_CART = /عرض السلة|View cart/;
@@ -154,11 +156,18 @@ test.describe('PR-6 POS responsive / mobile hardening', () => {
   });
 });
 
+function isKnownConsoleNoise(text: string, url = ''): boolean {
+  if (UNEXPECTED_HTTP_STATUS.test(text)) return false;
+  return KNOWN_CONSOLE_NOISE.test(text) || KNOWN_CONSOLE_NOISE.test(url);
+}
+
 function attachConsole(page: Page, bucket: string[]) {
   page.on('console', (message) => {
-    if (message.type() === 'error' && !ignoredConsole.test(message.text())) {
-      bucket.push(message.text());
-    }
+    if (message.type() !== 'error') return;
+    const text = message.text();
+    const url = message.location().url ?? '';
+    if (isKnownConsoleNoise(text, url)) return;
+    bucket.push(url ? `${text} (${url})` : text);
   });
   page.on('pageerror', (error) => {
     bucket.push(error.message);
