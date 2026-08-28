@@ -163,6 +163,10 @@ web/src/components/ui/dialog.tsx
 | `npm run test` | **864** اختباراً في **149** ملفاً — **كلها خضراء** |
 | `npm run build` | **ناجح** (يتضمن TypeScript check) |
 | `npm run lint` | **N/A** — لا ESLint config غير تفاعلي (نفس PR-2) |
+| Web CI (`web build`) | **pass** |
+| PHP CI (`sqlite` + `pgsql`) | **pass** |
+| Vercel Preview | **fail بيئي** — `Deployment rate limited — retry in 24 hours` (حد حساب Vercel، ليس خطأ بناء) |
+| GitHub required checks | **0 فشل مطلوب** — Vercel ليس فحصاً إلزامياً |
 
 ---
 
