@@ -17,6 +17,7 @@ class PlatformGlobalApplicationOverrideApplyRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'confirmation_token' => ['required', 'string', 'uuid'],
             'operation' => ['required', 'string', Rule::in(PlatformGlobalApplicationOverrideService::operations())],
             'application_key' => [
                 Rule::requiredIf(fn (): bool => PlatformGlobalApplicationOverrideService::isSingleAppOperation(

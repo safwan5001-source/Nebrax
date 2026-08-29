@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\PlatformGlobalApplicationOverrideApplyRequest;
 use App\Http\Requests\PlatformGlobalApplicationOverridePreviewRequest;
+use App\Http\Requests\PlatformGlobalApplicationOverrideSummaryRequest;
 use App\Models\PlatformAdministrator;
 use App\Services\PlatformGlobalApplicationOverrideService;
 use Illuminate\Http\JsonResponse;
@@ -14,15 +15,14 @@ class PlatformGlobalApplicationOverrideController extends ApiController
 {
     public function __construct(private PlatformGlobalApplicationOverrideService $globalOverrides) {}
 
-    public function summary(Request $request): JsonResponse
+    public function summary(PlatformGlobalApplicationOverrideSummaryRequest $request): JsonResponse
     {
-        $tenantIds = $request->query('tenant_ids');
-        if (is_string($tenantIds)) {
-            $tenantIds = array_filter(array_map('trim', explode(',', $tenantIds)));
-        }
+        $tenantIds = $request->validated()['tenant_ids'] ?? null;
 
         return response()->json([
-            'data' => $this->globalOverrides->summary(is_array($tenantIds) && $tenantIds !== [] ? $tenantIds : null),
+            'data' => $this->globalOverrides->summary(
+                is_array($tenantIds) && $tenantIds !== [] ? $tenantIds : null,
+            ),
         ]);
     }
 
@@ -32,6 +32,7 @@ class PlatformGlobalApplicationOverrideController extends ApiController
 
         try {
             $preview = $this->globalOverrides->preview(
+                $this->administrator($request),
                 $data['operation'],
                 $data['application_key'] ?? null,
                 $data['tenant_ids'] ?? null,
@@ -50,6 +51,7 @@ class PlatformGlobalApplicationOverrideController extends ApiController
         try {
             $result = $this->globalOverrides->apply(
                 $this->administrator($request),
+                $data['confirmation_token'],
                 $data['operation'],
                 $data['application_key'] ?? null,
                 $data['tenant_ids'] ?? null,

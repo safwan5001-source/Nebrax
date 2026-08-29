@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\JournalEntry;
 use App\Models\PlatformAdministrator;
 use App\Models\PlatformAdministratorAction;
 use App\Models\Tenant;
 use App\Support\ApplicationCatalog;
-use Illuminate\Support\Collection;
+use App\Support\PlatformGlobalApplicationOverrideConfirmation;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -19,6 +19,8 @@ use RuntimeException;
 class PlatformGlobalApplicationOverrideService
 {
     public const CHUNK_SIZE = 50;
+
+    public const SAMPLE_LIMIT = 10;
 
     public const GLOBAL_GRANT_ALL_TENANTS = 'grant_all_tenants';
     public const GLOBAL_REVERT_ALL_TENANTS = 'revert_all_tenants';
@@ -66,7 +68,6 @@ class PlatformGlobalApplicationOverrideService
     /** @return array{applications: list<array<string, mixed>>, tenant_count: int} */
     public function summary(?array $tenantIds = null): array
     {
-        $tenants = $this->resolveTenants($tenantIds);
         $aggregates = [];
 
         foreach (ApplicationCatalog::all() as $key => $application) {
@@ -87,7 +88,9 @@ class PlatformGlobalApplicationOverrideService
             ];
         }
 
-        foreach ($tenants as $tenant) {
+        $tenantCount = 0;
+        $this->foreachTenant($tenantIds, function (Tenant $tenant) use (&$aggregates, &$tenantCount): void {
+            $tenantCount++;
             $summary = $this->overrides->summary($tenant);
             foreach ($summary['applications'] as $row) {
                 $key = $row['key'];
@@ -110,11 +113,11 @@ class PlatformGlobalApplicationOverrideService
                 $aggregates[$key]['can_show_all_tenants'] = $aggregates[$key]['can_show_all_tenants'] || $row['can_show'];
                 $aggregates[$key]['can_hide_all_tenants'] = $aggregates[$key]['can_hide_all_tenants'] || $row['can_hide'];
             }
-        }
+        });
 
         return [
             'applications' => array_values($aggregates),
-            'tenant_count' => $tenants->count(),
+            'tenant_count' => $tenantCount,
         ];
     }
 
@@ -123,16 +126,34 @@ class PlatformGlobalApplicationOverrideService
      * @return array<string, mixed>
      */
     public function preview(
+        PlatformAdministrator $administrator,
         string $operation,
         ?string $applicationKey = null,
         ?array $tenantIds = null,
     ): array {
         $this->assertOperation($operation, $applicationKey);
         $requestId = (string) Str::uuid();
-        $tenants = $this->resolveTenants($tenantIds);
-        $tenantResults = $this->evaluateTenants($tenants, $operation, $applicationKey);
+        $aggregate = $this->aggregateTenants($operation, $applicationKey, $tenantIds, apply: false);
 
-        return $this->buildResponse($requestId, $operation, $applicationKey, $tenantIds, $tenantResults, null);
+        $response = $this->buildResponse(
+            $requestId,
+            $operation,
+            $applicationKey,
+            $tenantIds,
+            $aggregate,
+            null,
+        );
+        $response['confirmation_token'] = $requestId;
+
+        PlatformGlobalApplicationOverrideConfirmation::store($requestId, [
+            'administrator_id' => $administrator->id,
+            'operation' => $operation,
+            'application_key' => $applicationKey,
+            'tenant_ids' => $tenantIds,
+            'counts' => $response['counts'],
+        ]);
+
+        return $response;
     }
 
     /**
@@ -141,44 +162,152 @@ class PlatformGlobalApplicationOverrideService
      */
     public function apply(
         PlatformAdministrator $administrator,
+        string $confirmationToken,
         string $operation,
         ?string $applicationKey = null,
         ?array $tenantIds = null,
         ?string $reason = null,
     ): array {
         $this->assertOperation($operation, $applicationKey);
-        $requestId = (string) Str::uuid();
-        $tenants = $this->resolveTenants($tenantIds);
-        $journalEntriesBefore = JournalEntry::count();
-        $tenantResults = [];
 
-        foreach ($tenants->chunk(self::CHUNK_SIZE) as $chunk) {
-            foreach ($chunk as $tenant) {
-                $tenantResults[] = $this->applyForTenant(
-                    $tenant,
-                    $administrator,
-                    $operation,
-                    $applicationKey,
-                    $reason,
-                );
-            }
-        }
+        $cached = PlatformGlobalApplicationOverrideConfirmation::consume(
+            $confirmationToken,
+            $administrator->id,
+            $operation,
+            $applicationKey,
+            $tenantIds,
+        );
 
-        $response = $this->buildResponse($requestId, $operation, $applicationKey, $tenantIds, $tenantResults, $reason);
+        $freshPreview = $this->aggregateTenants($operation, $applicationKey, $tenantIds, apply: false);
+        PlatformGlobalApplicationOverrideConfirmation::assertCountsMatch($cached['counts'], $freshPreview['counts']);
+
+        $aggregate = $this->aggregateTenants(
+            $operation,
+            $applicationKey,
+            $tenantIds,
+            apply: true,
+            administrator: $administrator,
+            reason: $reason,
+        );
+
+        $response = $this->buildResponse(
+            $confirmationToken,
+            $operation,
+            $applicationKey,
+            $tenantIds,
+            $aggregate,
+            $reason,
+        );
         $this->logGlobalBulkAction($administrator, $response);
-
-        if (JournalEntry::count() !== $journalEntriesBefore) {
-            throw new RuntimeException('Global application override must not create journal entries.');
-        }
 
         return $response;
     }
 
     /**
      * @param  list<string>|null  $tenantIds
-     * @return Collection<int, Tenant>
+     * @return array{
+     *   counts: array{eligible_tenants:int,will_apply:int,skipped:int,failed:int},
+     *   skip_reasons: array<string,int>,
+     *   sample_tenants: list<array<string,mixed>>,
+     *   failures: list<array<string,mixed>>,
+     *   total_tenants: int
+     * }
      */
-    private function resolveTenants(?array $tenantIds): Collection
+    private function aggregateTenants(
+        string $operation,
+        ?string $applicationKey,
+        ?array $tenantIds,
+        bool $apply,
+        ?PlatformAdministrator $administrator = null,
+        ?string $reason = null,
+    ): array {
+        $willApply = 0;
+        $skipped = 0;
+        $failed = 0;
+        $groupedSkipReasons = [];
+        $sampleTenants = [];
+        $failures = [];
+        $totalTenants = 0;
+
+        $this->foreachTenant($tenantIds, function (Tenant $tenant) use (
+            $operation,
+            $applicationKey,
+            $apply,
+            $administrator,
+            $reason,
+            &$willApply,
+            &$skipped,
+            &$failed,
+            &$groupedSkipReasons,
+            &$sampleTenants,
+            &$failures,
+            &$totalTenants,
+        ): void {
+            $totalTenants++;
+            $row = $apply
+                ? $this->applyForTenant($tenant, $administrator, $operation, $applicationKey, $reason)
+                : $this->previewForTenant($tenant, $operation, $applicationKey);
+
+            match ($row['outcome']) {
+                'applied' => $willApply++,
+                'failed' => $failed++,
+                default => $skipped++,
+            };
+
+            foreach ($row['skip_reasons'] ?? [] as $skipReason) {
+                $groupedSkipReasons[$skipReason] = ($groupedSkipReasons[$skipReason] ?? 0) + 1;
+            }
+
+            if ($row['outcome'] === 'failed') {
+                if (count($failures) < self::SAMPLE_LIMIT) {
+                    $failures[] = $this->sampleRow($row);
+                }
+
+                return;
+            }
+
+            if (count($sampleTenants) >= self::SAMPLE_LIMIT) {
+                return;
+            }
+
+            if ($row['outcome'] === 'applied' || $row['outcome'] === 'skipped') {
+                $sampleTenants[] = $this->sampleRow($row);
+            }
+        });
+
+        arsort($groupedSkipReasons);
+
+        return [
+            'counts' => [
+                'eligible_tenants' => $willApply + $skipped,
+                'will_apply' => $willApply,
+                'skipped' => $skipped,
+                'failed' => $failed,
+            ],
+            'skip_reasons' => $groupedSkipReasons,
+            'sample_tenants' => $sampleTenants,
+            'failures' => $failures,
+            'total_tenants' => $totalTenants,
+        ];
+    }
+
+    /**
+     * @param  list<string>|null  $tenantIds
+     */
+    private function foreachTenant(?array $tenantIds, callable $callback): void
+    {
+        $this->tenantQuery($tenantIds)->chunkById(self::CHUNK_SIZE, function ($tenants) use ($callback): void {
+            foreach ($tenants as $tenant) {
+                $callback($tenant);
+            }
+        });
+    }
+
+    /**
+     * @param  list<string>|null  $tenantIds
+     * @return Builder<Tenant>
+     */
+    private function tenantQuery(?array $tenantIds): Builder
     {
         $query = Tenant::query()->orderBy('account_number')->orderBy('id');
 
@@ -186,7 +315,7 @@ class PlatformGlobalApplicationOverrideService
             $query->whereIn('id', $tenantIds);
         }
 
-        return $query->get();
+        return $query;
     }
 
     private function assertOperation(string $operation, ?string $applicationKey): void
@@ -202,49 +331,31 @@ class PlatformGlobalApplicationOverrideService
         }
     }
 
-    /**
-     * @param  Collection<int, Tenant>  $tenants
-     * @return list<array<string, mixed>>
-     */
-    private function evaluateTenants(Collection $tenants, string $operation, ?string $applicationKey): array
-    {
-        $results = [];
-
-        foreach ($tenants->chunk(self::CHUNK_SIZE) as $chunk) {
-            foreach ($chunk as $tenant) {
-                $results[] = $this->previewForTenant($tenant, $operation, $applicationKey);
-            }
-        }
-
-        return $results;
-    }
-
     /** @return array<string, mixed> */
     private function previewForTenant(Tenant $tenant, string $operation, ?string $applicationKey): array
     {
         if (self::isSingleAppOperation($operation)) {
             $preview = $this->previewSingleApp($tenant, $operation, $applicationKey);
-            $outcome = $preview['outcome'];
 
             return [
                 'tenant_id' => $tenant->id,
                 'tenant_name' => $tenant->name,
                 'account_number' => $tenant->account_number,
-                'outcome' => $outcome,
+                'outcome' => $preview['outcome'],
                 'skip_reasons' => $preview['skip_reasons'] ?? [],
-                'notes' => $preview['notes'] ?? [],
-                'application_results' => [$preview],
             ];
         }
 
         $bulkAction = $this->bulkActionForOperation($operation);
         $bulkPreview = $this->overrides->previewBulk($tenant, $bulkAction, null);
-        $appliedApps = array_values(array_filter(
-            $bulkPreview['results'],
-            fn (array $row): bool => $row['outcome'] === 'applied',
-        ));
+        $appliedApps = 0;
         $skipReasons = [];
+
         foreach ($bulkPreview['results'] as $row) {
+            if ($row['outcome'] === 'applied') {
+                $appliedApps++;
+            }
+
             foreach ($row['skip_reasons'] ?? [] as $reason) {
                 $skipReasons[] = $reason;
             }
@@ -254,11 +365,8 @@ class PlatformGlobalApplicationOverrideService
             'tenant_id' => $tenant->id,
             'tenant_name' => $tenant->name,
             'account_number' => $tenant->account_number,
-            'outcome' => $appliedApps !== [] ? 'applied' : 'skipped',
+            'outcome' => $appliedApps > 0 ? 'applied' : 'skipped',
             'skip_reasons' => array_values(array_unique($skipReasons)),
-            'notes' => [],
-            'application_results' => $bulkPreview['results'],
-            'applied_application_count' => count($appliedApps),
         ];
     }
 
@@ -280,7 +388,6 @@ class PlatformGlobalApplicationOverrideService
 
                 if (self::isSingleAppOperation($operation)) {
                     $result = $this->applySingleApp($tenant, $administrator, $operation, $applicationKey, $reason);
-                    $preview['application_results'] = [$result];
 
                     return array_merge($preview, [
                         'outcome' => $result['outcome'],
@@ -297,15 +404,13 @@ class PlatformGlobalApplicationOverrideService
                     $reason,
                     recordPlatformAction: false,
                 );
-                $appliedApps = array_values(array_filter(
+                $appliedApps = count(array_filter(
                     $bulkResult['results'],
                     fn (array $row): bool => $row['outcome'] === 'applied',
                 ));
 
                 return array_merge($preview, [
-                    'outcome' => $appliedApps !== [] ? 'applied' : 'skipped',
-                    'application_results' => $bulkResult['results'],
-                    'applied_application_count' => count($appliedApps),
+                    'outcome' => $appliedApps > 0 ? 'applied' : 'skipped',
                 ]);
             });
         } catch (\Throwable $exception) {
@@ -315,11 +420,22 @@ class PlatformGlobalApplicationOverrideService
                 'account_number' => $tenant->account_number,
                 'outcome' => 'failed',
                 'skip_reasons' => [],
-                'notes' => [],
                 'error' => $exception->getMessage(),
-                'application_results' => [],
             ];
         }
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private function sampleRow(array $row): array
+    {
+        return [
+            'tenant_id' => $row['tenant_id'],
+            'tenant_name' => $row['tenant_name'],
+            'account_number' => $row['account_number'],
+            'outcome' => $row['outcome'],
+            'skip_reasons' => $row['skip_reasons'] ?? [],
+            'error' => $row['error'] ?? null,
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -375,7 +491,13 @@ class PlatformGlobalApplicationOverrideService
 
     /**
      * @param  list<string>|null  $tenantIds
-     * @param  list<array<string, mixed>>  $tenantResults
+     * @param  array{
+     *   counts: array{eligible_tenants:int,will_apply:int,skipped:int,failed:int},
+     *   skip_reasons: array<string,int>,
+     *   sample_tenants: list<array<string,mixed>>,
+     *   failures: list<array<string,mixed>>,
+     *   total_tenants: int
+     * }  $aggregate
      * @return array<string, mixed>
      */
     private function buildResponse(
@@ -383,39 +505,10 @@ class PlatformGlobalApplicationOverrideService
         string $operation,
         ?string $applicationKey,
         ?array $tenantIds,
-        array $tenantResults,
+        array $aggregate,
         ?string $reason,
     ): array {
         $application = $applicationKey !== null ? ApplicationCatalog::find($applicationKey) : null;
-        $willApply = array_values(array_filter($tenantResults, fn (array $row): bool => $row['outcome'] === 'applied'));
-        $skipped = array_values(array_filter($tenantResults, fn (array $row): bool => $row['outcome'] === 'skipped'));
-        $failed = array_values(array_filter($tenantResults, fn (array $row): bool => $row['outcome'] === 'failed'));
-        $groupedSkipReasons = [];
-
-        foreach ($tenantResults as $row) {
-            foreach ($row['skip_reasons'] ?? [] as $skipReason) {
-                $groupedSkipReasons[$skipReason] = ($groupedSkipReasons[$skipReason] ?? 0) + 1;
-            }
-        }
-
-        arsort($groupedSkipReasons);
-
-        $sampleTenants = array_slice(array_merge(
-            array_map(fn (array $row): array => [
-                'tenant_id' => $row['tenant_id'],
-                'tenant_name' => $row['tenant_name'],
-                'account_number' => $row['account_number'],
-                'outcome' => $row['outcome'],
-                'skip_reasons' => $row['skip_reasons'] ?? [],
-            ], $willApply),
-            array_map(fn (array $row): array => [
-                'tenant_id' => $row['tenant_id'],
-                'tenant_name' => $row['tenant_name'],
-                'account_number' => $row['account_number'],
-                'outcome' => $row['outcome'],
-                'skip_reasons' => $row['skip_reasons'] ?? [],
-            ], $skipped),
-        ), 0, 10);
 
         return [
             'request_id' => $requestId,
@@ -425,17 +518,13 @@ class PlatformGlobalApplicationOverrideService
             'layer' => $this->layerForOperation($operation),
             'scope' => [
                 'mode' => $tenantIds === null || $tenantIds === [] ? 'all' : 'filtered',
-                'total_tenants' => count($tenantResults),
+                'total_tenants' => $aggregate['total_tenants'],
                 'tenant_ids' => $tenantIds,
             ],
-            'counts' => [
-                'eligible_tenants' => count($willApply) + count($skipped),
-                'will_apply' => count($willApply),
-                'skipped' => count($skipped),
-                'failed' => count($failed),
-            ],
-            'skip_reasons' => $groupedSkipReasons,
-            'sample_tenants' => $sampleTenants,
+            'counts' => $aggregate['counts'],
+            'skip_reasons' => $aggregate['skip_reasons'],
+            'sample_tenants' => $aggregate['sample_tenants'],
+            'failures' => $aggregate['failures'],
             'protections' => [
                 'mandatory' => $application['mandatory'] ?? null,
                 'dependencies' => $application['dependencies'] ?? [],
@@ -444,7 +533,6 @@ class PlatformGlobalApplicationOverrideService
                 'retired_blocked' => ($application['maturity'] ?? null) === ApplicationCatalog::MATURITY_RETIRED,
             ],
             'reason' => $reason,
-            'tenant_results' => $tenantResults,
         ];
     }
 

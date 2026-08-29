@@ -45,6 +45,7 @@ interface GlobalApplication {
 
 interface GlobalPreview {
   request_id: string;
+  confirmation_token: string;
   operation: GlobalOperation;
   application_key: string | null;
   layer: 'commercial' | 'operational';
@@ -157,7 +158,7 @@ export function GlobalApplicationControlsCard() {
   }
 
   async function applyPending() {
-    if (!pendingAction) return;
+    if (!pendingAction || !preview) return;
     setActing(true);
     setError(null);
     setSuccess(null);
@@ -165,6 +166,7 @@ export function GlobalApplicationControlsCard() {
       const response = await platformApi<{ data: GlobalPreview }>('/platform/application-overrides/global/apply', {
         method: 'POST',
         body: {
+          confirmation_token: preview.confirmation_token,
           operation: pendingAction.operation,
           application_key: pendingAction.applicationKey,
           reason: reason || null,

@@ -142,18 +142,40 @@ const summaryResponse = {
 
 describe('GlobalApplicationControlsCard', () => {
   beforeEach(() => {
-    platformApi.mockImplementation(async (path: string, options?: { method?: string }) => {
+    platformApi.mockImplementation(async (path: string, options?: { method?: string; body?: Record<string, unknown> }) => {
       if (path === '/platform/application-overrides/global/summary') return summaryResponse;
       if (path === '/platform/application-overrides/global/preview') {
         return {
           data: {
             request_id: 'req-1',
+            confirmation_token: 'token-1',
             operation: 'grant_all_tenants',
             application_key: 'document_center.core',
             layer: 'commercial',
             scope: { mode: 'all', total_tenants: 2, tenant_ids: null },
             counts: { eligible_tenants: 2, will_apply: 0, skipped: 2, failed: 0 },
             skip_reasons: { 'already granted': 2 },
+            sample_tenants: [],
+            protections: { mandatory: false, dependencies: [], maturity: 'built', coming_soon_blocked: false, retired_blocked: false },
+          },
+        };
+      }
+      if (path === '/platform/application-overrides/global/apply') {
+        expect(options?.body).toMatchObject({
+          confirmation_token: 'token-1',
+          operation: 'grant_all_tenants',
+          application_key: 'document_center.core',
+        });
+        return {
+          data: {
+            request_id: 'req-1',
+            confirmation_token: 'token-1',
+            operation: 'grant_all_tenants',
+            application_key: 'document_center.core',
+            layer: 'commercial',
+            scope: { mode: 'all', total_tenants: 2, tenant_ids: null },
+            counts: { eligible_tenants: 2, will_apply: 1, skipped: 1, failed: 0 },
+            skip_reasons: {},
             sample_tenants: [],
             protections: { mandatory: false, dependencies: [], maturity: 'built', coming_soon_blocked: false, retired_blocked: false },
           },

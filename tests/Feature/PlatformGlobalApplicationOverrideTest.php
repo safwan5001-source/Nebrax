@@ -47,6 +47,24 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
         ];
     }
 
+    /** @param  array<string, mixed>  $payload */
+    private function globalPreview(string $token, array $payload): \Illuminate\Testing\TestResponse
+    {
+        return $this->withToken($token)
+            ->postJson('/api/platform/application-overrides/global/preview', $payload);
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function globalApply(string $token, array $payload): \Illuminate\Testing\TestResponse
+    {
+        $preview = $this->globalPreview($token, $payload)->assertOk();
+
+        return $this->withToken($token)
+            ->postJson('/api/platform/application-overrides/global/apply', array_merge($payload, [
+                'confirmation_token' => $preview->json('data.confirmation_token'),
+            ]));
+    }
+
     /** @return array{tenant_id: string} */
     private function registerIsolatedTenant(string $slug, bool $autoEnableApplications = false): array
     {
@@ -105,24 +123,22 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
         $platform = $this->platformAdministrator();
         $journalBefore = JournalEntry::count();
 
-        $preview = $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/preview', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
-                'application_key' => self::COMMERCIAL_KEY,
-                'tenant_ids' => [$tenantA['tenant_id'], $tenantB['tenant_id']],
-            ])
-            ->assertOk();
+        $preview = $this->globalPreview($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
+            'application_key' => self::COMMERCIAL_KEY,
+            'tenant_ids' => [$tenantA['tenant_id'], $tenantB['tenant_id']],
+        ])->assertOk();
 
         $this->assertSame(2, $preview->json('data.counts.will_apply'));
+        $this->assertNotEmpty($preview->json('data.confirmation_token'));
         $this->assertSame(0, TenantApplicationEntitlement::withoutGlobalScopes()->count());
 
-        $apply = $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
-                'application_key' => self::COMMERCIAL_KEY,
-                'tenant_ids' => [$tenantA['tenant_id'], $tenantB['tenant_id']],
-                'reason' => 'منح عام',
-            ])
+        $apply = $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
+            'application_key' => self::COMMERCIAL_KEY,
+            'tenant_ids' => [$tenantA['tenant_id'], $tenantB['tenant_id']],
+            'reason' => 'منح عام',
+        ])
             ->assertOk()
             ->assertJsonPath('data.counts.will_apply', 2);
 
@@ -157,24 +173,21 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
             ->where('source_type', EntitlementSourceType::PLAN->value)
             ->sole();
 
-        $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
-                'application_key' => self::COMMERCIAL_KEY,
-                'tenant_ids' => [$tenant['tenant_id']],
-            ])
-            ->assertOk();
+        $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
+            'application_key' => self::COMMERCIAL_KEY,
+            'tenant_ids' => [$tenant['tenant_id']],
+        ])->assertOk();
 
         $overrideGrant = TenantApplicationEntitlement::withoutGlobalScopes()
             ->where('source_type', EntitlementSourceType::ADMINISTRATIVE_OVERRIDE->value)
             ->sole();
 
-        $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_REVERT_ALL_TENANTS,
-                'application_key' => self::COMMERCIAL_KEY,
-                'tenant_ids' => [$tenant['tenant_id']],
-            ])
+        $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_REVERT_ALL_TENANTS,
+            'application_key' => self::COMMERCIAL_KEY,
+            'tenant_ids' => [$tenant['tenant_id']],
+        ])
             ->assertOk()
             ->assertJsonPath('data.counts.will_apply', 1);
 
@@ -199,12 +212,11 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
         $tenantB = $this->registerIsolatedTenant('global-show-b', autoEnableApplications: false);
         $platform = $this->platformAdministrator();
 
-        $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
-                'application_key' => 'hr.employees',
-                'tenant_ids' => [$tenantA['tenant_id'], $tenantB['tenant_id']],
-            ])
+        $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
+            'application_key' => 'hr.employees',
+            'tenant_ids' => [$tenantA['tenant_id'], $tenantB['tenant_id']],
+        ])
             ->assertOk()
             ->assertJsonPath('data.counts.will_apply', 2);
 
@@ -238,11 +250,10 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
         $tenant = $this->registerIsolatedTenant('global-all-apps', autoEnableApplications: false);
         $platform = $this->platformAdministrator();
 
-        $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_APPS_ALL_TENANTS,
-                'tenant_ids' => [$tenant['tenant_id']],
-            ])
+        $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_APPS_ALL_TENANTS,
+            'tenant_ids' => [$tenant['tenant_id']],
+        ])
             ->assertOk()
             ->assertJsonPath('data.counts.will_apply', 1);
 
@@ -257,20 +268,17 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
         $tenant = $this->registerIsolatedTenant('global-idempotent', autoEnableApplications: false);
         $platform = $this->platformAdministrator();
 
-        $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
-                'application_key' => self::COMMERCIAL_KEY,
-                'tenant_ids' => [$tenant['tenant_id']],
-            ])
-            ->assertOk();
+        $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
+            'application_key' => self::COMMERCIAL_KEY,
+            'tenant_ids' => [$tenant['tenant_id']],
+        ])->assertOk();
 
-        $repeat = $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
-                'application_key' => self::COMMERCIAL_KEY,
-                'tenant_ids' => [$tenant['tenant_id']],
-            ])
+        $repeat = $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
+            'application_key' => self::COMMERCIAL_KEY,
+            'tenant_ids' => [$tenant['tenant_id']],
+        ])
             ->assertOk();
 
         $this->assertSame(0, $repeat->json('data.counts.will_apply'));
@@ -323,13 +331,11 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
         $tenantB = $this->registerIsolatedTenant('global-isolation-b', autoEnableApplications: false);
         $platform = $this->platformAdministrator();
 
-        $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
-                'application_key' => 'hr.employees',
-                'tenant_ids' => [$tenantA['tenant_id']],
-            ])
-            ->assertOk();
+        $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
+            'application_key' => 'hr.employees',
+            'tenant_ids' => [$tenantA['tenant_id']],
+        ])->assertOk();
 
         app(TenantContext::class)->set($tenantA['tenant_id']);
         $this->assertSame('enabled', app(TenantApplicationService::class)->statusFor('hr.employees'));
@@ -402,12 +408,11 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
             ])
             ->assertOk();
 
-        $response = $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
-                'application_key' => self::COMMERCIAL_KEY,
-                'tenant_ids' => [$tenantReady['tenant_id'], $tenantGranted['tenant_id']],
-            ])
+        $response = $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
+            'application_key' => self::COMMERCIAL_KEY,
+            'tenant_ids' => [$tenantReady['tenant_id'], $tenantGranted['tenant_id']],
+        ])
             ->assertOk();
 
         $this->assertSame(1, $response->json('data.counts.will_apply'));
@@ -422,13 +427,11 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
         $tenantB = $this->registerIsolatedTenant('global-audit-b', autoEnableApplications: false);
         $platform = $this->platformAdministrator();
 
-        $this->withToken($platform['token'])
-            ->postJson('/api/platform/application-overrides/global/apply', [
-                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
-                'application_key' => 'hr.employees',
-                'tenant_ids' => [$tenantA['tenant_id'], $tenantB['tenant_id']],
-            ])
-            ->assertOk();
+        $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
+            'application_key' => 'hr.employees',
+            'tenant_ids' => [$tenantA['tenant_id'], $tenantB['tenant_id']],
+        ])->assertOk();
 
         $this->assertSame(1, PlatformAdministratorAction::query()
             ->where('action', PlatformAdministratorAction::ACTION_APPLICATION_GLOBAL_BULK)
@@ -470,9 +473,61 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
             ])
             ->assertOk();
 
-        $results = collect($response->json('data.tenant_results'))->keyBy('tenant_id');
+        $results = collect($response->json('data.sample_tenants'))->keyBy('tenant_id');
         $this->assertSame('applied', $results[$legacy['tenant_id']]['outcome']);
         $this->assertSame('skipped', $results[$newTenant['tenant_id']]['outcome']);
+    }
+
+    /** @test */
+    public function global_apply_requires_confirmation_token(): void
+    {
+        $platform = $this->platformAdministrator();
+
+        $this->withToken($platform['token'])
+            ->postJson('/api/platform/application-overrides/global/apply', [
+                'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
+                'application_key' => 'hr.employees',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['confirmation_token']);
+    }
+
+    /** @test */
+    public function global_apply_rejects_reused_confirmation_token(): void
+    {
+        $tenant = $this->registerIsolatedTenant('global-token-reuse', autoEnableApplications: false);
+        $platform = $this->platformAdministrator();
+        $payload = [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
+            'application_key' => 'hr.employees',
+            'tenant_ids' => [$tenant['tenant_id']],
+        ];
+
+        $preview = $this->globalPreview($platform['token'], $payload)->assertOk();
+        $token = $preview->json('data.confirmation_token');
+
+        $this->withToken($platform['token'])
+            ->postJson('/api/platform/application-overrides/global/apply', array_merge($payload, [
+                'confirmation_token' => $token,
+            ]))
+            ->assertOk();
+
+        $this->withToken($platform['token'])
+            ->postJson('/api/platform/application-overrides/global/apply', array_merge($payload, [
+                'confirmation_token' => $token,
+            ]))
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function global_summary_rejects_invalid_tenant_ids(): void
+    {
+        $platform = $this->platformAdministrator();
+
+        $this->withToken($platform['token'])
+            ->getJson('/api/platform/application-overrides/global/summary?tenant_ids=not-a-uuid')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['tenant_ids.0']);
     }
 
     /** @return array{tenant_id: string} */
