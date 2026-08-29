@@ -23,6 +23,7 @@ import {
   POS_MOBILE_NAV_CLASS,
   POS_SALE_GRID_CLASS,
   posCartPaneClass,
+  posProductGridClass,
   posProductGridPadClass,
   posProductsPaneClass,
 } from '@/lib/pos-responsive';
@@ -1402,7 +1403,7 @@ export default function PosPage() {
       <div
         ref={registerProductsContainer}
         tabIndex={-1}
-        className={'grid gap-3 outline-none ' + (posCfg.show_product_images ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6') + posProductGridPadClass(count > 0)}
+        className={posProductGridClass(posCfg.show_product_images, count > 0)}
       >
         {filtered.map((p, index) => {
           const tracked = p.track_inventory;
