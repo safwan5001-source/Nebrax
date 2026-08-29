@@ -325,6 +325,87 @@
         "read_only": "Read only",
         "denied": "Denied"
       }
+    },
+    "globalApplicationControls": {
+      "title": "Global application controls",
+      "subtitle": "Apply platform overrides across {count} tenants — preview is required before confirmation.",
+      "refresh": "Refresh",
+      "loadFailed": "Unable to load global application controls.",
+      "previewFailed": "Unable to build the preview.",
+      "applyFailed": "Unable to apply the operation.",
+      "applySummary": "Applied to {applied} tenants, skipped {skipped}, failed {failed}.",
+      "loading": "Loading…",
+      "empty": "No matching applications.",
+      "search": "Search applications…",
+      "filterApps": "Filter applications",
+      "filterAll": "All applications",
+      "filterCommercial": "Commercially gated",
+      "filterBuilt": "Built non-mandatory",
+      "filterProtected": "Protected",
+      "filterStatus": "Filter status",
+      "statusAll": "All statuses",
+      "statusMandatory": "Mandatory",
+      "statusComingSoon": "Coming soon",
+      "statusRetired": "Retired",
+      "allAppsGrant": "Grant all apps to all tenants",
+      "allAppsRevert": "Revert all apps for all tenants",
+      "allAppsShow": "Show all apps to all tenants",
+      "allAppsHide": "Hide all apps for all tenants",
+      "grantAll": "Grant all tenants",
+      "revertAll": "Revert all tenants",
+      "showAll": "Show all tenants",
+      "hideAll": "Hide all tenants",
+      "rowActions": "Application actions",
+      "previewTitle": "Global control preview",
+      "previewOperation": "Operation",
+      "previewLayer": "Layer",
+      "previewTotal": "Total tenants",
+      "previewWillApply": "Will apply",
+      "previewSkipped": "Will skip",
+      "previewFailedCount": "Failed",
+      "previewSkipReasons": "Skip reasons",
+      "previewTenant": "Tenant",
+      "previewOutcome": "Outcome",
+      "previewDetails": "Details",
+      "reasonLabel": "Reason (optional)",
+      "cancel": "Cancel",
+      "confirmApply": "Apply to {count} tenants",
+      "applying": "Applying…",
+      "columns": {
+        "app": "Application",
+        "globalStatus": "Global status",
+        "protected": "Protection",
+        "actions": "Actions"
+      },
+      "counts": {
+        "granted": "Granted {count}",
+        "enabled": "Enabled {count}",
+        "suspended": "Suspended {count}"
+      },
+      "protected": {
+        "mandatory": "Mandatory",
+        "coming_soon": "Coming soon",
+        "retired": "Retired"
+      },
+      "layers": {
+        "commercial": "Commercial",
+        "operational": "Operational"
+      },
+      "outcomes": {
+        "applied": "Will apply",
+        "skipped": "Will skip",
+        "failed": "Failed"
+      },
+      "operations": {
+        "grant_all_tenants": "Grant all tenants",
+        "revert_all_tenants": "Revert all tenants",
+        "show_all_tenants": "Show all tenants",
+        "hide_all_tenants": "Hide all tenants",
+        "grant_all_apps_all_tenants": "Grant all apps to all tenants",
+        "revert_all_apps_all_tenants": "Revert all apps for all tenants",
+        "show_all_apps_all_tenants": "Show all apps to all tenants",
+        "hide_all_apps_all_tenants": "Hide all apps for all tenants"
+      }
     }
   },
   "platformPrices": {

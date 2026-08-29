@@ -24,6 +24,7 @@ class PlatformAdministratorAction extends Model
     public const ACTION_APPLICATION_SHOWN = 'application_shown';
     public const ACTION_APPLICATION_HIDDEN = 'application_hidden';
     public const ACTION_APPLICATION_BULK = 'application_bulk';
+    public const ACTION_APPLICATION_GLOBAL_BULK = 'application_global_bulk';
 
     public $incrementing = false;
 

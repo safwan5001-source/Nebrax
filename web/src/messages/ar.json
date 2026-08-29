@@ -325,6 +325,87 @@
         "read_only": "قراءة فقط",
         "denied": "مرفوض"
       }
+    },
+    "globalApplicationControls": {
+      "title": "التحكم العام بالتطبيقات",
+      "subtitle": "تطبيق تجاوزات المنصة على {count} مستأجرًا — معاينة إلزامية قبل التأكيد.",
+      "refresh": "تحديث",
+      "loadFailed": "تعذر تحميل التحكم العام بالتطبيقات.",
+      "previewFailed": "تعذر إنشاء المعاينة.",
+      "applyFailed": "تعذر تطبيق العملية.",
+      "applySummary": "تم التطبيق على {applied} مستأجر، وتخطّي {skipped}، وفشل {failed}.",
+      "loading": "جارٍ التحميل…",
+      "empty": "لا توجد تطبيقات مطابقة.",
+      "search": "بحث بالتطبيق…",
+      "filterApps": "تصفية التطبيقات",
+      "filterAll": "كل التطبيقات",
+      "filterCommercial": "محروسة تجارياً",
+      "filterBuilt": "مبنية غير إلزامية",
+      "filterProtected": "محمية",
+      "filterStatus": "تصفية الحالة",
+      "statusAll": "كل الحالات",
+      "statusMandatory": "إلزامية",
+      "statusComingSoon": "قريباً",
+      "statusRetired": "متقاعدة",
+      "allAppsGrant": "منح كل التطبيقات لكل المستأجرين",
+      "allAppsRevert": "تراجع كل التطبيقات لكل المستأجرين",
+      "allAppsShow": "إظهار كل التطبيقات لكل المستأجرين",
+      "allAppsHide": "إخفاء كل التطبيقات لكل المستأجرين",
+      "grantAll": "منح للجميع",
+      "revertAll": "تراجع للجميع",
+      "showAll": "إظهار للجميع",
+      "hideAll": "إخفاء للجميع",
+      "rowActions": "إجراءات التطبيق",
+      "previewTitle": "معاينة التحكم العام",
+      "previewOperation": "العملية",
+      "previewLayer": "الطبقة",
+      "previewTotal": "إجمالي المستأجرين",
+      "previewWillApply": "سيُطبَّق",
+      "previewSkipped": "سيُتخطى",
+      "previewFailedCount": "فشل",
+      "previewSkipReasons": "أسباب التخطي",
+      "previewTenant": "المستأجر",
+      "previewOutcome": "النتيجة",
+      "previewDetails": "التفاصيل",
+      "reasonLabel": "سبب (اختياري)",
+      "cancel": "إلغاء",
+      "confirmApply": "تطبيق على {count} مستأجرًا",
+      "applying": "جارٍ التطبيق…",
+      "columns": {
+        "app": "التطبيق",
+        "globalStatus": "الحالة العامة",
+        "protected": "الحماية",
+        "actions": "إجراءات"
+      },
+      "counts": {
+        "granted": "منح {count}",
+        "enabled": "مفعّل {count}",
+        "suspended": "معلّق {count}"
+      },
+      "protected": {
+        "mandatory": "إلزامي",
+        "coming_soon": "قريباً",
+        "retired": "متقاعد"
+      },
+      "layers": {
+        "commercial": "تجاري",
+        "operational": "تشغيلي"
+      },
+      "outcomes": {
+        "applied": "سيُطبَّق",
+        "skipped": "سيُتخطى",
+        "failed": "فشل"
+      },
+      "operations": {
+        "grant_all_tenants": "منح للجميع",
+        "revert_all_tenants": "تراجع للجميع",
+        "show_all_tenants": "إظهار للجميع",
+        "hide_all_tenants": "إخفاء للجميع",
+        "grant_all_apps_all_tenants": "منح كل التطبيقات لكل المستأجرين",
+        "revert_all_apps_all_tenants": "تراجع كل التطبيقات لكل المستأجرين",
+        "show_all_apps_all_tenants": "إظهار كل التطبيقات لكل المستأجرين",
+        "hide_all_apps_all_tenants": "إخفاء كل التطبيقات لكل المستأجرين"
+      }
     }
   },
   "platformPrices": {

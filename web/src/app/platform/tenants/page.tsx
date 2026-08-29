@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
 import { ArrowRight, RefreshCw, ShieldCheck } from 'lucide-react';
+import { GlobalApplicationControlsCard } from '@/components/platform/global-application-controls-card';
 import { DataTable } from '@/components/data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -184,6 +185,7 @@ export default function PlatformTenantsPage() {
           </Card>
         ) : (
           <div className="space-y-3">
+            <GlobalApplicationControlsCard />
             <div className="flex flex-wrap items-center gap-2">
               <Select
                 value={planFilter}
