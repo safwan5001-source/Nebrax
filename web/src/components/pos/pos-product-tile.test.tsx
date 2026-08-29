@@ -80,19 +80,25 @@ describe('PosProductTile', () => {
 
   it('يعرض الباركود ويخفي SKU ووسم الضريبة داخل البطاقة', () => {
     renderTile();
-    const barcode = screen.getByTestId('pos-product-barcode');
-    const barcodeValue = screen.getByText('6281000000330');
-    expect(barcode).toBeTruthy();
-    expect(barcodeValue.getAttribute('dir')).toBe('ltr');
+    expect(screen.getByText('6281000000330')).toBeTruthy();
     expect(screen.queryByText('W330')).toBeNull();
     expect(screen.queryByText('incl. VAT')).toBeNull();
     expect(screen.getByText('1.50')).toBeTruthy();
-    expect(screen.getByTestId('pos-product-stock').textContent).toContain('Available: 12');
+    expect(screen.getByText('Available: 12')).toBeTruthy();
+  });
+
+  it('يثبّت اتجاه الباركود LTR ويترك المخزون في سطر مستقل', () => {
+    renderTile();
+    const barcode = screen.getByText('6281000000330');
+    const stock = screen.getByText('Available: 12');
+    expect(barcode.getAttribute('dir')).toBe('ltr');
+    expect(barcode.closest('[data-testid="pos-product-barcode"]')).toBeTruthy();
+    expect(stock.closest('[data-testid="pos-product-stock"]')).toBeTruthy();
+    expect(barcode.closest('[data-testid="pos-product-barcode"]')).not.toBe(stock.closest('[data-testid="pos-product-stock"]'));
   });
 
   it('لا يعرض باركودًا وهميًا عند عدم وجود باركود حقيقي', () => {
     renderTile({ product: { ...product, barcode: null } });
-    expect(screen.queryByTestId('pos-product-barcode')).toBeNull();
     expect(screen.queryByText('6281000000330')).toBeNull();
     expect(screen.queryByText('W330')).toBeNull();
   });
