@@ -1031,7 +1031,12 @@ export default function PosPage() {
       let auditCartId: string | null = null;
       try {
         auditCartId = await ensureAuditCart(activeCart);
-        if (!auditCartId) throw new Error(t('open_to_start'));
+        if (!auditCartId) {
+          setCheckoutPhase('retryable_error');
+          setError(t('open_to_start'));
+          playPosFeedback('payment_error');
+          return;
+        }
 
         const submitOnce = async () => {
           const items = cart.map((l) => ({
@@ -1106,7 +1111,7 @@ export default function PosPage() {
             // الواجهة تعرض النتيجة فقط ولا تنشئ دليلاً نهائياً قابلاً للتزوير.
             // نبقي نفس attemptKey لإعادة محاولة آمنة (الخادم يمنع التكرار).
             const network = isPosCheckoutNetworkFailure(error);
-            setCheckoutPhase(network ? 'retryable_error' : 'retryable_error');
+            setCheckoutPhase('retryable_error');
             const reason = network
               ? t('checkout_retry_safe')
               : error instanceof ApiError
@@ -1163,6 +1168,19 @@ export default function PosPage() {
         } catch {
           toast({ title: t('sale_done'), description: t('receipt_unavailable'), variant: 'warning' });
         }
+      } catch (error) {
+        // فشل قبل/خارج مسار checkout (مثل إنشاء سلة التدقيق) — لا رفض غير معالَج.
+        setCheckoutPhase('retryable_error');
+        setError(
+          isPosCheckoutNetworkFailure(error)
+            ? t('checkout_retry_safe')
+            : error instanceof ApiError
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : tc('saveFailed'),
+        );
+        playPosFeedback('payment_error');
       } finally {
         paymentRequestRef.current = false;
         setPaying(false);

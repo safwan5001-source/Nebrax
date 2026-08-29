@@ -92,7 +92,7 @@ describe('PosPayment', () => {
 
     const confirm = screen.getByTestId('pos-confirm-payment') as HTMLButtonElement;
     expect(confirm.disabled).toBe(true);
-    expect(confirm).toHaveTextContent('checkout_submitting');
+    expect(confirm.textContent ?? '').toContain('checkout_submitting');
     fireEvent.click(confirm);
     expect(onConfirm).not.toHaveBeenCalled();
 
@@ -142,7 +142,7 @@ describe('PosPayment', () => {
 
     const confirm = screen.getByTestId('pos-confirm-payment') as HTMLButtonElement;
     expect(confirm.disabled).toBe(true);
-    expect(confirm).toHaveTextContent('checkout_recovering');
+    expect(confirm.textContent ?? '').toContain('checkout_recovering');
     expect(screen.getByTestId('pos-checkout-recovering')).toBeTruthy();
     fireEvent.click(confirm);
     fireEvent.keyDown(confirm, { key: 'Enter' });

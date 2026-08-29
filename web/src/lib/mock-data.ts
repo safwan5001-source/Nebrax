@@ -1035,8 +1035,8 @@ export const mockAppointments = [
 
 // ── المدفوعات ──────────────────────────────────────────────────────────────
 export const mockPaymentMethods = [
-  { id: 'pm-method-cash', name: 'نقدي', settlement_type: 'cash', cash_bank_account_id: 'cash-main', is_active: true, is_default: true },
-  { id: 'pm-method-bank', name: 'تحويل بنكي', settlement_type: 'bank', cash_bank_account_id: 'bank-main', is_active: true, is_default: false },
+  { id: 'pm-method-cash', name: 'نقدي', name_en: 'Cash', settlement_type: 'cash', cash_bank_account_id: 'cash-main', is_active: true, is_default: true },
+  { id: 'pm-method-bank', name: 'تحويل بنكي', name_en: 'Bank transfer', settlement_type: 'bank', cash_bank_account_id: 'bank-main', is_active: true, is_default: false },
 ];
 
 export const mockCashBankAccounts = [
@@ -2584,6 +2584,14 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     }
     // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
     if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
+    // سلة تدقيق POS: العقد الحقيقي يعيد cart_id؛ بدونها تفشل ensureAuditCart قبل checkout.
+    if (clean === '/pos/carts' && m === 'POST') {
+      return resolve({ data: { cart_id: `demo-cart-${Date.now()}` } });
+    }
+    const posCartEvent = clean.match(/^\/pos\/carts\/([^/]+)\/events$/);
+    if (posCartEvent && m === 'POST') {
+      return resolve({ data: { id: `demo-event-${posCartEvent[1]}`, cart_id: posCartEvent[1] } });
+    }
     if (clean === '/pos/checkout') {
       const thermalAssignment = mockPrintTemplateAssignments.find((assignment) => (
         assignment.branch_id === null && assignment.document_type === 'tax_invoice' && assignment.usage === 'thermal'
