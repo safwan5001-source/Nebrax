@@ -72,15 +72,15 @@ export function PosProductTile({
             {product.sale_price_label}
           </span>
 
-          <div className="mt-auto flex min-w-0 items-center justify-between gap-2 border-t border-border pt-2 text-[10px] text-muted">
+          <div className="mt-auto min-w-0 space-y-1.5 border-t border-border pt-2 text-[10px] text-muted">
             {product.barcode ? (
-              <span className="flex min-w-0 items-center gap-1" title={product.barcode}>
+              <span className="flex min-w-0 items-center gap-1" title={product.barcode} data-testid="pos-product-barcode">
                 <Barcode className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
                 <span className="num min-w-0 truncate" dir="ltr">{product.barcode}</span>
               </span>
-            ) : <span />}
+            ) : null}
             {product.track_inventory && (
-              <span className="num shrink-0 whitespace-nowrap">
+              <span className="num block truncate whitespace-nowrap" data-testid="pos-product-stock">
                 {availableLabel}: {product.quantity_on_hand}
               </span>
             )}
