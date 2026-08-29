@@ -70,9 +70,17 @@ function leafName(path: string): string {
   return path.split('.').pop() ?? path;
 }
 
-function formatLeafValue(path: string, value: unknown, formatMoneyMinor: (minor: string | number) => string): string {
+function formatLeafValue(
+  path: string,
+  value: unknown,
+  formatMoneyMinor: (minor: string | number) => string,
+  formatStatus?: (status: string) => string,
+): string {
   if (value === null || value === undefined) return '—';
   const leaf = leafName(path);
+  if (leaf === 'status' && typeof value === 'string') {
+    return formatStatus ? formatStatus(value) : value;
+  }
   if (MONEY_LEAVES.has(leaf) && (typeof value === 'number' || typeof value === 'string')) {
     return formatMoneyMinor(value);
   }
@@ -127,7 +135,10 @@ export function collectComparableLeaves(value: unknown, prefix = ''): Map<string
 export function buildEventDiff(
   before: unknown,
   after: unknown,
-  options?: { formatMoneyMinor?: (minor: string | number) => string },
+  options?: {
+    formatMoneyMinor?: (minor: string | number) => string;
+    formatStatus?: (status: string) => string;
+  },
 ): DiffRow[] {
   const formatMoneyMinor = options?.formatMoneyMinor ?? formatPayloadMoney;
   if (before === undefined && after === undefined) return [];
@@ -139,14 +150,19 @@ export function buildEventDiff(
   const rows: DiffRow[] = [];
 
   for (const path of [...paths].sort()) {
-    const left = beforeLeaves.has(path) ? beforeLeaves.get(path) : undefined;
-    const right = afterLeaves.has(path) ? afterLeaves.get(path) : undefined;
+    const leftPresent = beforeLeaves.has(path);
+    const rightPresent = afterLeaves.has(path);
+    // تغيّر شكلي (حقل متداخل اختفى لأن after بلا نفس الحاوية) لا يُعرض كفرق بشري.
+    if (path.includes('.') && leftPresent !== rightPresent) continue;
+    const left = leftPresent ? beforeLeaves.get(path) : undefined;
+    const right = rightPresent ? afterLeaves.get(path) : undefined;
     if (valuesEqual(left ?? null, right ?? null)) continue;
+    const leaf = leafName(path);
     rows.push({
       path,
-      field: leafName(path),
-      before: left === undefined ? '—' : formatLeafValue(path, left, formatMoneyMinor),
-      after: right === undefined ? '—' : formatLeafValue(path, right, formatMoneyMinor),
+      field: leaf,
+      before: left === undefined ? '—' : formatLeafValue(path, left, formatMoneyMinor, options?.formatStatus),
+      after: right === undefined ? '—' : formatLeafValue(path, right, formatMoneyMinor, options?.formatStatus),
     });
   }
   return rows;

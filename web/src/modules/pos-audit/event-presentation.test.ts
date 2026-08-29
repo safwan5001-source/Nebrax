@@ -83,9 +83,13 @@ describe('POS audit event presentation', () => {
   });
 
   it('diffs status, price, and quantity and ignores key order', () => {
-    const status = buildEventDiff({ status: 'active' }, { status: 'cancelled' });
+    const status = buildEventDiff(
+      { status: 'active' },
+      { status: 'cancelled' },
+      { formatStatus: (s) => (s === 'active' ? 'نشطة' : s === 'cancelled' ? 'ملغاة' : s) },
+    );
     expect(status).toEqual([
-      { path: 'status', field: 'status', before: 'active', after: 'cancelled' },
+      { path: 'status', field: 'status', before: 'نشطة', after: 'ملغاة' },
     ]);
 
     const price = buildEventDiff(
@@ -103,6 +107,16 @@ describe('POS audit event presentation', () => {
     const quantity = buildEventDiff({ item: { quantity: 2 } }, { item: { quantity: 1 } });
     expect(quantity).toEqual([
       { path: 'item.quantity', field: 'quantity', before: '2', after: '1' },
+    ]);
+  });
+
+  it('does not treat missing nested containers as field deletions', () => {
+    const rows = buildEventDiff(
+      { item: { description: 'فطيرة', quantity: 1 }, status: 'active' },
+      { status: 'cancelled' },
+    );
+    expect(rows).toEqual([
+      { path: 'status', field: 'status', before: 'active', after: 'cancelled' },
     ]);
   });
 

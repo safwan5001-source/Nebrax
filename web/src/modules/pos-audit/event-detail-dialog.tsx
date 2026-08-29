@@ -60,7 +60,9 @@ export function EventDetailDialog({ event, onClose }: Props) {
     formatDate: (value) => formatDate(value, locale),
     statusLabel,
   });
-  const diffs = hasBeforeAfter ? buildEventDiff(before ?? null, after ?? null) : [];
+  const diffs = hasBeforeAfter
+    ? buildEventDiff(before ?? null, after ?? null, { formatStatus: statusLabel })
+    : [];
   const reference = eventReference(event.payload);
   const showSource =
     event.source === 'client_observed' || event.source === 'hybrid' || event.source === 'legacy_unknown';
