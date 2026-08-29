@@ -51,6 +51,25 @@ class ZatcaQrCertificateMaterialExtractorTest extends TestCase
         }
     }
 
+    /** @test */
+    public function it_rejects_a_malformed_ecdsa_sequence_inside_the_certificate_bit_string(): void
+    {
+        [$caKey, $caCertificate] = $this->certificateAuthority();
+        [, $leafDer] = $this->leafCertificate($caKey, $caCertificate);
+        $extractor = app(ZatcaQrCertificateMaterialExtractor::class);
+        $signature = $extractor->extract(base64_encode($leafDer))['certificate_signature'];
+        $needle = "\x00".$signature;
+        $position = strpos($leafDer, $needle);
+        $this->assertNotFalse($position);
+        $this->assertGreaterThanOrEqual(2, strlen($signature));
+
+        // signatureValue is opaque to the X.509 parser; corrupt only the inner SEQUENCE length.
+        $leafDer[$position + 2] = "\x01";
+
+        $this->expectException(InvalidArgumentException::class);
+        $extractor->extract(base64_encode($leafDer));
+    }
+
     private function rsaCertificateDer(): string
     {
         $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
