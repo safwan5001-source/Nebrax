@@ -115,6 +115,7 @@ class DocumentReviewController extends Controller
 
     public function review(Request $request, DocumentBatch $batch): DocumentReviewResource
     {
+        $this->assertActiveBranch($batch);
         $batch->load(['files', 'reviewer:id,name', 'sourceReceipt.identity:id,display_name,external_identity_masked', 'transactionLinks.purchase', 'transactionLinks.expense']);
         $result = $this->latestResult($batch);
 
@@ -710,5 +711,12 @@ class DocumentReviewController extends Controller
         }
 
         return $safe === [] ? null : $safe;
+    }
+
+    private function assertActiveBranch(DocumentBatch $batch): void
+    {
+        if (($batch->branch_id ?? null) !== app(BranchContext::class)->id()) {
+            abort(404);
+        }
     }
 }

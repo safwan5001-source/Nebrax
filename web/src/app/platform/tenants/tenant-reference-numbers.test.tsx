@@ -1,3 +1,4 @@
+/* @vitest-environment jsdom */
 import * as React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -70,7 +71,10 @@ describe('tenant reference numbers in Platform Admin', () => {
     platformApi.mockReset();
     clipboardWriteText.mockReset();
     routerPush.mockReset();
-    Object.assign(navigator, { clipboard: { writeText: clipboardWriteText } });
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: clipboardWriteText },
+      configurable: true,
+    });
     platformApi.mockImplementation((path: string) => Promise.resolve(path === '/platform/tenants/tenant-1'
       ? { data: tenant }
       : { data: [tenant], pagination: { current_page: 1, last_page: 1, per_page: 100, total: 1 } }));
