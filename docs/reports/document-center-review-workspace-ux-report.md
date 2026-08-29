@@ -4,8 +4,8 @@
 **PR:** [#565](https://github.com/safwan5001-source/Nebrax/pull/565)  
 **الفرع:** `cursor/complete-document-center-review-ux-6a0f`  
 **Base SHA:** `a7d24fe1` (أحدث `main` بعد دمج #564)  
-**Head SHA:** `9439db3` + إصلاحات مراجعة PR #565 (محلي — بانتظار commit/push)  
-**الحالة:** Draft — بانتظار المراجعة (لم يُدمج ولم يُنشر)
+**Head SHA:** `948bd84f` (تقرير) · `e9ed8a07` (كود)  
+**الحالة:** Draft — مُدفوع؛ CI جزئي (انظر §7 و§14)
 
 ---
 
@@ -191,11 +191,22 @@ upload → processing/extraction → needs_review
 
 | الاختبار | النتيجة | ملاحظات |
 |----------|---------|---------|
-| `npm run build` | ⏳ | لم يُشغَّل — بيئة الـ VM: `spawn /bin/bash ENOENT` (`/usr/bin/bash` موجود) |
-| Vitest — `web/` | ⏳ | نفس العائق |
-| `php artisan test --filter='DocumentReview\|DocumentReviewer'` | ⏳ | يتطلب تجميع Laravel في `/tmp/nibras-app` |
-| `git diff --check` | ⏳ | يتطلب shell |
-| GitHub CI (PR #565) | ⏳ | يُحدَّث بعد push الإصلاحات |
+| `npm run build` | ✅ محلي | نجح على HEAD `e9ed8a07` |
+| Vitest — `web/` (محلي) | ⚠️ | 918/922 نجح؛ فشل `tenant-reference-numbers.test.tsx` (clipboard mock) |
+| Vitest — Web CI | ❌ | نفس فشل clipboard + OOM عارض في worker cleanup |
+| `php artisan test` — sqlite/pgsql | ❌ | فشل واحد: `DocumentCenterIsolationMatrixTest` (انظر §14) |
+| اختبارات document-center الجديدة | ✅ متوقع | `DocumentReviewPayloadTest`, `DocumentReviewerEligibilityTest`, `DocumentReviewShellTest`, `DocumentReviewListTest` |
+| Vercel Preview | ✅ | نجح على HEAD `e9ed8a07` |
+| `git diff --check` | ✅ | بلا أخطاء whitespace |
+
+### حالة CI على HEAD `e9ed8a07` (2026-08-29)
+
+| البوابة | الحالة |
+|--------|--------|
+| Vercel | ✅ |
+| Web CI (Vitest + build) | ❌ — `tenant-reference-numbers.test.tsx` |
+| CI sqlite | ❌ — `DocumentCenterIsolationMatrixTest` |
+| CI pgsql | ❌ — `DocumentCenterIsolationMatrixTest` |
 
 ### أوامر التحقق
 
@@ -215,8 +226,9 @@ git diff --check
 | `14caca23` | feat(documents): add review contract and lines/warnings API payload |
 | `c41008d4` | feat(documents): complete review workspace UX with filters, settings, and demo |
 | `b2db36bb` | docs: add Document Center Review Workspace UX report |
-| `9439db3b` | merge origin/main |
-| *(معلّق)* | fix(documents): address PR #565 review — eligibility, shell review, status_group, CI |
+| `9439db3b` | merge origin/main (#564 global application controls) |
+| `e9ed8a07` | fix(documents): address PR #565 CI — vitest OOM, payload test, review fixes |
+| `948bd84f` | docs: update report — CI status §7/§14 |
 
 ---
 
@@ -302,7 +314,7 @@ git diff --check
 - اختبارات Feature الجديدة تُنسخ تلقائياً عبر `deploy/assemble.sh` و`.github/workflows/ci.yml`.
 - في CI: `composer config policy.advisories.block false` لتجاوز حجب Laravel 11 (موجود مسبقاً).
 
-### هـ) أوامر التحقق (بعد push)
+### هـ) أوامر التحقق
 
 ```bash
 cd web && npm run test && npm run build
@@ -313,4 +325,24 @@ git diff --check
 
 ---
 
-*تم إنشاء هذا التقرير تلقائيًا من Cloud Agent — بانتظار مراجعة PR #565.*
+## 14. حالة CI المتبقية (HEAD `e9ed8a07`)
+
+### أ) Web CI — `tenant-reference-numbers.test.tsx`
+
+- **السبب:** `TypeError: Cannot set property clipboard of #<Navigator> which has only a getter` عند `Object.assign(navigator, { clipboard: ... })`.
+- **النطاق:** ملف من دمج `main` (#564) — `web/src/app/platform/tenants/tenant-reference-numbers.test.tsx`، ليس من وحدة document-center.
+- **التأثير:** يمنع Web CI من الاكتمال رغم نجاح `npm run build` محلياً.
+
+### ب) Backend CI — `DocumentCenterIsolationMatrixTest`
+
+- **السبب:** `GET /document-batches/{id}/review` يُرجع `200` (shell payload) بدل `404` عند الوصول من فرع آخر لحزمة بلا extraction result.
+- **الارتباط:** regression من `review_mode=shell` — يجب أن يبقى عزل الفرع سابقاً لأي طلب review.
+- **الإصلاح المطلوب:** رفض `review()` بـ 404 عندما `batch.branch_id` لا يطابق `BranchContext` قبل بناء shell.
+
+### ج) Vercel
+
+- ✅ نجح على HEAD الحالي (لم يعد rate-limit).
+
+---
+
+*آخر تحديث: 2026-08-29 — HEAD `948bd84f` — بانتظار مراجعة PR #565.*
