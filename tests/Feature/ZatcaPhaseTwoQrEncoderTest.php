@@ -83,6 +83,7 @@ class ZatcaPhaseTwoQrEncoderTest extends TestCase
             [...array_slice($valid, 0, 5), str_repeat("\x01", 31), ...array_slice($valid, 6), 'standard'],
             [...array_slice($valid, 0, 6), str_repeat("\x02", 63), $valid[7], 'standard'],
             [...array_slice($valid, 0, 7), str_repeat("\x03", 256), 'standard'],
+            [...array_slice($valid, 0, 7), "-----BEGIN PUBLIC KEY-----\nZmFrZQ==\n-----END PUBLIC KEY-----", 'standard'],
             [...$valid, 'standard', str_repeat("\x04", 70)],
         ] as $arguments) {
             try {
