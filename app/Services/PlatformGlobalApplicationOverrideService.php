@@ -5,9 +5,14 @@ namespace App\Services;
 use App\Models\PlatformAdministrator;
 use App\Models\PlatformAdministratorAction;
 use App\Models\Tenant;
+use App\Models\TenantApplicationEntitlement;
+use App\Models\TenantApplicationState;
 use App\Support\ApplicationCatalog;
+use App\Support\EntitlementSourceType;
 use App\Support\PlatformGlobalApplicationOverrideConfirmation;
 use App\Support\PlatformGlobalApplicationOverrideFingerprint;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -47,6 +52,7 @@ class PlatformGlobalApplicationOverrideService
 
     public function __construct(
         private PlatformApplicationOverrideService $overrides,
+        private TenantApplicationEntitlementResolver $entitlements,
     ) {}
 
     /** @return list<string> */
@@ -68,31 +74,34 @@ class PlatformGlobalApplicationOverrideService
     /** @return array{applications: list<array<string, mixed>>, tenant_count: int} */
     public function summary(?array $tenantIds = null): array
     {
-        $aggregates = [];
+        $catalog = ApplicationCatalog::all();
+        $aggregates = $this->initializeSummaryAggregates($catalog);
+        $tenants = $this->loadSummaryTenants($tenantIds);
 
-        foreach (ApplicationCatalog::all() as $key => $application) {
-            $aggregates[$key] = [
-                'key' => $key,
-                'group' => $application['group'],
-                'maturity' => $application['maturity'],
-                'mandatory' => $application['mandatory'],
-                'access' => $application['access'],
-                'dependencies' => $application['dependencies'],
-                'protected_status' => $this->protectedStatus($application),
-                'global_commercial' => ['granted' => 0, 'inherit' => 0, 'denied' => 0],
-                'global_operational' => ['enabled' => 0, 'disabled' => 0, 'suspended' => 0],
-                'can_grant_all_tenants' => false,
-                'can_revert_all_tenants' => false,
-                'can_show_all_tenants' => false,
-                'can_hide_all_tenants' => false,
+        if ($tenants->isEmpty()) {
+            return [
+                'applications' => array_values($aggregates),
+                'tenant_count' => 0,
             ];
         }
 
-        $tenantCount = 0;
-        $this->foreachTenant($tenantIds, function (Tenant $tenant) use (&$aggregates, &$tenantCount): void {
-            $tenantCount++;
-            $summary = $this->overrides->summary($tenant);
-            foreach ($summary['applications'] as $row) {
+        $at = CarbonImmutable::now('UTC');
+        $tenantIdList = $tenants->pluck('id')->all();
+        $statesByTenant = $this->loadApplicationStatesByTenant($tenantIdList);
+        $overrideGrantsByTenant = $this->loadActiveOverrideGrantsByTenant($tenantIdList, $at);
+        $commercialKeys = $this->commerciallyGatedKeys($catalog);
+        $commercialDecisionsByTenant = $commercialKeys === []
+            ? []
+            : $this->entitlements->resolveManyForTenants($tenants, $commercialKeys, $at);
+
+        foreach ($tenants as $tenant) {
+            /** @var Collection<string, TenantApplicationState> $statesByKey */
+            $statesByKey = $statesByTenant->get($tenant->id, collect());
+            /** @var Collection<string, TenantApplicationEntitlement> $overrideGrantsByKey */
+            $overrideGrantsByKey = $overrideGrantsByTenant->get($tenant->id, collect());
+            $commercialDecisions = $commercialDecisionsByTenant[$tenant->id] ?? [];
+
+            foreach ($this->overrides->globalSummaryRows($tenant, $statesByKey, $overrideGrantsByKey, $commercialDecisions) as $row) {
                 $key = $row['key'];
                 if (! isset($aggregates[$key])) {
                     continue;
@@ -113,12 +122,92 @@ class PlatformGlobalApplicationOverrideService
                 $aggregates[$key]['can_show_all_tenants'] = $aggregates[$key]['can_show_all_tenants'] || $row['can_show'];
                 $aggregates[$key]['can_hide_all_tenants'] = $aggregates[$key]['can_hide_all_tenants'] || $row['can_hide'];
             }
-        });
+        }
 
         return [
             'applications' => array_values($aggregates),
-            'tenant_count' => $tenantCount,
+            'tenant_count' => $tenants->count(),
         ];
+    }
+
+    /** @param array<string, array<string, mixed>> $catalog @return array<string, array<string, mixed>> */
+    private function initializeSummaryAggregates(array $catalog): array
+    {
+        $aggregates = [];
+
+        foreach ($catalog as $key => $application) {
+            $aggregates[$key] = [
+                'key' => $key,
+                'group' => $application['group'],
+                'maturity' => $application['maturity'],
+                'mandatory' => $application['mandatory'],
+                'access' => $application['access'],
+                'dependencies' => $application['dependencies'],
+                'protected_status' => $this->protectedStatus($application),
+                'global_commercial' => ['granted' => 0, 'inherit' => 0, 'denied' => 0],
+                'global_operational' => ['enabled' => 0, 'disabled' => 0, 'suspended' => 0],
+                'can_grant_all_tenants' => false,
+                'can_revert_all_tenants' => false,
+                'can_show_all_tenants' => false,
+                'can_hide_all_tenants' => false,
+            ];
+        }
+
+        return $aggregates;
+    }
+
+    /** @param list<string>|null $tenantIds @return Collection<int, Tenant> */
+    private function loadSummaryTenants(?array $tenantIds): Collection
+    {
+        $query = Tenant::query()->orderBy('id');
+
+        if ($tenantIds !== null && $tenantIds !== []) {
+            $sortedIds = array_values($tenantIds);
+            sort($sortedIds);
+            $query->whereIn('id', $sortedIds);
+        }
+
+        return $query->get(['id', 'created_at']);
+    }
+
+    /**
+     * @param  list<string>  $tenantIds
+     * @return Collection<string, Collection<string, TenantApplicationState>>
+     */
+    private function loadApplicationStatesByTenant(array $tenantIds): Collection
+    {
+        return TenantApplicationState::withoutGlobalScopes()
+            ->whereIn('tenant_id', $tenantIds)
+            ->get()
+            ->groupBy('tenant_id')
+            ->map(fn (Collection $rows): Collection => $rows->keyBy('application_key'));
+    }
+
+    /**
+     * @param  list<string>  $tenantIds
+     * @return Collection<string, Collection<string, TenantApplicationEntitlement>>
+     */
+    private function loadActiveOverrideGrantsByTenant(array $tenantIds, CarbonImmutable $at): Collection
+    {
+        return TenantApplicationEntitlement::withoutGlobalScopes()
+            ->whereIn('tenant_id', $tenantIds)
+            ->where('source_type', EntitlementSourceType::ADMINISTRATIVE_OVERRIDE->value)
+            ->where('source_reference_type', PlatformApplicationOverrideService::OVERRIDE_SOURCE_REFERENCE_TYPE)
+            ->where('starts_at', '<=', $at)
+            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', $at))
+            ->where(fn ($query) => $query->whereNull('revoked_at')->orWhere('revoked_at', '>', $at))
+            ->get()
+            ->groupBy('tenant_id')
+            ->map(fn (Collection $rows): Collection => $rows->keyBy('capability_key'));
+    }
+
+    /** @param array<string, array<string, mixed>> $catalog @return list<string> */
+    private function commerciallyGatedKeys(array $catalog): array
+    {
+        return array_values(array_filter(
+            array_keys($catalog),
+            fn (string $key): bool => ApplicationCatalog::isCommerciallyGated($key),
+        ));
     }
 
     /**

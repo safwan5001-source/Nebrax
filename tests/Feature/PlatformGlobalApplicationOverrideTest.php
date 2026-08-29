@@ -23,6 +23,7 @@ use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\TenantApplicationEntitlementResolver;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class PlatformGlobalApplicationOverrideTest extends TestCase
@@ -528,6 +529,121 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
             ->getJson('/api/platform/application-overrides/global/summary?tenant_ids=not-a-uuid')
             ->assertStatus(422)
             ->assertJsonValidationErrors(['tenant_ids.0']);
+    }
+
+    /** @test */
+    public function global_summary_scales_with_bounded_queries_and_matches_reference_aggregates(): void
+    {
+        $platform = $this->platformAdministrator(['platform:read', 'platform:manage']);
+        $tenantIds = [];
+
+        for ($index = 0; $index < 51; $index++) {
+            $tenantIds[] = $this->seedTenantRecord('global-summary-perf-' . $index)['tenant_id'];
+        }
+
+        $grantTargets = array_slice($tenantIds, 0, 5);
+        foreach ($grantTargets as $tenantId) {
+            $this->withToken($platform['token'])
+                ->postJson("/api/platform/tenants/{$tenantId}/application-overrides/grant", [
+                    'application_key' => self::COMMERCIAL_KEY,
+                ])
+                ->assertOk();
+        }
+
+        $showTargets = array_slice($tenantIds, 5, 8);
+        foreach ($showTargets as $tenantId) {
+            $this->withToken($platform['token'])
+                ->postJson("/api/platform/tenants/{$tenantId}/application-overrides/show", [
+                    'application_key' => 'hr.employees',
+                ])
+                ->assertOk();
+        }
+
+        $expected = $this->referenceGlobalSummaryAggregates($tenantIds);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $optimized = app(PlatformGlobalApplicationOverrideService::class)->summary($tenantIds);
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $response = $this->withToken($platform['token'])
+            ->getJson('/api/platform/application-overrides/global/summary?tenant_ids=' . implode(',', $tenantIds))
+            ->assertOk();
+
+        $this->assertSame($optimized, $response->json('data'));
+        $this->assertSame(51, $optimized['tenant_count']);
+        $this->assertLessThanOrEqual(10, $queryCount, 'Global summary service query count must stay bounded as tenants grow.');
+
+        $applications = collect($optimized['applications']);
+        $this->assertSame(count(ApplicationCatalog::all()), $applications->count());
+
+        foreach ($expected as $key => $aggregate) {
+            $entry = $applications->firstWhere('key', $key);
+            $this->assertNotNull($entry, "Missing application aggregate for {$key}");
+            $this->assertSame($aggregate['global_commercial'], $entry['global_commercial'], "Commercial aggregate mismatch for {$key}");
+            $this->assertSame($aggregate['global_operational'], $entry['global_operational'], "Operational aggregate mismatch for {$key}");
+            $this->assertSame($aggregate['can_grant_all_tenants'], $entry['can_grant_all_tenants'], "can_grant_all_tenants mismatch for {$key}");
+            $this->assertSame($aggregate['can_revert_all_tenants'], $entry['can_revert_all_tenants'], "can_revert_all_tenants mismatch for {$key}");
+            $this->assertSame($aggregate['can_show_all_tenants'], $entry['can_show_all_tenants'], "can_show_all_tenants mismatch for {$key}");
+            $this->assertSame($aggregate['can_hide_all_tenants'], $entry['can_hide_all_tenants'], "can_hide_all_tenants mismatch for {$key}");
+            $this->assertSame($key, $entry['key']);
+            $this->assertArrayHasKey('group', $entry);
+            $this->assertArrayHasKey('maturity', $entry);
+            $this->assertArrayHasKey('mandatory', $entry);
+            $this->assertArrayHasKey('access', $entry);
+            $this->assertArrayHasKey('dependencies', $entry);
+            $this->assertArrayHasKey('protected_status', $entry);
+        }
+    }
+
+    /**
+     * @param  list<string>  $tenantIds
+     * @return array<string, array<string, mixed>>
+     */
+    private function referenceGlobalSummaryAggregates(array $tenantIds): array
+    {
+        $overrides = app(PlatformApplicationOverrideService::class);
+        $aggregates = [];
+
+        foreach (ApplicationCatalog::all() as $key => $application) {
+            $aggregates[$key] = [
+                'global_commercial' => ['granted' => 0, 'inherit' => 0, 'denied' => 0],
+                'global_operational' => ['enabled' => 0, 'disabled' => 0, 'suspended' => 0],
+                'can_grant_all_tenants' => false,
+                'can_revert_all_tenants' => false,
+                'can_show_all_tenants' => false,
+                'can_hide_all_tenants' => false,
+            ];
+        }
+
+        foreach ($tenantIds as $tenantId) {
+            $tenant = Tenant::query()->findOrFail($tenantId);
+            foreach ($overrides->summary($tenant)['applications'] as $row) {
+                $key = $row['key'];
+                if (! isset($aggregates[$key])) {
+                    continue;
+                }
+
+                $commercialMode = $row['commercial_mode'];
+                if (isset($aggregates[$key]['global_commercial'][$commercialMode])) {
+                    $aggregates[$key]['global_commercial'][$commercialMode]++;
+                }
+
+                $operationalStatus = $row['operational_status'];
+                if (isset($aggregates[$key]['global_operational'][$operationalStatus])) {
+                    $aggregates[$key]['global_operational'][$operationalStatus]++;
+                }
+
+                $aggregates[$key]['can_grant_all_tenants'] = $aggregates[$key]['can_grant_all_tenants'] || $row['can_grant'];
+                $aggregates[$key]['can_revert_all_tenants'] = $aggregates[$key]['can_revert_all_tenants'] || $row['can_revert'];
+                $aggregates[$key]['can_show_all_tenants'] = $aggregates[$key]['can_show_all_tenants'] || $row['can_show'];
+                $aggregates[$key]['can_hide_all_tenants'] = $aggregates[$key]['can_hide_all_tenants'] || $row['can_hide'];
+            }
+        }
+
+        return $aggregates;
     }
 
     /** @test */

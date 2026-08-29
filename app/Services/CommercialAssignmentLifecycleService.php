@@ -27,14 +27,28 @@ class CommercialAssignmentLifecycleService
 
     public function accessForGrant(Tenant $tenant, ?string $grantGroupId, DateTimeInterface $evaluationTime): ?TenantApplicationEntitlementDecision
     {
-        if ($grantGroupId === null) return null;
+        if ($grantGroupId === null) {
+            return null;
+        }
 
         $assignment = TenantCommercialAssignment::query()
             ->where('id', $grantGroupId)
             ->where('tenant_id', $tenant->id)
             ->first();
-        if ($assignment === null) return null;
-        if (! $this->hasValidVersionRelation($assignment)) return TenantApplicationEntitlementDecision::DENIED;
+        if ($assignment === null) {
+            return null;
+        }
+
+        return $this->accessForPreloadedAssignment($assignment, $evaluationTime);
+    }
+
+    public function accessForPreloadedAssignment(
+        TenantCommercialAssignment $assignment,
+        DateTimeInterface $evaluationTime,
+    ): ?TenantApplicationEntitlementDecision {
+        if (! $this->hasValidVersionRelation($assignment)) {
+            return TenantApplicationEntitlementDecision::DENIED;
+        }
 
         $at = CarbonImmutable::instance($evaluationTime)->utc();
         if ($assignment->status !== TenantCommercialAssignment::STATUS_ACTIVE || $this->shouldEnd($assignment, $at)) {
@@ -45,8 +59,12 @@ class CommercialAssignmentLifecycleService
         }
 
         $days = CarbonImmutable::instance($assignment->payment_failed_at)->utc()->diffInDays($at);
-        if ($days > self::READ_ONLY_GRACE_DAYS) return TenantApplicationEntitlementDecision::DENIED;
-        if ($days > self::FULL_GRACE_DAYS) return TenantApplicationEntitlementDecision::READ_ONLY;
+        if ($days > self::READ_ONLY_GRACE_DAYS) {
+            return TenantApplicationEntitlementDecision::DENIED;
+        }
+        if ($days > self::FULL_GRACE_DAYS) {
+            return TenantApplicationEntitlementDecision::READ_ONLY;
+        }
 
         return TenantApplicationEntitlementDecision::FULL;
     }
