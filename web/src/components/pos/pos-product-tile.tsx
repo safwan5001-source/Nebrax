@@ -33,7 +33,7 @@ export function PosProductTile({
   showImage: boolean;
   selected: boolean;
   isFavorite: boolean;
-  /** يبقى مؤقتًا للتوافق مع استدعاء الصفحة الحالية؛ لا يُعرض داخل البطاقة. */
+  /** للتوافق المؤقت مع استدعاء الصفحة الحالية فقط؛ لا يُعرض داخل البطاقة. */
   taxLabel: string;
   availableLabel: string;
   favoriteLabel: string;
@@ -68,16 +68,9 @@ export function PosProductTile({
         <div className="flex min-h-0 flex-1 flex-col p-3">
           <span className="line-clamp-2 min-h-10 text-sm font-semibold leading-snug text-text">{product.name}</span>
 
-          <div className="mt-2 flex min-w-0 items-baseline justify-between gap-2">
-            <span className="num min-w-0 truncate text-[15px] font-extrabold text-text" title={product.sale_price_label}>
-              {product.sale_price_label}
-            </span>
-            {product.sku && (
-              <span className="num max-w-[46%] truncate text-[10px] text-muted" title={product.sku}>
-                {product.sku}
-              </span>
-            )}
-          </div>
+          <span className="num mt-2 min-w-0 truncate text-[15px] font-extrabold text-text" title={product.sale_price_label}>
+            {product.sale_price_label}
+          </span>
 
           <div className="mt-auto flex min-w-0 items-center justify-between gap-2 border-t border-border pt-2 text-[10px] text-muted">
             {product.barcode ? (
