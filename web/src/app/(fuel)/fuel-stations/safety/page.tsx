@@ -1,5 +1,5 @@
 'use client';
-import { displayLocale } from '@/lib/formatting';
+import { formatDate } from '@/lib/formatting';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -82,4 +82,4 @@ function Detail({ label, value }: { label: string; value: string }) { return <di
 function Empty({ text }: { text: string }) { return <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted">{text}</p>; }
 function Loading() { return <div className="space-y-4" aria-busy="true"><Skeleton className="h-10 w-72" /><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>; }
 function compact<T extends Record<string, unknown>>(value: T): T { return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== '' && item !== undefined)) as T; }
-function date(value: string | null | undefined, locale: string) { return value ? new Intl.DateTimeFormat(displayLocale(locale), { dateStyle: 'medium' }).format(new Date(value)) : '—'; }
+function date(value: string | null | undefined, locale: string) { return formatDate(value, locale); }

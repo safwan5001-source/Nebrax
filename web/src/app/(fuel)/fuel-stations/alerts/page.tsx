@@ -1,5 +1,5 @@
 'use client';
-import { displayLocale } from '@/lib/formatting';
+import { formatDateTime } from '@/lib/formatting';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -77,5 +77,5 @@ function ErrorBanner({ message, retry, label }: { message: string; retry: () => 
 function Detail({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs text-muted">{label}</dt><dd className="mt-1 break-words text-text">{value}</dd></div>; }
 function Empty({ text }: { text: string }) { return <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted">{text}</p>; }
 function Loading() { return <div className="space-y-4" aria-busy="true"><Skeleton className="h-10 w-72" /><Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" /></div>; }
-function date(value: string | null | undefined, locale: string) { return value ? new Intl.DateTimeFormat(displayLocale(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—'; }
+function date(value: string | null | undefined, locale: string) { return formatDateTime(value, locale); }
 function alertRuleLabel(rule: string, t: ReturnType<typeof useTranslations>) { return t(`rules.${fuelAlertRuleLabelKey(rule)}`); }

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
+import { formatMonthName } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 
 const EASTERN_ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
@@ -74,7 +74,7 @@ function isOutOfRange(value: string, min?: string | number, max?: string | numbe
 }
 
 function monthName(year: number, monthIndex: number, style: 'long' | 'short' = 'long') {
-  return new Intl.DateTimeFormat(ARABIC_DISPLAY_LOCALE, { month: style }).format(new Date(year, monthIndex, 1));
+  return formatMonthName(year, monthIndex, 'ar', style);
 }
 
 type GregorianDateInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'>;

@@ -1,5 +1,5 @@
 'use client';
-import { displayLocale } from '@/lib/formatting';
+import { formatDateTime } from '@/lib/formatting';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -350,7 +350,6 @@ export default function InvoiceDetailPage() {
       {entry ? <><dl className="grid grid-cols-2 gap-3 rounded border border-border bg-background p-3 text-sm sm:grid-cols-3"><div><dt className="text-xs text-muted">{t('entry_number')}</dt><dd className="num mt-1 text-text">{entry.number}</dd></div><div><dt className="text-xs text-muted">{t('entry_date')}</dt><dd className="num mt-1 text-text">{entry.date ?? '—'}</dd></div>{entry.description && <div><dt className="text-xs text-muted">{t('description')}</dt><dd className="mt-1 text-text">{entry.description}</dd></div>}</dl><div className="overflow-x-auto"><table className="w-full min-w-[34rem] text-sm"><thead className="border-b border-border bg-muted/40 text-start text-xs text-muted"><tr><th className="px-3 py-2.5 font-medium">{t('account')}</th><th className="px-3 py-2.5 font-medium">{t('description')}</th><th className="px-3 py-2.5 font-medium">{t('debit')}</th><th className="px-3 py-2.5 font-medium">{t('credit_amount')}</th></tr></thead><tbody className="divide-y divide-border">{entry.lines.map((line) => <tr key={`${entry.id}-${line.account_id}-${line.description ?? ''}`}><td className="px-3 py-2.5 text-text"><span className="num text-muted">{line.account_code}</span>{line.account_name && <span> · {line.account_name}</span>}</td><td className="px-3 py-2.5 text-muted">{line.description ?? '—'}</td><td className="num px-3 py-2.5 text-text">{formatRiyal(line.debit)}</td><td className="num px-3 py-2.5 text-text">{formatRiyal(line.credit)}</td></tr>)}</tbody></table></div></> : <p className="rounded border border-dashed border-border bg-background px-3 py-4 text-sm leading-6 text-muted">{empty}</p>}
     </section>
   );
-  const formatDateTime = (value: string | null) => value ? new Intl.DateTimeFormat(displayLocale(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
   const downloadAttachment = async (note: InvoiceNote, attachment: InvoiceNote['attachments'][number]) => {
     try {
       await downloadFile(`/invoices/${invoice.id}/notes/${note.id}/attachments/${attachment.id}/download`, attachment.original_name);
@@ -363,7 +362,7 @@ export default function InvoiceDetailPage() {
   ) : (
     <div className="p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted">{notesLog.length ? t('notes_attachments') : t('no_notes_attachments')}</p><Button size="sm" variant="outline" onClick={() => setNoteOpen(true)}><Paperclip className="h-4 w-4" strokeWidth={1.7} />{t('add_note_attachment')}</Button></div>
-      {notesLog.length > 0 && <div className="space-y-3">{notesLog.map((note) => <article key={note.id} className="rounded border border-border bg-background p-3"><p className="num text-xs text-muted">{formatDateTime(note.recorded_at)}</p>{note.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{note.body}</p>}{note.attachments.length > 0 && <ul className="mt-3 divide-y divide-border rounded border border-border">{note.attachments.map((attachment) => <li key={attachment.id} className="flex items-center justify-between gap-3 px-3 py-2"><span className="min-w-0 truncate text-sm text-text">{attachment.original_name}</span><Button size="sm" variant="ghost" onClick={() => downloadAttachment(note, attachment)}><Download className="h-4 w-4" strokeWidth={1.7} />{t('download_attachment')}</Button></li>)}</ul>}</article>)}</div>}
+      {notesLog.length > 0 && <div className="space-y-3">{notesLog.map((note) => <article key={note.id} className="rounded border border-border bg-background p-3"><p className="num text-xs text-muted">{formatDateTime(note.recorded_at, locale)}</p>{note.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{note.body}</p>}{note.attachments.length > 0 && <ul className="mt-3 divide-y divide-border rounded border border-border">{note.attachments.map((attachment) => <li key={attachment.id} className="flex items-center justify-between gap-3 px-3 py-2"><span className="min-w-0 truncate text-sm text-text">{attachment.original_name}</span><Button size="sm" variant="ghost" onClick={() => downloadAttachment(note, attachment)}><Download className="h-4 w-4" strokeWidth={1.7} />{t('download_attachment')}</Button></li>)}</ul>}</article>)}</div>}
     </div>
   );
   const inventoryContent = relationsLoading ? (

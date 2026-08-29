@@ -1,8 +1,8 @@
 'use client';
-import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatDateTime } from '@/lib/formatting';
 import { CheckCircle2, FileText, ClipboardCheck, Package, PencilLine } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -36,6 +36,7 @@ const ICON: Record<DocType, typeof FileText> = {
  */
 export function ActivityFeed({ limit = 6 }: { limit?: number }) {
   const t = useTranslations('dashboard');
+  const locale = useLocale();
   const [rows, setRows] = useState<Revision[] | null>(null);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export function ActivityFeed({ limit = 6 }: { limit?: number }) {
                 {r.user_name && <span className="text-muted"> — {r.user_name}</span>}
               </p>
               <p className="num mt-0.5 text-[11.5px] text-muted">
-                {new Date(r.created_at).toLocaleString(ARABIC_DISPLAY_LOCALE)}
+                {formatDateTime(r.created_at, locale)}
               </p>
             </div>
           </li>

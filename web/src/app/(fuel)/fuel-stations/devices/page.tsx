@@ -1,5 +1,5 @@
 'use client';
-import { DISPLAY_LOCALE } from '@/lib/formatting';
+import { formatDateTime } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
@@ -109,11 +109,11 @@ export default function FuelStationDevicesPage() {
     { accessorKey: 'adapter_key', header: t('adapter'), cell: ({ row }) => <span className="num text-xs">{row.original.adapter_key}</span> },
     { accessorKey: 'health', header: t('health'), cell: ({ row }) => <Badge tone={TONES[row.original.health] ?? 'neutral'}>{t(row.original.health)}</Badge> },
     { accessorKey: 'status', header: t('deviceStatus'), cell: ({ row }) => <Badge tone={TONES[row.original.status] ?? 'neutral'}>{t(row.original.status)}</Badge> },
-    { accessorKey: 'last_seen_at', header: t('lastSeen'), cell: ({ row }) => <span className="num text-xs">{row.original.last_seen_at ? new Date(row.original.last_seen_at).toLocaleString(DISPLAY_LOCALE) : '—'}</span> },
+    { accessorKey: 'last_seen_at', header: t('lastSeen'), cell: ({ row }) => <span className="num text-xs">{formatDateTime(row.original.last_seen_at)}</span> },
     { id: 'actions', header: '', cell: ({ row }) => <Button size="sm" variant="outline" disabled={!can('fuel.integration.ingest') || !EVENT_PRESETS[row.original.adapter_key]?.length} title={!can('fuel.integration.ingest') ? t('noPermission') : undefined} onClick={() => openSimulation(row.original)}><UploadCloud className="h-3.5 w-3.5" />{t('simulate')}</Button> },
   ], [can, t]);
   const eventColumns = useMemo<ColumnDef<IntegrationEvent, unknown>[]>(() => [
-    { accessorKey: 'occurred_at', header: t('occurredAt'), cell: ({ row }) => <span className="num text-xs">{new Date(row.original.occurred_at).toLocaleString(DISPLAY_LOCALE)}</span> },
+    { accessorKey: 'occurred_at', header: t('occurredAt'), cell: ({ row }) => <span className="num text-xs">{formatDateTime(row.original.occurred_at)}</span> },
     { accessorKey: 'event_type', header: t('eventType'), cell: ({ row }) => <span className="num text-xs">{row.original.event_type}</span> },
     { accessorKey: 'source_id', header: t('deviceKey'), cell: ({ row }) => <span className="num text-xs">{row.original.source_id}</span> },
     { accessorKey: 'status', header: t('eventStatus'), cell: ({ row }) => <Badge tone={TONES[row.original.status] ?? 'neutral'}>{t(row.original.status)}</Badge> },

@@ -3,6 +3,7 @@ import type { Company, Customer, InvoiceDoc } from '@/components/invoices/invoic
 import { DEFAULT_DOCUMENT_ITEMS_COLUMNS } from '@/modules/documents/registry/document-types';
 import { getDocumentImagePdfOpacity, getDocumentImagePdfSize, getDocumentImagePdfX, withDocumentImagePdfOpacity } from '@/modules/documents/utils/block-image-size';
 import type { DocBlockAlignment, DocBlockImageSize, DocItemsColumn, DocItemsColumnId, DocSectionLayoutItem, DocSectionProperties } from '@/modules/documents/types';
+import { formatDate, formatDateTime } from '@/lib/formatting';
 
 type PdfOrientation = 'portrait' | 'landscape';
 type PdfPage = { orientation: PdfOrientation; width: number; height: number; margin: number; contentWidth: number };
@@ -142,11 +143,9 @@ function money(value: string): string {
   return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0)) + ' SAR';
 }
 
-function date(value: string, locale: string): string {
-  const parsed = new Date(`${value}T12:00:00`);
-  if (Number.isNaN(parsed.valueOf())) return value;
+function date(value: string, _locale: string): string {
   // التاريخ المالي يُكتب بأرقام لاتينية محايدة داخل PDF لتجنّب أثر bidi مع العربية.
-  return new Intl.DateTimeFormat(locale === 'ar' ? 'en-GB' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(parsed);
+  return formatDate(value, 'en', { fallback: value || '—' });
 }
 
 const DEFAULT_ITEM_COLUMNS: readonly DocItemsColumn[] = DEFAULT_DOCUMENT_ITEMS_COLUMNS.map((id) => ({ id }));
@@ -255,9 +254,7 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
 
   const right = pdfPage.width - pdfPage.margin;
   const left = pdfPage.margin;
-  const generated = new Intl.DateTimeFormat('en-GB', {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(new Date()).replace(',', '');
+  const generated = formatDateTime(new Date(), 'en');
   let y = 18;
 
   const drawHeader = (continued = false) => {

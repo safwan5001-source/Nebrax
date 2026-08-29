@@ -1,5 +1,5 @@
 'use client';
-import { displayLocale } from '@/lib/formatting';
+import { formatDate, formatDateTime } from '@/lib/formatting';
 
 import { useMemo } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -35,13 +35,7 @@ function displayBalance(value: string, creditBalance: boolean): string {
 }
 
 function humanDate(value: string, locale: string): string {
-  if (!value) return '—';
-  const parsed = new Date(`${value}T12:00:00`);
-  return Number.isNaN(parsed.valueOf())
-    ? value
-    : new Intl.DateTimeFormat(displayLocale(locale), {
-        day: '2-digit', month: 'short', year: 'numeric',
-      }).format(parsed);
+  return formatDate(value, locale, { fallback: value || '—' });
 }
 
 /**
@@ -78,9 +72,7 @@ export function PartnerStatementDocument({
     ? t('all_branches')
     : t('branches_selected', { count: filters.branchIds.length });
 
-  const generatedAt = new Intl.DateTimeFormat(displayLocale(locale), {
-    dateStyle: 'medium', timeStyle: 'short',
-  }).format(new Date());
+  const generatedAt = formatDateTime(new Date(), locale);
 
   return (
     <article

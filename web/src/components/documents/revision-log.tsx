@@ -1,8 +1,8 @@
 'use client';
-import { ARABIC_DISPLAY_LOCALE } from '@/lib/formatting';
 
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatDateTime } from '@/lib/formatting';
 import { ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +59,7 @@ export function RevisionLog({
   defaultOpen?: boolean;
 }) {
   const t = useTranslations('revisions');
+  const locale = useLocale();
   const [log, setLog] = useState<Revision[] | null>(null);
   const [open, setOpen] = useState(defaultOpen);
   const contentId = `revision-log-${type}-${id}`;
@@ -100,7 +101,7 @@ export function RevisionLog({
                     <Badge tone={tone[entry.action]}>{t(`action_${entry.action}`)}</Badge>
                     <span className="text-sm text-text">{entry.user_name ?? t('system')}</span>
                     <span className="num text-xs text-muted">
-                      {new Date(entry.created_at).toLocaleString(ARABIC_DISPLAY_LOCALE)}
+                      {formatDateTime(entry.created_at, locale)}
                     </span>
                   </div>
 

@@ -1,5 +1,5 @@
 'use client';
-import { displayLocale } from '@/lib/formatting';
+import { formatDateTime } from '@/lib/formatting';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -391,7 +391,7 @@ export default function PartnerProfilePage() {
               <div className="print-only border-b border-border px-6 py-5">
                 <p className="text-xs text-muted">{partner?.name}</p>
                 <h2 className="mt-1 text-xl font-bold text-text">{t('ledger_title')}</h2>
-                <p className="mt-1 text-xs text-muted">{t('ledger_generated_at')}: {new Date().toLocaleString(displayLocale(locale))}</p>
+                <p className="mt-1 text-xs text-muted">{t('ledger_generated_at')}: {formatDateTime(new Date(), locale)}</p>
               </div>
               {ledgerLoading ? <Skeleton className="m-4 h-48 w-auto" /> : (
                 <LedgerTable

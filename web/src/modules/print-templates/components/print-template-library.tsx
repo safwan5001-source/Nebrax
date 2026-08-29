@@ -1,5 +1,5 @@
 'use client';
-import { displayLocale } from '@/lib/formatting';
+import { formatDate as formatDisplayDate } from '@/lib/formatting';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -159,7 +159,7 @@ export function PrintTemplateLibrary({
   const showAssignmentContextWarning = assignmentState === 'error' && (filters.usage !== 'all' || filters.assignmentScope !== 'all');
   const selectedDocumentType = filters.documentType === 'all' ? null : filters.documentType;
   const formatDate = (value: string | null | undefined) => value
-    ? new Intl.DateTimeFormat(displayLocale(locale), { dateStyle: 'medium' }).format(new Date(value))
+    ? formatDisplayDate(value, locale)
     : '—';
 
   const updateFilters = (changes: Partial<TemplateLibraryFilters>) => {
