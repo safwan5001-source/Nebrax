@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CircleAlert, FileSearch, Filter, RefreshCw, Upload } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { CircleAlert, FileSearch, Filter, RefreshCw, SlidersHorizontal, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
@@ -17,40 +18,37 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { BulkReviewerDialog } from '@/components/document-center/bulk-reviewer-dialog';
+import { DocumentBatchFiltersDialog } from '@/components/document-center/document-batch-filters-dialog';
 import { DocumentUploadDialog } from '@/components/document-center/document-upload-dialog';
 import { DocumentOperationsNav } from '@/components/documents/document-operations-nav';
 import { useToast } from '@/components/ui/toast';
-import { DOCUMENT_TYPES, type WorkflowStatusGroup, statusesForGroup } from '@/modules/document-center/intake-contract';
-
-type Batch = {
-  id: string;
-  document_type: string;
-  source_type: string;
-  status: string;
-  version: number;
-  created_at: string;
-  files_count: number;
-  blocking_issues_count: number;
-  warning_issues_count: number;
-  reviewer: { id: string; name: string } | null;
-};
+import {
+  DOCUMENT_TYPES,
+  type DocumentBatchFilters,
+  type DocumentBatchListItem,
+  buildBatchListQuery,
+  filtersFromSearchParams,
+  filtersToSearchParams,
+} from '@/modules/document-center';
 
 type PaginatedResponse = {
-  data: Batch[];
+  data: DocumentBatchListItem[];
   meta?: { current_page: number; last_page: number; total: number };
 };
 
-type Filters = {
-  statusGroup: '' | WorkflowStatusGroup;
-  documentType: string;
-  sourceType: string;
-  blockingOnly: boolean;
-};
+type TeamUser = { id: string; name: string; permissions?: string[]; role?: string; is_active?: boolean };
 
-const initialFilters: Filters = {
+const emptyFilters: DocumentBatchFilters = {
+  search: '',
+  status: '',
   statusGroup: '',
   documentType: '',
   sourceType: '',
+  channel: '',
+  reviewerId: '',
+  from: '',
+  to: '',
   blockingOnly: false,
 };
 
@@ -60,34 +58,42 @@ export default function DocumentsPage() {
   const { success } = useToast();
   const user = currentUser();
   const canManage = canManageDocumentCenter(user?.permissions, user?.role);
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [batches, setBatches] = useState<DocumentBatchListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [filters, setFilters] = useState<DocumentBatchFilters>(() => filtersFromSearchParams(searchParams));
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<PaginatedResponse['meta']>();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [reviewers, setReviewers] = useState<TeamUser[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkClearOpen, setBulkClearOpen] = useState(false);
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFilters(filtersFromSearchParams(searchParams));
+    setPage(1);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!canManage) return;
+    api<{ data: TeamUser[] }>('/document-batches/eligible-reviewers')
+      .then((response) => setReviewers(response.data))
+      .catch(() => setReviewers([]));
+  }, [canManage]);
 
   const hasFilters = Boolean(
-    query.trim() || filters.statusGroup || filters.documentType || filters.sourceType || filters.blockingOnly,
+    filters.search.trim() || filters.status || filters.statusGroup || filters.documentType || filters.sourceType
+    || filters.channel || filters.reviewerId || filters.from || filters.to || filters.blockingOnly,
   );
 
-  const requestPath = useMemo(() => {
-    const params = new URLSearchParams({
-      page: String(page),
-      per_page: '20',
-      sort: 'created_at',
-      direction: 'desc',
-    });
-    if (query.trim()) params.set('search', query.trim());
-    if (filters.documentType) params.set('document_type', filters.documentType);
-    if (filters.sourceType) params.set('source_type', filters.sourceType);
-    if (filters.blockingOnly) params.set('has_blocking', '1');
-
-    return `/document-batches?${params.toString()}`;
-  }, [filters.documentType, filters.sourceType, filters.blockingOnly, page, query]);
+  const requestPath = useMemo(() => buildBatchListQuery(filters, page), [filters, page]);
 
   const load = useCallback(async () => {
     if (page === 1) setLoading(true);
@@ -96,12 +102,7 @@ export default function DocumentsPage() {
 
     try {
       const response = await api<PaginatedResponse>(requestPath);
-      const groupStatuses = filters.statusGroup ? new Set(statusesForGroup(filters.statusGroup)) : null;
-      const filtered = groupStatuses
-        ? response.data.filter((batch) => groupStatuses.has(batch.status))
-        : response.data;
-
-      setBatches((current) => page === 1 ? filtered : [...current, ...filtered]);
+      setBatches((current) => page === 1 ? response.data : [...current, ...response.data]);
       setMeta(response.meta);
     } catch (exception) {
       setError(exception instanceof ApiError ? exception.message : t('loadFailed'));
@@ -109,32 +110,48 @@ export default function DocumentsPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [filters.statusGroup, page, requestPath, t]);
+  }, [page, requestPath, t]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 250);
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  function updateFilters(next: Partial<Filters>) {
-    setFilters((current) => ({ ...current, ...next }));
+  function syncFilters(next: DocumentBatchFilters) {
+    setFilters(next);
     setPage(1);
+    setSelected(new Set());
+    const params = filtersToSearchParams(next);
+    router.replace(params.toString() ? `/documents?${params.toString()}` : '/documents');
   }
 
   function resetFilters() {
-    setQuery('');
-    setFilters(initialFilters);
-    setPage(1);
+    syncFilters(emptyFilters);
   }
 
-  function handleUploadSuccess(batchId: string) {
+  function handleUploadSuccess() {
     setUploadOpen(false);
     success(ti('uploadSuccess'));
     setPage(1);
     void load();
   }
 
+  const selectedBatches = batches.filter((batch) => selected.has(batch.id));
   const canLoadMore = Boolean(meta && meta.current_page < meta.last_page);
+
+  function toggleSelect(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === batches.length) setSelected(new Set());
+    else setSelected(new Set(batches.map((batch) => batch.id)));
+  }
 
   return (
     <div className="space-y-5">
@@ -145,8 +162,8 @@ export default function DocumentsPage() {
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <input
-            value={query}
-            onChange={(event) => { setQuery(event.target.value); setPage(1); }}
+            value={filters.search}
+            onChange={(event) => syncFilters({ ...filters, search: event.target.value })}
             placeholder={t('search')}
             className="h-10 w-full rounded border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-w-64"
           />
@@ -161,6 +178,10 @@ export default function DocumentsPage() {
 
       <DocumentOperationsNav />
 
+      {bulkNotice && (
+        <div role="status" className="rounded border border-primary/20 bg-primary-soft px-3 py-2 text-sm text-text">{bulkNotice}</div>
+      )}
+
       <Card>
         <CardContent className="py-4">
           <div className="flex flex-wrap items-end gap-3">
@@ -171,7 +192,7 @@ export default function DocumentsPage() {
             <select
               aria-label={ti('statusGroupAll')}
               value={filters.statusGroup}
-              onChange={(event) => updateFilters({ statusGroup: event.target.value as Filters['statusGroup'] })}
+              onChange={(event) => syncFilters({ ...filters, statusGroup: event.target.value as DocumentBatchFilters['statusGroup'] })}
               className="h-9 min-w-[10rem] rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {STATUS_GROUP_OPTIONS.map((option) => (
@@ -181,7 +202,7 @@ export default function DocumentsPage() {
             <select
               aria-label={t('documentType')}
               value={filters.documentType}
-              onChange={(event) => updateFilters({ documentType: event.target.value })}
+              onChange={(event) => syncFilters({ ...filters, documentType: event.target.value })}
               className="h-9 min-w-[10rem] rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <option value="">{t('allDocumentTypes')}</option>
@@ -192,26 +213,31 @@ export default function DocumentsPage() {
             <select
               aria-label={t('document')}
               value={filters.sourceType}
-              onChange={(event) => updateFilters({ sourceType: event.target.value })}
+              onChange={(event) => syncFilters({ ...filters, sourceType: event.target.value })}
               className="h-9 min-w-[8rem] rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <option value="">{t('allSources')}</option>
               <option value="manual">{ti('sourceManual')}</option>
               <option value="web">{ti('sourceWeb')}</option>
             </select>
-            <label className="flex min-h-9 items-center gap-2 text-sm text-text">
-              <input
-                type="checkbox"
-                checked={filters.blockingOnly}
-                onChange={(event) => updateFilters({ blockingOnly: event.target.checked })}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-              />
-              {t('blockingOnly')}
-            </label>
+            <Button size="sm" variant="outline" onClick={() => setFiltersOpen(true)}>
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+              {t('advancedFilters')}
+            </Button>
             {hasFilters && <Button size="sm" variant="ghost" onClick={resetFilters}>{t('cancel')}</Button>}
           </div>
         </CardContent>
       </Card>
+
+      {canManage && selected.size > 0 && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-3 py-3 text-sm">
+            <span>{t('bulkSelected', { count: selected.size })}</span>
+            <Button size="sm" onClick={() => setBulkAssignOpen(true)}>{t('bulkAssign')}</Button>
+            <Button size="sm" variant="outline" onClick={() => setBulkClearOpen(true)}>{t('bulkClearReviewer')}</Button>
+          </CardContent>
+        </Card>
+      )}
 
       {loading && page === 1 ? (
         <Card><CardContent className="py-10 text-sm text-muted">{t('loading')}</CardContent></Card>
@@ -254,6 +280,11 @@ export default function DocumentsPage() {
             <table className="w-full text-sm">
               <thead className="bg-surface text-muted">
                 <tr>
+                  {canManage && (
+                    <th className="px-4 py-3 text-start">
+                      <input type="checkbox" aria-label={t('selectAll')} checked={selected.size === batches.length && batches.length > 0} onChange={toggleSelectAll} className="h-4 w-4 rounded border-border" />
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-start">{t('batch')}</th>
                   <th className="px-4 py-3 text-start">{t('documentType')}</th>
                   <th className="px-4 py-3 text-start">{t('reviewer')}</th>
@@ -265,6 +296,11 @@ export default function DocumentsPage() {
               <tbody>
                 {batches.map((batch) => (
                   <tr key={batch.id} className="border-t border-border">
+                    {canManage && (
+                      <td className="px-4 py-3">
+                        <input type="checkbox" checked={selected.has(batch.id)} onChange={() => toggleSelect(batch.id)} aria-label={batch.id} className="h-4 w-4 rounded border-border" />
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-mono">{batch.id.slice(0, 8)}</td>
                     <td className="px-4 py-3">{ti(documentTypeTranslationKey(batch.document_type))}</td>
                     <td className="px-4 py-3">{batch.reviewer?.name ?? t('notAssigned')}</td>
@@ -328,6 +364,42 @@ export default function DocumentsPage() {
           onClose={() => setUploadOpen(false)}
           onSuccess={handleUploadSuccess}
         />
+      )}
+
+      <DocumentBatchFiltersDialog
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        filters={filters}
+        reviewers={reviewers}
+        onApply={syncFilters}
+      />
+
+      {canManage && (
+        <>
+          <BulkReviewerDialog
+            open={bulkAssignOpen}
+            onClose={() => setBulkAssignOpen(false)}
+            batches={selectedBatches.map((batch) => ({ id: batch.id, version: batch.version }))}
+            reviewers={reviewers}
+            onComplete={({ success: ok, failed }) => {
+              setBulkNotice(t('bulkResult', { success: ok, failed }));
+              setSelected(new Set());
+              void load();
+            }}
+          />
+          <BulkReviewerDialog
+            open={bulkClearOpen}
+            onClose={() => setBulkClearOpen(false)}
+            batches={selectedBatches.map((batch) => ({ id: batch.id, version: batch.version }))}
+            reviewers={reviewers}
+            clear
+            onComplete={({ success: ok, failed }) => {
+              setBulkNotice(t('bulkResult', { success: ok, failed }));
+              setSelected(new Set());
+              void load();
+            }}
+          />
+        </>
       )}
     </div>
   );

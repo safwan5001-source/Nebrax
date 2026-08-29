@@ -4,11 +4,26 @@ export type DocumentReviewTranslationKey =
   | 'fieldDocumentDate'
   | 'fieldSupplierName'
   | 'fieldIssuerName'
+  | 'fieldRecipientName'
+  | 'fieldIssuerTaxNumber'
+  | 'fieldRecipientTaxNumber'
   | 'fieldCurrency'
   | 'fieldPriceIncludesTax'
   | 'fieldSubtotalMinor'
+  | 'fieldDiscountMinor'
   | 'fieldTaxMinor'
-  | 'fieldTotalMinor';
+  | 'fieldTotalMinor'
+  | 'fieldExternalReference'
+  | 'fieldPurchaseOrderNumber'
+  | 'lineDescription'
+  | 'lineSku'
+  | 'lineBarcode'
+  | 'lineUnit'
+  | 'lineQuantity'
+  | 'lineUnitPrice'
+  | 'lineDiscount'
+  | 'lineTax'
+  | 'lineTotal';
 
 const fieldTranslationKeys: Record<string, DocumentReviewTranslationKey> = {
   document_number: 'fieldDocumentNumber',
@@ -18,17 +33,44 @@ const fieldTranslationKeys: Record<string, DocumentReviewTranslationKey> = {
   supplier_name: 'fieldSupplierName',
   supplier: 'fieldSupplierName',
   issuer_name: 'fieldIssuerName',
+  recipient_name: 'fieldRecipientName',
+  issuer_tax_number: 'fieldIssuerTaxNumber',
+  recipient_tax_number: 'fieldRecipientTaxNumber',
   currency: 'fieldCurrency',
   price_includes_tax: 'fieldPriceIncludesTax',
   subtotal_minor: 'fieldSubtotalMinor',
+  discount_minor: 'fieldDiscountMinor',
   tax_minor: 'fieldTaxMinor',
   tax_amount_minor: 'fieldTaxMinor',
   total_minor: 'fieldTotalMinor',
   total_amount_minor: 'fieldTotalMinor',
+  external_reference: 'fieldExternalReference',
+  purchase_order_number: 'fieldPurchaseOrderNumber',
+  description: 'lineDescription',
+  sku: 'lineSku',
+  barcode: 'lineBarcode',
+  unit: 'lineUnit',
+  quantity: 'lineQuantity',
+  unit_price_minor: 'lineUnitPrice',
+  discount_minor_line: 'lineDiscount',
+  tax_amount_minor_line: 'lineTax',
+  total_minor_line: 'lineTotal',
 };
 
 export function documentFieldTranslationKey(key: string): DocumentReviewTranslationKey {
   return fieldTranslationKeys[key] ?? 'field';
+}
+
+export function lineFieldTranslationKey(key: string): DocumentReviewTranslationKey {
+  if (key === 'discount_minor') return 'lineDiscount';
+  if (key === 'tax_amount_minor') return 'lineTax';
+  if (key === 'total_minor') return 'lineTotal';
+  if (key === 'unit_price_minor') return 'lineUnitPrice';
+  return fieldTranslationKeys[key] ?? 'field';
+}
+
+export function isMinorAmountField(key: string): boolean {
+  return key.endsWith('_minor') || key.includes('unit_price') || key.includes('tax_amount') || key.includes('total_minor');
 }
 
 export function confidencePercentage(score: number | null | undefined): number | null {
@@ -37,6 +79,14 @@ export function confidencePercentage(score: number | null | undefined): number |
   }
 
   return Math.round(score / 100);
+}
+
+export function confidenceTone(score: number | null | undefined): 'positive' | 'warning' | 'negative' | 'muted' {
+  const percent = confidencePercentage(score);
+  if (percent === null) return 'muted';
+  if (percent >= 85) return 'positive';
+  if (percent >= 60) return 'warning';
+  return 'negative';
 }
 
 type MatchStatus = { status: string };
@@ -52,4 +102,14 @@ export function reviewHasVisibleBlocker(matches: MatchStatus[], issues: IssueSta
   const hasPendingMatch = matches.some((match) => !['confirmed', 'rejected'].includes(match.status));
 
   return hasUnresolvedBlockingIssue || hasPendingMatch;
+}
+
+export function matchStatusTone(status: string): 'positive' | 'warning' | 'negative' | 'muted' {
+  if (status === 'confirmed') return 'positive';
+  if (status === 'rejected') return 'muted';
+  return 'warning';
+}
+
+export function issueSeverityTone(severity: string): 'negative' | 'warning' {
+  return severity === 'blocking' ? 'negative' : 'warning';
 }

@@ -31,13 +31,17 @@ class DocumentReviewResource extends JsonResource
                     : null,
             ],
             'fields' => $this['fields'],
+            'lines' => $this['lines'] ?? [],
+            'warnings' => $this['warnings'] ?? [],
             'files' => $this['files'],
             'matches' => $this['matches'],
             'issues' => $this['issues'],
             'history' => $this['history'],
+            'processing_summary' => $this['processing_summary'] ?? null,
             'linked_transaction' => $this['linked_transaction'],
             'linked_purchase' => $this['linked_purchase'],
             'capabilities' => $this['capabilities'],
+            'review_mode' => $this['review_mode'] ?? 'full',
         ];
     }
 }

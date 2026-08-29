@@ -12,6 +12,7 @@ use App\Models\DocumentFile;
 use App\Services\DocumentCenter\DocumentFileIntakeService;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Support\DocumentScanStatus;
+use App\Tenancy\BranchContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
@@ -91,6 +92,10 @@ class DocumentIntakeController extends Controller
 
     private function assertDownloadable(DocumentFile $file): void
     {
+        if (($file->branch_id ?? null) !== app(BranchContext::class)->id()) {
+            abort(404);
+        }
+
         if ($file->scan_status !== DocumentScanStatus::CLEAN || $file->purged_at !== null) {
             throw ValidationException::withMessages(['file' => 'الملف غير متاح قبل اجتياز الفحص الأمني.']);
         }

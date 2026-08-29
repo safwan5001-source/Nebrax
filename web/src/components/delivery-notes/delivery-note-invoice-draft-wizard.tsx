@@ -307,6 +307,21 @@ export function DeliveryNoteInvoiceDraftWizard() {
           <div className="flex items-end"><Button type="button" className="w-full md:w-auto" disabled={previewing || selectedIds.length === 0} onClick={runPreview}>{previewing && <Loader2 className="h-4 w-4 animate-spin" />}{previewing ? t('invoiceDraftPreviewing') : t('invoiceDraftRunPreview')}</Button></div>
         </div>
         {preview && <div className="space-y-3" aria-live="polite">
+          <div className="rounded border border-border bg-surface p-3 text-sm">
+            <p className="font-medium text-text">{t('invoiceDraftSelectedCount', { count: previewRows.length })}</p>
+            <p className="mt-1 text-xs text-muted">
+              {t('quantity')}: <span className="num" dir="ltr">{preview.source_line_count ?? previewRows.reduce((sum, note) => sum + (note.lines?.length ?? 0), 0)}</span>
+            </p>
+            <ul className="mt-2 space-y-1 text-xs text-muted">
+              {previewRows.map((note) => (
+                <li key={note.id} className="flex flex-wrap items-center gap-2">
+                  <span className="num font-medium text-text">{note.number}</span>
+                  <span>{note.customer_name}</span>
+                  <span>· {note.lines?.length ?? 0}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
           {!allPreviewEligible && <div className="rounded border border-negative/30 bg-negative/10 p-3 text-sm text-negative"><strong>{t('invoiceDraftIneligibleTitle')}</strong><ul className="mt-2 list-disc space-y-1 ps-5">{preview.compatibility_issues.map((issue) => <li key={issue}>{t(issueKey(issue), { limit: preview.source_line_limit ?? 0 })}</li>)}{previewRows.filter((note) => !note.eligible).flatMap((note) => note.issues.map((issue) => <li key={`${note.id}-${issue}`}>{note.number ?? '—'}: {t(issueKey(issue), { limit: preview.source_line_limit ?? 0 })}</li>))}</ul></div>}
           {previewRows.map((note) => <div key={note.id} className="rounded border border-border p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><strong className="num text-text">{note.number}</strong><span className="mx-2 text-muted">·</span><span className="text-sm text-muted">{note.customer_name} — {note.warehouse_name}</span></div>{note.eligible ? <Badge tone="positive">{t('invoiceDraftEligible')}</Badge> : <Badge tone="negative">{t('invoiceDraftIneligible')}</Badge>}</div>{note.lines?.map((line) => {
             const decision = pricing[line.id];

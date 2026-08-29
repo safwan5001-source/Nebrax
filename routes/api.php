@@ -256,6 +256,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             ->middleware([$perm('documents.center.view'), $commercialApp('document_center.core'), 'signed'])
             ->name('document-files.download');
         Route::get('document-batches', [DocumentReviewController::class, 'index'])->middleware([$perm('documents.center.view'), $commercialApp('document_center.core')]);
+        Route::get('document-batches/eligible-reviewers', [DocumentReviewController::class, 'eligibleReviewers'])->middleware([$perm('documents.center.manage'), $commercialApp('document_center.core')]);
+        Route::get('document-batches/{batch}/eligible-reviewers', [DocumentReviewController::class, 'eligibleReviewersForBatch'])->middleware([$perm('documents.center.manage'), $commercialApp('document_center.core')]);
         Route::get('document-batches/{batch}/review', [DocumentReviewController::class, 'review'])->middleware([$perm('documents.center.view'), $commercialApp('document_center.core')]);
         Route::post('document-batches/{batch}/review-changes', [DocumentReviewController::class, 'change'])->middleware([$perm('documents.center.review'), $commercialApp('document_center.core', 'write')]);
         Route::post('document-batches/{batch}/assign-reviewer', [DocumentReviewController::class, 'assign'])->middleware([$perm('documents.center.manage'), $commercialApp('document_center.core', 'write')]);

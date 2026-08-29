@@ -11,6 +11,15 @@ export default defineConfig({
   // مشترك قابلاً للعرض في jsdom دون أن يشترط استيراد React صراحةً.
   esbuild: { jsx: 'automatic' },
   test: {
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        // CI runners OOM with parallel jsdom suites; one fork serializes safely.
+        singleFork: true,
+      },
+    },
+    maxWorkers: 1,
+    fileParallelism: false,
     environment: 'node',
     environmentMatchGlobs: [
       ['src/components/platform/**/*.test.tsx', 'jsdom'],
