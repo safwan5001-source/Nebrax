@@ -18,11 +18,11 @@
 
 ## 3. base SHA
 
-`fdef3ac074af296defefd7f44837ee39535ec840` — `origin/main` بعد دمج #557 (PR-7 Interaction Modes).
+`87fb14b99524c1b9a054ced32dd19f7caecdc069` — `origin/main` بعد دمج #557 (PR-7 Interaction Modes).
 
 ## 4. final HEAD SHA
 
-`b15681e9d7eaaa3c84e8fbb8255b29ff73f5a9a8`
+`87fb14b99524c1b9a054ced32dd19f7caecdc069`
 
 ## 5. changed files
 
