@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PlatformAuthController;
 use App\Http\Controllers\Api\PlatformApplicationOverrideController;
+use App\Http\Controllers\Api\PlatformGlobalApplicationOverrideController;
 use App\Http\Controllers\Api\PlatformCommercialAssignmentController;
 use App\Http\Controllers\Api\PlatformCommercialCatalogController;
 use App\Http\Controllers\Api\PlatformDashboardController;
@@ -197,6 +198,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             Route::post('tenants/{tenant}/application-overrides/show', [PlatformApplicationOverrideController::class, 'show']);
             Route::post('tenants/{tenant}/application-overrides/hide', [PlatformApplicationOverrideController::class, 'hide']);
             Route::post('tenants/{tenant}/application-overrides/bulk', [PlatformApplicationOverrideController::class, 'bulk']);
+            Route::get('application-overrides/global/summary', [PlatformGlobalApplicationOverrideController::class, 'summary']);
+            Route::post('application-overrides/global/preview', [PlatformGlobalApplicationOverrideController::class, 'preview']);
+            Route::post('application-overrides/global/apply', [PlatformGlobalApplicationOverrideController::class, 'apply']);
             Route::get('tenants/{tenant}/commercial-assignments', [PlatformCommercialAssignmentController::class, 'index']);
             Route::get('tenants/{tenant}/commercial-access/{capabilityKey}', [PlatformCommercialAssignmentController::class, 'inspectAccess']);
             Route::post('tenants/{tenant}/commercial-assignments/preview', [PlatformCommercialAssignmentController::class, 'preview']);

@@ -282,8 +282,9 @@ class PlatformApplicationOverrideService
         string $action,
         ?array $keys = null,
         ?string $reason = null,
+        bool $recordPlatformAction = true,
     ): array {
-        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $action, $keys, $reason): array {
+        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $action, $keys, $reason, $recordPlatformAction): array {
             $results = DB::transaction(function () use ($tenant, $administrator, $action, $keys, $reason): array {
                 $evaluated = $this->evaluateBulk($tenant, $action, $keys);
                 $applied = [];
@@ -316,13 +317,15 @@ class PlatformApplicationOverrideService
             });
 
             $appliedCount = count(array_filter($results, fn (array $row): bool => $row['outcome'] === 'applied'));
-            $this->logPlatformAction(
-                $administrator,
-                $tenant,
-                PlatformAdministratorAction::ACTION_APPLICATION_BULK,
-                $action,
-                (string) $appliedCount,
-            );
+            if ($recordPlatformAction) {
+                $this->logPlatformAction(
+                    $administrator,
+                    $tenant,
+                    PlatformAdministratorAction::ACTION_APPLICATION_BULK,
+                    $action,
+                    (string) $appliedCount,
+                );
+            }
 
             return ['action' => $action, 'results' => $results];
         });

@@ -31,6 +31,7 @@ vi.mock('@/lib/api', () => ({ ApiError: class ApiError extends Error {} }));
 vi.mock('@/components/platform/contract-management-card', () => ({ ContractManagementCard: () => <div /> }));
 vi.mock('@/components/platform/commercial-operations-card', () => ({ CommercialOperationsCard: () => <div /> }));
 vi.mock('@/components/platform/application-override-card', () => ({ ApplicationOverrideCard: () => <div /> }));
+vi.mock('@/components/platform/global-application-controls-card', () => ({ GlobalApplicationControlsCard: () => <div data-testid="global-application-controls" /> }));
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
   return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
