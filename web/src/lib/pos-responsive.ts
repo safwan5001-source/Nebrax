@@ -22,6 +22,12 @@ export const POS_CART_FAB_CLASS =
 export const POS_CART_PAY_FOOTER_CLASS =
   'p-3 pt-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]';
 
+const POS_PRODUCT_GRID_WITH_IMAGES_CLASS =
+  'grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5';
+
+const POS_PRODUCT_GRID_COMPACT_CLASS =
+  'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6';
+
 export function posCartPaneClass(mobileTab: 'products' | 'cart'): string {
   return mobileTab === 'cart'
     ? 'flex min-h-0 overflow-hidden'
@@ -36,6 +42,15 @@ export function posProductsPaneClass(mobileTab: 'products' | 'cart'): string {
 
 export function posProductGridPadClass(hasCartItems: boolean): string {
   return hasCartItems ? ' pb-16 md:pb-0' : '';
+}
+
+/**
+ * شبكة المنتجات لا تعتمد على عدد أعمدة ثابت في تنقل الكيبورد؛ التنقل يقرأ هندسة العناصر الفعلية.
+ * لذلك نضبط الكثافة حسب المساحة المتاحة، مع حماية iPad landscape من بطاقات شديدة الضيق.
+ */
+export function posProductGridClass(showImages: boolean, hasCartItems: boolean): string {
+  const columns = showImages ? POS_PRODUCT_GRID_WITH_IMAGES_CLASS : POS_PRODUCT_GRID_COMPACT_CLASS;
+  return `grid gap-3 outline-none ${columns}${posProductGridPadClass(hasCartItems)}`;
 }
 
 export function posShowsSplitCart(width: number): boolean {
