@@ -22,7 +22,9 @@
 
 ## 4. final HEAD SHA
 
-يُحدَّث عند آخر commit على الفرع (انظر git log). تنفيذ القشرة الأولى: `9fd3c4f00ebd6c33f86b1ff8af2924bc70d182a7`.
+`ccd3993c1f658b6be76e0577d0caacbd37fd51a4` — Visual QA + التقرير + مرشّح console في Playwright.
+
+تنفيذ القشرة الأولى: `9fd3c4f00ebd6c33f86b1ff8af2924bc70d182a7`.
 
 ## 5. changed files
 
