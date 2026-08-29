@@ -1415,6 +1415,7 @@ export default function PosPage() {
                 id: p.id,
                 name: p.name,
                 sku: p.sku,
+                barcode: p.barcode,
                 sale_price_label: formatRiyal(p.sale_price),
                 pos_image: p.pos_image,
                 track_inventory: tracked,
@@ -1423,7 +1424,6 @@ export default function PosPage() {
               showImage={posCfg.show_product_images}
               selected={productSelected}
               isFavorite={fav}
-              taxLabel={taxInclusive ? tprod('tax_incl_tag') : tprod('tax_excl_tag')}
               availableLabel={t('available')}
               favoriteLabel={t('tab_favorites')}
               onAdd={() => addProduct(p)}
