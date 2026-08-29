@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -13,12 +12,14 @@ import type { Warehouse as WarehouseType } from '@/lib/warehouse';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { logout } from '@/lib/auth';
 import { POS_RETURN_HREF } from '@/lib/pos-workspace';
+import { usePosNetworkStatus } from '@/lib/pos-network-status';
 
 /** شريط تشغيلي لـ POS: يعرض السياق الفعلي والإجراءات المتاحة فقط. */
 export function PosTopbar({
   cashier,
   branch,
   session,
+  online: onlineProp,
   warehouses = [],
   warehouseId = '',
   warehouseDisabled = false,
@@ -39,6 +40,8 @@ export function PosTopbar({
   cashier: string;
   branch: string;
   session?: { number: string; pos_device?: { name: string; code: string | null } | null } | null;
+  /** إن مُرِّر من الصفحة يُستخدم مصدر واحد؛ وإلا يُستمع محلياً للتوافق. */
+  online?: boolean;
   warehouses?: WarehouseType[];
   warehouseId?: string;
   warehouseDisabled?: boolean;
@@ -63,18 +66,8 @@ export function PosTopbar({
   const router = useRouter();
   const locale = useLocale();
   const { theme, setTheme } = useTheme();
-  const [online, setOnline] = useState(true);
-
-  useEffect(() => {
-    const sync = () => setOnline(typeof navigator === 'undefined' || navigator.onLine);
-    sync();
-    window.addEventListener('online', sync);
-    window.addEventListener('offline', sync);
-    return () => {
-      window.removeEventListener('online', sync);
-      window.removeEventListener('offline', sync);
-    };
-  }, []);
+  const localOnline = usePosNetworkStatus();
+  const online = onlineProp ?? localOnline;
 
   const userInitial = cashier.trim().slice(0, 2) || '؟';
   const sessionLabel = session?.number ?? null;
