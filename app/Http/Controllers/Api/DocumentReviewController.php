@@ -21,8 +21,10 @@ use App\Models\DocumentFile;
 use App\Models\DocumentIssue;
 use App\Models\DocumentMatchCandidate;
 use App\Models\DocumentMatchResult;
+use App\Models\DocumentProcessingRun;
 use App\Models\DocumentReviewAction;
 use App\Models\User;
+use App\Services\DocumentCenter\DocumentProcessingStatusProjector;
 use App\Services\DocumentCenter\DocumentRedactionProjector;
 use App\Services\DocumentCenter\DocumentReviewService;
 use App\Services\DocumentCenter\ExpenseDocumentDraftBuilder;
@@ -106,13 +108,18 @@ class DocumentReviewController extends Controller
         $original = $this->redactions->apply($result, $result->normalized_payload);
         $reviewed = $this->redactions->apply($result, app(ReviewedDocumentProjector::class)->project($result));
 
+        $matchPayload = $this->matches($result);
+
         return new DocumentReviewResource([
             'batch' => $batch,
             'fields' => $this->fields($original, $reviewed),
+            'lines' => $this->lines($original, $reviewed, $matchPayload),
+            'warnings' => $this->warnings($original),
             'files' => $this->files($batch->files),
-            'matches' => $this->matches($result),
+            'matches' => $matchPayload,
             'issues' => $this->issues($result),
             'history' => $this->history($batch, $result),
+            'processing_summary' => $this->processingSummary($batch, $batch->files),
             'linked_transaction' => $this->linkedTransaction($batch),
             // يبقى الحقل التوافقي لمسار Purchase إلى أن تستهلك الواجهة العقد العام بالكامل.
             'linked_purchase' => $this->linkedPurchase($batch),
@@ -314,8 +321,94 @@ class DocumentReviewController extends Controller
             'original_name' => $file->original_name,
             'mime_type' => $file->detected_mime ?: $file->declared_mime,
             'page_count' => $file->page_count,
+            'scan_status' => $file->scan_status->value,
             'download_available' => $file->scan_status === DocumentScanStatus::CLEAN && $file->purged_at === null,
         ])->values()->all();
+    }
+
+    /** @param array<int, array<string, mixed>> $matchPayload @return array<int, array<string, mixed>> */
+    private function lines(array $original, array $reviewed, array $matchPayload): array
+    {
+        $originalLines = is_array($original['lines'] ?? null) ? $original['lines'] : [];
+        $reviewedLines = is_array($reviewed['lines'] ?? null) ? $reviewed['lines'] : [];
+        $matchBySubject = collect($matchPayload)->keyBy('subject_key');
+        $editable = ['quantity', 'unit_price_minor', 'discount_minor', 'tax_amount_minor', 'total_minor'];
+        $count = max(count($originalLines), count($reviewedLines));
+        $lines = [];
+
+        for ($index = 0; $index < min($count, 200); $index++) {
+            $originalLine = is_array($originalLines[$index] ?? null) ? $originalLines[$index] : [];
+            $reviewedLine = is_array($reviewedLines[$index] ?? null) ? $reviewedLines[$index] : [];
+            $fields = [];
+
+            foreach (['description', 'sku', 'barcode', 'unit', 'quantity', 'unit_price_minor', 'discount_minor', 'tax_amount_minor', 'total_minor'] as $key) {
+                $originalValue = $this->safeValue($originalLine[$key] ?? null);
+                $currentValue = $this->safeValue($reviewedLine[$key] ?? null);
+                if ($originalValue === null && $currentValue === null) {
+                    continue;
+                }
+                $fields[] = array_filter([
+                    'key' => $key,
+                    'original' => $originalValue,
+                    'current' => $currentValue,
+                    'editable' => in_array($key, $editable, true),
+                ], fn ($value) => $value !== null);
+            }
+
+            $confidence = $this->confidence(is_array($originalLine) ? $originalLine : []);
+            $page = $this->page(is_array($originalLine) ? $originalLine : []);
+            $productMatch = $matchBySubject->get("lines.{$index}.product");
+            $unitMatch = $matchBySubject->get("lines.{$index}.unit");
+
+            $lines[] = array_filter([
+                'index' => $index,
+                'description' => $this->text($reviewedLine['description'] ?? $originalLine['description'] ?? null),
+                'fields' => $fields,
+                'confidence_basis_points' => $confidence,
+                'page' => $page,
+                'product_match_id' => is_array($productMatch) ? ($productMatch['id'] ?? null) : null,
+                'unit_match_id' => is_array($unitMatch) ? ($unitMatch['id'] ?? null) : null,
+            ], fn ($value) => $value !== null);
+        }
+
+        return $lines;
+    }
+
+    /** @return array<int, string> */
+    private function warnings(array $original): array
+    {
+        $warnings = is_array($original['warnings'] ?? null) ? $original['warnings'] : [];
+
+        return collect($warnings)
+            ->filter(fn ($warning) => is_string($warning) && trim($warning) !== '')
+            ->take(20)
+            ->map(fn (string $warning) => mb_substr(trim($warning), 0, 300))
+            ->values()
+            ->all();
+    }
+
+    /** @param Collection<int, DocumentFile> $files @return array<string, mixed> */
+    private function processingSummary(DocumentBatch $batch, Collection $files): array
+    {
+        $file = $files->first();
+        $runs = DocumentProcessingRun::query()
+            ->where('document_batch_id', $batch->id)
+            ->latest('updated_at')
+            ->limit(10)
+            ->get();
+        $status = app(DocumentProcessingStatusProjector::class)->project($batch, $file, $runs, false);
+
+        return [
+            'scan_status' => $file?->scan_status->value ?? 'unknown',
+            'download_available' => $file !== null
+                && $file->scan_status === DocumentScanStatus::CLEAN
+                && $file->purged_at === null,
+            'workflow_status' => $batch->status->value,
+            'processing_key' => $status['key'],
+            'processing_message' => $status['message'],
+            'retry_available' => $status['retry_available'],
+            'diagnostics_url' => '/documents/'.$batch->id.'/diagnostics',
+        ];
     }
 
     /** @return array<int, array<string, mixed>> */
