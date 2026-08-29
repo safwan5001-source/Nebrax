@@ -13,6 +13,7 @@ export function DocumentOperationsNav() {
     { href: '/documents/operations', label: t('navOperations') },
     { href: '/documents/usage', label: t('navUsage') },
     { href: '/documents/governance', label: t('navGovernance') },
+    { href: '/documents/settings', label: t('navSettings') },
   ];
 
   return (

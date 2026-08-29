@@ -41,6 +41,19 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+vi.mock('@/components/document-center/document-batch-filters-dialog', () => ({
+  DocumentBatchFiltersDialog: () => null,
+}));
+
+vi.mock('@/components/document-center/bulk-reviewer-dialog', () => ({
+  BulkReviewerDialog: () => null,
+}));
+
 vi.mock('@/components/documents/document-operations-nav', () => ({
   DocumentOperationsNav: () => <nav aria-label="document-operations">nav</nav>,
 }));

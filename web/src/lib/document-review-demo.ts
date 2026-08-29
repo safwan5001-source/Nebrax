@@ -6,11 +6,24 @@ type DemoField = {
   page?: number;
 };
 
+type DemoLine = {
+  index: number;
+  description: string | null;
+  fields: Array<{ key: string; original: string | number | boolean | null; current: string | number | boolean | null; editable: boolean }>;
+  confidence_basis_points?: number;
+  page?: number;
+  product_match_id: string | null;
+  unit_match_id: string | null;
+};
+
 type DemoState = {
   version: number;
   status: string;
+  reviewer: { id: string; name: string } | null;
   linkedPurchase: { link_id: string; transaction_type: string; transaction_id: string; transaction_number: string; status: string; url: string } | null;
   fields: DemoField[];
+  lines: DemoLine[];
+  warnings: string[];
   matches: Array<{
     id: string;
     subject_key: string;
@@ -61,10 +74,40 @@ function staleError(): Error & { status: number } {
   return Object.assign(new Error('stale_review_version'), { status: 409 });
 }
 
+function demoLines(): DemoLine[] {
+  return [{
+    index: 0,
+    description: 'صمام صناعي قياس 2 بوصة',
+    fields: [
+      { key: 'sku', original: 'VAL-2IN', current: 'VAL-2IN', editable: false },
+      { key: 'quantity', original: '10', current: '10', editable: true },
+      { key: 'unit_price_minor', original: 25000, current: 25000, editable: true },
+      { key: 'total_minor', original: 250000, current: 250000, editable: true },
+    ],
+    confidence_basis_points: 9100,
+    page: 1,
+    product_match_id: 'demo-match-line-product',
+    unit_match_id: null,
+  }];
+}
+
+function demoProcessingSummary(status: string) {
+  return {
+    scan_status: 'clean',
+    download_available: true,
+    workflow_status: status,
+    processing_key: status === 'needs_review' ? 'needs_review' : status,
+    processing_message: status === 'needs_review' ? 'المستند جاهز للمراجعة البشرية.' : 'جاهز للمسودة.',
+    retry_available: false,
+    diagnostics_url: '/documents/demo-batch-001/diagnostics',
+  };
+}
+
 function initialState(): DemoState {
   return {
     version: 7,
     status: 'needs_review',
+    reviewer: { id: 'demo-reviewer', name: 'أحمد المراجع' },
     linkedPurchase: null,
     fields: [
       { key: 'document_number', original: 'PI-2084', current: 'PI-2084', confidence_basis_points: 9800, page: 1 },
@@ -74,6 +117,8 @@ function initialState(): DemoState {
       { key: 'tax_minor', original: 37500, current: 37500, confidence_basis_points: 9200, page: 1 },
       { key: 'total_minor', original: 287500, current: 287500, confidence_basis_points: 9600, page: 1 },
     ],
+    lines: demoLines(),
+    warnings: ['تنبيه: رقم أمر الشراء غير واضح في الصفحة الأولى.'],
     matches: [
       {
         id: 'demo-match-supplier',
@@ -87,13 +132,13 @@ function initialState(): DemoState {
         ],
       },
       {
-        id: 'demo-match-line',
-        subject_key: 'total_minor',
-        status: 'confirmed',
-        score_basis_points: 9900,
-        strategy: 'amount_exact',
+        id: 'demo-match-line-product',
+        subject_key: 'lines.0.product',
+        status: 'suggested',
+        score_basis_points: 9200,
+        strategy: 'sku_exact',
         candidates: [
-          { id: 'demo-candidate-product-1', label: 'صمام صناعي قياس 2 بوصة', candidate_type: 'product', sku: 'VAL-2IN', unit: 'قطعة', score_basis_points: 9900, strategy: 'amount_exact', is_active: true },
+          { id: 'demo-candidate-product-1', label: 'صمام صناعي قياس 2 بوصة', candidate_type: 'product', sku: 'VAL-2IN', unit: 'قطعة', score_basis_points: 9200, strategy: 'sku_exact', is_active: true },
         ],
       },
     ],
@@ -199,6 +244,30 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
   const createDraftMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/create-purchase-draft$/);
   const createExpenseDraftMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/create-expense-draft$/);
 
+  const assignMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/assign-reviewer$/);
+
+  if (method === 'GET' && clean === '/users') {
+    return { handled: true, response: { data: [
+      { id: 'demo-reviewer', name: 'أحمد المراجع', is_active: true, role: 'admin', permissions: ['documents.center.review'] },
+      { id: 'demo-reviewer-2', name: 'سارة المراجعة', is_active: true, role: 'staff', permissions: ['documents.center.review'] },
+    ] } };
+  }
+
+  if (method === 'GET' && clean === '/warehouses') {
+    return { handled: true, response: { data: [{ id: 'demo-warehouse-main', name: 'المخزن الرئيسي', is_active: true }] } };
+  }
+
+  if (method === 'POST' && assignMatch) {
+    if (!validVersion(requestBody)) return { handled: true, error: staleError() };
+    const reviewerId = requestBody.reviewer_id ? String(requestBody.reviewer_id) : null;
+    state.reviewer = reviewerId === 'demo-reviewer-2'
+      ? { id: 'demo-reviewer-2', name: 'سارة المراجعة' }
+      : reviewerId ? { id: 'demo-reviewer', name: 'أحمد المراجع' } : null;
+    state.version += 1;
+    addHistory(reviewerId ? 'reviewer_assigned' : 'reviewer_unassigned', String(requestBody.reason ?? ''), null, { reviewer_id: reviewerId ?? '' });
+    return { handled: true, response: { data: { id: 'demo-assign' } } };
+  }
+
   if (method === 'GET' && clean === '/document-batches') {
     const query = new URLSearchParams(path.split('?')[1] ?? '');
     const search = query.get('search')?.toLowerCase() ?? '';
@@ -208,13 +277,23 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
         version: state.version, created_at: '2026-08-25T09:00:00+03:00', files_count: 1,
         blocking_issues_count: state.issues.filter((issue) => issue.severity === 'blocking' && issue.status !== 'resolved').length,
         warning_issues_count: state.issues.filter((issue) => issue.severity === 'warning' && issue.status !== 'resolved').length,
-        reviewer: { id: 'demo-reviewer', name: 'أحمد المراجع' },
+        reviewer: state.reviewer,
       },
       {
         id: 'demo-batch-002', document_type: 'expense', source_type: 'email', status: expenseState.status,
         version: expenseState.version, created_at: '2026-08-24T11:15:00+03:00', files_count: 1,
         blocking_issues_count: 0, warning_issues_count: 0,
         reviewer: { id: 'demo-reviewer', name: 'أحمد المراجع' },
+      },
+      {
+        id: 'demo-batch-003', document_type: 'purchase_invoice', source_type: 'manual', status: 'processing',
+        version: 2, created_at: '2026-08-23T08:00:00+03:00', files_count: 1,
+        blocking_issues_count: 0, warning_issues_count: 0, reviewer: null,
+      },
+      {
+        id: 'demo-batch-004', document_type: 'purchase_invoice', source_type: 'manual', status: 'failed',
+        version: 1, created_at: '2026-08-22T08:00:00+03:00', files_count: 1,
+        blocking_issues_count: 1, warning_issues_count: 0, reviewer: null,
       },
     ].filter((batch) => !search || `${batch.id} ${batch.document_type} ${batch.source_type}`.toLowerCase().includes(search));
 
@@ -244,10 +323,13 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
             reviewer: { id: 'demo-reviewer', name: 'أحمد المراجع' },
           },
           fields: expenseState.fields,
-          files: [{ id: 'demo-file-002', original_name: 'expense-receipt-EXP-417.pdf', mime_type: 'application/pdf', page_count: 1, download_available: true }],
+          lines: [],
+          warnings: [],
+          files: [{ id: 'demo-file-002', original_name: 'expense-receipt-EXP-417.pdf', mime_type: 'application/pdf', page_count: 1, download_available: true, scan_status: 'clean' }],
           matches: [],
           issues: [],
           history: expenseState.history,
+          processing_summary: demoProcessingSummary(expenseState.status),
           linked_transaction: expenseState.linkedExpense,
           linked_purchase: null,
           capabilities: { view: true, review: true, manage: true, build_draft: true },
@@ -263,13 +345,16 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
         data: {
           batch: {
             id: reviewMatch[1], document_type: 'purchase_invoice', status: state.status, version: state.version,
-            reviewer: { id: 'demo-reviewer', name: 'أحمد المراجع' },
+            reviewer: state.reviewer,
           },
           fields: state.fields,
-          files: [{ id: 'demo-file-001', original_name: 'purchase-invoice-PI-2084.pdf', mime_type: 'application/pdf', page_count: 1, download_available: true }],
+          lines: state.lines,
+          warnings: state.warnings,
+          files: [{ id: 'demo-file-001', original_name: 'purchase-invoice-PI-2084.pdf', mime_type: 'application/pdf', page_count: 1, download_available: true, scan_status: 'clean' }],
           matches: state.matches,
           issues: state.issues,
           history: state.history,
+          processing_summary: demoProcessingSummary(state.status),
           linked_transaction: state.linkedPurchase,
           linked_purchase: state.linkedPurchase,
           capabilities: { view: true, review: true, manage: true, build_draft: true },
