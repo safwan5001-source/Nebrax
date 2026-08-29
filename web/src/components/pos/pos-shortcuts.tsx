@@ -7,10 +7,16 @@ import { POS_SHORTCUT_FOOTER } from '@/components/pos/interactions/shortcut-regi
  * شريط اختصارات لوحة المفاتيح السفلي (ديسكتوب) — ألوان دلالية للحذف/الدفع.
  * يقرأ الاختصارات من السجل نفسه الذي ينفّذها، فلا يعرض مفتاحاً لا يعمل.
  */
-export function PosShortcuts() {
+export function PosShortcuts({ visible = true }: { visible?: boolean }) {
   const t = useTranslations('pos');
   return (
-    <footer className="hidden h-11 shrink-0 items-center gap-1.5 overflow-x-auto border-t border-border bg-surface px-4 lg:flex">
+    <footer
+      data-testid="pos-shortcut-footer"
+      data-visible={visible ? 'true' : 'false'}
+      className={visible
+        ? 'hidden h-11 shrink-0 items-center gap-1.5 overflow-x-auto border-t border-border bg-surface px-4 lg:flex'
+        : 'hidden'}
+    >
       {POS_SHORTCUT_FOOTER.map((shortcut) => (
         <div
           key={`${shortcut.id}-${shortcut.displayKey}`}

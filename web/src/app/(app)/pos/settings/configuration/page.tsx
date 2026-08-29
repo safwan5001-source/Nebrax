@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, CreditCard, Receipt, ShieldAlert, Settings2, Tag, Users } from 'lucide-react';
+import { ArrowLeft, CreditCard, MousePointerClick, Receipt, ShieldAlert, Settings2, Tag, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { FieldGrid, FieldSpan, FormSection } from '@/components/nebrax/form-section';
 import { api, ApiError } from '@/lib/api';
+import { parsePosInteractionMode, POS_INTERACTION_MODES, type PosInteractionMode } from '@/lib/pos-interaction-policy';
 
 type AuditOperationPolicy = 'allowed' | 'approval_required' | 'denied';
 
@@ -28,6 +29,7 @@ interface PosConfig {
   apply_customer_price_list: boolean;
   allow_unit_price_override: boolean;
   show_onscreen_numeric_keypad: boolean;
+  interaction_mode: PosInteractionMode;
   enabled_payment_method_ids: string[];
   payment_methods_mode: 'all_active' | 'only' | 'none';
   default_payment_method_id: string | null;
@@ -122,6 +124,7 @@ const DEFAULTS: PosConfig = {
   apply_customer_price_list: true,
   allow_unit_price_override: false,
   show_onscreen_numeric_keypad: false,
+  interaction_mode: 'AUTO',
   enabled_payment_method_ids: [],
   payment_methods_mode: 'all_active',
   default_payment_method_id: null,
@@ -137,6 +140,13 @@ const DEFAULTS: PosConfig = {
     item_remove: 'allowed', price_override: 'allowed', discount_change: 'allowed', cart_cancel: 'allowed', cash_recount: 'approval_required',
     refund: 'allowed', cash_out: 'allowed', manual_drawer_open: 'allowed',
   },
+};
+
+const INTERACTION_MODE_COPY: Record<PosInteractionMode, { label: 'interaction_mode_auto' | 'interaction_mode_touch' | 'interaction_mode_keyboard_mouse' | 'interaction_mode_hybrid'; hint: 'interaction_mode_auto_hint' | 'interaction_mode_touch_hint' | 'interaction_mode_keyboard_mouse_hint' | 'interaction_mode_hybrid_hint' }> = {
+  AUTO: { label: 'interaction_mode_auto', hint: 'interaction_mode_auto_hint' },
+  TOUCH: { label: 'interaction_mode_touch', hint: 'interaction_mode_touch_hint' },
+  KEYBOARD_MOUSE: { label: 'interaction_mode_keyboard_mouse', hint: 'interaction_mode_keyboard_mouse_hint' },
+  HYBRID: { label: 'interaction_mode_hybrid', hint: 'interaction_mode_hybrid_hint' },
 };
 
 /** إعدادات تشغيل POS: تبقى السياسات ووسائل التحصيل في مصدر إعداد واحد. */
@@ -176,7 +186,12 @@ export default function PosSettingsPage() {
       delete configuration.cash_drawer_driver;
       delete configuration.cash_drawer_enabled;
       delete configuration.cash_drawer_auto_open_after_cash;
-      setConfig({ ...DEFAULTS, ...configuration, audit_operation_policies: { ...DEFAULTS.audit_operation_policies, ...(configuration.audit_operation_policies ?? {}) } });
+      setConfig({
+        ...DEFAULTS,
+        ...configuration,
+        interaction_mode: parsePosInteractionMode(configuration.interaction_mode),
+        audit_operation_policies: { ...DEFAULTS.audit_operation_policies, ...(configuration.audit_operation_policies ?? {}) },
+      });
       setLpConfig({ ...LP_DEFAULTS, ...lossPrevention.data });
       setMethods(paymentMethods.data.filter((method) => method.is_active));
       setCategories(productCategories.data.filter((category) => category.is_active));
@@ -382,6 +397,54 @@ export default function PosSettingsPage() {
       ) : (
         <form onSubmit={submit} className="max-w-5xl space-y-4">
           {error ? <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p> : null}
+
+          <FormSection title={t('section_interaction')} description={t('section_interaction_description')} icon={MousePointerClick} contentClassName="space-y-4">
+            <fieldset className="space-y-2" data-testid="pos-interaction-mode">
+              <legend className="text-sm font-medium text-text">{t('interaction_mode')}</legend>
+              <p id="interaction-mode-hint" className="text-xs leading-relaxed text-muted">{t('interaction_mode_hint')}</p>
+              <div className="grid grid-cols-1 gap-2" role="presentation">
+                {POS_INTERACTION_MODES.map((mode) => {
+                  const selected = config.interaction_mode === mode;
+                  const optionId = `interaction_mode_${mode}`;
+                  const copy = INTERACTION_MODE_COPY[mode];
+                  return (
+                    <label
+                      key={mode}
+                      htmlFor={optionId}
+                      className={
+                        'flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-3 text-start ' +
+                        (selected ? 'border-primary bg-primary-soft' : 'border-border hover:border-primary')
+                      }
+                    >
+                      <input
+                        id={optionId}
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                        type="radio"
+                        name="interaction_mode"
+                        value={mode}
+                        checked={selected}
+                        onChange={() => patch('interaction_mode', mode)}
+                        aria-describedby={`${optionId}_hint`}
+                      />
+                      <span className="min-w-0 space-y-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className={'text-sm font-medium ' + (selected ? 'text-primary' : 'text-text')}>
+                            {t(copy.label)}
+                          </span>
+                          {mode === 'AUTO' ? (
+                            <span className="text-xs font-medium text-muted">{t('interaction_mode_auto_badge')}</span>
+                          ) : null}
+                        </span>
+                        <span id={`${optionId}_hint`} className="block text-xs leading-relaxed text-muted">
+                          {t(copy.hint)}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </FormSection>
 
           <FormSection title={t('section_customer_sales')} description={t('section_customer_sales_description')} icon={Users} contentClassName="space-y-4">
             <FieldGrid>

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -126,6 +127,46 @@ class SalesConfigTest extends TestCase
         $this->withToken($token)->putJson('/api/sales-config/pos', [
             'data' => ['show_onscreen_numeric_keypad' => 'enabled'],
         ])->assertUnprocessable();
+    }
+
+    /** @test */
+    public function pos_interaction_mode_defaults_to_auto_persists_and_rejects_invalid_or_legacy_values(): void
+    {
+        ['token' => $token, 'tenant_id' => $tenantId] = $this->registerTenant('pos-interaction', 'owner@pos-interaction.test');
+
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.interaction_mode', 'AUTO');
+
+        foreach (['TOUCH', 'KEYBOARD_MOUSE', 'HYBRID', 'AUTO'] as $mode) {
+            $this->withToken($token)->putJson('/api/sales-config/pos', [
+                'data' => ['interaction_mode' => $mode],
+            ])->assertOk()
+                ->assertJsonPath('data.interaction_mode', $mode)
+                ->assertJsonPath('data.allow_discount', true);
+
+            $this->withToken($token)->getJson('/api/sales-config/pos')
+                ->assertOk()
+                ->assertJsonPath('data.interaction_mode', $mode);
+        }
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['interaction_mode' => 'legacy_touch'],
+        ])->assertUnprocessable();
+
+        $this->withToken($token)->putJson('/api/sales-config/pos', [
+            'data' => ['interaction_mode' => 'auto'],
+        ])->assertUnprocessable();
+
+        $tenant = Tenant::findOrFail($tenantId);
+        $settings = $tenant->settings ?? [];
+        $settings['sales_config']['pos']['interaction_mode'] = 'legacy_touch';
+        $tenant->update(['settings' => $settings]);
+
+        $this->withToken($token)->getJson('/api/sales-config/pos')
+            ->assertOk()
+            ->assertJsonPath('data.interaction_mode', 'AUTO')
+            ->assertJsonPath('data.allow_discount', true);
     }
 
     /** @test */
