@@ -14,6 +14,7 @@ use App\Support\TenantApplicationEntitlementDecision;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Closure;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -76,6 +77,256 @@ class PlatformApplicationOverrideService
 
             return ['applications' => $applications];
         });
+    }
+
+    /**
+     * حقول Global Summary فقط — بلا استعلامات ولا ApplicationAccessDecision.
+     *
+     * @param  Collection<string, TenantApplicationState>  $statesByKey
+     * @param  Collection<string, TenantApplicationEntitlement>  $overrideGrantsByKey
+     * @param  array<string, TenantApplicationEntitlementDecision>  $commercialDecisions
+     * @return list<array{
+     *   key: string,
+     *   commercial_mode: string,
+     *   operational_status: string,
+     *   can_grant: bool,
+     *   can_revert: bool,
+     *   can_show: bool,
+     *   can_hide: bool
+     * }>
+     */
+    public function globalSummaryRows(
+        Tenant $tenant,
+        Collection $statesByKey,
+        Collection $overrideGrantsByKey,
+        array $commercialDecisions,
+    ): array {
+        $operationalStatuses = $this->operationalStatusesForGlobalSummary($tenant, $statesByKey);
+        $rows = [];
+
+        foreach (ApplicationCatalog::all() as $key => $application) {
+            $overrideGrant = $overrideGrantsByKey->get($key);
+            $commercialMode = $overrideGrant !== null
+                ? 'granted'
+                : (($commercialDecisions[$key] ?? TenantApplicationEntitlementDecision::DENIED) === TenantApplicationEntitlementDecision::DENIED
+                    ? 'denied'
+                    : 'inherit');
+            $operationalStatus = $operationalStatuses[$key];
+            $skipGrant = $this->skipReasonsForGlobalSummary(
+                $tenant,
+                $key,
+                $application,
+                'grant',
+                $overrideGrant,
+                $operationalStatus,
+                $operationalStatuses,
+                $statesByKey,
+            );
+            $skipRevert = $this->skipReasonsForGlobalSummary(
+                $tenant,
+                $key,
+                $application,
+                'revert',
+                $overrideGrant,
+                $operationalStatus,
+                $operationalStatuses,
+                $statesByKey,
+            );
+            $skipShow = $this->skipReasonsForGlobalSummary(
+                $tenant,
+                $key,
+                $application,
+                'show',
+                $overrideGrant,
+                $operationalStatus,
+                $operationalStatuses,
+                $statesByKey,
+            );
+            $skipHide = $this->skipReasonsForGlobalSummary(
+                $tenant,
+                $key,
+                $application,
+                'hide',
+                $overrideGrant,
+                $operationalStatus,
+                $operationalStatuses,
+                $statesByKey,
+            );
+
+            $rows[] = [
+                'key' => $key,
+                'commercial_mode' => $commercialMode,
+                'operational_status' => $operationalStatus,
+                'can_grant' => $skipGrant === [],
+                'can_revert' => $skipRevert === [],
+                'can_show' => $skipShow === [],
+                'can_hide' => $skipHide === [],
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** @return array<string, string> */
+    private function operationalStatusesForGlobalSummary(Tenant $tenant, Collection $statesByKey): array
+    {
+        $legacy = $this->applications->isLegacyTenant($tenant);
+        $statuses = [];
+
+        foreach (ApplicationCatalog::all() as $key => $application) {
+            if ($application['mandatory'] || $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+                $statuses[$key] = 'enabled';
+                continue;
+            }
+
+            $row = $statesByKey->get($key);
+            if ($row !== null) {
+                $statuses[$key] = $row->status;
+                continue;
+            }
+
+            $statuses[$key] = $legacy ? 'enabled' : 'disabled';
+        }
+
+        return $statuses;
+    }
+
+    /**
+     * @param  array{group:string,maturity:string,mandatory:bool,dependencies:list<string>,access:string}  $application
+     * @param  array<string, string>  $operationalStatuses
+     * @param  Collection<string, TenantApplicationState>  $statesByKey
+     * @return list<string>
+     */
+    private function skipReasonsForGlobalSummary(
+        Tenant $tenant,
+        string $key,
+        array $application,
+        string $operation,
+        ?TenantApplicationEntitlement $overrideGrant,
+        string $operationalStatus,
+        array $operationalStatuses,
+        Collection $statesByKey,
+    ): array {
+        $reasons = [];
+
+        if ($application['maturity'] === ApplicationCatalog::MATURITY_RETIRED) {
+            $reasons[] = 'القدرة متقاعدة.';
+        }
+
+        if (in_array($operation, ['grant', 'show'], true) && $application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+            $reasons[] = 'القدرة غير مبنية بعد.';
+        }
+
+        if ($application['mandatory'] && in_array($operation, ['hide'], true)) {
+            $reasons[] = 'القدرة إلزامية.';
+        }
+
+        if ($operation === 'grant') {
+            if (! ApplicationCatalog::isCommerciallyGated($key)) {
+                $reasons[] = 'ليست قدرةً محروسة تجارياً.';
+            }
+            if ($overrideGrant !== null) {
+                $reasons[] = 'تجاوز إداري نشط بالفعل.';
+            }
+        }
+
+        if ($operation === 'revert' && $overrideGrant === null) {
+            $reasons[] = 'لا يوجد تجاوز إداري نشط.';
+        }
+
+        if ($operation === 'show') {
+            if ($operationalStatus === 'enabled') {
+                $reasons[] = 'التطبيق مفعّل تشغيلياً بالفعل.';
+            }
+
+            $missing = $this->missingDependenciesForGlobalSummary($tenant, $key, $statesByKey, $operationalStatuses);
+            if ($missing !== []) {
+                $reasons[] = 'اعتماديات غير مفعّلة: ' . implode('، ', $missing);
+            }
+        }
+
+        if ($operation === 'hide') {
+            if ($application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+                $reasons[] = 'القدرة غير مبنية بعد.';
+            }
+
+            if ($operationalStatus === 'disabled') {
+                $reasons[] = 'التطبيق معطّل تشغيلياً بالفعل.';
+            }
+
+            $dependents = $this->dependentsBlockingForGlobalSummary($key, $operationalStatuses);
+            if ($dependents !== []) {
+                $reasons[] = 'توابع مفعّلة: ' . implode('، ', $dependents);
+            }
+        }
+
+        return $reasons;
+    }
+
+    /**
+     * @param  array<string, string>  $operationalStatuses
+     * @param  Collection<string, TenantApplicationState>  $statesByKey
+     * @return list<string>
+     */
+    private function missingDependenciesForGlobalSummary(
+        Tenant $tenant,
+        string $key,
+        Collection $statesByKey,
+        array $operationalStatuses,
+    ): array {
+        return array_values(array_filter(
+            ApplicationCatalog::dependenciesFor($key),
+            fn (string $dependency): bool => ! $this->isDependencySatisfiedForGlobalSummary(
+                $tenant,
+                $dependency,
+                $statesByKey,
+                $operationalStatuses,
+            ),
+        ));
+    }
+
+    /**
+     * @param  array<string, string>  $operationalStatuses
+     * @param  Collection<string, TenantApplicationState>  $statesByKey
+     */
+    private function isDependencySatisfiedForGlobalSummary(
+        Tenant $tenant,
+        string $dependency,
+        Collection $statesByKey,
+        array $operationalStatuses,
+    ): bool {
+        $application = ApplicationCatalog::find($dependency);
+        if ($application === null) {
+            return false;
+        }
+
+        if ($application['mandatory']) {
+            return true;
+        }
+
+        $row = $statesByKey->get($dependency);
+        if ($row !== null && $row->requested_enabled) {
+            return true;
+        }
+
+        return $row === null
+            && $this->applications->isLegacyTenant($tenant)
+            && ($operationalStatuses[$dependency] ?? 'disabled') !== 'disabled';
+    }
+
+    /** @param array<string, string> $operationalStatuses @return list<string> */
+    private function dependentsBlockingForGlobalSummary(string $key, array $operationalStatuses): array
+    {
+        $catalog = ApplicationCatalog::all();
+        $blockingKeys = array_keys(array_filter(
+            $catalog,
+            fn (array $app, string $appKey): bool => ! $app['mandatory']
+                && $app['maturity'] === ApplicationCatalog::MATURITY_BUILT
+                && ($operationalStatuses[$appKey] ?? 'disabled') !== 'disabled',
+            ARRAY_FILTER_USE_BOTH,
+        ));
+
+        return TenantApplicationService::dependentsCurrentlyEnabled($key, $catalog, $blockingKeys);
     }
 
     /** @return array<string, mixed> */

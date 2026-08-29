@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Models\Tenant;
 use App\Models\TenantApplicationEntitlement;
+use App\Models\TenantCommercialAssignment;
 use App\Support\ApplicationCatalog;
 use App\Support\EntitlementAccessMode;
 use App\Support\TenantApplicationEntitlementDecision;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
+use Illuminate\Support\Collection;
 use Throwable;
 
 class TenantApplicationEntitlementResolver
@@ -93,6 +95,95 @@ class TenantApplicationEntitlementResolver
         return $result;
     }
 
+    /**
+     * نفس عقد `resolveMany()` لعدّة مستأجرين — استعلامان ثابتان للمنح والإسنادات التجارية.
+     *
+     * @param  iterable<Tenant>  $tenants
+     * @param  list<string>  $capabilityKeys
+     * @return array<string, array<string, TenantApplicationEntitlementDecision>>
+     */
+    public function resolveManyForTenants(iterable $tenants, array $capabilityKeys, DateTimeInterface $evaluationTime): array
+    {
+        /** @var array<string, Tenant> $tenantsById */
+        $tenantsById = [];
+        foreach ($tenants as $tenant) {
+            $tenantsById[$tenant->getKey()] = $tenant;
+        }
+
+        $result = [];
+        foreach (array_keys($tenantsById) as $tenantId) {
+            $result[$tenantId] = [];
+            foreach ($capabilityKeys as $capabilityKey) {
+                $result[$tenantId][$capabilityKey] = TenantApplicationEntitlementDecision::DENIED;
+            }
+        }
+
+        if ($tenantsById === []) {
+            return $result;
+        }
+
+        $resolvable = [];
+        foreach ($capabilityKeys as $capabilityKey) {
+            if (ApplicationCatalog::isActivatable($capabilityKey)) {
+                $resolvable[] = $capabilityKey;
+            }
+        }
+
+        if ($resolvable === []) {
+            return $result;
+        }
+
+        try {
+            $at = CarbonImmutable::instance($evaluationTime)->utc();
+            $tenantIds = array_keys($tenantsById);
+            $grants = TenantApplicationEntitlement::withoutGlobalScopes()
+                ->whereIn('tenant_id', $tenantIds)
+                ->whereIn('capability_key', $resolvable)
+                ->where('starts_at', '<=', $at)
+                ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', $at))
+                ->where(fn ($query) => $query->whereNull('revoked_at')->orWhere('revoked_at', '>', $at))
+                ->get(['tenant_id', 'capability_key', 'access_mode', 'grant_group_id', 'metadata']);
+
+            $assignmentIds = $grants->pluck('grant_group_id')->filter()->unique()->values()->all();
+            /** @var Collection<string, TenantCommercialAssignment> $assignmentsById */
+            $assignmentsById = $assignmentIds === []
+                ? collect()
+                : TenantCommercialAssignment::query()
+                    ->whereIn('id', $assignmentIds)
+                    ->with(['planVersion:id', 'productVersion:id'])
+                    ->get()
+                    ->keyBy('id');
+
+            foreach ($grants->groupBy('tenant_id') as $tenantId => $tenantGrants) {
+                $tenant = $tenantsById[(string) $tenantId] ?? null;
+                if ($tenant === null) {
+                    continue;
+                }
+
+                foreach ($tenantGrants->groupBy('capability_key') as $capabilityKey => $capabilityGrants) {
+                    $modes = $capabilityGrants->map(
+                        fn (TenantApplicationEntitlement $grant): string => $this->effectiveModeForPreloaded(
+                            $tenant,
+                            $grant,
+                            $at,
+                            $assignmentsById,
+                        ),
+                    );
+
+                    $result[(string) $tenantId][(string) $capabilityKey] = match (true) {
+                        $modes->contains(EntitlementAccessMode::FULL->value) => TenantApplicationEntitlementDecision::FULL,
+                        $modes->contains(EntitlementAccessMode::READ_ONLY->value) => TenantApplicationEntitlementDecision::READ_ONLY,
+                        default => TenantApplicationEntitlementDecision::DENIED,
+                    };
+                }
+            }
+        } catch (Throwable) {
+            return $result;
+        }
+
+        return $result;
+    }
+
     private function effectiveModeFor(Tenant $tenant, TenantApplicationEntitlement $grant, DateTimeInterface $at): string
     {
         $lifecycle = $this->commercialLifecycle->accessForGrant($tenant, $grant->grant_group_id, $at);
@@ -101,6 +192,34 @@ class TenantApplicationEntitlementResolver
         }
         if ($lifecycle === TenantApplicationEntitlementDecision::DENIED) return TenantApplicationEntitlementDecision::DENIED->value;
         if ($lifecycle === TenantApplicationEntitlementDecision::READ_ONLY) return EntitlementAccessMode::READ_ONLY->value;
+
+        return $grant->access_mode;
+    }
+
+    /** @param Collection<string, TenantCommercialAssignment> $assignmentsById */
+    private function effectiveModeForPreloaded(
+        Tenant $tenant,
+        TenantApplicationEntitlement $grant,
+        DateTimeInterface $at,
+        Collection $assignmentsById,
+    ): string {
+        $lifecycle = null;
+        if ($grant->grant_group_id !== null) {
+            $assignment = $assignmentsById->get($grant->grant_group_id);
+            if ($assignment !== null && $assignment->tenant_id === $tenant->id) {
+                $lifecycle = $this->commercialLifecycle->accessForPreloadedAssignment($assignment, $at);
+            }
+        }
+
+        if (is_array($grant->metadata) && array_key_exists('commercial_assignment_id', $grant->metadata) && $lifecycle === null) {
+            return TenantApplicationEntitlementDecision::DENIED->value;
+        }
+        if ($lifecycle === TenantApplicationEntitlementDecision::DENIED) {
+            return TenantApplicationEntitlementDecision::DENIED->value;
+        }
+        if ($lifecycle === TenantApplicationEntitlementDecision::READ_ONLY) {
+            return EntitlementAccessMode::READ_ONLY->value;
+        }
 
         return $grant->access_mode;
     }
