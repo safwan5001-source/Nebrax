@@ -22,6 +22,14 @@ export const POS_CART_FAB_CLASS =
 export const POS_CART_PAY_FOOTER_CLASS =
   'p-3 pt-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]';
 
+/** مساحة عمل المنتجات: كثافة ثابتة بلا تضخيم إضافي عند lg حتى لا نخسر عرض iPad. */
+export const POS_PRODUCTS_PANEL_CLASS =
+  'flex min-h-0 flex-col gap-3 overflow-y-auto p-3 sm:p-4';
+
+/** شريط الأقسام الجانبي: مضغوط على lg ثم يستعيد التنفس على xl. */
+export const POS_DESKTOP_CATEGORIES_CLASS =
+  'hidden flex-col gap-1.5 overflow-y-auto border-s border-border bg-surface p-2 lg:flex xl:gap-2 xl:p-3';
+
 const POS_PRODUCT_GRID_WITH_IMAGES_CLASS =
   'grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5';
 

@@ -20,7 +20,9 @@ import { POS_RETURN_HREF, decidePosUnsavedExit } from '@/lib/pos-workspace';
 import {
   POS_CART_FAB_CLASS,
   POS_CART_PAY_FOOTER_CLASS,
+  POS_DESKTOP_CATEGORIES_CLASS,
   POS_MOBILE_NAV_CLASS,
+  POS_PRODUCTS_PANEL_CLASS,
   POS_SALE_GRID_CLASS,
   posCartPaneClass,
   posProductGridClass,
@@ -1324,7 +1326,7 @@ export default function PosPage() {
 
   // ── لوحات فرعية ──────────────────────────────────────────────
   const productsPanel = (
-    <section className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3 sm:p-4 lg:p-5">
+    <section className={POS_PRODUCTS_PANEL_CLASS}>
       <div className="flex gap-2">
         <button
           type="button"
@@ -1709,7 +1711,7 @@ export default function PosPage() {
   );
 
   const catsPanel = (
-    <aside className="hidden flex-col gap-2 overflow-y-auto border-s border-border bg-surface p-3 lg:flex">
+    <aside className={POS_DESKTOP_CATEGORIES_CLASS}>
       <h4 className="mb-1 px-1 text-xs font-bold text-muted">{t('categories')}</h4>
       {CATS.map(({ key, label, image, icon: Icon }) => {
         const on = cat === key;
