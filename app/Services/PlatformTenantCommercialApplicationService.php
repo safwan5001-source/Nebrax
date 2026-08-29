@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Tenant;
 use App\Models\TenantApplicationEntitlement;
 use App\Models\TenantCommercialAssignment;
+use App\Support\ApplicationCatalog;
 use App\Support\EntitlementSourceType;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -12,7 +13,10 @@ use Closure;
 
 class PlatformTenantCommercialApplicationService
 {
-    public function __construct(private TenantApplicationService $applications) {}
+    public function __construct(
+        private TenantApplicationService $applications,
+        private PlatformApplicationOverrideService $overrides,
+    ) {}
 
     /** @return array<string, mixed> */
     public function summary(Tenant $tenant): array
@@ -26,10 +30,15 @@ class PlatformTenantCommercialApplicationService
                 ->get();
             $active = $assignments->filter(fn (TenantCommercialAssignment $assignment): bool => $this->isCurrent($assignment, $at));
             $currentPlan = $active->first(fn (TenantCommercialAssignment $assignment) => $assignment->source_type === TenantCommercialAssignment::SOURCE_PLAN);
+            $overrideSummary = $this->overrides->summary($tenant);
+            $overrideByKey = collect($overrideSummary['applications'])->keyBy('key');
 
             return [
                 'applications' => collect($this->applications->stateFor())
-                    ->map(fn (array $application, string $key) => $this->applicationData($key, $application))
+                    ->map(fn (array $application, string $key) => [
+                        ...$this->applicationData($key, $application),
+                        ...$this->overrideFields($overrideByKey->get($key, [])),
+                    ])
                     ->values()
                     ->all(),
                 'commercial_summary' => [
@@ -72,6 +81,27 @@ class PlatformTenantCommercialApplicationService
                 ],
             ];
         });
+    }
+
+    /** @param array<string, mixed> $override @return array<string, mixed> */
+    private function overrideFields(array $override): array
+    {
+        return [
+            'access' => $override['access'] ?? ApplicationCatalog::ACCESS_OPERATIONAL,
+            'commercial_mode' => $override['commercial_mode'] ?? 'denied',
+            'override_grant_id' => $override['override_grant_id'] ?? null,
+            'operational_status' => $override['operational_status'] ?? 'disabled',
+            'can_grant' => $override['can_grant'] ?? false,
+            'can_revert' => $override['can_revert'] ?? false,
+            'can_show' => $override['can_show'] ?? false,
+            'can_hide' => $override['can_hide'] ?? false,
+            'skip_reasons' => $override['skip_reasons'] ?? [
+                'grant' => [],
+                'revert' => [],
+                'show' => [],
+                'hide' => [],
+            ],
+        ];
     }
 
     /** @param array<string, mixed> $application @return array<string, mixed> */

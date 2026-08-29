@@ -12,6 +12,7 @@ use App\Models\Payment;
 use App\Models\PosSession;
 use App\Models\Purchase;
 use App\Models\StockMovement;
+use App\Models\PlatformAdministrator;
 use App\Models\Tenant;
 use App\Models\TenantApplicationEvent;
 use App\Models\TenantApplicationState;
@@ -242,6 +243,93 @@ class TenantApplicationService
         return $tenant->created_at === null || $tenant->created_at->lt(self::ENFORCEMENT_CUTOVER_AT);
     }
 
+    public function enableForPlatform(string $key, PlatformAdministrator $administrator, ?string $reason = null): TenantApplicationState
+    {
+        if (! ApplicationCatalog::exists($key)) {
+            throw new RuntimeException('مفتاح تطبيق غير معروف.');
+        }
+
+        if (! ApplicationCatalog::isActivatable($key)) {
+            throw new RuntimeException('هذه القدرة غير مبنية بعد ولا يمكن تفعيلها.');
+        }
+
+        $missing = $this->missingDependenciesForPlatformEnable($key);
+
+        if ($missing !== []) {
+            throw new RuntimeException('اعتماديات غير مفعّلة: ' . implode('، ', $missing));
+        }
+
+        return DB::transaction(function () use ($key, $administrator, $reason) {
+            $state = TenantApplicationState::updateOrCreate(
+                ['application_key' => $key],
+                [
+                    'requested_enabled' => true,
+                    'status' => 'enabled',
+                    'changed_by' => null,
+                    'changed_by_platform_administrator_id' => $administrator->id,
+                    'reason' => $reason,
+                ],
+            );
+
+            TenantApplicationEvent::create([
+                'application_key' => $key,
+                'action' => 'enabled',
+                'changed_by' => null,
+                'changed_by_platform_administrator_id' => $administrator->id,
+                'reason' => $reason,
+            ]);
+
+            return $state;
+        });
+    }
+
+    public function disableForPlatform(string $key, PlatformAdministrator $administrator, ?string $reason = null): TenantApplicationState
+    {
+        $application = ApplicationCatalog::find($key);
+        if ($application === null) {
+            throw new RuntimeException('مفتاح تطبيق غير معروف.');
+        }
+
+        if ($application['mandatory']) {
+            throw new RuntimeException('هذه القدرة إلزامية ولا يمكن إيقافها.');
+        }
+
+        $dependents = $this->dependentsBlockingPlatformDisable($key);
+        if ($dependents !== []) {
+            throw new RuntimeException('توابع مفعّلة تعتمد على هذه القدرة: ' . implode('، ', $dependents));
+        }
+
+        return DB::transaction(function () use ($key, $administrator, $reason) {
+            $tenantId = app(TenantContext::class)->id();
+            if ($tenantId !== null) {
+                Tenant::whereKey($tenantId)->lockForUpdate()->firstOrFail();
+            }
+
+            $status = $this->hasOperationalData($key) ? 'suspended' : 'disabled';
+
+            $state = TenantApplicationState::updateOrCreate(
+                ['application_key' => $key],
+                [
+                    'requested_enabled' => false,
+                    'status' => $status,
+                    'changed_by' => null,
+                    'changed_by_platform_administrator_id' => $administrator->id,
+                    'reason' => $reason,
+                ],
+            );
+
+            TenantApplicationEvent::create([
+                'application_key' => $key,
+                'action' => $status,
+                'changed_by' => null,
+                'changed_by_platform_administrator_id' => $administrator->id,
+                'reason' => $reason,
+            ]);
+
+            return $state;
+        });
+    }
+
     public function enable(string $key, ?User $actor, ?string $reason = null): TenantApplicationState
     {
         if (! ApplicationCatalog::exists($key)) {
@@ -350,6 +438,67 @@ class TenantApplicationService
                 && isset($enabled[$candidate])
                 && in_array($key, $catalog[$candidate]['dependencies'], true),
         ));
+    }
+
+    /**
+     * اعتماديات يجب أن تكون مفعّلة قبل إظهار/تفعيل قدرة من المنصة.
+     * يحترم cohort ما قبل الإنفاذ: بلا صف حالة، يُعامَل الاعتماد كمُلبًى إذا
+     * لم يكن `statusFor()` معطّلاً — يطابق نية الإنفاذ على المسارات.
+     *
+     * @return list<string>
+     */
+    public function missingDependenciesForPlatformEnable(string $key): array
+    {
+        $rows = TenantApplicationState::query()->get()->keyBy('application_key');
+
+        return array_values(array_filter(
+            ApplicationCatalog::dependenciesFor($key),
+            fn (string $dependency) => ! $this->isDependencySatisfiedForPlatformEnable($dependency, $rows),
+        ));
+    }
+
+    /**
+     * توابع ما زالت تشغيلياً نشطة (غير معطّلة) وتمنع إخفاء هذه القدرة.
+     *
+     * @return list<string>
+     */
+    public function dependentsBlockingPlatformDisable(string $key): array
+    {
+        $rows = TenantApplicationState::query()->get()->keyBy('application_key');
+        $blockingKeys = array_keys(array_filter(
+            ApplicationCatalog::all(),
+            fn (array $app, string $appKey) => $this->countsAsBlockingDependent($appKey, $app, $rows),
+            ARRAY_FILTER_USE_BOTH,
+        ));
+
+        return self::dependentsCurrentlyEnabled($key, ApplicationCatalog::all(), $blockingKeys);
+    }
+
+    /** @param \Illuminate\Support\Collection<string, TenantApplicationState> $rows */
+    private function isDependencySatisfiedForPlatformEnable(string $dependency, $rows): bool
+    {
+        $application = ApplicationCatalog::find($dependency);
+        if ($application === null) {
+            return false;
+        }
+
+        if ($this->isEnabled($dependency, $application, $rows)) {
+            return true;
+        }
+
+        return $rows->get($dependency) === null
+            && $this->isGrandfatheredTenant()
+            && $this->statusFor($dependency) !== 'disabled';
+    }
+
+    /** @param \Illuminate\Support\Collection<string, TenantApplicationState> $rows */
+    private function countsAsBlockingDependent(string $appKey, array $app, $rows): bool
+    {
+        if ($app['mandatory'] || $app['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+            return false;
+        }
+
+        return $this->statusFor($appKey) !== 'disabled';
     }
 
     /** @param array{mandatory:bool}|null $application */
