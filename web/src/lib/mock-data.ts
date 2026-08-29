@@ -1459,6 +1459,138 @@ export const mockPosSessions = [
   { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00' },
 ];
 
+/** معاينة UX — أحداث رقابية بعينة before/after للتحقق من الملخص البشري والـdiff. */
+export const mockPosAuditEvents = [
+  {
+    id: 'evt-audit-1',
+    pos_session_id: 'ps-2',
+    branch_id: 'br-1',
+    cart_id: '550e8400-e29b-41d4-a716-446655440001',
+    correlation_id: '550e8400-e29b-41d4-a716-446655440099',
+    type: 'cart_cancelled',
+    category: 'cart',
+    amount: '300.00',
+    reason_code: 'wrong_price',
+    reason_note: 'سعر خاطئ',
+    source: 'client_observed',
+    trust_level: 'secondary',
+    created_at: '2026-08-28T11:22:00Z',
+    payload: {
+      client_observed: {
+        before: {
+          item: {
+            description: 'فطيرة الأجبان الثلاثة',
+            quantity: 1,
+            unit_price: 30000,
+            discount: 0,
+          },
+          status: 'active',
+        },
+        after: { status: 'cancelled' },
+      },
+    },
+    actor: { id: 'user-cashier', name: 'سارة الكاشير' },
+    performed_by_user: { id: 'user-cashier', name: 'سارة الكاشير' },
+    approved_by_user: null,
+    session: { id: 'ps-2', number: 'POS-2026-0002', device: { id: 'dev-1', name: 'كاشير 1', code: 'POS-01' } },
+  },
+  {
+    id: 'evt-audit-2',
+    pos_session_id: 'ps-2',
+    branch_id: 'br-1',
+    cart_id: '550e8400-e29b-41d4-a716-446655440002',
+    correlation_id: '550e8400-e29b-41d4-a716-446655440098',
+    type: 'price_overridden',
+    category: 'cart',
+    amount: '20.00',
+    reason_code: 'wrong_price',
+    reason_note: null,
+    source: 'client_observed',
+    trust_level: 'secondary',
+    created_at: '2026-08-28T10:05:00Z',
+    payload: {
+      client_observed: {
+        item: { description: 'ماء معدني', quantity: 2, unit_price: 2000 },
+        before: { item: { description: 'ماء معدني', quantity: 2, unit_price: 2500 } },
+        after: { item: { description: 'ماء معدني', quantity: 2, unit_price: 2000 } },
+      },
+    },
+    actor: { id: 'user-cashier', name: 'سارة الكاشير' },
+    performed_by_user: { id: 'user-cashier', name: 'سارة الكاشير' },
+    approved_by_user: { id: 'user-manager', name: 'خالد المشرف' },
+    session: { id: 'ps-2', number: 'POS-2026-0002', device: null },
+  },
+];
+
+export const mockPosAuditRules = [
+  {
+    id: 'rule-approval-replay',
+    rule_key: 'approval_replay',
+    category: 'approval',
+    version: 1,
+    is_enabled: true,
+    weight: 10,
+    min_sample: 20,
+    window_days: 14,
+    threshold: 3,
+  },
+  {
+    id: 'rule-approval-required-rate',
+    rule_key: 'approval_required_rate',
+    category: 'approval',
+    version: 1,
+    is_enabled: true,
+    weight: 8,
+    min_sample: 30,
+    window_days: 14,
+    threshold: 12000,
+  },
+  {
+    id: 'rule-approver-concentration',
+    rule_key: 'approver_concentration',
+    category: 'approval',
+    version: 2,
+    is_enabled: true,
+    weight: 9,
+    min_sample: 25,
+    window_days: 14,
+    threshold: 40000,
+  },
+  {
+    id: 'rule-override-approval-rate',
+    rule_key: 'override_approval_rate',
+    category: 'approval',
+    version: 1,
+    is_enabled: false,
+    weight: 7,
+    min_sample: 15,
+    window_days: 14,
+    threshold: 80000,
+  },
+  {
+    id: 'rule-pair-concentration',
+    rule_key: 'performer_approver_pair_concentration',
+    category: 'approval',
+    version: 1,
+    is_enabled: true,
+    weight: 11,
+    min_sample: 20,
+    window_days: 14,
+    threshold: 35000,
+  },
+  {
+    id: 'rule-cart-cancellation',
+    rule_key: 'cart_cancellation_rate',
+    category: 'cart',
+    version: 3,
+    is_enabled: true,
+    weight: 12,
+    min_sample: 40,
+    window_days: 14,
+    threshold: 8000,
+  },
+];
+
 /** معاينة Phase 4 — عقد GET /pos/audit/needs-attention فقط، ليست مصدر حقيقة موازياً. */
 export const mockNeedsAttention = {
   data: [
@@ -3107,9 +3239,26 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     });
   }
   if (clean === '/pos/audit/needs-attention') return resolve(mockNeedsAttention);
-  if (clean === '/pos/audit/events') return resolve({ data: [] });
-  if (clean === '/pos/audit/carts') return resolve({ data: [] });
-  if (clean === '/pos/audit/users') return resolve({ data: [] });
+  if (clean === '/pos/audit/events') return resolve({ data: mockPosAuditEvents });
+  if (clean === '/pos/audit/carts') {
+    return resolve({
+      data: [{
+        cart_id: mockPosAuditEvents[0].cart_id,
+        pos_session_id: 'ps-2',
+        branch_id: 'br-1',
+        created_at: '2026-08-28T11:00:00Z',
+        last_event_at: mockPosAuditEvents[0].created_at,
+        last_event_type: mockPosAuditEvents[0].type,
+        event_count: 3,
+        reason_code: 'wrong_price',
+      }],
+    });
+  }
+  if (clean === '/pos/audit/users') {
+    return resolve({
+      data: [{ user_id: 'user-cashier', name: 'سارة الكاشير', events_count: 12, last_event_at: mockPosAuditEvents[0].created_at }],
+    });
+  }
   if (clean === '/pos/audit/approvals') {
     return resolve({
       data: [{
@@ -3130,9 +3279,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/pos/audit/exceptions') return resolve({ data: [], meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 } });
   if (clean === '/pos/audit/risk') return resolve({ data: [], meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 } });
   if (clean === '/pos/audit/relationships') return resolve({ data: [] });
-  if (clean === '/pos/audit/rules') return resolve({ data: [] });
+  if (clean === '/pos/audit/rules') return resolve({ data: mockPosAuditRules });
   if (clean === '/pos/audit/cases') return resolve({ data: [], meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 } });
   if (clean === '/pos/audit/digest') return resolve({ data: [], meta: { total: 0, per_page: 25, current_page: 1, last_page: 1 } });
+  if (clean.match(/^\/pos\/audit\/carts\/[^/]+$/)) {
+    return resolve({ data: { timeline: mockPosAuditEvents } });
+  }
   if (clean === '/product-categories') return resolve({ data: [] });
 
   // افتراضي: لا بيانات بعد (حالة فارغة).

@@ -11,6 +11,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { TechnicalDetails } from '@/components/ui/technical-details';
 import { fromMilli, formatDateTime, reviewStateTone, severityTone } from './helpers';
 import type { PosExceptionRow, ReviewState } from './types';
 
@@ -221,23 +222,19 @@ export function ExceptionDetail({ id, canReview, canPromote, onClose, onReviewed
             </section>
           ) : null}
 
-          {/* تفاصيل تقنية ثانوية قابلة للطي */}
-          <details>
-            <summary className="cursor-pointer text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">{t('technicalDetails')}</summary>
-            <pre className="mt-2 max-h-56 overflow-auto rounded border border-border bg-background p-3 text-xs text-text" dir="ltr">
-              {JSON.stringify(
-                {
-                  id: exception.id,
-                  rule_key: exception.rule_key,
-                  rule_version: exception.rule_version,
-                  rule_snapshot: exception.rule_snapshot,
-                  explanation: exception.explanation,
-                },
-                null,
-                2,
-              )}
-            </pre>
-          </details>
+          <TechnicalDetails
+            title={t('technicalDetails')}
+            description={t('technicalDetailsHint')}
+            data={{
+              id: exception.id,
+              rule_key: exception.rule_key,
+              rule_version: exception.rule_version,
+              rule_snapshot: exception.rule_snapshot,
+              explanation: exception.explanation,
+            }}
+            copyLabel={t('copy')}
+            copiedLabel={t('copied')}
+          />
         </div>
       ) : null}
     </Dialog>

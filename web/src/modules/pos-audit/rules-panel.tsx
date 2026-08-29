@@ -114,9 +114,9 @@ export function RulesPanel({ canManage, canRecalculate }: Props) {
             {categoryRules.map((rule) => (
               <li key={rule.rule_key} className="p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium text-text">{ruleLabel(rule.rule_key)}</p>
-                    <p className="num mt-0.5 text-xs text-muted">{rule.rule_key} · v{rule.version}</p>
+                    <p className="mt-0.5 text-xs text-muted">{t('ruleVersion', { version: rule.version })}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge tone={rule.is_enabled ? 'positive' : 'muted'}>{rule.is_enabled ? t('enabled') : t('disabled')}</Badge>
@@ -127,17 +127,23 @@ export function RulesPanel({ canManage, canRecalculate }: Props) {
                     ) : null}
                   </div>
                 </div>
-                {canManage ? (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">{t('advancedTuning')}</summary>
-                    <div className="mt-2 grid gap-3 sm:grid-cols-3">
-                      <TuneField label={t('weight')} defaultValue={rule.weight} onCommit={(value) => void patch(rule, { weight: value })} />
-                      <TuneField label={t('minSample')} defaultValue={rule.min_sample} onCommit={(value) => void patch(rule, { min_sample: value })} />
-                      <TuneField label={t('windowDaysLabel')} defaultValue={rule.window_days} onCommit={(value) => void patch(rule, { window_days: value })} />
-                      <TuneField label={t('threshold')} defaultValue={rule.threshold} onCommit={(value) => void patch(rule, { threshold: value })} />
-                    </div>
-                  </details>
-                ) : null}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">{t('advancedTuning')}</summary>
+                  <div className="mt-2 space-y-3">
+                    <p className="text-xs text-muted">
+                      {t('ruleKey')}:{' '}
+                      <span className="num break-all font-mono" dir="ltr">{rule.rule_key}</span>
+                    </p>
+                    {canManage ? (
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <TuneField label={t('weight')} defaultValue={rule.weight} onCommit={(value) => void patch(rule, { weight: value })} />
+                        <TuneField label={t('minSample')} defaultValue={rule.min_sample} onCommit={(value) => void patch(rule, { min_sample: value })} />
+                        <TuneField label={t('windowDaysLabel')} defaultValue={rule.window_days} onCommit={(value) => void patch(rule, { window_days: value })} />
+                        <TuneField label={t('threshold')} defaultValue={rule.threshold} onCommit={(value) => void patch(rule, { threshold: value })} />
+                      </div>
+                    ) : null}
+                  </div>
+                </details>
               </li>
             ))}
           </ul>
