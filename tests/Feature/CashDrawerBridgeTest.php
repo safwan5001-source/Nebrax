@@ -131,6 +131,7 @@ class CashDrawerBridgeTest extends TestCase
             ->assertCreated()['data']['id'];
 
         $checkout = $this->withToken($auth['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $partner,
             'pos_session_id' => $session['id'],
             'warehouse_id' => $warehouse['id'],

@@ -75,6 +75,7 @@ describe('PosPayment', () => {
     const { rerender } = render(
       <PosPayment
         allowDeferredPayment
+        checkoutPhase="submitting"
         customerName="Walk-in"
         defaultPaymentMethodId="cash"
         error={null}
@@ -89,14 +90,16 @@ describe('PosPayment', () => {
       />,
     );
 
-    const confirm = screen.getByRole('button', { name: 'confirm_payment' }) as HTMLButtonElement;
+    const confirm = screen.getByTestId('pos-confirm-payment') as HTMLButtonElement;
     expect(confirm.disabled).toBe(true);
+    expect(confirm.textContent ?? '').toContain('checkout_submitting');
     fireEvent.click(confirm);
     expect(onConfirm).not.toHaveBeenCalled();
 
     rerender(
       <PosPayment
         allowDeferredPayment={false}
+        checkoutPhase="idle"
         customerName="Walk-in"
         defaultPaymentMethodId="cash"
         error={null}
@@ -110,9 +113,41 @@ describe('PosPayment', () => {
         totalMinor={10000}
       />,
     );
-    const disabledConfirm = screen.getByRole('button', { name: 'confirm_payment' }) as HTMLButtonElement;
+    const disabledConfirm = screen.getByTestId('pos-confirm-payment') as HTMLButtonElement;
     expect(disabledConfirm.disabled).toBe(true);
     fireEvent.click(disabledConfirm);
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('يمنع اللمس ولوحة المفاتيح من تجاوز قفل الإرسال ويعرض حالة الاسترداد', () => {
+    const onConfirm = vi.fn();
+    const onBack = vi.fn();
+    render(
+      <PosPayment
+        allowDeferredPayment
+        checkoutPhase="recovering"
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={onBack}
+        onConfirm={onConfirm}
+        paying
+        paymentMethods={paymentMethods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+
+    const confirm = screen.getByTestId('pos-confirm-payment') as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    expect(confirm.textContent ?? '').toContain('checkout_recovering');
+    expect(screen.getByTestId('pos-checkout-recovering')).toBeTruthy();
+    fireEvent.click(confirm);
+    fireEvent.keyDown(confirm, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'back_to_cart' }));
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
   });
 });

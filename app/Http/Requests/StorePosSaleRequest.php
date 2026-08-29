@@ -16,6 +16,8 @@ class StorePosSaleRequest extends FormRequest
         $rules = [
             'partner_id'          => ['required', 'uuid'],
             'pos_session_id'      => ['required', 'uuid'],
+            // مفتاح محاولة منطقية ثابتة: إعادة الإرسال بنفس المفتاح لا تنشئ بيعاً ثانياً.
+            'idempotency_key'     => ['required', 'uuid'],
             // اختياري للتوافق مع محطات POS/تكاملات قديمة؛ الواجهة الجديدة تنشئه خادمياً.
             'cart_id'             => ['nullable', 'uuid'],
             // يثبت مخزن الإخراج على الفاتورة الناتجة من عملية نقطة البيع.

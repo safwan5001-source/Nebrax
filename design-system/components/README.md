@@ -39,6 +39,7 @@
 | Input · Select · Label · Forms | `forms.md` | `ui/{input,select,label}.tsx` |
 | Badge · Card · Table · DataTable | `data-display.md` | `ui/{badge,card,table}.tsx`, `data-table.tsx` |
 | Dialog · Toast · Skeleton | `overlays.md` | `ui/{dialog,toast,skeleton}.tsx` |
+| TechnicalDetails | `../foundations/human-readable-technical-data.md` | `ui/technical-details.tsx` |
 | Sidebar · Topbar · Command Palette | `navigation.md` | `layout/{sidebar,topbar}.tsx` (+ لوحة أوامر مقترحة) |
 
 ## قاعدة إنشاء مكوّن جديد

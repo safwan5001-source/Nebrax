@@ -285,6 +285,7 @@ class PosLossPreventionPhase4Test extends TestCase
         $product = Product::create(['name' => 'صنف ف4', 'sale_price' => 10000, 'track_inventory' => false, 'quantity_on_hand' => 0, 'avg_cost' => 0]);
         $customer = $this->withToken($seller['token'])->postJson('/api/partners', ['name' => 'عميل ف4', 'type' => 'customer'])->assertCreated()->json('data.id');
         $invoice = Invoice::with('lines')->findOrFail($this->withToken($seller['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $customer, 'pos_session_id' => $session,
             'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
             'tenders' => ['cash' => 11500],
@@ -355,6 +356,7 @@ class PosLossPreventionPhase4Test extends TestCase
         $product = Product::create(['name' => 'صنف نافذة', 'sale_price' => 10000, 'track_inventory' => false, 'quantity_on_hand' => 0, 'avg_cost' => 0]);
         $customer = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل نافذة', 'type' => 'customer'])->assertCreated()->json('data.id');
         $invoice = Invoice::with('lines')->findOrFail($this->withToken($auth['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $customer, 'pos_session_id' => $sessionId,
             'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
             'tenders' => ['cash' => 11500],
@@ -544,6 +546,7 @@ class PosLossPreventionPhase4Test extends TestCase
         $product = Product::create(['name' => 'صنف منع', 'sale_price' => 10000, 'track_inventory' => false, 'quantity_on_hand' => 0, 'avg_cost' => 0]);
         $customer = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل منع', 'type' => 'customer'])->assertCreated()->json('data.id');
         $invoice = Invoice::with('lines')->findOrFail($this->withToken($auth['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $customer, 'pos_session_id' => $session,
             'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
             'tenders' => ['cash' => 11500],

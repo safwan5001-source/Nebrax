@@ -124,6 +124,7 @@ class PosLossPreventionTest extends TestCase
         $customer = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل التدقيق', 'type' => 'customer'])->assertCreated()->json('data.id');
 
         $this->withToken($auth['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $customer, 'pos_session_id' => $session, 'cart_id' => $cart,
             'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]], 'tenders' => ['cash' => 115000],
         ])->assertCreated();
