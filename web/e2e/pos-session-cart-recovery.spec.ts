@@ -28,7 +28,7 @@ test.describe('PR-9 POS session & cart recovery', () => {
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await addFirstProduct(page);
-    await expect(page.getByText(/ر\.س|SAR/).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: PAY })).toBeEnabled();
 
     // 1) سلة → reload → استعادة مرة واحدة بنفس الهوية
     const beforeIds = await page.evaluate(() => {
@@ -98,29 +98,17 @@ test.describe('PR-9 POS session & cart recovery', () => {
     await page.context().setOffline(false);
     await expect(page.getByTestId('pos-confirm-payment')).toBeEnabled({ timeout: 10_000 });
 
-    // 5) جلسة مغلقة عن بُعد → حالة blocking
+    // 5) جلسة مغلقة عن بُعد → حالة blocking (mock demo hook؛ الاستطلاع على online)
     await page.evaluate(() => {
       (window as Window & { __POS_SESSIONS_FORCE_EMPTY?: boolean }).__POS_SESSIONS_FORCE_EMPTY = true;
     });
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    // إن لم يدعم الـ mock العلم، أعد التحميل مع اعتراض القائمة.
-    await page.route('**/pos-sessions?**', async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: [] }),
-        });
-        return;
-      }
-      await route.continue();
-    });
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await expect(
-      page.getByText(/أُغلقت وردية|closed elsewhere|فتح جلسة جديدة|Open new session/).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect(page.getByTestId('pos-session-invalid-banner')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/أُغلقت وردية|closed elsewhere|فتح جلسة جديدة|Open new session/).first()).toBeVisible();
     await page.screenshot({ path: path.join(evidenceDir, 'desktop-1440-ar-rtl-light-closed-session.png') });
-    await page.unroute('**/pos-sessions?**');
+    await page.evaluate(() => {
+      (window as Window & { __POS_SESSIONS_FORCE_EMPTY?: boolean }).__POS_SESSIONS_FORCE_EMPTY = false;
+    });
 
     // Visual QA — dark / mobile
     await captureRestored(browser, consoleErrors, {
