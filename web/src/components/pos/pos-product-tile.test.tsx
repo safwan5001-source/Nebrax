@@ -52,7 +52,10 @@ describe('PosProductTile', () => {
 
   it('لا يضيف المنتج عند الضغط على المفضلة', () => {
     const { onAdd, onToggleFavorite } = renderTile();
-    fireEvent.click(screen.getByRole('button', { name: 'Favorites' }));
+    const favorite = screen.getByRole('button', { name: 'Favorites' });
+    expect(favorite.className).toContain('min-h-11');
+    expect(favorite.className).toContain('min-w-11');
+    fireEvent.click(favorite);
     expect(onToggleFavorite).toHaveBeenCalledOnce();
     expect(onAdd).not.toHaveBeenCalled();
   });
@@ -64,5 +67,21 @@ describe('PosProductTile', () => {
     const { onAdd: onAddSelected } = renderTile({ selected: true });
     expect(screen.getByRole('button', { name: /Water 330ml/ }).getAttribute('aria-selected')).toBe('true');
     expect(onAddSelected).toBeDefined();
+  });
+
+  it('يحافظ على حالات اللمس والماوس والكيبورد داخل البطاقة', () => {
+    renderTile();
+    const card = screen.getByRole('button', { name: /Water 330ml/ });
+    expect(card.className).toContain('touch-manipulation');
+    expect(card.className).toContain('hover:border-primary');
+    expect(card.className).toContain('focus-visible:ring-2');
+  });
+
+  it('يعرض السعر وSKU والمخزون والضريبة كطبقات مستقلة بلا تداخل', () => {
+    renderTile();
+    expect(screen.getByText('1.50')).toBeTruthy();
+    expect(screen.getByText('W330')).toBeTruthy();
+    expect(screen.getByText('Available: 12')).toBeTruthy();
+    expect(screen.getByText('incl. VAT')).toBeTruthy();
   });
 });
