@@ -78,12 +78,18 @@ describe('PosProductTile', () => {
     expect(card.className).toContain('focus-visible:ring-2');
   });
 
-  it('يعرض الباركود ولا يعرض SKU أو وسم الضريبة داخل البطاقة', () => {
+  it('يعرض الباركود ويخفي SKU ووسم الضريبة داخل البطاقة', () => {
     renderTile();
     expect(screen.getByText('6281000000330')).toBeTruthy();
     expect(screen.queryByText('W330')).toBeNull();
     expect(screen.queryByText('incl. VAT')).toBeNull();
     expect(screen.getByText('1.50')).toBeTruthy();
     expect(screen.getByText('Available: 12')).toBeTruthy();
+  });
+
+  it('لا يعرض باركودًا وهميًا عند عدم وجود باركود حقيقي', () => {
+    renderTile({ product: { ...product, barcode: null } });
+    expect(screen.queryByText('6281000000330')).toBeNull();
+    expect(screen.queryByText('W330')).toBeNull();
   });
 });
