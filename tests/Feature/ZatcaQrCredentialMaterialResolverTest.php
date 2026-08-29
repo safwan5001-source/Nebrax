@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ZatcaCredential;
 use App\Services\Accounting\ZatcaQrCredentialMaterialResolver;
+use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,15 +20,31 @@ class ZatcaQrCredentialMaterialResolverTest extends TestCase
         $auth = $this->registerTenant('zatca-qr-material', 'zatca-qr-material@example.test');
         app(TenantContext::class)->set($auth['tenant_id']);
         [$caKey, $caCertificate] = $this->certificateAuthority();
+        [$competingKey, , $competingDer] = $this->leafCertificate($caKey, $caCertificate);
         [$privateKey, $leafCertificate, $leafDer] = $this->leafCertificate($caKey, $caCertificate);
 
-        $credential = ZatcaCredential::create([
+        ZatcaCredential::create([
             'environment' => 'developer',
             'stage' => 'compliance',
             'status' => 'configured',
             'credentials' => [
+                'private_key' => $competingKey,
+                'certificate_chain' => [base64_encode($competingDer)],
+            ],
+            'certificate_fingerprint' => hash('sha256', $competingDer),
+            'configured_at' => now(),
+            'expires_at' => now()->addDay(),
+        ]);
+        Settings::put('zatca', ['active_environment' => 'simulation']);
+
+        $credential = ZatcaCredential::create([
+            'environment' => 'simulation',
+            'stage' => 'compliance',
+            'status' => 'configured',
+            'credentials' => [
                 'private_key' => $privateKey,
-                'certificate_chain' => [base64_encode($leafDer)],
+                // leaf أولاً ثم شهادة المُصدر؛ يجب ألا يشتق المحلل المادة من CA.
+                'certificate_chain' => [base64_encode($leafDer), base64_encode($this->certificateDer($caCertificate))],
             ],
             'certificate_fingerprint' => hash('sha256', $leafDer),
             'configured_at' => now(),
@@ -91,6 +108,18 @@ class ZatcaQrCredentialMaterialResolverTest extends TestCase
         $this->assertIsString($der);
 
         return [$privateKey, $certificate, $der];
+    }
+
+    private function certificateDer(\OpenSSLCertificate $certificate): string
+    {
+        $pem = '';
+        $this->assertTrue(openssl_x509_export($certificate, $pem));
+        $body = preg_replace('/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s+/', '', $pem);
+        $this->assertIsString($body);
+        $der = base64_decode($body, true);
+        $this->assertIsString($der);
+
+        return $der;
     }
 
     private function tbsCertificate(string $der): string
