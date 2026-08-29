@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Services\Accounting\ZatcaPhaseTwoQrEncoder;
 use DateTimeImmutable;
 use InvalidArgumentException;
+use RuntimeException;
 use Tests\TestCase;
 
 class ZatcaPhaseTwoQrEncoderTest extends TestCase
@@ -91,6 +92,26 @@ class ZatcaPhaseTwoQrEncoderTest extends TestCase
                 $this->addToAssertionCount(1);
             }
         }
+    }
+
+    /** @test */
+    public function it_rejects_a_combined_payload_over_the_official_base64_limit(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('700');
+
+        app(ZatcaPhaseTwoQrEncoder::class)->encode(
+            str_repeat('س', 120),
+            '310000000000003',
+            new DateTimeImmutable('2026-08-29T00:00:00Z'),
+            '100.00',
+            '15.00',
+            str_repeat("\x01", 32),
+            str_repeat("\x02", 64),
+            str_repeat("\x03", 255),
+            'simplified',
+            str_repeat("\x04", 255),
+        );
     }
 
     /** @return array<int,string> */
