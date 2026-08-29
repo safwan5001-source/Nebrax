@@ -43,8 +43,8 @@ final class ZatcaPhaseTwoQrEncoder
         if (strlen($ecdsaSignature) !== 64) {
             throw new InvalidArgumentException('توقيع ECDSA في QR يجب أن يكون 64 بايت خاماً.');
         }
-        if ($publicKey === '') {
-            throw new InvalidArgumentException('المفتاح العام في QR مفقود.');
+        if ($publicKey === '' || str_contains($publicKey, '-----BEGIN') || str_contains($publicKey, 'PUBLIC KEY')) {
+            throw new InvalidArgumentException('المفتاح العام في QR يجب أن يكون بايتات خاماً لا نص PEM.');
         }
         if ($documentType === 'simplified' && ($certificateSignature === null || $certificateSignature === '')) {
             throw new InvalidArgumentException('توقيع شهادة الختم مطلوب لـQR الفاتورة المبسطة.');
