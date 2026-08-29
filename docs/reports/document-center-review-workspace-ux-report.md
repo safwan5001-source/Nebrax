@@ -4,7 +4,7 @@
 **PR:** [#565](https://github.com/safwan5001-source/Nebrax/pull/565)  
 **الفرع:** `cursor/complete-document-center-review-ux-6a0f`  
 **Base SHA:** `a7d24fe1` (أحدث `main` بعد دمج #564)  
-**Head SHA:** `948bd84f` (تقرير) · `e9ed8a07` (كود)  
+**Head SHA:** `4117b112` (تقرير) · `e9ed8a07` (كود)  
 **الحالة:** Draft — مُدفوع؛ CI جزئي (انظر §7 و§14)
 
 ---
@@ -228,7 +228,7 @@ git diff --check
 | `b2db36bb` | docs: add Document Center Review Workspace UX report |
 | `9439db3b` | merge origin/main (#564 global application controls) |
 | `e9ed8a07` | fix(documents): address PR #565 CI — vitest OOM, payload test, review fixes |
-| `948bd84f` | docs: update report — CI status §7/§14 |
+| `4117b112` | docs: update report — CI status §7/§14 |
 
 ---
 
@@ -345,4 +345,4 @@ git diff --check
 
 ---
 
-*آخر تحديث: 2026-08-29 — HEAD `948bd84f` — بانتظار مراجعة PR #565.*
+*آخر تحديث: 2026-08-29 — HEAD `4117b112` — بانتظار مراجعة PR #565.*
