@@ -44,12 +44,14 @@ class PosServiceProvider extends ServiceProvider
                     ]);
 
                 Route::put('pos-shifts/{id}', [PosShiftController::class, 'update'])
+                    ->whereUuid('id')
                     ->middleware([
                         EnsurePermission::class . ':company.manage',
                         EnsureApplicationActive::class . ':sales.pos',
                     ]);
 
                 Route::delete('pos-shifts/{id}', [PosShiftController::class, 'destroy'])
+                    ->whereUuid('id')
                     ->middleware([
                         EnsurePermission::class . ':company.manage',
                         EnsureApplicationActive::class . ':sales.pos',
