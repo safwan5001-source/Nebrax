@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import {
   POS_CART_FAB_CLASS,
   POS_CART_PAY_FOOTER_CLASS,
+  POS_DESKTOP_CATEGORIES_CLASS,
   POS_MOBILE_NAV_CLASS,
+  POS_PRODUCTS_PANEL_CLASS,
   POS_SALE_GRID_CLASS,
   posCartPaneClass,
   posProductGridClass,
@@ -45,6 +47,15 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     expect(grid).toContain('2xl:grid-cols-6');
   });
 
+  it('يحافظ على مساحة المنتجات ولا يعيد تضخيم padding عند lg', () => {
+    expect(POS_PRODUCTS_PANEL_CLASS).toContain('p-3');
+    expect(POS_PRODUCTS_PANEL_CLASS).toContain('sm:p-4');
+    expect(POS_PRODUCTS_PANEL_CLASS).not.toContain('lg:p-5');
+    expect(POS_DESKTOP_CATEGORIES_CLASS).toContain('p-2');
+    expect(POS_DESKTOP_CATEGORIES_CLASS).toContain('lg:flex');
+    expect(POS_DESKTOP_CATEGORIES_CLASS).toContain('xl:p-3');
+  });
+
   it('يخفي الشريط السفلي وFAB تحت md ويعيد البادئة عند التابلت', () => {
     expect(POS_MOBILE_NAV_CLASS).toContain('md:hidden');
     expect(POS_MOBILE_NAV_CLASS).toContain('safe-area-inset-bottom');
@@ -79,6 +90,8 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
   it('يربط صفحة البيع بمساعدات الاستجابة دون لمس auth أو Dialog العام', () => {
     const page = source('src/app/(pos)/pos/page.tsx');
     expect(page).toContain('POS_SALE_GRID_CLASS');
+    expect(page).toContain('POS_PRODUCTS_PANEL_CLASS');
+    expect(page).toContain('POS_DESKTOP_CATEGORIES_CLASS');
     expect(page).toContain('posCartPaneClass');
     expect(page).toContain('posProductsPaneClass');
     expect(page).toContain('posProductGridClass');
