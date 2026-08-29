@@ -28,7 +28,19 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: routerPush, replac
 vi.mock('@/lib/platform-auth', () => ({ isPlatformAuthenticated: () => true }));
 vi.mock('@/lib/platform-api', () => ({ platformApi }));
 vi.mock('@/lib/api', () => ({ ApiError: class ApiError extends Error {} }));
-vi.mock('lucide-react', () => ({ ArrowRight: () => <span />, RefreshCw: () => <span />, ShieldCheck: () => <span />, Copy: () => <span /> }));
+vi.mock('@/components/platform/contract-management-card', () => ({ ContractManagementCard: () => <div /> }));
+vi.mock('@/components/platform/commercial-operations-card', () => ({ CommercialOperationsCard: () => <div /> }));
+vi.mock('@/components/platform/application-override-card', () => ({ ApplicationOverrideCard: () => <div /> }));
+vi.mock('lucide-react', () => {
+  const iconStub = () => <span />;
+  return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
+    get: (target, name) =>
+      typeof name === 'symbol' || name === 'then' || name === '__esModule'
+        ? Reflect.get(target, name)
+        : iconStub,
+    has: () => true,
+  });
+});
 vi.mock('@/components/ui/button', () => ({ Button: ({ children, ...props }: any) => <button {...props}>{children}</button> }));
 vi.mock('@/components/ui/card', () => ({ Card: ({ children }: any) => <section>{children}</section>, CardContent: ({ children }: any) => <div>{children}</div>, CardHeader: ({ children }: any) => <header>{children}</header>, CardTitle: ({ children }: any) => <h2>{children}</h2> }));
 vi.mock('@/components/ui/badge', () => ({ Badge: ({ children }: any) => <span>{children}</span> }));
@@ -43,8 +55,6 @@ vi.mock('@/components/data-table', () => ({
     </div>
   ),
 }));
-vi.mock('@/components/platform/contract-management-card', () => ({ ContractManagementCard: () => <div /> }));
-vi.mock('@/components/platform/commercial-operations-card', () => ({ CommercialOperationsCard: () => <div /> }));
 
 const tenant = {
   id: 'tenant-1', name: 'Reference Co', slug: 'reference-co', account_number: 1000000, support_number: 1000,
