@@ -27,9 +27,10 @@ final class ZatcaQrCertificateMaterialExtractor
         $x = is_array($details) ? ($details['ec']['x'] ?? null) : null;
         $y = is_array($details) ? ($details['ec']['y'] ?? null) : null;
         if (($details['type'] ?? null) !== OPENSSL_KEYTYPE_EC
+            || ($details['bits'] ?? null) !== 256
             || ($details['ec']['curve_name'] ?? null) !== 'secp256k1'
-            || ! is_string($x) || strlen($x) !== self::EC_COMPONENT_BYTES
-            || ! is_string($y) || strlen($y) !== self::EC_COMPONENT_BYTES
+            || ! is_string($x) || $x === '' || strlen($x) > self::EC_COMPONENT_BYTES
+            || ! is_string($y) || $y === '' || strlen($y) > self::EC_COMPONENT_BYTES
         ) {
             throw new InvalidArgumentException('شهادة CSID لا تحتوي مفتاح secp256k1 عاماً صالحاً.');
         }
@@ -41,7 +42,9 @@ final class ZatcaQrCertificateMaterialExtractor
 
         return [
             // تمثيل SEC1 غير المضغوط: 0x04 ثم X ثم Y.
-            'public_key' => "\x04".$x.$y,
+            'public_key' => "\x04"
+                .str_pad($x, self::EC_COMPONENT_BYTES, "\x00", STR_PAD_LEFT)
+                .str_pad($y, self::EC_COMPONENT_BYTES, "\x00", STR_PAD_LEFT),
             // X.509 يخزن توقيع CA بصيغة DER داخل BIT STRING بلا بايت unused-bits.
             'certificate_signature' => $this->certificateSignature($der),
         ];
@@ -69,11 +72,45 @@ final class ZatcaQrCertificateMaterialExtractor
         }
 
         $signatureDer = substr($value, 1);
-        if ($signatureDer === '' || strlen($signatureDer) > 255 || ord($signatureDer[0]) !== 0x30) {
+        if ($signatureDer === '' || strlen($signatureDer) > 255) {
             throw new InvalidArgumentException('توقيع شهادة CSID ليس ECDSA DER صالحاً لوسم QR.');
         }
 
+        $signatureOffset = 0;
+        $sequence = $this->readElement($signatureDer, $signatureOffset, strlen($signatureDer));
+        if ($sequence['tag'] !== 0x30 || $signatureOffset !== strlen($signatureDer)) {
+            throw new InvalidArgumentException('توقيع شهادة CSID لا يحتوي ECDSA SEQUENCE قانونية.');
+        }
+        $integerOffset = $sequence['content_start'];
+        foreach (['r', 's'] as $component) {
+            $integer = $this->expectElement(
+                $signatureDer,
+                $integerOffset,
+                $sequence['content_end'],
+                0x02,
+                "ECDSA {$component}",
+            );
+            $this->assertCanonicalPositiveInteger($signatureDer, $integer);
+        }
+        if ($integerOffset !== $sequence['content_end']) {
+            throw new InvalidArgumentException('توقيع شهادة CSID يحتوي عناصر زائدة داخل ECDSA SEQUENCE.');
+        }
+
         return $signatureDer;
+    }
+
+    /** @param array{tag:int,content_start:int,content_end:int} $integer */
+    private function assertCanonicalPositiveInteger(string $der, array $integer): void
+    {
+        $length = $integer['content_end'] - $integer['content_start'];
+        $first = $length > 0 ? ord($der[$integer['content_start']]) : -1;
+        $second = $length > 1 ? ord($der[$integer['content_start'] + 1]) : -1;
+        if ($length < 1 || $length > self::EC_COMPONENT_BYTES + 1
+            || ($first & 0x80) !== 0
+            || ($first === 0 && ($length === 1 || ($second & 0x80) === 0))
+        ) {
+            throw new InvalidArgumentException('مكوّن توقيع ECDSA ليس INTEGER موجباً وقانونياً.');
+        }
     }
 
     /** @return array{tag:int,content_start:int,content_end:int} */
