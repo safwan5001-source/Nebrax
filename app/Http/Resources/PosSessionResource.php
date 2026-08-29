@@ -16,6 +16,8 @@ class PosSessionResource extends JsonResource
             'branch_id'        => $this->branch_id,
             'pos_device_id'    => $this->pos_device_id,
             'warehouse_id'     => $this->warehouse_id,
+            'pos_shift_id'     => $this->pos_shift_id,
+            // Legacy HR shift reference: historical compatibility only.
             'shift_id'         => $this->shift_id,
             // حساب خزينة الجلسة المثبّت وقت الفتح؛ للعرض والتتبّع فقط (يحلّه الخادم).
             'cash_account_id'  => $this->cash_account_id,
@@ -48,6 +50,11 @@ class PosSessionResource extends JsonResource
                 'id'   => $this->warehouse->id,
                 'code' => $this->warehouse->code,
                 'name' => $this->warehouse->name,
+            ] : null),
+            'pos_shift'        => $this->whenLoaded('posShift', fn () => $this->posShift ? [
+                'id'   => $this->posShift->id,
+                'name' => $this->posShift->name,
+                'code' => $this->posShift->code,
             ] : null),
             'shift'            => $this->whenLoaded('shift', fn () => $this->shift ? [
                 'id'   => $this->shift->id,
