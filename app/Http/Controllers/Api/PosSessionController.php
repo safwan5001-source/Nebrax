@@ -9,11 +9,15 @@ use App\Http\Resources\PosCashMovementResource;
 use App\Http\Resources\PosSessionEventResource;
 use App\Http\Resources\PosSessionResource;
 use App\Models\PosSession;
+use App\Models\PosShift;
 use App\Services\Accounting\PosSessionService;
 use App\Services\Pos\CashDrawerService;
 use App\Support\Money;
+use App\Tenancy\BranchContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class PosSessionController extends ApiController
 {
@@ -24,7 +28,7 @@ class PosSessionController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        $query = PosSession::with(['posDevice.warehouse', 'warehouse', 'shift'])->orderByDesc('opened_at');
+        $query = PosSession::with(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])->orderByDesc('opened_at');
         if ($request->boolean('mine')) {
             $query->where('opened_by', $request->user()?->id);
         }
@@ -35,16 +39,34 @@ class PosSessionController extends ApiController
     public function open(OpenPosSessionRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $session = $this->domain(fn () => $this->sessions->open(
-            (int) $data['opening_balance'],
-            $data['pos_device_id'],
-            $data['shift_id'] ?? null,
-            $request->user()?->id,
-            $request->user(),
-        ));
+        $session = $this->domain(function () use ($data, $request) {
+            return DB::transaction(function () use ($data, $request) {
+                $branchId = app(BranchContext::class)->id();
+                $posShift = PosShift::lockForUpdate()->find($data['pos_shift_id']);
+                if (! $posShift) {
+                    throw new RuntimeException('وردية نقاط البيع غير موجودة أو لا تخص الفرع النشط.');
+                }
+                if (! $posShift->is_active) {
+                    throw new RuntimeException('وردية نقاط البيع المحددة معطّلة.');
+                }
+                if ($posShift->branch_id !== null && $posShift->branch_id !== $branchId) {
+                    throw new RuntimeException('وردية نقاط البيع لا تخص الفرع النشط.');
+                }
 
-        return (new PosSessionResource($session->load(['posDevice.warehouse', 'warehouse', 'shift'])))
-            ->response()->setStatusCode(201);
+                $session = $this->sessions->open(
+                    (int) $data['opening_balance'],
+                    $data['pos_device_id'],
+                    null,
+                    $request->user()?->id,
+                    $request->user(),
+                );
+                $session->update(['pos_shift_id' => $posShift->id]);
+
+                return $session->fresh(['posDevice.warehouse', 'warehouse', 'posShift', 'shift']);
+            });
+        });
+
+        return (new PosSessionResource($session))->response()->setStatusCode(201);
     }
 
     public function close(Request $request, string $id): JsonResponse
@@ -53,7 +75,7 @@ class PosSessionController extends ApiController
         $session = $this->visibleSession($id, $request);
         $closed = $this->domain(fn () => $this->sessions->close($session, (int) $data['closing_balance'], $request->user()?->id));
 
-        return (new PosSessionResource($closed->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
+        return (new PosSessionResource($closed->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])))->response();
     }
 
     /** يعيد العد بعد كشف النتيجة فقط، باعتماد منفصل محفوظ في سجل الأدلة. */
@@ -71,7 +93,7 @@ class PosSessionController extends ApiController
             $data['approval_id'],
         ));
 
-        return (new PosSessionResource($recounted->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
+        return (new PosSessionResource($recounted->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])))->response();
     }
 
     public function cashMovements(Request $request, string $id): JsonResponse
@@ -104,7 +126,6 @@ class PosSessionController extends ApiController
     {
         $data = $request->validate([
             'reason' => ['nullable', 'string', 'max:1000'],
-            // Phase 4 — مطلوب فقط حين تكون سياسة `manual_drawer_open` «تحتاج اعتماداً».
             'approval_id' => ['nullable', 'uuid'],
         ]);
         $session = $this->visibleSession($id, $request);
@@ -119,7 +140,6 @@ class PosSessionController extends ApiController
         return response()->json(['data' => $result], $status);
     }
 
-    /** نتيجة الجسر الموقعة فقط هي التي تحوّل الأمر المعلّق إلى opened. */
     public function completeCashDrawer(Request $request, string $id): JsonResponse
     {
         $data = $request->validate([
@@ -132,7 +152,6 @@ class PosSessionController extends ApiController
         return response()->json(['data' => $result], $result['status'] === 'opened' ? 200 : 409);
     }
 
-    /** يستخدم عند تعذر fetch المحلي؛ لا يقبل نتيجة opened من المتصفح وحده. */
     public function cashDrawerBridgeUnavailable(Request $request, string $id): JsonResponse
     {
         $data = $request->validate(['action_id' => ['required', 'uuid']]);
@@ -160,26 +179,24 @@ class PosSessionController extends ApiController
             $request->user(),
         ));
 
-        return (new PosSessionResource($acknowledged->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
+        return (new PosSessionResource($acknowledged->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])))->response();
     }
 
-    /** يسوّي فرق الصندوق المعتمد في دفتر الأستاذ مرّة واحدة؛ لا يمرّر الكاشير حساباً. */
     public function settleVariance(Request $request, string $id): JsonResponse
     {
         $session = $this->visibleSession($id, $request);
         $settled = $this->domain(fn () => $this->sessions->settleVariance($session, $request->user()));
 
-        return (new PosSessionResource($settled->load(['posDevice.warehouse', 'warehouse', 'shift'])))->response();
+        return (new PosSessionResource($settled->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])))->response();
     }
 
-    /** تقرير الوردية (X/Z): نقد البيع + حركات الدرج + المتوقّع + المطابقة. */
     public function report(Request $request, string $id): JsonResponse
     {
         $session = $this->visibleSession($id, $request);
         $report = $this->sessions->report($session);
 
         return response()->json([
-            'session' => new PosSessionResource($session->load(['posDevice.warehouse', 'warehouse', 'shift'])),
+            'session' => new PosSessionResource($session->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])),
             'report' => [
                 'cash_sales' => Money::toRiyal($report['cash_sales']),
                 'cash_refunds' => Money::toRiyal($report['cash_refunds']),
