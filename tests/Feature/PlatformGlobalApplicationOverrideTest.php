@@ -530,6 +530,138 @@ class PlatformGlobalApplicationOverrideTest extends TestCase
             ->assertJsonValidationErrors(['tenant_ids.0']);
     }
 
+    /** @test */
+    public function global_filtered_scope_processes_more_than_chunk_size_without_dropping_tenants(): void
+    {
+        $platform = $this->platformAdministrator();
+        $tenantIds = [];
+
+        for ($index = 0; $index < 51; $index++) {
+            $tenantIds[] = $this->seedTenantRecord('global-chunk-' . $index)['tenant_id'];
+        }
+
+        $payload = [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
+            'application_key' => 'hr.employees',
+            'tenant_ids' => $tenantIds,
+        ];
+
+        $preview = $this->globalPreview($platform['token'], $payload)->assertOk();
+        $this->assertSame(51, $preview->json('data.scope.total_tenants'));
+        $this->assertSame(51, $preview->json('data.counts.will_apply'));
+
+        $this->globalApply($platform['token'], $payload)
+            ->assertOk()
+            ->assertJsonPath('data.counts.will_apply', 51);
+
+        foreach ($tenantIds as $tenantId) {
+            app(TenantContext::class)->set($tenantId);
+            $this->assertSame('enabled', app(TenantApplicationService::class)->statusFor('hr.employees'));
+        }
+    }
+
+    /** @test */
+    public function global_apply_rejects_stale_fingerprint_when_tenant_outcomes_change_but_counts_match(): void
+    {
+        $tenantA = $this->registerIsolatedTenant('global-fp-a', autoEnableApplications: false);
+        $tenantB = $this->registerIsolatedTenant('global-fp-b', autoEnableApplications: false);
+        $platform = $this->platformAdministrator();
+        $payload = [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_TENANTS,
+            'application_key' => self::COMMERCIAL_KEY,
+            'tenant_ids' => [$tenantA['tenant_id'], $tenantB['tenant_id']],
+        ];
+
+        $preview = $this->globalPreview($platform['token'], $payload)->assertOk();
+        $this->assertSame(2, $preview->json('data.counts.will_apply'));
+
+        $this->withToken($platform['token'])
+            ->postJson("/api/platform/tenants/{$tenantA['tenant_id']}/application-overrides/grant", [
+                'application_key' => self::COMMERCIAL_KEY,
+            ])
+            ->assertOk();
+
+        $this->withToken($platform['token'])
+            ->postJson('/api/platform/application-overrides/global/apply', array_merge($payload, [
+                'confirmation_token' => $preview->json('data.confirmation_token'),
+            ]))
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'تغيّرت حالة المستأجرين منذ آخر معاينة؛ أعد المعاينة.');
+    }
+
+    /** @test */
+    public function global_apply_rejects_stale_all_apps_fingerprint_when_application_outcomes_change_but_counts_match(): void
+    {
+        $tenant = $this->registerIsolatedTenant('global-fp-all-apps', autoEnableApplications: false);
+        $platform = $this->platformAdministrator();
+        $payload = [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_GRANT_ALL_APPS_ALL_TENANTS,
+            'tenant_ids' => [$tenant['tenant_id']],
+        ];
+
+        $preview = $this->globalPreview($platform['token'], $payload)->assertOk();
+        $willApplyBefore = $preview->json('data.counts.will_apply');
+        $this->assertSame(1, $willApplyBefore);
+
+        $this->withToken($platform['token'])
+            ->postJson("/api/platform/tenants/{$tenant['tenant_id']}/application-overrides/grant", [
+                'application_key' => self::COMMERCIAL_KEY,
+            ])
+            ->assertOk();
+
+        $freshPreview = $this->globalPreview($platform['token'], $payload)->assertOk();
+        $this->assertSame($willApplyBefore, $freshPreview->json('data.counts.will_apply'));
+
+        $this->withToken($platform['token'])
+            ->postJson('/api/platform/application-overrides/global/apply', array_merge($payload, [
+                'confirmation_token' => $preview->json('data.confirmation_token'),
+            ]))
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'تغيّرت حالة المستأجرين منذ آخر معاينة؛ أعد المعاينة.');
+    }
+
+    /** @test */
+    public function nullable_tenant_migration_down_preserves_append_only_global_audit_rows(): void
+    {
+        $platform = $this->platformAdministrator();
+        $tenant = $this->registerIsolatedTenant('global-migration-rollback', autoEnableApplications: false);
+
+        $this->globalApply($platform['token'], [
+            'operation' => PlatformGlobalApplicationOverrideService::GLOBAL_SHOW_ALL_TENANTS,
+            'application_key' => 'hr.employees',
+            'tenant_ids' => [$tenant['tenant_id']],
+        ])->assertOk();
+
+        $this->assertSame(1, PlatformAdministratorAction::query()->whereNull('tenant_id')->count());
+
+        $migration = require database_path('migrations/2026_08_29_020000_nullable_tenant_on_platform_administrator_actions.php');
+
+        try {
+            $migration->down();
+            $this->fail('Expected migration down() to reject rollback while global audit rows exist.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('append-only', $exception->getMessage());
+        }
+
+        $this->assertSame(1, PlatformAdministratorAction::query()->whereNull('tenant_id')->count());
+    }
+
+    /** @return array{tenant_id: string} */
+    private function seedTenantRecord(string $slug): array
+    {
+        $tenant = Tenant::create([
+            'name' => 'مستأجر ' . $slug,
+            'slug' => $slug . '-' . uniqid(),
+            'vat_number' => '300000000000' . str_pad((string) random_int(0, 999), 3, '0', STR_PAD_LEFT),
+            'currency' => 'SAR',
+        ]);
+
+        app(TenantContext::class)->set($tenant->id);
+        app(ChartOfAccountsSeeder::class)->seed($tenant->id);
+
+        return ['tenant_id' => $tenant->id];
+    }
+
     /** @return array{tenant_id: string} */
     private function legacyTenantForGlobalOverrides(): array
     {

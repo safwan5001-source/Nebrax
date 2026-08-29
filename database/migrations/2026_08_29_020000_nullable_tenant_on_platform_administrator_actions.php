@@ -18,7 +18,11 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::table('platform_administrator_actions')->whereNull('tenant_id')->delete();
+        if (DB::table('platform_administrator_actions')->whereNull('tenant_id')->exists()) {
+            throw new RuntimeException(
+                'لا يمكن التراجع: توجد سجلات تدقيق عامة append-only (tenant_id IS NULL).'
+            );
+        }
 
         Schema::table('platform_administrator_actions', function (Blueprint $table) {
             $table->dropForeign(['tenant_id']);

@@ -7,7 +7,7 @@ use App\Models\PlatformAdministratorAction;
 use App\Models\Tenant;
 use App\Support\ApplicationCatalog;
 use App\Support\PlatformGlobalApplicationOverrideConfirmation;
-use Illuminate\Database\Eloquent\Builder;
+use App\Support\PlatformGlobalApplicationOverrideFingerprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -150,7 +150,7 @@ class PlatformGlobalApplicationOverrideService
             'operation' => $operation,
             'application_key' => $applicationKey,
             'tenant_ids' => $tenantIds,
-            'counts' => $response['counts'],
+            'fingerprint' => $aggregate['fingerprint'],
         ]);
 
         return $response;
@@ -179,7 +179,10 @@ class PlatformGlobalApplicationOverrideService
         );
 
         $freshPreview = $this->aggregateTenants($operation, $applicationKey, $tenantIds, apply: false);
-        PlatformGlobalApplicationOverrideConfirmation::assertCountsMatch($cached['counts'], $freshPreview['counts']);
+        PlatformGlobalApplicationOverrideFingerprint::assertMatches(
+            (string) $cached['fingerprint'],
+            $freshPreview['fingerprint'],
+        );
 
         $aggregate = $this->aggregateTenants(
             $operation,
@@ -210,7 +213,8 @@ class PlatformGlobalApplicationOverrideService
      *   skip_reasons: array<string,int>,
      *   sample_tenants: list<array<string,mixed>>,
      *   failures: list<array<string,mixed>>,
-     *   total_tenants: int
+     *   total_tenants: int,
+     *   fingerprint: string
      * }
      */
     private function aggregateTenants(
@@ -228,6 +232,8 @@ class PlatformGlobalApplicationOverrideService
         $sampleTenants = [];
         $failures = [];
         $totalTenants = 0;
+        $fingerprintTenants = [];
+        $fingerprintApplications = [];
 
         $this->foreachTenant($tenantIds, function (Tenant $tenant) use (
             $operation,
@@ -242,11 +248,18 @@ class PlatformGlobalApplicationOverrideService
             &$sampleTenants,
             &$failures,
             &$totalTenants,
+            &$fingerprintTenants,
+            &$fingerprintApplications,
         ): void {
             $totalTenants++;
             $row = $apply
                 ? $this->applyForTenant($tenant, $administrator, $operation, $applicationKey, $reason)
                 : $this->previewForTenant($tenant, $operation, $applicationKey);
+
+            $fingerprintTenants[$tenant->id] = $row['outcome'];
+            if (isset($row['application_outcomes'])) {
+                $fingerprintApplications[$tenant->id] = $row['application_outcomes'];
+            }
 
             match ($row['outcome']) {
                 'applied' => $willApply++,
@@ -277,6 +290,8 @@ class PlatformGlobalApplicationOverrideService
 
         arsort($groupedSkipReasons);
 
+        $applicationFingerprint = self::isAllAppsOperation($operation) ? $fingerprintApplications : null;
+
         return [
             'counts' => [
                 'eligible_tenants' => $willApply + $skipped,
@@ -288,6 +303,10 @@ class PlatformGlobalApplicationOverrideService
             'sample_tenants' => $sampleTenants,
             'failures' => $failures,
             'total_tenants' => $totalTenants,
+            'fingerprint' => PlatformGlobalApplicationOverrideFingerprint::hash(
+                $fingerprintTenants,
+                $applicationFingerprint,
+            ),
         ];
     }
 
@@ -296,26 +315,28 @@ class PlatformGlobalApplicationOverrideService
      */
     private function foreachTenant(?array $tenantIds, callable $callback): void
     {
-        $this->tenantQuery($tenantIds)->chunkById(self::CHUNK_SIZE, function ($tenants) use ($callback): void {
+        if ($tenantIds !== null && $tenantIds !== []) {
+            $sortedIds = array_values($tenantIds);
+            sort($sortedIds);
+
+            foreach (array_chunk($sortedIds, self::CHUNK_SIZE) as $idChunk) {
+                Tenant::query()
+                    ->whereIn('id', $idChunk)
+                    ->orderBy('id')
+                    ->get()
+                    ->each(function (Tenant $tenant) use ($callback): void {
+                        $callback($tenant);
+                    });
+            }
+
+            return;
+        }
+
+        Tenant::query()->orderBy('id')->chunkById(self::CHUNK_SIZE, function ($tenants) use ($callback): void {
             foreach ($tenants as $tenant) {
                 $callback($tenant);
             }
         });
-    }
-
-    /**
-     * @param  list<string>|null  $tenantIds
-     * @return Builder<Tenant>
-     */
-    private function tenantQuery(?array $tenantIds): Builder
-    {
-        $query = Tenant::query()->orderBy('account_number')->orderBy('id');
-
-        if ($tenantIds !== null && $tenantIds !== []) {
-            $query->whereIn('id', $tenantIds);
-        }
-
-        return $query;
     }
 
     private function assertOperation(string $operation, ?string $applicationKey): void
@@ -350,8 +371,10 @@ class PlatformGlobalApplicationOverrideService
         $bulkPreview = $this->overrides->previewBulk($tenant, $bulkAction, null);
         $appliedApps = 0;
         $skipReasons = [];
+        $applicationOutcomes = [];
 
         foreach ($bulkPreview['results'] as $row) {
+            $applicationOutcomes[$row['application_key']] = $row['outcome'];
             if ($row['outcome'] === 'applied') {
                 $appliedApps++;
             }
@@ -360,6 +383,7 @@ class PlatformGlobalApplicationOverrideService
                 $skipReasons[] = $reason;
             }
         }
+        ksort($applicationOutcomes);
 
         return [
             'tenant_id' => $tenant->id,
@@ -367,6 +391,7 @@ class PlatformGlobalApplicationOverrideService
             'account_number' => $tenant->account_number,
             'outcome' => $appliedApps > 0 ? 'applied' : 'skipped',
             'skip_reasons' => array_values(array_unique($skipReasons)),
+            'application_outcomes' => $applicationOutcomes,
         ];
     }
 

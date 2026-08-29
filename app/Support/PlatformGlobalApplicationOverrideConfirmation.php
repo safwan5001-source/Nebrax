@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
 /**
- * تخزين one-time لنتيجة المعاينة وربط apply بها مع فحص stale counts.
+ * تخزين one-time لنتيجة المعاينة وربط apply بها مع فحص stale fingerprint.
  */
 class PlatformGlobalApplicationOverrideConfirmation
 {
@@ -56,16 +56,6 @@ class PlatformGlobalApplicationOverrideConfirmation
         }
 
         return $cached;
-    }
-
-    /** @param array<string, int> $cachedCounts @param array<string, int> $freshCounts */
-    public static function assertCountsMatch(array $cachedCounts, array $freshCounts): void
-    {
-        foreach (['eligible_tenants', 'will_apply', 'skipped', 'failed'] as $field) {
-            if (($cachedCounts[$field] ?? null) !== ($freshCounts[$field] ?? null)) {
-                throw new RuntimeException('تغيّرت حالة المستأجرين منذ آخر معاينة؛ أعد المعاينة.');
-            }
-        }
     }
 
     /** @param  list<string>|null  $cached @param  list<string>|null  $requested */
