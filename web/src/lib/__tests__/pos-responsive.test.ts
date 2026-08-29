@@ -7,6 +7,7 @@ import {
   POS_MOBILE_NAV_CLASS,
   POS_SALE_GRID_CLASS,
   posCartPaneClass,
+  posProductGridClass,
   posProductGridPadClass,
   posProductsPaneClass,
   posShowsSplitCart,
@@ -28,6 +29,22 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     expect(posShowsSplitCart(1023)).toBe(true);
   });
 
+  it('يحمي بطاقات الصور من التضييق الزائد على iPad landscape', () => {
+    const grid = posProductGridClass(true, false);
+    expect(grid).toContain('md:grid-cols-2');
+    expect(grid).toContain('lg:grid-cols-3');
+    expect(grid).toContain('xl:grid-cols-5');
+    expect(grid).not.toContain('lg:grid-cols-4');
+  });
+
+  it('يزيد كثافة البطاقات بلا صور تدريجياً حتى 2xl', () => {
+    const grid = posProductGridClass(false, false);
+    expect(grid).toContain('md:grid-cols-3');
+    expect(grid).toContain('lg:grid-cols-4');
+    expect(grid).toContain('xl:grid-cols-5');
+    expect(grid).toContain('2xl:grid-cols-6');
+  });
+
   it('يخفي الشريط السفلي وFAB تحت md ويعيد البادئة عند التابلت', () => {
     expect(POS_MOBILE_NAV_CLASS).toContain('md:hidden');
     expect(POS_MOBILE_NAV_CLASS).toContain('safe-area-inset-bottom');
@@ -35,6 +52,7 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     expect(POS_CART_PAY_FOOTER_CLASS).toContain('md:pb-[max(0.75rem,env(safe-area-inset-bottom))]');
     expect(posProductGridPadClass(true)).toBe(' pb-16 md:pb-0');
     expect(posProductGridPadClass(false)).toBe('');
+    expect(posProductGridClass(true, true)).toContain('pb-16 md:pb-0');
   });
 
   it('يعرض السلة والمنتجات معاً من md حتى لو بقي تبويب الجوال على المنتجات', () => {
@@ -58,11 +76,12 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     expect(tile).toContain('focus-visible:ring-2');
   });
 
-  it('يربط صفحة البيع بالمساعد دون لمس auth أو Dialog العام', () => {
+  it('يربط صفحة البيع بمساعدات الاستجابة دون لمس auth أو Dialog العام', () => {
     const page = source('src/app/(pos)/pos/page.tsx');
     expect(page).toContain('POS_SALE_GRID_CLASS');
     expect(page).toContain('posCartPaneClass');
     expect(page).toContain('posProductsPaneClass');
+    expect(page).toContain('posProductGridClass');
     expect(page).toContain('POS_CART_FAB_CLASS');
     expect(page).toContain('POS_MOBILE_NAV_CLASS');
     expect(page).not.toContain("from '@/components/ui/dialog'");
