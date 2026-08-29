@@ -58,6 +58,11 @@ import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
 import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 import { runPosCheckout } from '@/lib/pos-checkout';
 import {
+  PosCheckoutAttemptController,
+  isPosCheckoutNetworkFailure,
+  type PosCheckoutPhase,
+} from '@/lib/pos-checkout-attempt';
+import {
   parsePosInteractionMode,
   posInteractionViewportFromMedia,
   resolvePosInteractionPolicy,
@@ -148,6 +153,7 @@ interface PosCheckoutResponse {
     thermal_template_revision?: LiveTemplateRevision | null;
   };
   cash_drawer_action?: CashDrawerAction;
+  idempotent_replay?: boolean;
 }
 
 const FAV_KEY = 'nibras_pos_favs';
@@ -212,7 +218,9 @@ export default function PosPage() {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [checkoutPhase, setCheckoutPhase] = useState<PosCheckoutPhase>('idle');
   const paymentRequestRef = useRef(false);
+  const checkoutAttemptRef = useRef(new PosCheckoutAttemptController());
   const auditCartRequestRef = useRef(new Map<string, Promise<string>>());
   const [posCfg, setPosCfg] = useState<PosConfig>(POS_DEFAULTS);
   const interactionMode = parsePosInteractionMode(posCfg.interaction_mode);
@@ -1017,33 +1025,62 @@ export default function PosPage() {
       if (paymentRequestRef.current) return;
       paymentRequestRef.current = true;
       setPaying(true);
+      setCheckoutPhase('submitting');
       setError(null);
+      const attemptKey = checkoutAttemptRef.current.ensure();
       let auditCartId: string | null = null;
       try {
         auditCartId = await ensureAuditCart(activeCart);
         if (!auditCartId) throw new Error(t('open_to_start'));
+
+        const submitOnce = async () => {
+          const items = cart.map((l) => ({
+            product_id: l.productId,
+            description: l.description,
+            quantity: l.qty,
+            unit: l.unit,
+            unit_price: riyalToMinor(effectiveLinePrice(l)),
+            tax_rate: l.tax,
+            discount: posCfg.allow_discount ? lineCalc(l).disc : 0, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
+          }));
+          // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
+          return api<PosCheckoutResponse>('/pos/checkout', {
+            method: 'POST',
+            body: {
+              idempotency_key: attemptKey,
+              partner_id: customer.id,
+              pos_session_id: session.id,
+              cart_id: auditCartId,
+              warehouse_id: warehouseId || null,
+              tax_inclusive: taxInclusive,
+              notes: activeCart.note.trim() || null,
+              items,
+              tenders,
+            },
+          });
+        };
+
+        const submitWithRecovery = async () => {
+          try {
+            return await submitOnce();
+          } catch (error) {
+            // بعد timeout/انقطاع: لا نفترض الفشل — إعادة POST بنفس المفتاح آمنة خادمياً.
+            if (!isPosCheckoutNetworkFailure(error)) throw error;
+            setCheckoutPhase('recovering');
+            setError(t('checkout_recovering'));
+            return await submitOnce();
+          }
+        };
+
         const result = await runPosCheckout({
-          submitCheckout: async () => {
-            const items = cart.map((l) => ({
-              product_id: l.productId,
-              description: l.description,
-              quantity: l.qty,
-              unit: l.unit,
-              unit_price: riyalToMinor(effectiveLinePrice(l)),
-              tax_rate: l.tax,
-              discount: posCfg.allow_discount ? lineCalc(l).disc : 0, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
-            }));
-            // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
-            return api<PosCheckoutResponse>('/pos/checkout', {
-              method: 'POST',
-              body: { partner_id: customer.id, pos_session_id: session.id, cart_id: auditCartId, warehouse_id: warehouseId || null, tax_inclusive: taxInclusive, notes: activeCart.note.trim() || null, items, tenders },
-            });
-          },
+          submitCheckout: submitWithRecovery,
           // لحظة النجاح المالي هي استجابة checkout؛ نغلق السلة ونغادر شاشة الدفع
           // قبل انتظار QR، فلا تعود العملية قابلة لإرسال الدفع نفسه مرة ثانية.
           onCheckoutSuccess: (checkout) => {
+            checkoutAttemptRef.current.resetAfterSuccess();
+            setCheckoutPhase('success');
             playPosFeedback('payment_success');
-            success(t('sale_done'));
+            success(checkout.idempotent_replay ? t('checkout_recovered_success') : t('sale_done'));
             closeCart(activeCart.id);
             setStep('sale');
             setMobileTab('products');
@@ -1067,7 +1104,14 @@ export default function PosPage() {
           onPaymentError: (error) => {
             // فشل الدفع يسجله PosService من مسار checkout نفسه بمصدر server؛
             // الواجهة تعرض النتيجة فقط ولا تنشئ دليلاً نهائياً قابلاً للتزوير.
-            const reason = error instanceof ApiError ? error.message : tc('saveFailed');
+            // نبقي نفس attemptKey لإعادة محاولة آمنة (الخادم يمنع التكرار).
+            const network = isPosCheckoutNetworkFailure(error);
+            setCheckoutPhase(network ? 'retryable_error' : 'retryable_error');
+            const reason = network
+              ? t('checkout_retry_safe')
+              : error instanceof ApiError
+                ? (error.status === 409 ? t('checkout_key_conflict') : error.message)
+                : tc('saveFailed');
             setError(reason);
             playPosFeedback('payment_error');
           },
@@ -1122,6 +1166,7 @@ export default function PosPage() {
       } finally {
         paymentRequestRef.current = false;
         setPaying(false);
+        setCheckoutPhase((phase) => (phase === 'success' ? 'idle' : phase === 'submitting' || phase === 'recovering' ? 'idle' : phase));
       }
     },
     [activeCart, cart, catalogLoading, closeCart, success, t, tc, toast, selectedCustomer, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback, ensureAuditCart, totalMinor],
@@ -1293,7 +1338,13 @@ export default function PosPage() {
   }
 
   function requestPaymentCancel() {
-    if (cart.length === 0) { setStep('sale'); return; }
+    if (paying) return;
+    if (cart.length === 0) {
+      checkoutAttemptRef.current.reset();
+      setCheckoutPhase('idle');
+      setStep('sale');
+      return;
+    }
     setSensitiveAction({ type: 'payment_cancelled', cartId: activeCart.id });
   }
 
@@ -1323,6 +1374,8 @@ export default function PosPage() {
           reason_code: reason.code, reason_note: reason.note,
           before: { items: target.items.map(auditLine), customer: target.customer }, after: { status: 'cancelled' },
         }, target);
+        checkoutAttemptRef.current.reset();
+        setCheckoutPhase('idle');
         setStep('sale');
         restoreFocusAfterUi();
       } else {
@@ -1588,6 +1641,7 @@ export default function PosPage() {
           paymentMethodsLoading={paymentMethodsLoading}
           paymentMethodsLoadError={paymentMethodsError}
           paying={paying}
+          checkoutPhase={checkoutPhase}
           error={error}
           onBack={requestPaymentCancel}
           onConfirm={confirmPayment}

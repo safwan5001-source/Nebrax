@@ -76,6 +76,7 @@ class PosReturnTest extends TestCase
         int $discount = 0,
     ): Invoice {
         $response = $this->withToken($auth['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $partnerId,
             'pos_session_id' => $sessionId,
             'items' => [[

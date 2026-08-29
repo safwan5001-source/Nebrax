@@ -44,6 +44,7 @@ final class PosAuditService
         PosSessionEvent::TYPE_CART_CANCELLED => 'cart',
         PosSessionEvent::TYPE_CHECKOUT_STARTED => 'checkout',
         PosSessionEvent::TYPE_CHECKOUT_COMPLETED => 'checkout',
+        PosSessionEvent::TYPE_CHECKOUT_IDEMPOTENT_REPLAY => 'checkout',
         PosSessionEvent::TYPE_CLOSING_COUNT_SUBMITTED => 'cash_count',
         PosSessionEvent::TYPE_CLOSING_COUNT_REVEALED => 'cash_count',
         PosSessionEvent::TYPE_CLOSING_COUNT_RECOUNTED => 'cash_count',
@@ -239,6 +240,7 @@ final class PosAuditService
             PosSessionEvent::TYPE_PAYMENT_FAILED,
             PosSessionEvent::TYPE_CHECKOUT_STARTED,
             PosSessionEvent::TYPE_CHECKOUT_COMPLETED,
+            PosSessionEvent::TYPE_CHECKOUT_IDEMPOTENT_REPLAY,
         ], true)) {
             throw new RuntimeException('نوع حدث الإتمام غير صالح.');
         }

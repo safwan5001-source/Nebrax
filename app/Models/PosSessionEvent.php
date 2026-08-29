@@ -44,6 +44,8 @@ class PosSessionEvent extends BaseModel
     public const TYPE_CART_CANCELLED = 'cart_cancelled';
     public const TYPE_CHECKOUT_STARTED = 'checkout_started';
     public const TYPE_CHECKOUT_COMPLETED = 'checkout_completed';
+    /** إعادة إرسال نفس محاولة الإتمام بعد نجاح سابق — لا فاتورة جديدة. */
+    public const TYPE_CHECKOUT_IDEMPOTENT_REPLAY = 'checkout_idempotent_replay';
     public const TYPE_CLOSING_COUNT_SUBMITTED = 'closing_count_submitted';
     public const TYPE_CLOSING_COUNT_REVEALED = 'closing_count_revealed';
     public const TYPE_CLOSING_COUNT_RECOUNTED = 'closing_count_recounted';
@@ -79,8 +81,8 @@ class PosSessionEvent extends BaseModel
             self::TYPE_CART_CANCELLED,
             self::TYPE_CHECKOUT_STARTED,
             self::TYPE_CHECKOUT_COMPLETED,
-            self::TYPE_CLOSING_COUNT_SUBMITTED,
-            self::TYPE_CLOSING_COUNT_REVEALED,
+            self::TYPE_CHECKOUT_IDEMPOTENT_REPLAY,
+            self::TYPE_CLOSING_COUNT_SUBMITTED,            self::TYPE_CLOSING_COUNT_REVEALED,
             self::TYPE_CLOSING_COUNT_RECOUNTED,
             self::TYPE_OVERRIDE_REQUESTED,
             self::TYPE_OVERRIDE_APPROVED,

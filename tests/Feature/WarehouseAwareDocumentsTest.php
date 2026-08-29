@@ -191,6 +191,7 @@ class WarehouseAwareDocumentsTest extends TestCase
             ->assertCreated()['data']['id'];
 
         $this->withToken($token)->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $this->customer($token),
             'pos_session_id' => $sessionId,
             'warehouse_id' => $warehouse['id'],

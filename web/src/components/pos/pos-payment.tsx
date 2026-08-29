@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, Banknote, CalendarClock, Check, Landmark, User } from 'lucide-react';
+import { ArrowRight, Banknote, CalendarClock, Check, Landmark, Loader2, User } from 'lucide-react';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
+import type { PosCheckoutPhase } from '@/lib/pos-checkout-attempt';
 
 export interface PaymentSummaryItem { name: string; qty: number; unitPrice: string; lineTotal: number }
 export interface PosPaymentMethod {
@@ -27,6 +28,7 @@ export function PosPayment({
   paymentMethodsLoading,
   paymentMethodsLoadError,
   paying,
+  checkoutPhase = 'idle',
   error,
   onBack,
   onConfirm,
@@ -40,6 +42,7 @@ export function PosPayment({
   paymentMethodsLoading: boolean;
   paymentMethodsLoadError: string | null;
   paying: boolean;
+  checkoutPhase?: PosCheckoutPhase;
   error: string | null;
   onBack: () => void;
   onConfirm: (tenders: PosTender[]) => void;
@@ -60,6 +63,7 @@ export function PosPayment({
   }, [paymentMethods, resolvedDefaultId]);
 
   const set = (id: string, value: string) => {
+    if (paying || checkoutPhase === 'submitting' || checkoutPhase === 'recovering') return;
     setSelectedMethodId(id);
     setTenders((current) => ({ ...current, [id]: value }));
   };
@@ -76,6 +80,7 @@ export function PosPayment({
     && (allowDeferredPayment || paidMinor >= totalMinor);
   const quick = [totalMinor / 100, 50, 100, 200, 500];
   const selectedMethod = paymentMethods.find((method) => method.id === selectedMethodId) ?? null;
+  const locked = paying || checkoutPhase === 'submitting' || checkoutPhase === 'recovering';
 
   function label(method: PosPaymentMethod): string {
     return locale === 'en' ? method.name_en || method.name : method.name;
@@ -87,13 +92,20 @@ export function PosPayment({
       .filter((tender) => tender.amount > 0);
   }
 
+  function confirmLabel(): string {
+    if (checkoutPhase === 'recovering') return t('checkout_recovering');
+    if (locked) return t('checkout_submitting');
+    return t('confirm_payment');
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col" data-checkout-phase={checkoutPhase} data-testid="pos-payment-screen">
       <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
         <button
           type="button"
           onClick={onBack}
-          className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-[13px] font-semibold text-text touch-manipulation hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40"
+          disabled={locked}
+          className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-[13px] font-semibold text-text touch-manipulation hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50"
         >
           <ArrowRight className="h-4 w-4" strokeWidth={2} />
           {t('back_to_cart')}
@@ -197,8 +209,9 @@ export function PosPayment({
                         onFocus={() => setSelectedMethodId(method.id)}
                         onChange={(event) => set(method.id, event.target.value)}
                         inputMode="decimal"
+                        disabled={locked}
                         placeholder="0.00"
-                        className="num min-h-12 w-full rounded-lg border border-border bg-background px-2 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40"
+                        className="num min-h-12 w-full rounded-lg border border-border bg-background px-2 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
                       />
                     </div>
                   );
@@ -225,7 +238,7 @@ export function PosPayment({
                 <button
                   key={index}
                   onClick={() => selectedMethod && set(selectedMethod.id, amount.toFixed(2))}
-                  disabled={!selectedMethod}
+                  disabled={!selectedMethod || locked}
                   className={
                     'num min-h-11 rounded-lg border px-2 py-2 text-[13px] font-bold touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 ' +
                     (index === 0 ? 'col-span-2 sm:col-auto ' : '') +
@@ -253,22 +266,33 @@ export function PosPayment({
             </div>
           </div>
 
-          {(error ?? paymentMethodsLoadError) && <p className="rounded-lg bg-negative/10 px-3 py-2 text-xs text-negative">{error ?? paymentMethodsLoadError}</p>}
+          {(error ?? paymentMethodsLoadError) && (
+            <p className="rounded-lg bg-negative/10 px-3 py-2 text-xs text-negative" role="alert">
+              {error ?? paymentMethodsLoadError}
+            </p>
+          )}
+          {checkoutPhase === 'recovering' && (
+            <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted" role="status" data-testid="pos-checkout-recovering">
+              {t('checkout_recovering')}
+            </p>
+          )}
         </main>
       </div>
 
       <footer className="flex shrink-0 border-t border-border bg-surface px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:p-4">
         <button
           type="button"
+          data-testid="pos-confirm-payment"
           onClick={() => {
-            if (!canConfirm || paying || paymentMethodsLoading) return;
+            if (!canConfirm || locked || paymentMethodsLoading) return;
             onConfirm(tenderPayload());
           }}
-          disabled={!canConfirm || paying || paymentMethodsLoading}
+          disabled={!canConfirm || locked || paymentMethodsLoading}
+          aria-busy={locked}
           className="flex min-h-12 flex-1 items-center justify-center gap-2.5 rounded-lg bg-primary px-4 py-3 text-base font-bold text-white touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Check className="h-5 w-5" strokeWidth={2.2} />
-          {t('confirm_payment')}
+          {locked ? <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2.2} aria-hidden /> : <Check className="h-5 w-5" strokeWidth={2.2} />}
+          {confirmLabel()}
         </button>
       </footer>
     </div>

@@ -2,13 +2,18 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\Branch;
 use App\Models\Invoice;
 use App\Models\PaymentMethod;
+use App\Models\PosCheckoutAttempt;
 use App\Models\PriceList;
 use App\Models\Product;
 use App\Support\PosSettings;
 use App\Services\Pos\CashDrawerService;
 use App\Services\Pos\PosAuditService;
+use App\Services\Pos\PosIdempotencyConflictException;
+use App\Tenancy\BranchContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -36,7 +41,7 @@ class PosService
     ) {}
 
     /**
-     * @param  array  $data  ['partner_id'=>uuid, 'tax_inclusive'=>?bool, 'items'=>[...],
+     * @param  array  $data  ['partner_id'=>uuid, 'idempotency_key'=>uuid, 'tax_inclusive'=>?bool, 'items'=>[...],
      *                        'tenders'=>[['payment_method_id'=>uuid, 'amount'=>int], ...], 'created_by'=>?]
      */
     public function checkout(array $data): Invoice
@@ -45,6 +50,9 @@ class PosService
             throw new RuntimeException('البيع يجب أن يحتوي على سطر واحد على الأقل.');
         }
 
+        $idempotencyKey = $this->requireIdempotencyKey($data['idempotency_key'] ?? null);
+        $checksum = $this->checkoutRequestChecksum($data);
+
         $drawerAttempt = null;
         $paymentIds = [];
         $cartId = $data['cart_id'] ?? null;
@@ -52,7 +60,11 @@ class PosService
 
         try {
             // يبدأ هذا الحدث من نفس الخدمة التي تنفذ البيع، لا من واجهة العميل.
-            if (is_string($cartId) && $cartId !== '') {
+            // Peek بلا قفل كافٍ للتلميتر: المسار الآمن مالياً داخل المعاملة أدناه.
+            $alreadyCompleted = PosCheckoutAttempt::query()
+                ->where('idempotency_key', $idempotencyKey)
+                ->exists();
+            if (! $alreadyCompleted && is_string($cartId) && $cartId !== '') {
                 $auditSession = $this->sessions->requireOpenForCheckout(
                     $data['pos_session_id'],
                     $data['created_by'] ?? null,
@@ -60,131 +72,46 @@ class PosService
                 );
                 $this->audit->recordCheckout($auditSession, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_PAYMENT_STARTED, [
                     'status' => 'checkout_requested',
+                    'idempotency_key' => $idempotencyKey,
                 ]);
             }
 
-            $invoice = DB::transaction(function () use ($data, &$drawerAttempt, &$paymentIds, $cartId) {
-            // تُقفل الجلسة وتتحقق قبل إنشاء أي مستند: لا بيع يُلحق بورديّة مغلقة
-            // أو بكاشير/فرع آخر، ويظل القفل قائماً حتى اكتمال الفاتورة وسنداتها.
-            $session = $this->sessions->requireOpenForCheckout(
-                $data['pos_session_id'],
-                $data['created_by'] ?? null,
-                $data['actor'] ?? null,
-            );
+            try {
+                $invoice = DB::transaction(function () use ($data, &$drawerAttempt, &$paymentIds, $cartId, $idempotencyKey, $checksum) {
+                    return $this->executeCheckoutWithinTransaction(
+                        $data, $drawerAttempt, $paymentIds, $cartId, $idempotencyKey, $checksum
+                    );
+                });
+            } catch (QueryException $exception) {
+                // سباق متزامن على نفس المفتاح: القيد الفريد يمنع الصف المكرر؛
+                // نعيد الفاتورة الفائزة بدل 500 كي تبقى إعادة المحاولة Idempotent.
+                if ($this->isUniqueConstraintViolation($exception)) {
+                    $existing = PosCheckoutAttempt::query()
+                        ->where('idempotency_key', $idempotencyKey)
+                        ->first();
+                    if ($existing !== null) {
+                        if (! hash_equals($existing->request_checksum, $checksum)) {
+                            throw new PosIdempotencyConflictException('تم استخدام مفتاح إعادة الطلب مع محتوى مختلف.');
+                        }
 
-            // سياسات الكتالوج وسعر الوحدة والخصم خادمية قبل أي فاتورة أو حركة
-            // مخزون؛ لا يكفي إخفاؤها في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
-            $priceList = $this->customerPriceLists->forPartner($data['partner_id']);
-            $this->assertProductsAllowedForPos($data['items']);
-            $this->assertUnitPricesAllowedForPos($data['items'], $priceList);
-            $this->assertDiscountsAllowedForPos($data['items']);
-
-            // تضمن تهيئة المؤسسة الجديدة كتالوجاً تشغيلياً واحداً فقط، ولا تعيد
-            // أي وسيلة حذفها مالكها بعد وجود الكتالوج.
-            $this->cashBankAccounts->bootstrapDefaults();
-            $this->assertPosPaymentMethodsAvailable();
-            $tenders = $this->normalizedTenders($data['tenders'] ?? []);
-            $methods = $this->configuredPaymentMethods($tenders);
-
-            // بدء الإتمام دليل خادمي من داخل المعاملة الفعلية؛ لا يعتمد على
-            // before/after أو مبلغ مرسل من العميل.
-            if (is_string($cartId) && $cartId !== '') {
-                $this->audit->recordCheckout($session, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_CHECKOUT_STARTED, [
-                    'status' => 'validated_for_checkout',
-                ]);
-            }
-
-            // الجلسات الجديدة تلتقط مخزن الجهاز عند الافتتاح؛ لا يقبل البيع أن
-            // يستبدله بطلب عميل. تبقى الجلسات التاريخية بلا مخزن على سلوكها السابق.
-            $warehouseId = $session->warehouse_id;
-            if ($warehouseId !== null
-                && array_key_exists('warehouse_id', $data)
-                && $data['warehouse_id'] !== null
-                && $data['warehouse_id'] !== $warehouseId) {
-                throw new RuntimeException('مخزن البيع يجب أن يطابق مخزن جهاز نقطة البيع في الجلسة.');
-            }
-            $warehouseId ??= $data['warehouse_id'] ?? null;
-
-            // 1) فاتورة آجلة (كامل الإجمالي على الذمم) ثم ترحيلها.
-            $invoice = $this->invoices->create([
-                'partner_id'    => $data['partner_id'],
-                'price_list_id' => $priceList?->id,
-                'pos_session_id' => $session->id,
-                'warehouse_id'  => $warehouseId,
-                'payment_type'  => 'credit',
-                'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
-                'notes'         => $data['notes'] ?? 'بيع نقطة بيع',
-                'created_by'    => $data['created_by'] ?? null,
-                'minimum_price_override_actor_id' => $data['minimum_price_override_actor_id'] ?? null,
-            ], $data['items']);
-            $invoice = $this->invoices->post($invoice);
-
-            $remaining = (int) $invoice->total;
-            foreach ($tenders as $tender) {
-                $method = $methods[$tender['payment_method_id']];
-                $amount = $tender['amount'];
-
-                // الفكّة لا تتولد إلا من النقد. لا نقبل تحصيلاً بنكياً أكبر من
-                // المتبقي لأنه لا يقابل ذمة ولا يمثل مبلغاً محصلاً في POS.
-                if ($method->settlement_type === 'bank' && $amount > $remaining) {
-                    throw new RuntimeException('لا يمكن أن يتجاوز مبلغ وسيلة الدفع البنكية المتبقي من إجمالي البيع.');
+                        return $this->replayCheckoutAttempt($existing, $data, $cartId, $idempotencyKey);
+                    }
                 }
-
-                $applied = min($amount, $remaining);
-                if ($applied <= 0) {
-                    continue;
-                }
-
-                // 2) سند قبض بالوسيلة المهيأة: PaymentService يلتقط الحساب
-                // المقابل واسم الوسيلة ثم يرحّل القيد المتوازن عبر LedgerService.
-                $payment = $this->payments->post($this->payments->create([
-                    'partner_id'        => $invoice->partner_id,
-                    'invoice_id'        => $invoice->id,
-                    'pos_session_id'    => $session->id,
-                    'direction'         => 'received',
-                    'payment_method_id' => $method->id,
-                    'amount'            => $applied,
-                    'notes'             => "{$method->name} — بيع {$invoice->number}",
-                    'created_by'        => $data['created_by'] ?? null,
-                ]));
-                $paymentIds[] = $payment->id;
-
-                $remaining -= $applied;
+                throw $exception;
             }
-
-            if ($remaining > 0 && ! PosSettings::allowsDeferredPayment()) {
-                throw new RuntimeException('الدفع الآجل غير مفعّل في إعدادات نقطة البيع، ويجب سداد كامل الإجمالي.');
-            }
-
-            // تجمع نية فتح الدرج فقط داخل المعاملة. التنفيذ الفعلي يقع بعد commit
-            // كي لا يستطيع عطل موصل مادي عكس الفاتورة أو سندات القبض المكتملة.
-            $drawer = PosSettings::group();
-            $hasCashTender = collect($tenders)->contains(fn (array $tender) => ($methods[$tender['payment_method_id']]->settlement_type ?? null) === 'cash');
-            if (($drawer['cash_drawer_enabled'] ?? false)
-                && ($drawer['cash_drawer_auto_open_after_cash'] ?? false)
-                && $hasCashTender) {
-                $drawerAttempt = [$session, $data['actor'] ?? null, $invoice];
-            }
-
-            if (is_string($cartId) && $cartId !== '') {
-                $this->audit->recordCheckout($session, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_CHECKOUT_COMPLETED, [
-                    'invoice_id' => $invoice->id,
-                    'invoice_number' => $invoice->number,
-                    'payment_ids' => $paymentIds,
-                    'amount' => (int) $invoice->total,
-                ]);
-            }
-
-                return $invoice->fresh(['lines']);
-            });
         } catch (\Throwable $exception) {
             // الفشل مثبت بواسطة مسار checkout الخادمي، ولا تعتمد قيمته أو سببه
             // على client telemetry. لا يخفي تعثر كتابة الدليل سبب فشل العملية الأصلي.
+            // تعارض idempotency ليس فشلاً مالياً — لا نُسجّل payment_failed.
+            if ($exception instanceof PosIdempotencyConflictException) {
+                throw $exception;
+            }
             if ($auditSession !== null && is_string($cartId) && $cartId !== '') {
                 try {
                     $this->audit->recordCheckout($auditSession, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_PAYMENT_FAILED, [
                         'status' => 'checkout_failed',
                         'error_code' => $exception instanceof \Illuminate\Validation\ValidationException ? 'validation_failed' : 'checkout_failed',
+                        'idempotency_key' => $idempotencyKey,
                     ]);
                 } catch (\Throwable) {
                     // الدليل تكميلي في مسار الاستثناء ولا يجوز أن يطمس خطأ البيع.
@@ -193,7 +120,7 @@ class PosService
             throw $exception;
         }
 
-        if ($drawerAttempt !== null) {
+        if ($drawerAttempt !== null && ! $invoice->getAttribute('idempotent_replay')) {
             [$session, $actor, $drawerInvoice] = $drawerAttempt;
             // بعد commit فقط: يعود أمرٌ قصير العمر للواجهة لتنفيذه على localhost.
             // لا يرمى أي عطل إلى معاملة البيع، ولا تتغير الفاتورة أو سندات القبض.
@@ -201,6 +128,269 @@ class PosService
         }
 
         return $invoice;
+    }
+
+    /**
+     * @param  array<string,mixed>  $data
+     * @param  list<string>  $paymentIds
+     */
+    private function executeCheckoutWithinTransaction(
+        array $data,
+        ?array &$drawerAttempt,
+        array &$paymentIds,
+        mixed $cartId,
+        string $idempotencyKey,
+        string $checksum,
+    ): Invoice {
+        // مرساة ثابتة لكل فرع: تمنع سباق المفتاح نفسه حتى مع جلسات متوازية.
+        $branchId = app(BranchContext::class)->id();
+        if (! is_string($branchId) || $branchId === '') {
+            throw new RuntimeException('فرع نقطة البيع غير محدد.');
+        }
+        Branch::query()->whereKey($branchId)->lockForUpdate()->firstOrFail();
+
+        $existing = PosCheckoutAttempt::query()
+            ->where('idempotency_key', $idempotencyKey)
+            ->lockForUpdate()
+            ->first();
+        if ($existing !== null) {
+            if (! hash_equals($existing->request_checksum, $checksum)) {
+                throw new PosIdempotencyConflictException('تم استخدام مفتاح إعادة الطلب مع محتوى مختلف.');
+            }
+
+            return $this->replayCheckoutAttempt($existing, $data, $cartId, $idempotencyKey);
+        }
+
+        // تُقفل الجلسة وتتحقق قبل إنشاء أي مستند: لا بيع يُلحق بورديّة مغلقة
+        // أو بكاشير/فرع آخر، ويظل القفل قائماً حتى اكتمال الفاتورة وسنداتها.
+        $session = $this->sessions->requireOpenForCheckout(
+            $data['pos_session_id'],
+            $data['created_by'] ?? null,
+            $data['actor'] ?? null,
+        );
+
+        // سياسات الكتالوج وسعر الوحدة والخصم خادمية قبل أي فاتورة أو حركة
+        // مخزون؛ لا يكفي إخفاؤها في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
+        $priceList = $this->customerPriceLists->forPartner($data['partner_id']);
+        $this->assertProductsAllowedForPos($data['items']);
+        $this->assertUnitPricesAllowedForPos($data['items'], $priceList);
+        $this->assertDiscountsAllowedForPos($data['items']);
+
+        // تضمن تهيئة المؤسسة الجديدة كتالوجاً تشغيلياً واحداً فقط، ولا تعيد
+        // أي وسيلة حذفها مالكها بعد وجود الكتالوج.
+        $this->cashBankAccounts->bootstrapDefaults();
+        $this->assertPosPaymentMethodsAvailable();
+        $tenders = $this->normalizedTenders($data['tenders'] ?? []);
+        $methods = $this->configuredPaymentMethods($tenders);
+
+        // بدء الإتمام دليل خادمي من داخل المعاملة الفعلية؛ لا يعتمد على
+        // before/after أو مبلغ مرسل من العميل.
+        if (is_string($cartId) && $cartId !== '') {
+            $this->audit->recordCheckout($session, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_CHECKOUT_STARTED, [
+                'status' => 'validated_for_checkout',
+                'idempotency_key' => $idempotencyKey,
+            ]);
+        }
+
+        // الجلسات الجديدة تلتقط مخزن الجهاز عند الافتتاح؛ لا يقبل البيع أن
+        // يستبدله بطلب عميل. تبقى الجلسات التاريخية بلا مخزن على سلوكها السابق.
+        $warehouseId = $session->warehouse_id;
+        if ($warehouseId !== null
+            && array_key_exists('warehouse_id', $data)
+            && $data['warehouse_id'] !== null
+            && $data['warehouse_id'] !== $warehouseId) {
+            throw new RuntimeException('مخزن البيع يجب أن يطابق مخزن جهاز نقطة البيع في الجلسة.');
+        }
+        $warehouseId ??= $data['warehouse_id'] ?? null;
+
+        // 1) فاتورة آجلة (كامل الإجمالي على الذمم) ثم ترحيلها.
+        $invoice = $this->invoices->create([
+            'partner_id'    => $data['partner_id'],
+            'price_list_id' => $priceList?->id,
+            'pos_session_id' => $session->id,
+            'warehouse_id'  => $warehouseId,
+            'payment_type'  => 'credit',
+            'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
+            'notes'         => $data['notes'] ?? 'بيع نقطة بيع',
+            'created_by'    => $data['created_by'] ?? null,
+            'minimum_price_override_actor_id' => $data['minimum_price_override_actor_id'] ?? null,
+        ], $data['items']);
+        $invoice = $this->invoices->post($invoice);
+
+        $remaining = (int) $invoice->total;
+        foreach ($tenders as $tender) {
+            $method = $methods[$tender['payment_method_id']];
+            $amount = $tender['amount'];
+
+            // الفكّة لا تتولد إلا من النقد. لا نقبل تحصيلاً بنكياً أكبر من
+            // المتبقي لأنه لا يقابل ذمة ولا يمثل مبلغاً محصلاً في POS.
+            if ($method->settlement_type === 'bank' && $amount > $remaining) {
+                throw new RuntimeException('لا يمكن أن يتجاوز مبلغ وسيلة الدفع البنكية المتبقي من إجمالي البيع.');
+            }
+
+            $applied = min($amount, $remaining);
+            if ($applied <= 0) {
+                continue;
+            }
+
+            // 2) سند قبض بالوسيلة المهيأة: PaymentService يلتقط الحساب
+            // المقابل واسم الوسيلة ثم يرحّل القيد المتوازن عبر LedgerService.
+            $payment = $this->payments->post($this->payments->create([
+                'partner_id'        => $invoice->partner_id,
+                'invoice_id'        => $invoice->id,
+                'pos_session_id'    => $session->id,
+                'direction'         => 'received',
+                'payment_method_id' => $method->id,
+                'amount'            => $applied,
+                'notes'             => "{$method->name} — بيع {$invoice->number}",
+                'created_by'        => $data['created_by'] ?? null,
+            ]));
+            $paymentIds[] = $payment->id;
+
+            $remaining -= $applied;
+        }
+
+        if ($remaining > 0 && ! PosSettings::allowsDeferredPayment()) {
+            throw new RuntimeException('الدفع الآجل غير مفعّل في إعدادات نقطة البيع، ويجب سداد كامل الإجمالي.');
+        }
+
+        // تجمع نية فتح الدرج فقط داخل المعاملة. التنفيذ الفعلي يقع بعد commit
+        // كي لا يستطيع عطل موصل مادي عكس الفاتورة أو سندات القبض المكتملة.
+        $drawer = PosSettings::group();
+        $hasCashTender = collect($tenders)->contains(fn (array $tender) => ($methods[$tender['payment_method_id']]->settlement_type ?? null) === 'cash');
+        if (($drawer['cash_drawer_enabled'] ?? false)
+            && ($drawer['cash_drawer_auto_open_after_cash'] ?? false)
+            && $hasCashTender) {
+            $drawerAttempt = [$session, $data['actor'] ?? null, $invoice];
+        }
+
+        if (is_string($cartId) && $cartId !== '') {
+            $this->audit->recordCheckout($session, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_CHECKOUT_COMPLETED, [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->number,
+                'payment_ids' => $paymentIds,
+                'amount' => (int) $invoice->total,
+                'idempotency_key' => $idempotencyKey,
+            ]);
+        }
+
+        PosCheckoutAttempt::withWriting(fn () => PosCheckoutAttempt::create([
+            'idempotency_key' => $idempotencyKey,
+            'request_checksum' => $checksum,
+            'invoice_id' => $invoice->id,
+            'cart_id' => is_string($cartId) && $cartId !== '' ? $cartId : null,
+            'pos_session_id' => $session->id,
+            'created_by' => $data['created_by'] ?? null,
+            'created_at' => now(),
+        ]));
+
+        return $invoice->fresh(['lines']);
+    }
+
+    /** @param  array<string,mixed>  $data */
+    private function replayCheckoutAttempt(
+        PosCheckoutAttempt $attempt,
+        array $data,
+        mixed $cartId,
+        string $idempotencyKey,
+    ): Invoice {
+        $invoice = Invoice::query()->with('lines')->findOrFail($attempt->invoice_id);
+        $invoice->setAttribute('idempotent_replay', true);
+
+        if (is_string($cartId) && $cartId !== '') {
+            $session = $this->sessions->requireOpenForCheckout(
+                $data['pos_session_id'],
+                $data['created_by'] ?? null,
+                $data['actor'] ?? null,
+            );
+            $this->audit->recordCheckout($session, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_CHECKOUT_IDEMPOTENT_REPLAY, [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->number,
+                'amount' => (int) $invoice->total,
+                'idempotency_key' => $idempotencyKey,
+                'status' => 'idempotent_replay',
+            ]);
+        }
+
+        return $invoice;
+    }
+
+    private function requireIdempotencyKey(mixed $key): string
+    {
+        if (! is_string($key) || $key === '' || ! preg_match('/^[0-9a-fA-F-]{36}$/', $key)) {
+            throw new RuntimeException('مفتاح إعادة المحاولة مطلوب ويجب أن يكون UUID صالحاً.');
+        }
+
+        return $key;
+    }
+
+    /**
+     * checksum دلالي مستقر لحمولة الإتمام — لا يشمل الفاعل أو مشتقات الإجمالي.
+     *
+     * @param  array<string,mixed>  $data
+     */
+    private function checkoutRequestChecksum(array $data): string
+    {
+        $items = [];
+        foreach ($data['items'] ?? [] as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $items[] = [
+                'product_id' => $item['product_id'] ?? null,
+                'description' => $item['description'] ?? null,
+                'quantity' => (int) ($item['quantity'] ?? 0),
+                'unit' => $item['unit'] ?? null,
+                'unit_price' => (int) ($item['unit_price'] ?? 0),
+                'tax_rate' => (int) ($item['tax_rate'] ?? 0),
+                'discount' => (int) ($item['discount'] ?? 0),
+            ];
+        }
+        usort($items, fn (array $a, array $b) => strcmp(json_encode($a), json_encode($b)));
+
+        $tenders = $data['tenders'] ?? [];
+        if (array_is_list($tenders)) {
+            $normalizedTenders = [];
+            foreach ($tenders as $tender) {
+                if (! is_array($tender)) {
+                    continue;
+                }
+                $normalizedTenders[] = [
+                    'payment_method_id' => $tender['payment_method_id'] ?? null,
+                    'amount' => (int) ($tender['amount'] ?? 0),
+                ];
+            }
+            usort($normalizedTenders, fn (array $a, array $b) => strcmp((string) $a['payment_method_id'], (string) $b['payment_method_id']));
+        } else {
+            $normalizedTenders = [
+                'cash' => (int) ($tenders['cash'] ?? 0),
+                'card' => (int) ($tenders['card'] ?? 0),
+                'transfer' => (int) ($tenders['transfer'] ?? 0),
+                'credit' => (int) ($tenders['credit'] ?? 0),
+            ];
+        }
+
+        $payload = [
+            'partner_id' => $data['partner_id'] ?? null,
+            'pos_session_id' => $data['pos_session_id'] ?? null,
+            'cart_id' => $data['cart_id'] ?? null,
+            'warehouse_id' => $data['warehouse_id'] ?? null,
+            'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
+            'notes' => $data['notes'] ?? null,
+            'items' => $items,
+            'tenders' => $normalizedTenders,
+        ];
+
+        return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+    }
+
+    private function isUniqueConstraintViolation(QueryException $e): bool
+    {
+        $sqlState = (string) ($e->errorInfo[0] ?? '');
+        $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+        // PostgreSQL unique_violation = 23505 · SQLite constraint = 19
+        return $sqlState === '23505' || $driverCode === 19 || str_contains(strtolower($e->getMessage()), 'unique');
     }
 
     /** يرفض المنتج المصنّف خارج سياسة POS، مع إبقاء السطر الوصفي بلا منتج مشروعاً. */

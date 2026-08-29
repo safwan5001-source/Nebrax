@@ -28,6 +28,7 @@ use App\Services\Accounting\PosCustomerPriceListResolver;
 use App\Services\Accounting\PosHeldSaleService;
 use App\Services\Accounting\PosReturnService;
 use App\Services\Accounting\PosSessionService;
+use App\Services\Pos\PosIdempotencyConflictException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -95,6 +96,8 @@ class PosController extends ApiController
     /**
      * إتمام بيع نقطة البيع بوسائل متعدّدة (ذرّياً): فاتورة آجلة مرحّلة + سندات قبض
      * (نقد→1110، بطاقة/تحويل→1120). يعيد الفاتورة الناتجة.
+     * إعادة الإرسال بنفس `idempotency_key` وحمولة متطابقة تعيد الفاتورة الأصلية (200)
+     * بلا بيع ثانٍ؛ حمولة مختلفة بنفس المفتاح → 409.
      */
     public function checkout(StorePosSaleRequest $request): JsonResponse
     {
@@ -108,18 +111,29 @@ class PosController extends ApiController
         $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $this->activeBranchId());
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
 
-        $invoice = $this->domain(fn () => $this->pos->checkout($data));
+        try {
+            $invoice = $this->domain(fn () => $this->pos->checkout($data));
+        } catch (PosIdempotencyConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+
+        $replayed = (bool) $invoice->getAttribute('idempotent_replay');
 
         // تُحمّل لقطة الإيصال الحراري المثبّتة مع فاتورة البيع الجديد، كي تعرض
         // واجهة POS المعاينة والطباعة من قرار المحرك وقت الترحيل لا من تعيين حي
         // قد يتغير بعد إتمام البيع.
-        $response = (new InvoiceResource($invoice->load(['lines', 'thermalTemplateRevision'])))->response()->setStatusCode(201);
+        $response = (new InvoiceResource($invoice->load(['lines', 'thermalTemplateRevision'])))
+            ->response()
+            ->setStatusCode($replayed ? 200 : 201);
+        $payload = $response->getData(true);
+        if ($replayed) {
+            $payload['idempotent_replay'] = true;
+        }
         $drawerAction = $invoice->getAttribute('cash_drawer_action');
         if (is_array($drawerAction)) {
-            $payload = $response->getData(true);
             $payload['cash_drawer_action'] = $drawerAction;
-            $response->setData($payload);
         }
+        $response->setData($payload);
 
         return $response;
     }
