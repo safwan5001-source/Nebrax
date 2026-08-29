@@ -70,7 +70,7 @@ class PosShiftController extends ApiController
 
         $query = PosShift::where('code', $code);
         if ($ignoreId !== null) {
-            $query->whereKeyNot($ignoreId);
+            $query->where('id', '!=', $ignoreId);
         }
 
         if ($query->exists()) {
