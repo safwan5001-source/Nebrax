@@ -1415,6 +1415,7 @@ export default function PosPage() {
                 id: p.id,
                 name: p.name,
                 sku: p.sku,
+                barcode: p.barcode,
                 sale_price_label: formatRiyal(p.sale_price),
                 pos_image: p.pos_image,
                 track_inventory: tracked,
