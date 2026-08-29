@@ -76,7 +76,7 @@ export function PosProductTile({
             {product.barcode ? (
               <span className="flex min-w-0 items-center gap-1" title={product.barcode}>
                 <Barcode className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                <span className="num min-w-0 truncate">{product.barcode}</span>
+                <span className="num min-w-0 truncate" dir="ltr">{product.barcode}</span>
               </span>
             ) : <span />}
             {product.track_inventory && (
