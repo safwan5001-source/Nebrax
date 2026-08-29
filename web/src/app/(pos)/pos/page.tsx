@@ -63,6 +63,13 @@ import {
   type PosCheckoutPhase,
 } from '@/lib/pos-checkout-attempt';
 import {
+  buildPosCartSnapshotScope,
+  buildPosCartStorageKey,
+  markSaleClearedSync,
+  snapshotHasRestorableWork,
+} from '@/lib/pos-cart-snapshot';
+import { usePosNetworkStatus } from '@/lib/pos-network-status';
+import {
   parsePosInteractionMode,
   posInteractionViewportFromMedia,
   resolvePosInteractionPolicy,
@@ -238,6 +245,8 @@ export default function PosPage() {
   // الوردية (الجلسة النقدية) — تُربط بالبيع: تُفتح قبل البيع وتُغلق بعدّ النقد.
   const [session, setSession] = useState<PosSession | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
+  const [sessionInvalid, setSessionInvalid] = useState(false);
+  const [sessionRevalidating, setSessionRevalidating] = useState(false);
   const [devices, setDevices] = useState<PosDevice[]>([]);
   const [shifts, setShifts] = useState<WorkShift[]>([]);
   const [deviceId, setDeviceId] = useState('');
@@ -251,14 +260,27 @@ export default function PosPage() {
   const [drawerBusy, setDrawerBusy] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const ts = useTranslations('posSessions');
+  const online = usePosNetworkStatus();
+  const restoreNoticeKeyRef = useRef<string | null>(null);
 
-  const activeCartStorageKey = session && cashierScope.userId && cashierScope.tenantId
-    ? `nibras_pos_active_carts:${cashierScope.tenantId}:${activeBranch?.id ?? 'main'}:${session.pos_device_id ?? 'no-device'}:${session.warehouse_id ?? 'no-warehouse'}:${session.shift_id ?? 'no-shift'}:${session.id}:${cashierScope.userId}`
+  const cartSnapshotScope = session && cashierScope.userId && cashierScope.tenantId
+    ? buildPosCartSnapshotScope({
+      tenantId: cashierScope.tenantId,
+      userId: cashierScope.userId,
+      branchId: activeBranch?.id ?? null,
+      session,
+    })
     : null;
+  const activeCartStorageKey = cartSnapshotScope ? buildPosCartStorageKey(cartSnapshotScope) : null;
   const {
-    carts, activeCart, activeCartId, hydrated, setActiveCartId, patchActive, updateActiveItems, updateCarts,
-    openCart, createCart, closeCart,
-  } = usePosActiveCarts({ storageKey: activeCartStorageKey, defaultTaxInclusive: systemTaxInclusive });
+    carts, activeCart, activeCartId, hydrated, restoreStatus, pendingAttempt,
+    setActiveCartId, patchActive, updateActiveItems, updateCarts,
+    openCart, createCart, closeCart, setPendingAttempt, applyClearedSaleState,
+  } = usePosActiveCarts({
+    storageKey: activeCartStorageKey,
+    scope: cartSnapshotScope,
+    defaultTaxInclusive: systemTaxInclusive,
+  });
   const cart = activeCart.items;
   const selectedCustomer = activeCart.customer;
   const taxInclusive = activeCart.taxInclusive;
@@ -367,6 +389,62 @@ export default function PosPage() {
       setSelectedCustomer(defaultCustomer);
     }
   }, [hydrated, activeCartStorageKey, posCfg, walkinName, activeCart, setSelectedCustomer]);
+
+  // إشعار خفيف مرة واحدة لكل مفتاح تخزين عند استعادة سلة غير فارغة — بلا modal مزعج.
+  useEffect(() => {
+    if (!hydrated || !activeCartStorageKey) return;
+    if (restoreNoticeKeyRef.current === activeCartStorageKey) return;
+    restoreNoticeKeyRef.current = activeCartStorageKey;
+    if (restoreStatus === 'restored' && snapshotHasRestorableWork(carts)) {
+      success(t('cart_restored'));
+    } else if (restoreStatus === 'ignored_stale' || restoreStatus === 'ignored_invalid' || restoreStatus === 'ignored_scope') {
+      toast({ title: t('cart_snapshot_ignored'), variant: 'warning' });
+    }
+  }, [hydrated, activeCartStorageKey, restoreStatus, carts, success, t, toast]);
+
+  const revalidateSession = useCallback(async () => {
+    if (!online) return;
+    setSessionRevalidating(true);
+    try {
+      const r = await api<{ data: PosSession[] }>('/pos-sessions?mine=1');
+      const current = r.data.find((item) => item.status === 'open') ?? null;
+      if (!current) {
+        if (session) {
+          setSessionInvalid(true);
+          setSession(null);
+          setStep('sale');
+          setCheckoutPhase('idle');
+          checkoutAttemptRef.current.reset();
+          setPaying(false);
+          paymentRequestRef.current = false;
+        }
+        return;
+      }
+      setSessionInvalid(false);
+      setSession((prev) => {
+        if (prev?.id === current.id) return prev;
+        return current;
+      });
+      if (current.warehouse_id) setWarehouseId(current.warehouse_id);
+    } catch {
+      // فشل الاستطلاع لا يُفترض إغلاقاً؛ نبقي الحالة الحالية.
+    } finally {
+      setSessionRevalidating(false);
+    }
+  }, [online, session]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void revalidateSession();
+    };
+    const onOnline = () => { void revalidateSession(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [revalidateSession]);
 
   useEffect(() => {
     posSound.preload();
@@ -850,7 +928,14 @@ export default function PosPage() {
       const key = selectedLineKey ?? cart[cart.length - 1]?.key;
       if (key) remove(key);
     },
-    payment: () => { if (cart.length > 0 && step === 'sale') setStep('payment'); },
+    payment: () => {
+      if (cart.length > 0 && step === 'sale' && !sessionInvalid && online) {
+        if (pendingAttempt?.cartId === activeCart.id) {
+          checkoutAttemptRef.current.adopt(pendingAttempt.attemptId);
+        }
+        setStep('payment');
+      }
+    },
     newCart: () => { createCart(); },
     openCarts: () => setOpenCartsOpen(true),
     back: step === 'payment' ? requestPaymentCancel : undefined,
@@ -934,6 +1019,7 @@ export default function PosPage() {
         body: { opening_balance: riyalToMinor(openBal), pos_device_id: deviceId, shift_id: shiftId || null },
       });
       setSession(r.data);
+      setSessionInvalid(false);
       if (r.data.warehouse_id) setWarehouseId(r.data.warehouse_id);
       setOpenBal('');
     } catch (err) {
@@ -1004,17 +1090,22 @@ export default function PosPage() {
 
   const confirmPayment = useCallback(
     async (tenders: PosTender[]) => {
+      if (!online) {
+        setError(t('checkout_offline_blocked'));
+        playPosFeedback('warning');
+        return;
+      }
+      if (sessionInvalid || !session) {
+        setError(sessionInvalid ? t('session_closed_remote') : t('open_to_start'));
+        playPosFeedback('warning');
+        return;
+      }
       if (catalogLoading) {
         setError(t('price_list_loading'));
         playPosFeedback('warning');
         return;
       }
       if (cart.length === 0) return;
-      if (!session) {
-        setError(t('open_to_start'));
-        playPosFeedback('warning');
-        return;
-      }
       const customer = selectedCustomer;
       if (!customer) {
         setError(t('customer_required_for_payment'));
@@ -1027,7 +1118,12 @@ export default function PosPage() {
       setPaying(true);
       setCheckoutPhase('submitting');
       setError(null);
+      // إعادة استخدام مفتاح محاولة محفوظة لنفس السلة (PR-9 + عقد #559) — لا مفتاح عشوائي جديد.
+      if (pendingAttempt?.cartId === activeCart.id) {
+        checkoutAttemptRef.current.adopt(pendingAttempt.attemptId);
+      }
       const attemptKey = checkoutAttemptRef.current.ensure();
+      setPendingAttempt({ cartId: activeCart.id, attemptId: attemptKey, savedAt: Date.now() });
       let auditCartId: string | null = null;
       try {
         auditCartId = await ensureAuditCart(activeCart);
@@ -1084,9 +1180,23 @@ export default function PosPage() {
           onCheckoutSuccess: (checkout) => {
             checkoutAttemptRef.current.resetAfterSuccess();
             setCheckoutPhase('success');
+            // مسح sync فوري حتى لا تُستعاد السلة المباعة بعد reload قبل دورة React.
+            if (activeCartStorageKey && cartSnapshotScope) {
+              const cleared = markSaleClearedSync({
+                storageKey: activeCartStorageKey,
+                scope: cartSnapshotScope,
+                carts,
+                activeId: activeCartId,
+                soldCartId: activeCart.id,
+                defaultTaxInclusive: systemTaxInclusive,
+              });
+              applyClearedSaleState(cleared);
+            } else {
+              setPendingAttempt(null);
+              closeCart(activeCart.id);
+            }
             playPosFeedback('payment_success');
             success(checkout.idempotent_replay ? t('checkout_recovered_success') : t('sale_done'));
-            closeCart(activeCart.id);
             setStep('sale');
             setMobileTab('products');
             restoreFocusAfterUi();
@@ -1187,7 +1297,7 @@ export default function PosPage() {
         setCheckoutPhase((phase) => (phase === 'success' ? 'idle' : phase === 'submitting' || phase === 'recovering' ? 'idle' : phase));
       }
     },
-    [activeCart, cart, catalogLoading, closeCart, success, t, tc, toast, selectedCustomer, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback, ensureAuditCart, totalMinor],
+    [activeCart, activeCartId, activeCartStorageKey, applyClearedSaleState, cart, cartSnapshotScope, carts, catalogLoading, closeCart, online, pendingAttempt, sessionInvalid, setPendingAttempt, success, systemTaxInclusive, t, tc, toast, selectedCustomer, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback, ensureAuditCart, totalMinor],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -1359,6 +1469,7 @@ export default function PosPage() {
     if (paying) return;
     if (cart.length === 0) {
       checkoutAttemptRef.current.reset();
+      setPendingAttempt(null);
       setCheckoutPhase('idle');
       setStep('sale');
       return;
@@ -1393,6 +1504,7 @@ export default function PosPage() {
           before: { items: target.items.map(auditLine), customer: target.customer }, after: { status: 'cancelled' },
         }, target);
         checkoutAttemptRef.current.reset();
+        setPendingAttempt(null);
         setCheckoutPhase('idle');
         setStep('sale');
         restoreFocusAfterUi();
@@ -1578,7 +1690,17 @@ export default function PosPage() {
       </div>
 
       <div className={POS_CART_PAY_FOOTER_CLASS}>
-        <button type="button" onClick={() => setStep('payment')} disabled={cart.length === 0 || catalogLoading} className="flex min-h-14 w-full touch-manipulation items-center justify-between rounded-md bg-primary px-4 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50">
+        <button
+          type="button"
+          onClick={() => {
+            if (pendingAttempt?.cartId === activeCart.id) {
+              checkoutAttemptRef.current.adopt(pendingAttempt.attemptId);
+            }
+            setStep('payment');
+          }}
+          disabled={cart.length === 0 || catalogLoading || sessionInvalid || !online}
+          className="flex min-h-14 w-full touch-manipulation items-center justify-between rounded-md bg-primary px-4 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+        >
           {t('pay')}<span className="num">{formatRiyal(totalMinor / 100)}<span className="hidden lg:inline"> · F9</span></span>
         </button>
       </div>
@@ -1630,23 +1752,46 @@ export default function PosPage() {
         cashier={cashier}
         branch={branch}
         session={session}
+        online={online}
         warehouses={warehouses}
         warehouseId={warehouseId}
-        warehouseDisabled={Boolean(session?.warehouse_id) || step === 'payment' || paying}
+        warehouseDisabled={Boolean(session?.warehouse_id) || step === 'payment' || paying || sessionInvalid}
         onWarehouseChange={setWarehouseId}
         heldCount={heldCount}
         onManageSession={() => (session ? (setCountedBal(''), setSessionError(null), setCloseOpen(true)) : router.push('/dashboard'))}
         onOpenHeld={() => setRetrieveOpen(true)}
         onOpenRecentInvoices={() => setRecentInvoicesOpen(true)}
         onOpenCashDrawer={() => void openCashDrawer()}
-        cashDrawerDisabled={!session || !sessionDrawerConfigured || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable' || drawerBusy}
+        cashDrawerDisabled={!session || sessionInvalid || !sessionDrawerConfigured || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable' || drawerBusy}
         cashDrawerBusy={drawerBusy}
         onReturn={() => setReturnOpen(true)}
         onReturnToSystem={requestReturnToSystem}
         onExchange={() => setExchangeOpen(true)}
         onLogout={requestLogout}
-        exchangeDisabled={cart.length === 0 || step === 'payment' || paying}
+        exchangeDisabled={cart.length === 0 || step === 'payment' || paying || sessionInvalid}
       />
+
+      {(sessionRevalidating || !online) && session && (
+        <div
+          role="status"
+          data-testid="pos-recovery-banner"
+          className="no-print flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-3 py-2 text-sm sm:px-4"
+        >
+          <p className={!online ? 'text-negative' : 'text-muted'}>
+            {!online ? t('checkout_offline_blocked') : t('session_revalidating')}
+          </p>
+        </div>
+      )}
+
+      {sessionInvalid && !session && (
+        <div
+          role="alert"
+          data-testid="pos-session-invalid-banner"
+          className="no-print border-b border-border bg-surface px-3 py-2 text-sm text-negative sm:px-4"
+        >
+          {t('session_closed_remote')}
+        </div>
+      )}
 
       {step === 'payment' ? (
         <PosPayment
@@ -1660,6 +1805,7 @@ export default function PosPage() {
           paymentMethodsLoadError={paymentMethodsError}
           paying={paying}
           checkoutPhase={checkoutPhase}
+          offline={!online}
           error={error}
           onBack={requestPaymentCancel}
           onConfirm={confirmPayment}
@@ -1796,7 +1942,7 @@ export default function PosPage() {
       {/* بوابة الوردية: لا بيع قبل فتح وردية — الإغلاق = مغادرة نقطة البيع. */}
       <PosDialog open={sessionReady && !session} onClose={() => router.push('/dashboard')} title={ts('open_title')}>
         <form onSubmit={openSession} className="space-y-3">
-          <p className="text-xs text-muted">{t('open_to_start')}</p>
+          <p className="text-xs text-muted">{sessionInvalid ? t('session_closed_remote') : t('open_to_start')}</p>
           <div className="space-y-1.5">
             <Label htmlFor="pos-device">{ts('device')}</Label>
             <select id="pos-device" value={deviceId} onChange={(e) => setDeviceId(e.target.value)} required disabled={sessionBusy || devices.length === 0} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60">

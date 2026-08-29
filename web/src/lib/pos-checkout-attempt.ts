@@ -52,6 +52,15 @@ export class PosCheckoutAttemptController {
     return this.attemptId;
   }
 
+  /**
+   * يتبنّى مفتاح محاولة محفوظاً (استعادة بعد refresh) قبل أي ensure جديد.
+   * لا يغيّر عقد #559: نفس المفتاح يُعاد استخدامه للمحاولة الغامضة فقط.
+   */
+  adopt(attemptId: string): void {
+    if (!attemptId.trim()) return;
+    this.attemptId = attemptId;
+  }
+
   /** بعد نجاح البيع — المحاولة التالية هوية جديدة. */
   resetAfterSuccess(): void {
     this.attemptId = null;

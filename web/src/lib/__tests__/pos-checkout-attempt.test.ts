@@ -26,6 +26,14 @@ describe('pos-checkout-attempt', () => {
     expect(controller.ensure()).not.toBe(first);
   });
 
+  it('يتبنّى مفتاح محاولة محفوظاً بدلاً من إنشاء مفتاح جديد', () => {
+    const controller = new PosCheckoutAttemptController();
+    const saved = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    controller.adopt(saved);
+    expect(controller.current()).toBe(saved);
+    expect(controller.ensure()).toBe(saved);
+  });
+
   it('يميز فشل الشبكة عن أخطاء API', () => {
     expect(isPosCheckoutNetworkFailure(new TypeError('Failed to fetch'))).toBe(true);
     expect(isPosCheckoutNetworkFailure(new Error('NetworkError when attempting to fetch'))).toBe(true);

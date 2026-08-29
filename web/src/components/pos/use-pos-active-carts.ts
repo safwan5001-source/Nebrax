@@ -1,117 +1,121 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PosCustomer } from '@/components/pos/customer-picker';
+import {
+  appendPosActiveCart,
+  cartHasUnsavedData,
+  closePosActiveCart,
+  createPosActiveCart,
+  type PosActiveCart,
+  type PosCartLine,
+} from '@/lib/pos-active-cart';
+import {
+  clearPosCartSnapshotSync,
+  parsePosCartSnapshot,
+  serializePosCartSnapshot,
+  type PosCartRestoreStatus,
+  type PosCartSnapshotScope,
+  type PosPendingCheckoutAttempt,
+} from '@/lib/pos-cart-snapshot';
 
-export interface PosCartLine {
-  key: string;
-  productId: string | null;
-  description: string;
-  sku: string | null;
-  unit: string | null;
-  price: string;
-  qty: number;
-  tax: number;
-  discount: string;
-}
+export type { PosActiveCart, PosCartLine };
+export {
+  appendPosActiveCart,
+  cartHasUnsavedData,
+  closePosActiveCart,
+  createPosActiveCart,
+};
 
-export interface PosActiveCart {
-  id: string;
-  /** هوية الخادم للسجل append-only؛ تبقى مستقلة عن مفتاح الواجهة المحلي. */
-  auditCartId?: string | null;
-  number: number;
-  items: PosCartLine[];
-  customer: PosCustomer | null;
-  note: string;
-  taxInclusive: boolean;
-}
-
-function id(): string {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `cart-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-export function createPosActiveCart(number: number, taxInclusive: boolean): PosActiveCart {
-  return { id: id(), auditCartId: null, number, items: [], customer: null, note: '', taxInclusive };
-}
-
-export function cartHasUnsavedData(cart: PosActiveCart): boolean {
-  return cart.items.length > 0 || cart.customer !== null || cart.note.trim().length > 0;
-}
-
+/** توافق رجعي: الشكل القديم `{carts,activeId}` عبر عقد اللقطة مع نطاق وهمي للمفتاح. */
 export function parseStoredPosActiveCarts(value: string): { carts: PosActiveCart[]; activeId: string } | null {
+  const dummyScope: PosCartSnapshotScope = {
+    tenantId: '_',
+    branchId: '_',
+    deviceId: '_',
+    warehouseId: '_',
+    shiftId: '_',
+    sessionId: '_',
+    userId: '_',
+  };
   try {
-    const parsed = JSON.parse(value) as { carts?: unknown; activeId?: unknown };
-    if (!Array.isArray(parsed.carts) || parsed.carts.length === 0 || typeof parsed.activeId !== 'string') return null;
-    const carts = parsed.carts.filter((cart): cart is PosActiveCart => (
-      typeof cart === 'object' && cart !== null
-      && typeof (cart as PosActiveCart).id === 'string'
-      && typeof (cart as PosActiveCart).number === 'number'
-      && Array.isArray((cart as PosActiveCart).items)
-      && typeof (cart as PosActiveCart).note === 'string'
-      && typeof (cart as PosActiveCart).taxInclusive === 'boolean'
-    ));
-    if (carts.length === 0 || !carts.some((cart) => cart.id === parsed.activeId)) return null;
-    return { carts, activeId: parsed.activeId };
+    const parsed = JSON.parse(value) as { v?: unknown };
+    // الشكل القديم بلا v — parsePosCartSnapshot يقبله عند أي نطاق متوقع.
+    if (parsed.v === undefined) {
+      const result = parsePosCartSnapshot(value, dummyScope, false);
+      if (result.status !== 'restored') return null;
+      return { carts: result.carts, activeId: result.activeId };
+    }
+    // v1 يحتاج نطاقاً مطابقاً؛ للاختبارات القديمة بلا نطاق نقرأ الشكل مباشرة.
+    const legacy = JSON.parse(value) as { carts?: unknown; activeId?: unknown; scope?: PosCartSnapshotScope };
+    if (legacy.scope) {
+      const result = parsePosCartSnapshot(value, legacy.scope, false);
+      if (result.status !== 'restored') return null;
+      return { carts: result.carts, activeId: result.activeId };
+    }
+    return null;
   } catch {
     return null;
   }
-}
-
-/** تضمن أن استعادة عملية معلّقة لا تنسخ السلة نفسها عند النقر المتكرر. */
-export function appendPosActiveCart(carts: PosActiveCart[], cart: PosActiveCart): PosActiveCart[] {
-  return carts.some((current) => current.id === cart.id) ? carts : [...carts, cart];
-}
-
-/** إغلاق سلة لا يترك شاشة بلا سلة؛ آخر سلة تُستبدل بمسودة جديدة مستقلة. */
-export function closePosActiveCart(carts: PosActiveCart[], activeId: string, idToClose: string, defaultTaxInclusive: boolean): { carts: PosActiveCart[]; activeId: string } {
-  const remaining = carts.filter((cart) => cart.id !== idToClose);
-  if (remaining.length > 0) {
-    return { carts: remaining, activeId: idToClose === activeId ? remaining[0].id : activeId };
-  }
-
-  const fresh = createPosActiveCart(1, defaultTaxInclusive);
-  return { carts: [fresh], activeId: fresh.id };
 }
 
 /**
  * السلات النشطة مسودات واجهية فقط. تحفظ كل سلة بصورة مستقلة ولا تُصبح مصدراً
  * مالياً؛ يبقى الخادم حارس السعر والمخزون والدفع عند checkout أو التعليق.
  */
-export function usePosActiveCarts({ storageKey, defaultTaxInclusive }: { storageKey: string | null; defaultTaxInclusive: boolean }) {
+export function usePosActiveCarts({
+  storageKey,
+  scope,
+  defaultTaxInclusive,
+}: {
+  storageKey: string | null;
+  scope: PosCartSnapshotScope | null;
+  defaultTaxInclusive: boolean;
+}) {
   const initial = useMemo(() => createPosActiveCart(1, defaultTaxInclusive), [defaultTaxInclusive]);
   const [carts, setCarts] = useState<PosActiveCart[]>([initial]);
   const [activeCartId, setActiveCartId] = useState(initial.id);
+  const [pendingAttempt, setPendingAttemptState] = useState<PosPendingCheckoutAttempt | null>(null);
+  const [restoreStatus, setRestoreStatus] = useState<PosCartRestoreStatus>('fresh');
   const loadedKeyRef = useRef<string | null>(null);
   // المفتاح الذي اكتملت استعادته من التخزين المحلي؛ مصدر إشارة `hydrated`
   // حتى لا يكتب مستهلك (كالعميل الافتراضي) فوق سلة قبل استبدالها بالمستعادة.
   const [hydratedKey, setHydratedKey] = useState<string | null>(null);
+  const pendingAttemptRef = useRef<PosPendingCheckoutAttempt | null>(null);
+  const skipPersistRef = useRef(false);
 
   useEffect(() => {
-    if (!storageKey || loadedKeyRef.current === storageKey) return;
+    if (!storageKey || !scope || loadedKeyRef.current === storageKey) return;
     const stored = localStorage.getItem(storageKey);
-    const parsed = stored ? parseStoredPosActiveCarts(stored) : null;
-    if (parsed) {
-      setCarts(parsed.carts);
-      setActiveCartId(parsed.activeId);
-    } else {
-      const fresh = createPosActiveCart(1, defaultTaxInclusive);
-      setCarts([fresh]);
-      setActiveCartId(fresh.id);
+    const parsed = parsePosCartSnapshot(stored, scope, defaultTaxInclusive);
+    if (parsed.status === 'ignored_invalid' || parsed.status === 'ignored_stale' || parsed.status === 'ignored_scope') {
+      clearPosCartSnapshotSync(storageKey);
     }
+    setCarts(parsed.carts);
+    setActiveCartId(parsed.activeId);
+    pendingAttemptRef.current = parsed.pendingAttempt;
+    setPendingAttemptState(parsed.pendingAttempt);
+    setRestoreStatus(parsed.status);
     loadedKeyRef.current = storageKey;
     setHydratedKey(storageKey);
-  }, [defaultTaxInclusive, storageKey]);
+  }, [defaultTaxInclusive, scope, storageKey]);
 
   useEffect(() => {
-    if (!storageKey || loadedKeyRef.current !== storageKey) return;
+    if (!storageKey || !scope || loadedKeyRef.current !== storageKey) return;
+    if (skipPersistRef.current) {
+      skipPersistRef.current = false;
+      return;
+    }
     try {
-      localStorage.setItem(storageKey, JSON.stringify({ carts, activeId: activeCartId }));
+      localStorage.setItem(storageKey, serializePosCartSnapshot({
+        scope,
+        carts,
+        activeId: activeCartId,
+        pendingAttempt: pendingAttemptRef.current,
+      }));
     } catch {
       // الإتاحة المحلية تحسين استمرارية فقط؛ لا تمنع البيع عند امتلاء التخزين.
     }
-  }, [activeCartId, carts, storageKey]);
+  }, [activeCartId, carts, scope, storageKey]);
 
   const activeCart = carts.find((cart) => cart.id === activeCartId) ?? carts[0];
 
@@ -141,14 +145,45 @@ export function usePosActiveCarts({ storageKey, defaultTaxInclusive }: { storage
 
   const closeCart = useCallback((idToClose: string) => {
     const next = closePosActiveCart(carts, activeCartId, idToClose, defaultTaxInclusive);
+    if (pendingAttemptRef.current?.cartId === idToClose) {
+      pendingAttemptRef.current = null;
+      setPendingAttemptState(null);
+    }
     setCarts(next.carts);
     setActiveCartId(next.activeId);
   }, [activeCartId, carts, defaultTaxInclusive]);
+
+  const setPendingAttempt = useCallback((next: PosPendingCheckoutAttempt | null) => {
+    pendingAttemptRef.current = next;
+    setPendingAttemptState(next);
+    if (!storageKey || !scope || loadedKeyRef.current !== storageKey) return;
+    try {
+      localStorage.setItem(storageKey, serializePosCartSnapshot({
+        scope,
+        carts,
+        activeId: activeCartId,
+        pendingAttempt: next,
+      }));
+    } catch {
+      // ignore
+    }
+  }, [activeCartId, carts, scope, storageKey]);
+
+  /** يطبّق نتيجة markSaleClearedSync على الحالة ويتخطى كتابة أثر مزدوجة. */
+  const applyClearedSaleState = useCallback((next: { carts: PosActiveCart[]; activeId: string }) => {
+    skipPersistRef.current = true;
+    pendingAttemptRef.current = null;
+    setPendingAttemptState(null);
+    setCarts(next.carts);
+    setActiveCartId(next.activeId);
+  }, []);
 
   return {
     carts,
     activeCart,
     activeCartId,
+    pendingAttempt,
+    restoreStatus,
     // صحيح فقط بعد أن يستقر التخزين المحلي للمفتاح الحالي (وليس لمفتاح سابق).
     hydrated: hydratedKey !== null && hydratedKey === storageKey,
     setActiveCartId,
@@ -158,5 +193,7 @@ export function usePosActiveCarts({ storageKey, defaultTaxInclusive }: { storage
     openCart,
     createCart,
     closeCart,
+    setPendingAttempt,
+    applyClearedSaleState,
   };
 }

@@ -29,6 +29,7 @@ export function PosPayment({
   paymentMethodsLoadError,
   paying,
   checkoutPhase = 'idle',
+  offline = false,
   error,
   onBack,
   onConfirm,
@@ -43,6 +44,7 @@ export function PosPayment({
   paymentMethodsLoadError: string | null;
   paying: boolean;
   checkoutPhase?: PosCheckoutPhase;
+  offline?: boolean;
   error: string | null;
   onBack: () => void;
   onConfirm: (tenders: PosTender[]) => void;
@@ -63,7 +65,7 @@ export function PosPayment({
   }, [paymentMethods, resolvedDefaultId]);
 
   const set = (id: string, value: string) => {
-    if (paying || checkoutPhase === 'submitting' || checkoutPhase === 'recovering') return;
+    if (paying || checkoutPhase === 'submitting' || checkoutPhase === 'recovering' || offline) return;
     setSelectedMethodId(id);
     setTenders((current) => ({ ...current, [id]: value }));
   };
@@ -80,7 +82,7 @@ export function PosPayment({
     && (allowDeferredPayment || paidMinor >= totalMinor);
   const quick = [totalMinor / 100, 50, 100, 200, 500];
   const selectedMethod = paymentMethods.find((method) => method.id === selectedMethodId) ?? null;
-  const locked = paying || checkoutPhase === 'submitting' || checkoutPhase === 'recovering';
+  const locked = paying || offline || checkoutPhase === 'submitting' || checkoutPhase === 'recovering';
 
   function label(method: PosPaymentMethod): string {
     return locale === 'en' ? method.name_en || method.name : method.name;
@@ -93,13 +95,14 @@ export function PosPayment({
   }
 
   function confirmLabel(): string {
+    if (offline) return t('checkout_offline_blocked');
     if (checkoutPhase === 'recovering') return t('checkout_recovering');
     if (locked) return t('checkout_submitting');
     return t('confirm_payment');
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-checkout-phase={checkoutPhase} data-testid="pos-payment-screen">
+    <div className="flex h-full min-h-0 flex-col" data-checkout-phase={checkoutPhase} data-offline={offline ? '1' : '0'} data-testid="pos-payment-screen">
       <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
         <button
           type="button"

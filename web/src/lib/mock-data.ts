@@ -2953,7 +2953,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const b = mockBranches.find((x) => x.id === branchMatch[1]) ?? mockBranches[0];
     return resolve({ data: b });
   }
-  if (clean === '/pos-sessions') return resolve({ data: mockPosSessions });
+  if (clean === '/pos-sessions') {
+    if (typeof window !== 'undefined'
+      && Boolean((window as Window & { __POS_SESSIONS_FORCE_EMPTY?: boolean }).__POS_SESSIONS_FORCE_EMPTY)) {
+      return resolve({ data: [] });
+    }
+    return resolve({ data: mockPosSessions });
+  }
   if (clean === '/pos/recent-invoices') {
     return resolve({
       data: mockInvoices
@@ -3008,7 +3014,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ dimension: by, data: mockBreakdown[by] ?? [] });
   }
   if (clean === '/revisions') return resolve({ data: mockFeed });
-  if (clean === '/pos-sessions') return resolve({ data: mockSessions });
+  if (clean === '/pos-sessions') {
+    if (typeof window !== 'undefined'
+      && Boolean((window as Window & { __POS_SESSIONS_FORCE_EMPTY?: boolean }).__POS_SESSIONS_FORCE_EMPTY)) {
+      return resolve({ data: [] });
+    }
+    return resolve({ data: mockSessions });
+  }
   if (clean.startsWith('/revisions/')) return resolve({ data: mockRevisions });
   if (clean === '/procurement') {
     const pt = new URLSearchParams(path.split('?')[1] ?? '').get('type');
