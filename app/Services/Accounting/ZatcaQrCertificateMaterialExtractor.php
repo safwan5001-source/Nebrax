@@ -23,13 +23,20 @@ final class ZatcaQrCertificateMaterialExtractor
         $certificate = @openssl_x509_read($pem);
         $key = $certificate === false ? false : openssl_pkey_get_public($certificate);
         $details = $key === false ? false : openssl_pkey_get_details($key);
+        $certificateDetails = $certificate === false ? false : openssl_x509_parse($certificate, false);
         $x = is_array($details) ? ($details['ec']['x'] ?? null) : null;
         $y = is_array($details) ? ($details['ec']['y'] ?? null) : null;
         if (($details['type'] ?? null) !== OPENSSL_KEYTYPE_EC
+            || ($details['ec']['curve_name'] ?? null) !== 'secp256k1'
             || ! is_string($x) || strlen($x) !== self::EC_COMPONENT_BYTES
             || ! is_string($y) || strlen($y) !== self::EC_COMPONENT_BYTES
         ) {
-            throw new InvalidArgumentException('شهادة CSID لا تحتوي مفتاح EC عاماً من 256 بت.');
+            throw new InvalidArgumentException('شهادة CSID لا تحتوي مفتاح secp256k1 عاماً صالحاً.');
+        }
+        if (! is_array($certificateDetails)
+            || ($certificateDetails['signatureTypeSN'] ?? null) !== 'ecdsa-with-SHA256'
+        ) {
+            throw new InvalidArgumentException('شهادة CSID لا تستخدم توقيع ECDSA-SHA256 المطلوب.');
         }
 
         return [
