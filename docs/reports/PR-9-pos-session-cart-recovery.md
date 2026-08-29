@@ -40,13 +40,23 @@
 
 **محدّث:** `use-pos-active-carts.ts`, `pos/page.tsx`, `pos-payment.tsx`, `pos-topbar.tsx`, `pos-checkout-attempt.ts`, `ar.json`/`en.json`.
 
-## 5. Known limitations
+## 5. Tests
+
+**محلياً (2026-08-29):**
+- vitest: `pos-cart-snapshot` + `pos-checkout-attempt` + `use-pos-active-carts` → 17 passed
+- vitest: `pos-topbar` + `pos-payment` → 7 passed
+- `npm run build` → success
+- Playwright desktop: `e2e/pos-session-cart-recovery.spec.ts` → passed
+
+**Visual QA:** `docs/visual-qa/pr-9/` (RTL light/dark، mobile 390، restored، offline، closed session)
+
+## 6. Known limitations
 
 - لا استعادة سلة من جهاز آخر (لا SoT سلة حيّة على الخادم).
 - ليس offline-first؛ offline يعطّل الدفع فقط.
 - `pendingAttempt` TTL ساعتان؛ بعده مفتاح جديد عند إعادة الدفع يدوياً.
 - لا service worker / sync engine (خارج النطاق).
 
-## 6. Explicit
+## 7. Explicit
 
 **NO MERGE / NO DEPLOY**
