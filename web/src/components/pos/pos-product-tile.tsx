@@ -1,6 +1,6 @@
 'use client';
 
-import { Star } from 'lucide-react';
+import { Barcode, Star } from 'lucide-react';
 import { PosProductImage } from '@/components/pos/pos-product-image';
 import { cn } from '@/lib/utils';
 
@@ -74,8 +74,9 @@ export function PosProductTile({
 
           <div className="mt-auto flex min-w-0 items-center justify-between gap-2 border-t border-border pt-2 text-[10px] text-muted">
             {product.barcode ? (
-              <span className="num min-w-0 truncate" title={product.barcode}>
-                {product.barcode}
+              <span className="flex min-w-0 items-center gap-1" title={product.barcode}>
+                <Barcode className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                <span className="num min-w-0 truncate">{product.barcode}</span>
               </span>
             ) : <span />}
             {product.track_inventory && (
