@@ -8,6 +8,7 @@ export interface PosProductTileProduct {
   id: string;
   name: string;
   sku: string | null;
+  barcode?: string | null;
   sale_price_label: string;
   pos_image?: { download_url: string } | null;
   track_inventory: boolean;
@@ -20,7 +21,7 @@ export function PosProductTile({
   showImage,
   selected,
   isFavorite,
-  taxLabel,
+  taxLabel: _taxLabel,
   availableLabel,
   favoriteLabel,
   onAdd,
@@ -32,6 +33,7 @@ export function PosProductTile({
   showImage: boolean;
   selected: boolean;
   isFavorite: boolean;
+  /** يبقى مؤقتًا للتوافق مع استدعاء الصفحة الحالية؛ لا يُعرض داخل البطاقة. */
   taxLabel: string;
   availableLabel: string;
   favoriteLabel: string;
@@ -78,7 +80,11 @@ export function PosProductTile({
           </div>
 
           <div className="mt-auto flex min-w-0 items-center justify-between gap-2 border-t border-border pt-2 text-[10px] text-muted">
-            <span className="truncate">{taxLabel}</span>
+            {product.barcode ? (
+              <span className="num min-w-0 truncate" title={product.barcode}>
+                {product.barcode}
+              </span>
+            ) : <span />}
             {product.track_inventory && (
               <span className="num shrink-0 whitespace-nowrap">
                 {availableLabel}: {product.quantity_on_hand}
