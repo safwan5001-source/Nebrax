@@ -272,7 +272,60 @@
     "manageTenants": "إدارة المستأجرين",
     "managePrices": "كتالوج الأسعار",
     "manageIntegrations": "إدارة التكاملات",
-    "documentOperations": "عمليات المستندات"
+    "documentOperations": "عمليات المستندات",
+    "applicationOverrides": {
+      "title": "تجاوزات التطبيقات",
+      "subtitle": "منح تجاري إداري أو إظهار/إخفاء تشغيلي — طبقتان منفصلتان، بلا تجاوز للصلاحيات.",
+      "refresh": "تحديث",
+      "loadFailed": "تعذر تحميل تجاوزات التطبيقات.",
+      "previewFailed": "تعذر إنشاء المعاينة.",
+      "applyFailed": "تعذر تطبيق التجاوز.",
+      "loading": "جارٍ التحميل…",
+      "search": "بحث بالتطبيق…",
+      "filterAll": "كل التطبيقات",
+      "filterCommercial": "محروسة تجارياً",
+      "filterBuilt": "مبنية غير إلزامية",
+      "bulkGrant": "منح الكل",
+      "bulkRevert": "تراجع الكل",
+      "bulkShow": "إظهار الكل",
+      "bulkHide": "إخفاء الكل",
+      "grant": "منح تجاري",
+      "revert": "تراجع",
+      "show": "إظهار",
+      "hide": "إخفاء",
+      "previewTitle": "معاينة التجاوز",
+      "previewOutcome": "النتيجة",
+      "previewDetails": "التفاصيل",
+      "outcomeApplied": "سيُطبَّق",
+      "outcomeSkipped": "سيُتخطى",
+      "reasonLabel": "سبب (اختياري)",
+      "cancel": "إلغاء",
+      "confirmApply": "تأكيد التطبيق",
+      "applying": "جارٍ التطبيق…",
+      "columns": {
+        "app": "التطبيق",
+        "commercial": "تجاري",
+        "operational": "تشغيلي",
+        "effective": "الوصول الفعال",
+        "actions": "إجراءات"
+      },
+      "commercialMode": {
+        "inherit": "موروث",
+        "granted": "منح إداري",
+        "denied": "مرفوض"
+      },
+      "operational": {
+        "enabled": "مفعّل",
+        "disabled": "معطّل",
+        "suspended": "معلّق"
+      },
+      "effective": {
+        "allowed": "مسموح",
+        "full": "كامل",
+        "read_only": "قراءة فقط",
+        "denied": "مرفوض"
+      }
+    }
   },
   "platformPrices": {
     "title": "كتالوج أسعار المنصة",

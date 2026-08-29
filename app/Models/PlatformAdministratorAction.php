@@ -19,6 +19,11 @@ class PlatformAdministratorAction extends Model
     public const ACTION_TRIAL_EXTENDED = 'trial_extended';
     public const ACTION_ACTIVATED = 'activated';
     public const ACTION_DEACTIVATED = 'deactivated';
+    public const ACTION_APPLICATION_GRANTED = 'application_granted';
+    public const ACTION_APPLICATION_REVERTED = 'application_reverted';
+    public const ACTION_APPLICATION_SHOWN = 'application_shown';
+    public const ACTION_APPLICATION_HIDDEN = 'application_hidden';
+    public const ACTION_APPLICATION_BULK = 'application_bulk';
 
     public $incrementing = false;
 

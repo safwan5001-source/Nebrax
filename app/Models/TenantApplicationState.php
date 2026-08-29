@@ -14,6 +14,7 @@ class TenantApplicationState extends BaseModel implements CompanyWide
         'requested_enabled',
         'status',
         'changed_by',
+        'changed_by_platform_administrator_id',
         'reason',
     ];
 
@@ -29,5 +30,10 @@ class TenantApplicationState extends BaseModel implements CompanyWide
     public function changedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'changed_by');
+    }
+
+    public function changedByPlatformAdministrator(): BelongsTo
+    {
+        return $this->belongsTo(PlatformAdministrator::class, 'changed_by_platform_administrator_id');
     }
 }

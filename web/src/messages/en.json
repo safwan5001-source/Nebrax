@@ -272,7 +272,60 @@
     "manageTenants": "Manage tenants",
     "managePrices": "Price catalogue",
     "manageIntegrations": "Manage integrations",
-    "documentOperations": "Document operations"
+    "documentOperations": "Document operations",
+    "applicationOverrides": {
+      "title": "Application overrides",
+      "subtitle": "Administrative commercial grants or operational show/hide — two separate layers, no RBAC bypass.",
+      "refresh": "Refresh",
+      "loadFailed": "Unable to load application overrides.",
+      "previewFailed": "Unable to build the preview.",
+      "applyFailed": "Unable to apply the override.",
+      "loading": "Loading…",
+      "search": "Search applications…",
+      "filterAll": "All applications",
+      "filterCommercial": "Commercially gated",
+      "filterBuilt": "Built non-mandatory",
+      "bulkGrant": "Grant all",
+      "bulkRevert": "Revert all",
+      "bulkShow": "Show all",
+      "bulkHide": "Hide all",
+      "grant": "Grant",
+      "revert": "Revert",
+      "show": "Show",
+      "hide": "Hide",
+      "previewTitle": "Override preview",
+      "previewOutcome": "Outcome",
+      "previewDetails": "Details",
+      "outcomeApplied": "Will apply",
+      "outcomeSkipped": "Will skip",
+      "reasonLabel": "Reason (optional)",
+      "cancel": "Cancel",
+      "confirmApply": "Confirm apply",
+      "applying": "Applying…",
+      "columns": {
+        "app": "Application",
+        "commercial": "Commercial",
+        "operational": "Operational",
+        "effective": "Effective access",
+        "actions": "Actions"
+      },
+      "commercialMode": {
+        "inherit": "Inherited",
+        "granted": "Admin grant",
+        "denied": "Denied"
+      },
+      "operational": {
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "suspended": "Suspended"
+      },
+      "effective": {
+        "allowed": "Allowed",
+        "full": "Full",
+        "read_only": "Read only",
+        "denied": "Denied"
+      }
+    }
   },
   "platformPrices": {
     "title": "Platform price catalogue",
