@@ -2614,7 +2614,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         : null;
 
       if (forceNetworkError) {
-        (window as Window & { __POS_CHECKOUT_FORCE_NETWORK_ERROR?: boolean }).__POS_CHECKOUT_FORCE_NETWORK_ERROR = false;
+        // يبقى مفعّلاً حتى يصفّره الاختبار — فشلان متتاليان → retryable_error بعد محاولة الاسترداد.
         return Promise.reject(new TypeError('Failed to fetch'));
       }
 

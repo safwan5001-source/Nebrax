@@ -99,7 +99,7 @@ test.describe('PR-8 POS checkout reliability', () => {
       file: 'desktop-1440-en-ltr-light-submitting.png',
     });
 
-    // retryable error
+    // retryable error: انقطاع مستمر (محاولة + استرداد يفشلان) → رسالة إعادة آمنة
     await openPos(page);
     await preparePayment(page);
     await page.evaluate(() => {
@@ -107,8 +107,13 @@ test.describe('PR-8 POS checkout reliability', () => {
       (window as Window & { __POS_CHECKOUT_DELAY_MS?: number }).__POS_CHECKOUT_DELAY_MS = 0;
     });
     await page.getByTestId('pos-confirm-payment').click();
-    await expect(page.getByRole('alert')).toBeVisible({ timeout: 10_000 });
+    const retryAlert = page.getByTestId('pos-payment-screen').getByRole('alert');
+    await expect(retryAlert).toBeVisible({ timeout: 10_000 });
+    await expect(retryAlert).toContainText(/تعذر إتمام الطلب|Could not complete/i);
     await page.screenshot({ path: path.join(evidenceDir, 'desktop-1440-ar-rtl-light-retryable.png') });
+    await page.evaluate(() => {
+      (window as Window & { __POS_CHECKOUT_FORCE_NETWORK_ERROR?: boolean }).__POS_CHECKOUT_FORCE_NETWORK_ERROR = false;
+    });
 
     // recovered success label path: fail-once then auto-retry succeeds
     await openPos(page);
@@ -163,14 +168,21 @@ async function captureSubmitting(
   await p.close();
 }
 
+/** مطابق لنمط PR-7/#552: الضوضاء المعروفة تُتجاهل؛ 401/403/500 لا. */
+function isKnownConsoleNoise(text: string, url = ''): boolean {
+  if (UNEXPECTED_HTTP_STATUS.test(text) || UNEXPECTED_HTTP_STATUS.test(url)) return false;
+  if (KNOWN_CONSOLE_NOISE.test(text) || KNOWN_CONSOLE_NOISE.test(url)) return true;
+  // Chromium غالباً يسجّل 404 للـ favicon بلا مسار في النص.
+  return /Failed to load resource/.test(text) && /status of 404/.test(text) && (!url || /\/favicon\.ico(?:\?|$)/.test(url));
+}
+
 function attachConsole(page: Page, sink: string[]) {
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return;
     const text = msg.text();
-    if (KNOWN_CONSOLE_NOISE.test(text)) return;
-    if (UNEXPECTED_HTTP_STATUS.test(text) || /Failed to load resource|404/.test(text)) {
-      sink.push(text);
-    }
+    const url = msg.location().url ?? '';
+    if (isKnownConsoleNoise(text, url)) return;
+    sink.push(url ? `${text} (${url})` : text);
   });
   page.on('pageerror', (error) => sink.push(String(error)));
 }
@@ -225,6 +237,9 @@ async function addFirstProduct(page: Page) {
 }
 
 async function selectCustomer(page: Page) {
+  // السلة النشطة قد تُستعاد من التخزين المحلي بعد فشل شبكة — العميل يبقى مختاراً.
+  const already = page.getByRole('button', { name: /مؤسسة الخليج|Gulf/ }).first();
+  if (await already.isVisible().catch(() => false)) return;
   await page.getByRole('button', { name: /اختيار العميل|Select customer/ }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
