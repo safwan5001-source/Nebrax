@@ -28,7 +28,6 @@ function renderTile(overrides: Partial<Parameters<typeof PosProductTile>[0]> = {
       showImage
       selected={false}
       isFavorite={false}
-      taxLabel="incl. VAT"
       availableLabel="Available"
       favoriteLabel="Favorites"
       onAdd={onAdd}
@@ -78,11 +77,10 @@ describe('PosProductTile', () => {
     expect(card.className).toContain('focus-visible:ring-2');
   });
 
-  it('يعرض الباركود ويخفي SKU ووسم الضريبة داخل البطاقة', () => {
+  it('يعرض الباركود ويخفي SKU داخل البطاقة', () => {
     renderTile();
     expect(screen.getByText('6281000000330')).toBeTruthy();
     expect(screen.queryByText('W330')).toBeNull();
-    expect(screen.queryByText('incl. VAT')).toBeNull();
     expect(screen.getByText('1.50')).toBeTruthy();
     expect(screen.getByText('Available: 12')).toBeTruthy();
   });
