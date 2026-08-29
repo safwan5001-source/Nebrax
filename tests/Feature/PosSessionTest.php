@@ -67,6 +67,7 @@ class PosSessionTest extends TestCase
     private function checkout(string $token, string $partnerId, string $sessionId, int $unitPrice = 100000, ?string $warehouseId = null): void
     {
         $this->withToken($token)->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id'     => $partnerId,
             'pos_session_id' => $sessionId,
             'warehouse_id'   => $warehouseId,
@@ -147,6 +148,7 @@ class PosSessionTest extends TestCase
         $partnerId = $this->customer($auth['token']);
 
         $this->withToken($auth['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $partnerId, 'pos_session_id' => $sessionId, 'warehouse_id' => $otherWarehouse,
             'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]], 'tenders' => ['cash' => 115000],
         ])->assertStatus(422);
@@ -212,6 +214,7 @@ class PosSessionTest extends TestCase
         $otherToken = $this->tokenForRole($auth['tenant_id'], 'admin', 'cashier@acme.test');
 
         $this->withToken($otherToken)->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id'     => $partnerId,
             'pos_session_id' => $id,
             'items'          => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],

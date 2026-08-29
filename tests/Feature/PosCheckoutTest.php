@@ -47,6 +47,7 @@ class PosCheckoutTest extends TestCase
     private function checkout(string $token, string $partnerId, string $sessionId, array $tenders, ?array $items = null): \Illuminate\Testing\TestResponse
     {
         return $this->withToken($token)->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id'     => $partnerId,
             'pos_session_id' => $sessionId,
             'items'          => $items ?? [['quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
@@ -325,6 +326,7 @@ class PosCheckoutTest extends TestCase
 
         // لا يُقبل عقد POS بلا جلسة صريحة؛ لا يكفي أن تنشئ الواجهة سلة محلية.
         $this->withToken($auth['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $partnerId,
             'items'      => [['quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
             'tenders'    => [],

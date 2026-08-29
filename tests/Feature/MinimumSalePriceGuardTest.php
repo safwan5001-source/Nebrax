@@ -131,6 +131,7 @@ class MinimumSalePriceGuardTest extends TestCase
 
         $this->withToken($auth['token'])
             ->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
                 'partner_id' => $customer['id'],
                 'pos_session_id' => $sessionId,
                 'items' => [[

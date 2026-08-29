@@ -1035,8 +1035,8 @@ export const mockAppointments = [
 
 // ── المدفوعات ──────────────────────────────────────────────────────────────
 export const mockPaymentMethods = [
-  { id: 'pm-method-cash', name: 'نقدي', settlement_type: 'cash', cash_bank_account_id: 'cash-main', is_active: true, is_default: true },
-  { id: 'pm-method-bank', name: 'تحويل بنكي', settlement_type: 'bank', cash_bank_account_id: 'bank-main', is_active: true, is_default: false },
+  { id: 'pm-method-cash', name: 'نقدي', name_en: 'Cash', settlement_type: 'cash', cash_bank_account_id: 'cash-main', is_active: true, is_default: true },
+  { id: 'pm-method-bank', name: 'تحويل بنكي', name_en: 'Bank transfer', settlement_type: 'bank', cash_bank_account_id: 'bank-main', is_active: true, is_default: false },
 ];
 
 export const mockCashBankAccounts = [
@@ -2716,6 +2716,14 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     }
     // إنشاء فاتورة (نقطة البيع/الفواتير): نُعيد رقماً وإجمالاً محسوباً من السطور.
     if (clean === '/invoices') return resolve({ data: { id: 'demo-inv', number: 'INV-2026-0119', total: invoiceTotalFromBody(body) } });
+    // سلة تدقيق POS: العقد الحقيقي يعيد cart_id؛ بدونها تفشل ensureAuditCart قبل checkout.
+    if (clean === '/pos/carts' && m === 'POST') {
+      return resolve({ data: { cart_id: `demo-cart-${Date.now()}` } });
+    }
+    const posCartEvent = clean.match(/^\/pos\/carts\/([^/]+)\/events$/);
+    if (posCartEvent && m === 'POST') {
+      return resolve({ data: { id: `demo-event-${posCartEvent[1]}`, cart_id: posCartEvent[1] } });
+    }
     if (clean === '/pos/checkout') {
       const thermalAssignment = mockPrintTemplateAssignments.find((assignment) => (
         assignment.branch_id === null && assignment.document_type === 'tax_invoice' && assignment.usage === 'thermal'
@@ -2723,14 +2731,80 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       const thermalTemplateRevision = thermalAssignment
         ? mockRevisionForAssignment(thermalAssignment.print_template_revision_id)
         : null;
-      return resolve({ data: {
-        id: 'demo-inv',
-        number: 'INV-2026-0119',
-        total: invoiceTotalFromBody(body),
-        payment_status: 'paid',
-        thermal_template_revision_id: thermalTemplateRevision?.id ?? null,
-        thermal_template_revision: thermalTemplateRevision,
-      } });
+      const requestBody = (body ?? {}) as { idempotency_key?: string };
+      const attemptKey = typeof requestBody.idempotency_key === 'string' ? requestBody.idempotency_key : '';
+      const delayMs = typeof window !== 'undefined'
+        ? Number((window as Window & { __POS_CHECKOUT_DELAY_MS?: number }).__POS_CHECKOUT_DELAY_MS ?? 0)
+        : 0;
+      const failOnce = typeof window !== 'undefined'
+        && Boolean((window as Window & { __POS_CHECKOUT_FAIL_ONCE?: boolean }).__POS_CHECKOUT_FAIL_ONCE);
+      const forceNetworkError = typeof window !== 'undefined'
+        && Boolean((window as Window & { __POS_CHECKOUT_FORCE_NETWORK_ERROR?: boolean }).__POS_CHECKOUT_FORCE_NETWORK_ERROR);
+      const store = typeof window !== 'undefined'
+        ? ((window as Window & { __POS_CHECKOUT_ATTEMPTS?: Map<string, unknown> }).__POS_CHECKOUT_ATTEMPTS
+          ?? ((window as Window & { __POS_CHECKOUT_ATTEMPTS?: Map<string, unknown> }).__POS_CHECKOUT_ATTEMPTS = new Map()))
+        : null;
+
+      if (forceNetworkError) {
+        // يبقى مفعّلاً حتى يصفّره الاختبار — فشلان متتاليان → retryable_error بعد محاولة الاسترداد.
+        return Promise.reject(new TypeError('Failed to fetch'));
+      }
+
+      const finish = () => {
+        if (attemptKey && store?.has(attemptKey)) {
+          return resolve({
+            ...(store.get(attemptKey) as object),
+            idempotent_replay: true,
+          } as T);
+        }
+        const payload = {
+          data: {
+            id: attemptKey ? `demo-inv-${attemptKey.slice(0, 8)}` : 'demo-inv',
+            number: 'INV-2026-0119',
+            total: invoiceTotalFromBody(body),
+            payment_status: 'paid',
+            thermal_template_revision_id: thermalTemplateRevision?.id ?? null,
+            thermal_template_revision: thermalTemplateRevision,
+          },
+        };
+        if (attemptKey && store) store.set(attemptKey, payload);
+        if (typeof window !== 'undefined') {
+          const calls = ((window as Window & { __POS_CHECKOUT_CALLS?: number }).__POS_CHECKOUT_CALLS ?? 0) + 1;
+          (window as Window & { __POS_CHECKOUT_CALLS?: number }).__POS_CHECKOUT_CALLS = calls;
+        }
+        return resolve(payload as T);
+      };
+
+      if (failOnce && attemptKey && store && !store.has(attemptKey)) {
+        (window as Window & { __POS_CHECKOUT_FAIL_ONCE?: boolean }).__POS_CHECKOUT_FAIL_ONCE = false;
+        // محاكاة: الخادم أنشأ البيع ثم ضاعت الاستجابة — نخزّن النتيجة ونرفض الشبكة.
+        const payload = {
+          data: {
+            id: `demo-inv-${attemptKey.slice(0, 8)}`,
+            number: 'INV-2026-0119',
+            total: invoiceTotalFromBody(body),
+            payment_status: 'paid',
+            thermal_template_revision_id: thermalTemplateRevision?.id ?? null,
+            thermal_template_revision: thermalTemplateRevision,
+          },
+        };
+        store.set(attemptKey, payload);
+        return Promise.reject(new TypeError('Failed to fetch'));
+      }
+
+      if (delayMs > 0) {
+        return new Promise<T>((res, rej) => {
+          setTimeout(() => {
+            try {
+              finish().then(res, rej);
+            } catch (error) {
+              rej(error);
+            }
+          }, delayMs);
+        });
+      }
+
+      return finish();
     }
     // إنشاء مصروف: نُعيد إجمالاً محسوباً من المبلغ والضريبة (مسودة).
     if (clean === '/expenses') {

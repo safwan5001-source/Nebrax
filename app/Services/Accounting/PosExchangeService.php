@@ -98,6 +98,8 @@ class PosExchangeService
                 'partner_id' => $source->partner_id,
                 'pos_session_id' => $session->id,
                 'warehouse_id' => $session->warehouse_id,
+                // مفتاح خادمي لكل استبدال: الاستبدال عملية منطقية جديدة وليست إعادة إرسال POS.
+                'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
                 'tax_inclusive' => (bool) ($replacementData['tax_inclusive'] ?? false),
                 'items' => $replacementData['items'],
                 'tenders' => array_merge($requestedTenders, ['credit' => $returnTotal + $requestedCredit]),

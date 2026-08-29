@@ -33,6 +33,7 @@ class PosRecentInvoicesTest extends TestCase
         ])->assertCreated()['data'];
 
         $checkout = $this->withToken($auth['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $customer['id'],
             'pos_session_id' => $session['id'],
             'warehouse_id' => $warehouse['id'],
@@ -77,6 +78,7 @@ class PosRecentInvoicesTest extends TestCase
 
         $checkout = function (string $description) use ($auth, $customer, $session, $warehouse): array {
             return $this->withToken($auth['token'])->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
                 'partner_id' => $customer['id'], 'pos_session_id' => $session['id'], 'warehouse_id' => $warehouse['id'],
                 'items' => [['description' => $description, 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
                 'tenders' => ['cash' => 11500],
@@ -113,6 +115,7 @@ class PosRecentInvoicesTest extends TestCase
             'opening_balance' => 0, 'pos_device_id' => $otherDevice['id'],
         ])->assertCreated()['data'];
         $otherInvoice = $this->withToken($auth['token'])->withHeaders($headers)->postJson('/api/pos/checkout', [
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $customer['id'], 'pos_session_id' => $otherSession['id'], 'warehouse_id' => $otherWarehouse['id'],
             'items' => [['description' => 'بيع فرع آخر', 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
             'tenders' => ['cash' => 11500],
