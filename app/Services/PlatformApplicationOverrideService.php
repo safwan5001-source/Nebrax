@@ -15,6 +15,7 @@ use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -89,13 +90,14 @@ class PlatformApplicationOverrideService
         PlatformAdministrator $administrator,
         string $applicationKey,
         ?string $reason = null,
+        bool $recordPlatformAction = true,
     ): array {
         $preview = $this->previewGrant($tenant, $applicationKey);
         if ($preview['outcome'] !== 'applied') {
             throw new RuntimeException($preview['skip_reasons'][0] ?? 'لا يمكن منح التجاوز التجاري.');
         }
 
-        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $applicationKey, $reason, $preview): array {
+        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $applicationKey, $reason, $recordPlatformAction): array {
             $grant = $this->grants->grant(
                 $tenant,
                 $applicationKey,
@@ -111,13 +113,15 @@ class PlatformApplicationOverrideService
                 $administrator->id,
             );
 
-            $this->logPlatformAction(
-                $administrator,
-                $tenant,
-                PlatformAdministratorAction::ACTION_APPLICATION_GRANTED,
-                null,
-                $applicationKey,
-            );
+            if ($recordPlatformAction && $grant->wasRecentlyCreated) {
+                $this->logPlatformAction(
+                    $administrator,
+                    $tenant,
+                    PlatformAdministratorAction::ACTION_APPLICATION_GRANTED,
+                    null,
+                    $applicationKey,
+                );
+            }
 
             return [
                 'outcome' => 'applied',
@@ -141,13 +145,14 @@ class PlatformApplicationOverrideService
         PlatformAdministrator $administrator,
         string $applicationKey,
         ?string $reason = null,
+        bool $recordPlatformAction = true,
     ): array {
         $preview = $this->previewRevert($tenant, $applicationKey);
         if ($preview['outcome'] !== 'applied') {
             throw new RuntimeException($preview['skip_reasons'][0] ?? 'لا يمكن التراجع عن التجاوز التجاري.');
         }
 
-        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $applicationKey, $reason): array {
+        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $applicationKey, $recordPlatformAction): array {
             $revoked = $this->grants->revokeSource(
                 $tenant,
                 EntitlementSourceType::ADMINISTRATIVE_OVERRIDE,
@@ -156,13 +161,15 @@ class PlatformApplicationOverrideService
                 $administrator->id,
             );
 
-            $this->logPlatformAction(
-                $administrator,
-                $tenant,
-                PlatformAdministratorAction::ACTION_APPLICATION_REVERTED,
-                $applicationKey,
-                null,
-            );
+            if ($recordPlatformAction && $revoked > 0) {
+                $this->logPlatformAction(
+                    $administrator,
+                    $tenant,
+                    PlatformAdministratorAction::ACTION_APPLICATION_REVERTED,
+                    $applicationKey,
+                    null,
+                );
+            }
 
             return [
                 'outcome' => 'applied',
@@ -185,22 +192,25 @@ class PlatformApplicationOverrideService
         PlatformAdministrator $administrator,
         string $applicationKey,
         ?string $reason = null,
+        bool $recordPlatformAction = true,
     ): array {
         $preview = $this->previewShow($tenant, $applicationKey);
         if ($preview['outcome'] !== 'applied') {
             throw new RuntimeException($preview['skip_reasons'][0] ?? 'لا يمكن إظهار التطبيق.');
         }
 
-        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $applicationKey, $reason): array {
+        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $applicationKey, $reason, $recordPlatformAction): array {
             $state = $this->applications->enableForPlatform($applicationKey, $administrator, $reason);
 
-            $this->logPlatformAction(
-                $administrator,
-                $tenant,
-                PlatformAdministratorAction::ACTION_APPLICATION_SHOWN,
-                null,
-                $applicationKey,
-            );
+            if ($recordPlatformAction) {
+                $this->logPlatformAction(
+                    $administrator,
+                    $tenant,
+                    PlatformAdministratorAction::ACTION_APPLICATION_SHOWN,
+                    null,
+                    $applicationKey,
+                );
+            }
 
             return [
                 'outcome' => 'applied',
@@ -222,22 +232,25 @@ class PlatformApplicationOverrideService
         PlatformAdministrator $administrator,
         string $applicationKey,
         ?string $reason = null,
+        bool $recordPlatformAction = true,
     ): array {
         $preview = $this->previewHide($tenant, $applicationKey);
         if ($preview['outcome'] !== 'applied') {
             throw new RuntimeException($preview['skip_reasons'][0] ?? 'لا يمكن إخفاء التطبيق.');
         }
 
-        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $applicationKey, $reason): array {
+        return $this->withTenantContext($tenant, function () use ($tenant, $administrator, $applicationKey, $reason, $recordPlatformAction): array {
             $state = $this->applications->disableForPlatform($applicationKey, $administrator, $reason);
 
-            $this->logPlatformAction(
-                $administrator,
-                $tenant,
-                PlatformAdministratorAction::ACTION_APPLICATION_HIDDEN,
-                $applicationKey,
-                $state->status,
-            );
+            if ($recordPlatformAction) {
+                $this->logPlatformAction(
+                    $administrator,
+                    $tenant,
+                    PlatformAdministratorAction::ACTION_APPLICATION_HIDDEN,
+                    $applicationKey,
+                    $state->status,
+                );
+            }
 
             return [
                 'outcome' => 'applied',
@@ -284,17 +297,17 @@ class PlatformApplicationOverrideService
                     $key = $row['application_key'];
                     try {
                         $applied[] = match ($action) {
-                            self::BULK_GRANT_ALL => $this->grant($tenant, $administrator, $key, $reason),
-                            self::BULK_REVERT_ALL => $this->revert($tenant, $administrator, $key, $reason),
-                            self::BULK_SHOW_ALL => $this->show($tenant, $administrator, $key, $reason),
-                            self::BULK_HIDE_ALL => $this->hide($tenant, $administrator, $key, $reason),
+                            self::BULK_GRANT_ALL => $this->grant($tenant, $administrator, $key, $reason, recordPlatformAction: false),
+                            self::BULK_REVERT_ALL => $this->revert($tenant, $administrator, $key, $reason, recordPlatformAction: false),
+                            self::BULK_SHOW_ALL => $this->show($tenant, $administrator, $key, $reason, recordPlatformAction: false),
+                            self::BULK_HIDE_ALL => $this->hide($tenant, $administrator, $key, $reason, recordPlatformAction: false),
                             default => throw new RuntimeException('إجراء مجمّع غير معروف.'),
                         };
-                    } catch (RuntimeException $exception) {
+                    } catch (RuntimeException|ValidationException $exception) {
                         $applied[] = [
                             'application_key' => $key,
                             'outcome' => 'skipped',
-                            'skip_reasons' => [$exception->getMessage()],
+                            'skip_reasons' => [$this->bulkSkipMessage($exception)],
                         ];
                     }
                 }
@@ -553,10 +566,7 @@ class PlatformApplicationOverrideService
                 $reasons[] = 'التطبيق مفعّل تشغيلياً بالفعل.';
             }
 
-            $missing = array_values(array_filter(
-                $application['dependencies'],
-                fn (string $dependency): bool => $this->applications->statusFor($dependency) === 'disabled',
-            ));
+            $missing = $this->applications->missingDependenciesForPlatformEnable($key);
 
             if ($missing !== []) {
                 $reasons[] = 'اعتماديات غير مفعّلة: ' . implode('، ', $missing);
@@ -564,25 +574,15 @@ class PlatformApplicationOverrideService
         }
 
         if ($operation === 'hide') {
+            if ($application['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+                $reasons[] = 'القدرة غير مبنية بعد.';
+            }
+
             if ($operationalStatus === 'disabled') {
                 $reasons[] = 'التطبيق معطّل تشغيلياً بالفعل.';
             }
 
-            $rows = TenantApplicationState::query()->get()->keyBy('application_key');
-            $enabledKeys = array_keys(array_filter(
-                ApplicationCatalog::all(),
-                function (array $app, string $appKey) use ($rows): bool {
-                    if ($app['mandatory']) {
-                        return true;
-                    }
-                    $row = $rows->get($appKey);
-
-                    return $row !== null && $row->requested_enabled;
-                },
-                ARRAY_FILTER_USE_BOTH,
-            ));
-
-            $dependents = TenantApplicationService::dependentsCurrentlyEnabled($key, ApplicationCatalog::all(), $enabledKeys);
+            $dependents = $this->applications->dependentsBlockingPlatformDisable($key);
             if ($dependents !== []) {
                 $reasons[] = 'توابع مفعّلة: ' . implode('، ', $dependents);
             }
@@ -635,6 +635,15 @@ class PlatformApplicationOverrideService
             'from_value' => $from,
             'to_value' => $to,
         ]);
+    }
+
+    private function bulkSkipMessage(RuntimeException|ValidationException $exception): string
+    {
+        if ($exception instanceof ValidationException) {
+            return collect($exception->errors())->flatten()->first() ?? $exception->getMessage();
+        }
+
+        return $exception->getMessage();
     }
 
     private function withTenantContext(Tenant $tenant, Closure $callback): mixed

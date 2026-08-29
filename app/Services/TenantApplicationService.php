@@ -253,11 +253,7 @@ class TenantApplicationService
             throw new RuntimeException('هذه القدرة غير مبنية بعد ولا يمكن تفعيلها.');
         }
 
-        $rows = TenantApplicationState::query()->get()->keyBy('application_key');
-        $missing = array_values(array_filter(
-            ApplicationCatalog::dependenciesFor($key),
-            fn (string $dependency) => ! $this->isEnabled($dependency, ApplicationCatalog::find($dependency), $rows),
-        ));
+        $missing = $this->missingDependenciesForPlatformEnable($key);
 
         if ($missing !== []) {
             throw new RuntimeException('اعتماديات غير مفعّلة: ' . implode('، ', $missing));
@@ -298,14 +294,7 @@ class TenantApplicationService
             throw new RuntimeException('هذه القدرة إلزامية ولا يمكن إيقافها.');
         }
 
-        $rows = TenantApplicationState::query()->get()->keyBy('application_key');
-        $enabledKeys = array_keys(array_filter(
-            ApplicationCatalog::all(),
-            fn (array $app, string $appKey) => $this->isEnabled($appKey, $app, $rows),
-            ARRAY_FILTER_USE_BOTH,
-        ));
-
-        $dependents = self::dependentsCurrentlyEnabled($key, ApplicationCatalog::all(), $enabledKeys);
+        $dependents = $this->dependentsBlockingPlatformDisable($key);
         if ($dependents !== []) {
             throw new RuntimeException('توابع مفعّلة تعتمد على هذه القدرة: ' . implode('، ', $dependents));
         }
@@ -449,6 +438,67 @@ class TenantApplicationService
                 && isset($enabled[$candidate])
                 && in_array($key, $catalog[$candidate]['dependencies'], true),
         ));
+    }
+
+    /**
+     * اعتماديات يجب أن تكون مفعّلة قبل إظهار/تفعيل قدرة من المنصة.
+     * يحترم cohort ما قبل الإنفاذ: بلا صف حالة، يُعامَل الاعتماد كمُلبًى إذا
+     * لم يكن `statusFor()` معطّلاً — يطابق نية الإنفاذ على المسارات.
+     *
+     * @return list<string>
+     */
+    public function missingDependenciesForPlatformEnable(string $key): array
+    {
+        $rows = TenantApplicationState::query()->get()->keyBy('application_key');
+
+        return array_values(array_filter(
+            ApplicationCatalog::dependenciesFor($key),
+            fn (string $dependency) => ! $this->isDependencySatisfiedForPlatformEnable($dependency, $rows),
+        ));
+    }
+
+    /**
+     * توابع ما زالت تشغيلياً نشطة (غير معطّلة) وتمنع إخفاء هذه القدرة.
+     *
+     * @return list<string>
+     */
+    public function dependentsBlockingPlatformDisable(string $key): array
+    {
+        $rows = TenantApplicationState::query()->get()->keyBy('application_key');
+        $blockingKeys = array_keys(array_filter(
+            ApplicationCatalog::all(),
+            fn (array $app, string $appKey) => $this->countsAsBlockingDependent($appKey, $app, $rows),
+            ARRAY_FILTER_USE_BOTH,
+        ));
+
+        return self::dependentsCurrentlyEnabled($key, ApplicationCatalog::all(), $blockingKeys);
+    }
+
+    /** @param \Illuminate\Support\Collection<string, TenantApplicationState> $rows */
+    private function isDependencySatisfiedForPlatformEnable(string $dependency, $rows): bool
+    {
+        $application = ApplicationCatalog::find($dependency);
+        if ($application === null) {
+            return false;
+        }
+
+        if ($this->isEnabled($dependency, $application, $rows)) {
+            return true;
+        }
+
+        return $rows->get($dependency) === null
+            && $this->isGrandfatheredTenant()
+            && $this->statusFor($dependency) !== 'disabled';
+    }
+
+    /** @param \Illuminate\Support\Collection<string, TenantApplicationState> $rows */
+    private function countsAsBlockingDependent(string $appKey, array $app, $rows): bool
+    {
+        if ($app['mandatory'] || $app['maturity'] !== ApplicationCatalog::MATURITY_BUILT) {
+            return false;
+        }
+
+        return $this->statusFor($appKey) !== 'disabled';
     }
 
     /** @param array{mandatory:bool}|null $application */
