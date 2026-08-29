@@ -2,13 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CircleAlert, FileSearch, Filter, RefreshCw } from 'lucide-react';
+import { CircleAlert, FileSearch, Filter, RefreshCw, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { api, ApiError } from '@/lib/api';
+import { currentUser } from '@/lib/auth';
+import { canManageDocumentCenter } from '@/lib/document-review-access';
+import {
+  STATUS_GROUP_OPTIONS,
+  documentTypeTranslationKey,
+  sourceTypeTranslationKey,
+  statusBadgeTone,
+  statusTranslationKey,
+} from '@/lib/document-intake-present';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DocumentUploadDialog } from '@/components/document-center/document-upload-dialog';
 import { DocumentOperationsNav } from '@/components/documents/document-operations-nav';
+import { useToast } from '@/components/ui/toast';
+import { DOCUMENT_TYPES, type WorkflowStatusGroup, statusesForGroup } from '@/modules/document-center/intake-contract';
 
 type Batch = {
   id: string;
@@ -29,25 +41,25 @@ type PaginatedResponse = {
 };
 
 type Filters = {
-  status: string;
+  statusGroup: '' | WorkflowStatusGroup;
   documentType: string;
   sourceType: string;
   blockingOnly: boolean;
 };
 
 const initialFilters: Filters = {
-  status: '',
+  statusGroup: '',
   documentType: '',
   sourceType: '',
   blockingOnly: false,
 };
 
-function statusTone(status: string): 'positive' | 'warning' {
-  return status === 'ready_for_draft' ? 'positive' : 'warning';
-}
-
 export default function DocumentsPage() {
   const t = useTranslations('documentCenterReview');
+  const ti = useTranslations('documentCenterIntake');
+  const { success } = useToast();
+  const user = currentUser();
+  const canManage = canManageDocumentCenter(user?.permissions, user?.role);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -56,9 +68,10 @@ export default function DocumentsPage() {
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<PaginatedResponse['meta']>();
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const hasFilters = Boolean(
-    query.trim() || filters.status || filters.documentType || filters.sourceType || filters.blockingOnly,
+    query.trim() || filters.statusGroup || filters.documentType || filters.sourceType || filters.blockingOnly,
   );
 
   const requestPath = useMemo(() => {
@@ -69,13 +82,12 @@ export default function DocumentsPage() {
       direction: 'desc',
     });
     if (query.trim()) params.set('search', query.trim());
-    if (filters.status) params.set('status', filters.status);
     if (filters.documentType) params.set('document_type', filters.documentType);
     if (filters.sourceType) params.set('source_type', filters.sourceType);
     if (filters.blockingOnly) params.set('has_blocking', '1');
 
     return `/document-batches?${params.toString()}`;
-  }, [filters, page, query]);
+  }, [filters.documentType, filters.sourceType, filters.blockingOnly, page, query]);
 
   const load = useCallback(async () => {
     if (page === 1) setLoading(true);
@@ -84,7 +96,12 @@ export default function DocumentsPage() {
 
     try {
       const response = await api<PaginatedResponse>(requestPath);
-      setBatches((current) => page === 1 ? response.data : [...current, ...response.data]);
+      const groupStatuses = filters.statusGroup ? new Set(statusesForGroup(filters.statusGroup)) : null;
+      const filtered = groupStatuses
+        ? response.data.filter((batch) => groupStatuses.has(batch.status))
+        : response.data;
+
+      setBatches((current) => page === 1 ? filtered : [...current, ...filtered]);
       setMeta(response.meta);
     } catch (exception) {
       setError(exception instanceof ApiError ? exception.message : t('loadFailed'));
@@ -92,7 +109,7 @@ export default function DocumentsPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [page, requestPath, t]);
+  }, [filters.statusGroup, page, requestPath, t]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 250);
@@ -110,21 +127,36 @@ export default function DocumentsPage() {
     setPage(1);
   }
 
+  function handleUploadSuccess(batchId: string) {
+    setUploadOpen(false);
+    success(ti('uploadSuccess'));
+    setPage(1);
+    void load();
+  }
+
   const canLoadMore = Boolean(meta && meta.current_page < meta.last_page);
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
           <p className="mt-1 text-sm text-muted">{t('subtitle')}</p>
         </div>
-        <input
-          value={query}
-          onChange={(event) => { setQuery(event.target.value); setPage(1); }}
-          placeholder={t('search')}
-          className="h-10 w-full rounded border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:max-w-sm"
-        />
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <input
+            value={query}
+            onChange={(event) => { setQuery(event.target.value); setPage(1); }}
+            placeholder={t('search')}
+            className="h-10 w-full rounded border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-w-64"
+          />
+          {canManage && (
+            <Button className="w-full shrink-0 sm:w-auto" onClick={() => setUploadOpen(true)}>
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              {ti('upload')}
+            </Button>
+          )}
+        </div>
       </header>
 
       <DocumentOperationsNav />
@@ -137,34 +169,35 @@ export default function DocumentsPage() {
               {t('status')}
             </div>
             <select
-              aria-label={t('status')}
-              value={filters.status}
-              onChange={(event) => updateFilters({ status: event.target.value })}
-              className="h-9 rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label={ti('statusGroupAll')}
+              value={filters.statusGroup}
+              onChange={(event) => updateFilters({ statusGroup: event.target.value as Filters['statusGroup'] })}
+              className="h-9 min-w-[10rem] rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              <option value="">{t('allStatuses')}</option>
-              <option value="needs_review">{t('needsReview')}</option>
-              <option value="ready_for_draft">{t('readyForDraft')}</option>
+              {STATUS_GROUP_OPTIONS.map((option) => (
+                <option key={option.labelKey} value={option.value}>{ti(option.labelKey)}</option>
+              ))}
             </select>
             <select
               aria-label={t('documentType')}
               value={filters.documentType}
               onChange={(event) => updateFilters({ documentType: event.target.value })}
-              className="h-9 rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="h-9 min-w-[10rem] rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <option value="">{t('allDocumentTypes')}</option>
-              <option value="purchase_invoice">purchase_invoice</option>
-              <option value="expense">expense</option>
+              {DOCUMENT_TYPES.map((type) => (
+                <option key={type} value={type}>{ti(documentTypeTranslationKey(type))}</option>
+              ))}
             </select>
             <select
               aria-label={t('document')}
               value={filters.sourceType}
               onChange={(event) => updateFilters({ sourceType: event.target.value })}
-              className="h-9 rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="h-9 min-w-[8rem] rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <option value="">{t('allSources')}</option>
-              <option value="upload">upload</option>
-              <option value="email">email</option>
+              <option value="manual">{ti('sourceManual')}</option>
+              <option value="web">{ti('sourceWeb')}</option>
             </select>
             <label className="flex min-h-9 items-center gap-2 text-sm text-text">
               <input
@@ -195,9 +228,24 @@ export default function DocumentsPage() {
         </Card>
       ) : batches.length === 0 ? (
         <Card>
-          <CardContent className="flex items-center gap-3 py-10 text-sm text-muted">
-            <FileSearch className="h-5 w-5" aria-hidden="true" />
-            {hasFilters ? t('filteredEmpty') : t('empty')}
+          <CardContent className="flex flex-col items-start gap-4 py-10 sm:items-center sm:text-center">
+            <div className="flex items-start gap-3 sm:flex-col sm:items-center">
+              <FileSearch className="h-8 w-8 shrink-0 text-muted" aria-hidden="true" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-text">
+                  {hasFilters ? t('filteredEmpty') : ti('emptyTitle')}
+                </p>
+                {!hasFilters && (
+                  <p className="max-w-lg text-sm text-muted">{ti('emptyDescription')}</p>
+                )}
+              </div>
+            </div>
+            {canManage && !hasFilters && (
+              <Button onClick={() => setUploadOpen(true)}>
+                <Upload className="h-4 w-4" aria-hidden="true" />
+                {ti('upload')}
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -218,15 +266,21 @@ export default function DocumentsPage() {
                 {batches.map((batch) => (
                   <tr key={batch.id} className="border-t border-border">
                     <td className="px-4 py-3 font-mono">{batch.id.slice(0, 8)}</td>
-                    <td className="px-4 py-3">{batch.document_type}</td>
+                    <td className="px-4 py-3">{ti(documentTypeTranslationKey(batch.document_type))}</td>
                     <td className="px-4 py-3">{batch.reviewer?.name ?? t('notAssigned')}</td>
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs text-muted">{batch.files_count} {t('files')}</span>
                       {batch.blocking_issues_count > 0 && <Badge className="ms-2" tone="negative">{batch.blocking_issues_count} {t('blocking')}</Badge>}
                       {batch.warning_issues_count > 0 && <Badge className="ms-2" tone="warning">{batch.warning_issues_count} {t('warning')}</Badge>}
                     </td>
-                    <td className="px-4 py-3"><Badge tone={statusTone(batch.status)}>{batch.status === 'ready_for_draft' ? t('readyForDraft') : t('needsReview')}</Badge></td>
-                    <td className="px-4 py-3 text-end"><Button asChild size="sm"><Link href={`/documents/${batch.id}`}>{t('review')}</Link></Button></td>
+                    <td className="px-4 py-3">
+                      <Badge tone={statusBadgeTone(batch.status)}>{ti(statusTranslationKey(batch.status))}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-end">
+                      <Button asChild size="sm">
+                        <Link href={`/documents/${batch.id}`}>{t('review')}</Link>
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -239,12 +293,13 @@ export default function DocumentsPage() {
                 <CardContent className="space-y-3 py-4">
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-mono text-sm">{batch.id.slice(0, 8)}</span>
-                    <Badge tone={statusTone(batch.status)}>{batch.status === 'ready_for_draft' ? t('readyForDraft') : t('needsReview')}</Badge>
+                    <Badge tone={statusBadgeTone(batch.status)}>{ti(statusTranslationKey(batch.status))}</Badge>
                   </div>
-                  <p className="text-sm text-text">{batch.document_type}</p>
+                  <p className="text-sm text-text">{ti(documentTypeTranslationKey(batch.document_type))}</p>
                   <p className="text-xs text-muted">{t('reviewer')}: {batch.reviewer?.name ?? t('notAssigned')}</p>
                   <div className="flex flex-wrap gap-2 text-xs text-muted">
                     <span>{batch.files_count} {t('files')}</span>
+                    <span>{ti(sourceTypeTranslationKey(batch.source_type))}</span>
                     {batch.blocking_issues_count > 0 && <Badge tone="negative">{batch.blocking_issues_count} {t('blocking')}</Badge>}
                     {batch.warning_issues_count > 0 && <Badge tone="warning">{batch.warning_issues_count} {t('warning')}</Badge>}
                   </div>
@@ -265,6 +320,14 @@ export default function DocumentsPage() {
             )}
           </div>
         </>
+      )}
+
+      {canManage && (
+        <DocumentUploadDialog
+          open={uploadOpen}
+          onClose={() => setUploadOpen(false)}
+          onSuccess={handleUploadSuccess}
+        />
       )}
     </div>
   );
