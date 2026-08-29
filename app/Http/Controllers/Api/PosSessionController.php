@@ -9,15 +9,11 @@ use App\Http\Resources\PosCashMovementResource;
 use App\Http\Resources\PosSessionEventResource;
 use App\Http\Resources\PosSessionResource;
 use App\Models\PosSession;
-use App\Models\PosShift;
 use App\Services\Accounting\PosSessionService;
 use App\Services\Pos\CashDrawerService;
 use App\Support\Money;
-use App\Tenancy\BranchContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 class PosSessionController extends ApiController
 {
@@ -39,34 +35,16 @@ class PosSessionController extends ApiController
     public function open(OpenPosSessionRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $session = $this->domain(function () use ($data, $request) {
-            return DB::transaction(function () use ($data, $request) {
-                $branchId = app(BranchContext::class)->id();
-                $posShift = PosShift::lockForUpdate()->find($data['pos_shift_id']);
-                if (! $posShift) {
-                    throw new RuntimeException('وردية نقاط البيع غير موجودة أو لا تخص الفرع النشط.');
-                }
-                if (! $posShift->is_active) {
-                    throw new RuntimeException('وردية نقاط البيع المحددة معطّلة.');
-                }
-                if ($posShift->branch_id !== null && $posShift->branch_id !== $branchId) {
-                    throw new RuntimeException('وردية نقاط البيع لا تخص الفرع النشط.');
-                }
+        $session = $this->domain(fn () => $this->sessions->open(
+            (int) $data['opening_balance'],
+            $data['pos_device_id'],
+            $data['pos_shift_id'],
+            $request->user()?->id,
+            $request->user(),
+        ));
 
-                $session = $this->sessions->open(
-                    (int) $data['opening_balance'],
-                    $data['pos_device_id'],
-                    null,
-                    $request->user()?->id,
-                    $request->user(),
-                );
-                $session->update(['pos_shift_id' => $posShift->id]);
-
-                return $session->fresh(['posDevice.warehouse', 'warehouse', 'posShift', 'shift']);
-            });
-        });
-
-        return (new PosSessionResource($session))->response()->setStatusCode(201);
+        return (new PosSessionResource($session->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])))
+            ->response()->setStatusCode(201);
     }
 
     public function close(Request $request, string $id): JsonResponse
