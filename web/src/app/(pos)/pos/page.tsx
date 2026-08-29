@@ -1424,7 +1424,6 @@ export default function PosPage() {
               showImage={posCfg.show_product_images}
               selected={productSelected}
               isFavorite={fav}
-              taxLabel={taxInclusive ? tprod('tax_incl_tag') : tprod('tax_excl_tag')}
               availableLabel={t('available')}
               favoriteLabel={t('tab_favorites')}
               onAdd={() => addProduct(p)}
