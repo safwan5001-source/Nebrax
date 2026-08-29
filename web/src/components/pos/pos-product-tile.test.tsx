@@ -80,15 +80,19 @@ describe('PosProductTile', () => {
 
   it('يعرض الباركود ويخفي SKU ووسم الضريبة داخل البطاقة', () => {
     renderTile();
-    expect(screen.getByText('6281000000330')).toBeTruthy();
+    const barcode = screen.getByTestId('pos-product-barcode');
+    const barcodeValue = screen.getByText('6281000000330');
+    expect(barcode).toBeTruthy();
+    expect(barcodeValue.getAttribute('dir')).toBe('ltr');
     expect(screen.queryByText('W330')).toBeNull();
     expect(screen.queryByText('incl. VAT')).toBeNull();
     expect(screen.getByText('1.50')).toBeTruthy();
-    expect(screen.getByText('Available: 12')).toBeTruthy();
+    expect(screen.getByTestId('pos-product-stock').textContent).toContain('Available: 12');
   });
 
   it('لا يعرض باركودًا وهميًا عند عدم وجود باركود حقيقي', () => {
     renderTile({ product: { ...product, barcode: null } });
+    expect(screen.queryByTestId('pos-product-barcode')).toBeNull();
     expect(screen.queryByText('6281000000330')).toBeNull();
     expect(screen.queryByText('W330')).toBeNull();
   });
