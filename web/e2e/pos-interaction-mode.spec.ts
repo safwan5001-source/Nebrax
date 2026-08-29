@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
-const evidenceDir = path.resolve(process.cwd(), '../docs/visual-qa/pr-interaction-mode');
+const evidenceDir = path.resolve(process.cwd(), '../docs/visual-qa/pr-557');
 /** ضوضاء Next/Chromium المعروفة فقط — لا تبتلع فشل موارد غير متوقع. */
 const KNOWN_CONSOLE_NOISE = /net::ERR_ABORTED|\.css\.map|[?&]_rsc=|\/favicon\.ico(?:\?|$)/;
 const UNEXPECTED_HTTP_STATUS = /status of (401|403|500)\b/;
@@ -124,17 +124,20 @@ test.describe('PR-7 POS interaction mode settings', () => {
   });
 });
 
+function isKnownConsoleNoise(text: string, url = ''): boolean {
+  if (UNEXPECTED_HTTP_STATUS.test(text) || UNEXPECTED_HTTP_STATUS.test(url)) return false;
+  if (KNOWN_CONSOLE_NOISE.test(text) || KNOWN_CONSOLE_NOISE.test(url)) return true;
+  // Chromium غالباً يسجّل 404 للـ favicon بلا مسار في النص.
+  return /Failed to load resource/.test(text) && /status of 404/.test(text) && (!url || /\/favicon\.ico(?:\?|$)/.test(url));
+}
+
 function attachConsole(page: Page, bucket: string[]) {
   page.on('console', (message) => {
-    const text = message.text();
     if (message.type() !== 'error') return;
-    if (UNEXPECTED_HTTP_STATUS.test(text)) {
-      bucket.push(text);
-      return;
-    }
-    if (KNOWN_CONSOLE_NOISE.test(text)) return;
-    if (text.includes('Failed to load resource') && KNOWN_CONSOLE_NOISE.test(text)) return;
-    bucket.push(text);
+    const text = message.text();
+    const url = message.location().url ?? '';
+    if (isKnownConsoleNoise(text, url)) return;
+    bucket.push(url ? `${text} (${url})` : text);
   });
   page.on('pageerror', (error) => {
     bucket.push(error.message);
