@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { displayLocale } from '@/lib/formatting';
 import { type ColumnDef } from '@tanstack/react-table';
 import { ChevronLeft, ChevronRight, Download, History } from 'lucide-react';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
@@ -41,6 +42,7 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
 
 export default function InventoryPage() {
   const t = useTranslations('inventory');
+  const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<StockItem[]>([]);
@@ -248,7 +250,7 @@ export default function InventoryPage() {
       <DataTable columns={columns} data={pageData} loading={loading} emptyLabel={t('empty')} exportName="inventory" showToolbar={false} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted">{sorted.length.toLocaleString('ar-SA')} · صفحة {page.toLocaleString('ar-SA')} من {totalPages.toLocaleString('ar-SA')}</p>
+        <p className="text-xs text-muted">{sorted.length.toLocaleString(displayLocale(locale))} · صفحة {page.toLocaleString(displayLocale(locale))} من {totalPages.toLocaleString(displayLocale(locale))}</p>
         <div className="flex items-center gap-2">
           <Select value={String(perPage)} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))} className="h-9 w-24 bg-surface text-sm" aria-label="عدد النتائج في الصفحة">
             <option value="25">25</option><option value="50">50</option><option value="100">100</option>

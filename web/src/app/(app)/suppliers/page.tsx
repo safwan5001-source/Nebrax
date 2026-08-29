@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { displayLocale } from '@/lib/formatting';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
 import { BookOpen, ChevronLeft, ChevronRight, FileText, Plus, Pencil } from 'lucide-react';
@@ -41,6 +42,7 @@ function uniqueOptions(values: Array<string | null | undefined>) {
 export default function SuppliersPage() {
   const ts = useTranslations('suppliers');
   const tp = useTranslations('partners');
+  const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [data, setData] = useState<Partner[]>([]);
@@ -212,7 +214,7 @@ export default function SuppliersPage() {
     <DataTable columns={columns} data={pageData} loading={loading} emptyLabel={ts('empty')} exportName="suppliers" showToolbar={false} />
 
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-muted">{sorted.length.toLocaleString('ar-SA')} مورد · صفحة {page.toLocaleString('ar-SA')} من {totalPages.toLocaleString('ar-SA')}</p>
+      <p className="text-xs text-muted">{sorted.length.toLocaleString(displayLocale(locale))} مورد · صفحة {page.toLocaleString(displayLocale(locale))} من {totalPages.toLocaleString(displayLocale(locale))}</p>
       <div className="flex items-center gap-2">
         <Select value={String(perPage)} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))} className="h-9 w-24 bg-surface text-sm" aria-label="عدد النتائج في الصفحة">
           <option value="25">25</option><option value="50">50</option><option value="100">100</option>

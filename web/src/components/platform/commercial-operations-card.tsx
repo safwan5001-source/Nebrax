@@ -1,5 +1,5 @@
 'use client';
-import { ARABIC_DISPLAY_LOCALE, displayLocale } from '@/lib/formatting';
+import { formatDate as formatDisplayDate } from '@/lib/formatting';
 
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -154,8 +154,7 @@ function dateValue(value: string | null): string {
 }
 
 function formatDate(value: string | null, locale: string): string {
-  if (!value) return '—';
-  return new Intl.DateTimeFormat(displayLocale(locale), { dateStyle: 'medium' }).format(new Date(value));
+  return formatDisplayDate(value, locale);
 }
 
 export function CommercialOperationsCard({ tenantId, onChanged }: { tenantId: string; onChanged?: () => void }) {
@@ -418,7 +417,7 @@ export function CommercialOperationsCard({ tenantId, onChanged }: { tenantId: st
 
           <section className="space-y-3 border-t border-border pt-5">
             <div><h3 className="font-medium text-text">{t('commercialHistory')}</h3><p className="mt-1 text-xs text-muted">{t('commercialHistoryNotice')}</p></div>
-            {assignments.length === 0 ? <Empty label={t('noCommercialHistory')} /> : <div className="space-y-2">{assignments.map((assignment) => <article key={assignment.id} className="rounded-md border border-border p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-medium text-text">{assignmentLabel(assignment)}</p><p className="mt-1 text-xs text-muted">{t(`assignmentSource.${assignment.source_type}`)} · {formatDate(assignment.starts_at, ARABIC_DISPLAY_LOCALE)} — {formatDate(assignment.ends_at, ARABIC_DISPLAY_LOCALE)}</p></div><div className="flex flex-wrap items-center gap-2">{commercialBadge(assignment.status === 'active' ? assignment.lifecycle_state === 'scheduled_cancellation' ? 'scheduled' : assignment.source_type === 'trial' ? 'trial' : assignment.source_type === 'addon' ? 'addon' : 'included' : assignment.status)}<Badge tone="neutral">{t(`assignmentLifecycle.${assignment.lifecycle_state}`)}</Badge></div></div>{assignment.reason && <p className="mt-2 text-xs text-muted">{assignment.reason}</p>}{assignment.status === 'active' && <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={() => { setActionDialog({ assignment, action: 'schedule' }); setActionReason(''); setFormError(null); }}>{t('scheduleCancellation')}</Button><Button size="sm" variant="outline" onClick={() => { setActionDialog({ assignment, action: 'cancel' }); setActionReason(''); setFormError(null); }}>{assignment.source_type === 'trial' ? t('endTrial') : t('cancelAssignment')}</Button><Button size="sm" variant="danger" onClick={() => { setActionDialog({ assignment, action: 'revoke' }); setActionReason(''); setFormError(null); }}><XCircle className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('revokeAssignment')}</Button></div>}</article>)}</div>}
+            {assignments.length === 0 ? <Empty label={t('noCommercialHistory')} /> : <div className="space-y-2">{assignments.map((assignment) => <article key={assignment.id} className="rounded-md border border-border p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-medium text-text">{assignmentLabel(assignment)}</p><p className="mt-1 text-xs text-muted">{t(`assignmentSource.${assignment.source_type}`)} · {formatDate(assignment.starts_at, 'ar')} — {formatDate(assignment.ends_at, 'ar')}</p></div><div className="flex flex-wrap items-center gap-2">{commercialBadge(assignment.status === 'active' ? assignment.lifecycle_state === 'scheduled_cancellation' ? 'scheduled' : assignment.source_type === 'trial' ? 'trial' : assignment.source_type === 'addon' ? 'addon' : 'included' : assignment.status)}<Badge tone="neutral">{t(`assignmentLifecycle.${assignment.lifecycle_state}`)}</Badge></div></div>{assignment.reason && <p className="mt-2 text-xs text-muted">{assignment.reason}</p>}{assignment.status === 'active' && <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={() => { setActionDialog({ assignment, action: 'schedule' }); setActionReason(''); setFormError(null); }}>{t('scheduleCancellation')}</Button><Button size="sm" variant="outline" onClick={() => { setActionDialog({ assignment, action: 'cancel' }); setActionReason(''); setFormError(null); }}>{assignment.source_type === 'trial' ? t('endTrial') : t('cancelAssignment')}</Button><Button size="sm" variant="danger" onClick={() => { setActionDialog({ assignment, action: 'revoke' }); setActionReason(''); setFormError(null); }}><XCircle className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('revokeAssignment')}</Button></div>}</article>)}</div>}
           </section>
 
           <section className="space-y-3 border-t border-border pt-5">

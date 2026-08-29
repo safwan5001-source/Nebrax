@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nebrax Date Formatter QA</title>
+<style>
+  :root { --bg:#f8fafc; --fg:#0f172a; --muted:#64748b; --border:#e2e8f0; --primary:#1d4ed8; --card:#fff; }
+  body.dark { --bg:#0b1220; --fg:#e2e8f0; --muted:#94a3b8; --border:#1e293b; --card:#111827; }
+  *{box-sizing:border-box} body{margin:0;font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+  main{max-width:720px;margin:0 auto;padding:24px}
+  h1{font-size:1.25rem;margin:0 0 8px} p.lead{color:var(--muted);margin:0 0 24px;font-size:.9rem}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border)}
+  th,td{padding:12px 14px;border-bottom:1px solid var(--border);text-align:start;font-size:.95rem}
+  th{color:var(--muted);font-weight:600;font-size:.75rem}
+  td.num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  button{border:1px solid var(--border);background:var(--card);color:var(--fg);padding:8px 12px;border-radius:6px;cursor:pointer}
+  button.active{border-color:var(--primary);color:var(--primary)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;background:#dbeafe;color:#1e40af;font-size:.75rem}
+  body.dark .badge{background:#1e3a8a;color:#bfdbfe}
+</style>
+</head>
+<body>
+<main>
+  <div class="row">
+    <button id="ltr" type="button">LTR EN</button>
+    <button id="rtl" type="button" class="active">RTL AR</button>
+    <button id="theme" type="button">Dark</button>
+  </div>
+  <h1>تنسيق التاريخ المركزي — Nebrax</h1>
+  <p class="lead">Gregorian · Latin digits · صباحًا/مساءً · AM/PM</p>
+  <span class="badge">central formatter samples</span>
+  <table style="margin-top:16px">
+    <thead><tr><th>الحالة</th><th>الناتج</th></tr></thead>
+    <tbody>
+      <tr><td>عربي — تاريخ</td><td class="num" dir="ltr">29‏/08‏/2026</td></tr>
+      <tr><td>عربي — طويل</td><td class="num">29 أغسطس 2026</td></tr>
+      <tr><td>عربي — صباحًا</td><td class="num">29‏/08‏/2026، 1:00 صباحًا</td></tr>
+      <tr><td>عربي — مساءً</td><td class="num">29‏/08‏/2026، 1:00 مساءً</td></tr>
+      <tr><td>عربي — وقت</td><td class="num">1:00 مساءً</td></tr>
+      <tr><td>English — date</td><td class="num" dir="ltr">29 Aug 2026</td></tr>
+      <tr><td>English — AM</td><td class="num" dir="ltr">29 Aug 2026, 01:00 AM</td></tr>
+      <tr><td>English — PM</td><td class="num" dir="ltr">29 Aug 2026, 01:00 PM</td></tr>
+    </tbody>
+  </table>
+</main>
+<script>
+const body=document.body;
+document.getElementById('theme').onclick=()=>{body.classList.toggle('dark');};
+document.getElementById('ltr').onclick=()=>{body.dir='ltr';body.lang='en';this.classList.add('active');document.getElementById('rtl').classList.remove('active');};
+document.getElementById('rtl').onclick=()=>{body.dir='rtl';body.lang='ar';this.classList.add('active');document.getElementById('ltr').classList.remove('active');};
+</script>
+</body></html>

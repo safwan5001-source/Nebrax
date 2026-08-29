@@ -1,5 +1,5 @@
 'use client';
-import { displayLocale } from '@/lib/formatting';
+import { formatDateTime } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -423,7 +423,7 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
   const selectedName = selected.name || t('preview_template_name');
   const savedAt = lastSavedAt ?? revision.published_at ?? revision.created_at ?? null;
   const lastSaveLabel = savedAt
-    ? new Intl.DateTimeFormat(displayLocale(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(savedAt))
+    ? formatDateTime(savedAt, locale)
     : t('workspace_no_save_time');
   const validationLabel = (issue: (typeof validationIssues)[number]) => {
     const section = issue.section ? tSections(issue.section) : t('validation_layout');

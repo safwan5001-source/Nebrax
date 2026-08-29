@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { DISPLAY_LOCALE } from '@/lib/formatting';
+import { formatDate, formatDateTime } from '@/lib/formatting';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { CalendarClock, ReceiptText, RotateCw, UserRound } from 'lucide-react';
 import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ interface RecentPosInvoice {
 /** فواتير POS حقيقية ومحدودة خادمياً؛ لا تغيّر جلسة البيع المفتوحة. */
 export function PosRecentInvoicesDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useTranslations('pos');
+  const locale = useLocale();
   const router = useRouter();
   const [invoices, setInvoices] = useState<RecentPosInvoice[]>([]);
   const [loading, setLoading] = useState(false);
@@ -52,7 +53,7 @@ export function PosRecentInvoicesDialog({ open, onClose }: { open: boolean; onCl
   function dateLabel(invoice: RecentPosInvoice) {
     const value = invoice.created_at ?? invoice.invoice_date;
     if (!value) return '—';
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, { dateStyle: 'medium', timeStyle: invoice.created_at ? 'short' : undefined }).format(new Date(value));
+    return invoice.created_at ? formatDateTime(value, locale) : formatDate(value, locale);
   }
 
   return (

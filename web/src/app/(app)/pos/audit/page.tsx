@@ -7,6 +7,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { ClipboardCheck, Download, Eye, FileClock, ListFilter, RefreshCw, ShieldCheck, UsersRound, WalletCards } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { formatDateTime as formatDate } from '@/lib/formatting';
 import { formatRiyal } from '@/lib/money';
 import { DataTable } from '@/components/data-table';
 import { Dialog } from '@/components/ui/dialog';
@@ -33,11 +34,6 @@ interface AuditUser { user_id: string; name: string; events_count: number; last_
 interface ReasonCode { id: string; code: string; name_ar: string; name_en: string; requires_note: boolean; is_active: boolean }
 
 type AuditTab = 'overview' | 'attention' | 'exceptions' | 'risk' | 'relationships' | 'cases' | 'digest' | 'sensitive' | 'carts' | 'cash' | 'users' | 'approvals' | 'settings';
-
-function formatDate(value: string | null, locale: string): string {
-  if (!value) return '—';
-  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
-}
 
 export default function PosAuditPage() {
   const t = useTranslations('posAudit');

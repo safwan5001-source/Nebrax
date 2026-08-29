@@ -1,0 +1,52 @@
+[
+  {
+    "name": "dates-ar-rtl-light-dashboard.png",
+    "note": "Dashboard Arabic light",
+    "url": "http://localhost:3000/dashboard"
+  },
+  {
+    "name": "dates-ar-rtl-light-invoices.png",
+    "note": "Invoices Arabic light",
+    "url": "http://localhost:3000/invoices?sort=-invoice_date&per_page=25"
+  },
+  {
+    "name": "dates-ar-rtl-light-pos-audit.png",
+    "note": "POS audit Arabic light",
+    "url": "http://localhost:3000/pos/audit"
+  },
+  {
+    "name": "dates-ar-rtl-dark.png",
+    "note": "Dashboard Arabic dark",
+    "url": "http://localhost:3000/"
+  },
+  {
+    "name": "dates-en-ltr-light.png",
+    "note": "English light spot check",
+    "url": "http://localhost:3000/invoices?sort=-invoice_date&per_page=25"
+  },
+  {
+    "name": "dates-mobile-390-ar.png",
+    "note": "iPhone 390 Arabic RTL overflow=false",
+    "url": "http://localhost:3000/"
+  },
+  {
+    "name": "dates-formatter-samples-ar-light.png",
+    "note": "Central formatter samples AR",
+    "url": "file:///workspace/docs/visual-qa/pr-561/formatter-samples.html"
+  },
+  {
+    "name": "dates-formatter-samples-ar-dark.png",
+    "note": "Central formatter samples AR dark",
+    "url": "file:///workspace/docs/visual-qa/pr-561/formatter-samples.html"
+  },
+  {
+    "name": "dates-formatter-samples-en-light.png",
+    "note": "Central formatter samples EN layout",
+    "url": "file:///workspace/docs/visual-qa/pr-561/formatter-samples.html"
+  },
+  {
+    "extracted_date_strings": [
+      "© 2026 Nebrax — An integrated cloud platform for managing businesses."
+    ]
+  }
+]

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
+import { formatDateTime, formatLongDate } from '@/lib/formatting';
 import { formatRiyal } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,7 +71,7 @@ export function DigestPanel({ canManage, onOpenCase }: Props) {
 
   const active = useMemo(() => digests.find((d) => d.digest_date === selectedDate) ?? digests[0] ?? null, [digests, selectedDate]);
 
-  const dateLabel = (value: string) => new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', { dateStyle: 'long' }).format(new Date(value));
+  const dateLabel = (value: string) => formatLongDate(value, locale);
 
   if (loading && digests.length === 0) return <p className="text-sm text-muted">{t('loading')}</p>;
   if (loadError) return <p className="rounded border border-negative/30 bg-negative/10 p-3 text-sm text-negative">{loadError}</p>;
@@ -129,7 +130,7 @@ export function DigestPanel({ canManage, onOpenCase }: Props) {
                 <StatTile label={t('digest.confirmedLoss')} value={active.confirmed_loss_count > 0 ? formatRiyal(active.confirmed_loss) : '—'} hint={t('digest.confirmedLossCount', { count: active.confirmed_loss_count })} />
                 <StatTile label={t('digest.controlFailure')} value={String(active.control_failure_count)} />
                 <StatTile label={t('digest.materialVariance')} value={String(active.material_variance_sessions_count)} />
-                <StatTile label={t('digest.generatedAt')} value={active.generated_at ? new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(active.generated_at)) : '—'} />
+                <StatTile label={t('digest.generatedAt')} value={formatDateTime(active.generated_at, locale)} />
               </div>
 
               {active.branch_breakdown.length > 0 && (

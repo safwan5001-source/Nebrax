@@ -1,6 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
+import { formatDateTime } from '@/lib/formatting';
 import { formatRiyal } from '@/lib/money';
 import { Dialog } from '@/components/ui/dialog';
 import { TechnicalDetails } from '@/components/ui/technical-details';
@@ -20,14 +21,6 @@ export interface PosAuditEvent extends AuditEventLike {
   category: string | null;
   source: 'server' | 'client_observed' | 'hybrid' | 'legacy_unknown';
   trust_level: string;
-}
-
-function formatDate(value: string | null, locale: string): string {
-  if (!value) return '—';
-  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
 }
 
 interface Props {
@@ -57,7 +50,7 @@ export function EventDetailDialog({ event, onClose }: Props) {
   const hasBeforeAfter = before !== undefined || after !== undefined;
   const summaryRows = buildEventSummaryRows(event, {
     formatAmount: formatRiyal,
-    formatDate: (value) => formatDate(value, locale),
+    formatDate: (value) => formatDateTime(value, locale),
     statusLabel,
   });
   const diffs = hasBeforeAfter
@@ -84,7 +77,7 @@ export function EventDetailDialog({ event, onClose }: Props) {
             </dl>
           ) : (
             <p className="text-sm text-muted">
-              {event.performed_by_user?.name ?? event.actor?.name ?? '—'} · {formatDate(event.created_at, locale)}
+              {event.performed_by_user?.name ?? event.actor?.name ?? '—'} · {formatDateTime(event.created_at, locale)}
             </p>
           )}
           {showSource ? (

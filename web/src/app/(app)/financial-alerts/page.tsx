@@ -1,5 +1,5 @@
 'use client';
-import { displayLocale } from '@/lib/formatting';
+import { formatDateTime } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -98,10 +98,7 @@ export default function FinancialAlertsPage() {
     router.replace(url.toString() ? `/financial-alerts?${url.toString()}` : '/financial-alerts', { scroll: false });
   }, [explorer, router]);
 
-  const formatDate = useCallback((value?: string | null) => {
-    if (!value) return '—';
-    return new Intl.DateTimeFormat(displayLocale(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
-  }, [locale]);
+  const formatDate = useCallback((value?: string | null) => formatDateTime(value, locale), [locale]);
 
   async function acknowledge(alert: FinancialAlert) {
     setAcknowledgingId(alert.id);

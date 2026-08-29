@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { displayLocale } from '@/lib/formatting';
+import { formatDateTime } from '@/lib/formatting';
 
 /**
  * أسلوب «دفتر التحليل»: حركة المورد تُعرض كنطاق ورصيد وحركات قابلة للبحث؛
@@ -227,7 +227,7 @@ export default function SupplierLedgerPage() {
         <CardHeader className="no-print"><CardTitle>{ts('entries')}</CardTitle><p className="mt-1 text-xs text-muted">{t('preview_hint')}</p></CardHeader>
         <CardContent className="space-y-3 print:p-0">
           <div className="no-print relative"><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" strokeWidth={1.7} /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('search')} aria-label={t('search')} className="h-10 ps-9" /></div>
-          <div id="print-root" className="overflow-x-auto bg-surface"><div className="print-only border-b border-border px-6 py-5"><p className="text-xs text-muted">{supplier.name}</p><h2 className="mt-1 text-xl font-bold text-text">{t('title')}</h2><p className="mt-1 text-xs text-muted">{t('generated_at')}: {new Date().toLocaleString(displayLocale(locale))}</p></div><LedgerTable opening={statement.opening_balance} rows={rows} sourceHref={sourceHref} allocationHref={allocationHref} creditBalance labels={{ date: ts('date'), number: ts('entry_number'), source: t('source'), description: ts('description'), settlement: t('settlement'), debit: ts('debit'), credit: ts('credit'), balance: ts('balance'), opening: ts('opening_balance'), empty: t('empty') }} /><p className="print-only border-t border-border px-6 py-3 text-xs text-muted">{t('footer')}</p></div>
+          <div id="print-root" className="overflow-x-auto bg-surface"><div className="print-only border-b border-border px-6 py-5"><p className="text-xs text-muted">{supplier.name}</p><h2 className="mt-1 text-xl font-bold text-text">{t('title')}</h2><p className="mt-1 text-xs text-muted">{t('generated_at')}: {formatDateTime(new Date(), locale)}</p></div><LedgerTable opening={statement.opening_balance} rows={rows} sourceHref={sourceHref} allocationHref={allocationHref} creditBalance labels={{ date: ts('date'), number: ts('entry_number'), source: t('source'), description: ts('description'), settlement: t('settlement'), debit: ts('debit'), credit: ts('credit'), balance: ts('balance'), opening: ts('opening_balance'), empty: t('empty') }} /><p className="print-only border-t border-border px-6 py-3 text-xs text-muted">{t('footer')}</p></div>
         </CardContent>
       </Card>
     </div>

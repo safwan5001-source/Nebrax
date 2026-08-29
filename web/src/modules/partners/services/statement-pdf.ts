@@ -1,4 +1,4 @@
-import { displayLocale } from '@/lib/formatting';
+import { formatDate as formatDisplayDate, formatDateTime } from '@/lib/formatting';
 import type { Company } from '@/lib/company';
 import type { PartnerStatementData, StatementFilters } from '@/components/partners/partner-statement-document';
 
@@ -82,12 +82,7 @@ function money(value: string, currency: string): string {
 }
 
 function formatDate(value: string, locale: string): string {
-  if (!value) return '—';
-  const date = new Date(`${value}T12:00:00`);
-  if (Number.isNaN(date.valueOf())) return value;
-  return new Intl.DateTimeFormat(displayLocale(locale), {
-    day: '2-digit', month: 'short', year: 'numeric',
-  }).format(date);
+  return formatDisplayDate(value, locale, { fallback: value || '—' });
 }
 
 function formatPeriod(filters: StatementFilters, labels: StatementPdfLabels, locale: string): string {
@@ -154,9 +149,7 @@ export async function createPartnerStatementPdf(input: StatementPdfInput): Promi
 
   const currency = input.company?.currency ?? 'SAR';
   // رقم وتاريخ محايدان في المستند المصدَّر: فصلهما عن النص العربي يمنع خلل اتجاه bidi.
-  const generatedAt = new Intl.DateTimeFormat('en-GB', {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(new Date()).replace(',', '');
+  const generatedAt = formatDateTime(new Date(), 'en');
   const branchScope = input.filters.branchIds.length === 0
     ? input.labels.allBranches
     : input.labels.selectedBranches(input.filters.branchIds.length);

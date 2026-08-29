@@ -41,10 +41,7 @@ export function reviewStateTone(state: string): 'neutral' | 'muted' | 'positive'
   }
 }
 
-export function formatDateTime(value: string | null | undefined, locale: string): string {
-  if (!value) return '—';
-  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
-}
+export { formatDateTime } from '@/lib/formatting';
 
 export function caseStatusTone(status: CaseStatus): 'neutral' | 'muted' | 'positive' | 'warning' | 'negative' {
   switch (status) {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { Archive, ArrowRight, Link2, Loader2, TestTube2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { executeCashDrawerAction, type CashDrawerAction, type CashDrawerBridgeResult } from '@/lib/cash-drawer-bridge';
 import { api, ApiError } from '@/lib/api';
+import { formatDateTime } from '@/lib/formatting';
 
 interface CashDrawerSettings {
   cash_drawer_driver: 'unavailable' | 'local_bridge';
@@ -59,6 +60,7 @@ const DEFAULT_BRIDGE_URL = 'http://127.0.0.1:17463';
 
 export default function PosCashDrawerSettingsPage() {
   const t = useTranslations('posSettings');
+  const locale = useLocale();
   const td = useTranslations('posDevices');
   const tc = useTranslations('common');
   const { success, error: errorToast } = useToast();
@@ -311,7 +313,7 @@ export default function PosCashDrawerSettingsPage() {
                     <div className="flex items-center gap-2"><Archive className="h-4 w-4 text-muted" strokeWidth={1.7} aria-hidden="true" /><h3 id="drawer-status-heading" className="font-medium text-text">{t('cash_drawer_status')}</h3></div>
                     {(() => {
                       const status = drawerStatus(selectedDevice);
-                      return <div className="space-y-3"><Badge tone={status.tone}>{status.label}</Badge><dl className="grid gap-2 text-sm"><div className="flex justify-between gap-3 border-b border-border pb-2"><dt className="text-muted">{t('drawer_printer')}</dt><dd className="num max-w-48 truncate text-text" dir="ltr">{selectedDevice.cash_drawer?.printer_identifier ?? '—'}</dd></div><div className="flex justify-between gap-3 border-b border-border pb-2"><dt className="text-muted">{t('drawer_channel')}</dt><dd className="num text-text">{selectedDevice.cash_drawer?.drawer_channel ?? '—'}</dd></div><div className="flex justify-between gap-3 border-b border-border pb-2"><dt className="text-muted">{t('drawer_pulse_on')}</dt><dd className="num text-text">{selectedDevice.cash_drawer?.pulse_on_ms ?? '—'}</dd></div><div className="flex justify-between gap-3 border-b border-border pb-2"><dt className="text-muted">{t('drawer_pulse_off')}</dt><dd className="num text-text">{selectedDevice.cash_drawer?.pulse_off_ms ?? '—'}</dd></div><div className="flex justify-between gap-3"><dt className="text-muted">{t('drawer_last_test')}</dt><dd className="num text-text">{selectedDevice.cash_drawer?.last_result?.at ? new Date(selectedDevice.cash_drawer.last_result.at).toLocaleString() : '—'}</dd></div><div className="flex justify-between gap-3"><dt className="text-muted">{t('drawer_last_success')}</dt><dd className="num text-text">{selectedDevice.cash_drawer?.last_success_at ? new Date(selectedDevice.cash_drawer.last_success_at).toLocaleString() : '—'}</dd></div></dl></div>;
+                      return <div className="space-y-3"><Badge tone={status.tone}>{status.label}</Badge><dl className="grid gap-2 text-sm"><div className="flex justify-between gap-3 border-b border-border pb-2"><dt className="text-muted">{t('drawer_printer')}</dt><dd className="num max-w-48 truncate text-text" dir="ltr">{selectedDevice.cash_drawer?.printer_identifier ?? '—'}</dd></div><div className="flex justify-between gap-3 border-b border-border pb-2"><dt className="text-muted">{t('drawer_channel')}</dt><dd className="num text-text">{selectedDevice.cash_drawer?.drawer_channel ?? '—'}</dd></div><div className="flex justify-between gap-3 border-b border-border pb-2"><dt className="text-muted">{t('drawer_pulse_on')}</dt><dd className="num text-text">{selectedDevice.cash_drawer?.pulse_on_ms ?? '—'}</dd></div><div className="flex justify-between gap-3 border-b border-border pb-2"><dt className="text-muted">{t('drawer_pulse_off')}</dt><dd className="num text-text">{selectedDevice.cash_drawer?.pulse_off_ms ?? '—'}</dd></div><div className="flex justify-between gap-3"><dt className="text-muted">{t('drawer_last_test')}</dt><dd className="num text-text">{formatDateTime(selectedDevice.cash_drawer?.last_result?.at, locale)}</dd></div><div className="flex justify-between gap-3"><dt className="text-muted">{t('drawer_last_success')}</dt><dd className="num text-text">{formatDateTime(selectedDevice.cash_drawer?.last_success_at, locale)}</dd></div></dl></div>;
                     })()}
                     <Button type="button" variant="outline" disabled={!selectedDevice.cash_drawer?.configured || testing} onClick={() => void testDrawer()}><TestTube2 className="h-4 w-4" strokeWidth={1.7} />{testing ? t('drawer_testing') : t('drawer_test')}</Button>
                     {!selectedDevice.cash_drawer?.configured && <p className="text-xs text-muted">{t('drawer_test_requires_pairing')}</p>}

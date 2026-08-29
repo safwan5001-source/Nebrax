@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import { formatDateTime } from '@/lib/formatting';
 import { BadgeDollarSign, CircleAlert, Cog, Database, Radio, RefreshCw, Save, Settings2, ShieldCheck, SlidersHorizontal, Timer, WalletCards } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -269,7 +270,7 @@ function omitKeys<T extends Record<string, unknown>>(source: T, keys: readonly s
 function asNonNegativeInteger(value: string) { if (!/^\d+$/.test(value.trim())) return null; const parsed = Number(value); return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null; }
 function basisPointsToPercent(value: number) { return Number.isFinite(value) ? String(value / 100) : '0'; }
 function percentToBasisPoints(value: string) { if (!/^\d+(?:\.\d{1,2})?$/.test(value.trim())) return null; const parsed = Math.round(Number(value) * 100); return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= 1000000 ? parsed : null; }
-function date(value: string | null | undefined, locale: string) { return value ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—'; }
+function date(value: string | null | undefined, locale: string) { return formatDateTime(value, locale); }
 function advancedValue(key: string, value: Settings[string], t: ReturnType<typeof useTranslations>) { if (value === null || value === '') return t('notSpecified'); if (typeof value === 'number') { if (key.endsWith('_seconds')) return humanSeconds(value, t); if (key === 'offline_event_retention_days' || key.endsWith('_interval_days') || key.endsWith('_warning_days')) return t('daysValue', { count: value }); if (key.endsWith('_attempts')) return t('attemptsValue', { count: value }); return t('unitsValue', { count: value }); } if (Array.isArray(value)) return value.length ? t('selectedCount', { count: value.length }) : t('noneSelected'); return String(value); }
 function humanSeconds(seconds: number, t: ReturnType<typeof useTranslations>) { if (seconds > 0 && seconds % 3600 === 0) return t('hoursValue', { count: seconds / 3600 }); if (seconds > 0 && seconds % 60 === 0) return t('minutesValue', { count: seconds / 60 }); return t('secondsValue', { count: seconds }); }
 function humanDeviceType(value: string, t: ReturnType<typeof useTranslations>) { const labels: Record<string, string> = { forecourt_controller: 'forecourtController', atg: 'atg', rfid_reader: 'rfidReader', payment_terminal: 'paymentTerminal', station_gateway: 'stationGateway', other: 'other' }; return t(`deviceTypes.${labels[value] ?? 'other'}`); }
