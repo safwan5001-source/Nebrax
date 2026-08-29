@@ -125,9 +125,9 @@ function LineRow({
         <td className="px-3 py-2 text-end">
           {canEdit && (
             <div className="flex justify-end gap-1">
-              {[quantity, unitPrice, total].filter((f) => f?.editable).map((field) => (
-                <Button key={field!.key} size="sm" variant="outline" onClick={() => editField(field)}>
-                  {t(lineFieldTranslationKey(field!.key))}
+              {line.fields.filter((field) => field.editable).map((field) => (
+                <Button key={field.key} size="sm" variant="outline" onClick={() => editField(field)}>
+                  {t(lineFieldTranslationKey(field.key))}
                 </Button>
               ))}
             </div>

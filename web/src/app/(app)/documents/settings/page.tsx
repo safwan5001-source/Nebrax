@@ -29,18 +29,27 @@ export default function DocumentSettingsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const [gov, ops] = await Promise.all([
-        api<{ data: Governance }>('/document-governance'),
-        api<{ data: OperationsSummary }>('/document-operations?per_page=1'),
-      ]);
-      setGovernance(gov.data);
-      setOperations(ops.data);
-    } catch (exception) {
+    setGovernance(null);
+    setOperations(null);
+
+    const [govResult, opsResult] = await Promise.allSettled([
+      api<{ data: Governance }>('/document-governance'),
+      api<{ data: OperationsSummary }>('/document-operations?per_page=1'),
+    ]);
+
+    if (govResult.status === 'rejected') {
+      const exception = govResult.reason;
       setError(exception instanceof ApiError ? exception.message : t('loadFailed'));
-    } finally {
       setLoading(false);
+      return;
     }
+
+    setGovernance(govResult.value.data);
+    if (opsResult.status === 'fulfilled') {
+      setOperations(opsResult.value.data);
+    }
+
+    setLoading(false);
   }, [t]);
 
   useEffect(() => {
