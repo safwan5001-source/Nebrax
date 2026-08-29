@@ -31,6 +31,11 @@ export function canViewDocumentCenter(permissions?: string[], role?: string): bo
   return hasPermission(permissions, role, 'documents.center.view');
 }
 
+/** إنشاء حزمة ورفع ملفات يتطلب صلاحية الإدارة — لا يكفي العرض. */
+export function canManageDocumentCenter(permissions?: string[], role?: string): boolean {
+  return hasPermission(permissions, role, 'documents.center.manage');
+}
+
 export function canBuildDocumentDraft(input: {
   canBuildDraft: boolean;
   documentType: string;

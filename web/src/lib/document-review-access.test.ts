@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canBuildDocumentDraft,
   canBuildPurchaseDraft,
+  canManageDocumentCenter,
   canMutateDocumentReview,
   canViewDocumentCenter,
   isDocumentReviewMutable,
@@ -38,6 +39,16 @@ describe('Document Center sidebar access', () => {
   it('follows the resolved permission list over the role name when the list is present', () => {
     expect(canViewDocumentCenter([], 'owner')).toBe(false);
     expect(canViewDocumentCenter(['invoices.view'], 'admin')).toBe(false);
+  });
+});
+
+describe('Document Center manage access', () => {
+  it('allows intake actions only with documents.center.manage', () => {
+    expect(canManageDocumentCenter(['documents.center.manage'], 'staff')).toBe(true);
+    expect(canManageDocumentCenter(['documents.center.view'], 'staff')).toBe(false);
+    expect(canManageDocumentCenter(['*'], 'owner')).toBe(true);
+    expect(canManageDocumentCenter(undefined, 'owner')).toBe(true);
+    expect(canManageDocumentCenter([], 'owner')).toBe(false);
   });
 });
 
