@@ -79,7 +79,7 @@ describe('PosProductTile', () => {
 
   it('يعرض الباركود ويخفي SKU داخل البطاقة', () => {
     renderTile();
-    expect(screen.getByText('6281000000330')).toBeTruthy();
+    expect(screen.getByTestId('pos-product-barcode')).toHaveTextContent('6281000000330');
     expect(screen.queryByText('W330')).toBeNull();
     expect(screen.getByText('1.50')).toBeTruthy();
     expect(screen.getByText('Available: 12')).toBeTruthy();
@@ -90,14 +90,14 @@ describe('PosProductTile', () => {
     const barcode = screen.getByText('6281000000330');
     const stock = screen.getByText('Available: 12');
     expect(barcode.getAttribute('dir')).toBe('ltr');
-    expect(barcode.closest('[data-testid="pos-product-barcode"]')).toBeTruthy();
-    expect(stock.closest('[data-testid="pos-product-stock"]')).toBeTruthy();
-    expect(barcode.closest('[data-testid="pos-product-barcode"]')).not.toBe(stock.closest('[data-testid="pos-product-stock"]'));
+    expect(screen.getByTestId('pos-product-barcode')).toContainElement(barcode);
+    expect(screen.getByTestId('pos-product-stock')).toContainElement(stock);
+    expect(screen.getByTestId('pos-product-barcode')).not.toBe(screen.getByTestId('pos-product-stock'));
   });
 
   it('لا يعرض باركودًا وهميًا عند عدم وجود باركود حقيقي', () => {
     renderTile({ product: { ...product, barcode: null } });
-    expect(screen.queryByText('6281000000330')).toBeNull();
+    expect(screen.queryByTestId('pos-product-barcode')).toBeNull();
     expect(screen.queryByText('W330')).toBeNull();
   });
 });
