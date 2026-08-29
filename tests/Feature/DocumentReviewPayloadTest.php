@@ -50,7 +50,10 @@ class DocumentReviewPayloadTest extends TestCase
 
         $actor = User::query()->where('tenant_id', $auth['tenant_id'])->firstOrFail();
         $batch = DocumentBatch::create(['document_type' => 'purchase_invoice', 'source_type' => 'manual', 'created_by' => $actor->id]);
-        $batch = app(DocumentWorkflowService::class)->transition($batch, DocumentWorkflowStatus::NEEDS_REVIEW, 'review_payload_test', 'user', $actor->id);
+        $workflow = app(DocumentWorkflowService::class);
+        $batch = $workflow->transition($batch, DocumentWorkflowStatus::RECEIVING, 'review_payload_receiving', 'user', $actor->id);
+        $batch = $workflow->transition($batch, DocumentWorkflowStatus::RECEIVED, 'review_payload_received', 'user', $actor->id);
+        $batch = $workflow->transition($batch, DocumentWorkflowStatus::NEEDS_REVIEW, 'review_payload_test', 'user', $actor->id);
 
         $file = DocumentFile::create([
             'document_batch_id' => $batch->id,

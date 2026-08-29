@@ -10,6 +10,7 @@ describe('document-center contract', () => {
     const path = buildBatchListQuery({
       search: 'PI-2084',
       status: 'needs_review',
+      statusGroup: 'review',
       documentType: 'purchase_invoice',
       sourceType: 'manual',
       channel: 'web',
@@ -21,6 +22,7 @@ describe('document-center contract', () => {
 
     expect(path).toContain('search=PI-2084');
     expect(path).toContain('status=needs_review');
+    expect(path).toContain('status_group=review');
     expect(path).toContain('document_type=purchase_invoice');
     expect(path).toContain('reviewer_id=user-1');
     expect(path).toContain('has_blocking=1');

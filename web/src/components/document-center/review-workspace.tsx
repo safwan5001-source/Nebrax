@@ -98,7 +98,8 @@ export function ReviewWorkspace({ batchId }: Props) {
 
   const canReview = review.capabilities.review;
   const canManage = review.capabilities.manage;
-  const isReviewMutable = isDocumentReviewMutable(review.batch.status);
+  const isShellMode = review.review_mode === 'shell' || review.capabilities.review_shell === true;
+  const isReviewMutable = !isShellMode && isDocumentReviewMutable(review.batch.status);
   const canMutateReview = canMutateDocumentReview({ canReview, status: review.batch.status });
   const canComplete = canMutateReview && !hasVisibleBlocker;
   const showReadinessBlocker = shouldShowReviewReadinessBlocker({ isReviewMutable, canComplete });
@@ -278,15 +279,21 @@ export function ReviewWorkspace({ batchId }: Props) {
         batchId={batchId}
       />
 
-      {showReadinessBlocker && (
+      {isShellMode && (
+        <p className="rounded border border-border bg-surface px-3 py-2 text-sm text-muted">
+          {t('processingShellNotice')}
+        </p>
+      )}
+
+      {showReadinessBlocker && !isShellMode && (
         <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
           {!canReview ? t('notAllowed') : t('readinessBlocked')}
         </p>
       )}
 
       <div className="hidden grid-cols-1 gap-5 xl:grid-cols-[minmax(0,.95fr)_minmax(0,1.05fr)] lg:grid">
-        <div className="space-y-5">{previewPanel}{detailsPanel}{linesPanel}</div>
-        <div className="space-y-5">{matchesPanel}{issuesPanel}{historyPanel}</div>
+        <div className="space-y-5">{previewPanel}{!isShellMode && detailsPanel}{!isShellMode && linesPanel}</div>
+        <div className="space-y-5">{!isShellMode && matchesPanel}{!isShellMode && issuesPanel}{historyPanel}</div>
       </div>
 
       <div className="lg:hidden">
@@ -306,10 +313,10 @@ export function ReviewWorkspace({ batchId }: Props) {
         </div>
         <div className="mt-4">
           {mobileSection === 'preview' && previewPanel}
-          {mobileSection === 'details' && detailsPanel}
-          {mobileSection === 'lines' && linesPanel}
-          {mobileSection === 'matches' && matchesPanel}
-          {mobileSection === 'issues' && issuesPanel}
+          {mobileSection === 'details' && !isShellMode && detailsPanel}
+          {mobileSection === 'lines' && !isShellMode && linesPanel}
+          {mobileSection === 'matches' && !isShellMode && matchesPanel}
+          {mobileSection === 'issues' && !isShellMode && issuesPanel}
           {mobileSection === 'history' && historyPanel}
         </div>
       </div>

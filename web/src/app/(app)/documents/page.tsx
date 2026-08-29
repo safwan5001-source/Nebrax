@@ -8,7 +8,6 @@ import { useTranslations } from 'next-intl';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { canManageDocumentCenter } from '@/lib/document-review-access';
-import { hasPermission } from '@/lib/permissions';
 import {
   STATUS_GROUP_OPTIONS,
   documentTypeTranslationKey,
@@ -28,11 +27,9 @@ import {
   DOCUMENT_TYPES,
   type DocumentBatchFilters,
   type DocumentBatchListItem,
-  type WorkflowStatusGroup,
   buildBatchListQuery,
   filtersFromSearchParams,
   filtersToSearchParams,
-  statusesForGroup,
 } from '@/modules/document-center';
 
 type PaginatedResponse = {
@@ -45,6 +42,7 @@ type TeamUser = { id: string; name: string; permissions?: string[]; role?: strin
 const emptyFilters: DocumentBatchFilters = {
   search: '',
   status: '',
+  statusGroup: '',
   documentType: '',
   sourceType: '',
   channel: '',
@@ -68,7 +66,6 @@ export default function DocumentsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<DocumentBatchFilters>(() => filtersFromSearchParams(searchParams));
-  const [statusGroup, setStatusGroup] = useState<'' | WorkflowStatusGroup>('');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<PaginatedResponse['meta']>();
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -86,14 +83,14 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     if (!canManage) return;
-    api<{ data: TeamUser[] }>('/users')
-      .then((response) => setReviewers(response.data.filter((u) => u.is_active !== false && hasPermission(u.permissions, u.role, 'documents.center.review'))))
+    api<{ data: TeamUser[] }>('/document-batches/eligible-reviewers')
+      .then((response) => setReviewers(response.data))
       .catch(() => setReviewers([]));
   }, [canManage]);
 
   const hasFilters = Boolean(
-    filters.search.trim() || filters.status || filters.documentType || filters.sourceType
-    || filters.channel || filters.reviewerId || filters.from || filters.to || filters.blockingOnly || statusGroup,
+    filters.search.trim() || filters.status || filters.statusGroup || filters.documentType || filters.sourceType
+    || filters.channel || filters.reviewerId || filters.from || filters.to || filters.blockingOnly,
   );
 
   const requestPath = useMemo(() => buildBatchListQuery(filters, page), [filters, page]);
@@ -105,12 +102,7 @@ export default function DocumentsPage() {
 
     try {
       const response = await api<PaginatedResponse>(requestPath);
-      const groupStatuses = statusGroup ? new Set(statusesForGroup(statusGroup)) : null;
-      const filtered = groupStatuses
-        ? response.data.filter((batch) => groupStatuses.has(batch.status))
-        : response.data;
-
-      setBatches((current) => page === 1 ? filtered : [...current, ...filtered]);
+      setBatches((current) => page === 1 ? response.data : [...current, ...response.data]);
       setMeta(response.meta);
     } catch (exception) {
       setError(exception instanceof ApiError ? exception.message : t('loadFailed'));
@@ -118,7 +110,7 @@ export default function DocumentsPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [page, requestPath, statusGroup, t]);
+  }, [page, requestPath, t]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 250);
@@ -134,7 +126,6 @@ export default function DocumentsPage() {
   }
 
   function resetFilters() {
-    setStatusGroup('');
     syncFilters(emptyFilters);
   }
 
@@ -200,8 +191,8 @@ export default function DocumentsPage() {
             </div>
             <select
               aria-label={ti('statusGroupAll')}
-              value={statusGroup}
-              onChange={(event) => { setStatusGroup(event.target.value as typeof statusGroup); setPage(1); }}
+              value={filters.statusGroup}
+              onChange={(event) => syncFilters({ ...filters, statusGroup: event.target.value as DocumentBatchFilters['statusGroup'] })}
               className="h-9 min-w-[10rem] rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {STATUS_GROUP_OPTIONS.map((option) => (

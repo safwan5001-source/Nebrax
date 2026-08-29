@@ -8,14 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError, hasApiStatus } from '@/lib/api';
-import { hasPermission } from '@/lib/permissions';
 
 type TeamUser = {
   id: string;
   name: string;
-  is_active?: boolean;
-  permissions?: string[];
-  role?: string;
 };
 
 type Props = {
@@ -49,17 +45,14 @@ export function ReviewerAssignmentDialog({
     if (!canManage) return;
     setLoading(true);
     try {
-      const response = await api<{ data: TeamUser[] }>('/users');
-      const eligible = response.data.filter(
-        (user) => user.is_active !== false && hasPermission(user.permissions, user.role, 'documents.center.review'),
-      );
-      setUsers(eligible);
+      const response = await api<{ data: TeamUser[] }>(`/document-batches/${batchId}/eligible-reviewers`);
+      setUsers(response.data);
     } catch {
       setUsers([]);
     } finally {
       setLoading(false);
     }
-  }, [canManage]);
+  }, [batchId, canManage]);
 
   useEffect(() => {
     if (open) {

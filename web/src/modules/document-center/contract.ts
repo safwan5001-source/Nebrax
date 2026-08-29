@@ -1,10 +1,13 @@
 /** عقد مراجعة مركز المستندات — مرآة `DocumentReviewResource` و`DocumentBatchReviewResource`. */
 
+import type { WorkflowStatusGroup } from './intake-contract';
+
 export type ReviewCapabilities = {
   view: boolean;
   review: boolean;
   manage: boolean;
   build_draft: boolean;
+  review_shell?: boolean;
 };
 
 export type ReviewFile = {
@@ -127,6 +130,7 @@ export type DocumentReviewPayload = {
   linked_transaction: LinkedTransaction | null;
   linked_purchase: LinkedTransaction | null;
   capabilities: ReviewCapabilities;
+  review_mode?: 'shell' | 'full';
 };
 
 export type DocumentBatchListItem = {
@@ -145,6 +149,7 @@ export type DocumentBatchListItem = {
 export type DocumentBatchFilters = {
   search: string;
   status: string;
+  statusGroup: '' | WorkflowStatusGroup;
   documentType: string;
   sourceType: string;
   channel: string;
@@ -179,6 +184,7 @@ export function buildBatchListQuery(filters: DocumentBatchFilters, page: number,
   });
   if (filters.search.trim()) params.set('search', filters.search.trim());
   if (filters.status) params.set('status', filters.status);
+  if (filters.statusGroup) params.set('status_group', filters.statusGroup);
   if (filters.documentType) params.set('document_type', filters.documentType);
   if (filters.sourceType) params.set('source_type', filters.sourceType);
   if (filters.channel) params.set('channel', filters.channel);
@@ -193,6 +199,7 @@ export function filtersFromSearchParams(params: URLSearchParams): DocumentBatchF
   return {
     search: params.get('search') ?? '',
     status: params.get('status') ?? '',
+    statusGroup: (params.get('status_group') ?? '') as DocumentBatchFilters['statusGroup'],
     documentType: params.get('document_type') ?? '',
     sourceType: params.get('source_type') ?? '',
     channel: params.get('channel') ?? '',
@@ -207,6 +214,7 @@ export function filtersToSearchParams(filters: DocumentBatchFilters): URLSearchP
   const params = new URLSearchParams();
   if (filters.search.trim()) params.set('search', filters.search.trim());
   if (filters.status) params.set('status', filters.status);
+  if (filters.statusGroup) params.set('status_group', filters.statusGroup);
   if (filters.documentType) params.set('document_type', filters.documentType);
   if (filters.sourceType) params.set('source_type', filters.sourceType);
   if (filters.channel) params.set('channel', filters.channel);

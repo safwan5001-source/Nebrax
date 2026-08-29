@@ -7245,6 +7245,7 @@
     "noPurchaseWarehouse": "المخزن الافتراضي",
     "purchaseDraftHint": "اختياريًا حدّد المخزن ومركز التكلفة قبل إنشاء مسودة المشتريات.",
     "retryProcessing": "إعادة المحاولة",
+    "processingShellNotice": "المستند ما زال قيد المعالجة أو فشل الاستخراج. استخدم التشخيص أو العمليات لإعادة المحاولة قبل المراجعة.",
     "openDiagnostics": "فتح التشخيص",
     "advancedFilters": "فلاتر متقدمة",
     "applyFilters": "تطبيق",

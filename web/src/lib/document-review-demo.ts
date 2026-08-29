@@ -246,6 +246,13 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
 
   const assignMatch = clean.match(/^\/document-batches\/(demo-batch-[^/]+)\/assign-reviewer$/);
 
+  if (method === 'GET' && (clean === '/document-batches/eligible-reviewers' || /^\/document-batches\/demo-batch-[^/]+\/eligible-reviewers$/.test(clean))) {
+    return { handled: true, response: { data: [
+      { id: 'demo-reviewer', name: 'أحمد المراجع' },
+      { id: 'demo-reviewer-2', name: 'سارة المراجعة' },
+    ] } };
+  }
+
   if (method === 'GET' && clean === '/users') {
     return { handled: true, response: { data: [
       { id: 'demo-reviewer', name: 'أحمد المراجع', is_active: true, role: 'admin', permissions: ['documents.center.review'] },
@@ -295,9 +302,21 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
         version: 1, created_at: '2026-08-22T08:00:00+03:00', files_count: 1,
         blocking_issues_count: 1, warning_issues_count: 0, reviewer: null,
       },
-    ].filter((batch) => !search || `${batch.id} ${batch.document_type} ${batch.source_type}`.toLowerCase().includes(search));
+    ];
+    const statusGroup = query.get('status_group');
+    const groupStatuses = statusGroup === 'review'
+      ? new Set(['needs_review'])
+      : statusGroup === 'inbox'
+        ? new Set(['draft', 'receiving', 'received', 'queued', 'processing'])
+        : statusGroup === 'terminal'
+          ? new Set(['failed', 'quarantined', 'duplicate', 'cancelled'])
+          : null;
+    const filtered = all.filter((batch) => {
+      if (groupStatuses && !groupStatuses.has(batch.status)) return false;
+      return !search || `${batch.id} ${batch.document_type} ${batch.source_type}`.toLowerCase().includes(search);
+    });
 
-    return { handled: true, response: { data: all, meta: { current_page: 1, last_page: 1, total: all.length } } };
+    return { handled: true, response: { data: filtered, meta: { current_page: 1, last_page: 1, total: filtered.length } } };
   }
 
   if (method === 'GET' && clean === '/accounts') {
@@ -311,6 +330,40 @@ export function handleDocumentReviewDemo(path: string, method: string, body?: un
   }
   if (method === 'GET' && clean === '/cost-centers') {
     return { handled: true, response: { data: [{ id: 'demo-expense-cost-center-admin', code: 'ADM', name: 'الإدارة', is_active: true }] } };
+  }
+
+  if (method === 'GET' && reviewMatch?.[1] === 'demo-batch-003') {
+    return {
+      handled: true,
+      response: {
+        data: {
+          batch: { id: 'demo-batch-003', document_type: 'purchase_invoice', status: 'processing', version: 2, reviewer: null },
+          fields: [], lines: [], warnings: [], matches: [], issues: [], history: [],
+          files: [{ id: 'demo-file-003', original_name: 'processing.pdf', mime_type: 'application/pdf', page_count: 1, download_available: false, scan_status: 'pending' }],
+          processing_summary: demoProcessingSummary('processing'),
+          linked_transaction: null, linked_purchase: null,
+          capabilities: { view: true, review: false, manage: true, build_draft: false, review_shell: true },
+          review_mode: 'shell',
+        },
+      },
+    };
+  }
+
+  if (method === 'GET' && reviewMatch?.[1] === 'demo-batch-004') {
+    return {
+      handled: true,
+      response: {
+        data: {
+          batch: { id: 'demo-batch-004', document_type: 'purchase_invoice', status: 'failed', version: 1, reviewer: null },
+          fields: [], lines: [], warnings: [], matches: [], issues: [], history: [],
+          files: [{ id: 'demo-file-004', original_name: 'failed.pdf', mime_type: 'application/pdf', page_count: 1, download_available: false, scan_status: 'clean' }],
+          processing_summary: demoProcessingSummary('failed'),
+          linked_transaction: null, linked_purchase: null,
+          capabilities: { view: true, review: false, manage: true, build_draft: false, review_shell: true },
+          review_mode: 'shell',
+        },
+      },
+    };
   }
 
   if (method === 'GET' && reviewMatch?.[1] === 'demo-batch-002') {

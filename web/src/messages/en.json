@@ -7249,6 +7249,7 @@
     "noPurchaseWarehouse": "Default warehouse",
     "purchaseDraftHint": "Optionally choose warehouse and cost center before creating the purchase draft.",
     "retryProcessing": "Retry processing",
+    "processingShellNotice": "This batch is still processing or extraction failed. Use diagnostics or operations to retry before review.",
     "openDiagnostics": "Open diagnostics",
     "advancedFilters": "Advanced filters",
     "applyFilters": "Apply",

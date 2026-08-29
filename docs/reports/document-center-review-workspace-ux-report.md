@@ -3,8 +3,8 @@
 **التاريخ:** 2026-08-29  
 **PR:** [#565](https://github.com/safwan5001-source/Nebrax/pull/565)  
 **الفرع:** `cursor/complete-document-center-review-ux-6a0f`  
-**Base SHA:** `0811d9cf262a5363effedca07a7e32c355c6ce3e`  
-**Head SHA:** `c41008d487c904cb50616b922f1671a0d3d73456`  
+**Base SHA:** `a7d24fe1` (أحدث `main` بعد دمج #564)  
+**Head SHA:** `9439db3` + إصلاحات مراجعة PR #565 (محلي — بانتظار commit/push)  
 **الحالة:** Draft — بانتظار المراجعة (لم يُدمج ولم يُنشر)
 
 ---
@@ -22,7 +22,7 @@
 | معاينة مضمّنة (PDF/image) | signed URL موجود | يفتح tab جديد فقط | **مبني** — `DocumentPreviewPanel` |
 | بنود السطور (lines) | schema + edits (`lines.N.*`) | غير معروض | **مبني** — API `lines` + `LineItemsPanel` |
 | تحذيرات الاستخراج | `normalized_payload.warnings` | غير معروض | **مبني** — API + `IssuesWarningsPanel` |
-| تعيين المراجع | `POST assign-reviewer` | i18n فقط | **مبني** — `ReviewerAssignmentDialog` |
+| تعيين المراجع | `POST assign-reviewer` + `GET eligible-reviewers` | كان يعتمد `GET /users` | **مُصلَح** — مصدر مراجعين من الخادم بصلاحية `manage` فقط |
 | Purchase draft options | `warehouse_id`, `cost_center_id` | لا dialog | **مبني** — `PurchaseDraftDialog` |
 | Draft preview summary | مشتق من review payload | غير موجود | **مبني** — `DraftPreviewDialog` |
 | فلاتر: reviewer/date/channel/status | مدعوم في `index` | جزئي | **مبني** — dialog + URL sync |
@@ -31,6 +31,8 @@
 | فلاتر: uploaded_by | غير مدعوم | — | **Gap** |
 | فلاتر: confidence band | غير مدعوم | — | **Gap** |
 | فلاتر: draft created | `status=draft_created` | غير في القائمة | **مبني** — خيار status |
+| فلاتر: status_group | `status_group=inbox\|review\|...` | client-side وهمي | **مُصلَح** — فلترة خادمية عبر `DocumentWorkflowStatusGroup` |
+| مراجعة حزمة قيد المعالجة | extraction غير جاهز | 404/خطأ | **مُصلَح** — `review_mode=shell` + `capabilities.review_shell` |
 | Bulk actions | لا endpoint مجمّع | — | **مبني** — sequential `assign-reviewer` + partial success |
 | Error/retry في المراجعة | diagnostics + operations | منفصل | **مبني** — `ReviewStatusBanner` + رابط retry/diagnostics |
 | Settings tenant | governance + ops | لا صفحة | **مبني** — `/documents/settings` (read-only) |
@@ -57,7 +59,7 @@
 ### تعيين المراجع
 
 - **`reviewer-assignment-dialog.tsx`** — assign/change/clear عبر `POST assign-reviewer`
-- قائمة المراجعين من `GET /users` (فلترة `documents.center.review`)
+- قائمة المراجعين من `GET /document-batches/{id}/eligible-reviewers` (بدون `users.view`)
 
 ### إنشاء المسودة
 
@@ -98,9 +100,15 @@
 
 | الملف | التغيير |
 |-------|---------|
-| `app/Http/Controllers/Api/DocumentReviewController.php` | `lines()`, `warnings()`, `processingSummary()` |
-| `app/Http/Resources/DocumentReviewResource.php` | حقول `lines`, `warnings`, `processing_summary` |
+| `app/Http/Controllers/Api/DocumentReviewController.php` | `lines()`, `warnings()`, `processingSummary()`, `status_group`, shell review, `eligibleReviewers*` |
+| `app/Http/Resources/DocumentReviewResource.php` | حقول `lines`, `warnings`, `processing_summary`, `review_mode` |
+| `app/Services/DocumentCenter/DocumentReviewerEligibilityService.php` | مرشحو المراجعة (فرع + `documents.center.review`) |
+| `app/Support/DocumentWorkflowStatusGroup.php` | مجموعات الحالة لـ `status_group` |
+| `routes/api.php` | `GET document-batches/eligible-reviewers` (+ per-batch) |
 | `tests/Feature/DocumentReviewPayloadTest.php` | اختبار العقد الجديد + عزل + لا raw provider |
+| `tests/Feature/DocumentReviewerEligibilityTest.php` | عقد eligible-reviewers + رفض إسناد خارج الفرع |
+| `tests/Feature/DocumentReviewShellTest.php` | shell payload لـ processing/failed بلا extraction |
+| `tests/Feature/DocumentReviewListTest.php` | `status_group` + pagination meta + stale 409 |
 
 ### عقد `GET /document-batches/{id}/review` — إضافات
 
@@ -150,7 +158,8 @@
 
 | Method | Path | الغرض |
 |--------|------|-------|
-| GET | `/users` | قائمة المراجعين المحتملين |
+| GET | `/document-batches/eligible-reviewers` | مراجعون مؤهلون للفرع النشط (`manage`) |
+| GET | `/document-batches/{id}/eligible-reviewers` | مراجعون مؤهلون لحزمة محددة |
 | GET | `/warehouses` | مخازن لمسودة المشتريات |
 | GET | `/cost-centers` | مراكز تكلفة |
 | GET | `/accounts` | حسابات المصروف |
@@ -182,20 +191,18 @@ upload → processing/extraction → needs_review
 
 | الاختبار | النتيجة | ملاحظات |
 |----------|---------|---------|
-| `npm run build` | ✅ نجح | Next.js 15 |
-| Vitest — document-center | ✅ | contract, preview panel, documents page |
-| Vitest — كامل | 988/990 | worker OOM عارض في بيئة VM |
-| `DocumentReviewPayloadTest` | ⏳ CI | البيئة المحلية نواة فقط |
-| `php artisan test` | ⏳ CI | يتطلب Laravel كامل |
-| `git diff --check` | ✅ | لا whitespace errors |
+| `npm run build` | ⏳ | لم يُشغَّل — بيئة الـ VM: `spawn /bin/bash ENOENT` (`/usr/bin/bash` موجود) |
+| Vitest — `web/` | ⏳ | نفس العائق |
+| `php artisan test --filter='DocumentReview\|DocumentReviewer'` | ⏳ | يتطلب تجميع Laravel في `/tmp/nibras-app` |
+| `git diff --check` | ⏳ | يتطلب shell |
+| GitHub CI (PR #565) | ⏳ | يُحدَّث بعد push الإصلاحات |
 
 ### أوامر التحقق
 
 ```bash
-cd web && npm run test
-cd web && npm run build
-php artisan test --filter=DocumentReview   # في CI
-php artisan test                            # في CI
+cd /workspace && bash deploy/assemble.sh /workspace /tmp/nibras-app
+cd /tmp/nibras-app && php artisan test --filter='DocumentReview|DocumentReviewer'
+cd /workspace/web && npm run test && npm run build
 git diff --check
 ```
 
@@ -207,6 +214,9 @@ git diff --check
 |--------|-------|
 | `14caca23` | feat(documents): add review contract and lines/warnings API payload |
 | `c41008d4` | feat(documents): complete review workspace UX with filters, settings, and demo |
+| `b2db36bb` | docs: add Document Center Review Workspace UX report |
+| `9439db3b` | merge origin/main |
+| *(معلّق)* | fix(documents): address PR #565 review — eligibility, shell review, status_group, CI |
 
 ---
 
@@ -248,9 +258,58 @@ git diff --check
   - `lines`, `warnings`, `processing_summary`
   - handler لـ `assign-reviewer`
   - `demo-batch-003` (processing), `demo-batch-004` (failed)
-  - `GET /users`, `GET /warehouses`
+  - `GET /document-batches/eligible-reviewers`, `GET /warehouses`
+  - `review_mode=shell` لـ demo-batch-003/004
 
 تفعيل: `localStorage.setItem('demo', 'true')`
+
+---
+
+## 13. إصلاحات مراجعة PR #565 (post-review)
+
+### أ) أهلية المراجع (Reviewer eligibility)
+
+- **`DocumentReviewerEligibilityService`**: نفس شروط `DocumentReviewService::assign()` — مستخدم نشط + `documents.center.review` + `canAccessBranch`.
+- **مسارات جديدة** (محروسة بـ `documents.center.manage`):
+  - `GET /api/document-batches/eligible-reviewers`
+  - `GET /api/document-batches/{batch}/eligible-reviewers`
+- **الواجهة**: `reviewer-assignment-dialog.tsx`، `documents/page.tsx`، و`bulk-reviewer-dialog` تستهلك المصدر الجديد بدل `GET /users` (كان يتطلب `users.view`).
+- **اختبار**: `DocumentReviewerEligibilityTest` — قائمة مراجعين صريحة + رفض `assign-reviewer` لمراجع خارج الفرع.
+
+### ب) وضع المراجعة الصدفي (Review shell)
+
+عند غياب `DocumentExtractionResult` (معالجة جارية أو فشل قبل الاستخراج):
+
+- `review_mode: "shell"` مع `fields/lines/matches/issues` فارغة.
+- `capabilities.review_shell: true` و`capabilities.review/build_draft: false`.
+- `processing_summary` + `diagnostics_url` للحزم الفاشلة.
+- **الواجهة**: `review-workspace.tsx` يعطّل التعديل/الإكمال/المسودة في shell mode ويعرض banner المعالجة.
+
+**اختبار**: `DocumentReviewShellTest`.
+
+### ج) فلتر `status_group`
+
+- **`DocumentWorkflowStatusGroup`**: `inbox` · `review` · `ready` · `completed` · `terminal`.
+- **`DocumentReviewController::index`**: `?status_group=review` يفلتر خادمياً (مع `meta.total`).
+- **الواجهة**: شريط مجموعات الحالة في `/documents` + عقد `contract.ts` (`statusGroup` ↔ `status_group`).
+
+**اختبار**: `DocumentReviewListTest::review_list_supports_server_side_status_group_filtering_with_pagination_meta`.
+
+### د) CI / التجميع
+
+- **Vitest OOM:** `web/package.json` — `NODE_OPTIONS=--max-old-space-size=8192`؛ `web/vitest.config.ts` — `pool: forks`, `poolOptions.forks.singleFork: true`, `maxWorkers: 1`, `fileParallelism: false`؛ `web-ci.yml` — نفس `NODE_OPTIONS`.
+- **`DocumentReviewPayloadTest`:** مسار workflow صحيح (`draft → receiving → received → needs_review`) بدل انتقال مباشر مرفوض.
+- اختبارات Feature الجديدة تُنسخ تلقائياً عبر `deploy/assemble.sh` و`.github/workflows/ci.yml`.
+- في CI: `composer config policy.advisories.block false` لتجاوز حجب Laravel 11 (موجود مسبقاً).
+
+### هـ) أوامر التحقق (بعد push)
+
+```bash
+cd web && npm run test && npm run build
+php artisan test --filter='DocumentReview|DocumentReviewer'
+php artisan test
+git diff --check
+```
 
 ---
 

@@ -41,6 +41,44 @@ class DocumentReviewListTest extends TestCase
     }
 
     /** @test */
+    public function review_list_supports_server_side_status_group_filtering_with_pagination_meta(): void
+    {
+        $auth = $this->registerTenant('review-list-group', 'review-list-group@test.local');
+        $branchId = Branch::query()->where('tenant_id', $auth['tenant_id'])->value('id');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        app(BranchContext::class)->set($branchId);
+        app(EntitlementGrantService::class)->grant(Tenant::findOrFail($auth['tenant_id']), 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::ADDON, now('UTC')->subMinute(), null, 'document-review-list-group-test', (string) \Illuminate\Support\Str::uuid());
+
+        $workflow = app(\App\Services\DocumentCenter\DocumentWorkflowService::class);
+        $actor = \App\Models\User::query()->where('tenant_id', $auth['tenant_id'])->firstOrFail();
+
+        $reviewBatch = DocumentBatch::create(['document_type' => 'purchase_invoice', 'source_type' => 'manual']);
+        $reviewBatch = $workflow->transition($reviewBatch, \App\Support\DocumentWorkflowStatus::RECEIVING, 'list_group_receiving', 'user', $actor->id);
+        $reviewBatch = $workflow->transition($reviewBatch, \App\Support\DocumentWorkflowStatus::RECEIVED, 'list_group_received', 'user', $actor->id);
+        $reviewBatch = $workflow->transition($reviewBatch, \App\Support\DocumentWorkflowStatus::NEEDS_REVIEW, 'list_group_review', 'user', $actor->id);
+
+        $processingBatch = DocumentBatch::create(['document_type' => 'expense', 'source_type' => 'manual']);
+        $processingBatch = $workflow->transition($processingBatch, \App\Support\DocumentWorkflowStatus::RECEIVING, 'list_group_proc_receiving', 'user', $actor->id);
+        $processingBatch = $workflow->transition($processingBatch, \App\Support\DocumentWorkflowStatus::RECEIVED, 'list_group_proc_received', 'user', $actor->id);
+        $processingBatch = $workflow->transition($processingBatch, \App\Support\DocumentWorkflowStatus::QUEUED, 'list_group_proc_queued', 'user', $actor->id);
+        $processingBatch = $workflow->transition($processingBatch, \App\Support\DocumentWorkflowStatus::PROCESSING, 'list_group_proc_processing', 'user', $actor->id);
+
+        $this->withToken($auth['token'])->withHeader('X-Branch-Id', $branchId)
+            ->getJson('/api/document-batches?status_group=review&per_page=10')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $reviewBatch->id)
+            ->assertJsonMissing(['id' => $processingBatch->id]);
+
+        $this->withToken($auth['token'])->withHeader('X-Branch-Id', $branchId)
+            ->getJson('/api/document-batches?status_group=inbox&per_page=10')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $processingBatch->id)
+            ->assertJsonMissing(['id' => $reviewBatch->id]);
+    }
+
+    /** @test */
     public function stale_review_version_returns_a_safe_http_conflict(): void
     {
         $auth = $this->registerTenant('review-stale', 'review-stale@test.local');

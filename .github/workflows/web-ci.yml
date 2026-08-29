@@ -32,6 +32,8 @@ jobs:
 
       - name: اختبارات الواجهة (Vitest)
         run: npm run test
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
       - name: بناء الواجهة (يتضمن فحص أنواع TypeScript)
         run: npm run build

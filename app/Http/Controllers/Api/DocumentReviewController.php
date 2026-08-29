@@ -26,6 +26,7 @@ use App\Models\DocumentReviewAction;
 use App\Models\User;
 use App\Services\DocumentCenter\DocumentProcessingStatusProjector;
 use App\Services\DocumentCenter\DocumentRedactionProjector;
+use App\Services\DocumentCenter\DocumentReviewerEligibilityService;
 use App\Services\DocumentCenter\DocumentReviewService;
 use App\Services\DocumentCenter\ExpenseDocumentDraftBuilder;
 use App\Services\DocumentCenter\ExpenseDraftBuildOptions;
@@ -34,6 +35,9 @@ use App\Services\DocumentCenter\PurchaseDraftBuildOptions;
 use App\Services\DocumentCenter\ReviewedDocumentProjector;
 use App\Support\DocumentScanStatus;
 use App\Support\DocumentSourceChannel;
+use App\Support\DocumentWorkflowStatusGroup;
+use App\Tenancy\BranchContext;
+use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -56,6 +60,16 @@ class DocumentReviewController extends Controller
         $perPage = min(100, max(1, $request->integer('per_page', 25)));
 
         $batches = DocumentBatch::query()
+            ->when($request->filled('status_group'), function ($query) use ($request): void {
+                $group = $request->string('status_group')->toString();
+                $statuses = DocumentWorkflowStatusGroup::statusesFor($group);
+                if ($statuses === []) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->whereIn('status', $statuses);
+            })
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->when($request->filled('document_type'), fn ($query) => $query->where('document_type', $request->string('document_type')->toString()))
             ->when($request->filled('source_type'), fn ($query) => $query->where('source_type', $request->string('source_type')->toString()))
@@ -102,7 +116,26 @@ class DocumentReviewController extends Controller
     public function review(Request $request, DocumentBatch $batch): DocumentReviewResource
     {
         $batch->load(['files', 'reviewer:id,name', 'sourceReceipt.identity:id,display_name,external_identity_masked', 'transactionLinks.purchase', 'transactionLinks.expense']);
-        $result = $this->resultFor($batch);
+        $result = $this->latestResult($batch);
+
+        if ($result === null) {
+            return new DocumentReviewResource([
+                'batch' => $batch,
+                'fields' => [],
+                'lines' => [],
+                'warnings' => [],
+                'files' => $this->files($batch->files),
+                'matches' => [],
+                'issues' => [],
+                'history' => $this->history($batch, null),
+                'processing_summary' => $this->processingSummary($batch, $batch->files),
+                'linked_transaction' => $this->linkedTransaction($batch),
+                'linked_purchase' => $this->linkedPurchase($batch),
+                'capabilities' => $this->capabilities($request->user(), true),
+                'review_mode' => 'shell',
+            ]);
+        }
+
         // الـoverlay لا يمس evidence أو projection الذي يبني المسودة؛ يطبق فقط
         // على النسختين المرسلتين إلى واجهة العرض كي لا تظهر القيمة المحجوبة.
         $original = $this->redactions->apply($result, $result->normalized_payload);
@@ -123,8 +156,25 @@ class DocumentReviewController extends Controller
             'linked_transaction' => $this->linkedTransaction($batch),
             // يبقى الحقل التوافقي لمسار Purchase إلى أن تستهلك الواجهة العقد العام بالكامل.
             'linked_purchase' => $this->linkedPurchase($batch),
-            'capabilities' => $this->capabilities($request->user()),
+            'capabilities' => $this->capabilities($request->user(), false),
+            'review_mode' => 'full',
         ]);
+    }
+
+    public function eligibleReviewers(Request $request): JsonResponse
+    {
+        $tenantId = app(TenantContext::class)->id();
+        $branchId = app(BranchContext::class)->id();
+        $users = app(DocumentReviewerEligibilityService::class)->forBranch($tenantId, $branchId);
+
+        return response()->json(['data' => $this->reviewerOptions($users)]);
+    }
+
+    public function eligibleReviewersForBatch(DocumentBatch $batch): JsonResponse
+    {
+        $users = app(DocumentReviewerEligibilityService::class)->forBatch($batch);
+
+        return response()->json(['data' => $this->reviewerOptions($users)]);
     }
 
     public function change(StoreDocumentReviewChangeRequest $request, DocumentBatch $batch): JsonResponse
@@ -472,7 +522,7 @@ class DocumentReviewController extends Controller
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function history(DocumentBatch $batch, DocumentExtractionResult $result): array
+    private function history(DocumentBatch $batch, ?DocumentExtractionResult $result): array
     {
         return DocumentReviewAction::query()
             ->where('document_batch_id', $batch->id)
@@ -483,8 +533,8 @@ class DocumentReviewController extends Controller
                 'id' => $action->id,
                 'action' => $action->action,
                 'reason' => $action->reason,
-                'before' => $this->redactedAuditValue($result, $action->before),
-                'after' => $this->redactedAuditValue($result, $action->after),
+                'before' => $result === null ? $this->safeAuditValue($action->before) : $this->redactedAuditValue($result, $action->before),
+                'after' => $result === null ? $this->safeAuditValue($action->after) : $this->redactedAuditValue($result, $action->after),
                 'review_version' => $action->review_version,
                 'actor' => $action->actor
                     ? ['id' => $action->actor->id, 'name' => $action->actor->name]
@@ -508,14 +558,24 @@ class DocumentReviewController extends Controller
     }
 
     /** @return array<string, bool> */
-    private function capabilities(?User $user): array
+    private function capabilities(?User $user, bool $shell = false): array
     {
         return [
             'view' => $user?->hasPermission('documents.center.view') ?? false,
-            'review' => $user?->hasPermission('documents.center.review') ?? false,
+            'review' => ! $shell && ($user?->hasPermission('documents.center.review') ?? false),
             'manage' => $user?->hasPermission('documents.center.manage') ?? false,
-            'build_draft' => $user?->hasPermission('documents.center.build_draft') ?? false,
+            'build_draft' => ! $shell && ($user?->hasPermission('documents.center.build_draft') ?? false),
+            'review_shell' => $shell,
         ];
+    }
+
+    /** @param Collection<int, User> $users @return array<int, array{id: string, name: string}> */
+    private function reviewerOptions(Collection $users): array
+    {
+        return $users
+            ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
+            ->values()
+            ->all();
     }
 
     /** @return array<string, string>|null */
@@ -550,12 +610,17 @@ class DocumentReviewController extends Controller
         return $this->linkedTransaction($batch);
     }
 
-    private function resultFor(DocumentBatch $batch): DocumentExtractionResult
+    private function latestResult(DocumentBatch $batch): ?DocumentExtractionResult
     {
         return DocumentExtractionResult::query()
             ->where('document_batch_id', $batch->id)
             ->latest('extracted_at')
-            ->firstOrFail();
+            ->first();
+    }
+
+    private function resultFor(DocumentBatch $batch): DocumentExtractionResult
+    {
+        return $this->latestResult($batch) ?? throw new \Illuminate\Database\Eloquent\ModelNotFoundException();
     }
 
     private function safeValue(mixed $value): string|int|bool|null
