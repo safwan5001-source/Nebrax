@@ -36,7 +36,12 @@ class ZatcaQrCertificateMaterialExtractorTest extends TestCase
     {
         $extractor = app(ZatcaQrCertificateMaterialExtractor::class);
 
-        foreach (['not-base64', base64_encode('not-a-certificate'), base64_encode($this->rsaCertificateDer())] as $material) {
+        foreach ([
+            'not-base64',
+            base64_encode('not-a-certificate'),
+            base64_encode($this->rsaCertificateDer()),
+            base64_encode($this->ecCertificateDer('prime256v1')),
+        ] as $material) {
             try {
                 $extractor->extract($material);
                 $this->fail('كان يجب رفض مادة شهادة غير صالحة.');
@@ -57,6 +62,24 @@ class ZatcaQrCertificateMaterialExtractorTest extends TestCase
         $pem = '';
         $this->assertTrue(openssl_x509_export($certificate, $pem));
         $body = preg_replace('/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s+/', '', $pem);
+        $this->assertIsString($body);
+        $der = base64_decode($body, true);
+        $this->assertIsString($der);
+
+        return $der;
+    }
+
+    private function ecCertificateDer(string $curveName): string
+    {
+        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => $curveName]);
+        $this->assertNotFalse($key);
+        $request = openssl_csr_new(['commonName' => 'Wrong Curve Device'], $key, ['digest_alg' => 'sha256']);
+        $this->assertNotFalse($request);
+        $certificate = openssl_csr_sign($request, null, $key, 1, ['digest_alg' => 'sha256']);
+        $this->assertNotFalse($certificate);
+        $pem = '';
+        $this->assertTrue(openssl_x509_export($certificate, $pem));
+        $body = preg_replace('/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\\s+/', '', $pem);
         $this->assertIsString($body);
         $der = base64_decode($body, true);
         $this->assertIsString($der);
