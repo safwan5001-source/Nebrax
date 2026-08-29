@@ -12,6 +12,7 @@ const product = {
   id: 'p1',
   name: 'Water 330ml',
   sku: 'W330',
+  barcode: '6281000000330',
   sale_price_label: '1.50',
   pos_image: { download_url: '/img.png' },
   track_inventory: true,
@@ -77,11 +78,12 @@ describe('PosProductTile', () => {
     expect(card.className).toContain('focus-visible:ring-2');
   });
 
-  it('يعرض السعر وSKU والمخزون والضريبة كطبقات مستقلة بلا تداخل', () => {
+  it('يعرض الباركود ولا يعرض وسم الضريبة داخل البطاقة', () => {
     renderTile();
+    expect(screen.getByText('6281000000330')).toBeTruthy();
+    expect(screen.queryByText('incl. VAT')).toBeNull();
     expect(screen.getByText('1.50')).toBeTruthy();
     expect(screen.getByText('W330')).toBeTruthy();
     expect(screen.getByText('Available: 12')).toBeTruthy();
-    expect(screen.getByText('incl. VAT')).toBeTruthy();
   });
 });
