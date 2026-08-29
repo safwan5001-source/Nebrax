@@ -31,6 +31,10 @@ class TenancyServiceProvider extends ServiceProvider
         // الطلب/المهمّة، وإلا دُمج تعديلُ مستندٍ في قيدِ مهمّةٍ سابقة داخل
         // العامل نفسه. الحاوية تُفرغ الـ scoped بين كل طلب وكل مهمّة طابور.
         $this->app->scoped(RevisionBuffer::class, fn () => new RevisionBuffer());
+
+        // POS يملك مزوده التشغيلي حتى لا يعتمد على HR ولا يوسّع ملف routes/api.php
+        // الكبير لأجل مسارات Domain صغيرة مستقلة.
+        $this->app->register(PosServiceProvider::class);
     }
 
     public function boot(): void
