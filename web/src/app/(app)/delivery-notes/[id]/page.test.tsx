@@ -36,7 +36,7 @@ const { api, currentUser, translate } = vi.hoisted(() => {
   return { api: vi.fn(), currentUser: vi.fn(), translate: translator };
 });
 
-vi.mock('next-intl', () => ({ useTranslations: () => translate }));
+vi.mock('next-intl', () => ({ useTranslations: () => translate, useLocale: () => 'ar' }));
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'dn-linked' }) }));
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock('@/lib/api', () => ({ api, ApiError: class ApiError extends Error {} }));

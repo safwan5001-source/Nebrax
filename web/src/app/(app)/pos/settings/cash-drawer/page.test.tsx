@@ -25,7 +25,7 @@ const strings: Record<string, string> = {
 };
 const translate = (key: string) => strings[key] ?? key;
 
-vi.mock('next-intl', () => ({ useTranslations: () => translate }));
+vi.mock('next-intl', () => ({ useTranslations: () => translate, useLocale: () => 'ar' }));
 vi.mock('next/navigation', () => ({ useSearchParams: () => search }));
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => ({ success, error }) }));
