@@ -21,6 +21,7 @@ export function PosProductTile({
   showImage,
   selected,
   isFavorite,
+  taxLabel: _taxLabel,
   availableLabel,
   favoriteLabel,
   onAdd,
@@ -32,6 +33,8 @@ export function PosProductTile({
   showImage: boolean;
   selected: boolean;
   isFavorite: boolean;
+  /** توافق مؤقت مع استدعاء صفحة POS؛ القيمة لا تُعرض داخل البطاقة. */
+  taxLabel: string;
   availableLabel: string;
   favoriteLabel: string;
   onAdd: () => void;
