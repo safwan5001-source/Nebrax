@@ -15,11 +15,13 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     /** @test */
     public function it_extracts_raw_hash_and_signature_from_the_signed_invoice(): void
     {
-        $signed = $this->signedInvoice();
+        $signed = $this->signedInvoice('customInvoiceReference');
+        $digest = app(ZatcaInvoiceHasher::class)->hash($signed);
+        $signed = str_replace($digest, substr($digest, 0, 20)."\n".substr($digest, 20), $signed);
         $material = app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($signed);
 
         $this->assertSame(
-            base64_decode(app(ZatcaInvoiceHasher::class)->hash($signed), true),
+            base64_decode($digest, true),
             $material['invoice_hash'],
         );
         $this->assertSame(32, strlen($material['invoice_hash']));
@@ -48,7 +50,9 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
             str_replace($match[0], '', $signed),
             str_replace($match[0], $match[0].$match[0], $signed),
             str_replace($match[1], 'not-base64', $signed),
+            preg_replace('#(<ds:SignedInfo\b.*?</ds:SignedInfo>)#s', '$1$1', $signed, 1),
         ] as $invalid) {
+            $this->assertIsString($invalid);
             try {
                 app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($invalid);
                 $this->fail('كان يجب رفض مادة توقيع QR المفقودة أو المكررة أو التالفة.');
@@ -58,7 +62,7 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
         }
     }
 
-    private function signedInvoice(): string
+    private function signedInvoice(string $invoiceReferenceId = 'invoiceSignedData'): string
     {
         [$privateKey, $leaf] = $this->certificate();
 
@@ -69,6 +73,7 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
             new DateTimeImmutable('2026-08-30T01:02:03+03:00'),
             'https://zatca.gov.sa/security-policy.pdf',
             base64_encode(hash('sha256', 'policy', true)),
+            invoiceReferenceId: $invoiceReferenceId,
         );
     }
 
