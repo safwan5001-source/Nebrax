@@ -47,8 +47,19 @@ Every retained old-brand occurrence must be classified as an intentional legacy/
 - `web/src/lib/brand.ts` is the canonical runtime brand-name source.
 - `web/src/app/layout.tsx` reads metadata from the central brand source.
 - `web/src/components/layout/awj-logo.tsx` is the shared AWJ product wordmark.
-- Authentication and landing surfaces must consume the AWJ component.
+- Authentication and landing surfaces consume the AWJ component.
 - Company branding remains separate (`CompanyLogoMark`) and must not be overwritten by the product brand.
+- `web/src/lib/brand-migration-guard.test.ts` guards migrated customer-facing surfaces against reintroducing legacy display names.
+
+## Current verified status
+
+- Canonical runtime identity: complete.
+- Metadata, landing page and authentication shell: complete.
+- README and design-system visible identity: complete.
+- Compatibility shim for legacy `NebraxLogo` imports: intentionally preserved.
+- Latest GitHub Actions on the migration branch: Web CI and backend CI both passed, including SQLite and PostgreSQL.
+- `CLAUDE.md`: full safe source restored and audited; remaining product-brand references must be migrated without changing the historical reference-company name `نبراس الطموح`.
+- `web/src/messages/ar.json` and `web/src/messages/en.json`: still require value-only customer-facing migration. Translation keys and technical identifiers must not be renamed blindly.
 
 ## Design-system constraints
 
@@ -77,5 +88,5 @@ Before merge:
 2. Verify intentional technical legacy references against the whitelist.
 3. Run frontend build and relevant unit/i18n tests.
 4. Verify Arabic/English, RTL/LTR, light/dark, landing and auth surfaces.
-5. Open an independent PR and review CI.
+5. Review the independent PR and its final CI state.
 6. Do not merge or deploy without explicit approval.
