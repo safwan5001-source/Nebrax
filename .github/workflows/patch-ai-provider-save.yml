@@ -1,0 +1,42 @@
+name: Patch AI provider save action
+
+on:
+  push:
+    branches:
+      - fix/platform-ai-provider-save-action
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/platform-ai-provider-save-action
+      - name: Apply surgical UI patch
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('web/src/app/platform/integrations/page.tsx')
+          s = p.read_text()
+          old_call = "update={(field, value) => updateProvider(provider, field, value)} test={() => testAiProvider(provider)} t={t} />"
+          new_call = "update={(field, value) => updateProvider(provider, field, value)} save={saveAi} test={() => testAiProvider(provider)} t={t} />"
+          old_sig = "function AiProviderCard({ provider, form, configuration, busy, testing, update, test, t }: { provider: AiProviderKey; form: DocumentAiFormState['providers'][AiProviderKey]; configuration: Record<string, any>; busy: string | null; testing: string | null; update: (field: keyof AiProviderFormState, value: string | boolean) => void; test: () => void; t: Translate })"
+          new_sig = "function AiProviderCard({ provider, form, configuration, busy, testing, update, save, test, t }: { provider: AiProviderKey; form: DocumentAiFormState['providers'][AiProviderKey]; configuration: Record<string, any>; busy: string | null; testing: string | null; update: (field: keyof AiProviderFormState, value: string | boolean) => void; save: () => void; test: () => void; t: Translate })"
+          old_actions = '<div className="mt-auto flex justify-end border-t border-border pt-4"><Button variant="outline" size="sm" onClick={test} disabled={busy !== null || testing !== null}>{testing === `ai:${provider}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t(\'test\')}</Button></div>'
+          new_actions = '<div className="mt-auto flex flex-wrap justify-end gap-2 border-t border-border pt-4"><Button variant="outline" size="sm" onClick={test} disabled={busy !== null || testing !== null}>{testing === `ai:${provider}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t(\'test\')}</Button><Button size="sm" onClick={save} disabled={busy !== null || testing !== null}>{busy === \'document_ai\' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t(\'save\')}</Button></div>'
+          for old, new in [(old_call,new_call),(old_sig,new_sig),(old_actions,new_actions)]:
+              if old not in s:
+                  raise SystemExit('Expected source pattern not found; refusing broad rewrite')
+              s = s.replace(old,new,1)
+          p.write_text(s)
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/app/platform/integrations/page.tsx
+          git commit -m "fix(platform): add save action to AI provider cards"
+          git push origin HEAD:fix/platform-ai-provider-save-action
