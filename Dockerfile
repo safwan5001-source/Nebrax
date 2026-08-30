@@ -35,14 +35,15 @@ RUN cp /core/deploy/entrypoint.sh /usr/local/bin/entrypoint.sh \
 
 WORKDIR /app
 
-# قيم بيئة إنتاجية افتراضية (تُتجاوَز بمتغيّرات المنصة)
+# قيم بيئة إنتاجية افتراضية (تُتجاوَز بمتغيّرات المنصة).
+# database يبقي المعالجة غير متزامنة بلا Redis؛ عامل documents مستقل يستهلك الطابور.
 ENV APP_ENV=production \
     APP_DEBUG=false \
     DB_CONNECTION=pgsql \
     LOG_CHANNEL=stderr \
     CACHE_STORE=file \
     SESSION_DRIVER=file \
-    QUEUE_CONNECTION=sync
+    QUEUE_CONNECTION=database
 
 EXPOSE 8000
 CMD ["/usr/local/bin/entrypoint.sh"]
