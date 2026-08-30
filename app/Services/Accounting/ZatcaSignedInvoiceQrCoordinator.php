@@ -9,6 +9,7 @@ use DOMDocument;
 use DOMElement;
 use DOMXPath;
 use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * يوقّع XML ويبني QR للمرحلة الثانية من لقطة اعتماد واحدة.
@@ -60,12 +61,75 @@ final class ZatcaSignedInvoiceQrCoordinator
                 ? $certificateMaterial['certificate_signature']
                 : null,
         );
+        $finalXml = $this->embedQrCode($signedXml, $qrCode);
+        $finalMaterial = $this->signedMaterialExtractor->extract($finalXml);
+        if (! hash_equals($signedMaterial['invoice_hash'], $finalMaterial['invoice_hash'])
+            || ! hash_equals($signedMaterial['ecdsa_signature'], $finalMaterial['ecdsa_signature'])
+        ) {
+            throw new RuntimeException('تضمين QR غيّر مادة توقيع فاتورة ZATCA بشكل غير متوقع.');
+        }
 
         return new ZatcaSignedInvoiceQrResult(
-            $signedXml,
-            $signedMaterial['invoice_hash'],
+            $finalXml,
+            $finalMaterial['invoice_hash'],
             $qrCode,
         );
+    }
+
+    private function embedQrCode(string $signedXml, string $qrCode): string
+    {
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $document = new DOMDocument();
+            $document->preserveWhiteSpace = true;
+            $loaded = $document->loadXML(
+                $signedXml,
+                LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_COMPACT,
+            );
+            $root = $document->documentElement;
+            if (! $loaded || ! $root instanceof DOMElement || $document->doctype !== null
+                || $root->namespaceURI !== 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2'
+                || $root->localName !== 'Invoice'
+            ) {
+                throw new RuntimeException('تعذر فتح فاتورة ZATCA الموقعة لتضمين QR.');
+            }
+
+            $xpath = new DOMXPath($document);
+            $xpath->registerNamespace('inv', 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2');
+            $xpath->registerNamespace('cbc', ZatcaXadesSignatureAssembler::CBC_NAMESPACE);
+            $xpath->registerNamespace(
+                'cac',
+                'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
+            );
+            $references = $xpath->query(
+                "/inv:Invoice/cac:AdditionalDocumentReference[cbc:ID='QR']",
+            );
+            $reference = $references !== false && $references->length === 1
+                ? $references->item(0)
+                : null;
+            $attachments = $reference instanceof DOMElement
+                ? $xpath->query('./cac:Attachment/cbc:EmbeddedDocumentBinaryObject', $reference)
+                : false;
+            $attachment = $attachments !== false && $attachments->length === 1
+                ? $attachments->item(0)
+                : null;
+            if (! $attachment instanceof DOMElement
+                || $attachment->getAttribute('mimeCode') !== 'text/plain'
+            ) {
+                throw new RuntimeException('مرفق QR الفريد داخل فاتورة ZATCA مفقود أو غير صالح.');
+            }
+
+            $attachment->textContent = $qrCode;
+            $finalXml = $document->saveXML();
+            if (! is_string($finalXml)) {
+                throw new RuntimeException('تعذر تسلسل فاتورة ZATCA بعد تضمين QR.');
+            }
+
+            return $finalXml;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
     }
 
     /**

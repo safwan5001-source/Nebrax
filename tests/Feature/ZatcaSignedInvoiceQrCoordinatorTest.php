@@ -45,6 +45,8 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
         $this->assertSame($certificateMaterial['certificate_signature'], $fields[9]);
         $this->assertStringContainsString(base64_encode($leafDer), $result->signedXml);
         $this->assertStringContainsString(base64_encode($this->certificateDer($issuerCertificate)), $result->signedXml);
+        $this->assertStringContainsString($result->qrCode, $result->signedXml);
+        $this->assertStringNotContainsString('__NEBRAX_ZATCA_QR__', $result->signedXml);
         $this->assertStringNotContainsString($privateKey, $result->signedXml);
 
         $leafKey = openssl_pkey_get_public($leafCertificate);
@@ -233,7 +235,7 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
  <cbc:IssueDate>2026-08-30</cbc:IssueDate>
  <cbc:IssueTime>{$issueTime}</cbc:IssueTime>
  <cbc:InvoiceTypeCode name="{$transactionCode}">388</cbc:InvoiceTypeCode>
- <cac:AdditionalDocumentReference><cbc:ID>QR</cbc:ID><cac:Attachment><cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">QR</cbc:EmbeddedDocumentBinaryObject></cac:Attachment></cac:AdditionalDocumentReference>
+ <cac:AdditionalDocumentReference><cbc:ID>QR</cbc:ID><cac:Attachment><cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">__NEBRAX_ZATCA_QR__</cbc:EmbeddedDocumentBinaryObject></cac:Attachment></cac:AdditionalDocumentReference>
  <cac:Signature><cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID></cac:Signature>
  <cac:AccountingSupplierParty><cac:Party>
   <cac:PartyTaxScheme><cbc:CompanyID>310000000000003</cbc:CompanyID></cac:PartyTaxScheme>
