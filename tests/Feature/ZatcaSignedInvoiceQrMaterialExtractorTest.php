@@ -149,6 +149,45 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_a_signature_moved_outside_the_official_ubl_extension(): void
+    {
+        $document = new DOMDocument();
+        $document->preserveWhiteSpace = true;
+        $this->assertTrue($document->loadXML($this->signedInvoice(), LIBXML_NONET));
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
+        $xpath->registerNamespace(
+            'cac',
+            'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
+        );
+        $signature = $xpath->query('//ds:Signature')?->item(0);
+        $excludedContainer = $xpath->query('//cac:Signature')?->item(0);
+        $this->assertInstanceOf(DOMElement::class, $signature);
+        $this->assertInstanceOf(DOMElement::class, $excludedContainer);
+        $excludedContainer->appendChild($signature);
+        $tampered = $document->saveXML();
+        $this->assertIsString($tampered);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('امتداد UBL');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+    }
+
+    /** @test */
+    public function it_rejects_qualifying_properties_not_targeting_their_signature(): void
+    {
+        $signed = $this->signedInvoice();
+        $tampered = str_replace('Target="#signature"', 'Target="#detachedSignature"', $signed);
+        $this->assertNotSame($signed, $tampered);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Target');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
