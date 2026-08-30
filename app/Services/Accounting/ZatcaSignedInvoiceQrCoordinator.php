@@ -2,7 +2,9 @@
 
 namespace App\Services\Accounting;
 
+use DateTimeImmutable;
 use DateTimeInterface;
+use DateTimeZone;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
@@ -27,14 +29,9 @@ final class ZatcaSignedInvoiceQrCoordinator
 
     public function build(
         string $invoiceXml,
-        string $sellerName,
-        string $vatNumber,
-        DateTimeInterface $invoiceTime,
         DateTimeInterface $signingTime,
-        string $invoiceTotal,
-        string $vatTotal,
     ): ZatcaSignedInvoiceQrResult {
-        $documentType = $this->documentType($invoiceXml);
+        $snapshot = $this->invoiceSnapshot($invoiceXml);
         $material = $this->credentials->resolve();
         $policy = $this->policy->resolve();
         $signedXml = $this->assembler->assemble(
@@ -50,16 +47,16 @@ final class ZatcaSignedInvoiceQrCoordinator
             $material->certificateChain[0],
         );
         $qrCode = $this->qrEncoder->encode(
-            $sellerName,
-            $vatNumber,
-            $invoiceTime,
-            $invoiceTotal,
-            $vatTotal,
+            $snapshot['seller_name'],
+            $snapshot['vat_number'],
+            $snapshot['invoice_time'],
+            $snapshot['invoice_total'],
+            $snapshot['vat_total'],
             $signedMaterial['invoice_hash'],
             $signedMaterial['ecdsa_signature'],
             $certificateMaterial['public_key'],
-            $documentType,
-            $documentType === 'simplified'
+            $snapshot['document_type'],
+            $snapshot['document_type'] === 'simplified'
                 ? $certificateMaterial['certificate_signature']
                 : null,
         );
@@ -71,7 +68,17 @@ final class ZatcaSignedInvoiceQrCoordinator
         );
     }
 
-    private function documentType(string $invoiceXml): string
+    /**
+     * @return array{
+     *   seller_name:string,
+     *   vat_number:string,
+     *   invoice_time:DateTimeImmutable,
+     *   invoice_total:string,
+     *   vat_total:string,
+     *   document_type:string
+     * }
+     */
+    private function invoiceSnapshot(string $invoiceXml): array
     {
         $previous = libxml_use_internal_errors(true);
         try {
@@ -91,24 +98,108 @@ final class ZatcaSignedInvoiceQrCoordinator
             $xpath = new DOMXPath($document);
             $xpath->registerNamespace('inv', 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2');
             $xpath->registerNamespace('cbc', ZatcaXadesSignatureAssembler::CBC_NAMESPACE);
-            $typeCodes = $xpath->query('/inv:Invoice/cbc:InvoiceTypeCode');
-            $typeCode = $typeCodes !== false && $typeCodes->length === 1
-                ? $typeCodes->item(0)
-                : null;
-            if (! $typeCode instanceof DOMElement || trim($typeCode->textContent) !== '388') {
+            $xpath->registerNamespace(
+                'cac',
+                'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
+            );
+            $typeCode = $this->uniqueElement($xpath, '/inv:Invoice/cbc:InvoiceTypeCode');
+            if (trim($typeCode->textContent) !== '388') {
                 throw new InvalidArgumentException('فاتورة ZATCA يجب أن تحتوي InvoiceTypeCode فريداً بقيمة 388.');
             }
+            $transactionCode = $typeCode->getAttribute('name');
+            if (preg_match('/^(01|02)[01]{5}$/D', $transactionCode, $typeMatch) !== 1) {
+                throw new InvalidArgumentException('اسم InvoiceTypeCode ليس رمز معاملة ZATCA صالحاً.');
+            }
 
-            return match ($typeCode->getAttribute('name')) {
-                '0100000' => 'standard',
-                '0200000' => 'simplified',
-                default => throw new InvalidArgumentException(
-                    'اسم InvoiceTypeCode يجب أن يحدد فاتورة standard أو simplified صراحةً.',
+            $sellerName = trim($this->uniqueElement(
+                $xpath,
+                '/inv:Invoice/cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName',
+            )->textContent);
+            $vatNumber = trim($this->uniqueElement(
+                $xpath,
+                '/inv:Invoice/cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID',
+            )->textContent);
+            $issueDate = trim($this->uniqueElement($xpath, '/inv:Invoice/cbc:IssueDate')->textContent);
+            $issueTime = trim($this->uniqueElement($xpath, '/inv:Invoice/cbc:IssueTime')->textContent);
+            $invoiceTotal = $this->amount(
+                $this->uniqueElement(
+                    $xpath,
+                    "/inv:Invoice/cac:LegalMonetaryTotal/cbc:TaxInclusiveAmount[@currencyID='SAR']",
                 ),
-            };
+                'إجمالي الفاتورة',
+            );
+            $vatTotal = $this->amount(
+                $this->uniqueElement(
+                    $xpath,
+                    "/inv:Invoice/cac:TaxTotal/cbc:TaxAmount[@currencyID='SAR']",
+                ),
+                'إجمالي الضريبة',
+            );
+
+            return [
+                'seller_name' => $sellerName,
+                'vat_number' => $vatNumber,
+                'invoice_time' => $this->invoiceTime($issueDate, $issueTime),
+                'invoice_total' => $invoiceTotal,
+                'vat_total' => $vatTotal,
+                'document_type' => $typeMatch[1] === '01' ? 'standard' : 'simplified',
+            ];
         } finally {
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
         }
+    }
+
+    private function uniqueElement(DOMXPath $xpath, string $expression): DOMElement
+    {
+        $nodes = $xpath->query($expression);
+        $element = $nodes !== false && $nodes->length === 1 ? $nodes->item(0) : null;
+        if (! $element instanceof DOMElement) {
+            throw new InvalidArgumentException('فاتورة ZATCA تفتقد حقل QR فريداً ومطلوباً.');
+        }
+
+        return $element;
+    }
+
+    private function amount(DOMElement $element, string $label): string
+    {
+        $amount = trim($element->textContent);
+        if (preg_match('/^\d+\.\d{2}$/D', $amount) !== 1) {
+            throw new InvalidArgumentException("{$label} داخل XML يجب أن يكون SAR بمنزلتين عشريتين.");
+        }
+
+        return $amount;
+    }
+
+    private function invoiceTime(string $date, string $time): DateTimeImmutable
+    {
+        $stamp = $date.'T'.$time;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})?$/D', $stamp) !== 1) {
+            throw new InvalidArgumentException('تاريخ أو وقت إصدار فاتورة ZATCA غير صالح لوسم QR.');
+        }
+
+        $timezoneName = config('app.timezone', 'UTC');
+        if (! is_string($timezoneName)) {
+            throw new InvalidArgumentException('منطقة وقت التطبيق غير صالحة لبناء QR.');
+        }
+        try {
+            $timezone = new DateTimeZone($timezoneName);
+        } catch (\Exception) {
+            throw new InvalidArgumentException('تعذر تفسير وقت إصدار فاتورة ZATCA.');
+        }
+        $format = str_ends_with($stamp, 'Z')
+            ? '!Y-m-d\TH:i:s\Z'
+            : (preg_match('/[+-]\d{2}:\d{2}$/D', $stamp) === 1
+                ? '!Y-m-d\TH:i:sP'
+                : '!Y-m-d\TH:i:s');
+        $invoiceTime = DateTimeImmutable::createFromFormat($format, $stamp, $timezone);
+        $errors = DateTimeImmutable::getLastErrors();
+        if ($invoiceTime === false || (is_array($errors)
+            && ($errors['warning_count'] !== 0 || $errors['error_count'] !== 0))
+        ) {
+            throw new InvalidArgumentException('تعذر تفسير وقت إصدار فاتورة ZATCA.');
+        }
+
+        return $invoiceTime;
     }
 }

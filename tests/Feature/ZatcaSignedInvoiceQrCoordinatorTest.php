@@ -25,12 +25,7 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
 
         $result = app(ZatcaSignedInvoiceQrCoordinator::class)->build(
             $this->invoiceXml('0200000'),
-            'شركة نبراكس',
-            '310000000000003',
-            new DateTimeImmutable('2026-08-30 03:04:05+03:00'),
             new DateTimeImmutable('2026-08-30 03:05:06+03:00'),
-            '115.00',
-            '15.00',
         );
 
         $signedMaterial = app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($result->signedXml);
@@ -68,13 +63,8 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
         $this->activeCredential();
 
         $result = app(ZatcaSignedInvoiceQrCoordinator::class)->build(
-            $this->invoiceXml('0100000'),
-            'Nebrax',
-            '310000000000003',
-            new DateTimeImmutable('2026-08-30T00:04:05Z'),
+            $this->invoiceXml('0100100'),
             new DateTimeImmutable('2026-08-30T00:05:06Z'),
-            '115.00',
-            '15.00',
         );
 
         $fields = $this->decode($result->qrCode);
@@ -94,13 +84,8 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
         $this->expectExceptionMessage('InvoiceTypeCode');
 
         app(ZatcaSignedInvoiceQrCoordinator::class)->build(
-            $this->invoiceXml(''),
-            'Nebrax',
-            '310000000000003',
-            new DateTimeImmutable('2026-08-30T00:04:05Z'),
+            $this->invoiceXml('0300000'),
             new DateTimeImmutable('2026-08-30T00:05:06Z'),
-            '115.00',
-            '15.00',
         );
     }
 
@@ -231,9 +216,16 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
  xmlns:xades="http://uri.etsi.org/01903/v1.3.2#">
  <cbc:ID>INV-SIGNED-QR-1</cbc:ID>
  <cbc:UUID>44444444-4444-4444-8444-444444444444</cbc:UUID>
+ <cbc:IssueDate>2026-08-30</cbc:IssueDate>
+ <cbc:IssueTime>03:04:05+03:00</cbc:IssueTime>
  <cbc:InvoiceTypeCode name="{$transactionCode}">388</cbc:InvoiceTypeCode>
  <cac:AdditionalDocumentReference><cbc:ID>QR</cbc:ID><cac:Attachment><cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">QR</cbc:EmbeddedDocumentBinaryObject></cac:Attachment></cac:AdditionalDocumentReference>
  <cac:Signature><cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID></cac:Signature>
+ <cac:AccountingSupplierParty><cac:Party>
+  <cac:PartyTaxScheme><cbc:CompanyID>310000000000003</cbc:CompanyID></cac:PartyTaxScheme>
+  <cac:PartyLegalEntity><cbc:RegistrationName>شركة نبراكس</cbc:RegistrationName></cac:PartyLegalEntity>
+ </cac:Party></cac:AccountingSupplierParty>
+ <cac:TaxTotal><cbc:TaxAmount currencyID="SAR">15.00</cbc:TaxAmount></cac:TaxTotal>
  <cac:LegalMonetaryTotal><cbc:TaxInclusiveAmount currencyID="SAR">115.00</cbc:TaxInclusiveAmount></cac:LegalMonetaryTotal>
 </Invoice>
 XML;
