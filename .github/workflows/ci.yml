@@ -159,4 +159,15 @@ jobs:
 
       - name: تشغيل الاختبارات
         working-directory: ${{ env.APP_DIR }}
-        run: php artisan test
+        shell: bash
+        run: |
+          set -o pipefail
+          php artisan test 2>&1 | tee test-output-${{ matrix.db }}.txt
+
+      - name: حفظ مخرجات الاختبارات للتشخيص
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ matrix.db }}
+          path: ${{ env.APP_DIR }}/test-output-${{ matrix.db }}.txt
+          retention-days: 1
