@@ -16,9 +16,10 @@ class OpenPosSessionRequest extends FormRequest
         return [
             'opening_balance' => ['required', 'integer', 'min:0'], // هللات
             'pos_device_id'   => ['required', 'uuid'],
-            // المصدر الجديد لوردية تشغيل POS. يبقى shift_id مؤقتاً للتوافق
-            // مع العملاء/الجلسات التاريخية فقط، ولا يُستخدم لفتح جلسة جديدة.
-            'pos_shift_id'    => ['required', 'uuid'],
+            // المسار الجديد. الواجهة الجديدة ترسله دائماً، لكنه يبقى nullable
+            // خلال نافذة الترحيل حتى لا نكسر عملاء API القديمة دفعة واحدة.
+            'pos_shift_id'    => ['nullable', 'uuid'],
+            // توافق مرحلي فقط مع تكاملات POS القديمة. لا تستخدمه الواجهة الجديدة.
             'shift_id'        => ['nullable', 'uuid'],
         ];
     }
