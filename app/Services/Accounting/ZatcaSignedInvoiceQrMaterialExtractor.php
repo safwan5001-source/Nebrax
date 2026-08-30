@@ -55,7 +55,11 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         if ($references->length !== 2) {
             throw new InvalidArgumentException('SignedInfo يجب أن تحتوي مرجعي الفاتورة وSignedProperties فقط.');
         }
-        $this->assertSignedPropertiesReference($xpath, $signatureElement, $signedInfo->item(0));
+        $signedProperties = $this->assertSignedPropertiesReference(
+            $xpath,
+            $signatureElement,
+            $signedInfo->item(0),
+        );
 
         $invoiceHashBase64 = trim($invoiceDigests->item(0)?->textContent ?? '');
         $signatureBase64 = trim($signatureValues->item(0)?->textContent ?? '');
@@ -80,7 +84,7 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         if ($certificates->length < 1) {
             throw new InvalidArgumentException('توقيع فاتورة ZATCA يفتقد شهادة leaf.');
         }
-        $this->assertSigningCertificateDigests($xpath, $signatureElement, $certificates);
+        $this->assertSigningCertificateDigests($xpath, $signedProperties, $certificates);
         $publicKeyPem = $this->publicKeyPem(trim($certificates->item(0)?->textContent ?? ''));
         if (! $this->signatureVerifier->verify(
             $this->canonicalizer->canonicalizeElementInContext($signedInfo->item(0)),
@@ -100,16 +104,39 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
 
     private function assertSigningCertificateDigests(
         DOMXPath $xpath,
-        DOMElement $signature,
+        DOMElement $signedProperties,
         \DOMNodeList $certificates,
     ): void {
+        $signatureProperties = $this->query(
+            $xpath,
+            './xades:SignedSignatureProperties',
+            $signedProperties,
+        );
+        if ($signatureProperties->length !== 1 || ! $signatureProperties->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('SignedProperties لا تحتوي SignedSignatureProperties فريدة.');
+        }
+        $signingCertificates = $this->query(
+            $xpath,
+            './xades:SigningCertificateV2',
+            $signatureProperties->item(0),
+        );
+        if ($signingCertificates->length !== 1 || ! $signingCertificates->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('SignedProperties لا تحتوي SigningCertificateV2 فريدة.');
+        }
+        $certificateEntries = $this->query(
+            $xpath,
+            './xades:Cert',
+            $signingCertificates->item(0),
+        );
         $certDigests = $this->query(
             $xpath,
-            './/xades:SigningCertificateV2/xades:Cert/xades:CertDigest',
-            $signature,
+            './xades:Cert/xades:CertDigest',
+            $signingCertificates->item(0),
         );
-        if ($certDigests->length !== $certificates->length) {
-            throw new InvalidArgumentException('بصمات SigningCertificateV2 لا تطابق سلسلة شهادات KeyInfo.');
+        if ($certificateEntries->length !== $certificates->length
+            || $certDigests->length !== $certificates->length
+        ) {
+            throw new RuntimeException('بصمات SigningCertificateV2 لا تطابق سلسلة شهادات KeyInfo.');
         }
         for ($index = 0; $index < $certificates->length; $index++) {
             $certDigest = $certDigests->item($index);
@@ -139,7 +166,7 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         DOMXPath $xpath,
         DOMElement $signature,
         DOMElement $signedInfo,
-    ): void {
+    ): DOMElement {
         $references = $this->query(
             $xpath,
             "./ds:Reference[@Type='".ZatcaXmlDsigSignedInfoBuilder::SIGNED_PROPERTIES_TYPE."']",
@@ -193,6 +220,8 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         if (! hash_equals($calculated, $digest)) {
             throw new RuntimeException('DigestValue لا يطابق SignedProperties المضمّنة.');
         }
+
+        return $targets->item(0);
     }
 
     /** @return list<DOMElement> */
