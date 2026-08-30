@@ -241,6 +241,46 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_multiple_root_ubl_extensions_wrappers(): void
+    {
+        $document = new DOMDocument();
+        $document->preserveWhiteSpace = true;
+        $this->assertTrue($document->loadXML($this->signedInvoice(), LIBXML_NONET));
+        $root = $document->documentElement;
+        $this->assertInstanceOf(DOMElement::class, $root);
+        $extraWrapper = $document->createElementNS(
+            ZatcaXadesSignatureAssembler::EXT_NAMESPACE,
+            'ext:UBLExtensions',
+        );
+        $extraWrapper->appendChild($document->createElementNS(
+            ZatcaXadesSignatureAssembler::EXT_NAMESPACE,
+            'ext:UBLExtension',
+        ));
+        $root->appendChild($extraWrapper);
+        $tampered = $document->saveXML();
+        $this->assertIsString($tampered);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('UBLExtensions');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+    }
+
+    /** @test */
+    public function it_rejects_transforms_split_across_multiple_containers(): void
+    {
+        foreach (['invoice', 'signed_properties'] as $reference) {
+            $tampered = $this->signedInvoiceWithSplitTransforms($reference);
+            try {
+                app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+                $this->fail('كان يجب رفض Reference تحتوي أكثر من حاوية Transforms.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('تحويل', $exception->getMessage());
+            }
+        }
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
@@ -445,6 +485,55 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
             app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedProperties),
             true,
         ));
+        $signatureValue->nodeValue = app(ZatcaXmlEcdsaSigner::class)->sign(
+            app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
+            $privateKey,
+        );
+        $xml = $document->saveXML();
+        $this->assertIsString($xml);
+
+        return $xml;
+    }
+
+    private function signedInvoiceWithSplitTransforms(string $referenceKind): string
+    {
+        [$privateKey, $leaf] = $this->certificate();
+        $signed = app(ZatcaXadesSignatureAssembler::class)->assemble(
+            $this->invoiceXml(),
+            [base64_encode($leaf)],
+            $privateKey,
+            new DateTimeImmutable('2026-08-30T01:02:03+03:00'),
+            'https://zatca.gov.sa/security-policy.pdf',
+            base64_encode(hash('sha256', 'policy', true)),
+        );
+
+        $document = new DOMDocument();
+        $document->preserveWhiteSpace = true;
+        $this->assertTrue($document->loadXML($signed, LIBXML_NONET));
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
+        $referenceExpression = $referenceKind === 'invoice'
+            ? "//ds:SignedInfo/ds:Reference[@URI='']"
+            : "//ds:SignedInfo/ds:Reference[@Type='".
+                \App\Services\Accounting\ZatcaXmlDsigSignedInfoBuilder::SIGNED_PROPERTIES_TYPE."']";
+        $reference = $xpath->query($referenceExpression)?->item(0);
+        $transforms = $reference instanceof DOMElement
+            ? $xpath->query('./ds:Transforms', $reference)?->item(0)
+            : null;
+        $signedInfo = $xpath->query('//ds:Signature/ds:SignedInfo')?->item(0);
+        $signatureValue = $xpath->query('//ds:Signature/ds:SignatureValue')?->item(0);
+        $this->assertInstanceOf(DOMElement::class, $reference);
+        $this->assertInstanceOf(DOMElement::class, $transforms);
+        $this->assertInstanceOf(DOMElement::class, $signedInfo);
+        $this->assertInstanceOf(DOMElement::class, $signatureValue);
+        $lastTransform = $transforms->lastElementChild;
+        $this->assertInstanceOf(DOMElement::class, $lastTransform);
+        $secondContainer = $document->createElementNS(
+            ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE,
+            'ds:Transforms',
+        );
+        $secondContainer->appendChild($lastTransform);
+        $reference->insertBefore($secondContainer, $transforms->nextSibling);
         $signatureValue->nodeValue = app(ZatcaXmlEcdsaSigner::class)->sign(
             app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
             $privateKey,
