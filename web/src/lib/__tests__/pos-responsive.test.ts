@@ -107,4 +107,31 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     expect(auth).not.toContain('pos-responsive');
     expect(auth).not.toContain('PosDialog');
   });
+
+  it('يحافظ على ربط السلة والدفع والإيصال دون إعادة lg:p-5 أو صناديق أيقونات ملوّنة', () => {
+    const page = source('src/app/(pos)/pos/page.tsx');
+    const payment = source('src/components/pos/pos-payment.tsx');
+    const receipt = source('src/components/pos/receipt-dialog.tsx');
+    const products = source('src/lib/pos-responsive.ts');
+
+    expect(page).toContain('PosCartLineFrame');
+    expect(page).toContain('PosCartQtyControls');
+    expect(page).toContain('PosCartRemoveButton');
+    expect(page).toContain('PosCartEmptyState');
+    expect(page).toContain('usePosBarcodeScanner');
+    expect(page).toContain('POS_PRODUCTS_PANEL_CLASS');
+    expect(products).not.toContain('lg:p-5');
+    expect(page).not.toContain('lg:p-5');
+
+    expect(payment).not.toContain('grid h-8 w-8');
+    expect(payment).not.toContain('grid h-5 w-5 place-items-center rounded-md bg-primary');
+    expect(payment).toContain('data-testid="pos-confirm-payment"');
+    expect(payment).toContain('data-testid="pos-checkout-recovering"');
+
+    expect(receipt).toContain('DocumentView');
+    expect(receipt).toContain('DocumentScaler');
+    expect(receipt).toContain('printDocument');
+    expect(receipt).toContain('pos-receipt-success');
+    expect(receipt).not.toContain('max-w-xs');
+  });
 });

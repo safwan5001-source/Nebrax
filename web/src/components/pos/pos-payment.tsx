@@ -122,12 +122,12 @@ export function PosPayment({
 
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[340px_1fr]">
         <aside className="hidden flex-col border-b border-border bg-surface lg:flex lg:border-b-0 lg:border-e lg:overflow-y-auto">
-          <div className="border-b border-border p-5">
+          <div className="border-b border-border p-4">
             <div className="mb-1.5 text-xs font-semibold text-muted">{t('invoice_total')}</div>
-            <div className="num text-3xl font-extrabold text-primary-hover">
+            <div className="num text-3xl font-bold text-text">
               {formatRiyal(totalMinor / 100)}
             </div>
-            <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold">
+            <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold">
               <User className="h-3.5 w-3.5 text-muted" strokeWidth={1.7} />
               {customerName}
             </div>
@@ -145,12 +145,12 @@ export function PosPayment({
           </div>
         </aside>
 
-        <main className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain p-3 sm:p-5 lg:gap-5 lg:p-7">
-          <section className="rounded-lg border border-border bg-surface p-3 lg:hidden">
+        <main className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain p-3 sm:p-4 lg:gap-5">
+          <section className="rounded-md border border-border bg-surface p-3 lg:hidden">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[11px] font-semibold text-muted">{t('invoice_total')}</div>
-                <div className="num mt-0.5 text-2xl font-extrabold text-primary-hover">
+                <div className="num mt-0.5 text-2xl font-bold text-text">
                   {formatRiyal(totalMinor / 100)}
                 </div>
               </div>
@@ -193,29 +193,26 @@ export function PosPayment({
                     <div
                       key={method.id}
                       onClick={() => setSelectedMethodId(method.id)}
-                      className={'min-h-12 cursor-pointer rounded-lg border-[1.5px] bg-surface p-3 touch-manipulation sm:p-4 ' + (selected || applied ? 'border-primary bg-primary-soft' : 'border-border')}
+                      className={'min-h-12 cursor-pointer rounded-md border bg-surface p-3 touch-manipulation sm:p-3.5 ' + (selected || applied ? 'border-primary bg-primary-soft' : 'border-border')}
                     >
-                      <div className="mb-2 flex items-center justify-between sm:mb-2.5">
-                        <div className={'grid h-8 w-8 place-items-center rounded-lg sm:h-9 sm:w-9 ' + (selected || applied ? 'bg-primary text-white' : 'bg-background text-muted')}>
-                          <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
-                        </div>
-                        {applied && (
-                          <div className="grid h-5 w-5 place-items-center rounded-md bg-primary text-white">
-                            <Check className="h-3 w-3" strokeWidth={3} />
-                          </div>
-                        )}
+                      <div className="mb-2 flex items-center justify-between">
+                        <Icon className={'h-4 w-4 ' + (selected || applied ? 'text-primary' : 'text-muted')} strokeWidth={1.7} />
+                        {applied && <Check className="h-4 w-4 text-primary" strokeWidth={1.8} aria-hidden />}
                       </div>
-                      <div className="mb-1.5 truncate text-xs font-bold sm:mb-2 sm:text-[13px]" title={label(method)}>{label(method)}</div>
-                      <input
-                        aria-label={label(method)}
-                        value={tenders[method.id] ?? ''}
-                        onFocus={() => setSelectedMethodId(method.id)}
-                        onChange={(event) => set(method.id, event.target.value)}
-                        inputMode="decimal"
-                        disabled={locked}
-                        placeholder="0.00"
-                        className="num min-h-12 w-full rounded-lg border border-border bg-background px-2 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
-                      />
+                      <div className="mb-1.5 truncate text-xs font-semibold sm:text-[13px]" title={label(method)}>{label(method)}</div>
+                      <label className="block">
+                        <span className="sr-only">{t('received_amount')}</span>
+                        <input
+                          aria-label={label(method)}
+                          value={tenders[method.id] ?? ''}
+                          onFocus={() => setSelectedMethodId(method.id)}
+                          onChange={(event) => set(method.id, event.target.value)}
+                          inputMode="decimal"
+                          disabled={locked}
+                          placeholder="0.00"
+                          className="num min-h-12 w-full rounded-md border border-border bg-background px-2 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+                        />
+                      </label>
                     </div>
                   );
                 })}
@@ -255,17 +252,17 @@ export function PosPayment({
           </div>
 
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <div className="min-w-0 rounded-lg border border-border bg-surface p-2.5 sm:p-4">
+            <div className="min-w-0 rounded-md border border-border bg-surface p-2.5 sm:p-3" data-testid="pos-payment-paid">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('paid')}</div>
-              <div className="num truncate text-sm font-extrabold text-positive sm:text-lg" title={formatRiyal(paidMinor / 100)}>{formatRiyal(paidMinor / 100)}</div>
+              <div className={'num truncate text-sm font-bold sm:text-lg ' + (paidMinor > 0 ? 'text-positive' : 'text-text')} title={formatRiyal(paidMinor / 100)}>{formatRiyal(paidMinor / 100)}</div>
             </div>
-            <div className="min-w-0 rounded-lg border border-border bg-surface p-2.5 sm:p-4">
+            <div className="min-w-0 rounded-md border border-border bg-surface p-2.5 sm:p-3" data-testid="pos-payment-remaining">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('remaining')}</div>
-              <div className="num truncate text-sm font-extrabold text-negative sm:text-lg" title={formatRiyal(remainingMinor / 100)}>{formatRiyal(remainingMinor / 100)}</div>
+              <div className={'num truncate text-sm font-bold sm:text-lg ' + (remainingMinor > 0 ? 'text-negative' : 'text-text')} title={formatRiyal(remainingMinor / 100)}>{formatRiyal(remainingMinor / 100)}</div>
             </div>
-            <div className="min-w-0 rounded-lg border border-border bg-surface p-2.5 sm:p-4">
+            <div className="min-w-0 rounded-md border border-border bg-surface p-2.5 sm:p-3" data-testid="pos-payment-change">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('change')}</div>
-              <div className="num truncate text-sm font-extrabold text-primary-hover sm:text-lg" title={formatRiyal(changeMinor / 100)}>{formatRiyal(changeMinor / 100)}</div>
+              <div className={'num truncate text-sm font-bold sm:text-lg ' + (changeMinor > 0 ? 'text-positive' : 'text-text')} title={formatRiyal(changeMinor / 100)}>{formatRiyal(changeMinor / 100)}</div>
             </div>
           </div>
 
@@ -292,7 +289,7 @@ export function PosPayment({
           }}
           disabled={!canConfirm || locked || paymentMethodsLoading}
           aria-busy={locked}
-          className="flex min-h-12 flex-1 items-center justify-center gap-2.5 rounded-lg bg-primary px-4 py-3 text-base font-bold text-white touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-14 flex-1 items-center justify-center gap-2.5 rounded-md bg-primary px-4 py-3 text-base font-bold text-white touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           {locked ? <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2.2} aria-hidden /> : <Check className="h-5 w-5" strokeWidth={2.2} />}
           {confirmLabel()}
