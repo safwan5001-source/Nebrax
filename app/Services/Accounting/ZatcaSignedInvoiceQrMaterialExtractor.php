@@ -11,7 +11,11 @@ use RuntimeException;
 /** يستخرج وسمي QR 6 و7 من فاتورة موقعة ويتحقق من ارتباط الهاش بمحتواها. */
 final class ZatcaSignedInvoiceQrMaterialExtractor
 {
-    public function __construct(private readonly ZatcaInvoiceHasher $invoiceHasher) {}
+    public function __construct(
+        private readonly ZatcaInvoiceHasher $invoiceHasher,
+        private readonly ZatcaXmlCanonicalizer $canonicalizer,
+        private readonly ZatcaXmlEcdsaSigner $signatureVerifier,
+    ) {}
 
     /** @return array{invoice_hash:string, ecdsa_signature:string} بايتات خام */
     public function extract(string $signedXml): array
@@ -55,12 +59,53 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
             throw new InvalidArgumentException('SignatureValue لفاتورة ZATCA ليس Base64 صالحاً بطول 64 بايت.');
         }
 
+        $keyInfo = $this->query($xpath, './ds:KeyInfo', $signatureElement);
+        if ($keyInfo->length !== 1 || ! $keyInfo->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('توقيع فاتورة ZATCA لا يحتوي KeyInfo فريدة.');
+        }
+        $x509Data = $this->query($xpath, './ds:X509Data', $keyInfo->item(0));
+        if ($x509Data->length !== 1 || ! $x509Data->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('توقيع فاتورة ZATCA لا يحتوي X509Data فريدة.');
+        }
+        $certificates = $this->query($xpath, './ds:X509Certificate', $x509Data->item(0));
+        if ($certificates->length < 1) {
+            throw new InvalidArgumentException('توقيع فاتورة ZATCA يفتقد شهادة leaf.');
+        }
+        $publicKeyPem = $this->publicKeyPem(trim($certificates->item(0)?->textContent ?? ''));
+        if (! $this->signatureVerifier->verify(
+            $this->canonicalizer->canonicalizeElementInContext($signedInfo->item(0)),
+            $signatureBase64,
+            $publicKeyPem,
+        )) {
+            throw new RuntimeException('SignatureValue لا يطابق SignedInfo وشهادة leaf المضمّنة.');
+        }
+
         $calculatedHash = base64_decode($this->invoiceHasher->hash($signedXml), true);
         if (! is_string($calculatedHash) || ! hash_equals($calculatedHash, $invoiceHash)) {
             throw new RuntimeException('هاش QR لا يطابق محتوى فاتورة ZATCA الموقعة.');
         }
 
         return ['invoice_hash' => $invoiceHash, 'ecdsa_signature' => $signature];
+    }
+
+    private function publicKeyPem(string $certificateBase64): string
+    {
+        $der = base64_decode($certificateBase64, true);
+        if (! is_string($der) || $der === '') {
+            throw new InvalidArgumentException('شهادة leaf المضمّنة ليست Base64 DER صالحة.');
+        }
+        $pem = "-----BEGIN CERTIFICATE-----\n"
+            .chunk_split(base64_encode($der), 64, "\n")
+            ."-----END CERTIFICATE-----\n";
+        $certificate = @openssl_x509_read($pem);
+        $publicKey = $certificate === false ? false : openssl_pkey_get_public($certificate);
+        $details = $publicKey === false ? false : openssl_pkey_get_details($publicKey);
+        $publicKeyPem = is_array($details) ? ($details['key'] ?? null) : null;
+        if (! is_string($publicKeyPem) || $publicKeyPem === '') {
+            throw new InvalidArgumentException('تعذر استخراج المفتاح العام من شهادة leaf المضمّنة.');
+        }
+
+        return $publicKeyPem;
     }
 
     private function assertInvoiceReferenceTransforms(DOMXPath $xpath, DOMElement $reference): void
