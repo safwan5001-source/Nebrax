@@ -190,7 +190,7 @@ export default function PosShiftsSettingsPage() {
         ))}
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen} title={editing ? labels.edit : labels.add}>
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={editing ? labels.edit : labels.add}>
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="pos-shift-name">{labels.name}</Label>
