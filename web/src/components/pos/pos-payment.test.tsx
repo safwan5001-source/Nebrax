@@ -150,4 +150,59 @@ describe('PosPayment', () => {
     expect(onConfirm).not.toHaveBeenCalled();
     expect(onBack).not.toHaveBeenCalled();
   });
+
+  it('يزيل صناديق الأيقونات الملوّنة ويستخدم دلالة مالية للمدفوع والمتبقي والباقي', () => {
+    const { rerender } = render(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={vi.fn()}
+        paying={false}
+        paymentMethods={paymentMethods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+
+    expect(document.querySelector('.grid.h-8.w-8')).toBeNull();
+    expect(document.querySelector('.grid.h-5.w-5')).toBeNull();
+    expect(screen.getByTestId('pos-payment-paid').querySelector('.num')?.className).toMatch(/text-text/);
+    expect(screen.getByTestId('pos-payment-remaining').querySelector('.num')?.className).toMatch(/text-negative/);
+    expect(screen.getByTestId('pos-payment-change').querySelector('.num')?.className).toMatch(/text-text/);
+    expect(screen.getByTestId('pos-confirm-payment').className).toMatch(/min-h-14/);
+    expect(screen.getByTestId('pos-confirm-payment').className).toMatch(/bg-primary/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'exact_amount' }));
+    expect(screen.getByTestId('pos-payment-paid').querySelector('.num')?.className).toMatch(/text-positive/);
+    expect(screen.getByTestId('pos-payment-remaining').querySelector('.num')?.className).toMatch(/text-text/);
+    expect(screen.getByTestId('pos-payment-remaining').querySelector('.num')?.className).not.toMatch(/text-negative/);
+
+    const amount = screen.getByRole('textbox', { name: 'Cash' });
+    fireEvent.change(amount, { target: { value: '150.00' } });
+    expect(screen.getByTestId('pos-payment-change').querySelector('.num')?.className).toMatch(/text-positive/);
+
+    rerender(
+      <PosPayment
+        allowDeferredPayment={false}
+        checkoutPhase="idle"
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error="card declined"
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={vi.fn()}
+        paying={false}
+        paymentMethods={paymentMethods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+    expect(screen.getByRole('alert').className).toMatch(/text-negative/);
+  });
 });

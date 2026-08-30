@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Minus, Plus, Trash2 } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { cn } from '@/lib/utils';
 
@@ -63,7 +63,7 @@ export function PosCartRemoveButton({
         event.stopPropagation();
         onRemove();
       }}
-      className="ms-2 grid min-h-12 min-w-12 shrink-0 touch-manipulation place-items-center rounded-md text-muted hover:bg-negative/10 hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="grid min-h-12 min-w-12 shrink-0 touch-manipulation place-items-center rounded-md text-muted hover:bg-negative/10 hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       aria-label={label}
     >
       <Trash2 className="h-4 w-4" strokeWidth={1.7} />
@@ -125,6 +125,19 @@ export function PosCartQtyControls({
       >
         <Plus className="h-4 w-4" strokeWidth={1.7} />
       </button>
+    </div>
+  );
+}
+
+/** حالة السلة الفارغة: مضغوطة وهادئة، بلا مساحة ميتة أو صندوق أيقونة ملوّن. */
+export function PosCartEmptyState({ message }: { message: string }) {
+  return (
+    <div
+      className="flex h-full min-h-0 flex-col items-center justify-center gap-2 px-3 py-6 text-center"
+      data-testid="pos-cart-empty"
+    >
+      <ShoppingCart className="h-5 w-5 text-muted" strokeWidth={1.7} aria-hidden />
+      <p className="max-w-[16rem] text-sm text-muted">{message}</p>
     </div>
   );
 }
