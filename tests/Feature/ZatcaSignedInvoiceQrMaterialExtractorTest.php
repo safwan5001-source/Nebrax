@@ -295,6 +295,17 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_an_invalid_invoice_data_object_mime_type(): void
+    {
+        $tampered = $this->signedInvoiceWithDetachedDataObjectFormat('mime_type');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('MimeType');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
@@ -594,8 +605,17 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
         $this->assertInstanceOf(DOMElement::class, $signatureValue);
         if ($mutation === 'reference_id') {
             $invoiceReference->setAttribute('Id', 'detachedInvoiceReference');
-        } else {
+        } elseif ($mutation === 'object_reference') {
             $dataObjectFormat->setAttribute('ObjectReference', '#detachedInvoiceReference');
+            $propertiesDigest->nodeValue = base64_encode(hash(
+                'sha256',
+                app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedProperties),
+                true,
+            ));
+        } else {
+            $mimeType = $xpath->query('./xades:MimeType', $dataObjectFormat)?->item(0);
+            $this->assertInstanceOf(DOMElement::class, $mimeType);
+            $mimeType->nodeValue = 'application/xml';
             $propertiesDigest->nodeValue = base64_encode(hash(
                 'sha256',
                 app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedProperties),
