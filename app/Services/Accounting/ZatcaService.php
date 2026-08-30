@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Branch;
 use App\Models\Invoice;
 use App\Models\Tenant;
+use App\Models\ZatcaCredential;
 use App\Support\ZatcaIcvScope;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -15,18 +16,19 @@ use RuntimeException;
  * ═══════════════════════════════════════════════════════════════
  *  المرحلة 1 (التوليد): رمز QR بصيغة TLV/Base64 بالحقول الخمسة.
  *  المرحلة 2 (الربط):   UUID + عدّاد ICV + سلسلة الهاش (PIH) + مستند UBL 2.1
- *                       + هاش SHA-256 بعد تحويل ZATCA الرسمي وC14N 1.1.
+ *                       + هاش SHA-256 بعد تحويل ZATCA الرسمي وC14N 1.1
+ *                       + توقيع XAdES وQR المرحلة الثانية عند بدء التهيئة.
  *
- *  المؤجَّل (يتطلب شهادات ZATCA وربطاً حياً): التوقيع التشفيري (secp256k1)،
- *  CSID/CSR، توسعة QR للوسوم 6–9، وإرسال Clearance/Reporting.
+ *  المؤجَّل (يتطلب ربطاً حياً): CSID/CSR الآلي وإرسال Clearance/Reporting.
  *
  *  المبالغ تُحوَّل من الهللات إلى نص عشري بلا float.
  */
 class ZatcaService
 {
-    public function __construct(private readonly ZatcaInvoiceHasher $invoiceHasher)
-    {
-    }
+    public function __construct(
+        private readonly ZatcaInvoiceHasher $invoiceHasher,
+        private readonly ZatcaSignedInvoiceFinalizer $signedInvoiceFinalizer,
+    ) {}
 
     /**
      * بناء كامل بيانات الفاتورة الإلكترونية عند الترحيل.
@@ -79,6 +81,28 @@ class ZatcaService
         $hash = $this->invoiceHasher->hash($unsignedXml);
         $qr   = $this->qrFor($invoice, $tenant);
         $xml  = $this->attachQr($unsignedXml, $qr);
+
+        // لا وجود لاعتماد = مستأجر ما زال على عقد المرحلة الأولى التاريخي.
+        // بمجرد وجود أي صف اعتماد يبدأ مسار المرحلة الثانية ولا يُسمح بالرجوع
+        // الصامت إلى XML غير موقّع بسبب اختيار بيئة بلا اعتماد أو سياسة ناقصة؛
+        // finalizer يفشل مغلقاً، ومعاملة InvoiceService تتراجع بكامل أثرها.
+        if (ZatcaCredential::query()->exists()) {
+            $issueTime = $invoice->created_at ?? now();
+            $final = $this->signedInvoiceFinalizer->finalize(
+                $xml,
+                $qr,
+                $tenant?->name ?? '',
+                $tenant?->vat_number ?? '',
+                $issueTime,
+                now('UTC'),
+                $this->formatAmount($invoice->total),
+                $this->formatAmount($invoice->tax_amount),
+                $invoice->zatca_document_type,
+            );
+            $xml = $final['xml'];
+            $hash = $final['hash'];
+            $qr = $final['qr'];
+        }
 
         return compact('uuid', 'icv', 'prev', 'xml', 'hash', 'qr');
     }
