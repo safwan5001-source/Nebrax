@@ -46,7 +46,7 @@ class PosSessionService
     public function open(
         int $openingBalance,
         string $deviceId,
-        string $posShiftId,
+        ?string $posShiftId = null,
         ?string $userId = null,
         ?User $actor = null,
     ): PosSession {
@@ -75,7 +75,7 @@ class PosSessionService
                 throw new RuntimeException('جهاز نقطة البيع أو مستودعه خارج نطاق صلاحياتك.');
             }
 
-            $posShift = $this->resolvePosShift($posShiftId, $branchId);
+            $posShift = $posShiftId !== null ? $this->resolvePosShift($posShiftId, $branchId) : null;
             if (PosSession::where('pos_device_id', $device->id)->where('status', 'open')->exists()) {
                 throw new RuntimeException('توجد وردية مفتوحة على جهاز نقطة البيع المحدد — أغلقها أولاً.');
             }
@@ -88,7 +88,7 @@ class PosSessionService
                 'opened_by'       => $userId,
                 'pos_device_id'   => $device->id,
                 'warehouse_id'    => $warehouse->id,
-                'pos_shift_id'    => $posShift->id,
+                'pos_shift_id'    => $posShift?->id,
                 // `shift_id` القديم يبقى فقط كسجل تاريخي للجلسات السابقة ولا
                 // يُعاد ملؤه في الجلسات الجديدة بعد فصل POS عن HR.
                 'shift_id'        => null,
