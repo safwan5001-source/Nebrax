@@ -125,6 +125,19 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_a_replacement_key_info_certificate_even_when_resigned(): void
+    {
+        $signed = $this->signedInvoice();
+        [$replacementKey, $replacementDer] = $this->certificate();
+        $tampered = $this->replaceCertificateAndResign($signed, $replacementDer, $replacementKey);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('SigningCertificateV2');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
@@ -215,6 +228,33 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
                 'urn:wrong:'.$prefix,
             );
         }
+        $xml = $document->saveXML();
+        $this->assertIsString($xml);
+
+        return $xml;
+    }
+
+    private function replaceCertificateAndResign(
+        string $signedXml,
+        string $replacementDer,
+        string $replacementPrivateKey,
+    ): string {
+        $document = new DOMDocument();
+        $document->preserveWhiteSpace = true;
+        $this->assertTrue($document->loadXML($signedXml, LIBXML_NONET));
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
+        $certificate = $xpath->query('//ds:KeyInfo/ds:X509Data/ds:X509Certificate')?->item(0);
+        $signedInfo = $xpath->query('//ds:Signature/ds:SignedInfo')?->item(0);
+        $signatureValue = $xpath->query('//ds:Signature/ds:SignatureValue')?->item(0);
+        $this->assertInstanceOf(DOMElement::class, $certificate);
+        $this->assertInstanceOf(DOMElement::class, $signedInfo);
+        $this->assertInstanceOf(DOMElement::class, $signatureValue);
+        $certificate->nodeValue = base64_encode($replacementDer);
+        $signatureValue->nodeValue = app(ZatcaXmlEcdsaSigner::class)->sign(
+            app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
+            $replacementPrivateKey,
+        );
         $xml = $document->saveXML();
         $this->assertIsString($xml);
 
