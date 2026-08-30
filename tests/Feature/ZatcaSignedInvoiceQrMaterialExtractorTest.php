@@ -5,7 +5,12 @@ namespace Tests\Feature;
 use App\Services\Accounting\ZatcaInvoiceHasher;
 use App\Services\Accounting\ZatcaSignedInvoiceQrMaterialExtractor;
 use App\Services\Accounting\ZatcaXadesSignatureAssembler;
+use App\Services\Accounting\ZatcaXmlCanonicalizer;
+use App\Services\Accounting\ZatcaXmlEcdsaSigner;
 use DateTimeImmutable;
+use DOMDocument;
+use DOMElement;
+use DOMXPath;
 use InvalidArgumentException;
 use RuntimeException;
 use Tests\TestCase;
@@ -15,9 +20,8 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     /** @test */
     public function it_extracts_raw_hash_and_signature_from_the_signed_invoice(): void
     {
-        $signed = $this->signedInvoice('customInvoiceReference');
+        $signed = $this->signedInvoiceWithWrappedDigest('customInvoiceReference');
         $digest = app(ZatcaInvoiceHasher::class)->hash($signed);
-        $signed = str_replace($digest, substr($digest, 0, 20)."\n".substr($digest, 20), $signed);
         $material = app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($signed);
 
         $this->assertSame(
@@ -37,6 +41,20 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
         $this->expectExceptionMessage('لا يطابق');
 
         app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($signed);
+    }
+
+    /** @test */
+    public function it_rejects_a_forged_signature_with_the_correct_raw_length(): void
+    {
+        $signed = $this->signedInvoice();
+        preg_match('#<ds:SignatureValue>([^<]+)</ds:SignatureValue>#', $signed, $match);
+        $this->assertArrayHasKey(1, $match);
+        $forged = str_replace($match[1], base64_encode(str_repeat("\x7f", 64)), $signed);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('لا يطابق');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($forged);
     }
 
     /** @test */
@@ -75,6 +93,41 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
             base64_encode(hash('sha256', 'policy', true)),
             invoiceReferenceId: $invoiceReferenceId,
         );
+    }
+
+    private function signedInvoiceWithWrappedDigest(string $invoiceReferenceId): string
+    {
+        [$privateKey, $leaf] = $this->certificate();
+        $signed = app(ZatcaXadesSignatureAssembler::class)->assemble(
+            $this->invoiceXml(),
+            [base64_encode($leaf)],
+            $privateKey,
+            new DateTimeImmutable('2026-08-30T01:02:03+03:00'),
+            'https://zatca.gov.sa/security-policy.pdf',
+            base64_encode(hash('sha256', 'policy', true)),
+            invoiceReferenceId: $invoiceReferenceId,
+        );
+
+        $document = new DOMDocument();
+        $document->preserveWhiteSpace = true;
+        $this->assertTrue($document->loadXML($signed, LIBXML_NONET));
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
+        $digest = $xpath->query("//ds:Reference[@URI='']/ds:DigestValue")?->item(0);
+        $signedInfo = $xpath->query('//ds:Signature/ds:SignedInfo')?->item(0);
+        $signatureValue = $xpath->query('//ds:Signature/ds:SignatureValue')?->item(0);
+        $this->assertInstanceOf(DOMElement::class, $digest);
+        $this->assertInstanceOf(DOMElement::class, $signedInfo);
+        $this->assertInstanceOf(DOMElement::class, $signatureValue);
+        $digest->nodeValue = substr($digest->textContent, 0, 20)."\n".substr($digest->textContent, 20);
+        $signatureValue->nodeValue = app(ZatcaXmlEcdsaSigner::class)->sign(
+            app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
+            $privateKey,
+        );
+        $xml = $document->saveXML();
+        $this->assertIsString($xml);
+
+        return $xml;
     }
 
     /** @return array{string,string} private PEM, certificate DER */
