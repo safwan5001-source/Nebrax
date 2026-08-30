@@ -32,7 +32,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { LangToggle } from '@/components/layout/lang-toggle';
-import { NebraxLogo } from '@/components/layout/nebrax-logo';
+import { AwjLogo } from '@/components/layout/awj-logo';
 import { enableDemo } from '@/lib/demo';
 
 const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
@@ -102,7 +102,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-20 border-b border-border/80 bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center" aria-label={t('brand_aria')}>
-            <NebraxLogo className="h-10 w-auto" priority />
+            <AwjLogo className="h-10 w-auto" priority />
           </Link>
 
           <div className="ms-auto flex items-center gap-1.5 sm:gap-2">
