@@ -20,7 +20,9 @@ final class ZatcaInvoiceSigner
 
     public function sign(string $invoiceXml, DateTimeInterface $signingTime): string
     {
-        return $this->signWithQrMaterial($invoiceXml, $signingTime)['xml'];
+        $material = $this->credentials->resolve();
+
+        return $this->assemble($invoiceXml, $signingTime, $material);
     }
 
     /**
@@ -33,16 +35,7 @@ final class ZatcaInvoiceSigner
     public function signWithQrMaterial(string $invoiceXml, DateTimeInterface $signingTime): array
     {
         $material = $this->credentials->resolve();
-        $policy = $this->policy->resolve();
-
-        $signedXml = $this->assembler->assemble(
-            $invoiceXml,
-            $material->certificateChain,
-            $material->privateKey,
-            $signingTime,
-            $policy->identifier,
-            $policy->digest,
-        );
+        $signedXml = $this->assemble($invoiceXml, $signingTime, $material);
         $qrMaterial = $this->qrCertificateMaterial->extract($material->certificateChain[0]);
 
         return [
@@ -50,5 +43,22 @@ final class ZatcaInvoiceSigner
             'public_key' => $qrMaterial['public_key'],
             'certificate_signature' => $qrMaterial['certificate_signature'],
         ];
+    }
+
+    private function assemble(
+        string $invoiceXml,
+        DateTimeInterface $signingTime,
+        ZatcaSigningMaterial $material,
+    ): string {
+        $policy = $this->policy->resolve();
+
+        return $this->assembler->assemble(
+            $invoiceXml,
+            $material->certificateChain,
+            $material->privateKey,
+            $signingTime,
+            $policy->identifier,
+            $policy->digest,
+        );
     }
 }
