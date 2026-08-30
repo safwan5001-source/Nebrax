@@ -93,7 +93,7 @@ class ZatcaSignedInvoicePostingTest extends TestCase
             app(InvoiceService::class)->post($invoice);
             $this->fail('كان يجب رفض الإصدار عند غياب سياسة توقيع ZATCA.');
         } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('السياسة', $exception->getMessage());
+            $this->assertStringContainsString('سياسة توقيع ZATCA', $exception->getMessage());
         }
 
         $this->assertSame('draft', $invoice->fresh()->status);
