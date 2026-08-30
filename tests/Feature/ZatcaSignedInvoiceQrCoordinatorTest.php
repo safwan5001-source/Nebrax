@@ -10,6 +10,7 @@ use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use DateTimeImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
@@ -23,14 +24,13 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
         [$privateKey, $leafCertificate, $leafDer, $issuerCertificate] = $this->activeCredential();
 
         $result = app(ZatcaSignedInvoiceQrCoordinator::class)->build(
-            $this->invoiceXml(),
+            $this->invoiceXml('0200000'),
             'شركة نبراكس',
             '310000000000003',
             new DateTimeImmutable('2026-08-30 03:04:05+03:00'),
             new DateTimeImmutable('2026-08-30 03:05:06+03:00'),
             '115.00',
             '15.00',
-            'simplified',
         );
 
         $signedMaterial = app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($result->signedXml);
@@ -68,14 +68,13 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
         $this->activeCredential();
 
         $result = app(ZatcaSignedInvoiceQrCoordinator::class)->build(
-            $this->invoiceXml(),
+            $this->invoiceXml('0100000'),
             'Nebrax',
             '310000000000003',
             new DateTimeImmutable('2026-08-30T00:04:05Z'),
             new DateTimeImmutable('2026-08-30T00:05:06Z'),
             '115.00',
             '15.00',
-            'standard',
         );
 
         $fields = $this->decode($result->qrCode);
@@ -86,6 +85,23 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
         $this->assertSame($signedMaterial['invoice_hash'], $result->invoiceHash);
         $this->assertSame($signedMaterial['invoice_hash'], $fields[6]);
         $this->assertSame($signedMaterial['ecdsa_signature'], $fields[7]);
+    }
+
+    /** @test */
+    public function it_rejects_an_invoice_without_an_explicit_supported_transaction_code(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('InvoiceTypeCode');
+
+        app(ZatcaSignedInvoiceQrCoordinator::class)->build(
+            $this->invoiceXml(''),
+            'Nebrax',
+            '310000000000003',
+            new DateTimeImmutable('2026-08-30T00:04:05Z'),
+            new DateTimeImmutable('2026-08-30T00:05:06Z'),
+            '115.00',
+            '15.00',
+        );
     }
 
     /** @return array{string,\OpenSSLCertificate,string,\OpenSSLCertificate} */
@@ -200,9 +216,9 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
         return $fields;
     }
 
-    private function invoiceXml(): string
+    private function invoiceXml(string $transactionCode): string
     {
-        return <<<'XML'
+        return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
  xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
@@ -215,6 +231,7 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
  xmlns:xades="http://uri.etsi.org/01903/v1.3.2#">
  <cbc:ID>INV-SIGNED-QR-1</cbc:ID>
  <cbc:UUID>44444444-4444-4444-8444-444444444444</cbc:UUID>
+ <cbc:InvoiceTypeCode name="{$transactionCode}">388</cbc:InvoiceTypeCode>
  <cac:AdditionalDocumentReference><cbc:ID>QR</cbc:ID><cac:Attachment><cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">QR</cbc:EmbeddedDocumentBinaryObject></cac:Attachment></cac:AdditionalDocumentReference>
  <cac:Signature><cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID></cac:Signature>
  <cac:LegalMonetaryTotal><cbc:TaxInclusiveAmount currencyID="SAR">115.00</cbc:TaxInclusiveAmount></cac:LegalMonetaryTotal>
