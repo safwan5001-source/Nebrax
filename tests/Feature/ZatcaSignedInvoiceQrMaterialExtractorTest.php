@@ -58,6 +58,24 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_signed_info_that_declares_unsupported_algorithms(): void
+    {
+        $signed = $this->signedInvoice();
+        foreach ([
+            ZatcaXmlCanonicalizer::ALGORITHM,
+            \App\Services\Accounting\ZatcaXmlDsigSignedInfoBuilder::ECDSA_SHA256_ALGORITHM,
+        ] as $algorithm) {
+            $invalid = str_replace($algorithm, 'urn:unsupported:algorithm', $signed);
+            try {
+                app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($invalid);
+                $this->fail('كان يجب رفض خوارزمية SignedInfo غير المدعومة.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('خوارزمية', $exception->getMessage());
+            }
+        }
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
