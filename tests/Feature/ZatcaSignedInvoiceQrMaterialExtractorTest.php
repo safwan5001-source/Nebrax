@@ -188,6 +188,59 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_duplicate_or_conflicting_ubl_signature_discriminators(): void
+    {
+        $signed = $this->signedInvoice();
+        foreach ([
+            '<ext:ExtensionURI>'.ZatcaXadesSignatureAssembler::EXTENSION_URI.'</ext:ExtensionURI>'
+                => '<ext:ExtensionURI>'.ZatcaXadesSignatureAssembler::EXTENSION_URI.'</ext:ExtensionURI>'
+                    .'<ext:ExtensionURI>urn:conflicting-extension</ext:ExtensionURI>',
+            '<cbc:ID>'.ZatcaXadesSignatureAssembler::SIGNATURE_INFORMATION_ID.'</cbc:ID>'
+                => '<cbc:ID>'.ZatcaXadesSignatureAssembler::SIGNATURE_INFORMATION_ID.'</cbc:ID>'
+                    .'<cbc:ID>urn:conflicting-information</cbc:ID>',
+            '<sbc:ReferencedSignatureID>'.ZatcaXadesSignatureAssembler::REFERENCED_SIGNATURE_ID
+                .'</sbc:ReferencedSignatureID>'
+                => '<sbc:ReferencedSignatureID>'.ZatcaXadesSignatureAssembler::REFERENCED_SIGNATURE_ID
+                    .'</sbc:ReferencedSignatureID>'
+                    .'<sbc:ReferencedSignatureID>urn:conflicting-reference</sbc:ReferencedSignatureID>',
+        ] as $search => $replacement) {
+            $tampered = str_replace($search, $replacement, $signed);
+            $this->assertNotSame($signed, $tampered);
+            try {
+                app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+                $this->fail('كان يجب رفض حقل مميز مكرر داخل حاوية توقيع UBL.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('UBL', $exception->getMessage());
+            }
+        }
+    }
+
+    /** @test */
+    public function it_rejects_an_additional_direct_signed_properties_element(): void
+    {
+        $document = new DOMDocument();
+        $document->preserveWhiteSpace = true;
+        $this->assertTrue($document->loadXML($this->signedInvoice(), LIBXML_NONET));
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('xades', ZatcaXadesSignatureAssembler::XADES_NAMESPACE);
+        $qualifyingProperties = $xpath->query('//xades:QualifyingProperties')?->item(0);
+        $this->assertInstanceOf(DOMElement::class, $qualifyingProperties);
+        $extra = $document->createElementNS(
+            ZatcaXadesSignatureAssembler::XADES_NAMESPACE,
+            'xades:SignedProperties',
+        );
+        $extra->setAttribute('Id', 'additionalSignedProperties');
+        $qualifyingProperties->appendChild($extra);
+        $tampered = $document->saveXML();
+        $this->assertIsString($tampered);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('SignedProperties');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
