@@ -258,9 +258,8 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
                 throw new InvalidArgumentException('بصمة شهادة XAdES لا تستخدم SHA-256 بشكل فريد.');
             }
             $declared = base64_decode(trim($values->item(0)?->textContent ?? ''), true);
-            $der = base64_decode(trim($certificates->item($index)?->textContent ?? ''), true);
+            $der = $this->certificateDer(trim($certificates->item($index)?->textContent ?? ''));
             if (! is_string($declared) || strlen($declared) !== 32
-                || ! is_string($der) || $der === ''
                 || ! hash_equals(hash('sha256', $der, true), $declared)
             ) {
                 throw new RuntimeException('بصمة SigningCertificateV2 لا تطابق شهادة KeyInfo المقابلة.');
@@ -398,10 +397,7 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
 
     private function publicKeyPem(string $certificateBase64): string
     {
-        $der = base64_decode($certificateBase64, true);
-        if (! is_string($der) || $der === '') {
-            throw new InvalidArgumentException('شهادة leaf المضمّنة ليست Base64 DER صالحة.');
-        }
+        $der = $this->certificateDer($certificateBase64);
         $pem = "-----BEGIN CERTIFICATE-----\n"
             .chunk_split(base64_encode($der), 64, "\n")
             ."-----END CERTIFICATE-----\n";
@@ -414,6 +410,35 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         }
 
         return $publicKeyPem;
+    }
+
+    private function certificateDer(string $certificateBase64): string
+    {
+        $der = base64_decode($certificateBase64, true);
+        if (! is_string($der) || $der === '') {
+            throw new InvalidArgumentException('شهادة ZATCA المضمّنة ليست Base64 DER صالحة.');
+        }
+        $pem = "-----BEGIN CERTIFICATE-----\n"
+            .chunk_split(base64_encode($der), 64, "\n")
+            ."-----END CERTIFICATE-----\n";
+        $certificate = @openssl_x509_read($pem);
+        $normalizedPem = '';
+        if ($certificate === false || ! openssl_x509_export($certificate, $normalizedPem, true)) {
+            throw new InvalidArgumentException('شهادة ZATCA المضمّنة ليست شهادة X.509 صالحة.');
+        }
+        $normalizedBody = preg_replace(
+            '/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s+/',
+            '',
+            $normalizedPem,
+        );
+        $normalizedDer = is_string($normalizedBody)
+            ? base64_decode($normalizedBody, true)
+            : false;
+        if (! is_string($normalizedDer) || ! hash_equals($normalizedDer, $der)) {
+            throw new InvalidArgumentException('شهادة ZATCA المضمّنة تحتوي بايتات خارج DER.');
+        }
+
+        return $normalizedDer;
     }
 
     private function assertInvoiceReferenceTransforms(DOMXPath $xpath, DOMElement $reference): void
