@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
 import { BarChart3, CircleDollarSign, ClipboardCheck, History, LockKeyhole, Plus } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
@@ -61,6 +61,7 @@ interface SessionEvent {
 }
 
 export default function PosSessionsPage() {
+  const locale = useLocale();
   const t = useTranslations('posSessions');
   const tp = useTranslations('pos');
   const tc = useTranslations('common');
@@ -279,7 +280,7 @@ export default function PosSessionsPage() {
               <option value="">{t('work_shift')}</option>
               {shifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.name}{shift.code ? ` · ${shift.code}` : ''}</option>)}
             </select>
-            {shifts.length === 0 && <p className="text-xs text-warning">{t('no_shift')}</p>}
+            {shifts.length === 0 && <p className="text-xs text-warning">{locale === 'ar' ? 'لا توجد وردية نقاط بيع نشطة في هذا الفرع.' : 'No active POS shift is available in this branch.'}</p>}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="ob">{t('opening_balance')}</Label>
