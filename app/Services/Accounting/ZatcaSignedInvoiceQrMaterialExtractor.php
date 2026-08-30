@@ -11,6 +11,8 @@ use RuntimeException;
 /** يستخرج وسمي QR 6 و7 من فاتورة موقعة ويتحقق من ارتباط الهاش بمحتواها. */
 final class ZatcaSignedInvoiceQrMaterialExtractor
 {
+    private const CAC_NAMESPACE = 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2';
+
     public function __construct(
         private readonly ZatcaInvoiceHasher $invoiceHasher,
         private readonly ZatcaXmlCanonicalizer $canonicalizer,
@@ -138,11 +140,29 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         }
         foreach ($expectedXpath as $index => $expression) {
             $transform = $transforms->item($index);
+            $xpathNodes = $transform instanceof DOMElement
+                ? $this->query($xpath, './ds:XPath', $transform)
+                : null;
+            $xpathElement = $xpathNodes?->length === 1 ? $xpathNodes->item(0) : null;
             if (! $transform instanceof DOMElement
                 || $transform->getAttribute('Algorithm') !== ZatcaXmlDsigSignedInfoBuilder::XPATH_ALGORITHM
-                || trim($this->query($xpath, './ds:XPath', $transform)->item(0)?->textContent ?? '') !== $expression
+                || ! $xpathElement instanceof DOMElement
+                || trim($xpathElement->textContent) !== $expression
             ) {
                 throw new InvalidArgumentException('تحويل XPath في مرجع فاتورة ZATCA غير مطابق.');
+            }
+            $requiredNamespaces = match ($index) {
+                0 => ['ext' => ZatcaXadesSignatureAssembler::EXT_NAMESPACE],
+                1 => ['cac' => self::CAC_NAMESPACE],
+                2 => [
+                    'cac' => self::CAC_NAMESPACE,
+                    'cbc' => ZatcaXadesSignatureAssembler::CBC_NAMESPACE,
+                ],
+            };
+            foreach ($requiredNamespaces as $prefix => $namespace) {
+                if ($xpathElement->lookupNamespaceURI($prefix) !== $namespace) {
+                    throw new InvalidArgumentException("بادئة {$prefix} داخل تحويل XPath غير مرتبطة بمساحة UBL المطلوبة.");
+                }
             }
         }
         $canonicalization = $transforms->item(3);
