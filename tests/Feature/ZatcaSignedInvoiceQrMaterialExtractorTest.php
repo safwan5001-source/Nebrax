@@ -281,6 +281,20 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_data_object_format_detached_from_the_invoice_reference(): void
+    {
+        foreach (['reference_id', 'object_reference'] as $mutation) {
+            $tampered = $this->signedInvoiceWithDetachedDataObjectFormat($mutation);
+            try {
+                app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+                $this->fail('كان يجب رفض DataObjectFormat غير المرتبطة بمرجع الفاتورة.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('مرجع', $exception->getMessage());
+            }
+        }
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
@@ -534,6 +548,60 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
         );
         $secondContainer->appendChild($lastTransform);
         $reference->insertBefore($secondContainer, $transforms->nextSibling);
+        $signatureValue->nodeValue = app(ZatcaXmlEcdsaSigner::class)->sign(
+            app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
+            $privateKey,
+        );
+        $xml = $document->saveXML();
+        $this->assertIsString($xml);
+
+        return $xml;
+    }
+
+    private function signedInvoiceWithDetachedDataObjectFormat(string $mutation): string
+    {
+        [$privateKey, $leaf] = $this->certificate();
+        $signed = app(ZatcaXadesSignatureAssembler::class)->assemble(
+            $this->invoiceXml(),
+            [base64_encode($leaf)],
+            $privateKey,
+            new DateTimeImmutable('2026-08-30T01:02:03+03:00'),
+            'https://zatca.gov.sa/security-policy.pdf',
+            base64_encode(hash('sha256', 'policy', true)),
+        );
+
+        $document = new DOMDocument();
+        $document->preserveWhiteSpace = true;
+        $this->assertTrue($document->loadXML($signed, LIBXML_NONET));
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
+        $xpath->registerNamespace('xades', ZatcaXadesSignatureAssembler::XADES_NAMESPACE);
+        $invoiceReference = $xpath->query("//ds:SignedInfo/ds:Reference[@URI='']")?->item(0);
+        $dataObjectFormat = $xpath->query('//xades:SignedDataObjectProperties/xades:DataObjectFormat')?->item(0);
+        $signedProperties = $xpath->query('//xades:SignedProperties')?->item(0);
+        $propertiesDigest = $xpath->query(
+            "//ds:SignedInfo/ds:Reference[@Type='".
+            \App\Services\Accounting\ZatcaXmlDsigSignedInfoBuilder::SIGNED_PROPERTIES_TYPE.
+            "']/ds:DigestValue",
+        )?->item(0);
+        $signedInfo = $xpath->query('//ds:Signature/ds:SignedInfo')?->item(0);
+        $signatureValue = $xpath->query('//ds:Signature/ds:SignatureValue')?->item(0);
+        $this->assertInstanceOf(DOMElement::class, $invoiceReference);
+        $this->assertInstanceOf(DOMElement::class, $dataObjectFormat);
+        $this->assertInstanceOf(DOMElement::class, $signedProperties);
+        $this->assertInstanceOf(DOMElement::class, $propertiesDigest);
+        $this->assertInstanceOf(DOMElement::class, $signedInfo);
+        $this->assertInstanceOf(DOMElement::class, $signatureValue);
+        if ($mutation === 'reference_id') {
+            $invoiceReference->setAttribute('Id', 'detachedInvoiceReference');
+        } else {
+            $dataObjectFormat->setAttribute('ObjectReference', '#detachedInvoiceReference');
+            $propertiesDigest->nodeValue = base64_encode(hash(
+                'sha256',
+                app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedProperties),
+                true,
+            ));
+        }
         $signatureValue->nodeValue = app(ZatcaXmlEcdsaSigner::class)->sign(
             app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
             $privateKey,
