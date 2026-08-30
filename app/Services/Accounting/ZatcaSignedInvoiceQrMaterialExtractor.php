@@ -34,21 +34,59 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         $xpath->registerNamespace('xades', ZatcaXadesSignatureAssembler::XADES_NAMESPACE);
 
         $allSignatures = $this->query($xpath, '//ds:Signature');
-        $signatures = $this->query(
+        $officialExtensions = $this->query(
             $xpath,
             "/inv:Invoice/ext:UBLExtensions/ext:UBLExtension[ext:ExtensionURI='".
             ZatcaXadesSignatureAssembler::EXTENSION_URI.
-            "']/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation".
-            "[cbc:ID='".ZatcaXadesSignatureAssembler::SIGNATURE_INFORMATION_ID."']".
-            "[sbc:ReferencedSignatureID='".ZatcaXadesSignatureAssembler::REFERENCED_SIGNATURE_ID."']".
-            '/ds:Signature',
+            "']",
         );
-        if ($allSignatures->length !== 1 || $signatures->length !== 1
+        if ($officialExtensions->length !== 1 || ! $officialExtensions->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('فاتورة ZATCA لا تحتوي امتداد UBL رسمياً وفريداً.');
+        }
+        $officialExtension = $officialExtensions->item(0);
+        $extensionUris = $this->query($xpath, './ext:ExtensionURI', $officialExtension);
+        $extensionContents = $this->query($xpath, './ext:ExtensionContent', $officialExtension);
+        if ($extensionUris->length !== 1
+            || trim($extensionUris->item(0)?->textContent ?? '') !== ZatcaXadesSignatureAssembler::EXTENSION_URI
+            || $extensionContents->length !== 1
+            || ! $extensionContents->item(0) instanceof DOMElement
+        ) {
+            throw new InvalidArgumentException('حقول امتداد UBL الرسمي مفقودة أو مكررة.');
+        }
+        $documentSignatures = $this->query(
+            $xpath,
+            './sig:UBLDocumentSignatures',
+            $extensionContents->item(0),
+        );
+        if ($documentSignatures->length !== 1 || ! $documentSignatures->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('حاوية توقيع UBL الرسمية مفقودة أو مكررة.');
+        }
+        $signatureInformation = $this->query(
+            $xpath,
+            './sac:SignatureInformation',
+            $documentSignatures->item(0),
+        );
+        if ($signatureInformation->length !== 1 || ! $signatureInformation->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('SignatureInformation الرسمية مفقودة أو مكررة.');
+        }
+        $informationIds = $this->query($xpath, './cbc:ID', $signatureInformation->item(0));
+        $referencedIds = $this->query(
+            $xpath,
+            './sbc:ReferencedSignatureID',
+            $signatureInformation->item(0),
+        );
+        $signatures = $this->query($xpath, './ds:Signature', $signatureInformation->item(0));
+        if ($informationIds->length !== 1
+            || trim($informationIds->item(0)?->textContent ?? '') !== ZatcaXadesSignatureAssembler::SIGNATURE_INFORMATION_ID
+            || $referencedIds->length !== 1
+            || trim($referencedIds->item(0)?->textContent ?? '') !== ZatcaXadesSignatureAssembler::REFERENCED_SIGNATURE_ID
+            || $allSignatures->length !== 1
+            || $signatures->length !== 1
             || ! $signatures->item(0) instanceof DOMElement
             || ! $allSignatures->item(0) instanceof DOMElement
             || ! $allSignatures->item(0)->isSameNode($signatures->item(0))
         ) {
-            throw new InvalidArgumentException('فاتورة ZATCA لا تحتوي توقيعاً فريداً داخل امتداد UBL الرسمي.');
+            throw new InvalidArgumentException('حقول حاوية توقيع UBL الرسمية مفقودة أو مكررة أو متضاربة.');
         }
         $signatureElement = $signatures->item(0);
         $signedInfo = $this->query($xpath, './ds:SignedInfo', $signatureElement);
@@ -215,13 +253,10 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         ) {
             throw new InvalidArgumentException('QualifyingProperties لا ترتبط بتوقيع ZATCA عبر Target صالح وفريد.');
         }
-        $targets = $this->query(
-            $xpath,
-            "./xades:SignedProperties[@Id='".$match[1]."']",
-            $qualifyingProperties->item(0),
-        );
+        $targets = $this->query($xpath, './xades:SignedProperties', $qualifyingProperties->item(0));
         $documentTargets = $this->elementsWithId($signature->ownerDocument, $match[1]);
         if ($targets->length !== 1 || ! $targets->item(0) instanceof DOMElement
+            || $targets->item(0)->getAttribute('Id') !== $match[1]
             || count($documentTargets) !== 1
             || ! $documentTargets[0]->isSameNode($targets->item(0))
         ) {
