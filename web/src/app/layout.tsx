@@ -19,7 +19,7 @@ const mono = IBM_Plex_Mono({
   variable: '--font-ibm-mono',
 });
 export const metadata: Metadata = {
-  title: 'نبراكس',
+  title: 'أَوْج | AWJ',
   description: 'منصة سحابية متكاملة لإدارة المؤسسات',
 };
 
