@@ -120,7 +120,11 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
             ".//xades:SignedProperties[@Id='".$match[1]."']",
             $signature,
         );
-        if ($targets->length !== 1 || ! $targets->item(0) instanceof DOMElement) {
+        $documentTargets = $this->elementsWithId($signature->ownerDocument, $match[1]);
+        if ($targets->length !== 1 || ! $targets->item(0) instanceof DOMElement
+            || count($documentTargets) !== 1
+            || ! $documentTargets[0]->isSameNode($targets->item(0))
+        ) {
             throw new InvalidArgumentException('عنصر SignedProperties المستهدف مفقود أو مكرر.');
         }
 
@@ -151,6 +155,25 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         if (! hash_equals($calculated, $digest)) {
             throw new RuntimeException('DigestValue لا يطابق SignedProperties المضمّنة.');
         }
+    }
+
+    /** @return list<DOMElement> */
+    private function elementsWithId(DOMDocument $document, string $id): array
+    {
+        $matches = [];
+        foreach ($document->getElementsByTagName('*') as $element) {
+            foreach ($element->attributes as $attribute) {
+                $plainId = $attribute->namespaceURI === null && $attribute->nodeName === 'Id';
+                $xmlId = $attribute->namespaceURI === 'http://www.w3.org/XML/1998/namespace'
+                    && $attribute->localName === 'id';
+                if (($plainId || $xmlId) && hash_equals($id, $attribute->nodeValue)) {
+                    $matches[] = $element;
+                    break;
+                }
+            }
+        }
+
+        return $matches;
     }
 
     private function assertSignedInfoAlgorithms(DOMXPath $xpath, DOMElement $signedInfo): void
