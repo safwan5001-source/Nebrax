@@ -21,13 +21,27 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
 
         $signatures = $this->query($xpath, '//ds:Signature');
-        $signatureValues = $this->query($xpath, '//ds:Signature/ds:SignatureValue');
-        $invoiceDigests = $this->query(
-            $xpath,
-            "//ds:Signature/ds:SignedInfo/ds:Reference[@Id='invoiceSignedData' and @URI='']/ds:DigestValue",
-        );
-        if ($signatures->length !== 1 || $signatureValues->length !== 1 || $invoiceDigests->length !== 1) {
+        if ($signatures->length !== 1 || ! $signatures->item(0) instanceof DOMElement) {
             throw new InvalidArgumentException('فاتورة ZATCA الموقعة لا تحتوي مجموعة توقيع واحدة مكتملة للـQR.');
+        }
+        $signatureElement = $signatures->item(0);
+        $signedInfo = $this->query($xpath, './ds:SignedInfo', $signatureElement);
+        $signatureValues = $this->query($xpath, './ds:SignatureValue', $signatureElement);
+        if ($signedInfo->length !== 1 || $signatureValues->length !== 1
+            || ! $signedInfo->item(0) instanceof DOMElement
+        ) {
+            throw new InvalidArgumentException('فاتورة ZATCA الموقعة لا تحتوي SignedInfo وSignatureValue فريدتين.');
+        }
+
+        $invoiceReferences = $this->query($xpath, "./ds:Reference[@URI='']", $signedInfo->item(0));
+        if ($invoiceReferences->length !== 1 || ! $invoiceReferences->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('مرجع مستند الفاتورة داخل SignedInfo مفقود أو مكرر.');
+        }
+        $invoiceReference = $invoiceReferences->item(0);
+        $this->assertInvoiceReferenceTransforms($xpath, $invoiceReference);
+        $invoiceDigests = $this->query($xpath, './ds:DigestValue', $invoiceReference);
+        if ($invoiceDigests->length !== 1) {
+            throw new InvalidArgumentException('مرجع الفاتورة لا يحتوي DigestValue فريدة.');
         }
 
         $invoiceHashBase64 = trim($invoiceDigests->item(0)?->textContent ?? '');
@@ -41,12 +55,47 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
             throw new InvalidArgumentException('SignatureValue لفاتورة ZATCA ليس Base64 صالحاً بطول 64 بايت.');
         }
 
-        $calculatedHash = $this->invoiceHasher->hash($signedXml);
-        if (! hash_equals($calculatedHash, $invoiceHashBase64)) {
+        $calculatedHash = base64_decode($this->invoiceHasher->hash($signedXml), true);
+        if (! is_string($calculatedHash) || ! hash_equals($calculatedHash, $invoiceHash)) {
             throw new RuntimeException('هاش QR لا يطابق محتوى فاتورة ZATCA الموقعة.');
         }
 
         return ['invoice_hash' => $invoiceHash, 'ecdsa_signature' => $signature];
+    }
+
+    private function assertInvoiceReferenceTransforms(DOMXPath $xpath, DOMElement $reference): void
+    {
+        $transforms = $this->query($xpath, './ds:Transforms/ds:Transform', $reference);
+        $expectedXpath = [
+            'not(//ancestor-or-self::ext:UBLExtensions)',
+            'not(//ancestor-or-self::cac:Signature)',
+            "not(//ancestor-or-self::cac:AdditionalDocumentReference[cbc:ID='QR'])",
+        ];
+        if ($transforms->length !== 4) {
+            throw new InvalidArgumentException('مرجع الفاتورة لا يحتوي تحويلات ZATCA الأربع المتوقعة.');
+        }
+        foreach ($expectedXpath as $index => $expression) {
+            $transform = $transforms->item($index);
+            if (! $transform instanceof DOMElement
+                || $transform->getAttribute('Algorithm') !== ZatcaXmlDsigSignedInfoBuilder::XPATH_ALGORITHM
+                || trim($this->query($xpath, './ds:XPath', $transform)->item(0)?->textContent ?? '') !== $expression
+            ) {
+                throw new InvalidArgumentException('تحويل XPath في مرجع فاتورة ZATCA غير مطابق.');
+            }
+        }
+        $canonicalization = $transforms->item(3);
+        if (! $canonicalization instanceof DOMElement
+            || $canonicalization->getAttribute('Algorithm') !== ZatcaXmlCanonicalizer::ALGORITHM
+        ) {
+            throw new InvalidArgumentException('تحويل C14N في مرجع فاتورة ZATCA غير مطابق.');
+        }
+
+        $digestMethods = $this->query($xpath, './ds:DigestMethod', $reference);
+        if ($digestMethods->length !== 1 || ! $digestMethods->item(0) instanceof DOMElement
+            || $digestMethods->item(0)->getAttribute('Algorithm') !== ZatcaXmlDsigSignedInfoBuilder::SHA256_ALGORITHM
+        ) {
+            throw new InvalidArgumentException('مرجع الفاتورة لا يستخدم SHA-256 المطلوب.');
+        }
     }
 
     private function parseSecurely(string $xml): DOMDocument
@@ -74,9 +123,9 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         }
     }
 
-    private function query(DOMXPath $xpath, string $expression): \DOMNodeList
+    private function query(DOMXPath $xpath, string $expression, ?DOMElement $context = null): \DOMNodeList
     {
-        $nodes = $xpath->query($expression);
+        $nodes = $xpath->query($expression, $context);
         if ($nodes === false) {
             throw new RuntimeException('تعذر فحص مادة QR داخل توقيع ZATCA.');
         }
