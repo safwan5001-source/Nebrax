@@ -245,12 +245,47 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
         $xpath = new DOMXPath($document);
         $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
         $certificate = $xpath->query('//ds:KeyInfo/ds:X509Data/ds:X509Certificate')?->item(0);
+        $keyInfo = $xpath->query('//ds:Signature/ds:KeyInfo')?->item(0);
+        $x509Data = $xpath->query('//ds:KeyInfo/ds:X509Data')?->item(0);
         $signedInfo = $xpath->query('//ds:Signature/ds:SignedInfo')?->item(0);
         $signatureValue = $xpath->query('//ds:Signature/ds:SignatureValue')?->item(0);
         $this->assertInstanceOf(DOMElement::class, $certificate);
+        $this->assertInstanceOf(DOMElement::class, $keyInfo);
+        $this->assertInstanceOf(DOMElement::class, $x509Data);
         $this->assertInstanceOf(DOMElement::class, $signedInfo);
         $this->assertInstanceOf(DOMElement::class, $signatureValue);
+        $originalCertificate = $certificate->textContent;
         $certificate->nodeValue = base64_encode($replacementDer);
+        $x509Data->appendChild($document->createElementNS(
+            ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE,
+            'ds:X509Certificate',
+            $originalCertificate,
+        ));
+
+        // محاولة التفاف: SigningCertificateV2 غير موقعة قرب KeyInfo للمفتاح البديل.
+        $unsignedSigningCertificate = $document->createElementNS(
+            ZatcaXadesSignatureAssembler::XADES_NAMESPACE,
+            'xades:SigningCertificateV2',
+        );
+        $cert = $document->createElementNS(ZatcaXadesSignatureAssembler::XADES_NAMESPACE, 'xades:Cert');
+        $certDigest = $document->createElementNS(ZatcaXadesSignatureAssembler::XADES_NAMESPACE, 'xades:CertDigest');
+        $digestMethod = $document->createElementNS(
+            ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE,
+            'ds:DigestMethod',
+        );
+        $digestMethod->setAttribute(
+            'Algorithm',
+            \App\Services\Accounting\ZatcaXmlDsigSignedInfoBuilder::SHA256_ALGORITHM,
+        );
+        $certDigest->appendChild($digestMethod);
+        $certDigest->appendChild($document->createElementNS(
+            ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE,
+            'ds:DigestValue',
+            base64_encode(hash('sha256', $replacementDer, true)),
+        ));
+        $cert->appendChild($certDigest);
+        $unsignedSigningCertificate->appendChild($cert);
+        $keyInfo->insertBefore($unsignedSigningCertificate, $x509Data);
         $signatureValue->nodeValue = app(ZatcaXmlEcdsaSigner::class)->sign(
             app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
             $replacementPrivateKey,
