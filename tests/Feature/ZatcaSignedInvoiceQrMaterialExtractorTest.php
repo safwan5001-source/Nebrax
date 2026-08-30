@@ -169,7 +169,7 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
         $this->assertIsString($tampered);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('امتداد UBL');
+        $this->expectExceptionMessage('UBL');
 
         app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
     }
@@ -190,22 +190,28 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     /** @test */
     public function it_rejects_duplicate_or_conflicting_ubl_signature_discriminators(): void
     {
-        $signed = $this->signedInvoice();
         foreach ([
-            '<ext:ExtensionURI>'.ZatcaXadesSignatureAssembler::EXTENSION_URI.'</ext:ExtensionURI>'
-                => '<ext:ExtensionURI>'.ZatcaXadesSignatureAssembler::EXTENSION_URI.'</ext:ExtensionURI>'
-                    .'<ext:ExtensionURI>urn:conflicting-extension</ext:ExtensionURI>',
-            '<cbc:ID>'.ZatcaXadesSignatureAssembler::SIGNATURE_INFORMATION_ID.'</cbc:ID>'
-                => '<cbc:ID>'.ZatcaXadesSignatureAssembler::SIGNATURE_INFORMATION_ID.'</cbc:ID>'
-                    .'<cbc:ID>urn:conflicting-information</cbc:ID>',
-            '<sbc:ReferencedSignatureID>'.ZatcaXadesSignatureAssembler::REFERENCED_SIGNATURE_ID
-                .'</sbc:ReferencedSignatureID>'
-                => '<sbc:ReferencedSignatureID>'.ZatcaXadesSignatureAssembler::REFERENCED_SIGNATURE_ID
-                    .'</sbc:ReferencedSignatureID>'
-                    .'<sbc:ReferencedSignatureID>urn:conflicting-reference</sbc:ReferencedSignatureID>',
-        ] as $search => $replacement) {
-            $tampered = str_replace($search, $replacement, $signed);
-            $this->assertNotSame($signed, $tampered);
+            ['//ext:ExtensionURI', ZatcaXadesSignatureAssembler::EXT_NAMESPACE, 'ext:ExtensionURI'],
+            ['//sac:SignatureInformation/cbc:ID', ZatcaXadesSignatureAssembler::CBC_NAMESPACE, 'cbc:ID'],
+            ['//sac:SignatureInformation/sbc:ReferencedSignatureID', ZatcaXadesSignatureAssembler::SBC_NAMESPACE, 'sbc:ReferencedSignatureID'],
+        ] as [$expression, $namespace, $qualifiedName]) {
+            $document = new DOMDocument();
+            $document->preserveWhiteSpace = true;
+            $this->assertTrue($document->loadXML($this->signedInvoice(), LIBXML_NONET));
+            $xpath = new DOMXPath($document);
+            $xpath->registerNamespace('ext', ZatcaXadesSignatureAssembler::EXT_NAMESPACE);
+            $xpath->registerNamespace('sac', ZatcaXadesSignatureAssembler::SAC_NAMESPACE);
+            $xpath->registerNamespace('sbc', ZatcaXadesSignatureAssembler::SBC_NAMESPACE);
+            $xpath->registerNamespace('cbc', ZatcaXadesSignatureAssembler::CBC_NAMESPACE);
+            $original = $xpath->query($expression)?->item(0);
+            $this->assertInstanceOf(DOMElement::class, $original);
+            $original->parentNode?->appendChild($document->createElementNS(
+                $namespace,
+                $qualifiedName,
+                'urn:conflicting-value',
+            ));
+            $tampered = $document->saveXML();
+            $this->assertIsString($tampered);
             try {
                 app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
                 $this->fail('كان يجب رفض حقل مميز مكرر داخل حاوية توقيع UBL.');
