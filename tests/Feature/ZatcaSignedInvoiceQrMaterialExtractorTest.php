@@ -98,6 +98,23 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_signed_properties_changed_after_signing(): void
+    {
+        $signed = $this->signedInvoice();
+        $tampered = str_replace(
+            'https://zatca.gov.sa/security-policy.pdf',
+            'https://example.test/forged-policy.pdf',
+            $signed,
+        );
+        $this->assertNotSame($signed, $tampered);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('SignedProperties');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
