@@ -28,9 +28,10 @@ COPY . /core
 RUN bash /core/deploy/assemble.sh /core /app \
     && chmod -R 775 /app/storage /app/bootstrap/cache
 
-# نقطة التشغيل (تُنسخ قبل حذف النواة)
+# نقاط التشغيل (web + عامل المستندات) تُنسخ قبل حذف النواة.
 RUN cp /core/deploy/entrypoint.sh /usr/local/bin/entrypoint.sh \
-    && chmod +x /usr/local/bin/entrypoint.sh \
+    && cp /core/deploy/document-worker.sh /usr/local/bin/document-worker.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/document-worker.sh \
     && rm -rf /core
 
 WORKDIR /app
