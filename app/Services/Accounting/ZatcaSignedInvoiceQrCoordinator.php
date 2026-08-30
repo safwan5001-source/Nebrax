@@ -128,11 +128,9 @@ final class ZatcaSignedInvoiceQrCoordinator
                 ),
                 'إجمالي الفاتورة',
             );
-            $vatTotal = $this->amount(
-                $this->uniqueElement(
-                    $xpath,
-                    "/inv:Invoice/cac:TaxTotal/cbc:TaxAmount[@currencyID='SAR']",
-                ),
+            $vatTotal = $this->identicalAmount(
+                $xpath,
+                "/inv:Invoice/cac:TaxTotal/cbc:TaxAmount[@currencyID='SAR']",
                 'إجمالي الضريبة',
             );
 
@@ -171,6 +169,32 @@ final class ZatcaSignedInvoiceQrCoordinator
         return $amount;
     }
 
+    private function identicalAmount(DOMXPath $xpath, string $expression, string $label): string
+    {
+        $nodes = $xpath->query($expression);
+        if ($nodes === false || $nodes->length < 1) {
+            throw new InvalidArgumentException("فاتورة ZATCA تفتقد {$label} المطلوب لوسم QR.");
+        }
+
+        $expected = null;
+        foreach ($nodes as $node) {
+            if (! $node instanceof DOMElement) {
+                throw new InvalidArgumentException("بنية {$label} داخل فاتورة ZATCA غير صالحة.");
+            }
+            $amount = $this->amount($node, $label);
+            if ($expected !== null && $amount !== $expected) {
+                throw new InvalidArgumentException("قيم {$label} المكررة داخل فاتورة ZATCA غير متطابقة.");
+            }
+            $expected = $amount;
+        }
+
+        if (! is_string($expected)) {
+            throw new InvalidArgumentException("فاتورة ZATCA تفتقد {$label} المطلوب لوسم QR.");
+        }
+
+        return $expected;
+    }
+
     private function invoiceTime(string $date, string $time): DateTimeImmutable
     {
         $stamp = $date.'T'.$time;
@@ -182,12 +206,13 @@ final class ZatcaSignedInvoiceQrCoordinator
         if (! is_string($timezoneName)) {
             throw new InvalidArgumentException('منطقة وقت التطبيق غير صالحة لبناء QR.');
         }
+        $isZulu = str_ends_with($stamp, 'Z');
         try {
-            $timezone = new DateTimeZone($timezoneName);
+            $timezone = new DateTimeZone($isZulu ? 'UTC' : $timezoneName);
         } catch (\Exception) {
             throw new InvalidArgumentException('تعذر تفسير وقت إصدار فاتورة ZATCA.');
         }
-        $format = str_ends_with($stamp, 'Z')
+        $format = $isZulu
             ? '!Y-m-d\TH:i:s\Z'
             : (preg_match('/[+-]\d{2}:\d{2}$/D', $stamp) === 1
                 ? '!Y-m-d\TH:i:sP'

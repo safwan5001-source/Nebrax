@@ -89,6 +89,20 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
         );
     }
 
+    /** @test */
+    public function it_treats_a_zulu_issue_time_as_utc_regardless_of_the_application_timezone(): void
+    {
+        $this->activeCredential();
+        config()->set('app.timezone', 'Asia/Riyadh');
+
+        $result = app(ZatcaSignedInvoiceQrCoordinator::class)->build(
+            $this->invoiceXml('0200000', '00:04:05Z'),
+            new DateTimeImmutable('2026-08-30T00:05:06Z'),
+        );
+
+        $this->assertSame('2026-08-30T00:04:05Z', $this->decode($result->qrCode)[3]);
+    }
+
     /** @return array{string,\OpenSSLCertificate,string,\OpenSSLCertificate} */
     private function activeCredential(): array
     {
@@ -201,7 +215,7 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
         return $fields;
     }
 
-    private function invoiceXml(string $transactionCode): string
+    private function invoiceXml(string $transactionCode, string $issueTime = '03:04:05+03:00'): string
     {
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
@@ -217,7 +231,7 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
  <cbc:ID>INV-SIGNED-QR-1</cbc:ID>
  <cbc:UUID>44444444-4444-4444-8444-444444444444</cbc:UUID>
  <cbc:IssueDate>2026-08-30</cbc:IssueDate>
- <cbc:IssueTime>03:04:05+03:00</cbc:IssueTime>
+ <cbc:IssueTime>{$issueTime}</cbc:IssueTime>
  <cbc:InvoiceTypeCode name="{$transactionCode}">388</cbc:InvoiceTypeCode>
  <cac:AdditionalDocumentReference><cbc:ID>QR</cbc:ID><cac:Attachment><cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">QR</cbc:EmbeddedDocumentBinaryObject></cac:Attachment></cac:AdditionalDocumentReference>
  <cac:Signature><cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID></cac:Signature>
@@ -226,6 +240,9 @@ class ZatcaSignedInvoiceQrCoordinatorTest extends TestCase
   <cac:PartyLegalEntity><cbc:RegistrationName>شركة نبراكس</cbc:RegistrationName></cac:PartyLegalEntity>
  </cac:Party></cac:AccountingSupplierParty>
  <cac:TaxTotal><cbc:TaxAmount currencyID="SAR">15.00</cbc:TaxAmount></cac:TaxTotal>
+ <cac:TaxTotal><cbc:TaxAmount currencyID="SAR">15.00</cbc:TaxAmount>
+  <cac:TaxSubtotal><cbc:TaxAmount currencyID="SAR">15.00</cbc:TaxAmount></cac:TaxSubtotal>
+ </cac:TaxTotal>
  <cac:LegalMonetaryTotal><cbc:TaxInclusiveAmount currencyID="SAR">115.00</cbc:TaxInclusiveAmount></cac:LegalMonetaryTotal>
 </Invoice>
 XML;
