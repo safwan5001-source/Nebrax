@@ -122,6 +122,7 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
             $signatureElement,
             $signedInfo->item(0),
         );
+        $this->assertInvoiceDataObjectFormat($xpath, $signedProperties, $invoiceReference);
 
         $invoiceHashBase64 = trim($invoiceDigests->item(0)?->textContent ?? '');
         $signatureBase64 = trim($signatureValues->item(0)?->textContent ?? '');
@@ -162,6 +163,40 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         }
 
         return ['invoice_hash' => $invoiceHash, 'ecdsa_signature' => $signature];
+    }
+
+    private function assertInvoiceDataObjectFormat(
+        DOMXPath $xpath,
+        DOMElement $signedProperties,
+        DOMElement $invoiceReference,
+    ): void {
+        $referenceId = $invoiceReference->getAttribute('Id');
+        $referenceTargets = preg_match('/^[A-Za-z_][A-Za-z0-9._-]*$/D', $referenceId) === 1
+            ? $this->elementsWithId($invoiceReference->ownerDocument, $referenceId)
+            : [];
+        if (count($referenceTargets) !== 1 || ! $referenceTargets[0]->isSameNode($invoiceReference)) {
+            throw new InvalidArgumentException('معرّف مرجع فاتورة ZATCA مفقود أو مكرر على مستوى المستند.');
+        }
+        $dataObjectProperties = $this->query(
+            $xpath,
+            './xades:SignedDataObjectProperties',
+            $signedProperties,
+        );
+        if ($dataObjectProperties->length !== 1
+            || ! $dataObjectProperties->item(0) instanceof DOMElement
+        ) {
+            throw new InvalidArgumentException('SignedProperties لا تحتوي SignedDataObjectProperties فريدة.');
+        }
+        $formats = $this->query(
+            $xpath,
+            './xades:DataObjectFormat',
+            $dataObjectProperties->item(0),
+        );
+        if ($formats->length !== 1 || ! $formats->item(0) instanceof DOMElement
+            || $formats->item(0)->getAttribute('ObjectReference') !== '#'.$referenceId
+        ) {
+            throw new InvalidArgumentException('DataObjectFormat لا ترتبط بمرجع فاتورة ZATCA الفريد.');
+        }
     }
 
     private function assertSigningCertificateDigests(
