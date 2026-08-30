@@ -80,14 +80,7 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     {
         $signed = $this->signedInvoice();
         foreach (['ext', 'cac', 'cbc'] as $prefix) {
-            $invalid = preg_replace(
-                '#(<ds:SignedInfo\b[^>]*xmlns:'.$prefix.'=")[^"]+#',
-                '$1urn:wrong:'.$prefix,
-                $signed,
-                1,
-            );
-            $this->assertIsString($invalid);
-            $this->assertNotSame($signed, $invalid);
+            $invalid = $this->rebindXpathPrefix($signed, $prefix);
             try {
                 app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($invalid);
                 $this->fail('كان يجب رفض ربط بادئة XPath بغير مساحة UBL الرسمية.');
@@ -95,6 +88,23 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
                 $this->assertStringContainsString('بادئة', $exception->getMessage());
             }
         }
+    }
+
+    /** @test */
+    public function it_rejects_a_duplicate_signed_properties_id_anywhere_in_the_document(): void
+    {
+        $signed = $this->signedInvoice();
+        $duplicate = str_replace(
+            '</ext:ExtensionContent>',
+            '<xades:SignedProperties Id="xadesSignedProperties"/></ext:ExtensionContent>',
+            $signed,
+        );
+        $this->assertNotSame($signed, $duplicate);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('مكرر');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($duplicate);
     }
 
     /** @test */
@@ -181,6 +191,30 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
             app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
             $privateKey,
         );
+        $xml = $document->saveXML();
+        $this->assertIsString($xml);
+
+        return $xml;
+    }
+
+    private function rebindXpathPrefix(string $signedXml, string $prefix): string
+    {
+        $document = new DOMDocument();
+        $document->preserveWhiteSpace = true;
+        $this->assertTrue($document->loadXML($signedXml, LIBXML_NONET));
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
+        $nodes = $xpath->query("//ds:SignedInfo//ds:XPath[contains(., '{$prefix}:')]");
+        $this->assertNotFalse($nodes);
+        $this->assertGreaterThan(0, $nodes->length);
+        foreach ($nodes as $node) {
+            $this->assertInstanceOf(DOMElement::class, $node);
+            $node->setAttributeNS(
+                'http://www.w3.org/2000/xmlns/',
+                'xmlns:'.$prefix,
+                'urn:wrong:'.$prefix,
+            );
+        }
         $xml = $document->saveXML();
         $this->assertIsString($xml);
 
