@@ -36,6 +36,7 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         ) {
             throw new InvalidArgumentException('فاتورة ZATCA الموقعة لا تحتوي SignedInfo وSignatureValue فريدتين.');
         }
+        $this->assertSignedInfoAlgorithms($xpath, $signedInfo->item(0));
 
         $invoiceReferences = $this->query($xpath, "./ds:Reference[@URI='']", $signedInfo->item(0));
         if ($invoiceReferences->length !== 1 || ! $invoiceReferences->item(0) instanceof DOMElement) {
@@ -86,6 +87,22 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         }
 
         return ['invoice_hash' => $invoiceHash, 'ecdsa_signature' => $signature];
+    }
+
+    private function assertSignedInfoAlgorithms(DOMXPath $xpath, DOMElement $signedInfo): void
+    {
+        $canonicalization = $this->query($xpath, './ds:CanonicalizationMethod', $signedInfo);
+        $signatureMethod = $this->query($xpath, './ds:SignatureMethod', $signedInfo);
+        if ($canonicalization->length !== 1 || ! $canonicalization->item(0) instanceof DOMElement
+            || $canonicalization->item(0)->getAttribute('Algorithm') !== ZatcaXmlCanonicalizer::ALGORITHM
+        ) {
+            throw new InvalidArgumentException('SignedInfo لا تعلن خوارزمية C14N المطلوبة لـZATCA.');
+        }
+        if ($signatureMethod->length !== 1 || ! $signatureMethod->item(0) instanceof DOMElement
+            || $signatureMethod->item(0)->getAttribute('Algorithm') !== ZatcaXmlDsigSignedInfoBuilder::ECDSA_SHA256_ALGORITHM
+        ) {
+            throw new InvalidArgumentException('SignedInfo لا تعلن خوارزمية ECDSA-SHA256 المطلوبة لـZATCA.');
+        }
     }
 
     private function publicKeyPem(string $certificateBase64): string
