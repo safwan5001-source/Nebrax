@@ -80,6 +80,7 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         if ($certificates->length < 1) {
             throw new InvalidArgumentException('توقيع فاتورة ZATCA يفتقد شهادة leaf.');
         }
+        $this->assertSigningCertificateDigests($xpath, $signatureElement, $certificates);
         $publicKeyPem = $this->publicKeyPem(trim($certificates->item(0)?->textContent ?? ''));
         if (! $this->signatureVerifier->verify(
             $this->canonicalizer->canonicalizeElementInContext($signedInfo->item(0)),
@@ -95,6 +96,43 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         }
 
         return ['invoice_hash' => $invoiceHash, 'ecdsa_signature' => $signature];
+    }
+
+    private function assertSigningCertificateDigests(
+        DOMXPath $xpath,
+        DOMElement $signature,
+        \DOMNodeList $certificates,
+    ): void {
+        $certDigests = $this->query(
+            $xpath,
+            './/xades:SigningCertificateV2/xades:Cert/xades:CertDigest',
+            $signature,
+        );
+        if ($certDigests->length !== $certificates->length) {
+            throw new InvalidArgumentException('بصمات SigningCertificateV2 لا تطابق سلسلة شهادات KeyInfo.');
+        }
+        for ($index = 0; $index < $certificates->length; $index++) {
+            $certDigest = $certDigests->item($index);
+            if (! $certDigest instanceof DOMElement) {
+                throw new InvalidArgumentException('بنية بصمة شهادة XAdES غير صالحة.');
+            }
+            $methods = $this->query($xpath, './ds:DigestMethod', $certDigest);
+            $values = $this->query($xpath, './ds:DigestValue', $certDigest);
+            if ($methods->length !== 1 || ! $methods->item(0) instanceof DOMElement
+                || $methods->item(0)->getAttribute('Algorithm') !== ZatcaXmlDsigSignedInfoBuilder::SHA256_ALGORITHM
+                || $values->length !== 1
+            ) {
+                throw new InvalidArgumentException('بصمة شهادة XAdES لا تستخدم SHA-256 بشكل فريد.');
+            }
+            $declared = base64_decode(trim($values->item(0)?->textContent ?? ''), true);
+            $der = base64_decode(trim($certificates->item($index)?->textContent ?? ''), true);
+            if (! is_string($declared) || strlen($declared) !== 32
+                || ! is_string($der) || $der === ''
+                || ! hash_equals(hash('sha256', $der, true), $declared)
+            ) {
+                throw new RuntimeException('بصمة SigningCertificateV2 لا تطابق شهادة KeyInfo المقابلة.');
+            }
+        }
     }
 
     private function assertSignedPropertiesReference(
