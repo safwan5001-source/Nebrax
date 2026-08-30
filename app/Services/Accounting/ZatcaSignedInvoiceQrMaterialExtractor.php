@@ -197,6 +197,17 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         ) {
             throw new InvalidArgumentException('DataObjectFormat لا ترتبط بمرجع فاتورة ZATCA الفريد.');
         }
+        $dataObjectChildren = $this->elementChildren($dataObjectProperties->item(0));
+        $formatChildren = $this->elementChildren($formats->item(0));
+        if (count($dataObjectChildren) !== 1
+            || ! $dataObjectChildren[0]->isSameNode($formats->item(0))
+            || count($formatChildren) !== 1
+            || $formatChildren[0]->namespaceURI !== ZatcaXadesSignatureAssembler::XADES_NAMESPACE
+            || $formatChildren[0]->localName !== 'MimeType'
+            || trim($formatChildren[0]->textContent) !== 'text/xml'
+        ) {
+            throw new InvalidArgumentException('DataObjectFormat يجب أن تحتوي MimeType فريدة بقيمة text/xml.');
+        }
     }
 
     private function assertSigningCertificateDigests(
@@ -354,6 +365,19 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         }
 
         return $matches;
+    }
+
+    /** @return list<DOMElement> */
+    private function elementChildren(DOMElement $parent): array
+    {
+        $children = [];
+        foreach ($parent->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $children[] = $child;
+            }
+        }
+
+        return $children;
     }
 
     private function assertSignedInfoAlgorithms(DOMXPath $xpath, DOMElement $signedInfo): void
