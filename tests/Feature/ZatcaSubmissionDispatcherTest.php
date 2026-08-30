@@ -112,7 +112,11 @@ class ZatcaSubmissionDispatcherTest extends TestCase
     public function controller_queues_only_new_attempts_when_dispatch_is_explicitly_enabled(): void
     {
         Queue::fake();
-        config(['zatca.transport.dispatch_enabled' => true, 'zatca.transport.queue' => 'zatca']);
+        config([
+            'zatca.transport.dispatch_enabled' => true,
+            'zatca.transport.queue_connection' => 'database',
+            'zatca.transport.queue' => 'zatca',
+        ]);
 
         $response = $this->withToken($this->auth['token'])
             ->withHeader('Idempotency-Key', 'queued-1')

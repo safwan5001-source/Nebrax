@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Jobs\Accounting\SendZatcaSubmission;
 use App\Support\ZatcaSubmissionConflict;
 use App\Models\Invoice;
 use App\Models\ZatcaSubmissionAttempt;
 use App\Services\Accounting\ZatcaSubmissionService;
+use App\Services\Accounting\ZatcaSubmissionQueue;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use PDOException;
@@ -16,6 +16,7 @@ class ZatcaSubmissionController extends ApiController
 {
     public function __construct(
         protected ZatcaSubmissionService $submissions,
+        protected ZatcaSubmissionQueue $queue,
     ) {}
 
     public function index(Request $request, string $id): JsonResponse
@@ -54,13 +55,15 @@ class ZatcaSubmissionController extends ApiController
         }
 
         $queueDispatched = false;
+        $queueError = null;
         if ($result['created'] && config('zatca.transport.dispatch_enabled') === true) {
-            SendZatcaSubmission::dispatch(
-                $result['attempt']->tenant_id,
-                $result['attempt']->branch_id,
-                $result['attempt']->id,
-            )->onQueue((string) config('zatca.transport.queue', 'zatca'));
-            $queueDispatched = true;
+            try {
+                $result['attempt'] = $this->queue->enqueue($result['attempt']);
+                $queueDispatched = true;
+            } catch (RuntimeException) {
+                // تبقى المحاولة pending قابلة لإعادة الصف بعد إصلاح الجاهزية.
+                $queueError = 'queue_not_ready';
+            }
         }
 
         return response()->json([
@@ -70,8 +73,30 @@ class ZatcaSubmissionController extends ApiController
                 'dispatch_status' => $result['attempt']->status,
                 'network_submission_performed' => false,
                 'queue_dispatch_performed' => $queueDispatched,
+                'queue_dispatch_error' => $queueError,
             ],
         ], $result['created'] ? 202 : 200);
+    }
+
+    public function dispatch(Request $request, string $id, string $attemptId): JsonResponse
+    {
+        $invoice = $this->visibleInvoice($request, $id);
+        $attempt = ZatcaSubmissionAttempt::query()
+            ->where('invoice_id', $invoice->id)
+            ->findOrFail($attemptId);
+
+        try {
+            $queued = $this->queue->enqueue($attempt);
+        } catch (ZatcaSubmissionConflict $exception) {
+            abort(409, $exception->getMessage());
+        } catch (RuntimeException $exception) {
+            abort(422, $exception->getMessage());
+        }
+
+        return response()->json([
+            'data' => $this->payload($queued),
+            'meta' => ['queue_dispatch_performed' => true],
+        ], 202);
     }
 
     private function visibleInvoice(Request $request, string $id): Invoice
@@ -92,6 +117,8 @@ class ZatcaSubmissionController extends ApiController
             'request_hash' => $attempt->request_hash,
             'requested_by' => $attempt->requested_by,
             'requested_at' => $attempt->requested_at?->toISOString(),
+            'queue_count' => $attempt->queue_count,
+            'queued_at' => $attempt->queued_at?->toISOString(),
             'completed_at' => $attempt->completed_at?->toISOString(),
             'response_http_status' => $attempt->response_http_status,
             'response_code' => $attempt->response_code,

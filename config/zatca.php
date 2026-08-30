@@ -56,6 +56,7 @@ return [
     'transport' => [
         // Must be enabled explicitly after queue workers and credentials are verified.
         'dispatch_enabled' => env('ZATCA_SUBMISSION_DISPATCH_ENABLED', false),
+        'queue_connection' => env('ZATCA_SUBMISSION_QUEUE_CONNECTION'),
         'queue' => env('ZATCA_SUBMISSION_QUEUE', 'zatca'),
         'connect_timeout_seconds' => 5,
         'timeout_seconds' => 30,
