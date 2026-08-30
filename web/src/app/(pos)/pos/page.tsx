@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import {
-  Search, Barcode, Star, Package, Plus, Trash2,
+  Search, Barcode, Star, Package, Plus, X,
   User, UserPlus, StickyNote, LayoutGrid, ShoppingCart,
   Users, MoreHorizontal, PauseCircle, Archive, Trash,
 } from 'lucide-react';
@@ -20,9 +20,12 @@ import { POS_RETURN_HREF, decidePosUnsavedExit } from '@/lib/pos-workspace';
 import {
   POS_CART_FAB_CLASS,
   POS_CART_PAY_FOOTER_CLASS,
+  POS_DESKTOP_CATEGORIES_CLASS,
   POS_MOBILE_NAV_CLASS,
+  POS_PRODUCTS_PANEL_CLASS,
   POS_SALE_GRID_CLASS,
   posCartPaneClass,
+  posProductGridClass,
   posProductGridPadClass,
   posProductsPaneClass,
 } from '@/lib/pos-responsive';
@@ -42,7 +45,7 @@ import { PosHeldSalesDialog, type PosHeldSale } from '@/components/pos/pos-held-
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { PosProductTile } from '@/components/pos/pos-product-tile';
-import { PosCartLineFrame, PosCartQtyControls, PosCartRemoveButton } from '@/components/pos/pos-cart-line-controls';
+import { PosCartEmptyState, PosCartLineFrame, PosCartQtyControls, PosCartRemoveButton } from '@/components/pos/pos-cart-line-controls';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 import { PosAuditReasonDialog } from '@/components/pos/pos-audit-reason-dialog';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
@@ -1196,7 +1199,9 @@ export default function PosPage() {
               closeCart(activeCart.id);
             }
             playPosFeedback('payment_success');
-            success(checkout.idempotent_replay ? t('checkout_recovered_success') : t('sale_done'));
+            if (checkout.idempotent_replay) {
+              success(t('checkout_recovered_success'));
+            }
             setStep('sale');
             setMobileTab('products');
             restoreFocusAfterUi();
@@ -1323,7 +1328,7 @@ export default function PosPage() {
 
   // ── لوحات فرعية ──────────────────────────────────────────────
   const productsPanel = (
-    <section className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3 sm:p-4 lg:p-5">
+    <section className={POS_PRODUCTS_PANEL_CLASS}>
       <div className="flex gap-2">
         <button
           type="button"
@@ -1402,7 +1407,7 @@ export default function PosPage() {
       <div
         ref={registerProductsContainer}
         tabIndex={-1}
-        className={'grid gap-3 outline-none ' + (posCfg.show_product_images ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6') + posProductGridPadClass(count > 0)}
+        className={posProductGridClass(posCfg.show_product_images, count > 0)}
       >
         {filtered.map((p, index) => {
           const tracked = p.track_inventory;
@@ -1415,6 +1420,7 @@ export default function PosPage() {
                 id: p.id,
                 name: p.name,
                 sku: p.sku,
+                barcode: p.barcode,
                 sale_price_label: formatRiyal(p.sale_price),
                 pos_image: p.pos_image,
                 track_inventory: tracked,
@@ -1423,7 +1429,6 @@ export default function PosPage() {
               showImage={posCfg.show_product_images}
               selected={productSelected}
               isFavorite={fav}
-              taxLabel={taxInclusive ? tprod('tax_incl_tag') : tprod('tax_excl_tag')}
               availableLabel={t('available')}
               favoriteLabel={t('tab_favorites')}
               onAdd={() => addProduct(p)}
@@ -1579,14 +1584,14 @@ export default function PosPage() {
           <button type="button" onClick={() => setClearCartOpen(true)} disabled={cart.length === 0} className="grid min-h-11 min-w-11 place-items-center rounded-md border border-border text-muted hover:bg-negative/10 hover:text-negative disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('clear_cart')}>
             <Trash className="h-4 w-4" strokeWidth={1.7} />
           </button>
-          <button type="button" onClick={() => requestCloseCart(activeCart.id)} className="grid min-h-11 min-w-11 place-items-center rounded-md border border-border text-muted hover:bg-negative/10 hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('close_cart')}>
-            <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+          <button type="button" onClick={() => requestCloseCart(activeCart.id)} className="grid min-h-11 min-w-11 place-items-center rounded-md border border-border text-muted hover:bg-background hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={t('close_cart')}>
+            <X className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
       </div>
 
       <div ref={registerCartContainer} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto px-3 outline-none">
-        {cart.length === 0 && <p className="py-10 text-center text-sm text-muted">{t('empty_cart')}</p>}
+        {cart.length === 0 && <PosCartEmptyState message={t('empty_cart')} />}
         {cart.map((line) => {
           const units = line.productId ? products.find((product) => product.id === line.productId)?.pos_units ?? [] : [];
           const lineSelected = policy.allowKeyboardPowerMode && keyboardActive && activeZone === 'cart' && selectedLineKey === line.key;
@@ -1601,12 +1606,12 @@ export default function PosPage() {
               }}
               register={(element) => registerCartLine(line.key, element)}
             >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-text">{line.description}</div>
                     {line.productId !== null && units.length > 1 ? (
-                      <select aria-label={tprod('unit')} value={line.unit ?? ''} onChange={(event) => setUnit(line.key, event.target.value)} onClick={(event) => event.stopPropagation()} className="mt-1 min-h-10 max-w-28 rounded border border-border bg-background px-1.5 text-xs text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                      <select aria-label={tprod('unit')} value={line.unit ?? ''} onChange={(event) => setUnit(line.key, event.target.value)} onClick={(event) => event.stopPropagation()} className="mt-1 min-h-11 max-w-28 rounded border border-border bg-background px-1.5 text-xs text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                         {units.map((unit) => <option key={unit.name} value={unit.name}>{unit.name}</option>)}
                       </select>
                     ) : line.unit ? <div className="mt-1 text-xs text-muted">{line.unit}</div> : null}
@@ -1614,7 +1619,7 @@ export default function PosPage() {
                   <PosCartRemoveButton label={t('remove')} onRemove={() => remove(line.key)} />
                 </div>
                 {(posCfg.allow_unit_price_override || posCfg.allow_discount) && (
-                  <div className="mt-2 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
+                  <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                     {posCfg.allow_unit_price_override && (
                       <label className="flex items-center gap-1 text-xs text-muted">
                         {t('unit_price')}
@@ -1649,20 +1654,20 @@ export default function PosPage() {
                     )}
                   </div>
                 )}
-                {priceErrors[line.key] && <p className="mt-1 text-xs text-negative">{priceErrors[line.key]}</p>}
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <PosCartQtyControls
-                    qty={line.qty}
-                    decreaseLabel={t('return_decrease')}
-                    increaseLabel={t('return_increase')}
-                    quantityLabel={t('quantity')}
-                    keypadTitle={t('numeric_keypad_edit_quantity')}
-                    showKeypad={posCfg.show_onscreen_numeric_keypad}
-                    labels={numericEditorLabels}
-                    onDecrease={() => setQty(line.key, -1)}
-                    onIncrease={() => setQty(line.key, 1)}
-                    onQtyChange={(value) => setQtyFromInput(line.key, value)}
-                  />
+                {priceErrors[line.key] && <p className="text-xs text-negative">{priceErrors[line.key]}</p>}
+                <PosCartQtyControls
+                  qty={line.qty}
+                  decreaseLabel={t('return_decrease')}
+                  increaseLabel={t('return_increase')}
+                  quantityLabel={t('quantity')}
+                  keypadTitle={t('numeric_keypad_edit_quantity')}
+                  showKeypad={posCfg.show_onscreen_numeric_keypad}
+                  labels={numericEditorLabels}
+                  onDecrease={() => setQty(line.key, -1)}
+                  onIncrease={() => setQty(line.key, 1)}
+                  onQtyChange={(value) => setQtyFromInput(line.key, value)}
+                />
+                <div className="flex items-baseline justify-end">
                   <span className="num text-sm font-bold text-text">{formatRiyal(lineCalc(line).total / 100)}</span>
                 </div>
               </div>
@@ -1677,16 +1682,18 @@ export default function PosPage() {
             <PauseCircle className="h-4 w-4" strokeWidth={1.7} />{t('hold')}
           </button>
           <button type="button" onClick={() => setNoteOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-semibold text-text touch-manipulation hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-            <StickyNote className="h-4 w-4" strokeWidth={1.7} />{t('cart_note')}
+            <StickyNote className="h-4 w-4" strokeWidth={1.7} />
+            {t('cart_note')}
+            {activeCart.note.trim() !== '' && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />}
           </button>
         </div>
       </div>
 
-      <div className="space-y-1.5 border-t border-border bg-background p-3">
+      <div className="space-y-1.5 border-t border-border bg-background p-3" data-testid="pos-cart-totals">
         <div className="flex justify-between text-sm"><span className="text-muted">{t('subtotal')}</span><span className="num font-semibold text-text">{formatRiyal(subMinor / 100)}</span></div>
         {discMinor > 0 && <div className="flex justify-between text-sm"><span className="text-muted">{t('discount')}</span><span className="num font-semibold text-positive">−{formatRiyal(discMinor / 100)}</span></div>}
         <div className="flex justify-between text-sm"><span className="text-muted">{t('tax')}</span><span className="num font-semibold text-text">{formatRiyal(taxMinor / 100)}</span></div>
-        <div className="flex items-baseline justify-between border-t border-border pt-2"><span className="font-semibold text-text">{t('total')}</span><span className="num text-xl font-bold text-text">{formatRiyal(totalMinor / 100)}</span></div>
+        <div className="flex items-baseline justify-between border-t border-border pt-2"><span className="text-sm font-semibold text-text">{t('total')}</span><span className="num text-xl font-bold text-text">{formatRiyal(totalMinor / 100)}</span></div>
       </div>
 
       <div className={POS_CART_PAY_FOOTER_CLASS}>
@@ -1699,16 +1706,17 @@ export default function PosPage() {
             setStep('payment');
           }}
           disabled={cart.length === 0 || catalogLoading || sessionInvalid || !online}
+          data-testid="pos-cart-pay"
           className="flex min-h-14 w-full touch-manipulation items-center justify-between rounded-md bg-primary px-4 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {t('pay')}<span className="num">{formatRiyal(totalMinor / 100)}<span className="hidden lg:inline"> · F9</span></span>
+          {t('pay')}<span className="num">{formatRiyal(totalMinor / 100)}{policy.showShortcutHints ? <span className="hidden lg:inline"> · F9</span> : null}</span>
         </button>
       </div>
     </aside>
   );
 
   const catsPanel = (
-    <aside className="hidden flex-col gap-2 overflow-y-auto border-s border-border bg-surface p-3 lg:flex">
+    <aside className={POS_DESKTOP_CATEGORIES_CLASS}>
       <h4 className="mb-1 px-1 text-xs font-bold text-muted">{t('categories')}</h4>
       {CATS.map(({ key, label, image, icon: Icon }) => {
         const on = cat === key;
@@ -1894,7 +1902,7 @@ export default function PosPage() {
                   <div className="truncate text-sm font-semibold text-text">{cartState.customer?.name ?? t('cart_named', { number: cartState.number })}</div>
                   <div className="num mt-1 text-xs text-muted">{t('item_count', { count: itemCount })}</div>
                 </button>
-                <Button type="button" variant="ghost" size="icon" className="min-h-11 min-w-11" onClick={() => requestCloseCart(cartState.id)} aria-label={t('close_cart')}><Trash2 className="h-4 w-4" strokeWidth={1.7} /></Button>
+                <Button type="button" variant="ghost" size="icon" className="min-h-11 min-w-11" onClick={() => requestCloseCart(cartState.id)} aria-label={t('close_cart')}><X className="h-4 w-4" strokeWidth={1.7} /></Button>
               </div>
             );
           })}

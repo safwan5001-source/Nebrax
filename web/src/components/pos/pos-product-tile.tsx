@@ -1,6 +1,6 @@
 'use client';
 
-import { Star } from 'lucide-react';
+import { Barcode, Star } from 'lucide-react';
 import { PosProductImage } from '@/components/pos/pos-product-image';
 import { cn } from '@/lib/utils';
 
@@ -8,6 +8,7 @@ export interface PosProductTileProduct {
   id: string;
   name: string;
   sku: string | null;
+  barcode?: string | null;
   sale_price_label: string;
   pos_image?: { download_url: string } | null;
   track_inventory: boolean;
@@ -20,7 +21,6 @@ export function PosProductTile({
   showImage,
   selected,
   isFavorite,
-  taxLabel,
   availableLabel,
   favoriteLabel,
   onAdd,
@@ -32,7 +32,6 @@ export function PosProductTile({
   showImage: boolean;
   selected: boolean;
   isFavorite: boolean;
-  taxLabel: string;
   availableLabel: string;
   favoriteLabel: string;
   onAdd: () => void;
@@ -50,26 +49,42 @@ export function PosProductTile({
         onClick={onAdd}
         onFocus={onFocus}
         className={cn(
-          'flex w-full touch-manipulation select-none flex-col rounded-lg border bg-surface p-2.5 text-start',
-          'hover:border-primary active:border-primary active:bg-primary-soft',
+          'group flex w-full touch-manipulation select-none flex-col overflow-hidden rounded-lg border bg-surface text-start',
+          'transition-[border-color,background-color] duration-150 hover:border-primary active:border-primary active:bg-primary-soft',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
           selected ? 'border-primary ring-2 ring-primary/40' : 'border-border',
-          showImage ? '' : 'min-h-28 justify-between',
+          showImage ? 'min-h-[172px]' : 'min-h-32',
         )}
       >
         {showImage && (
-          <div className={'mb-2.5 overflow-hidden rounded-md bg-background ' + (product.pos_image?.download_url ? 'aspect-[4/3]' : 'h-10')}>
+          <div className={'w-full overflow-hidden border-b border-border bg-background ' + (product.pos_image?.download_url ? 'aspect-[4/3]' : 'h-12')}>
             <PosProductImage path={product.pos_image?.download_url} alt={product.name} />
           </div>
         )}
-        <span className="line-clamp-2 min-h-11 text-sm font-semibold leading-snug text-text">{product.name}</span>
-        {product.sku && <span className="num mt-1 truncate text-[11px] text-muted">{product.sku}</span>}
-        <div className="mt-2 flex items-end justify-between gap-2">
-          <span className="num text-sm font-bold text-primary">{product.sale_price_label}</span>
-          {product.track_inventory && <span className="num text-[11px] text-muted">{availableLabel}: {product.quantity_on_hand}</span>}
+
+        <div className="flex min-h-0 flex-1 flex-col p-3">
+          <span className="line-clamp-2 min-h-10 text-sm font-semibold leading-snug text-text">{product.name}</span>
+
+          <span className="num mt-2 min-w-0 truncate text-[15px] font-extrabold text-text" title={product.sale_price_label}>
+            {product.sale_price_label}
+          </span>
+
+          <div className="mt-auto min-w-0 space-y-1.5 border-t border-border pt-2 text-[10px] text-muted">
+            {product.barcode ? (
+              <span className="flex min-w-0 items-center gap-1" title={product.barcode} data-testid="pos-product-barcode">
+                <Barcode className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                <span className="num min-w-0 truncate" dir="ltr">{product.barcode}</span>
+              </span>
+            ) : null}
+            {product.track_inventory && (
+              <span className="num block truncate whitespace-nowrap" data-testid="pos-product-stock">
+                {availableLabel}: {product.quantity_on_hand}
+              </span>
+            )}
+          </div>
         </div>
-        <span className="mt-0.5 text-[10px] text-muted">{taxLabel}</span>
       </button>
+
       <button
         type="button"
         onClick={(event) => {
@@ -77,9 +92,9 @@ export function PosProductTile({
           onToggleFavorite();
         }}
         className={cn(
-          'absolute end-2 top-2 grid min-h-11 min-w-11 touch-manipulation place-items-center rounded-md bg-surface/90',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-          isFavorite ? 'text-warning' : 'text-muted hover:text-primary',
+          'absolute end-2 top-2 grid min-h-11 min-w-11 touch-manipulation place-items-center rounded-md border border-border bg-surface/95',
+          'hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+          isFavorite ? 'text-warning' : 'text-muted',
         )}
         aria-label={favoriteLabel}
       >

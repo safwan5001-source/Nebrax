@@ -12,6 +12,7 @@ const product = {
   id: 'p1',
   name: 'Water 330ml',
   sku: 'W330',
+  barcode: '6281000000330',
   sale_price_label: '1.50',
   pos_image: { download_url: '/img.png' },
   track_inventory: true,
@@ -27,7 +28,6 @@ function renderTile(overrides: Partial<Parameters<typeof PosProductTile>[0]> = {
       showImage
       selected={false}
       isFavorite={false}
-      taxLabel="incl. VAT"
       availableLabel="Available"
       favoriteLabel="Favorites"
       onAdd={onAdd}
@@ -52,7 +52,10 @@ describe('PosProductTile', () => {
 
   it('لا يضيف المنتج عند الضغط على المفضلة', () => {
     const { onAdd, onToggleFavorite } = renderTile();
-    fireEvent.click(screen.getByRole('button', { name: 'Favorites' }));
+    const favorite = screen.getByRole('button', { name: 'Favorites' });
+    expect(favorite.className).toContain('min-h-11');
+    expect(favorite.className).toContain('min-w-11');
+    fireEvent.click(favorite);
     expect(onToggleFavorite).toHaveBeenCalledOnce();
     expect(onAdd).not.toHaveBeenCalled();
   });
@@ -64,5 +67,39 @@ describe('PosProductTile', () => {
     const { onAdd: onAddSelected } = renderTile({ selected: true });
     expect(screen.getByRole('button', { name: /Water 330ml/ }).getAttribute('aria-selected')).toBe('true');
     expect(onAddSelected).toBeDefined();
+  });
+
+  it('يحافظ على حالات اللمس والماوس والكيبورد داخل البطاقة', () => {
+    renderTile();
+    const card = screen.getByRole('button', { name: /Water 330ml/ });
+    expect(card.className).toContain('touch-manipulation');
+    expect(card.className).toContain('hover:border-primary');
+    expect(card.className).toContain('focus-visible:ring-2');
+  });
+
+  it('يعرض الباركود ويخفي SKU داخل البطاقة', () => {
+    renderTile();
+    expect(screen.getByTestId('pos-product-barcode').textContent).toContain('6281000000330');
+    expect(screen.queryByText('W330')).toBeNull();
+    expect(screen.getByText('1.50')).toBeTruthy();
+    expect(screen.getByText('Available: 12')).toBeTruthy();
+  });
+
+  it('يثبّت اتجاه الباركود LTR ويترك المخزون في سطر مستقل', () => {
+    renderTile();
+    const barcode = screen.getByText('6281000000330');
+    const stock = screen.getByText('Available: 12');
+    const barcodeRow = screen.getByTestId('pos-product-barcode');
+    const stockRow = screen.getByTestId('pos-product-stock');
+    expect(barcode.getAttribute('dir')).toBe('ltr');
+    expect(barcodeRow.contains(barcode)).toBe(true);
+    expect(stockRow.contains(stock)).toBe(true);
+    expect(barcodeRow).not.toBe(stockRow);
+  });
+
+  it('لا يعرض باركودًا وهميًا عند عدم وجود باركود حقيقي', () => {
+    renderTile({ product: { ...product, barcode: null } });
+    expect(screen.queryByTestId('pos-product-barcode')).toBeNull();
+    expect(screen.queryByText('W330')).toBeNull();
   });
 });

@@ -157,4 +157,13 @@ describe('عزل مصدر السياسة', () => {
     expect(auth).not.toContain('pos-interaction-policy');
     expect(auth).not.toContain('PosDialog');
   });
+
+  it('يربط تلميح F9 على زر الدفع بسياسة الاختصارات دون كسر الماسح', () => {
+    const page = source('src/app/(pos)/pos/page.tsx');
+    expect(page).toContain('policy.showShortcutHints ? <span className="hidden lg:inline"> · F9</span> : null');
+    expect(page).toContain('usePosBarcodeScanner');
+    expect(page).toContain('usePosCartNavigation');
+    expect(page).toContain('usePosFocusManager');
+    expect(page).not.toContain("success(checkout.idempotent_replay ? t('checkout_recovered_success') : t('sale_done'))");
+  });
 });

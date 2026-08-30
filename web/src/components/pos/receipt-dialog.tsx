@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import { CheckCircle2 } from 'lucide-react';
 import { PosDialog } from '@/components/pos/pos-dialog';
 import { Button } from '@/components/ui/button';
 import { DocumentView } from '@/modules/documents/components/document-view';
@@ -11,6 +12,7 @@ import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import { resolveTemplateRevisionDefinition, type LiveTemplateRevision } from '@/modules/print-templates/services/live-template-definition';
 import type { DocumentModel } from '@/modules/documents/types';
+import { formatRiyal } from '@/lib/money';
 
 export interface Receipt {
   /** نموذج المستند للإيصال الحراري (يُبنى من السلة عبر محرّك المستندات). */
@@ -83,25 +85,46 @@ export function ReceiptDialog({
 
   if (!receipt) return null;
 
+  const totalMinor = receipt.model.totals?.total ?? 0;
+
   return (
-    <PosDialog open={!!receipt} onClose={onClose} title={t('receipt')} className="max-w-xs">
-      <div className="max-h-[60vh] overflow-auto rounded-lg bg-background p-2">
-        <DocumentScaler>
-          <DocumentView
-            model={receipt.model}
-            templateId={format.templateId}
-            themeId={'themeId' in format ? format.themeId : undefined}
-            showLogo={'showLogo' in format ? format.showLogo : undefined}
-            layout={'layout' in format ? format.layout : undefined}
-            rootId="print-root"
-          />
-        </DocumentScaler>
-      </div>
-      <div className="mt-4 flex justify-end gap-2 no-print">
-        <Button variant="outline" onClick={onClose}>
-          {t('new_sale')}
-        </Button>
-        <Button onClick={() => printDocument(format.paper)}>{t('print')}</Button>
+    <PosDialog open={!!receipt} onClose={onClose} title={t('receipt')} className="max-w-md sm:max-w-lg">
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3" data-testid="pos-receipt-success">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-text">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-positive" strokeWidth={1.7} aria-hidden />
+              {t('receipt_done')}
+            </div>
+            <p className="num mt-1 truncate text-sm font-semibold text-text">{receipt.number}</p>
+          </div>
+          <div className="shrink-0 text-end">
+            <div className="text-[11px] font-semibold text-muted">{t('total')}</div>
+            <div className="num text-lg font-bold text-text">{formatRiyal(totalMinor / 100)}</div>
+          </div>
+        </div>
+
+        <div className="max-h-[min(55vh,28rem)] overflow-auto rounded-md border border-border bg-background p-3">
+          <DocumentScaler>
+            <DocumentView
+              model={receipt.model}
+              templateId={format.templateId}
+              themeId={'themeId' in format ? format.themeId : undefined}
+              showLogo={'showLogo' in format ? format.showLogo : undefined}
+              layout={'layout' in format ? format.layout : undefined}
+              rootId="print-root"
+            />
+          </DocumentScaler>
+        </div>
+
+        <div className="flex flex-col gap-2 no-print sm:flex-row sm:justify-end">
+          <Button variant="outline" className="min-h-11 touch-manipulation sm:min-w-28" onClick={onClose}>
+            {t('new_sale')}
+          </Button>
+          <Button className="min-h-11 touch-manipulation sm:min-w-28" onClick={() => printDocument(format.paper)}>
+            {t('print')}
+          </Button>
+        </div>
       </div>
     </PosDialog>
   );

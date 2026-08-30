@@ -12,15 +12,27 @@ const { printDocument, documentView } = vi.hoisted(() => ({
 }));
 
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
-vi.mock('@/components/pos/pos-dialog', () => ({ Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, PosDialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
-vi.mock('@/components/ui/button', () => ({ Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => <button type="button" onClick={onClick}>{children}</button> }));
+vi.mock('@/components/pos/pos-dialog', () => ({
+  Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PosDialog: ({ children, title, className }: { children: React.ReactNode; title: string; className?: string }) => (
+    <div role="dialog" aria-label={title} data-class={className}>{children}</div>
+  ),
+}));
+vi.mock('@/components/ui/button', () => ({
+  Button: ({ children, onClick, className }: { children: React.ReactNode; onClick?: () => void; className?: string }) => (
+    <button type="button" className={className} onClick={onClick}>{children}</button>
+  ),
+}));
 vi.mock('@/modules/documents/components/document-view', () => ({ DocumentView: documentView }));
 vi.mock('@/modules/documents/components/document-scaler', () => ({ DocumentScaler: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock('@/modules/documents/services/export', () => ({ printDocument }));
 
 function receipt(templateId: string): Receipt {
   return {
-    model: {} as Receipt['model'],
+    model: {
+      totals: { subtotal: 10000, tax: 1500, total: 11500 },
+      meta: { number: 'POS-2026-0001', date: '2026-08-30' },
+    } as Receipt['model'],
     number: 'POS-2026-0001',
     thermalTemplateRevision: {
       id: 'thermal-revision-1',
@@ -75,5 +87,32 @@ describe('ReceiptDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'print' }));
     expect(printDocument).toHaveBeenCalledWith({ widthMm: 58, heightMm: 0 });
+  });
+
+  it('يبرز نجاح العملية ورقم الفاتورة والإجمالي مع معاينة DocumentView وإجراءات لمس', () => {
+    const onClose = vi.fn();
+    render(<ReceiptDialog receipt={receipt('tax-invoice-thermal80')} paperSize="thermal_80" onClose={onClose} />);
+
+    const dialog = screen.getByRole('dialog', { name: 'receipt' });
+    expect(dialog.getAttribute('data-class')).toContain('max-w-md');
+    expect(dialog.getAttribute('data-class')).toContain('sm:max-w-lg');
+    expect(dialog.getAttribute('data-class')).not.toContain('max-w-xs');
+
+    const success = screen.getByTestId('pos-receipt-success');
+    expect(success.textContent).toContain('receipt_done');
+    expect(success.textContent).toContain('POS-2026-0001');
+    expect(success.querySelector('.text-positive')).toBeTruthy();
+
+    expect(documentView.mock.calls.at(-1)?.[0]).toMatchObject({
+      templateId: 'tax-invoice-thermal80',
+      rootId: 'print-root',
+    });
+
+    const print = screen.getByRole('button', { name: 'print' });
+    const next = screen.getByRole('button', { name: 'new_sale' });
+    expect(print.className).toMatch(/min-h-11/);
+    expect(next.className).toMatch(/min-h-11/);
+    fireEvent.click(next);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });
