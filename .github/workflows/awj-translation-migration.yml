@@ -1,0 +1,39 @@
+name: AWJ translation migration
+
+on:
+  push:
+    branches: ['chore/awj-brand-migration']
+    paths: ['.github/workflows/awj-translation-migration.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chore/awj-brand-migration
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Migrate customer-facing translation values
+        working-directory: web
+        run: node scripts/awj-brand-value-migration.mjs src/messages/ar.json src/messages/en.json
+      - name: Verify migration is clean and JSON parses
+        working-directory: web
+        run: |
+          node scripts/awj-brand-value-migration.mjs --check src/messages/ar.json src/messages/en.json
+          node -e "JSON.parse(require('fs').readFileSync('src/messages/ar.json','utf8')); JSON.parse(require('fs').readFileSync('src/messages/en.json','utf8'))"
+      - name: Commit translation migration
+        run: |
+          if git diff --quiet -- web/src/messages/ar.json web/src/messages/en.json; then
+            echo 'No translation migration changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/messages/ar.json web/src/messages/en.json
+          git commit -m 'refactor(brand): migrate customer-facing translations to AWJ'
+          git push origin HEAD:chore/awj-brand-migration
