@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { IBM_Plex_Sans_Arabic, IBM_Plex_Mono } from 'next/font/google';
 import { getLocale, getMessages } from 'next-intl/server';
 import { Providers } from '@/components/providers';
+import { BRAND } from '@/lib/brand';
 import './globals.css';
 
 // خطوط ذاتية الاستضافة (next/font) — تُبنى محلياً فلا طلب CDN حاجب للعرض
@@ -19,7 +20,7 @@ const mono = IBM_Plex_Mono({
   variable: '--font-ibm-mono',
 });
 export const metadata: Metadata = {
-  title: 'أَوْج | AWJ',
+  title: BRAND.displayName,
   description: 'منصة سحابية متكاملة لإدارة المؤسسات',
 };
 
