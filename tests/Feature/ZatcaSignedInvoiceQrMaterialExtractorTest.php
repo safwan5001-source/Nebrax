@@ -306,6 +306,17 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_trailing_bytes_after_an_embedded_der_certificate(): void
+    {
+        $tampered = $this->signedInvoiceWithTrailingCertificateBytes();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('DER');
+
+        app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($tampered);
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
@@ -622,6 +633,60 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
                 true,
             ));
         }
+        $signatureValue->nodeValue = app(ZatcaXmlEcdsaSigner::class)->sign(
+            app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
+            $privateKey,
+        );
+        $xml = $document->saveXML();
+        $this->assertIsString($xml);
+
+        return $xml;
+    }
+
+    private function signedInvoiceWithTrailingCertificateBytes(): string
+    {
+        [$privateKey, $leaf] = $this->certificate();
+        $signed = app(ZatcaXadesSignatureAssembler::class)->assemble(
+            $this->invoiceXml(),
+            [base64_encode($leaf)],
+            $privateKey,
+            new DateTimeImmutable('2026-08-30T01:02:03+03:00'),
+            'https://zatca.gov.sa/security-policy.pdf',
+            base64_encode(hash('sha256', 'policy', true)),
+        );
+
+        $document = new DOMDocument();
+        $document->preserveWhiteSpace = true;
+        $this->assertTrue($document->loadXML($signed, LIBXML_NONET));
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
+        $xpath->registerNamespace('xades', ZatcaXadesSignatureAssembler::XADES_NAMESPACE);
+        $certificate = $xpath->query('//ds:KeyInfo/ds:X509Data/ds:X509Certificate')?->item(0);
+        $certificateDigest = $xpath->query(
+            '//xades:SigningCertificateV2/xades:Cert/xades:CertDigest/ds:DigestValue',
+        )?->item(0);
+        $signedProperties = $xpath->query('//xades:SignedProperties')?->item(0);
+        $propertiesDigest = $xpath->query(
+            "//ds:SignedInfo/ds:Reference[@Type='".
+            \App\Services\Accounting\ZatcaXmlDsigSignedInfoBuilder::SIGNED_PROPERTIES_TYPE.
+            "']/ds:DigestValue",
+        )?->item(0);
+        $signedInfo = $xpath->query('//ds:Signature/ds:SignedInfo')?->item(0);
+        $signatureValue = $xpath->query('//ds:Signature/ds:SignatureValue')?->item(0);
+        $this->assertInstanceOf(DOMElement::class, $certificate);
+        $this->assertInstanceOf(DOMElement::class, $certificateDigest);
+        $this->assertInstanceOf(DOMElement::class, $signedProperties);
+        $this->assertInstanceOf(DOMElement::class, $propertiesDigest);
+        $this->assertInstanceOf(DOMElement::class, $signedInfo);
+        $this->assertInstanceOf(DOMElement::class, $signatureValue);
+        $paddedCertificate = $leaf."trailing-bytes";
+        $certificate->nodeValue = base64_encode($paddedCertificate);
+        $certificateDigest->nodeValue = base64_encode(hash('sha256', $paddedCertificate, true));
+        $propertiesDigest->nodeValue = base64_encode(hash(
+            'sha256',
+            app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedProperties),
+            true,
+        ));
         $signatureValue->nodeValue = app(ZatcaXmlEcdsaSigner::class)->sign(
             app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
             $privateKey,
