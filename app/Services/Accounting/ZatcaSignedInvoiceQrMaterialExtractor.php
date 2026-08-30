@@ -128,21 +128,19 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
             './xades:Cert',
             $signingCertificates->item(0),
         );
-        $certDigests = $this->query(
-            $xpath,
-            './xades:Cert/xades:CertDigest',
-            $signingCertificates->item(0),
-        );
-        if ($certificateEntries->length !== $certificates->length
-            || $certDigests->length !== $certificates->length
-        ) {
+        if ($certificateEntries->length !== $certificates->length) {
             throw new RuntimeException('بصمات SigningCertificateV2 لا تطابق سلسلة شهادات KeyInfo.');
         }
         for ($index = 0; $index < $certificates->length; $index++) {
-            $certDigest = $certDigests->item($index);
-            if (! $certDigest instanceof DOMElement) {
-                throw new InvalidArgumentException('بنية بصمة شهادة XAdES غير صالحة.');
+            $certificateEntry = $certificateEntries->item($index);
+            if (! $certificateEntry instanceof DOMElement) {
+                throw new InvalidArgumentException('بنية شهادة XAdES غير صالحة.');
             }
+            $entryDigests = $this->query($xpath, './xades:CertDigest', $certificateEntry);
+            if ($entryDigests->length !== 1 || ! $entryDigests->item(0) instanceof DOMElement) {
+                throw new InvalidArgumentException('كل عنصر Cert في XAdES يجب أن يحتوي CertDigest مباشرة وفريدة.');
+            }
+            $certDigest = $entryDigests->item(0);
             $methods = $this->query($xpath, './ds:DigestMethod', $certDigest);
             $values = $this->query($xpath, './ds:DigestValue', $certDigest);
             if ($methods->length !== 1 || ! $methods->item(0) instanceof DOMElement
