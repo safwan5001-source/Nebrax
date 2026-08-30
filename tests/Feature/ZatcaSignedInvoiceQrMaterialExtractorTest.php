@@ -76,6 +76,28 @@ class ZatcaSignedInvoiceQrMaterialExtractorTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_xpath_prefixes_rebound_to_non_ubl_namespaces(): void
+    {
+        $signed = $this->signedInvoice();
+        foreach (['ext', 'cac', 'cbc'] as $prefix) {
+            $invalid = preg_replace(
+                '#(<ds:SignedInfo\b[^>]*xmlns:'.$prefix.'=")[^"]+#',
+                '$1urn:wrong:'.$prefix,
+                $signed,
+                1,
+            );
+            $this->assertIsString($invalid);
+            $this->assertNotSame($signed, $invalid);
+            try {
+                app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($invalid);
+                $this->fail('كان يجب رفض ربط بادئة XPath بغير مساحة UBL الرسمية.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('بادئة', $exception->getMessage());
+            }
+        }
+    }
+
+    /** @test */
     public function it_rejects_missing_duplicate_or_malformed_signature_material(): void
     {
         $signed = $this->signedInvoice();
