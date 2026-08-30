@@ -34,11 +34,16 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         $xpath->registerNamespace('xades', ZatcaXadesSignatureAssembler::XADES_NAMESPACE);
 
         $allSignatures = $this->query($xpath, '//ds:Signature');
+        $extensionWrappers = $this->query($xpath, '/inv:Invoice/ext:UBLExtensions');
+        if ($extensionWrappers->length !== 1 || ! $extensionWrappers->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('فاتورة ZATCA يجب أن تحتوي غلاف UBLExtensions جذرياً واحداً.');
+        }
         $officialExtensions = $this->query(
             $xpath,
-            "/inv:Invoice/ext:UBLExtensions/ext:UBLExtension[ext:ExtensionURI='".
+            "./ext:UBLExtension[ext:ExtensionURI='".
             ZatcaXadesSignatureAssembler::EXTENSION_URI.
             "']",
+            $extensionWrappers->item(0),
         );
         if ($officialExtensions->length !== 1 || ! $officialExtensions->item(0) instanceof DOMElement) {
             throw new InvalidArgumentException('فاتورة ZATCA لا تحتوي امتداد UBL رسمياً وفريداً.');
@@ -263,8 +268,11 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
             throw new InvalidArgumentException('عنصر SignedProperties المستهدف مفقود أو مكرر.');
         }
 
-        $transforms = $this->query($xpath, './ds:Transforms/ds:Transform', $reference);
-        if ($transforms->length !== 1 || ! $transforms->item(0) instanceof DOMElement
+        $transformContainers = $this->query($xpath, './ds:Transforms', $reference);
+        $transforms = $transformContainers->length === 1 && $transformContainers->item(0) instanceof DOMElement
+            ? $this->query($xpath, './ds:Transform', $transformContainers->item(0))
+            : null;
+        if ($transforms === null || $transforms->length !== 1 || ! $transforms->item(0) instanceof DOMElement
             || $transforms->item(0)->getAttribute('Algorithm') !== ZatcaXmlCanonicalizer::ALGORITHM
         ) {
             throw new InvalidArgumentException('مرجع SignedProperties لا يستخدم تحويل C14N المطلوب وحده.');
@@ -351,13 +359,16 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
 
     private function assertInvoiceReferenceTransforms(DOMXPath $xpath, DOMElement $reference): void
     {
-        $transforms = $this->query($xpath, './ds:Transforms/ds:Transform', $reference);
+        $transformContainers = $this->query($xpath, './ds:Transforms', $reference);
+        $transforms = $transformContainers->length === 1 && $transformContainers->item(0) instanceof DOMElement
+            ? $this->query($xpath, './ds:Transform', $transformContainers->item(0))
+            : null;
         $expectedXpath = [
             'not(//ancestor-or-self::ext:UBLExtensions)',
             'not(//ancestor-or-self::cac:Signature)',
             "not(//ancestor-or-self::cac:AdditionalDocumentReference[cbc:ID='QR'])",
         ];
-        if ($transforms->length !== 4) {
+        if ($transforms === null || $transforms->length !== 4) {
             throw new InvalidArgumentException('مرجع الفاتورة لا يحتوي تحويلات ZATCA الأربع المتوقعة.');
         }
         foreach ($expectedXpath as $index => $expression) {
