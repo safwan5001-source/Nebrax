@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { LangToggle } from '@/components/layout/lang-toggle';
-import { NebraxLogo } from '@/components/layout/nebrax-logo';
+import { AwjLogo } from '@/components/layout/awj-logo';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 export function AuthShell({ children }: { children: ReactNode }) {
@@ -19,7 +19,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
       <div className="mx-auto w-full max-w-md">
         <Link href="/" className="mb-6 flex justify-center" aria-label={landing('brand_aria')}>
-          <NebraxLogo alt="" className="h-14 w-auto sm:h-16" priority />
+          <AwjLogo alt="" className="h-14 w-auto sm:h-16" priority />
         </Link>
         {children}
       </div>

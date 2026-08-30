@@ -1,56 +1,81 @@
-# AWJ / أَوْج — Rebrand Audit Baseline
+# AWJ Rebrand Audit
 
 ## Decision
 
-The customer-facing product brand is migrating from **نبراكس / Nebrax** to **أَوْج / AWJ**.
+The customer-facing product brand is migrating from **نبراكس / Nebrax** and legacy **نبراس / Nibras** references to **أَوْج / AWJ**.
 
-This is a controlled brand migration. It is **not** a blanket rename of technical identifiers.
+This is a controlled product-brand migration, not a blanket technical rename.
 
-## Phase 1 scope
+## Canonical names
 
-### Rename / replace
-- Customer-facing product name and accessible brand labels.
-- Web metadata and page titles.
-- Shared logo component and its consumer imports.
-- Authentication shell branding.
-- Landing-page branding.
-- Arabic and English translation strings that visibly refer to the old brand.
-- Brand assets used by the web application.
-- User-facing document/report/email branding where confirmed by audit.
-- Product-facing documentation.
+- Arabic UI: `أَوْج`
+- English UI: `AWJ`
+- Combined metadata/docs: `أَوْج | AWJ`
 
-### Preserve unless separately approved
-- GitHub repository name and repository URLs.
-- Production/staging domains and deployment project identifiers.
-- Database names, table/column names, migrations and historical identifiers.
-- Environment variable names and API contracts when changing them would create compatibility risk.
-- Historical migration/audit records where rewriting history is inappropriate.
+## Search variants
 
-## Confirmed current touchpoints on `main`
+Every migration pass must inspect all of these variants:
 
-1. `web/src/app/layout.tsx`: metadata title is currently `نبراكس`.
-2. `web/src/components/layout/nebrax-logo.tsx`: shared localized logo component is named `NebraxLogo`; it uses `/brand/nebrax-logo.png` for Arabic and `/brand/nebrax-logo-en.png` for English, with the design-system `--primary` token.
-3. `web/src/app/page.tsx`: landing page imports and renders `NebraxLogo`.
-4. `web/src/components/auth/auth-shell.tsx`: authentication shell imports and renders `NebraxLogo`.
-5. `web/public/brand/`: four Nebrax logo assets are present.
-6. `web/src/messages/ar.json` and `web/src/messages/en.json`: central translation catalogs require a brand-string audit before replacement.
+- `نبراكس`
+- `Nebrax`, `NEBRAX`, `nebrax`
+- `نبراس`
+- `Nibras`, `NIBRAS`, `nibras`
+
+## Rename customer-facing references
+
+- Product name and metadata.
+- Shared product wordmark/logo component.
+- Authentication shell and public landing page.
+- Arabic and English translations.
+- User-facing emails, templates, reports and PDFs where the old name is confirmed as product branding.
+- Current product documentation and design-system wording.
+
+## Preserve technical compatibility unless separately approved
+
+Do not blindly rename:
+
+- GitHub repository name or repository URLs.
+- Production/deployment hostnames such as legacy `nebrax` / `nibras` URLs.
+- Database names, tables, migrations or namespaces.
+- Environment variable names or API contracts.
+- Historical records whose value is evidence/history rather than current product branding.
+
+Every retained old-brand occurrence must be classified as an intentional legacy/technical reference.
+
+## Confirmed touchpoints
+
+- `web/src/lib/brand.ts` is the canonical runtime brand-name source.
+- `web/src/app/layout.tsx` reads metadata from the central brand source.
+- `web/src/components/layout/awj-logo.tsx` is the shared AWJ product wordmark.
+- Authentication and landing surfaces must consume the AWJ component.
+- Company branding remains separate (`CompanyLogoMark`) and must not be overwritten by the product brand.
 
 ## Design-system constraints
 
-- Keep brand color controlled by the existing design token; do not hard-code a new blue inside components.
-- Preserve RTL/LTR behavior and Arabic/English localization.
-- Preserve light/dark compatibility.
-- Prefer a single shared AWJ logo component rather than screen-specific logo implementations.
-- Keep the accounting UI dense, clear and operational; the rebrand must not trigger unrelated UI redesign.
+- Preserve existing design tokens; no unrelated redesign in this migration.
+- Product identity uses token-controlled `text-primary` / `--primary`, never hard-coded component colors.
+- Preserve RTL/LTR behavior and light/dark modes.
+- Keep IBM Plex Sans Arabic for product wordmark fallback and UI typography.
+- Do not introduce gradients, decorative shadows, or unrelated visual effects.
 
-## Asset requirement
+## Final logo assets
 
-The supplied AWJ artwork is the visual reference, but production assets must have genuine transparency and suitable crops/aspect ratios. Required web variants should include at minimum Arabic AWJ, English AWJ or an approved bilingual equivalent, symbol-only, and favicon/app-icon assets. The app must not ship a checkerboard baked into the image background.
+When approved production artwork is available, add genuine transparent assets for:
+
+- Arabic `أَوْج` wordmark.
+- English `AWJ` wordmark or approved bilingual lockup.
+- Symbol-only mark.
+- Favicon/app icon.
+
+Do not ship checkerboard pixels as transparency. Until final artwork is committed, the shared AWJ component uses the canonical text wordmark and design tokens so no legacy Nebrax artwork is shown on migrated surfaces.
 
 ## Validation gates
 
-Before merge: audit old-brand occurrences and classify retained technical references; run frontend checks/build; smoke-check RTL/LTR and light/dark; check landing, auth, application shell and POS; check invoice/document/PDF/email branding where applicable; require green CI.
+Before merge:
 
-## Safety boundary
-
-This branch/PR must stop before merge and production deployment until explicit approval is given.
+1. Audit customer-facing code and content for all eight legacy variants above.
+2. Verify intentional technical legacy references against the whitelist.
+3. Run frontend build and relevant unit/i18n tests.
+4. Verify Arabic/English, RTL/LTR, light/dark, landing and auth surfaces.
+5. Open an independent PR and review CI.
+6. Do not merge or deploy without explicit approval.
