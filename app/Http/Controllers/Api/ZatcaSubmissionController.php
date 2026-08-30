@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Jobs\Accounting\SendZatcaSubmission;
 use App\Support\ZatcaSubmissionConflict;
 use App\Models\Invoice;
 use App\Models\ZatcaSubmissionAttempt;
@@ -28,10 +29,7 @@ class ZatcaSubmissionController extends ApiController
         return response()->json(['data' => $attempts]);
     }
 
-    /**
-     * يسجل طلب إرسال/إعادة إرسال يدوياً. لا ينفذ HTTP إلى ZATCA في هذا PR؛
-     * سيستهلك الـJob اللاحق المحاولة pending وفق نفس العقد الدائم.
-     */
+    /** يسجل طلباً دائماً ويصفّه فقط عند تفعيل النقل صراحةً في إعداد الخادم. */
     public function store(Request $request, string $id): JsonResponse
     {
         $invoice = $this->visibleInvoice($request, $id);
@@ -55,12 +53,23 @@ class ZatcaSubmissionController extends ApiController
             abort(422, $exception->getMessage());
         }
 
+        $queueDispatched = false;
+        if ($result['created'] && config('zatca.transport.dispatch_enabled') === true) {
+            SendZatcaSubmission::dispatch(
+                $result['attempt']->tenant_id,
+                $result['attempt']->branch_id,
+                $result['attempt']->id,
+            )->onQueue((string) config('zatca.transport.queue', 'zatca'));
+            $queueDispatched = true;
+        }
+
         return response()->json([
             'data' => $this->payload($result['attempt']),
             'meta' => [
                 'created' => $result['created'],
                 'dispatch_status' => $result['attempt']->status,
                 'network_submission_performed' => false,
+                'queue_dispatch_performed' => $queueDispatched,
             ],
         ], $result['created'] ? 202 : 200);
     }
