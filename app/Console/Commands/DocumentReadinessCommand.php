@@ -15,6 +15,8 @@ final class DocumentReadinessCommand extends Command
 
     /** @var list<string> */
     private const REQUIRED_TABLES = [
+        'jobs',
+        'failed_jobs',
         'document_batches',
         'document_workflow_events',
         'document_files',
