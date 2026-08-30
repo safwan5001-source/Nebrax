@@ -24,12 +24,31 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
     {
         $document = $this->parseSecurely($signedXml);
         $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('inv', 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2');
+        $xpath->registerNamespace('ext', ZatcaXadesSignatureAssembler::EXT_NAMESPACE);
+        $xpath->registerNamespace('sig', ZatcaXadesSignatureAssembler::SIG_NAMESPACE);
+        $xpath->registerNamespace('sac', ZatcaXadesSignatureAssembler::SAC_NAMESPACE);
+        $xpath->registerNamespace('sbc', ZatcaXadesSignatureAssembler::SBC_NAMESPACE);
+        $xpath->registerNamespace('cbc', ZatcaXadesSignatureAssembler::CBC_NAMESPACE);
         $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
         $xpath->registerNamespace('xades', ZatcaXadesSignatureAssembler::XADES_NAMESPACE);
 
-        $signatures = $this->query($xpath, '//ds:Signature');
-        if ($signatures->length !== 1 || ! $signatures->item(0) instanceof DOMElement) {
-            throw new InvalidArgumentException('فاتورة ZATCA الموقعة لا تحتوي مجموعة توقيع واحدة مكتملة للـQR.');
+        $allSignatures = $this->query($xpath, '//ds:Signature');
+        $signatures = $this->query(
+            $xpath,
+            "/inv:Invoice/ext:UBLExtensions/ext:UBLExtension[ext:ExtensionURI='".
+            ZatcaXadesSignatureAssembler::EXTENSION_URI.
+            "']/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation".
+            "[cbc:ID='".ZatcaXadesSignatureAssembler::SIGNATURE_INFORMATION_ID."']".
+            "[sbc:ReferencedSignatureID='".ZatcaXadesSignatureAssembler::REFERENCED_SIGNATURE_ID."']".
+            '/ds:Signature',
+        );
+        if ($allSignatures->length !== 1 || $signatures->length !== 1
+            || ! $signatures->item(0) instanceof DOMElement
+            || ! $allSignatures->item(0) instanceof DOMElement
+            || ! $allSignatures->item(0)->isSameNode($signatures->item(0))
+        ) {
+            throw new InvalidArgumentException('فاتورة ZATCA لا تحتوي توقيعاً فريداً داخل امتداد UBL الرسمي.');
         }
         $signatureElement = $signatures->item(0);
         $signedInfo = $this->query($xpath, './ds:SignedInfo', $signatureElement);
@@ -178,10 +197,28 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         if (preg_match('/^#([A-Za-z_][A-Za-z0-9._-]*)$/D', $uri, $match) !== 1) {
             throw new InvalidArgumentException('URI مرجع SignedProperties ليس XML ID محلياً صالحاً.');
         }
+        $signatureId = $signature->getAttribute('Id');
+        $signatureTargets = preg_match('/^[A-Za-z_][A-Za-z0-9._-]*$/D', $signatureId) === 1
+            ? $this->elementsWithId($signature->ownerDocument, $signatureId)
+            : [];
+        if (count($signatureTargets) !== 1 || ! $signatureTargets[0]->isSameNode($signature)) {
+            throw new InvalidArgumentException('معرّف توقيع ZATCA مفقود أو مكرر على مستوى المستند.');
+        }
+        $qualifyingProperties = $this->query(
+            $xpath,
+            './ds:Object/xades:QualifyingProperties',
+            $signature,
+        );
+        if ($qualifyingProperties->length !== 1
+            || ! $qualifyingProperties->item(0) instanceof DOMElement
+            || $qualifyingProperties->item(0)->getAttribute('Target') !== '#'.$signatureId
+        ) {
+            throw new InvalidArgumentException('QualifyingProperties لا ترتبط بتوقيع ZATCA عبر Target صالح وفريد.');
+        }
         $targets = $this->query(
             $xpath,
-            ".//xades:SignedProperties[@Id='".$match[1]."']",
-            $signature,
+            "./xades:SignedProperties[@Id='".$match[1]."']",
+            $qualifyingProperties->item(0),
         );
         $documentTargets = $this->elementsWithId($signature->ownerDocument, $match[1]);
         if ($targets->length !== 1 || ! $targets->item(0) instanceof DOMElement
