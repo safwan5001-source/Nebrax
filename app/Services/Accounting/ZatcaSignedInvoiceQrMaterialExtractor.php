@@ -25,6 +25,7 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         $document = $this->parseSecurely($signedXml);
         $xpath = new DOMXPath($document);
         $xpath->registerNamespace('ds', ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE);
+        $xpath->registerNamespace('xades', ZatcaXadesSignatureAssembler::XADES_NAMESPACE);
 
         $signatures = $this->query($xpath, '//ds:Signature');
         if ($signatures->length !== 1 || ! $signatures->item(0) instanceof DOMElement) {
@@ -50,6 +51,11 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         if ($invoiceDigests->length !== 1) {
             throw new InvalidArgumentException('مرجع الفاتورة لا يحتوي DigestValue فريدة.');
         }
+        $references = $this->query($xpath, './ds:Reference', $signedInfo->item(0));
+        if ($references->length !== 2) {
+            throw new InvalidArgumentException('SignedInfo يجب أن تحتوي مرجعي الفاتورة وSignedProperties فقط.');
+        }
+        $this->assertSignedPropertiesReference($xpath, $signatureElement, $signedInfo->item(0));
 
         $invoiceHashBase64 = trim($invoiceDigests->item(0)?->textContent ?? '');
         $signatureBase64 = trim($signatureValues->item(0)?->textContent ?? '');
@@ -89,6 +95,62 @@ final class ZatcaSignedInvoiceQrMaterialExtractor
         }
 
         return ['invoice_hash' => $invoiceHash, 'ecdsa_signature' => $signature];
+    }
+
+    private function assertSignedPropertiesReference(
+        DOMXPath $xpath,
+        DOMElement $signature,
+        DOMElement $signedInfo,
+    ): void {
+        $references = $this->query(
+            $xpath,
+            "./ds:Reference[@Type='".ZatcaXmlDsigSignedInfoBuilder::SIGNED_PROPERTIES_TYPE."']",
+            $signedInfo,
+        );
+        if ($references->length !== 1 || ! $references->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('مرجع SignedProperties مفقود أو مكرر.');
+        }
+        $reference = $references->item(0);
+        $uri = $reference->getAttribute('URI');
+        if (preg_match('/^#([A-Za-z_][A-Za-z0-9._-]*)$/D', $uri, $match) !== 1) {
+            throw new InvalidArgumentException('URI مرجع SignedProperties ليس XML ID محلياً صالحاً.');
+        }
+        $targets = $this->query(
+            $xpath,
+            ".//xades:SignedProperties[@Id='".$match[1]."']",
+            $signature,
+        );
+        if ($targets->length !== 1 || ! $targets->item(0) instanceof DOMElement) {
+            throw new InvalidArgumentException('عنصر SignedProperties المستهدف مفقود أو مكرر.');
+        }
+
+        $transforms = $this->query($xpath, './ds:Transforms/ds:Transform', $reference);
+        if ($transforms->length !== 1 || ! $transforms->item(0) instanceof DOMElement
+            || $transforms->item(0)->getAttribute('Algorithm') !== ZatcaXmlCanonicalizer::ALGORITHM
+        ) {
+            throw new InvalidArgumentException('مرجع SignedProperties لا يستخدم تحويل C14N المطلوب وحده.');
+        }
+        $digestMethods = $this->query($xpath, './ds:DigestMethod', $reference);
+        if ($digestMethods->length !== 1 || ! $digestMethods->item(0) instanceof DOMElement
+            || $digestMethods->item(0)->getAttribute('Algorithm') !== ZatcaXmlDsigSignedInfoBuilder::SHA256_ALGORITHM
+        ) {
+            throw new InvalidArgumentException('مرجع SignedProperties لا يستخدم SHA-256 المطلوب.');
+        }
+        $digestValues = $this->query($xpath, './ds:DigestValue', $reference);
+        $digest = $digestValues->length === 1
+            ? base64_decode(trim($digestValues->item(0)?->textContent ?? ''), true)
+            : false;
+        if (! is_string($digest) || strlen($digest) !== 32) {
+            throw new InvalidArgumentException('DigestValue لـSignedProperties غير صالح.');
+        }
+        $calculated = hash(
+            'sha256',
+            $this->canonicalizer->canonicalizeElementInContext($targets->item(0)),
+            true,
+        );
+        if (! hash_equals($calculated, $digest)) {
+            throw new RuntimeException('DigestValue لا يطابق SignedProperties المضمّنة.');
+        }
     }
 
     private function assertSignedInfoAlgorithms(DOMXPath $xpath, DOMElement $signedInfo): void
