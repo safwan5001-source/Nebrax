@@ -18,8 +18,9 @@ return [
     ],
 
     'ai' => [
-        // PR-4 تأسيسي فقط: يمنع هذا الحارس أي اتصال خارجي حتى اعتماد مرحلة تشغيل لاحقة صراحةً.
-        'provider_network_enabled' => false,
+        // Fail closed by default. External provider traffic is enabled only by an explicit
+        // backend environment flag; provider-level settings still apply independently.
+        'provider_network_enabled' => filter_var(env('DOCUMENT_AI_PROVIDER_NETWORK_ENABLED', false), FILTER_VALIDATE_BOOL),
     ],
 
     'intake' => [
