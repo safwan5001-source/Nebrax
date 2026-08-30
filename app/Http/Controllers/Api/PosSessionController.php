@@ -9,11 +9,14 @@ use App\Http\Resources\PosCashMovementResource;
 use App\Http\Resources\PosSessionEventResource;
 use App\Http\Resources\PosSessionResource;
 use App\Models\PosSession;
+use App\Models\Shift;
 use App\Services\Accounting\PosSessionService;
 use App\Services\Pos\CashDrawerService;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class PosSessionController extends ApiController
 {
@@ -35,13 +38,33 @@ class PosSessionController extends ApiController
     public function open(OpenPosSessionRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $session = $this->domain(fn () => $this->sessions->open(
-            (int) $data['opening_balance'],
-            $data['pos_device_id'],
-            $data['pos_shift_id'],
-            $request->user()?->id,
-            $request->user(),
-        ));
+        $posShiftId = $data['pos_shift_id'] ?? null;
+        $legacyShiftId = $posShiftId === null ? ($data['shift_id'] ?? null) : null;
+
+        $session = $this->domain(fn () => DB::transaction(function () use ($data, $request, $posShiftId, $legacyShiftId): PosSession {
+            // توافق ترحيل محدود: العملاء القدماء قد يرسلون HR shift_id. نتحقق منه
+            // كما كان سابقاً، بينما أي عميل جديد يرسل pos_shift_id ولا يكتب shift_id.
+            if ($legacyShiftId !== null) {
+                $legacyShift = Shift::query()->whereKey($legacyShiftId)->where('is_active', true)->first();
+                if (! $legacyShift) {
+                    throw new RuntimeException('وردية العمل القديمة غير موجودة أو معطّلة أو لا تخص الفرع النشط.');
+                }
+            }
+
+            $session = $this->sessions->open(
+                (int) $data['opening_balance'],
+                $data['pos_device_id'],
+                $posShiftId,
+                $request->user()?->id,
+                $request->user(),
+            );
+
+            if ($legacyShiftId !== null) {
+                $session->forceFill(['shift_id' => $legacyShiftId])->save();
+            }
+
+            return $session->refresh();
+        }));
 
         return (new PosSessionResource($session->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])))
             ->response()->setStatusCode(201);
