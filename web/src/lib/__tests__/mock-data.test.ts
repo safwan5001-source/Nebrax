@@ -16,7 +16,7 @@ describe('mockApi ZATCA settings', () => {
       active_environment: 'developer',
     });
 
-    await expect(mockApi<ZatcaSettingsResponse>('/zatca-settings')).resolves.toEqual({
+    await expect(mockApi<ZatcaSettingsResponse>('/zatca-settings')).resolves.toMatchObject({
       data: {
         icv_scope: 'tenant',
         submission_mode: 'manual',
@@ -29,7 +29,7 @@ describe('mockApi ZATCA settings', () => {
         submission_mode: 'automatic',
         active_environment: 'simulation',
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       data: {
         icv_scope: 'tenant',
         submission_mode: 'automatic',
@@ -37,7 +37,7 @@ describe('mockApi ZATCA settings', () => {
       },
     });
 
-    await expect(mockApi<ZatcaSettingsResponse>('/zatca-settings')).resolves.toEqual({
+    await expect(mockApi<ZatcaSettingsResponse>('/zatca-settings')).resolves.toMatchObject({
       data: {
         icv_scope: 'tenant',
         submission_mode: 'automatic',
@@ -49,6 +49,24 @@ describe('mockApi ZATCA settings', () => {
     const response = await mockApi<{ data: Record<string, boolean> }>('/applications/nav-state');
 
     expect(response.data['compliance.zatca']).toBe(true);
+  });
+
+  it('يعيد بيانات اعتماد عامة فقط مع ميتاداتا الجاهزية', async () => {
+    await mockApi('/zatca-settings', 'PUT', { active_environment: 'developer' });
+    const settings = await mockApi<{ meta: { signing_readiness: { ready: boolean }; transport_readiness: { ready: boolean } } }>('/zatca-settings');
+    const credentials = await mockApi<{ data: Array<Record<string, unknown>> }>('/zatca-credentials');
+
+    expect(settings.meta.signing_readiness.ready).toBe(true);
+    expect(settings.meta.transport_readiness.ready).toBe(false);
+    expect(credentials.data[0]).toMatchObject({
+      environment: 'developer',
+      has_binary_security_token: true,
+      has_secret: true,
+      has_private_key: true,
+    });
+    expect(credentials.data[0]).not.toHaveProperty('binary_security_token');
+    expect(credentials.data[0]).not.toHaveProperty('secret');
+    expect(credentials.data[0]).not.toHaveProperty('private_key');
   });
 
 });

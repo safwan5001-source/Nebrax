@@ -1330,9 +1330,41 @@ export const mockUsers = [
 
 type MockZatcaSubmissionMode = 'manual' | 'automatic';
 type MockZatcaEnvironment = 'developer' | 'simulation' | 'production';
+type MockZatcaCredential = {
+  id: string;
+  environment: MockZatcaEnvironment;
+  stage: 'compliance' | 'production';
+  status: string;
+  has_binary_security_token: boolean;
+  has_secret: boolean;
+  has_private_key: boolean;
+  has_request_id: boolean;
+  public_key_curve: string | null;
+  certificate_chain_length: number;
+  certificate_fingerprint: string | null;
+  configured_at: string | null;
+  expires_at: string | null;
+  updated_at: string | null;
+};
 
 let mockZatcaSubmissionMode: MockZatcaSubmissionMode = 'manual';
 let mockZatcaEnvironment: MockZatcaEnvironment = 'developer';
+const mockZatcaCredentials: MockZatcaCredential[] = [{
+  id: 'zatca-credential-demo',
+  environment: 'developer',
+  stage: 'compliance',
+  status: 'configured',
+  has_binary_security_token: true,
+  has_secret: true,
+  has_private_key: true,
+  has_request_id: true,
+  public_key_curve: 'secp256k1',
+  certificate_chain_length: 2,
+  certificate_fingerprint: 'DEMO-8F:72:44:1A:60:CE:91:2B',
+  configured_at: '2026-08-25T08:00:00Z',
+  expires_at: '2027-08-25T08:00:00Z',
+  updated_at: '2026-08-25T08:00:00Z',
+}];
 
 export const mockSalesConfig: Record<string, unknown> = {
   statuses: [
@@ -2400,13 +2432,68 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       }
     }
 
+    const activeCredential = mockZatcaCredentials.find((item) => item.environment === mockZatcaEnvironment);
     return resolve({
       data: {
         icv_scope: 'tenant',
         submission_mode: mockZatcaSubmissionMode,
         active_environment: mockZatcaEnvironment,
       },
+      meta: {
+        effective_icv_scope: 'tenant',
+        branch_scope_available: false,
+        branch_scope_blocker: null,
+        signing_readiness: {
+          ready: Boolean(activeCredential),
+          environment: mockZatcaEnvironment,
+          credential_stage: activeCredential?.stage ?? null,
+          blockers: activeCredential ? [] : ['credential_unavailable'],
+        },
+        transport_readiness: {
+          ready: false,
+          enabled: false,
+          environment: activeCredential ? mockZatcaEnvironment : '',
+          queue_connection: 'sync',
+          blockers: [
+            'dispatch_disabled',
+            'unsafe_queue_connection',
+            ...(activeCredential ? [] : ['transport_credential_unavailable']),
+          ],
+        },
+      },
     });
+  }
+
+  if (clean === '/zatca-credentials' && m === 'GET') {
+    return resolve({ data: mockZatcaCredentials.map((credential) => ({ ...credential })) });
+  }
+
+  const zatcaCredentialMatch = clean.match(/^\/zatca-credentials\/(developer|simulation|production)$/);
+  if (zatcaCredentialMatch && m === 'PUT') {
+    const environment = zatcaCredentialMatch[1] as MockZatcaEnvironment;
+    const payload = body as Record<string, unknown> | undefined;
+    const existingIndex = mockZatcaCredentials.findIndex((item) => item.environment === environment);
+    const existing = existingIndex >= 0 ? mockZatcaCredentials[existingIndex] : null;
+    const now = new Date().toISOString();
+    const credential: MockZatcaCredential = {
+      id: existing?.id ?? `zatca-credential-${environment}`,
+      environment,
+      stage: payload?.stage === 'production' ? 'production' : 'compliance',
+      status: 'configured',
+      has_binary_security_token: existing?.has_binary_security_token || typeof payload?.binary_security_token === 'string',
+      has_secret: existing?.has_secret || typeof payload?.secret === 'string',
+      has_private_key: existing?.has_private_key || typeof payload?.private_key === 'string',
+      has_request_id: existing?.has_request_id || typeof payload?.request_id === 'string',
+      public_key_curve: 'secp256k1',
+      certificate_chain_length: 2,
+      certificate_fingerprint: existing?.certificate_fingerprint ?? `DEMO-${environment.toUpperCase()}-FINGERPRINT`,
+      configured_at: existing?.configured_at ?? now,
+      expires_at: existing?.expires_at ?? '2027-08-25T08:00:00Z',
+      updated_at: now,
+    };
+    if (existingIndex >= 0) mockZatcaCredentials[existingIndex] = credential;
+    else mockZatcaCredentials.push(credential);
+    return resolve({ data: { ...credential } });
   }
 
   const deliveryMatch = clean.match(/^\/delivery-notes\/([^/]+)$/);
