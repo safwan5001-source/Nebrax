@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
 import { BarChart3, CircleDollarSign, ClipboardCheck, History, LockKeyhole, Plus } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
@@ -17,16 +17,18 @@ import { formatRiyal, riyalToMinor, isNegative, isValidRiyal } from '@/lib/money
 import { cn } from '@/lib/utils';
 
 interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null }
-interface WorkShift { id: string; name: string; is_active: boolean }
+interface PosShift { id: string; name: string; code: string | null; is_active: boolean }
 interface Session {
   id: string;
   number: string;
   status: string;
   pos_device_id: string | null;
   warehouse_id: string | null;
+  pos_shift_id: string | null;
   shift_id: string | null;
   pos_device?: { id: string; name: string; code: string | null } | null;
   warehouse?: { id: string; code: string; name: string } | null;
+  pos_shift?: { id: string; name: string; code: string | null } | null;
   opening_balance: string;
   closing_balance: string | null;
   expected_balance: string | null;
@@ -59,6 +61,7 @@ interface SessionEvent {
 }
 
 export default function PosSessionsPage() {
+  const locale = useLocale();
   const t = useTranslations('posSessions');
   const tp = useTranslations('pos');
   const tc = useTranslations('common');
@@ -81,7 +84,7 @@ export default function PosSessionsPage() {
   const [movementReason, setMovementReason] = useState('');
   const [acknowledgementNote, setAcknowledgementNote] = useState('');
   const [devices, setDevices] = useState<PosDevice[]>([]);
-  const [shifts, setShifts] = useState<WorkShift[]>([]);
+  const [shifts, setShifts] = useState<PosShift[]>([]);
   const [deviceId, setDeviceId] = useState('');
   const [shiftId, setShiftId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -96,7 +99,7 @@ export default function PosSessionsPage() {
   useEffect(() => load(), [load]);
   useEffect(() => {
     api<{ data: PosDevice[] }>('/pos-devices').then((r) => setDevices(r.data.filter((device) => device.is_active))).catch(() => {});
-    api<{ data: WorkShift[] }>('/shifts').then((r) => setShifts(r.data.filter((shift) => shift.is_active))).catch(() => {});
+    api<{ data: PosShift[] }>('/pos-shifts').then((r) => setShifts(r.data.filter((shift) => shift.is_active))).catch(() => {});
   }, []);
   useEffect(() => {
     const user = currentUser();
@@ -113,7 +116,7 @@ export default function PosSessionsPage() {
   async function submitOpen() {
     setBusy(true); setError(null);
     try {
-      await api('/pos-sessions/open', { method: 'POST', body: { opening_balance: riyalToMinor(amount), pos_device_id: deviceId, shift_id: shiftId || null } });
+      await api('/pos-sessions/open', { method: 'POST', body: { opening_balance: riyalToMinor(amount), pos_device_id: deviceId, pos_shift_id: shiftId } });
       success(tc('created')); setOpenDialog(false); setAmount(''); setDeviceId(''); setShiftId(''); load();
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
@@ -195,6 +198,7 @@ export default function PosSessionsPage() {
       { accessorKey: 'number', header: t('number'), cell: ({ row }) => <span className="num">{row.original.number}</span> },
       { accessorKey: 'opened_at', header: t('opened_at'), cell: ({ row }) => <span className="num text-muted">{(row.original.opened_at ?? '').slice(0, 16).replace('T', ' ')}</span> },
       { id: 'device', header: t('device'), cell: ({ row }) => <span>{row.original.pos_device?.name ?? '—'}</span> },
+      { id: 'posShift', header: t('work_shift'), cell: ({ row }) => <span>{row.original.pos_shift?.name ?? '—'}</span> },
       { id: 'warehouse', header: tp('warehouse'), cell: ({ row }) => <span>{row.original.warehouse?.name ?? '—'}</span> },
       { accessorKey: 'opening_balance', header: t('opening_balance'), cell: ({ row }) => <div className="num text-end">{formatRiyal(row.original.opening_balance)}</div> },
       { accessorKey: 'expected_balance', header: t('expected'), cell: ({ row }) => <div className="num text-end">{row.original.expected_balance ? formatRiyal(row.original.expected_balance) : '—'}</div> },
@@ -271,11 +275,12 @@ export default function PosSessionsPage() {
             {devices.length === 0 && <p className="text-xs text-warning">{t('no_device')}</p>}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="session-shift">{t('work_shift')} <span className="text-muted">({t('optional')})</span></Label>
-            <select id="session-shift" value={shiftId} onChange={(e) => setShiftId(e.target.value)} disabled={busy} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60">
-              <option value="">{t('optional')}</option>
-              {shifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.name}</option>)}
+            <Label htmlFor="session-shift">{t('work_shift')}</Label>
+            <select id="session-shift" value={shiftId} onChange={(e) => setShiftId(e.target.value)} required disabled={busy || shifts.length === 0} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60">
+              <option value="">{t('work_shift')}</option>
+              {shifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.name}{shift.code ? ` · ${shift.code}` : ''}</option>)}
             </select>
+            {shifts.length === 0 && <p className="text-xs text-warning">{locale === 'ar' ? 'لا توجد وردية نقاط بيع نشطة في هذا الفرع.' : 'No active POS shift is available in this branch.'}</p>}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="ob">{t('opening_balance')}</Label>
@@ -284,7 +289,7 @@ export default function PosSessionsPage() {
           {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>{t('cancel')}</Button>
-            <Button type="submit" disabled={busy || !deviceId || !isValidRiyal(amount)}>{t('save')}</Button>
+            <Button type="submit" disabled={busy || !deviceId || !shiftId || !isValidRiyal(amount)}>{t('save')}</Button>
           </div>
         </form>
       </Dialog>
@@ -360,7 +365,7 @@ export default function PosSessionsPage() {
               [t('net_sales'), report.net_sales],
               [t('expected'), report.expected],
               [t('average'), report.average],
-            ].map(([label, amount]) => <div key={String(label)} className="flex items-center justify-between gap-3 border-b border-border py-2.5 text-sm"><dt className="text-muted">{label}</dt><dd className="num font-semibold text-text">{formatRiyal(String(amount))}</dd></div>)}
+            ].map(([label, reportAmount]) => <div key={String(label)} className="flex items-center justify-between gap-3 border-b border-border py-2.5 text-sm"><dt className="text-muted">{label}</dt><dd className="num font-semibold text-text">{formatRiyal(String(reportAmount))}</dd></div>)}
             <div className="flex items-center justify-between gap-3 border-b border-border py-2.5 text-sm"><dt className="text-muted">{t('sales_count')}</dt><dd className="num font-semibold text-text">{report.sales_count}</dd></div>
             <div className="flex items-center justify-between gap-3 border-b border-border py-2.5 text-sm"><dt className="text-muted">{t('returns_count')}</dt><dd className="num font-semibold text-text">{report.returns_count}</dd></div>
           </dl>}

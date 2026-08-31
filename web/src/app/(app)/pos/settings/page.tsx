@@ -22,7 +22,7 @@ interface PosSettingsItem {
 const ITEMS: PosSettingsItem[] = [
   { key: 'configuration', href: '/pos/settings/configuration', icon: Settings2 },
   { key: 'sound_feedback', href: '/pos/settings/sound-feedback', icon: Volume2 },
-  { key: 'shifts', href: '/pos/sessions', icon: Clock3 },
+  { key: 'shifts', href: '/pos/settings/shifts', icon: Clock3 },
   { key: 'devices', href: '/pos/settings/devices', icon: TabletSmartphone },
   { key: 'cash_drawer', href: '/pos/settings/cash-drawer', icon: Archive },
   { key: 'desktop', href: null, icon: MonitorDown },

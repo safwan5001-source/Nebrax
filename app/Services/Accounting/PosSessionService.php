@@ -13,8 +13,8 @@ use App\Models\PosHeldSale;
 use App\Models\PaymentMethod;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
+use App\Models\PosShift;
 use App\Models\ReturnDocument;
-use App\Models\Shift;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\PosSettings;
@@ -46,7 +46,7 @@ class PosSessionService
     public function open(
         int $openingBalance,
         string $deviceId,
-        ?string $shiftId = null,
+        ?string $posShiftId = null,
         ?string $userId = null,
         ?User $actor = null,
     ): PosSession {
@@ -54,7 +54,7 @@ class PosSessionService
             throw new RuntimeException('الرصيد الافتتاحي لا يكون سالباً.');
         }
 
-        return DB::transaction(function () use ($openingBalance, $deviceId, $shiftId, $userId, $actor) {
+        return DB::transaction(function () use ($openingBalance, $deviceId, $posShiftId, $userId, $actor) {
             $device = PosDevice::lockForUpdate()->findOrFail($deviceId);
             $branchId = app(BranchContext::class)->id();
             if ($device->branch_id !== $branchId) {
@@ -75,7 +75,7 @@ class PosSessionService
                 throw new RuntimeException('جهاز نقطة البيع أو مستودعه خارج نطاق صلاحياتك.');
             }
 
-            $shift = $this->resolveShift($shiftId, $branchId);
+            $posShift = $posShiftId !== null ? $this->resolvePosShift($posShiftId, $branchId) : null;
             if (PosSession::where('pos_device_id', $device->id)->where('status', 'open')->exists()) {
                 throw new RuntimeException('توجد وردية مفتوحة على جهاز نقطة البيع المحدد — أغلقها أولاً.');
             }
@@ -88,7 +88,10 @@ class PosSessionService
                 'opened_by'       => $userId,
                 'pos_device_id'   => $device->id,
                 'warehouse_id'    => $warehouse->id,
-                'shift_id'        => $shift?->id,
+                'pos_shift_id'    => $posShift?->id,
+                // `shift_id` القديم يبقى فقط كسجل تاريخي للجلسات السابقة ولا
+                // يُعاد ملؤه في الجلسات الجديدة بعد فصل POS عن HR.
+                'shift_id'        => null,
                 // نثبّت خزينة الجلسة من مسار نقد POS نفسه وقت الفتح، فلا تنجرف
                 // تسوية الفرق لاحقاً إلى «الرئيسية» إن غُيّرت خزينة الطريقة.
                 'cash_account_id' => $this->resolveSessionCashAccountId(),
@@ -646,21 +649,14 @@ class PosSessionService
         return $this->audit->auditEventForExistingOperation($session, $type, $actor, $payload);
     }
 
-    private function resolveShift(?string $shiftId, ?string $branchId): ?Shift
+    private function resolvePosShift(string $posShiftId, string $branchId): PosShift
     {
-        if ($shiftId === null) {
-            return null;
-        }
-
-        $shift = Shift::whereKey($shiftId)->first();
-        if (! $shift) {
-            throw new RuntimeException('وردية العمل غير موجودة أو لا تخص الفرع النشط.');
+        $shift = PosShift::whereKey($posShiftId)->first();
+        if (! $shift || $shift->branch_id !== $branchId) {
+            throw new RuntimeException('وردية نقاط البيع غير موجودة أو لا تخص الفرع النشط.');
         }
         if (! $shift->is_active) {
-            throw new RuntimeException('وردية العمل المحددة معطّلة.');
-        }
-        if ($shift->branch_id !== null && $shift->branch_id !== $branchId) {
-            throw new RuntimeException('وردية العمل لا تخص الفرع النشط.');
+            throw new RuntimeException('وردية نقاط البيع المحددة معطّلة.');
         }
 
         return $shift;

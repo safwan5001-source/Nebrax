@@ -7,8 +7,9 @@ use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+
 /**
- * جلسة نقطة بيع (وردية) — سجلّ تشغيلي لمطابقة النقدية. غير محاسبي.
+ * جلسة نقطة بيع — سجل تشغيلي لمطابقة النقدية. غير محاسبي.
  * المبالغ بالهللات كـ bigint.
  */
 class PosSession extends BaseModel
@@ -22,7 +23,7 @@ class PosSession extends BaseModel
         'tenant_id', 'number', 'status', 'opening_balance', 'closing_balance',
         'counted_balance_locked_at', 'closing_count_revealed_at', 'recounted_by', 'recounted_at',
         'expected_balance', 'difference', 'opened_at', 'closed_at', 'notes', 'opened_by', 'closed_by',
-        'pos_device_id', 'warehouse_id', 'shift_id', 'cash_account_id',
+        'pos_device_id', 'warehouse_id', 'pos_shift_id', 'shift_id', 'cash_account_id',
         'difference_status', 'difference_acknowledged_by', 'difference_acknowledged_at', 'difference_acknowledgement_note',
         'variance_journal_entry_id',
     ];
@@ -45,19 +46,28 @@ class PosSession extends BaseModel
         'opening_balance' => 0,
     ];
 
-    /** جهاز البيع المثبت عند فتح الورديّة؛ يحل تاريخياً خارج عزل الفرع. */
+    /** جهاز البيع المثبت عند فتح الجلسة؛ يحل تاريخياً خارج عزل الفرع. */
     public function posDevice(): BelongsTo
     {
         return $this->referenceBelongsTo(PosDevice::class);
     }
 
-    /** مخزن خروج البضائع المثبت للجلسة؛ لا يُعاد حله من إعداد الجهاز الحي. */
+    /** مخزن خروج البضائع المثبت للجلسة؛ لا يعاد حله من إعداد الجهاز الحي. */
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
     }
 
-    /** وردية الموارد البشرية الاختيارية التي بدأت فيها جلسة الكاشير. */
+    /** وردية تشغيل POS المثبتة عند الفتح؛ مستقلة عن جداول دوام HR. */
+    public function posShift(): BelongsTo
+    {
+        return $this->referenceBelongsTo(PosShift::class);
+    }
+
+    /**
+     * مرجع HR التاريخي القديم. يبقى للتوافق مع الجلسات السابقة فقط ولا يستخدم
+     * لفتح جلسات POS الجديدة بعد إدخال PosShift.
+     */
     public function shift(): BelongsTo
     {
         return $this->referenceBelongsTo(Shift::class);
@@ -106,13 +116,13 @@ class PosSession extends BaseModel
         return $this->belongsTo(User::class, 'recounted_by');
     }
 
-    /** قيد تسوية فرق الصندوق المثبّت؛ وجوده يعني أن الفرق سُوِّي محاسبياً مرة واحدة. */
+    /** قيد تسوية فرق الصندوق المثبت؛ وجوده يعني أن الفرق سوي محاسبياً مرة واحدة. */
     public function varianceJournalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'variance_journal_entry_id');
     }
 
-    /** حساب خزينة الجلسة المثبّت وقت الفتح؛ عليه تُرحّل تسوية الفرق لا على الرئيسية. */
+    /** حساب خزينة الجلسة المثبت وقت الفتح؛ عليه ترحل تسوية الفرق لا على الرئيسية. */
     public function cashAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'cash_account_id');
