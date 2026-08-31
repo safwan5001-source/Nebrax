@@ -161,7 +161,10 @@ jobs:
       # تشخيص مؤقت معزول؛ يُحذف بعد تثبيت فشل الاستعادة.
       - name: تشخيص ZATCA queue
         working-directory: ${{ env.APP_DIR }}
-        run: php artisan test --filter='ZatcaSubmission(Recovery|Dispatcher)Test'
+        run: |
+          php artisan route:list --path=register
+          php artisan route:list --path=zatca/submissions
+          php artisan test --filter='ZatcaSubmission(Recovery|Dispatcher)Test'
 
       - name: تشغيل الاختبارات
         working-directory: ${{ env.APP_DIR }}

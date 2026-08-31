@@ -46,7 +46,7 @@ trait InteractsWithApi
             'name'         => 'المالك',
             'email'        => $email,
             'password'     => 'password123',
-        ])->assertCreated();
+        ])->dump()->assertCreated();
 
         $tenantId = $res['tenant']['id'];
 
