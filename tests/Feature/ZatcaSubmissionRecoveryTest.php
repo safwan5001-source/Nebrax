@@ -24,13 +24,6 @@ class ZatcaSubmissionRecoveryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Queue::fake();
-        config([
-            'zatca.transport.dispatch_enabled' => true,
-            'zatca.transport.queue_connection' => 'database',
-            'zatca.transport.queue' => 'zatca',
-        ]);
-
         $this->auth = $this->registerTenant('zatca-recovery', 'zatca-recovery@example.test');
         app(TenantContext::class)->set($this->auth['tenant_id']);
         $customer = Partner::create(['name' => 'عميل الاستعادة', 'type' => 'customer']);
@@ -48,6 +41,15 @@ class ZatcaSubmissionRecoveryTest extends TestCase
             'certificate_fingerprint' => str_repeat('a', 64),
             'configured_at' => now(),
             'expires_at' => now()->addDay(),
+        ]);
+
+        // لا تغيّر بيئة الطابور العالمية قبل اكتمال تأسيس المستأجر؛ الاختبار
+        // يملك هذه الإعدادات من لحظة بدء سيناريو ZATCA فقط.
+        Queue::fake();
+        config([
+            'zatca.transport.dispatch_enabled' => true,
+            'zatca.transport.queue_connection' => 'database',
+            'zatca.transport.queue' => 'zatca',
         ]);
     }
 

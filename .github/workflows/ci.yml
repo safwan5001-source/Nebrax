@@ -158,11 +158,6 @@ jobs:
           fi
           php artisan migrate:fresh --force
 
-      # تشخيص مؤقت معزول لـ PR الاستعادة؛ سيُحذف بعد تثبيت سبب الفشل.
-      - name: تشخيص ZATCA recovery
-        working-directory: ${{ env.APP_DIR }}
-        run: php artisan test --filter=ZatcaSubmissionRecoveryTest
-
       - name: تشغيل الاختبارات
         working-directory: ${{ env.APP_DIR }}
         run: php artisan test
