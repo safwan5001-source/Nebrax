@@ -469,6 +469,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             ->middleware([$perm('zatca.view'), $app('compliance.zatca')]);
         Route::post('invoices/{id}/zatca/submissions', [ZatcaSubmissionController::class, 'store'])
             ->middleware([$perm('invoices.manage'), $app('compliance.zatca'), 'throttle:10,1']);
+        Route::post('invoices/{id}/zatca/submissions/{attemptId}/dispatch', [ZatcaSubmissionController::class, 'dispatch'])
+            ->middleware([$perm('invoices.manage'), $app('compliance.zatca'), 'throttle:10,1']);
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
         Route::post('invoices/{id}/notes', [InvoiceController::class, 'storeNote'])->middleware($perm('invoices.manage'));
         Route::post('invoices/{id}/duplicate', [InvoiceController::class, 'duplicate'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);

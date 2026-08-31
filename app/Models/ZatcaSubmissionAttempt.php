@@ -25,6 +25,8 @@ class ZatcaSubmissionAttempt extends BaseModel
         'request_hash',
         'requested_by',
         'requested_at',
+        'queue_count',
+        'queued_at',
         'completed_at',
         'response_http_status',
         'response_code',
@@ -45,7 +47,9 @@ class ZatcaSubmissionAttempt extends BaseModel
     {
         return [
             'attempt_number' => 'integer',
+            'queue_count' => 'integer',
             'requested_at' => 'datetime',
+            'queued_at' => 'datetime',
             'completed_at' => 'datetime',
             'response_http_status' => 'integer',
             'response_payload' => 'array',
@@ -63,6 +67,14 @@ class ZatcaSubmissionAttempt extends BaseModel
         });
 
         static::updating(function (self $attempt): void {
+            $dirty = array_keys($attempt->getDirty());
+            $queueAuditFields = ['queue_count', 'queued_at', 'updated_at'];
+            if ($attempt->getOriginal('status') === 'pending'
+                && $attempt->status === 'pending'
+                && array_diff($dirty, $queueAuditFields) === []) {
+                return;
+            }
+
             $allowed = [
                 'status',
                 'completed_at',
@@ -73,7 +85,7 @@ class ZatcaSubmissionAttempt extends BaseModel
                 'updated_at',
             ];
 
-            if (array_diff(array_keys($attempt->getDirty()), $allowed) !== []) {
+            if (array_diff($dirty, $allowed) !== []) {
                 throw new LogicException('ZATCA submission attempt identity is immutable.');
             }
             if ($attempt->getOriginal('status') !== 'pending'

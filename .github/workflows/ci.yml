@@ -57,7 +57,7 @@ jobs:
       #  الـ CI هنا** برسالة تقول أين يُضاف.
       - name: حارس قائمة النسخ
         run: |
-          ALLOWED="app/Contracts app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware \
+          ALLOWED="app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware \
                    app/Services/Reporting app/Services/PrintTemplates app/Support app/Tenancy \
                    app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Providers \
@@ -104,13 +104,14 @@ jobs:
         run: |
           CORE="$GITHUB_WORKSPACE"
           cd "$APP_DIR"
-          mkdir -p app/Contracts app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
+          mkdir -p app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
                    app/Models/Concerns tests/Feature routes config
           cp -r "$CORE/app/Models/"*.php                  app/Models/
           cp -r "$CORE/app/Contracts/"*.php                app/Contracts/
           cp -r "$CORE/app/Jobs/DocumentCenter/"*.php      app/Jobs/DocumentCenter/
+          cp -r "$CORE/app/Jobs/Accounting/"*.php          app/Jobs/Accounting/
           # المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
           cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
           cp -r "$CORE/app/Services/"*.php                app/Services/ 2>/dev/null || true
