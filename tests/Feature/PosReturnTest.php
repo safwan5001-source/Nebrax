@@ -213,7 +213,9 @@ class PosReturnTest extends TestCase
         $auth = $this->registerTenant();
         app(TenantContext::class)->set($auth['tenant_id']);
         $first = $this->openSession($auth);
-        $second = $this->openSession($auth);
+        $secondAuth = $auth;
+        $secondAuth['token'] = $this->tokenForRole($auth['tenant_id'], 'admin', 'second-return-cashier@test.local');
+        $second = $this->openSession($secondAuth);
         $invoice = $this->checkout(
             $auth,
             $this->customer($auth['token']),
@@ -222,7 +224,7 @@ class PosReturnTest extends TestCase
             ['cash' => 11500],
         );
 
-        $this->returnFromPos($auth, $second['session_id'], $invoice, 1)->assertStatus(422);
+        $this->returnFromPos($secondAuth, $second['session_id'], $invoice, 1)->assertStatus(422);
         $this->assertSame(0, ReturnDocument::count());
     }
 
