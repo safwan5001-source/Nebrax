@@ -20,9 +20,11 @@ class PosSession extends BaseModel
 
     protected $fillable = [
         'branch_id',
-        'tenant_id', 'number', 'status', 'opening_balance', 'closing_balance',
+        'tenant_id', 'number', 'status', 'handover_status', 'single_cashier_guard', 'opening_balance', 'closing_balance',
         'counted_balance_locked_at', 'closing_count_revealed_at', 'recounted_by', 'recounted_at',
-        'expected_balance', 'difference', 'opened_at', 'closed_at', 'notes', 'opened_by', 'closed_by',
+        'expected_balance', 'difference', 'opened_at', 'closed_at', 'notes', 'handover_note',
+        'handover_submitted_at', 'opened_by', 'closed_by', 'handover_confirmed_by',
+        'handover_confirmed_at', 'handover_confirmation_note',
         'pos_device_id', 'warehouse_id', 'pos_shift_id', 'shift_id', 'cash_account_id',
         'difference_status', 'difference_acknowledged_by', 'difference_acknowledged_at', 'difference_acknowledgement_note',
         'variance_journal_entry_id',
@@ -35,6 +37,9 @@ class PosSession extends BaseModel
         'difference'       => 'integer',
         'opened_at'        => 'datetime',
         'closed_at'        => 'datetime',
+        'handover_submitted_at' => 'datetime',
+        'handover_confirmed_at' => 'datetime',
+        'single_cashier_guard' => 'boolean',
         'difference_acknowledged_at' => 'datetime',
         'counted_balance_locked_at' => 'datetime',
         'closing_count_revealed_at' => 'datetime',
@@ -91,6 +96,16 @@ class PosSession extends BaseModel
     public function events(): HasMany
     {
         return $this->hasMany(PosSessionEvent::class);
+    }
+
+    public function reconciliations(): HasMany
+    {
+        return $this->hasMany(PosSessionReconciliation::class)->orderBy('reconciliation_key');
+    }
+
+    public function handoverConfirmedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'handover_confirmed_by');
     }
 
     /** مرتجعات POS المرتبطة بالجلسة؛ لا تشمل المرتجعات العامة أو التاريخية. */

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { BarChart3, CircleDollarSign, ClipboardCheck, History, LockKeyhole, Plus } from 'lucide-react';
+import { BarChart3, CircleDollarSign, ClipboardCheck, History, LockKeyhole, Plus, ShieldCheck } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ interface Session {
   id: string;
   number: string;
   status: string;
+  handover_status: 'pending' | 'confirmed' | null;
   pos_device_id: string | null;
   warehouse_id: string | null;
   pos_shift_id: string | null;
@@ -39,6 +40,12 @@ interface Session {
   variance_journal_entry_id: string | null;
   opened_at: string | null;
   closed_at: string | null;
+  handover_confirmed_at: string | null;
+}
+interface ClosingPreviewMethod { payment_method_id: string | null; payment_method_name: string; settlement_type: string; expected_amount: string | null }
+interface ClosingPreview {
+  cash_drawer: { reconciliation_key: string; name: string; settlement_type: 'cash'; expected_amount: string | null };
+  payment_methods: ClosingPreviewMethod[];
 }
 interface SessionReport {
   cash_sales: string;
@@ -70,6 +77,12 @@ export default function PosSessionsPage() {
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [closeId, setCloseId] = useState<string | null>(null);
+  const [closePreview, setClosePreview] = useState<ClosingPreview | null>(null);
+  const [closePreviewLoading, setClosePreviewLoading] = useState(false);
+  const [paymentCounts, setPaymentCounts] = useState<Record<string, string>>({});
+  const [handoverNote, setHandoverNote] = useState('');
+  const [handoverSessionId, setHandoverSessionId] = useState<string | null>(null);
+  const [handoverConfirmationNote, setHandoverConfirmationNote] = useState('');
   const [movementSessionId, setMovementSessionId] = useState<string | null>(null);
   const [acknowledgementSessionId, setAcknowledgementSessionId] = useState<string | null>(null);
   const [historySession, setHistorySession] = useState<Session | null>(null);
@@ -90,6 +103,7 @@ export default function PosSessionsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [canAcknowledgeDifference, setCanAcknowledgeDifference] = useState(false);
+  const [canConfirmHandover, setCanConfirmHandover] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -103,9 +117,10 @@ export default function PosSessionsPage() {
   }, []);
   useEffect(() => {
     const user = currentUser();
-    const applyPermissions = (permissions: string[] | undefined) => setCanAcknowledgeDifference(
-      Boolean(permissions?.includes('*') || permissions?.includes('pos.variance.approve')),
-    );
+    const applyPermissions = (permissions: string[] | undefined) => {
+      setCanAcknowledgeDifference(Boolean(permissions?.includes('*') || permissions?.includes('pos.variance.approve')));
+      setCanConfirmHandover(Boolean(permissions?.includes('*') || permissions?.includes('pos.session.handover.confirm')));
+    };
     if (user?.permissions !== undefined) {
       applyPermissions(user.permissions);
       return;
@@ -125,8 +140,36 @@ export default function PosSessionsPage() {
     if (!closeId) return;
     setBusy(true); setError(null);
     try {
-      await api(`/pos-sessions/${closeId}/close`, { method: 'POST', body: { closing_balance: riyalToMinor(amount) } });
-      success(tc('updated')); setCloseId(null); setAmount(''); load();
+      const counts = (closePreview?.payment_methods ?? [])
+        .filter((method): method is ClosingPreviewMethod & { payment_method_id: string } => Boolean(method.payment_method_id))
+        .map((method) => ({ payment_method_id: method.payment_method_id, counted_amount: riyalToMinor(paymentCounts[method.payment_method_id]) }));
+      await api(`/pos-sessions/${closeId}/close`, {
+        method: 'POST',
+        body: { closing_balance: riyalToMinor(amount), payment_counts: counts, handover_note: handoverNote.trim() || null },
+      });
+      success(t('handover_submitted_success')); setCloseId(null); setAmount(''); setClosePreview(null); setPaymentCounts({}); setHandoverNote(''); load();
+    } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
+  }
+
+  async function prepareClose(session: Session) {
+    setCloseId(session.id); setAmount(''); setError(null); setClosePreview(null); setPaymentCounts({}); setHandoverNote(''); setClosePreviewLoading(true);
+    try {
+      const result = await api<{ data: ClosingPreview }>(`/pos-sessions/${session.id}/closing-preview`);
+      setClosePreview(result.data);
+      setPaymentCounts(Object.fromEntries(result.data.payment_methods.filter((method) => method.payment_method_id).map((method) => [method.payment_method_id as string, ''])));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : tc('loadFailed'));
+    } finally {
+      setClosePreviewLoading(false);
+    }
+  }
+
+  async function submitHandoverConfirmation() {
+    if (!handoverSessionId) return;
+    setBusy(true); setError(null);
+    try {
+      await api(`/pos-sessions/${handoverSessionId}/confirm-handover`, { method: 'POST', body: { note: handoverConfirmationNote.trim() } });
+      success(t('handover_confirmed_success')); setHandoverSessionId(null); setHandoverConfirmationNote(''); load();
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
   }
 
@@ -186,6 +229,8 @@ export default function PosSessionsPage() {
     closing_difference_requires_acknowledgement: t('event_closing_difference_requires_acknowledgement'),
     closing_difference_acknowledged: t('event_closing_difference_acknowledged'),
     closing_difference_settled: t('event_closing_difference_settled'),
+    session_handover_submitted: t('event_handover_submitted'),
+    session_handover_confirmed: t('event_handover_confirmed'),
   };
   const differenceLabels: Record<string, string> = {
     pending: t('difference_pending'),
@@ -212,10 +257,16 @@ export default function PosSessionsPage() {
         id: 'differenceStatus', header: t('status'),
         cell: ({ row }) => row.original.status === 'open'
           ? <Badge tone="warning">{t('open_status')}</Badge>
-          : row.original.variance_journal_entry_id
+          : row.original.difference_status === 'pending'
+            ? <Badge tone="warning">{differenceLabels.pending}</Badge>
+            : row.original.handover_status === 'pending'
+              ? <Badge tone="warning">{t('handover_pending')}</Badge>
+              : row.original.handover_status === 'confirmed'
+                ? <Badge tone="positive">{t('handover_confirmed')}</Badge>
+                : row.original.variance_journal_entry_id
             ? <Badge tone="positive">{t('variance_settled')}</Badge>
             : row.original.difference_status
-              ? <Badge tone={row.original.difference_status === 'pending' ? 'warning' : 'positive'}>{differenceLabels[row.original.difference_status]}</Badge>
+              ? <Badge tone="positive">{differenceLabels[row.original.difference_status]}</Badge>
               : <Badge tone="positive">{t('closed_status')}</Badge>,
       },
       {
@@ -232,7 +283,7 @@ export default function PosSessionsPage() {
               <Button variant="outline" size="sm" onClick={() => { setMovementSessionId(row.original.id); setMovementAmount(''); setMovementReason(''); setMovementType('cash_in'); setError(null); }}>
                 <CircleDollarSign className="h-3.5 w-3.5" strokeWidth={1.7} />{t('record_movement')}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => { setCloseId(row.original.id); setAmount(''); setError(null); }}>
+              <Button variant="outline" size="sm" onClick={() => void prepareClose(row.original)}>
                 <LockKeyhole className="h-3.5 w-3.5" strokeWidth={1.7} />{t('close')}
               </Button>
             </>}
@@ -246,11 +297,16 @@ export default function PosSessionsPage() {
                 <ClipboardCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('settle_variance')}
               </Button>
             )}
+            {row.original.status === 'closed' && row.original.handover_status === 'pending' && (
+              <Button variant="outline" size="sm" disabled={!canConfirmHandover || row.original.difference_status === 'pending' || busy} title={!canConfirmHandover ? t('handover_approver_only') : row.original.difference_status === 'pending' ? t('handover_resolve_variance_first') : undefined} onClick={() => { setHandoverSessionId(row.original.id); setHandoverConfirmationNote(''); setError(null); }}>
+                <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('confirm_handover')}
+              </Button>
+            )}
           </div>
         ),
       },
     ],
-    [busy, canAcknowledgeDifference, differenceLabels, t, tp],
+    [busy, canAcknowledgeDifference, canConfirmHandover, differenceLabels, t, tp],
   );
 
   return (
@@ -295,15 +351,45 @@ export default function PosSessionsPage() {
       </Dialog>
 
       <Dialog open={!!closeId} onClose={() => setCloseId(null)} title={t('close_title')}>
-        <form onSubmit={(e) => { e.preventDefault(); submitClose(); }} className="space-y-3">
+        <form onSubmit={(e) => { e.preventDefault(); submitClose(); }} className="space-y-4">
+          <p className="rounded bg-primary-soft px-3 py-2 text-xs text-text">{t('close_reconciliation_hint')}</p>
+          {closePreviewLoading && <p className="text-sm text-muted">{tc('loading')}</p>}
+          {closePreview && <div className="overflow-hidden rounded-md border border-border">
+            <div className="grid grid-cols-[minmax(0,1fr)_140px] gap-3 border-b border-border bg-surface-subtle px-3 py-2 text-xs font-medium text-muted">
+              <span>{t('reconciliation_source')}</span><span className="text-end">{t('counted')}</span>
+            </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_140px] items-center gap-3 border-b border-border px-3 py-2.5">
+              <div className="min-w-0 text-sm"><p className="font-medium text-text">{t('cash_drawer')}</p>{closePreview.cash_drawer.expected_amount !== null && <p className="num text-xs text-muted">{t('expected')}: {formatRiyal(closePreview.cash_drawer.expected_amount)}</p>}</div>
+              <Input id="cb" aria-label={t('counted')} className="num text-end" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+            </div>
+            {closePreview.payment_methods.map((method) => method.payment_method_id && <div key={method.payment_method_id} className="grid grid-cols-[minmax(0,1fr)_140px] items-center gap-3 border-b border-border px-3 py-2.5 last:border-b-0">
+              <div className="min-w-0 text-sm"><p className="truncate font-medium text-text">{method.payment_method_name}</p>{method.expected_amount !== null && <p className="num text-xs text-muted">{t('expected')}: {formatRiyal(method.expected_amount)}</p>}</div>
+              <Input aria-label={`${t('counted')} — ${method.payment_method_name}`} className="num text-end" inputMode="decimal" value={paymentCounts[method.payment_method_id] ?? ''} onChange={(e) => setPaymentCounts((current) => ({ ...current, [method.payment_method_id as string]: e.target.value }))} required />
+            </div>)}
+          </div>}
           <div className="space-y-1.5">
-            <Label htmlFor="cb">{t('counted')}</Label>
-            <Input id="cb" className="num text-end" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+            <Label htmlFor="handover-note">{t('handover_note')}</Label>
+            <textarea id="handover-note" value={handoverNote} onChange={(e) => setHandoverNote(e.target.value)} placeholder={t('handover_note_placeholder')} required className="min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
           </div>
           {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setCloseId(null)}>{t('cancel')}</Button>
-            <Button type="submit" disabled={busy || !isValidRiyal(amount)}>{t('close')}</Button>
+            <Button type="submit" disabled={busy || closePreviewLoading || !closePreview || !isValidRiyal(amount) || handoverNote.trim().length < 3 || closePreview.payment_methods.some((method) => Boolean(method.payment_method_id) && !isValidRiyal(paymentCounts[method.payment_method_id as string] ?? ''))}>{t('close_and_submit_handover')}</Button>
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog open={!!handoverSessionId} onClose={() => setHandoverSessionId(null)} title={t('confirm_handover_title')}>
+        <form onSubmit={(e) => { e.preventDefault(); submitHandoverConfirmation(); }} className="space-y-4">
+          <p className="rounded bg-primary-soft px-3 py-2 text-xs text-text">{t('confirm_handover_hint')}</p>
+          <div className="space-y-1.5">
+            <Label htmlFor="handover-confirmation-note">{t('handover_confirmation_note')}</Label>
+            <textarea id="handover-confirmation-note" value={handoverConfirmationNote} onChange={(e) => setHandoverConfirmationNote(e.target.value)} placeholder={t('handover_confirmation_note_placeholder')} required className="min-h-24 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
+          </div>
+          {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setHandoverSessionId(null)}>{t('cancel')}</Button>
+            <Button type="submit" disabled={busy || handoverConfirmationNote.trim().length < 3}>{t('confirm_handover')}</Button>
           </div>
         </form>
       </Dialog>

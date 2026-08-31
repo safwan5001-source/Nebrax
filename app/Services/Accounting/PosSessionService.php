@@ -13,6 +13,7 @@ use App\Models\PosHeldSale;
 use App\Models\PaymentMethod;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
+use App\Models\PosSessionReconciliation;
 use App\Models\PosShift;
 use App\Models\ReturnDocument;
 use App\Models\User;
@@ -76,6 +77,9 @@ class PosSessionService
             }
 
             $posShift = $posShiftId !== null ? $this->resolvePosShift($posShiftId, $branchId) : null;
+            if ($userId !== null && PosSession::where('opened_by', $userId)->where('status', 'open')->exists()) {
+                throw new RuntimeException('لدى الكاشير جلسة نقطة بيع مفتوحة بالفعل — أغلقها قبل فتح جلسة على جهاز آخر.');
+            }
             if (PosSession::where('pos_device_id', $device->id)->where('status', 'open')->exists()) {
                 throw new RuntimeException('توجد وردية مفتوحة على جهاز نقطة البيع المحدد — أغلقها أولاً.');
             }
@@ -83,6 +87,7 @@ class PosSessionService
             return PosSession::create([
                 'number'          => $this->nextNumber(),
                 'status'          => 'open',
+                'single_cashier_guard' => true,
                 'opening_balance' => $openingBalance,
                 'opened_at'       => now(),
                 'opened_by'       => $userId,
@@ -176,17 +181,27 @@ class PosSessionService
         });
     }
 
-    public function close(PosSession $session, int $countedBalance, ?string $userId = null): PosSession
+    /** @param array<int,array{payment_method_id:string,counted_amount:int}> $paymentCounts */
+    public function close(
+        PosSession $session,
+        int $countedBalance,
+        ?string $userId = null,
+        array $paymentCounts = [],
+        ?string $handoverNote = null,
+    ): PosSession
     {
         if ($countedBalance < 0) {
             throw new RuntimeException('الرصيد المعدود لا يكون سالباً.');
         }
 
-        return DB::transaction(function () use ($session, $countedBalance, $userId) {
+        return DB::transaction(function () use ($session, $countedBalance, $userId, $paymentCounts, $handoverNote) {
             // القفل نفسه الذي يأخذه checkout() وحركة الدرج يحسم سباق الإقفال مع البيع أو السحب.
             $session = PosSession::lockForUpdate()->findOrFail($session->id);
             if (! $session->isOpen()) {
                 throw new RuntimeException('الجلسة مغلقة بالفعل.');
+            }
+            if ($session->opened_by !== null && $session->opened_by !== $userId) {
+                throw new RuntimeException('إغلاق الجلسة وتقديم عهدتها متاحان لكاشير الجلسة فقط.');
             }
 
             $cash = $this->cashMovement($session);
@@ -222,6 +237,7 @@ class PosSessionService
             $difference = $countedBalance - $expected;
             $requiresAcknowledgement = $difference !== 0;
             $closedAt = now();
+            $reconciliations = $this->buildCloseReconciliations($session, $expected, $countedBalance, $paymentCounts, $closedAt);
 
             $this->audit->auditEventForExistingOperation($session, PosSessionEvent::TYPE_CLOSING_COUNT_SUBMITTED, $userId ? User::find($userId) : null, [
                 'counted_balance' => $countedBalance,
@@ -231,6 +247,7 @@ class PosSessionService
 
             $session->update([
                 'status'                           => 'closed',
+                'handover_status'                  => 'pending',
                 'closing_balance'                  => $countedBalance,
                 'counted_balance_locked_at'         => $closedAt,
                 'closing_count_revealed_at'         => $closedAt,
@@ -242,6 +259,11 @@ class PosSessionService
                 'difference_acknowledgement_note'  => null,
                 'closed_at'                        => $closedAt,
                 'closed_by'                        => $userId,
+                'handover_note'                    => ($note = trim((string) $handoverNote)) !== '' ? $note : null,
+                'handover_submitted_at'            => $closedAt,
+                'handover_confirmed_by'            => null,
+                'handover_confirmed_at'            => null,
+                'handover_confirmation_note'       => null,
             ]);
 
             $actor = $userId ? User::find($userId) : null;
@@ -261,8 +283,204 @@ class PosSessionService
                 ]);
             }
 
-            return $session->fresh();
+            $this->recordEvent($session, PosSessionEvent::TYPE_SESSION_HANDOVER_SUBMITTED, $actor, [
+                'handover_status' => 'pending',
+                'reconciliations' => array_map(static fn (array $row): array => [
+                    'reconciliation_key' => $row['reconciliation_key'],
+                    'payment_method_id' => $row['payment_method_id'],
+                    'expected_amount' => $row['expected_amount'],
+                    'counted_amount' => $row['counted_amount'],
+                    'difference' => $row['difference'],
+                ], $reconciliations),
+            ]);
+
+            return $session->fresh('reconciliations');
         });
+    }
+
+    /**
+     * Values used by the close dialog. The controller suppresses expected
+     * amounts when blind cash count is enabled; the service remains the single
+     * source of truth and recomputes everything under lock at submission.
+     *
+     * @return array{cash_drawer:array<string,mixed>,payment_methods:array<int,array<string,mixed>>}
+     */
+    public function closingPreview(PosSession $session, User $actor): array
+    {
+        $session = PosSession::findOrFail($session->id);
+        if (! $session->isOpen()) {
+            throw new RuntimeException('معاينة الإغلاق متاحة للجلسة المفتوحة فقط.');
+        }
+        if ($session->opened_by !== null && $session->opened_by !== $actor->id) {
+            throw new RuntimeException('معاينة إغلاق الجلسة متاحة لكاشير الجلسة فقط.');
+        }
+
+        $cash = $this->cashMovement($session);
+
+        return [
+            'cash_drawer' => [
+                'reconciliation_key' => 'cash_drawer',
+                'name' => 'الصندوق النقدي',
+                'settlement_type' => 'cash',
+                'expected_amount' => $session->opening_balance + $cash['net'],
+            ],
+            'payment_methods' => array_values($this->expectedNonCashTenderRows($session)),
+        ];
+    }
+
+    public function confirmHandover(PosSession $session, User $actor, string $note): PosSession
+    {
+        $note = trim($note);
+        if ($note === '') {
+            throw new RuntimeException('ملاحظة استلام عهدة الجلسة مطلوبة.');
+        }
+        if (! $actor->hasPermission('pos.session.handover.confirm')) {
+            throw new RuntimeException('لا تملك صلاحية تأكيد استلام عهدة جلسة نقطة البيع.');
+        }
+
+        return DB::transaction(function () use ($session, $actor, $note) {
+            $session = PosSession::lockForUpdate()->findOrFail($session->id);
+            if ($session->status !== 'closed' || $session->handover_status !== 'pending') {
+                throw new RuntimeException('عهدة الجلسة ليست بانتظار الاستلام.');
+            }
+            if ($session->closed_by === $actor->id || $session->opened_by === $actor->id) {
+                throw new RuntimeException('لا يجوز للكاشير تأكيد استلام عهدته بنفسه.');
+            }
+            if ($session->difference_status === 'pending') {
+                throw new RuntimeException('اعتمد فرق الصندوق أولاً قبل تأكيد استلام العهدة.');
+            }
+
+            $confirmedAt = now();
+            $session->update([
+                'handover_status' => 'confirmed',
+                'handover_confirmed_by' => $actor->id,
+                'handover_confirmed_at' => $confirmedAt,
+                'handover_confirmation_note' => $note,
+            ]);
+
+            $this->recordEvent($session, PosSessionEvent::TYPE_SESSION_HANDOVER_CONFIRMED, $actor, [
+                'handover_status' => 'confirmed',
+                'note' => $note,
+                'confirmed_at' => $confirmedAt->toIso8601String(),
+            ]);
+
+            return $session->fresh(['reconciliations', 'handoverConfirmedBy']);
+        });
+    }
+
+    /**
+     * @param array<int,array{payment_method_id:string,counted_amount:int}> $paymentCounts
+     * @return array<int,array<string,mixed>>
+     */
+    private function buildCloseReconciliations(
+        PosSession $session,
+        int $cashExpected,
+        int $cashCounted,
+        array $paymentCounts,
+        Carbon $createdAt,
+    ): array {
+        $countedByMethod = [];
+        foreach ($paymentCounts as $count) {
+            $methodId = (string) ($count['payment_method_id'] ?? '');
+            if ($methodId === '' || isset($countedByMethod[$methodId])) {
+                throw new RuntimeException('وسائل الدفع في مطابقة الإغلاق غير صالحة أو مكررة.');
+            }
+            $countedByMethod[$methodId] = (int) ($count['counted_amount'] ?? 0);
+        }
+
+        $methods = $countedByMethod === []
+            ? collect()
+            : PaymentMethod::whereIn('id', array_keys($countedByMethod))->get()->keyBy('id');
+        if ($methods->count() !== count($countedByMethod)) {
+            throw new RuntimeException('إحدى وسائل الدفع في مطابقة الإغلاق غير موجودة.');
+        }
+        foreach ($methods as $method) {
+            if ($method->settlement_type === 'cash') {
+                throw new RuntimeException('النقد يطابق مرة واحدة ضمن الصندوق، لا كسطر وسيلة دفع منفصل.');
+            }
+        }
+
+        $rows = $this->expectedNonCashTenderRows($session);
+        foreach ($methods as $method) {
+            $key = 'method:' . $method->id;
+            $rows[$key] ??= [
+                'reconciliation_key' => $key,
+                'payment_method_id' => $method->id,
+                'payment_method_name' => $method->name,
+                'settlement_type' => $method->settlement_type,
+                'expected_amount' => 0,
+            ];
+        }
+
+        ksort($rows);
+        $snapshots = [[
+            'reconciliation_key' => 'cash_drawer',
+            'payment_method_id' => null,
+            'payment_method_name' => 'الصندوق النقدي',
+            'settlement_type' => 'cash',
+            'expected_amount' => $cashExpected,
+            'counted_amount' => $cashCounted,
+            'difference' => $cashCounted - $cashExpected,
+            'count_source' => 'operator',
+        ]];
+
+        foreach ($rows as $row) {
+            $methodId = $row['payment_method_id'];
+            $operatorCounted = $methodId !== null && array_key_exists($methodId, $countedByMethod);
+            $counted = $operatorCounted ? $countedByMethod[$methodId] : (int) $row['expected_amount'];
+            $snapshots[] = [
+                ...$row,
+                'counted_amount' => $counted,
+                'difference' => $counted - (int) $row['expected_amount'],
+                // Old API clients submitted cash only. Preserve compatibility
+                // while making that fallback explicit in the immutable snapshot.
+                'count_source' => $operatorCounted ? 'operator' : 'system_legacy',
+            ];
+        }
+
+        foreach ($snapshots as $snapshot) {
+            PosSessionReconciliation::create([
+                ...$snapshot,
+                'branch_id' => $session->branch_id,
+                'pos_session_id' => $session->id,
+                'created_at' => $createdAt,
+            ]);
+        }
+
+        return $snapshots;
+    }
+
+    /** @return array<string,array<string,mixed>> */
+    private function expectedNonCashTenderRows(PosSession $session): array
+    {
+        $rows = [];
+        $payments = Payment::with('paymentMethod')
+            ->where('pos_session_id', $session->id)
+            ->where('status', 'posted')
+            ->where('direction', 'received')
+            ->get();
+
+        foreach ($payments as $payment) {
+            $method = $payment->paymentMethod;
+            $settlementType = $method?->settlement_type ?? $payment->method;
+            if ($settlementType === 'cash') {
+                continue;
+            }
+
+            $key = $method ? 'method:' . $method->id : 'legacy:' . $settlementType;
+            $rows[$key] ??= [
+                'reconciliation_key' => $key,
+                'payment_method_id' => $method?->id,
+                'payment_method_name' => $payment->payment_method_name ?: ($method?->name ?? $settlementType),
+                'settlement_type' => $settlementType,
+                'expected_amount' => 0,
+            ];
+            $rows[$key]['expected_amount'] += (int) $payment->amount;
+        }
+
+        ksort($rows);
+
+        return $rows;
     }
 
     /** اعتماد إداري للفرق يقر بالحالة فقط؛ لا ينشئ تسوية أو قيداً محاسبياً. */
