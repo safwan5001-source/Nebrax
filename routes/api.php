@@ -553,7 +553,9 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('pos-sessions/{id}/cash-movements', [PosSessionController::class, 'cashMovements'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('pos-sessions/{id}/events', [PosSessionController::class, 'events'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::post('pos-sessions/open', [PosSessionController::class, 'open'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::get('pos-sessions/{id}/closing-preview', [PosSessionController::class, 'closingPreview'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/close', [PosSessionController::class, 'close'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos-sessions/{id}/confirm-handover', [PosSessionController::class, 'confirmHandover'])->middleware([$perm('pos.session.handover.confirm'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/recount', [PosSessionController::class, 'recount'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-movements', [PosSessionController::class, 'recordCashMovement'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos-sessions/{id}/cash-drawer/open', [PosSessionController::class, 'openCashDrawer'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);

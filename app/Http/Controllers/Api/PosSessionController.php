@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\AcknowledgePosSessionDifferenceRequest;
+use App\Http\Requests\ClosePosSessionRequest;
+use App\Http\Requests\ConfirmPosSessionHandoverRequest;
 use App\Http\Requests\OpenPosSessionRequest;
 use App\Http\Requests\StorePosCashMovementRequest;
 use App\Http\Resources\PosCashMovementResource;
@@ -27,7 +29,7 @@ class PosSessionController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        $query = PosSession::with(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])->orderByDesc('opened_at');
+        $query = PosSession::with(['posDevice.warehouse', 'warehouse', 'posShift', 'shift', 'reconciliations', 'handoverConfirmedBy'])->orderByDesc('opened_at');
         if ($request->boolean('mine')) {
             $query->where('opened_by', $request->user()?->id);
         }
@@ -70,13 +72,52 @@ class PosSessionController extends ApiController
             ->response()->setStatusCode(201);
     }
 
-    public function close(Request $request, string $id): JsonResponse
+    public function closingPreview(Request $request, string $id): JsonResponse
     {
-        $data = $request->validate(['closing_balance' => ['required', 'integer', 'min:0']]); // هللات
         $session = $this->visibleSession($id, $request);
-        $closed = $this->domain(fn () => $this->sessions->close($session, (int) $data['closing_balance'], $request->user()?->id));
+        $preview = $this->domain(fn () => $this->sessions->closingPreview($session, $request->user()));
+        if (\App\Support\PosSettings::blindCashCountEnabled()) {
+            $preview['cash_drawer']['expected_amount'] = null;
+            foreach ($preview['payment_methods'] as &$method) {
+                $method['expected_amount'] = null;
+            }
+            unset($method);
+        } else {
+            $preview['cash_drawer']['expected_amount'] = Money::toRiyal($preview['cash_drawer']['expected_amount']);
+            foreach ($preview['payment_methods'] as &$method) {
+                $method['expected_amount'] = Money::toRiyal($method['expected_amount']);
+            }
+            unset($method);
+        }
 
-        return (new PosSessionResource($closed->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])))->response();
+        return response()->json(['data' => $preview]);
+    }
+
+    public function close(ClosePosSessionRequest $request, string $id): JsonResponse
+    {
+        $data = $request->validated();
+        $session = $this->visibleSession($id, $request);
+        $closed = $this->domain(fn () => $this->sessions->close(
+            $session,
+            (int) $data['closing_balance'],
+            $request->user()?->id,
+            $data['payment_counts'] ?? [],
+            $data['handover_note'] ?? null,
+        ));
+
+        return (new PosSessionResource($closed->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift', 'reconciliations', 'handoverConfirmedBy'])))->response();
+    }
+
+    public function confirmHandover(ConfirmPosSessionHandoverRequest $request, string $id): JsonResponse
+    {
+        $session = $this->visibleSession($id, $request);
+        $confirmed = $this->domain(fn () => $this->sessions->confirmHandover(
+            $session,
+            $request->user(),
+            $request->validated('note'),
+        ));
+
+        return (new PosSessionResource($confirmed->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift', 'reconciliations', 'handoverConfirmedBy'])))->response();
     }
 
     /** يعيد العد بعد كشف النتيجة فقط، باعتماد منفصل محفوظ في سجل الأدلة. */

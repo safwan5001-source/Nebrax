@@ -101,7 +101,7 @@ class PosSessionTest extends TestCase
     }
 
     /** @test */
-    public function it_allows_parallel_sessions_on_distinct_devices_and_snapshots_an_optional_work_shift(): void
+    public function it_allows_parallel_sessions_for_distinct_cashiers_and_devices_and_snapshots_an_optional_work_shift(): void
     {
         $auth = $this->registerTenant();
         $first = $this->device($auth);
@@ -116,7 +116,8 @@ class PosSessionTest extends TestCase
         ])->assertCreated()['data'];
 
         $a = $this->openSession($auth, 0, $first['id'], $shift['id']);
-        $b = $this->openSession($auth, 0, $second['id']);
+        $otherToken = $this->tokenForRole($auth['tenant_id'], 'admin', 'parallel-cashier@acme.test');
+        $b = $this->openSession(['token' => $otherToken], 0, $second['id']);
 
         $this->assertNotSame($a, $b);
         $this->assertDatabaseHas('pos_sessions', [

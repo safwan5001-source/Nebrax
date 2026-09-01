@@ -59,6 +59,8 @@ final class PosAuditService
         PosSessionEvent::TYPE_CLOSING_DIFFERENCE_REQUIRES_ACKNOWLEDGEMENT => 'cash_count',
         PosSessionEvent::TYPE_CLOSING_DIFFERENCE_ACKNOWLEDGED => 'cash_count',
         PosSessionEvent::TYPE_CLOSING_DIFFERENCE_SETTLED => 'cash_count',
+        PosSessionEvent::TYPE_SESSION_HANDOVER_SUBMITTED => 'handover',
+        PosSessionEvent::TYPE_SESSION_HANDOVER_CONFIRMED => 'handover',
         PosSessionEvent::TYPE_CASH_DRAWER_OPEN_ATTEMPT => 'drawer',
     ];
 

@@ -105,16 +105,17 @@ class PosRecentInvoicesTest extends TestCase
         $otherBranch = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع فواتير آخر'])
             ->assertCreated()['data']['id'];
         $headers = ['X-Branch-Id' => $otherBranch];
-        $otherWarehouse = $this->withToken($auth['token'])->withHeaders($headers)->postJson('/api/warehouses', [
+        $otherCashier = $this->tokenForRole($auth['tenant_id'], 'admin', 'recent-pos-other-cashier@test.local');
+        $otherWarehouse = $this->withToken($otherCashier)->withHeaders($headers)->postJson('/api/warehouses', [
             'name' => 'مخزن الفرع الآخر', 'code' => 'RECENT-BRANCH-W', 'branch_id' => $otherBranch, 'is_active' => true,
         ])->assertCreated()['data'];
-        $otherDevice = $this->withToken($auth['token'])->withHeaders($headers)->postJson('/api/pos-devices', [
+        $otherDevice = $this->withToken($otherCashier)->withHeaders($headers)->postJson('/api/pos-devices', [
             'name' => 'كاشير الفرع الآخر', 'code' => 'RECENT-BRANCH-1', 'warehouse_id' => $otherWarehouse['id'], 'is_active' => true,
         ])->assertCreated()['data'];
-        $otherSession = $this->withToken($auth['token'])->withHeaders($headers)->postJson('/api/pos-sessions/open', [
+        $otherSession = $this->withToken($otherCashier)->withHeaders($headers)->postJson('/api/pos-sessions/open', [
             'opening_balance' => 0, 'pos_device_id' => $otherDevice['id'],
         ])->assertCreated()['data'];
-        $otherInvoice = $this->withToken($auth['token'])->withHeaders($headers)->postJson('/api/pos/checkout', [
+        $otherInvoice = $this->withToken($otherCashier)->withHeaders($headers)->postJson('/api/pos/checkout', [
             'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
             'partner_id' => $customer['id'], 'pos_session_id' => $otherSession['id'], 'warehouse_id' => $otherWarehouse['id'],
             'items' => [['description' => 'بيع فرع آخر', 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],

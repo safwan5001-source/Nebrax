@@ -49,6 +49,8 @@ class PosSessionEvent extends BaseModel
     public const TYPE_CLOSING_COUNT_SUBMITTED = 'closing_count_submitted';
     public const TYPE_CLOSING_COUNT_REVEALED = 'closing_count_revealed';
     public const TYPE_CLOSING_COUNT_RECOUNTED = 'closing_count_recounted';
+    public const TYPE_SESSION_HANDOVER_SUBMITTED = 'session_handover_submitted';
+    public const TYPE_SESSION_HANDOVER_CONFIRMED = 'session_handover_confirmed';
     public const TYPE_OVERRIDE_REQUESTED = 'override_requested';
     public const TYPE_OVERRIDE_APPROVED = 'override_approved';
     public const TYPE_OVERRIDE_CONSUMED = 'override_consumed';
@@ -84,6 +86,8 @@ class PosSessionEvent extends BaseModel
             self::TYPE_CHECKOUT_IDEMPOTENT_REPLAY,
             self::TYPE_CLOSING_COUNT_SUBMITTED,            self::TYPE_CLOSING_COUNT_REVEALED,
             self::TYPE_CLOSING_COUNT_RECOUNTED,
+            self::TYPE_SESSION_HANDOVER_SUBMITTED,
+            self::TYPE_SESSION_HANDOVER_CONFIRMED,
             self::TYPE_OVERRIDE_REQUESTED,
             self::TYPE_OVERRIDE_APPROVED,
             self::TYPE_OVERRIDE_CONSUMED,
