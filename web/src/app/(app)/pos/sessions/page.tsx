@@ -155,8 +155,12 @@ export default function PosSessionsPage() {
     setCloseId(session.id); setAmount(''); setError(null); setClosePreview(null); setPaymentCounts({}); setHandoverNote(''); setClosePreviewLoading(true);
     try {
       const result = await api<{ data: ClosingPreview }>(`/pos-sessions/${session.id}/closing-preview`);
-      setClosePreview(result.data);
-      setPaymentCounts(Object.fromEntries(result.data.payment_methods.filter((method) => method.payment_method_id).map((method) => [method.payment_method_id as string, ''])));
+      const preview = result.data;
+      if (!preview?.cash_drawer || !Array.isArray(preview.payment_methods)) {
+        throw new Error('Invalid POS closing preview response.');
+      }
+      setClosePreview(preview);
+      setPaymentCounts(Object.fromEntries(preview.payment_methods.filter((method) => method.payment_method_id).map((method) => [method.payment_method_id as string, ''])));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : tc('loadFailed'));
     } finally {
