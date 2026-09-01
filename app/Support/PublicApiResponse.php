@@ -2,9 +2,11 @@
 
 namespace App\Support;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Str;
 
 /**
@@ -53,6 +55,40 @@ class PublicApiResponse
             'error' => $error,
             'meta'  => ['request_id' => self::requestId($request)],
         ], $status ?? $code->defaultHttpStatus());
+    }
+
+    /**
+     * استجابة قائمة مقسَّمة (paginated): { data:[…], meta:{ request_id, pagination } }.
+     * سقف حجم الصفحة يفرضه المتحكّم؛ هنا نبني العقد فقط. تُحوَّل كل عنصر عبر
+     * مورد الـ Public المخصّص (لا يُكشف نموذج Eloquent مباشرة).
+     *
+     * @param  class-string<JsonResource>  $resourceClass
+     */
+    public static function paginated(Request $request, LengthAwarePaginator $paginator, string $resourceClass): JsonResponse
+    {
+        $data = $paginator->getCollection()
+            ->map(fn ($model) => (new $resourceClass($model))->resolve($request))
+            ->all();
+
+        return new JsonResponse([
+            'data' => $data,
+            'meta' => [
+                'request_id' => self::requestId($request),
+                'pagination' => [
+                    'page'      => $paginator->currentPage(),
+                    'per_page'  => $paginator->perPage(),
+                    'total'     => $paginator->total(),
+                    'last_page' => $paginator->lastPage(),
+                    'has_more'  => $paginator->hasMorePages(),
+                ],
+            ],
+        ], 200);
+    }
+
+    /** استجابة مورد مفرد عبر مورد Public مخصّص (لا نموذج Eloquent مباشر). */
+    public static function resource(Request $request, JsonResource $resource): JsonResponse
+    {
+        return self::success($request, $resource->resolve($request));
     }
 
     /**
