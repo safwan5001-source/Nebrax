@@ -70,4 +70,20 @@ describe('POS demo contracts', () => {
       expect.objectContaining({ payment_method_id: 'pm-method-bank', expected_amount: '650.00' }),
     ]);
   });
+
+  it('does not reveal expected amounts while blind count is enabled', async () => {
+    await mockApi('/sales-config/pos', 'PUT', { data: { blind_cash_count_enabled: true } });
+
+    try {
+      const response = await mockApi<{ data: {
+        cash_drawer: { expected_amount: string | null };
+        payment_methods: Array<{ expected_amount: string | null }>;
+      } }>('/pos-sessions/ps-2/closing-preview');
+
+      expect(response.data.cash_drawer.expected_amount).toBeNull();
+      expect(response.data.payment_methods.every((method) => method.expected_amount === null)).toBe(true);
+    } finally {
+      await mockApi('/sales-config/pos', 'PUT', { data: { blind_cash_count_enabled: false } });
+    }
+  });
 });
