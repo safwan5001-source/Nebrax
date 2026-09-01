@@ -3292,7 +3292,11 @@
     "report_failed": "The session report could not be loaded.",
     "retry": "Retry",
     "print": "Print report",
-    "actions": "Report actions"
+    "actions": "Report actions",
+    "x_report": "X report — current reading",
+    "z_report": "Z report — final close",
+    "returns": "Posted session returns",
+    "returns_empty": "No posted returns in this session"
   },
   "posSessions": {
     "title": "POS sessions",

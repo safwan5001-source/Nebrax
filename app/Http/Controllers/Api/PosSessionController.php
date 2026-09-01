@@ -14,6 +14,7 @@ use App\Models\Invoice;
 use App\Models\PosDevice;
 use App\Models\PosSession;
 use App\Models\PosShift;
+use App\Models\ReturnDocument;
 use App\Models\Shift;
 use App\Services\Accounting\PosSessionService;
 use App\Services\Pos\CashDrawerService;
@@ -296,9 +297,18 @@ class PosSessionController extends ApiController
             ->orderBy('invoice_date')
             ->orderBy('created_at')
             ->get(['id', 'number', 'invoice_date', 'payment_type', 'total']);
+        $returnDocuments = ReturnDocument::query()
+            ->where('tenant_id', $session->tenant_id)
+            ->where('branch_id', $session->branch_id)
+            ->where('pos_session_id', $session->id)
+            ->where('type', 'sales')
+            ->where('status', 'posted')
+            ->orderBy('return_date')
+            ->orderBy('created_at')
+            ->get(['id', 'number', 'return_date', 'payment_type', 'total']);
         // صفوف البيع ومجاميعها تُشتق من اللقطة المحمّلة نفسها. فلا يمكن أن
         // يتغيّر sales_count/average عن الصفوف إذا اكتمل checkout متزامن.
-        $report = $this->sessions->report($session, $salesInvoices);
+        $report = $this->sessions->report($session, $salesInvoices, $returnDocuments);
         $sales = $salesInvoices
             ->map(fn (Invoice $invoice) => [
                 'id' => $invoice->id,
@@ -306,6 +316,15 @@ class PosSessionController extends ApiController
                 'invoice_date' => optional($invoice->invoice_date)->toDateString(),
                 'payment_type' => $invoice->payment_type,
                 'total' => Money::toRiyal($invoice->total),
+            ])
+            ->values();
+        $returns = $returnDocuments
+            ->map(fn (ReturnDocument $return) => [
+                'id' => $return->id,
+                'number' => $return->number,
+                'return_date' => optional($return->return_date)->toDateString(),
+                'payment_type' => $return->payment_type,
+                'total' => Money::toRiyal($return->total),
             ])
             ->values();
 
@@ -326,6 +345,7 @@ class PosSessionController extends ApiController
             // تفاصيل التقرير من المصدر نفسه الذي كوّن المجاميع؛ لا تعتمد الواجهة
             // على قائمة الفواتير العامة أو نافذة زمنية قابلة للاختلاط بين الجلسات.
             'sales' => $sales,
+            'returns' => $returns,
         ]);
     }
 

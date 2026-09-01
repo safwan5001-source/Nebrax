@@ -110,13 +110,15 @@ describe('POS demo contracts', () => {
   });
 
   it('keeps report sales tied to the selected demo session', async () => {
-    const closed = await mockApi<{ session: { id: string }; report: { sales_count: number }; sales: Array<{ id: string }> }>('/pos-sessions/ps-1/report');
-    const open = await mockApi<{ session: { id: string }; report: { sales_count: number }; sales: Array<{ id: string }> }>('/pos-sessions/ps-2/report');
+    const closed = await mockApi<{ session: { id: string }; report: { sales_count: number; returns_count: number }; sales: Array<{ id: string }>; returns: Array<{ id: string }> }>('/pos-sessions/ps-1/report');
+    const open = await mockApi<{ session: { id: string }; report: { sales_count: number; returns_count: number }; sales: Array<{ id: string }>; returns: Array<{ id: string }> }>('/pos-sessions/ps-2/report');
 
     expect(closed.session.id).toBe('ps-1');
     expect(closed.sales).toHaveLength(closed.report.sales_count);
+    expect(closed.returns).toHaveLength(closed.report.returns_count);
     expect(open.session.id).toBe('ps-2');
     expect(open.sales).toHaveLength(open.report.sales_count);
+    expect(open.returns).toHaveLength(open.report.returns_count);
     expect(open.sales.map((sale) => sale.id)).not.toEqual(closed.sales.map((sale) => sale.id));
   });
 });
