@@ -261,6 +261,7 @@ class PosSessionTest extends TestCase
         $this->assertSame($sessionInvoiceIds, collect($response->json('sales'))->pluck('id')->all());
         $this->assertNotContains($ordinaryInvoiceId, collect($response->json('sales'))->pluck('id')->all());
         $this->assertSame(['1150.00', '1150.00'], collect($response->json('sales'))->pluck('total')->all());
+        $this->assertSame($response->json('report.sales_count'), count($response->json('sales')));
     }
 
     /** @test */

@@ -21,6 +21,7 @@ use App\Models\Warehouse;
 use App\Support\PosSettings;
 use App\Services\Pos\PosAuditService;
 use App\Tenancy\BranchContext;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -744,10 +745,12 @@ class PosSessionService
      *
      * @return array{cash_sales:int,cash_refunds:int,cash_in:int,cash_out:int,sales_count:int,returns_count:int,returns_total:int,net_sales:int,average:int,expected:int}
      */
-    public function report(PosSession $session): array
+    public function report(PosSession $session, ?EloquentCollection $postedInvoices = null): array
     {
         $cash = $this->cashMovement($session);
-        $invoices = Invoice::where('pos_session_id', $session->id)->where('status', 'posted');
+        $invoices = $postedInvoices ?? Invoice::where('pos_session_id', $session->id)
+            ->where('status', 'posted')
+            ->get(['id', 'total']);
         $salesTotal = (int) $invoices->sum('total');
         $count = (int) $invoices->count();
         $returns = ReturnDocument::where('pos_session_id', $session->id)

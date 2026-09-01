@@ -288,15 +288,18 @@ class PosSessionController extends ApiController
     public function report(Request $request, string $id): JsonResponse
     {
         $session = $this->visibleSession($id, $request);
-        $report = $this->sessions->report($session);
-        $sales = Invoice::query()
+        $salesInvoices = Invoice::query()
             ->where('tenant_id', $session->tenant_id)
             ->where('branch_id', $session->branch_id)
             ->where('pos_session_id', $session->id)
             ->where('status', 'posted')
             ->orderBy('invoice_date')
             ->orderBy('created_at')
-            ->get(['id', 'number', 'invoice_date', 'payment_type', 'total'])
+            ->get(['id', 'number', 'invoice_date', 'payment_type', 'total']);
+        // صفوف البيع ومجاميعها تُشتق من اللقطة المحمّلة نفسها. فلا يمكن أن
+        // يتغيّر sales_count/average عن الصفوف إذا اكتمل checkout متزامن.
+        $report = $this->sessions->report($session, $salesInvoices);
+        $sales = $salesInvoices
             ->map(fn (Invoice $invoice) => [
                 'id' => $invoice->id,
                 'number' => $invoice->number,
