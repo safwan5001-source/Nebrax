@@ -549,6 +549,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('pos/exchanges/quote', [PosController::class, 'quoteExchange'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/exchanges', [PosController::class, 'storeExchange'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos-sessions', [PosSessionController::class, 'index'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::get('pos-sessions/{id}', [PosSessionController::class, 'show'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('pos-sessions/{id}/report', [PosSessionController::class, 'report'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('pos-sessions/{id}/cash-movements', [PosSessionController::class, 'cashMovements'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('pos-sessions/{id}/events', [PosSessionController::class, 'events'])->middleware([$perm('invoices.view'), $app('sales.pos')]);

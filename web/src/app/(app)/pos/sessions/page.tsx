@@ -1,9 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { BarChart3, CircleDollarSign, ClipboardCheck, History, LockKeyhole, Plus, ShieldCheck } from 'lucide-react';
+import { BarChart3, CircleDollarSign, ClipboardCheck, Eye, History, LockKeyhole, Plus, ShieldCheck } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -244,7 +245,7 @@ export default function PosSessionsPage() {
 
   const columns = useMemo<ColumnDef<Session, unknown>[]>(
     () => [
-      { accessorKey: 'number', header: t('number'), cell: ({ row }) => <span className="num">{row.original.number}</span> },
+      { accessorKey: 'number', header: t('number'), cell: ({ row }) => <Link href={`/pos/sessions/${row.original.id}`} className="num font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">{row.original.number}</Link> },
       { accessorKey: 'opened_at', header: t('opened_at'), cell: ({ row }) => <span className="num text-muted">{(row.original.opened_at ?? '').slice(0, 16).replace('T', ' ')}</span> },
       { id: 'device', header: t('device'), cell: ({ row }) => <span>{row.original.pos_device?.name ?? '—'}</span> },
       { id: 'posShift', header: t('work_shift'), cell: ({ row }) => <span>{row.original.pos_shift?.name ?? '—'}</span> },
@@ -277,6 +278,9 @@ export default function PosSessionsPage() {
         id: 'actions', header: t('actions'),
         cell: ({ row }) => (
           <div className="flex flex-wrap justify-end gap-1.5">
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/pos/sessions/${row.original.id}`} aria-label={t('view_details')}><Eye className="h-3.5 w-3.5" strokeWidth={1.7} />{t('view_details')}</Link>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => openReport(row.original)} aria-label={t('view_report')}>
               <BarChart3 className="h-3.5 w-3.5" strokeWidth={1.7} />{t('view_report')}
             </Button>
