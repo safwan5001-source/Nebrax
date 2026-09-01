@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 48978)
-Total output lines: 3624
-
 // بيانات وهمية واقعية لوضع المعاينة (Demo). كل المبالغ بالريال كنصوص (مثل ما يعيده الـ API)
 // لأن التحويل من الهللات يتم في طبقة موارد الـ backend. لا يُستخدم أي float في حساب مالي حقيقي هنا.
 
@@ -1471,7 +1468,701 @@ function demoPosSettings(): Record<string, unknown> {
 export const mockBranches = [
   { id: 'br-1', code: '00001', name: 'الفرع الرئيسي', is_main: true, phone: '0138100000', mobile: '0550000000', address_line1: 'طريق الملك فهد', address_line2: '', city: 'الدمام', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: 'الأحد–الخميس ٩ص–٥م', latitude: 26.4207, longitude: 50.0888, is_active: true },
   { id: 'br-2', code: '00002', name: 'فرع الخبر', is_main: false, phone: '0138200000', mobile: '0551111111', address_line1: 'شارع الأمير فيصل', address_line2: '', city: 'الخبر', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: 26.2794, longitude: 50.2083, is_active: true },
-  { id: 'br-3', code: '00003', name: 'فرع الجبيل', is_main: false, phone: '…8978 tokens truncated…) worked += 24 * 60; }
+  { id: 'br-3', code: '00003', name: 'فرع الجبيل', is_main: false, phone: '0133000000', mobile: '', address_line1: '', address_line2: '', city: 'الجبيل', region: 'المنطقة الشرقية', country: 'Saudi Arabia', description: '', working_hours: '', latitude: null, longitude: null, is_active: false },
+];
+
+export const mockWarehouses = [
+  { id: 'wh-1', code: '00001', name: 'المخزن الرئيسي', branch_id: 'br-1', city: 'الدمام', address: '', notes: '', is_default: true, is_active: true },
+  { id: 'wh-2', code: '00002', name: 'مخزن الخبر', branch_id: 'br-2', city: 'الخبر', address: '', notes: '', is_default: false, is_active: true },
+  { id: 'wh-3', code: '00003', name: 'مخزن مركزي', branch_id: null, city: 'الدمام', address: '', notes: '', is_default: false, is_active: false },
+];
+
+export const mockBranchSettings = {
+  main_branch_id: 'br-1',
+  share_customers: true,
+  share_products: true,
+  share_suppliers: true,
+  share_cost_centers: true,
+  account_branch_scoping: false,
+};
+
+export const mockPosDevices = [
+  { id: 'pd-1', name: 'كاشير الفرع الرئيسي', code: 'POS-01', warehouse_id: 'wh-1', is_active: true, warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' } },
+  { id: 'pd-2', name: 'كاشير الخبر', code: 'POS-02', warehouse_id: 'wh-2', is_active: false, warehouse: { id: 'wh-2', name: 'مخزن الخبر', code: '00002' } },
+];
+
+export const mockPosShifts = [
+  { id: 'pos-shift-morning', name: 'الوردية الصباحية', code: 'MORNING', is_active: true },
+  { id: 'pos-shift-evening', name: 'الوردية المسائية', code: 'EVENING', is_active: false },
+];
+
+export const mockPosSessions = [
+  { id: 'ps-2', number: 'POS-2026-0002', status: 'open', handover_status: null, pos_device_id: 'pd-1', pos_shift_id: 'pos-shift-morning', pos_device: mockPosDevices[0], pos_shift: mockPosShifts[0], warehouse: mockPosDevices[0].warehouse, opening_balance: '500.00', closing_balance: null, expected_balance: null, difference: null, difference_status: null, opened_at: '2026-06-28T08:00:00', closed_at: null, handover_confirmed_at: null },
+  { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', handover_status: 'confirmed', pos_device_id: 'pd-2', pos_shift_id: 'pos-shift-evening', pos_device: mockPosDevices[1], pos_shift: mockPosShifts[1], warehouse: mockPosDevices[1].warehouse, opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', difference_status: 'not_required', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00', handover_confirmed_at: '2026-06-27T20:05:00' },
+];
+
+/** معاينة UX — أحداث رقابية بعينة before/after للتحقق من الملخص البشري والـdiff. */
+export const mockPosAuditEvents = [
+  {
+    id: 'evt-audit-1',
+    pos_session_id: 'ps-2',
+    branch_id: 'br-1',
+    cart_id: '550e8400-e29b-41d4-a716-446655440001',
+    correlation_id: '550e8400-e29b-41d4-a716-446655440099',
+    type: 'cart_cancelled',
+    category: 'cart',
+    amount: '300.00',
+    reason_code: 'wrong_price',
+    reason_note: 'سعر خاطئ',
+    source: 'client_observed',
+    trust_level: 'secondary',
+    created_at: '2026-08-28T11:22:00Z',
+    payload: {
+      client_observed: {
+        before: {
+          item: {
+            description: 'فطيرة الأجبان الثلاثة',
+            quantity: 1,
+            unit_price: 30000,
+            discount: 0,
+          },
+          status: 'active',
+        },
+        after: { status: 'cancelled' },
+      },
+    },
+    actor: { id: 'user-cashier', name: 'سارة الكاشير' },
+    performed_by_user: { id: 'user-cashier', name: 'سارة الكاشير' },
+    approved_by_user: null,
+    session: { id: 'ps-2', number: 'POS-2026-0002', device: { id: 'dev-1', name: 'كاشير 1', code: 'POS-01' } },
+  },
+  {
+    id: 'evt-audit-2',
+    pos_session_id: 'ps-2',
+    branch_id: 'br-1',
+    cart_id: '550e8400-e29b-41d4-a716-446655440002',
+    correlation_id: '550e8400-e29b-41d4-a716-446655440098',
+    type: 'price_overridden',
+    category: 'cart',
+    amount: '20.00',
+    reason_code: 'wrong_price',
+    reason_note: null,
+    source: 'client_observed',
+    trust_level: 'secondary',
+    created_at: '2026-08-28T10:05:00Z',
+    payload: {
+      client_observed: {
+        item: { description: 'ماء معدني', quantity: 2, unit_price: 2000 },
+        before: { item: { description: 'ماء معدني', quantity: 2, unit_price: 2500 } },
+        after: { item: { description: 'ماء معدني', quantity: 2, unit_price: 2000 } },
+      },
+    },
+    actor: { id: 'user-cashier', name: 'سارة الكاشير' },
+    performed_by_user: { id: 'user-cashier', name: 'سارة الكاشير' },
+    approved_by_user: { id: 'user-manager', name: 'خالد المشرف' },
+    session: { id: 'ps-2', number: 'POS-2026-0002', device: null },
+  },
+];
+
+export const mockPosAuditRules = [
+  {
+    id: 'rule-approval-replay',
+    rule_key: 'approval_replay',
+    category: 'approval',
+    version: 1,
+    is_enabled: true,
+    weight: 10,
+    min_sample: 20,
+    window_days: 14,
+    threshold: 3,
+  },
+  {
+    id: 'rule-approval-required-rate',
+    rule_key: 'approval_required_rate',
+    category: 'approval',
+    version: 1,
+    is_enabled: true,
+    weight: 8,
+    min_sample: 30,
+    window_days: 14,
+    threshold: 12000,
+  },
+  {
+    id: 'rule-approver-concentration',
+    rule_key: 'approver_concentration',
+    category: 'approval',
+    version: 2,
+    is_enabled: true,
+    weight: 9,
+    min_sample: 25,
+    window_days: 14,
+    threshold: 40000,
+  },
+  {
+    id: 'rule-override-approval-rate',
+    rule_key: 'override_approval_rate',
+    category: 'approval',
+    version: 1,
+    is_enabled: false,
+    weight: 7,
+    min_sample: 15,
+    window_days: 14,
+    threshold: 80000,
+  },
+  {
+    id: 'rule-pair-concentration',
+    rule_key: 'performer_approver_pair_concentration',
+    category: 'approval',
+    version: 1,
+    is_enabled: true,
+    weight: 11,
+    min_sample: 20,
+    window_days: 14,
+    threshold: 35000,
+  },
+  {
+    id: 'rule-cart-cancellation',
+    rule_key: 'cart_cancellation_rate',
+    category: 'cart',
+    version: 3,
+    is_enabled: true,
+    weight: 12,
+    min_sample: 40,
+    window_days: 14,
+    threshold: 8000,
+  },
+];
+
+/** معاينة Phase 4 — عقد GET /pos/audit/needs-attention فقط، ليست مصدر حقيقة موازياً. */
+export const mockNeedsAttention = {
+  data: [
+    {
+      id: 'approval:appr-lp-1',
+      kind: 'pending_approval',
+      urgency_rank: 1,
+      branch_id: 'br-1',
+      reference: { type: 'approval', id: 'appr-lp-1' },
+      operation: 'refund',
+      cart_id: null,
+      pos_session_id: 'ps-2',
+      reason_code: 'manager_override',
+      performed_by: 'user-cashier',
+      performed_by_name: 'سارة الكاشير',
+      created_at: '2026-08-28T07:12:00Z',
+      expires_at: '2026-08-28T09:12:00Z',
+    },
+    {
+      id: 'exception:exc-lp-1',
+      kind: 'priority_exception',
+      urgency_rank: 2,
+      branch_id: 'br-1',
+      reference: { type: 'exception', id: 'exc-lp-1' },
+      rule_key: 'cross_cashier_refund',
+      category: 'returns',
+      severity: 'priority',
+      review_state: 'new',
+      subject_user_id: 'user-cashier',
+      subject_name: 'سارة الكاشير',
+      amount_under_review: '345.00',
+      detected_at: '2026-08-28T07:40:00Z',
+    },
+    {
+      id: 'exception:exc-lp-2',
+      kind: 'needs_investigation_exception',
+      urgency_rank: 3,
+      branch_id: 'br-1',
+      reference: { type: 'exception', id: 'exc-lp-2' },
+      rule_key: 'outside_operating_hours',
+      category: 'timing',
+      severity: 'review',
+      review_state: 'needs_investigation',
+      subject_user_id: 'user-cashier',
+      subject_name: 'سارة الكاشير',
+      amount_under_review: '0.00',
+      detected_at: '2026-08-28T02:05:00Z',
+    },
+    {
+      id: 'case:case-lp-1',
+      kind: 'attention_case',
+      urgency_rank: 4,
+      branch_id: 'br-1',
+      reference: { type: 'case', id: 'case-lp-1' },
+      reasons: ['unassigned', 'overdue'],
+      number: 'INV-LP-2026-0004',
+      title: 'تحقيق مرتجع خارج الجلسة',
+      status: 'open',
+      priority: 'high',
+      owner_id: null,
+      owner_name: null,
+      opened_at: '2026-08-25T09:00:00Z',
+      last_activity_at: '2026-08-25T09:00:00Z',
+      amount_under_review: '345.00',
+    },
+    {
+      id: 'digest:2026-08-27',
+      kind: 'digest_highlight',
+      urgency_rank: 5,
+      branch_id: null,
+      reference: { type: 'digest', id: 'digest-lp-1' },
+      digest_date: '2026-08-27',
+      priority_exceptions_count: 2,
+      unresolved_high_priority_cases_count: 1,
+      confirmed_loss_count: 0,
+    },
+  ],
+  meta: { total: 5, per_page: 25, current_page: 1, last_page: 1 },
+};
+
+export const mockCustomerSettings = {
+  default_type: 'customer',
+  default_city: 'الدمام',
+  payment_terms_days: 30,
+  require_tax_number: false,
+  loyalty_enabled: false,
+};
+
+export const mockSalesSettings = {
+  default_tax_rate: 15,
+  default_payment_type: 'credit',
+  quote_validity_days: 14,
+  invoice_prefix: 'INV',
+  default_terms: 'الدفع خلال 30 يوماً من تاريخ الفاتورة.',
+};
+
+export const mockSubscription = {
+  plan: 'pro',
+  active: true,
+  trial_ends_at: null as string | null,
+  subscription_ends_at: '2026-12-31',
+  limits: { invoices_per_month: 1000, users: 10 },
+  usage: { invoices_this_month: 147, users: 3 },
+};
+
+// ── التقارير ───────────────────────────────────────────────────────────────
+export const mockTrialBalance = {
+  rows: [
+    { code: '1110', name: 'الصندوق', debit: '54320.00', credit: '0.00' },
+    { code: '1120', name: 'البنك', debit: '163520.00', credit: '0.00' },
+    { code: '1130', name: 'العملاء', debit: '63200.00', credit: '0.00' },
+    { code: '1140', name: 'المخزون', debit: '85000.00', credit: '0.00' },
+    { code: '1150', name: 'ضريبة المدخلات', debit: '12400.00', credit: '0.00' },
+    { code: '2110', name: 'الموردون', debit: '0.00', credit: '41250.00' },
+    { code: '2120', name: 'ضريبة المخرجات', debit: '0.00', credit: '33960.00' },
+    { code: '2130', name: 'رواتب مستحقة', debit: '0.00', credit: '5350.00' },
+    { code: '3110', name: 'رأس المال', debit: '0.00', credit: '138000.00' },
+    { code: '4110', name: 'إيرادات المبيعات', debit: '0.00', credit: '482500.00' },
+    { code: '5110', name: 'تكلفة البضاعة المباعة', debit: '264660.00', credit: '0.00' },
+    { code: '5120', name: 'الرواتب والأجور', debit: '54150.00', credit: '0.00' },
+    { code: '5140', name: 'الوقود', debit: '3810.00', credit: '0.00' },
+  ],
+  total_debit: '701060.00',
+  total_credit: '701060.00',
+  balanced: true,
+};
+
+export const mockCostCenterProfit = {
+  rows: [
+    { cost_center_id: 'cc-1', code: 'CC-DMM', name: 'فرع الدمام', revenue: '210000.00', expense: '84300.00', profit: '125700.00' },
+    { cost_center_id: 'cc-2', code: 'CC-KHB', name: 'فرع الخبر', revenue: '148000.00', expense: '96500.00', profit: '51500.00' },
+    { cost_center_id: 'cc-3', code: 'CC-JBL', name: 'فرع الجبيل', revenue: '124500.00', expense: '132000.00', profit: '-7500.00' },
+    { cost_center_id: 'cc-4', code: 'CC-ADM', name: 'الإدارة العامة', revenue: '0.00', expense: '18750.00', profit: '-18750.00' },
+  ],
+  total_revenue: '482500.00',
+  total_expense: '331550.00',
+  total_profit: '150950.00',
+};
+
+// تقارير الحسابات العامة في وضع العرض: تطابق عقود Laravel الحقيقية كي يبقى
+// اختبار الواجهة التجريبية كاشفاً لانحراف العقد لا سبباً لانهيار وقت التشغيل.
+export const mockCashFlow = {
+  operating: {
+    inflows: '38250.00', outflows: '14400.00', net: '23850.00',
+    entries: [
+      { date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', inflow: '5750.00', outflow: '0.00', net: '5750.00' },
+      { date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', inflow: '0.00', outflow: '6900.00', net: '-6900.00' },
+    ],
+  },
+  investing: {
+    inflows: '0.00', outflows: '45000.00', net: '-45000.00',
+    entries: [{ date: '2026-06-15', number: 'JRN-2026-0042', description: 'شراء معدات', inflow: '0.00', outflow: '45000.00', net: '-45000.00' }],
+  },
+  financing: {
+    inflows: '60000.00', outflows: '0.00', net: '60000.00',
+    entries: [{ date: '2026-06-01', number: 'JRN-2026-0038', description: 'ضخ رأس مال', inflow: '60000.00', outflow: '0.00', net: '60000.00' }],
+  },
+  net_cash_flow: '38850.00',
+};
+
+export const mockTaxReport = {
+  input_vat: '12150.00',
+  output_vat: '21300.00',
+  net_vat: '9150.00',
+  status: 'payable',
+};
+
+export const mockJournalEntries = {
+  rows: [
+    {
+      entry_id: 'jrn-51', date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', debit: '5750.00', credit: '5750.00',
+      lines: [
+        { account_id: 'a1120', account_code: '1120', account_name: 'البنك', description: null, debit: '5750.00', credit: '0.00' },
+        { account_id: 'a1130', account_code: '1130', account_name: 'العملاء (المدينون)', description: null, debit: '0.00', credit: '5750.00' },
+      ],
+    },
+    {
+      entry_id: 'jrn-49', date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', debit: '6900.00', credit: '6900.00',
+      lines: [
+        { account_id: 'a2110', account_code: '2110', account_name: 'الموردون (الدائنون)', description: null, debit: '6900.00', credit: '0.00' },
+        { account_id: 'a1110', account_code: '1110', account_name: 'الصندوق', description: null, debit: '0.00', credit: '6900.00' },
+      ],
+    },
+  ],
+  total_debit: '12650.00',
+  total_credit: '12650.00',
+};
+
+function accountLedgerFor(accountId: string) {
+  const account = mockAccounts.find((candidate) => candidate.id === accountId) ?? mockAccounts.find((candidate) => candidate.code === '1110')!;
+  const rows = account.code === '1120'
+    ? [{ date: '2026-06-24', number: 'JRN-2026-0051', description: 'تحصيل من عميل', debit: '5750.00', credit: '0.00', balance: '163520.00' }]
+    : [{ date: '2026-06-20', number: 'JRN-2026-0049', description: 'سداد مورد', debit: '0.00', credit: '6900.00', balance: '54320.00' }];
+  return { account: { id: account.id, code: account.code, name: account.name }, opening_balance: account.code === '1120' ? '157770.00' : '61220.00', rows, closing_balance: rows[rows.length - 1].balance };
+}
+
+function agingFor(type: string) {
+  if (type === 'payable') {
+    return {
+      type, as_of: '2026-06-26',
+      rows: [
+        { partner_id: 'p3', name: 'مصنع الشرق للبلاستيك', b0_30: '3450.00', b31_60: '0.00', b61_90: '0.00', b90_plus: '0.00', total: '3450.00' },
+        { partner_id: 'p5', name: 'شركة البحر الأحمر اللوجستية', b0_30: '0.00', b31_60: '2300.00', b61_90: '0.00', b90_plus: '0.00', total: '2300.00' },
+      ],
+      totals: { b0_30: '3450.00', b31_60: '2300.00', b61_90: '0.00', b90_plus: '0.00', total: '5750.00' },
+    };
+  }
+  return {
+    type: 'receivable', as_of: '2026-06-26',
+    rows: [
+      { partner_id: 'p2', name: 'شركة الواحة للمقاولات', b0_30: '6325.00', b31_60: '0.00', b61_90: '0.00', b90_plus: '6612.50', total: '12937.50' },
+      { partner_id: 'p3', name: 'مصنع الشرق للبلاستيك', b0_30: '0.00', b31_60: '8280.00', b61_90: '0.00', b90_plus: '0.00', total: '8280.00' },
+      { partner_id: 'p6', name: 'مؤسسة الفيصل للأجهزة', b0_30: '5200.00', b31_60: '0.00', b61_90: '0.00', b90_plus: '0.00', total: '5200.00' },
+    ],
+    totals: { b0_30: '11525.00', b31_60: '8280.00', b61_90: '0.00', b90_plus: '6612.50', total: '26417.50' },
+  };
+}
+
+function partnerStatement(id: string) {
+  const p = mockPartners.find((x) => x.id === id) ?? mockPartners[0];
+  const base = { partner: { id: p.id, name: p.name, type: p.type }, opening_balance: '0.00' };
+
+  // عند فتح التقرير عبر المورد، لا نعيد إطلاقاً مستندات مبيعات أو سندات قبض.
+  // المورد p7 لديه دورة متكاملة: شراء آجل، إشعار مدين، ثم سند صرف.
+  if (p.type === 'supplier' || p.type === 'both') {
+    if (p.id !== 'p7') return { ...base, rows: [], closing_balance: '0.00' };
+    return {
+      ...base,
+      rows: [
+        {
+          date: '2026-06-15', number: 'JRN-2026-0043', description: 'فاتورة شراء PUR-2026-0043',
+          debit: '0.00', credit: '13800.00', balance: '-13800.00',
+          source: { kind: 'purchase', id: 'pu-43', label: 'فاتورة شراء PUR-2026-0043', allocations: [] },
+        },
+        {
+          date: '2026-06-19', number: 'JRN-2026-0044', description: 'إشعار مدين DN-2026-0002',
+          debit: '1200.00', credit: '0.00', balance: '-12600.00',
+          source: { kind: 'credit_note', id: 'dn-2', label: 'إشعار مدين DN-2026-0002', allocations: [] },
+        },
+        {
+          date: '2026-06-20', number: 'JRN-2026-0049', description: 'سند صرف PMT-2026-0049',
+          debit: '6900.00', credit: '0.00', balance: '-5700.00',
+          source: {
+            kind: 'payment', id: 'pm-49', label: 'سند صرف PMT-2026-0049',
+            allocations: [{ kind: 'purchase', id: 'pu-43', number: 'PUR-2026-0043', amount: '6900.00' }],
+          },
+        },
+      ],
+      closing_balance: '-5700.00',
+    };
+  }
+
+  return {
+    ...base,
+    rows: [
+      {
+        date: '2026-06-01', number: 'JRN-2026-0117', description: 'فاتورة مبيعات INV-2026-0117',
+        debit: '12650.00', credit: '0.00', balance: '12650.00',
+        source: { kind: 'invoice', id: 'inv-0117', label: 'فاتورة INV-2026-0117', allocations: [] },
+      },
+      {
+        date: '2026-06-22', number: 'JRN-2026-0050', description: 'دفعة مستلمة PMT-2026-0050',
+        debit: '0.00', credit: '6325.00', balance: '6325.00',
+        source: {
+          kind: 'payment', id: 'pmt-0050', label: 'دفعة PMT-2026-0050',
+          allocations: [{ kind: 'invoice', id: 'inv-0117', number: 'INV-2026-0117', amount: '6325.00' }],
+        },
+      },
+    ],
+    closing_balance: '6325.00',
+  };
+}
+
+// ── تقرير المبيعات في وضع العرض التجريبي ───────────────────────────────────
+// يبقى هذا المسار محصوراً في `isDemo()`؛ الواجهة الحقيقية تقرأ عقد Laravel نفسه.
+function salesReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'period';
+  const from = query.get('from') ?? '';
+  const to = query.get('to') ?? '';
+  const customerId = query.get('customer_id') ?? '';
+  const paymentStatus = query.get('payment_status') ?? '';
+  const receiptMethod = query.get('receipt_method') ?? '';
+  const money = (value: number) => value.toFixed(2);
+  const inRange = (date: string) => (!from || date >= from) && (!to || date <= to);
+  const invoices = mockInvoices.filter((invoice) => invoice.status === 'posted'
+    && inRange(invoice.invoice_date)
+    && (!customerId || invoice.partner_id === customerId)
+    && (!paymentStatus || invoice.payment_status === paymentStatus));
+  const amount = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.total), 0);
+  const netSales = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.subtotal), 0);
+  const tax = (list: MockInvoice[]) => list.reduce((sum, invoice) => sum + Number(invoice.tax_amount), 0);
+  const invoiceTotals = { invoices: invoices.length, amount: money(amount(invoices)), net_sales: money(netSales(invoices)), tax: money(tax(invoices)) };
+  const group = <T extends { key: string; label: string }>(items: T[], value: (item: T) => number, countKey: 'invoices' | 'quantity' | 'receipts') => {
+    const buckets = new Map<string, { key: string; label: string; count: number; amount: number }>();
+    items.forEach((item) => {
+      const bucket = buckets.get(item.key) ?? { key: item.key, label: item.label, count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += value(item);
+      buckets.set(item.key, bucket);
+    });
+    return [...buckets.values()].sort((a, b) => b.amount - a.amount).map((bucket) => ({ key: bucket.key, label: bucket.label, [countKey]: bucket.count, amount: money(bucket.amount) }));
+  };
+
+  if (view === 'payments') {
+    const receipts = mockPayments.filter((payment) => payment.direction === 'received' && inRange(payment.payment_date) && (!receiptMethod || payment.method === receiptMethod));
+    const rows = group(receipts.map((payment) => ({ key: payment.payment_date.slice(0, 7), label: payment.payment_date.slice(0, 7), amount: Number(payment.amount) })), (row) => row.amount, 'receipts');
+    return { view, data: rows, totals: { receipts: receipts.length, amount: money(receipts.reduce((sum, receipt) => sum + Number(receipt.amount), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_receipts' } };
+  }
+
+  if (view === 'product') {
+    const rows = group(invoices.flatMap((invoice) => invoice.lines.map((line) => ({ key: line.description ?? 'manual', label: line.description ?? 'بند وصفي', amount: Number(line.line_total), quantity: line.quantity }))), (row) => row.amount, 'quantity');
+    const quantityByProduct = new Map(invoices.flatMap((invoice) => invoice.lines).map((line) => [line.description ?? 'manual', line.quantity]));
+    return { view, data: rows.map((row) => ({ ...row, quantity: quantityByProduct.get(row.key) ?? row.quantity })), totals: { invoices: invoices.length, amount: money(invoices.flatMap((invoice) => invoice.lines).reduce((sum, line) => sum + Number(line.line_total), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+
+  if (view === 'customer') {
+    const rows = group(invoices.map((invoice) => ({ key: invoice.partner_id, label: mockPartners.find((partner) => partner.id === invoice.partner_id)?.name ?? 'غير مسند', amount: Number(invoice.total) })), (row) => row.amount, 'invoices');
+    return { view, data: rows, totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+
+  const periods = group(invoices.map((invoice) => ({ key: invoice.invoice_date.slice(0, 7), label: invoice.invoice_date.slice(0, 7), amount: Number(invoice.total) })), (row) => row.amount, 'invoices');
+  if (view === 'profit') {
+    const rows = periods.map((row) => ({ ...row, revenue: row.amount, cost: '0.00', profit: row.amount, margin_bp: 10000 }));
+    const revenue = netSales(invoices);
+    return { view, data: rows, totals: { revenue: money(revenue), cost: '0.00', profit: money(revenue), margin_bp: 10000 }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+  if (view === 'salesperson') {
+    return { view, data: [{ key: 'unassigned', label: 'غير مسند', invoices: invoices.length, amount: money(amount(invoices)) }], totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+  }
+  return { view, data: periods, totals: invoiceTotals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_sales_invoices' } };
+}
+
+// ── تقرير المشتريات في وضع العرض التجريبي ───────────────────────────────────
+// هذا الموجّه لا يُستدعى إلا مع `isDemo()`؛ وهو يسهّل مراجعة واجهة التقارير
+// المتجاوبة من دون طلب أي بيانات حقيقية أو تغيير منطق تقارير Laravel.
+function purchasesReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'period';
+  const from = query.get('from') ?? '';
+  const to = query.get('to') ?? '';
+  const supplierId = query.get('supplier_id') ?? '';
+  const paymentStatus = query.get('payment_status') ?? '';
+  const paymentMethod = query.get('payment_method') ?? '';
+  const money = (value: number) => value.toFixed(2);
+  const inRange = (date: string) => (!from || date >= from) && (!to || date <= to);
+  const purchases = mockPurchases.filter((purchase) => purchase.status === 'posted'
+    && inRange(purchase.purchase_date)
+    && (!supplierId || purchase.partner_id === supplierId)
+    && (!paymentStatus || purchase.payment_status === paymentStatus));
+  const amount = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.total), 0);
+  const net = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.subtotal), 0);
+  const tax = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.tax_amount), 0);
+  const balance = (list: MockPurchase[]) => list.reduce((sum, purchase) => sum + Number(purchase.remaining), 0);
+  const totals = {
+    purchases: purchases.length,
+    amount: money(amount(purchases)),
+    net_purchases: money(net(purchases)),
+    tax: money(tax(purchases)),
+    balance: money(balance(purchases)),
+  };
+  const group = <T extends { key: string; label: string }>(items: T[], value: (item: T) => number, countKey: 'purchases' | 'payments') => {
+    const buckets = new Map<string, { key: string; label: string; count: number; amount: number }>();
+    items.forEach((item) => {
+      const bucket = buckets.get(item.key) ?? { key: item.key, label: item.label, count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += value(item);
+      buckets.set(item.key, bucket);
+    });
+    return [...buckets.values()].sort((a, b) => b.amount - a.amount).map((bucket) => ({ key: bucket.key, label: bucket.label, [countKey]: bucket.count, amount: money(bucket.amount) }));
+  };
+
+  if (view === 'payments') {
+    const payments = mockPayments.filter((payment) => payment.direction === 'paid'
+      && inRange(payment.payment_date)
+      && (!paymentMethod || payment.method === paymentMethod));
+    const rows = group(payments.map((payment) => ({ key: payment.payment_date.slice(0, 7), label: payment.payment_date.slice(0, 7), amount: Number(payment.amount) })), (row) => row.amount, 'payments');
+    return { view, data: rows, totals: { payments: payments.length, amount: money(payments.reduce((sum, payment) => sum + Number(payment.amount), 0)) }, scope: { interval: query.get('interval') ?? 'month', source: 'posted_supplier_payments' } };
+  }
+
+  if (view === 'product') {
+    const rows = group(purchases.flatMap((purchase) => purchase.lines.map((line) => ({ key: line.description ?? 'manual', label: line.description ?? 'بند وصفي', amount: Number(line.line_total), quantity: line.quantity }))), (row) => row.amount, 'purchases');
+    const quantityByProduct = new Map(purchases.flatMap((purchase) => purchase.lines).map((line) => [line.description ?? 'manual', line.quantity]));
+    return { view, data: rows.map((row) => ({ ...row, quantity: quantityByProduct.get(row.key) ?? row.purchases })), totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  if (view === 'supplier' || view === 'balances') {
+    const rows = group(purchases.map((purchase) => ({ key: purchase.partner_id, label: mockPartners.find((partner) => partner.id === purchase.partner_id)?.name ?? 'غير مسند', amount: Number(purchase.total), balance: Number(purchase.remaining) })), (row) => row.amount, 'purchases');
+    if (view === 'balances') {
+      const balances = new Map<string, number>();
+      purchases.forEach((purchase) => balances.set(purchase.partner_id, (balances.get(purchase.partner_id) ?? 0) + Number(purchase.remaining)));
+      return { view, data: rows.map((row) => ({ ...row, balance: money(balances.get(row.key) ?? 0) })), totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+    }
+    return { view, data: rows, totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  if (view === 'employee') {
+    return { view, data: [{ key: 'unassigned', label: 'غير مسند', purchases: purchases.length, amount: money(amount(purchases)) }], totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+  }
+
+  const periods = group(purchases.map((purchase) => ({ key: purchase.purchase_date.slice(0, 7), label: purchase.purchase_date.slice(0, 7), amount: Number(purchase.total) })), (row) => row.amount, 'purchases');
+  return { view, data: periods, totals, scope: { interval: query.get('interval') ?? 'month', source: 'posted_purchases' } };
+}
+
+// تقارير العملاء في وضع العرض: عقود مطابقة للـ API، لا استجابة افتراضية فارغة.
+function customersReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'sales';
+  const customer = query.get('customer_id') ?? 'p-customer-1';
+  const customers = [
+    { key: customer, label: 'شركة الروّاد', invoices: 7, amount: '38250.00', balance: '9450.00' },
+    { key: 'p-customer-2', label: 'مؤسسة المدى', invoices: 4, amount: '17400.00', balance: '2200.00' },
+  ];
+
+  if (view === 'balances') {
+    return {
+      view,
+      data: customers,
+      totals: { invoices: 11, amount: '55650.00', balance: '11650.00' },
+      scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_invoices' },
+    };
+  }
+  if (view === 'payments') {
+    return {
+      view,
+      data: [
+        { key: '2026-05', label: '2026-05', receipts: 5, amount: '14800.00' },
+        { key: '2026-06', label: '2026-06', receipts: 8, amount: '21400.00' },
+      ],
+      totals: { receipts: 13, amount: '36200.00' },
+      scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_receipts' },
+    };
+  }
+  if (view === 'appointments') {
+    return {
+      view,
+      data: [
+        { key: customer, label: 'شركة الروّاد', appointments: 4, scheduled: 2, done: 1, cancelled: 1 },
+        { key: 'p-customer-2', label: 'مؤسسة المدى', appointments: 3, scheduled: 1, done: 2, cancelled: 0 },
+      ],
+      totals: { appointments: 7, scheduled: 3, done: 3, cancelled: 1 },
+      scope: { interval: query.get('interval') ?? 'month', source: 'customer_appointments' },
+    };
+  }
+
+  return {
+    view: 'sales',
+    data: customers,
+    totals: { invoices: 11, amount: '55650.00', net_sales: '48391.30', tax: '7258.70' },
+    scope: { interval: query.get('interval') ?? 'month', source: 'posted_customer_invoices' },
+  };
+}
+
+// تقارير المخزون في وضع العرض: نفس العقود الصادقة لمسارات API الحية.
+function inventoryReportFor(path: string) {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const view = query.get('view') ?? 'value';
+  const snapshot = (source: string) => ({ source, snapshot: true });
+  const history = (source: string) => ({ source, snapshot: false });
+
+  if (view === 'warehouses') {
+    return {
+      view,
+      data: [
+        { key: 'pr2', warehouse_id: 'wh1', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', quantity: 22 },
+        { key: 'pr3', warehouse_id: 'wh2', warehouse: 'مخزن الخبر', branch: 'فرع الخبر', sku: 'SKU-003', label: 'كرتون ورق A4', unit: 'carton', quantity: 130 },
+      ],
+      totals: { items: 2, warehouses: 2, quantity: 152 },
+      scope: snapshot('warehouse_stock_quantities'),
+    };
+  }
+  if (view === 'movements') {
+    return {
+      view,
+      data: [
+        { key: 'mv2', date: '2026-06-24', type: 'out', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', quantity: 3, unit_cost: '760.00', total_cost: '2280.00', balance_quantity: 22, notes: 'بيع عبر فاتورة INV-2026-0118' },
+        { key: 'mv1', date: '2026-06-20', type: 'in', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', quantity: 25, unit_cost: '760.00', total_cost: '19000.00', balance_quantity: 25, notes: 'استلام مخزون مرحّل' },
+      ],
+      totals: { movements: 2, in_quantity: 25, out_quantity: 3, in_cost: '19000.00', out_cost: '2280.00', total_cost: '21280.00' },
+      scope: history('posted_stock_movements'),
+    };
+  }
+  if (view === 'operations') {
+    return {
+      view,
+      data: [
+        { key: 'op2', number: 'ST-2026-00012', date: '2026-06-24', type: 'transfer', warehouse: 'المخزن الرئيسي', target_warehouse: 'مخزن الخبر', branch: 'الفرع الرئيسي', target_branch: 'فرع الخبر', lines: 1, quantity: 3, total_cost: '2280.00' },
+        { key: 'op1', number: 'SR-2026-00008', date: '2026-06-20', type: 'receipt', warehouse: 'المخزن الرئيسي', target_warehouse: null, branch: 'الفرع الرئيسي', target_branch: null, lines: 2, quantity: 31, total_cost: '21850.00' },
+      ],
+      totals: { operations: 2, lines: 3, quantity: 34, total_cost: '24130.00' },
+      scope: history('posted_stock_permits'),
+    };
+  }
+  if (view === 'stocktakes') {
+    return {
+      view,
+      data: [
+        { key: 'stk1', number: 'STK-2026-00004', date: '2026-06-18', warehouse: 'المخزن الرئيسي', branch: 'الفرع الرئيسي', counted_lines: 4, quantity_difference: -2, difference_value: '-1520.00' },
+      ],
+      totals: { stocktakes: 1, counted_lines: 4, quantity_difference: -2, difference_value: '-1520.00' },
+      scope: history('posted_stocktakes'),
+    };
+  }
+
+  return {
+    view: 'value',
+    data: [
+      { key: 'pr2', sku: 'SKU-002', label: 'جهاز قياس رقمي', unit: 'piece', quantity: 22, reorder_level: 10, avg_cost: '760.00', stock_value: '16720.00' },
+      { key: 'pr3', sku: 'SKU-003', label: 'كرتون ورق A4', unit: 'carton', quantity: 130, reorder_level: 10, avg_cost: '58.00', stock_value: '7540.00' },
+    ],
+    totals: { products: 2, quantity: 152, stock_value: '24260.00' },
+    scope: snapshot('current_tracked_products'),
+  };
+}
+
+export const mockShifts = [
+  { id: 'sh1', branch_id: null, name: 'الوردية الصباحية', start_time: '08:00', end_time: '16:00', break_minutes: 30, work_days: [0, 1, 2, 3, 4], net_minutes: 450, is_active: true },
+  { id: 'sh2', branch_id: null, name: 'الوردية المسائية', start_time: '14:00', end_time: '22:00', break_minutes: 30, work_days: [0, 1, 2, 3], net_minutes: 450, is_active: true },
+  { id: 'sh3', branch_id: null, name: 'وردية المستودع', start_time: '07:00', end_time: '15:00', break_minutes: 0, work_days: [1, 2, 3, 4, 5], net_minutes: 480, is_active: true },
+];
+
+const att = (
+  id: string, emp: { id: string; name: string }, date: string,
+  checkIn: string | null, checkOut: string | null,
+  status: 'present' | 'absent' | 'late' | 'leave',
+  shift: { id: string; name: string } | null = null, notes: string | null = null,
+) => {
+  const toMin = (v: string) => { const [h, m] = v.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+  let worked = 0;
+  if (checkIn && checkOut) { worked = toMin(checkOut) - toMin(checkIn); if (worked < 0) worked += 24 * 60; }
   return {
     id, employee_id: emp.id, employee: emp, shift_id: shift?.id ?? null, shift,
     attendance_date: date, check_in: checkIn, check_out: checkOut, status, worked_minutes: worked, notes,
