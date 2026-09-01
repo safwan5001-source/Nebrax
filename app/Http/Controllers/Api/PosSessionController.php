@@ -10,6 +10,7 @@ use App\Http\Requests\StorePosCashMovementRequest;
 use App\Http\Resources\PosCashMovementResource;
 use App\Http\Resources\PosSessionEventResource;
 use App\Http\Resources\PosSessionResource;
+use App\Models\Invoice;
 use App\Models\PosDevice;
 use App\Models\PosSession;
 use App\Models\PosShift;
@@ -287,7 +288,26 @@ class PosSessionController extends ApiController
     public function report(Request $request, string $id): JsonResponse
     {
         $session = $this->visibleSession($id, $request);
-        $report = $this->sessions->report($session);
+        $salesInvoices = Invoice::query()
+            ->where('tenant_id', $session->tenant_id)
+            ->where('branch_id', $session->branch_id)
+            ->where('pos_session_id', $session->id)
+            ->where('status', 'posted')
+            ->orderBy('invoice_date')
+            ->orderBy('created_at')
+            ->get(['id', 'number', 'invoice_date', 'payment_type', 'total']);
+        // صفوف البيع ومجاميعها تُشتق من اللقطة المحمّلة نفسها. فلا يمكن أن
+        // يتغيّر sales_count/average عن الصفوف إذا اكتمل checkout متزامن.
+        $report = $this->sessions->report($session, $salesInvoices);
+        $sales = $salesInvoices
+            ->map(fn (Invoice $invoice) => [
+                'id' => $invoice->id,
+                'number' => $invoice->number,
+                'invoice_date' => optional($invoice->invoice_date)->toDateString(),
+                'payment_type' => $invoice->payment_type,
+                'total' => Money::toRiyal($invoice->total),
+            ])
+            ->values();
 
         return response()->json([
             'session' => new PosSessionResource($session->load(['posDevice.warehouse', 'warehouse', 'posShift', 'shift'])),
@@ -303,6 +323,9 @@ class PosSessionController extends ApiController
                 'average' => Money::toRiyal($report['average']),
                 'expected' => Money::toRiyal($report['expected']),
             ],
+            // تفاصيل التقرير من المصدر نفسه الذي كوّن المجاميع؛ لا تعتمد الواجهة
+            // على قائمة الفواتير العامة أو نافذة زمنية قابلة للاختلاط بين الجلسات.
+            'sales' => $sales,
         ]);
     }
 

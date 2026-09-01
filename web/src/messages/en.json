@@ -3278,16 +3278,21 @@
   },
   "posReport": {
     "title": "POS report",
-    "subtitle": "Summary of posted cash sales.",
+    "subtitle": "A trustworthy X/Z report built only from the selected session's documents.",
     "total_sales": "Total cash sales",
     "cash_sales": "Cash sales (shift)",
     "count": "Invoice count",
     "avg": "Average invoice",
-    "recent": "Recent POS invoices",
+    "recent": "Posted session invoices",
     "number": "Number",
     "date": "Date",
     "total": "Total",
-    "empty": "No cash sales yet"
+    "empty": "No posted sales invoices in this session",
+    "load_failed": "POS sessions could not be loaded.",
+    "report_failed": "The session report could not be loaded.",
+    "retry": "Retry",
+    "print": "Print report",
+    "actions": "Report actions"
   },
   "posSessions": {
     "title": "POS sessions",

@@ -3115,7 +3115,19 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const posReportMatch = clean.match(/^\/pos-sessions\/([^/]+)\/report$/);
   if (posReportMatch) {
     const s = mockPosSessions.find((x) => x.id === posReportMatch[1]) ?? mockPosSessions[0];
-    return resolve({ session: s, report: { cash_sales: '3880.00', cash_refunds: '120.00', cash_in: '50.00', cash_out: '30.00', sales_count: 12, returns_count: 1, returns_total: '120.00', net_sales: '4410.00', average: '367.50', expected: '4380.00' } });
+    const closed = s.status === 'closed';
+    return resolve({
+      session: s,
+      report: closed
+        ? { cash_sales: '3880.00', cash_refunds: '120.00', cash_in: '50.00', cash_out: '30.00', sales_count: 2, returns_count: 1, returns_total: '120.00', net_sales: '3880.00', average: '2000.00', expected: '4380.00' }
+        : { cash_sales: '1150.00', cash_refunds: '0.00', cash_in: '0.00', cash_out: '0.00', sales_count: 1, returns_count: 0, returns_total: '0.00', net_sales: '1150.00', average: '1150.00', expected: '1650.00' },
+      sales: closed
+        ? [
+            { id: 'inv-pos-session-1', number: 'INV-POS-0101', invoice_date: '2026-06-27', payment_type: 'cash', total: '2300.00' },
+            { id: 'inv-pos-session-2', number: 'INV-POS-0102', invoice_date: '2026-06-27', payment_type: 'cash', total: '1700.00' },
+          ]
+        : [{ id: 'inv-pos-session-open-1', number: 'INV-POS-0103', invoice_date: '2026-06-28', payment_type: 'cash', total: '1150.00' }],
+    });
   }
   const posCashMovementsMatch = clean.match(/^\/pos-sessions\/([^/]+)\/cash-movements$/);
   if (posCashMovementsMatch) {

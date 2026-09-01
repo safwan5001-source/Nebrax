@@ -247,13 +247,21 @@ class PosSessionTest extends TestCase
         $this->withToken($auth['token'])->postJson("/api/invoices/{$ordinaryInvoiceId}/post")->assertOk();
         $this->assertNull(Invoice::findOrFail($ordinaryInvoiceId)->pos_session_id);
 
-        $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$id}/report")
+        $sessionInvoiceIds = Invoice::where('pos_session_id', $id)->orderBy('created_at')->pluck('id')->all();
+
+        $response = $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$id}/report")
             ->assertOk()
             ->assertJsonPath('report.cash_sales', '2300.00')
             ->assertJsonPath('report.sales_count', 2)
             ->assertJsonPath('report.average', '1150.00')
             ->assertJsonPath('report.expected', '2800.00')
+            ->assertJsonCount(2, 'sales')
             ->assertJsonPath('session.status', 'open');
+
+        $this->assertSame($sessionInvoiceIds, collect($response->json('sales'))->pluck('id')->all());
+        $this->assertNotContains($ordinaryInvoiceId, collect($response->json('sales'))->pluck('id')->all());
+        $this->assertSame(['1150.00', '1150.00'], collect($response->json('sales'))->pluck('total')->all());
+        $this->assertSame($response->json('report.sales_count'), count($response->json('sales')));
     }
 
     /** @test */
