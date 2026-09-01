@@ -16,13 +16,15 @@ describe('POS session register controls', () => {
     expect(page).toContain("params.set('date_from', dateFrom)");
     expect(page).toContain("params.set('date_to', dateTo)");
     expect(page).toContain('router.replace(registerQuery');
+    expect(page).toContain('requestId !== registerRequestId.current');
+    expect(page).toContain('requestId === registerRequestId.current');
   });
 
   it('keeps inactive historical device and shift values filterable but not selectable for opening', () => {
     const page = source('src/app/(app)/pos/sessions/page.tsx');
 
-    expect(page).toContain('devices.map((device)');
-    expect(page).toContain('shifts.map((shift)');
+    expect(page).toContain('filterDevices.map((device)');
+    expect(page).toContain('filterShifts.map((shift)');
     expect(page).toContain('activeDevices.map((device)');
     expect(page).toContain('activeShifts.map((shift)');
   });

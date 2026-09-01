@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
@@ -109,12 +109,15 @@ export default function PosSessionsPage() {
   const [acknowledgementNote, setAcknowledgementNote] = useState('');
   const [devices, setDevices] = useState<PosDevice[]>([]);
   const [shifts, setShifts] = useState<PosShift[]>([]);
+  const [filterDevices, setFilterDevices] = useState<PosDevice[]>([]);
+  const [filterShifts, setFilterShifts] = useState<PosShift[]>([]);
   const [deviceId, setDeviceId] = useState('');
   const [shiftId, setShiftId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [canAcknowledgeDifference, setCanAcknowledgeDifference] = useState(false);
   const [canConfirmHandover, setCanConfirmHandover] = useState(false);
+  const registerRequestId = useRef(0);
 
   const registerQuery = useMemo(() => {
     const params = new URLSearchParams();
@@ -127,12 +130,23 @@ export default function PosSessionsPage() {
   }, [dateFrom, dateTo, deviceFilter, shiftFilter, statusFilter]);
 
   const load = useCallback(() => {
+    const requestId = ++registerRequestId.current;
     setLoading(true);
     setListError(null);
-    api<{ data: Session[] }>(`/pos-sessions${registerQuery ? `?${registerQuery}` : ''}`)
-      .then((r) => setData(r.data))
-      .catch((cause) => setListError(cause instanceof ApiError ? cause.message : tc('loadFailed')))
-      .finally(() => setLoading(false));
+    api<{ data: Session[]; meta?: { filters?: { devices?: PosDevice[]; shifts?: PosShift[] } } }>(`/pos-sessions${registerQuery ? `?${registerQuery}` : ''}`)
+      .then((r) => {
+        if (requestId !== registerRequestId.current) return;
+        setData(r.data);
+        setFilterDevices(r.meta?.filters?.devices ?? []);
+        setFilterShifts(r.meta?.filters?.shifts ?? []);
+      })
+      .catch((cause) => {
+        if (requestId !== registerRequestId.current) return;
+        setListError(cause instanceof ApiError ? cause.message : tc('loadFailed'));
+      })
+      .finally(() => {
+        if (requestId === registerRequestId.current) setLoading(false);
+      });
   }, [registerQuery, tc]);
 
   useEffect(() => load(), [load]);
@@ -368,8 +382,8 @@ export default function PosSessionsPage() {
       <section aria-label={t('register_filters')} className="rounded border border-border bg-surface p-3">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <div className="space-y-1.5"><Label htmlFor="session-status-filter">{t('filter_status')}</Label><select id="session-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_statuses')}</option><option value="open">{t('open_status')}</option><option value="closed">{t('closed_status')}</option></select></div>
-          <div className="space-y-1.5"><Label htmlFor="session-device-filter">{t('filter_device')}</Label><select id="session-device-filter" value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_devices')}</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.name}{device.code ? ` · ${device.code}` : ''}</option>)}</select></div>
-          <div className="space-y-1.5"><Label htmlFor="session-shift-filter">{t('filter_shift')}</Label><select id="session-shift-filter" value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_shifts')}</option>{shifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.name}{shift.code ? ` · ${shift.code}` : ''}</option>)}</select></div>
+          <div className="space-y-1.5"><Label htmlFor="session-device-filter">{t('filter_device')}</Label><select id="session-device-filter" value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_devices')}</option>{filterDevices.map((device) => <option key={device.id} value={device.id}>{device.name}{device.code ? ` · ${device.code}` : ''}</option>)}</select></div>
+          <div className="space-y-1.5"><Label htmlFor="session-shift-filter">{t('filter_shift')}</Label><select id="session-shift-filter" value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_shifts')}</option>{filterShifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.name}{shift.code ? ` · ${shift.code}` : ''}</option>)}</select></div>
           <div className="space-y-1.5"><Label htmlFor="session-date-from">{t('date_from')}</Label><Input id="session-date-from" type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} className="num h-9" /></div>
           <div className="space-y-1.5"><Label htmlFor="session-date-to">{t('date_to')}</Label><Input id="session-date-to" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} className="num h-9" /></div>
         </div>

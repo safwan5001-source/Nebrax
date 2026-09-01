@@ -3068,7 +3068,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         && (!shiftId || session.pos_shift_id === shiftId)
         && (!dateFrom || openedDate >= dateFrom)
         && (!dateTo || openedDate <= dateTo);
-    }) });
+    }), meta: { filters: { devices: mockPosDevices, shifts: mockPosShifts } } });
   }
   if (clean === '/pos-devices') return resolve({ data: mockPosDevices });
   if (clean === '/pos-shifts') return resolve({ data: mockPosShifts });

@@ -177,7 +177,9 @@ class PosSessionTest extends TestCase
         $this->withToken($auth['token'])->getJson("/api/pos-sessions?{$query}")
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.id', $closedId);
+            ->assertJsonPath('data.0.id', $closedId)
+            ->assertJsonCount(2, 'meta.filters.devices')
+            ->assertJsonCount(2, 'meta.filters.shifts');
 
         $this->withToken($auth['token'])->getJson('/api/pos-sessions?status=open')
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $openId);
