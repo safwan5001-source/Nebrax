@@ -1487,8 +1487,8 @@ export const mockBranchSettings = {
 };
 
 export const mockPosSessions = [
-  { id: 'ps-2', number: 'POS-2026-0002', status: 'open', opening_balance: '500.00', closing_balance: null, expected_balance: null, difference: null, opened_at: '2026-06-28T08:00:00', closed_at: null },
-  { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00' },
+  { id: 'ps-2', number: 'POS-2026-0002', status: 'open', handover_status: null, opening_balance: '500.00', closing_balance: null, expected_balance: null, difference: null, difference_status: null, opened_at: '2026-06-28T08:00:00', closed_at: null, handover_confirmed_at: null },
+  { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', handover_status: 'confirmed', opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', difference_status: 'not_required', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00', handover_confirmed_at: '2026-06-27T20:05:00' },
 ];
 
 /** معاينة UX — أحداث رقابية بعينة before/after للتحقق من الملخص البشري والـdiff. */
@@ -3065,6 +3065,28 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         })),
     });
   }
+  const posClosingPreviewMatch = clean.match(/^\/pos-sessions\/([^/]+)\/closing-preview$/);
+  if (posClosingPreviewMatch) {
+    const session = mockPosSessions.find((item) => item.id === posClosingPreviewMatch[1]) ?? mockPosSessions[0];
+    const blindCountEnabled = demoPosSettings().blind_cash_count_enabled === true;
+    return resolve({
+      data: {
+        cash_drawer: {
+          reconciliation_key: 'cash_drawer',
+          name: 'الصندوق النقدي',
+          settlement_type: 'cash',
+          expected_amount: blindCountEnabled ? null : session.expected_balance ?? session.opening_balance,
+        },
+        payment_methods: [{
+          payment_method_id: 'pm-method-bank',
+          payment_method_name: 'تحويل بنكي',
+          settlement_type: 'bank',
+          expected_amount: blindCountEnabled ? null : '650.00',
+        }],
+      },
+    });
+  }
+
   const posReportMatch = clean.match(/^\/pos-sessions\/([^/]+)\/report$/);
   if (posReportMatch) {
     const s = mockPosSessions.find((x) => x.id === posReportMatch[1]) ?? mockPosSessions[0];
