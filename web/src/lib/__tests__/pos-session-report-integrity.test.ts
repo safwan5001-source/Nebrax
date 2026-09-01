@@ -16,7 +16,9 @@ describe('POS session report integrity', () => {
     expect(page).toContain('setReturns(result.returns)');
     expect(page).not.toContain("api<{ data: Invoice[] }>('/invoices')");
     expect(page).not.toContain('.slice(0, 10)');
-    expect(page).toContain('href: `/returns/${item.id}`');
+    expect(page).toContain('`-${formatRiyal(item.total)}`');
+    expect(page).not.toContain('href={`/returns/${item.id}`}');
+    expect(page).not.toContain('href: `/returns/${item.id}`');
   });
 
   it('prevents stale session responses from replacing the selected report', () => {

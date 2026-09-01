@@ -100,7 +100,7 @@ export default function PosReportPage() {
   const scope = session ? `${closed ? t('z_report') : t('x_report')} · ${session.number} · ${closed ? ts('closed_status') : ts('open_status')} · ${session.opened_at?.slice(0, 16).replace('T', ' ') ?? '—'}` : undefined;
   const columns = [{ label: t('number') }, { label: t('date') }, { label: t('total'), align: 'end' as const }];
   const rows = sales.map((sale) => [sale.number, sale.invoice_date ?? '—', formatRiyal(sale.total)]);
-  const returnRows = returns.map((item) => [item.number, item.return_date ?? '—', formatRiyal(item.total)]);
+  const returnRows = returns.map((item) => [item.number, item.return_date ?? '—', `-${formatRiyal(item.total)}`]);
 
   return <div className="space-y-5">
     <ReportScreenHeader title={t('title')} description={t('subtitle')} scope={scope} actionsLabel={t('actions')} actions={[{ id: 'print', label: t('print'), icon: Printer, onSelect: () => window.print(), disabled: reportLoading || !report || Boolean(reportError) }]} />
@@ -124,8 +124,8 @@ export default function PosReportPage() {
 
     {session && !reportError && <Card><CardHeader><CardTitle>{t('returns')}</CardTitle></CardHeader><CardContent>
       {reportLoading ? <Skeleton className="h-24 w-full" /> : returns.length === 0 ? <p className="py-8 text-center text-sm text-muted">{t('returns_empty')}</p> : <>
-        <ReportMobileRows columns={columns} rows={returnRows} primaryIndex={0} secondaryIndex={1} rowActions={returns.map((item) => ({ href: `/returns/${item.id}`, label: item.number }))} />
-        <Table className="hidden md:table"><THead><TR><TH>{t('number')}</TH><TH>{t('date')}</TH><TH className="text-end">{t('total')}</TH></TR></THead><TBody>{returns.map((item) => <TR key={item.id}><TD><Link href={`/returns/${item.id}`} className="num font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">{item.number}</Link></TD><TD className="num text-muted">{item.return_date ?? '—'}</TD><TD className="num text-end text-negative">-{formatRiyal(item.total)}</TD></TR>)}</TBody></Table>
+        <ReportMobileRows columns={columns} rows={returnRows} primaryIndex={0} secondaryIndex={1} />
+        <Table className="hidden md:table"><THead><TR><TH>{t('number')}</TH><TH>{t('date')}</TH><TH className="text-end">{t('total')}</TH></TR></THead><TBody>{returns.map((item) => <TR key={item.id}><TD className="num font-medium text-text">{item.number}</TD><TD className="num text-muted">{item.return_date ?? '—'}</TD><TD className="num text-end text-negative">-{formatRiyal(item.total)}</TD></TR>)}</TBody></Table>
       </>}
     </CardContent></Card>}
   </div>;
