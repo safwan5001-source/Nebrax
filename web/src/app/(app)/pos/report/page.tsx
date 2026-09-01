@@ -21,9 +21,10 @@ interface Session {
   expected_balance: string | null; difference: string | null;
   opened_at: string | null; closed_at: string | null;
 }
-interface Report { cash_sales: string; sales_count: number; average: string; expected: string }
+interface Report { cash_sales: string; cash_refunds: string; cash_in: string; cash_out: string; sales_count: number; returns_count: number; returns_total: string; net_sales: string; average: string; expected: string }
 interface SessionSale { id: string; number: string; invoice_date: string | null; payment_type: string; total: string }
-interface ReportResponse { session: Session; report: Report; sales: SessionSale[] }
+interface SessionReturn { id: string; number: string; return_date: string | null; payment_type: string; total: string }
+interface ReportResponse { session: Session; report: Report; sales: SessionSale[]; returns: SessionReturn[] }
 
 export default function PosReportPage() {
   const t = useTranslations('posReport');
@@ -33,6 +34,7 @@ export default function PosReportPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [sales, setSales] = useState<SessionSale[]>([]);
+  const [returns, setReturns] = useState<SessionReturn[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -56,19 +58,19 @@ export default function PosReportPage() {
   const loadReport = useCallback(async () => {
     const requestId = ++reportRequestId.current;
     if (!selectedId) {
-      setSession(null); setReport(null); setSales([]); setReportError(null);
+      setSession(null); setReport(null); setSales([]); setReturns([]); setReportError(null);
       return;
     }
     setReportLoading(true);
     setReportError(null);
-    setSession(null); setReport(null); setSales([]);
+    setSession(null); setReport(null); setSales([]); setReturns([]);
     try {
       const result = await api<ReportResponse>(`/pos-sessions/${selectedId}/report`);
       if (requestId !== reportRequestId.current) return;
-      setSession(result.session); setReport(result.report); setSales(result.sales);
+      setSession(result.session); setReport(result.report); setSales(result.sales); setReturns(result.returns);
     } catch (cause) {
       if (requestId !== reportRequestId.current) return;
-      setSession(null); setReport(null); setSales([]);
+      setSession(null); setReport(null); setSales([]); setReturns([]);
       setReportError(cause instanceof ApiError ? cause.message : t('report_failed'));
     } finally {
       if (requestId === reportRequestId.current) setReportLoading(false);
@@ -82,7 +84,12 @@ export default function PosReportPage() {
   const metrics = useMemo(() => session ? [
     { label: ts('opening_balance'), value: formatRiyalShort(session.opening_balance) },
     { label: t('cash_sales'), value: report ? formatRiyalShort(report.cash_sales) : '—' },
+    { label: ts('cash_refunds'), value: report ? formatRiyalShort(report.cash_refunds) : '—', tone: report && report.cash_refunds !== '0.00' ? 'negative' as const : undefined },
+    { label: ts('cash_in_total'), value: report ? formatRiyalShort(report.cash_in) : '—' },
+    { label: ts('cash_out_total'), value: report ? formatRiyalShort(report.cash_out) : '—' },
+    { label: ts('net_sales'), value: report ? formatRiyalShort(report.net_sales) : '—' },
     { label: t('count'), value: report ? String(report.sales_count) : '—' },
+    { label: ts('returns_count'), value: report ? String(report.returns_count) : '—' },
     { label: t('avg'), value: report ? formatRiyalShort(report.average) : '—' },
     { label: ts('expected'), value: report ? formatRiyalShort(report.expected) : '—' },
     ...(closed ? [
@@ -90,9 +97,10 @@ export default function PosReportPage() {
       { label: ts('difference'), value: formatRiyalShort(session.difference ?? '0'), tone: isNegative(session.difference ?? '0') ? 'negative' as const : undefined },
     ] : []),
   ] : [], [closed, report, session, t, ts]);
-  const scope = session ? `${session.number} · ${closed ? ts('closed_status') : ts('open_status')} · ${session.opened_at?.slice(0, 16).replace('T', ' ') ?? '—'}` : undefined;
+  const scope = session ? `${closed ? t('z_report') : t('x_report')} · ${session.number} · ${closed ? ts('closed_status') : ts('open_status')} · ${session.opened_at?.slice(0, 16).replace('T', ' ') ?? '—'}` : undefined;
   const columns = [{ label: t('number') }, { label: t('date') }, { label: t('total'), align: 'end' as const }];
   const rows = sales.map((sale) => [sale.number, sale.invoice_date ?? '—', formatRiyal(sale.total)]);
+  const returnRows = returns.map((item) => [item.number, item.return_date ?? '—', `-${formatRiyal(item.total)}`]);
 
   return <div className="space-y-5">
     <ReportScreenHeader title={t('title')} description={t('subtitle')} scope={scope} actionsLabel={t('actions')} actions={[{ id: 'print', label: t('print'), icon: Printer, onSelect: () => window.print(), disabled: reportLoading || !report || Boolean(reportError) }]} />
@@ -111,6 +119,13 @@ export default function PosReportPage() {
       {reportLoading ? <Skeleton className="h-32 w-full" /> : sales.length === 0 ? <p className="py-8 text-center text-sm text-muted">{t('empty')}</p> : <>
         <ReportMobileRows columns={columns} rows={rows} primaryIndex={0} secondaryIndex={1} rowActions={sales.map((sale) => ({ href: `/invoices/${sale.id}`, label: sale.number }))} />
         <Table className="hidden md:table"><THead><TR><TH>{t('number')}</TH><TH>{t('date')}</TH><TH className="text-end">{t('total')}</TH></TR></THead><TBody>{sales.map((sale) => <TR key={sale.id}><TD><Link href={`/invoices/${sale.id}`} className="num font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">{sale.number}</Link></TD><TD className="num text-muted">{sale.invoice_date ?? '—'}</TD><TD className="num text-end">{formatRiyal(sale.total)}</TD></TR>)}</TBody></Table>
+      </>}
+    </CardContent></Card>}
+
+    {session && !reportError && <Card><CardHeader><CardTitle>{t('returns')}</CardTitle></CardHeader><CardContent>
+      {reportLoading ? <Skeleton className="h-24 w-full" /> : returns.length === 0 ? <p className="py-8 text-center text-sm text-muted">{t('returns_empty')}</p> : <>
+        <ReportMobileRows columns={columns} rows={returnRows} primaryIndex={0} secondaryIndex={1} />
+        <Table className="hidden md:table"><THead><TR><TH>{t('number')}</TH><TH>{t('date')}</TH><TH className="text-end">{t('total')}</TH></TR></THead><TBody>{returns.map((item) => <TR key={item.id}><TD className="num font-medium text-text">{item.number}</TD><TD className="num text-muted">{item.return_date ?? '—'}</TD><TD className="num text-end text-negative">-{formatRiyal(item.total)}</TD></TR>)}</TBody></Table>
       </>}
     </CardContent></Card>}
   </div>;

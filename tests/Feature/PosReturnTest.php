@@ -151,13 +151,19 @@ class PosReturnTest extends TestCase
         $this->assertSame(0, $this->balance('4110'));
         $this->assertSame(0, $this->balance('2120'));
 
-        $report = $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$session['session_id']}/report")
+        $response = $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$session['session_id']}/report")
             ->assertOk()
-            ->json('report');
+            ->assertJsonCount(2, 'returns');
+        $report = $response->json('report');
         $this->assertSame('343.85', $report['cash_refunds']);
         $this->assertSame('0.00', $report['expected']);
         $this->assertSame(2, $report['returns_count']);
         $this->assertSame('0.00', $report['net_sales']);
+        $this->assertSame($report['returns_count'], count($response->json('returns')));
+        $this->assertSame(
+            ReturnDocument::where('pos_session_id', $session['session_id'])->orderBy('return_date')->orderBy('created_at')->pluck('id')->all(),
+            collect($response->json('returns'))->pluck('id')->all(),
+        );
     }
 
     /** @test */

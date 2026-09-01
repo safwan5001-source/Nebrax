@@ -10,11 +10,15 @@ describe('POS session report integrity', () => {
   it('renders invoice rows from the selected session report contract only', () => {
     const page = source('src/app/(app)/pos/report/page.tsx');
 
-    expect(page).toContain('interface ReportResponse { session: Session; report: Report; sales: SessionSale[] }');
+    expect(page).toContain('interface ReportResponse { session: Session; report: Report; sales: SessionSale[]; returns: SessionReturn[] }');
     expect(page).toContain('api<ReportResponse>(`/pos-sessions/${selectedId}/report`)');
     expect(page).toContain('setSales(result.sales)');
+    expect(page).toContain('setReturns(result.returns)');
     expect(page).not.toContain("api<{ data: Invoice[] }>('/invoices')");
     expect(page).not.toContain('.slice(0, 10)');
+    expect(page).toContain('`-${formatRiyal(item.total)}`');
+    expect(page).not.toContain('href={`/returns/${item.id}`}');
+    expect(page).not.toContain('href: `/returns/${item.id}`');
   });
 
   it('prevents stale session responses from replacing the selected report', () => {

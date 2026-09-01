@@ -745,7 +745,7 @@ class PosSessionService
      *
      * @return array{cash_sales:int,cash_refunds:int,cash_in:int,cash_out:int,sales_count:int,returns_count:int,returns_total:int,net_sales:int,average:int,expected:int}
      */
-    public function report(PosSession $session, ?EloquentCollection $postedInvoices = null): array
+    public function report(PosSession $session, ?EloquentCollection $postedInvoices = null, ?EloquentCollection $postedReturns = null): array
     {
         $cash = $this->cashMovement($session);
         $invoices = $postedInvoices ?? Invoice::where('pos_session_id', $session->id)
@@ -753,9 +753,10 @@ class PosSessionService
             ->get(['id', 'total']);
         $salesTotal = (int) $invoices->sum('total');
         $count = (int) $invoices->count();
-        $returns = ReturnDocument::where('pos_session_id', $session->id)
+        $returns = $postedReturns ?? ReturnDocument::where('pos_session_id', $session->id)
             ->where('type', 'sales')
-            ->where('status', 'posted');
+            ->where('status', 'posted')
+            ->get(['id', 'total']);
         $returnsTotal = (int) $returns->sum('total');
         $returnsCount = (int) $returns->count();
 

@@ -3127,6 +3127,9 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
             { id: 'inv-pos-session-2', number: 'INV-POS-0102', invoice_date: '2026-06-27', payment_type: 'cash', total: '1700.00' },
           ]
         : [{ id: 'inv-pos-session-open-1', number: 'INV-POS-0103', invoice_date: '2026-06-28', payment_type: 'cash', total: '1150.00' }],
+      returns: closed
+        ? [{ id: 'return-pos-session-1', number: 'SR-POS-0001', return_date: '2026-06-27', payment_type: 'cash', total: '120.00' }]
+        : [],
     });
   }
   const posCashMovementsMatch = clean.match(/^\/pos-sessions\/([^/]+)\/cash-movements$/);
