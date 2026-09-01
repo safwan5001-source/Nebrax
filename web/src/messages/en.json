@@ -3399,6 +3399,7 @@
     "refresh": "Refresh",
     "manage_session": "Manage open session",
     "register_filters": "Session register filters",
+    "queue_overview": "Session queue overview",
     "filter_status": "Session status",
     "all_statuses": "All statuses",
     "filter_handover_status": "Handover status",
