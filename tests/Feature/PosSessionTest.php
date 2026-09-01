@@ -169,6 +169,8 @@ class PosSessionTest extends TestCase
 
         $query = http_build_query([
             'status' => 'closed',
+            'handover_status' => 'pending',
+            'difference_status' => 'not_required',
             'pos_device_id' => $firstDevice['id'],
             'pos_shift_id' => $firstShift['id'],
             'date_from' => '2026-08-01',
@@ -184,6 +186,8 @@ class PosSessionTest extends TestCase
         $this->withToken($auth['token'])->getJson('/api/pos-sessions?status=open')
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $openId);
         $this->withToken($auth['token'])->getJson('/api/pos-sessions?status=unknown')->assertUnprocessable();
+        $this->withToken($auth['token'])->getJson('/api/pos-sessions?handover_status=unknown')->assertUnprocessable();
+        $this->withToken($auth['token'])->getJson('/api/pos-sessions?difference_status=unknown')->assertUnprocessable();
         $this->withToken($auth['token'])->getJson('/api/pos-sessions?date_from=2026-09-02&date_to=2026-09-01')->assertUnprocessable();
     }
 

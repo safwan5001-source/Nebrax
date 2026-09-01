@@ -102,7 +102,7 @@ describe('POS demo contracts', () => {
   });
 
   it('filters the demo session register with the server query contract', async () => {
-    const response = await mockApi<{ data: Array<{ id: string }>; meta: { filters: { devices: unknown[]; shifts: unknown[] } } }>('/pos-sessions?status=closed&pos_device_id=pd-2&pos_shift_id=pos-shift-evening&date_from=2026-06-27&date_to=2026-06-27');
+    const response = await mockApi<{ data: Array<{ id: string }>; meta: { filters: { devices: unknown[]; shifts: unknown[] } } }>('/pos-sessions?status=closed&handover_status=confirmed&difference_status=not_required&pos_device_id=pd-2&pos_shift_id=pos-shift-evening&date_from=2026-06-27&date_to=2026-06-27');
 
     expect(response.data).toEqual([{ id: 'ps-1' }].map(({ id }) => expect.objectContaining({ id })));
     expect(response.meta.filters.devices).toHaveLength(2);

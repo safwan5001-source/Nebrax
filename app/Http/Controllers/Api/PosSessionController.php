@@ -36,6 +36,8 @@ class PosSessionController extends ApiController
     {
         $filters = $request->validate([
             'status' => ['sometimes', 'nullable', Rule::in(['open', 'closed'])],
+            'handover_status' => ['sometimes', 'nullable', Rule::in(['pending', 'confirmed'])],
+            'difference_status' => ['sometimes', 'nullable', Rule::in(['pending', 'acknowledged', 'not_required'])],
             'pos_device_id' => ['sometimes', 'nullable', 'uuid'],
             'pos_shift_id' => ['sometimes', 'nullable', 'uuid'],
             'date_from' => ['sometimes', 'nullable', 'date'],
@@ -52,6 +54,12 @@ class PosSessionController extends ApiController
         }
         if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
+        }
+        if (! empty($filters['handover_status'])) {
+            $query->where('handover_status', $filters['handover_status']);
+        }
+        if (! empty($filters['difference_status'])) {
+            $query->where('difference_status', $filters['difference_status']);
         }
         if (! empty($filters['pos_device_id'])) {
             $query->where('pos_device_id', $filters['pos_device_id']);

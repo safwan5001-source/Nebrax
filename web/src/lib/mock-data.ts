@@ -3057,6 +3057,8 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     }
     const params = new URLSearchParams(path.split('?')[1] ?? '');
     const status = params.get('status');
+    const handoverStatus = params.get('handover_status');
+    const differenceStatus = params.get('difference_status');
     const deviceId = params.get('pos_device_id');
     const shiftId = params.get('pos_shift_id');
     const dateFrom = params.get('date_from');
@@ -3064,6 +3066,8 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: mockPosSessions.filter((session) => {
       const openedDate = session.opened_at.slice(0, 10);
       return (!status || session.status === status)
+        && (!handoverStatus || session.handover_status === handoverStatus)
+        && (!differenceStatus || session.difference_status === differenceStatus)
         && (!deviceId || session.pos_device_id === deviceId)
         && (!shiftId || session.pos_shift_id === shiftId)
         && (!dateFrom || openedDate >= dateFrom)
