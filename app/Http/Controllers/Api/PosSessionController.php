@@ -18,6 +18,7 @@ use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use RuntimeException;
 
 class PosSessionController extends ApiController
@@ -29,9 +30,31 @@ class PosSessionController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
+        $filters = $request->validate([
+            'status' => ['sometimes', 'nullable', Rule::in(['open', 'closed'])],
+            'pos_device_id' => ['sometimes', 'nullable', 'uuid'],
+            'pos_shift_id' => ['sometimes', 'nullable', 'uuid'],
+            'date_from' => ['sometimes', 'nullable', 'date'],
+            'date_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:date_from'],
+        ]);
         $query = PosSession::with(['posDevice.warehouse', 'warehouse', 'posShift', 'shift', 'reconciliations', 'handoverConfirmedBy'])->orderByDesc('opened_at');
         if ($request->boolean('mine')) {
             $query->where('opened_by', $request->user()?->id);
+        }
+        if (! empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+        if (! empty($filters['pos_device_id'])) {
+            $query->where('pos_device_id', $filters['pos_device_id']);
+        }
+        if (! empty($filters['pos_shift_id'])) {
+            $query->where('pos_shift_id', $filters['pos_shift_id']);
+        }
+        if (! empty($filters['date_from'])) {
+            $query->whereDate('opened_at', '>=', $filters['date_from']);
+        }
+        if (! empty($filters['date_to'])) {
+            $query->whereDate('opened_at', '<=', $filters['date_to']);
         }
 
         return PosSessionResource::collection($this->scopeToActiveBranch($query, $request)->get())->response();

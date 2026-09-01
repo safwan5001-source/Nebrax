@@ -100,4 +100,10 @@ describe('POS demo contracts', () => {
       expect.objectContaining({ reconciliation_key: 'cash_drawer', expected_amount: '4380.00' }),
     ]));
   });
+
+  it('filters the demo session register with the server query contract', async () => {
+    const response = await mockApi<{ data: Array<{ id: string }> }>('/pos-sessions?status=closed&pos_device_id=pd-2&pos_shift_id=pos-shift-evening&date_from=2026-06-27&date_to=2026-06-27');
+
+    expect(response.data).toEqual([{ id: 'ps-1' }].map(({ id }) => expect.objectContaining({ id })));
+  });
 });
