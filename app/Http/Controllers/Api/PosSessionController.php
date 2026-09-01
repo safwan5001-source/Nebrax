@@ -10,7 +10,9 @@ use App\Http\Requests\StorePosCashMovementRequest;
 use App\Http\Resources\PosCashMovementResource;
 use App\Http\Resources\PosSessionEventResource;
 use App\Http\Resources\PosSessionResource;
+use App\Models\PosDevice;
 use App\Models\PosSession;
+use App\Models\PosShift;
 use App\Models\Shift;
 use App\Services\Accounting\PosSessionService;
 use App\Services\Pos\CashDrawerService;
@@ -18,6 +20,7 @@ use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use RuntimeException;
 
 class PosSessionController extends ApiController
@@ -29,12 +32,47 @@ class PosSessionController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        $query = PosSession::with(['posDevice.warehouse', 'warehouse', 'posShift', 'shift', 'reconciliations', 'handoverConfirmedBy'])->orderByDesc('opened_at');
+        $filters = $request->validate([
+            'status' => ['sometimes', 'nullable', Rule::in(['open', 'closed'])],
+            'pos_device_id' => ['sometimes', 'nullable', 'uuid'],
+            'pos_shift_id' => ['sometimes', 'nullable', 'uuid'],
+            'date_from' => ['sometimes', 'nullable', 'date'],
+            'date_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+        $visible = $this->scopeToActiveBranch(PosSession::query(), $request);
+        $deviceIds = (clone $visible)->whereNotNull('pos_device_id')->distinct()->pluck('pos_device_id');
+        $shiftIds = (clone $visible)->whereNotNull('pos_shift_id')->distinct()->pluck('pos_shift_id');
+        $filterDevices = PosDevice::query()->whereIn('id', $deviceIds)->orderBy('name')->get(['id', 'name', 'code', 'is_active']);
+        $filterShifts = PosShift::query()->whereIn('id', $shiftIds)->orderBy('name')->get(['id', 'name', 'code', 'is_active']);
+        $query = (clone $visible)->with(['posDevice.warehouse', 'warehouse', 'posShift', 'shift', 'reconciliations', 'handoverConfirmedBy'])->orderByDesc('opened_at');
         if ($request->boolean('mine')) {
             $query->where('opened_by', $request->user()?->id);
         }
+        if (! empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+        if (! empty($filters['pos_device_id'])) {
+            $query->where('pos_device_id', $filters['pos_device_id']);
+        }
+        if (! empty($filters['pos_shift_id'])) {
+            $query->where('pos_shift_id', $filters['pos_shift_id']);
+        }
+        if (! empty($filters['date_from'])) {
+            $query->whereDate('opened_at', '>=', $filters['date_from']);
+        }
+        if (! empty($filters['date_to'])) {
+            $query->whereDate('opened_at', '<=', $filters['date_to']);
+        }
 
-        return PosSessionResource::collection($this->scopeToActiveBranch($query, $request)->get())->response();
+        return response()->json([
+            'data' => PosSessionResource::collection($query->get())->resolve($request),
+            'meta' => [
+                'filters' => [
+                    'devices' => $filterDevices,
+                    'shifts' => $filterShifts,
+                ],
+            ],
+        ]);
     }
 
     public function show(Request $request, string $id): JsonResponse

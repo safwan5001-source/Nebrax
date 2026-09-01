@@ -1486,9 +1486,19 @@ export const mockBranchSettings = {
   account_branch_scoping: false,
 };
 
+export const mockPosDevices = [
+  { id: 'pd-1', name: 'كاشير الفرع الرئيسي', code: 'POS-01', warehouse_id: 'wh-1', is_active: true, warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' } },
+  { id: 'pd-2', name: 'كاشير الخبر', code: 'POS-02', warehouse_id: 'wh-2', is_active: false, warehouse: { id: 'wh-2', name: 'مخزن الخبر', code: '00002' } },
+];
+
+export const mockPosShifts = [
+  { id: 'pos-shift-morning', name: 'الوردية الصباحية', code: 'MORNING', is_active: true },
+  { id: 'pos-shift-evening', name: 'الوردية المسائية', code: 'EVENING', is_active: false },
+];
+
 export const mockPosSessions = [
-  { id: 'ps-2', number: 'POS-2026-0002', status: 'open', handover_status: null, opening_balance: '500.00', closing_balance: null, expected_balance: null, difference: null, difference_status: null, opened_at: '2026-06-28T08:00:00', closed_at: null, handover_confirmed_at: null },
-  { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', handover_status: 'confirmed', opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', difference_status: 'not_required', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00', handover_confirmed_at: '2026-06-27T20:05:00' },
+  { id: 'ps-2', number: 'POS-2026-0002', status: 'open', handover_status: null, pos_device_id: 'pd-1', pos_shift_id: 'pos-shift-morning', pos_device: mockPosDevices[0], pos_shift: mockPosShifts[0], warehouse: mockPosDevices[0].warehouse, opening_balance: '500.00', closing_balance: null, expected_balance: null, difference: null, difference_status: null, opened_at: '2026-06-28T08:00:00', closed_at: null, handover_confirmed_at: null },
+  { id: 'ps-1', number: 'POS-2026-0001', status: 'closed', handover_status: 'confirmed', pos_device_id: 'pd-2', pos_shift_id: 'pos-shift-evening', pos_device: mockPosDevices[1], pos_shift: mockPosShifts[1], warehouse: mockPosDevices[1].warehouse, opening_balance: '500.00', closing_balance: '4380.00', expected_balance: '4380.00', difference: '0.00', difference_status: 'not_required', opened_at: '2026-06-27T08:00:00', closed_at: '2026-06-27T20:00:00', handover_confirmed_at: '2026-06-27T20:05:00' },
 ];
 
 /** معاينة UX — أحداث رقابية بعينة before/after للتحقق من الملخص البشري والـdiff. */
@@ -3045,8 +3055,23 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       && Boolean((window as Window & { __POS_SESSIONS_FORCE_EMPTY?: boolean }).__POS_SESSIONS_FORCE_EMPTY)) {
       return resolve({ data: [] });
     }
-    return resolve({ data: mockPosSessions });
+    const params = new URLSearchParams(path.split('?')[1] ?? '');
+    const status = params.get('status');
+    const deviceId = params.get('pos_device_id');
+    const shiftId = params.get('pos_shift_id');
+    const dateFrom = params.get('date_from');
+    const dateTo = params.get('date_to');
+    return resolve({ data: mockPosSessions.filter((session) => {
+      const openedDate = session.opened_at.slice(0, 10);
+      return (!status || session.status === status)
+        && (!deviceId || session.pos_device_id === deviceId)
+        && (!shiftId || session.pos_shift_id === shiftId)
+        && (!dateFrom || openedDate >= dateFrom)
+        && (!dateTo || openedDate <= dateTo);
+    }), meta: { filters: { devices: mockPosDevices, shifts: mockPosShifts } } });
   }
+  if (clean === '/pos-devices') return resolve({ data: mockPosDevices });
+  if (clean === '/pos-shifts') return resolve({ data: mockPosShifts });
   if (clean === '/pos/recent-invoices') {
     return resolve({
       data: mockInvoices
@@ -3110,9 +3135,9 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const closed = session.status === 'closed';
     return resolve({ data: {
       ...session,
-      pos_device: { id: 'pd-1', name: 'كاشير الفرع الرئيسي', code: 'POS-01' },
-      warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' },
-      pos_shift: { id: 'pos-shift-morning', name: 'الوردية الصباحية', code: 'MORNING' },
+      pos_device: session.pos_device,
+      warehouse: session.warehouse,
+      pos_shift: session.pos_shift,
       handover_note: closed ? 'تم تسليم النقد وإيصالات وسائل الدفع.' : null,
       handover_submitted_at: closed ? '2026-06-27T20:00:00Z' : null,
       handover_confirmation_note: closed ? 'تم استلام العهدة والمستندات.' : null,

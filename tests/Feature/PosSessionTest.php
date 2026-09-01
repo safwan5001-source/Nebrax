@@ -137,6 +137,57 @@ class PosSessionTest extends TestCase
     }
 
     /** @test */
+    public function session_register_filters_are_validated_and_applied_inside_the_active_branch(): void
+    {
+        $auth = $this->registerTenant('pos-register-filters', 'owner@pos-register-filters.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $firstDevice = $this->device($auth);
+        $secondDevice = $this->device($auth);
+        $firstShift = $this->withToken($auth['token'])->postJson('/api/pos-shifts', [
+            'name' => 'وردية الصباح', 'code' => 'MORNING', 'is_active' => true,
+        ])->assertCreated()['data'];
+        $secondShift = $this->withToken($auth['token'])->postJson('/api/pos-shifts', [
+            'name' => 'وردية المساء', 'code' => 'EVENING', 'is_active' => true,
+        ])->assertCreated()['data'];
+
+        $closedId = $this->withToken($auth['token'])->postJson('/api/pos-sessions/open', [
+            'opening_balance' => 0,
+            'pos_device_id' => $firstDevice['id'],
+            'pos_shift_id' => $firstShift['id'],
+        ])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$closedId}/close", [
+            'closing_balance' => 0,
+        ])->assertOk();
+        PosSession::findOrFail($closedId)->forceFill(['opened_at' => '2026-08-15 08:00:00'])->save();
+
+        $openId = $this->withToken($auth['token'])->postJson('/api/pos-sessions/open', [
+            'opening_balance' => 0,
+            'pos_device_id' => $secondDevice['id'],
+            'pos_shift_id' => $secondShift['id'],
+        ])->assertCreated()['data']['id'];
+        PosSession::findOrFail($openId)->forceFill(['opened_at' => '2026-09-01 16:00:00'])->save();
+
+        $query = http_build_query([
+            'status' => 'closed',
+            'pos_device_id' => $firstDevice['id'],
+            'pos_shift_id' => $firstShift['id'],
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+        ]);
+        $this->withToken($auth['token'])->getJson("/api/pos-sessions?{$query}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $closedId)
+            ->assertJsonCount(2, 'meta.filters.devices')
+            ->assertJsonCount(2, 'meta.filters.shifts');
+
+        $this->withToken($auth['token'])->getJson('/api/pos-sessions?status=open')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $openId);
+        $this->withToken($auth['token'])->getJson('/api/pos-sessions?status=unknown')->assertUnprocessable();
+        $this->withToken($auth['token'])->getJson('/api/pos-sessions?date_from=2026-09-02&date_to=2026-09-01')->assertUnprocessable();
+    }
+
+    /** @test */
     public function checkout_uses_the_session_device_warehouse_and_rejects_an_override(): void
     {
         $auth = $this->registerTenant();
