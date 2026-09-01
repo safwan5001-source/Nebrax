@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -18,8 +19,11 @@ use Laravel\Sanctum\HasApiTokens;
  * يرث `BaseModel` (UUID + عزل مستأجر تلقائي عبر `BelongsToTenant`)، فالإدارة
  * (سرد/إبطال) معزولة بالمستأجر. أمّا حلّ الهوية وقت المصادقة فيتجاوز نطاق المستأجر
  * صراحةً في `AuthenticateApiClient` (الهوية عالمية قبل إنشاء حدّ المستأجر).
+ *
+ * `CompanyWide` (إقرار واعٍ): اعتماد تكامل على مستوى المؤسسة، غير مرتبط بفرع —
+ * مثل المستخدمين والصلاحيات وإعدادات المؤسسة، لا بيانات تشغيلية معزولة بالفرع.
  */
-class ApiClient extends BaseModel
+class ApiClient extends BaseModel implements CompanyWide
 {
     use HasApiTokens;
 
