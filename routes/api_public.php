@@ -1,6 +1,13 @@
 <?php
 
 use App\Http\Controllers\Api\PublicHealthController;
+use App\Http\Controllers\Api\PublicInvoiceController;
+use App\Http\Controllers\Api\PublicPartnerController;
+use App\Http\Controllers\Api\PublicProductController;
+use App\Http\Middleware\AuthenticateApiClient;
+use App\Http\Middleware\EnsureActiveSubscription;
+use App\Http\Middleware\EnsureApiScope;
+use App\Http\Middleware\PublicApiTenantGuard;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -38,3 +45,36 @@ use Illuminate\Support\Facades\Route;
 
 // فحص صحّة عام: بلا مصادقة، بلا مستأجر، بلا قاعدة بيانات، بلا كشف بيانات.
 Route::get('health', PublicHealthController::class)->name('health');
+
+/*
+|--------------------------------------------------------------------------
+| موارد المستأجر — قراءة فقط (PR-3)
+|--------------------------------------------------------------------------
+| السلسلة الأمنية لكل مسار:
+|   API Key → ApiClient → TenantContext → PublicApiTenantGuard (fail-closed)
+|   → EnsureActiveSubscription (استحقاق: اشتراك نشط، مُعاد استخدامه من الداخلي)
+|   → EnsureApiScope (scope تام = نظير صلاحية الأعمال للـ M2M) → استعلام قراءة معزول.
+|
+| المستأجر يُشتقّ من العميل حصراً؛ لا سياق فرع (نطاق على مستوى المستأجر). لا كتابة.
+| كل المعرّفات UUID (whereUuid) فيُرفض المشوّه عند التوجيه (404 مغلّف).
+*/
+Route::middleware([
+    AuthenticateApiClient::class,
+    PublicApiTenantGuard::class,
+    EnsureActiveSubscription::class,
+])->group(function () {
+    Route::middleware(EnsureApiScope::class.':partners:read')->group(function () {
+        Route::get('partners', [PublicPartnerController::class, 'index'])->name('partners.index');
+        Route::get('partners/{id}', [PublicPartnerController::class, 'show'])->whereUuid('id')->name('partners.show');
+    });
+
+    Route::middleware(EnsureApiScope::class.':products:read')->group(function () {
+        Route::get('products', [PublicProductController::class, 'index'])->name('products.index');
+        Route::get('products/{id}', [PublicProductController::class, 'show'])->whereUuid('id')->name('products.show');
+    });
+
+    Route::middleware(EnsureApiScope::class.':invoices:read')->group(function () {
+        Route::get('invoices', [PublicInvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('invoices/{id}', [PublicInvoiceController::class, 'show'])->whereUuid('id')->name('invoices.show');
+    });
+});
