@@ -208,7 +208,7 @@ export default function PosSessionsPage() {
     } else if (view === 'handover_pending') {
       setStatusFilter('closed'); setHandoverStatusFilter('pending'); setDifferenceStatusFilter('');
     } else if (view === 'difference_pending') {
-      setStatusFilter('closed'); setHandoverStatusFilter('pending'); setDifferenceStatusFilter('pending');
+      setStatusFilter('closed'); setHandoverStatusFilter(''); setDifferenceStatusFilter('pending');
     } else {
       setStatusFilter('closed'); setHandoverStatusFilter('confirmed'); setDifferenceStatusFilter('');
     }
@@ -415,7 +415,7 @@ export default function PosSessionsPage() {
         {[
           { id: 'open', label: t('open_status'), value: summary.open_count, active: statusFilter === 'open' && !handoverStatusFilter && !differenceStatusFilter },
           { id: 'handover_pending', label: t('handover_pending'), value: summary.handover_pending_count, active: statusFilter === 'closed' && handoverStatusFilter === 'pending' && !differenceStatusFilter },
-          { id: 'difference_pending', label: t('difference_pending'), value: summary.difference_pending_count, active: statusFilter === 'closed' && handoverStatusFilter === 'pending' && differenceStatusFilter === 'pending' },
+          { id: 'difference_pending', label: t('difference_pending'), value: summary.difference_pending_count, active: statusFilter === 'closed' && !handoverStatusFilter && differenceStatusFilter === 'pending' },
           { id: 'handover_confirmed', label: t('handover_confirmed'), value: summary.handover_confirmed_count, active: statusFilter === 'closed' && handoverStatusFilter === 'confirmed' && !differenceStatusFilter },
         ].map((item) => <button key={item.id} type="button" aria-pressed={item.active} onClick={() => applyQueueView(item.id as 'open' | 'handover_pending' | 'difference_pending' | 'handover_confirmed')} className={cn('flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2.5 text-start transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', item.active && 'border-primary bg-primary-soft')}><span className="text-sm text-muted">{item.label}</span><strong className="num text-lg font-semibold text-text">{item.value}</strong></button>)}
       </section>}

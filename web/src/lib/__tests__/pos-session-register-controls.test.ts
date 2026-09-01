@@ -22,6 +22,7 @@ describe('POS session register controls', () => {
     expect(page).toContain('requestId === registerRequestId.current');
     expect(page).toContain('r.meta?.summary');
     expect(page).toContain("applyQueueView(item.id as 'open' | 'handover_pending' | 'difference_pending' | 'handover_confirmed')");
+    expect(page).toMatch(/view === 'difference_pending'[\s\S]{0,180}setHandoverStatusFilter\(''\)[\s\S]{0,120}setDifferenceStatusFilter\('pending'\)/);
   });
 
   it('keeps inactive historical device and shift values filterable but not selectable for opening', () => {
