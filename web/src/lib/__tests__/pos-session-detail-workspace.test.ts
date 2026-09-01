@@ -35,4 +35,13 @@ describe('POS session detail workspace', () => {
     expect(list).toContain('href={`/pos/sessions/${row.original.id}`}');
     expect(list).toContain("t('view_details')");
   });
+
+  it('preserves legacy session facts and does not offer inaccessible evidence', () => {
+    const page = source('src/app/(app)/pos/sessions/[id]/page.tsx');
+
+    expect(page).toContain("session.handover_status === 'confirmed'");
+    expect(page).toContain("session.shift?.name ?? '—'");
+    expect(page).toContain('session.variance_journal_entry_id && canViewAccounts');
+    expect(page).toContain("permissions?.includes('accounts.view')");
+  });
 });

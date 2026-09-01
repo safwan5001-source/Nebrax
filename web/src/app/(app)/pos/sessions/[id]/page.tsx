@@ -51,6 +51,7 @@ interface Session {
   pos_device?: { id: string; name: string; code: string | null } | null;
   warehouse?: { id: string; name: string; code: string | null } | null;
   pos_shift?: { id: string; name: string; code: string | null } | null;
+  shift?: { id: string; name: string } | null;
   reconciliations: Reconciliation[];
 }
 
@@ -103,6 +104,7 @@ export default function PosSessionDetailPage() {
   const [busy, setBusy] = useState(false);
   const [canAcknowledgeDifference, setCanAcknowledgeDifference] = useState(false);
   const [canConfirmHandover, setCanConfirmHandover] = useState(false);
+  const [canViewAccounts, setCanViewAccounts] = useState(false);
 
   const formatDate = useCallback(
     (value: string | null) => formatDateTime(value, locale),
@@ -135,6 +137,7 @@ export default function PosSessionDetailPage() {
     const apply = (permissions: string[] | undefined) => {
       setCanAcknowledgeDifference(Boolean(permissions?.includes('*') || permissions?.includes('pos.variance.approve')));
       setCanConfirmHandover(Boolean(permissions?.includes('*') || permissions?.includes('pos.session.handover.confirm')));
+      setCanViewAccounts(Boolean(permissions?.includes('*') || permissions?.includes('accounts.view')));
     };
     const user = currentUser();
     if (user?.permissions !== undefined) apply(user.permissions);
@@ -199,7 +202,9 @@ export default function PosSessionDetailPage() {
       ? { label: t('difference_pending'), tone: 'warning' as const }
       : session.handover_status === 'pending'
         ? { label: t('handover_pending'), tone: 'warning' as const }
-        : { label: t('handover_confirmed'), tone: 'positive' as const };
+        : session.handover_status === 'confirmed'
+          ? { label: t('handover_confirmed'), tone: 'positive' as const }
+          : { label: t('closed_status'), tone: 'neutral' as const };
 
   const figures = [
     [t('opening_balance'), session.opening_balance],
@@ -261,7 +266,7 @@ export default function PosSessionDetailPage() {
       <aside className="space-y-4">
         <Card><CardHeader><CardTitle className="text-base">{t('operational_details')}</CardTitle></CardHeader><CardContent><dl className="space-y-2.5 text-sm">{[
           [t('device'), session.pos_device ? `${session.pos_device.name}${session.pos_device.code ? ` · ${session.pos_device.code}` : ''}` : '—'],
-          [t('work_shift'), session.pos_shift ? `${session.pos_shift.name}${session.pos_shift.code ? ` · ${session.pos_shift.code}` : ''}` : '—'],
+          [t('work_shift'), session.pos_shift ? `${session.pos_shift.name}${session.pos_shift.code ? ` · ${session.pos_shift.code}` : ''}` : session.shift?.name ?? '—'],
           [t('warehouse'), session.warehouse ? `${session.warehouse.name}${session.warehouse.code ? ` · ${session.warehouse.code}` : ''}` : '—'],
           [t('opened_at'), formatDate(session.opened_at)], [t('closed_at'), formatDate(session.closed_at)],
         ].map(([label, value]) => <div key={label} className="flex justify-between gap-4 border-b border-border pb-2.5 last:border-b-0"><dt className="text-muted">{label}</dt><dd className="text-end text-text">{value}</dd></div>)}</dl></CardContent></Card>
@@ -271,7 +276,7 @@ export default function PosSessionDetailPage() {
           <div><p className="text-xs text-muted">{t('handover_confirmation_note')}</p><p className="mt-1 whitespace-pre-wrap text-text">{session.handover_confirmation_note || '—'}</p></div>
           {session.handover_receiver && <div><p className="text-xs text-muted">{t('handover_receiver')}</p><p className="mt-1 text-text">{session.handover_receiver.name} · {formatDate(session.handover_confirmed_at)}</p></div>}
           {session.difference_acknowledgement && <div><p className="text-xs text-muted">{t('acknowledgement_note')}</p><p className="mt-1 whitespace-pre-wrap text-text">{session.difference_acknowledgement.note || '—'}</p><p className="mt-1 text-xs text-muted">{formatDate(session.difference_acknowledgement.acknowledged_at)}</p></div>}
-          {session.variance_journal_entry_id && <Link href={`/journal-entries/${session.variance_journal_entry_id}`} className="inline-flex text-primary hover:underline">{t('view_variance_journal')}</Link>}
+          {session.variance_journal_entry_id && canViewAccounts && <Link href={`/journal-entries/${session.variance_journal_entry_id}`} className="inline-flex text-primary hover:underline">{t('view_variance_journal')}</Link>}
         </CardContent></Card>
 
         <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4 text-muted" strokeWidth={1.7} />{t('audit_log')}</CardTitle></CardHeader><CardContent>{events.length === 0 ? <p className="text-sm text-muted">{t('audit_empty')}</p> : <ol className="space-y-0">{events.map((event) => <li key={event.id} className="relative border-s border-border pb-4 ps-4 last:border-transparent last:pb-0"><span className="absolute -start-1 top-1 h-2 w-2 rounded-full bg-primary" /><p className="text-sm font-medium text-text">{eventLabels[event.type] ?? event.type.replaceAll('_', ' ')}</p><p className="mt-0.5 text-xs text-muted">{event.actor?.name ?? '—'} · {formatDate(event.created_at)}</p>{event.reason_note && <p className="mt-1 text-xs text-text">{event.reason_note}</p>}{event.amount && <p className="num mt-1 text-xs text-text">{formatRiyal(event.amount)}</p>}</li>)}</ol>}</CardContent></Card>
