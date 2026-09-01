@@ -22,6 +22,8 @@ enum PublicApiErrorCode: string
     case UNAUTHENTICATED         = 'unauthenticated';
     case FORBIDDEN               = 'forbidden';
     case TENANT_CONTEXT_REQUIRED = 'tenant_context_required';
+    case CLIENT_INACTIVE         = 'client_inactive';
+    case INSUFFICIENT_SCOPE      = 'insufficient_scope';
     case RATE_LIMITED            = 'rate_limited';
 
     /** رمز HTTP الافتراضي لكل رمز خطأ — مرجع واحد يمنع التضارب بين المسارات. */
@@ -31,7 +33,9 @@ enum PublicApiErrorCode: string
             self::BAD_REQUEST             => 400,
             self::UNAUTHENTICATED        => 401,
             self::FORBIDDEN,
-            self::TENANT_CONTEXT_REQUIRED => 403,
+            self::TENANT_CONTEXT_REQUIRED,
+            self::CLIENT_INACTIVE,
+            self::INSUFFICIENT_SCOPE     => 403,
             self::NOT_FOUND              => 404,
             self::METHOD_NOT_ALLOWED     => 405,
             self::VALIDATION_FAILED      => 422,
