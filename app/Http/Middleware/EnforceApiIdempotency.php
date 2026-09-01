@@ -11,6 +11,7 @@ use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as IlluminateResponse;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -128,20 +129,26 @@ class EnforceApiIdempotency
     ): array {
         $now = now();
 
+        $record = new PublicApiIdempotencyKey();
+        $record->forceFill([
+            'tenant_id'           => $client->tenant_id,
+            'api_client_id'       => $client->getKey(),
+            'key_hash'            => $keyHash,
+            'method'              => strtoupper($request->getMethod()),
+            'route_identity'      => mb_substr($routeIdentity, 0, 191),
+            'request_fingerprint' => $fingerprint,
+            'status'              => PublicApiIdempotencyKey::STATUS_IN_PROGRESS,
+            'locked_at'           => $now,
+            'expires_at'          => $now->copy()->addHours(PublicApiIdempotency::RETENTION_HOURS),
+        ]);
+
         try {
-            $record = new PublicApiIdempotencyKey();
-            $record->forceFill([
-                'tenant_id'           => $client->tenant_id,
-                'api_client_id'       => $client->getKey(),
-                'key_hash'            => $keyHash,
-                'method'              => strtoupper($request->getMethod()),
-                'route_identity'      => mb_substr($routeIdentity, 0, 191),
-                'request_fingerprint' => $fingerprint,
-                'status'              => PublicApiIdempotencyKey::STATUS_IN_PROGRESS,
-                'locked_at'           => $now,
-                'expires_at'          => $now->copy()->addHours(PublicApiIdempotency::RETENTION_HOURS),
-            ]);
-            $record->save();
+            // إدراج محاطٌ بـ savepoint: على PostgreSQL يُفسد انتهاكُ القيد الفريد
+            // المعاملةَ المحيطة كلَّها («current transaction is aborted»)، فيفشل
+            // الاستعلامُ التالي (SELECT). المعاملة المتداخلة (SAVEPOINT) تحصر
+            // التراجع في الإدراج وحده فتبقى المعاملة المحيطة صالحةً للاستعلام بعده.
+            // في الإنتاج (autocommit بلا معاملة محيطة) تصبح معاملةَ عبارةٍ واحدة.
+            DB::transaction(fn () => $record->save());
 
             return ['claimed', $record];
         } catch (QueryException $e) {
