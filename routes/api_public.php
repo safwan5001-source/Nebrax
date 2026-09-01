@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\PublicInvoiceController;
 use App\Http\Controllers\Api\PublicPartnerController;
 use App\Http\Controllers\Api\PublicProductController;
 use App\Http\Middleware\AuthenticateApiClient;
+use App\Http\Middleware\EnforceApiIdempotency;
+use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApiScope;
@@ -95,23 +97,34 @@ Route::middleware([
 
 /*
 |--------------------------------------------------------------------------
-| بذرة تكامل الكتابة (PR-5) — **موثَّقة لا منفَّذة**
+| موارد المستأجر — كتابة محكومة (PR-5)
 |--------------------------------------------------------------------------
-| توفّر PR-4 طبقةً قابلة لإعادة الاستخدام تحمي أيّ مسار كتابةٍ مستقبلي دون
-| إعادة تصميم. تُحمى الكتابة بالسلسلة نفسها مع فئة معدّلٍ أثقل + حارس idempotency:
+| إنشاء فقط (POST): طرف · منتج · **مسودّة** فاتورة. تعيد استخدام طبقة الحماية
+| (PR-4) وخدمات الدومين القائمة — لا منطق أعمالٍ موازٍ ولا كتابة مباشرة في القيد
+| أو المخزون. لا PUT/PATCH/DELETE ولا ترحيل/سداد/إرسال ZATCA.
 |
-|   Route::middleware([
-|       AuthenticateApiClient::class,
-|       PublicApiTenantGuard::class,
-|       PublicApiRequestAudit::class,
-|       EnforcePublicApiRateLimit::class.':'.PublicApiRateLimits::CLASS_WRITE,
-|       EnsureActiveSubscription::class,
-|       EnsureApiScope::class.':invoices:write',   // scope كتابة يُعرَّف في PR-5
-|       EnforceApiIdempotency::class,              // POST/PUT/PATCH/DELETE فقط
-|   ])->group(function () {
-|       Route::post('invoices', [PublicInvoiceWriteController::class, 'store']);
-|       // المتحكّم يفوّض لخدمة الدومين القائمة (InvoiceService) — لا منطق موازٍ.
-|   });
-|
-| PR-4 لا يضيف أيّ مسار كتابة؛ هذا توثيق seam فقط.
+| السلسلة لكل مسار كتابة:
+|   AuthenticateApiClient → PublicApiTenantGuard → PublicApiRequestAudit
+|   → EnforcePublicApiRateLimit:**write** → EnsureActiveSubscription
+|   → EnsureApiScope:{x}:write → EnforceApiIdempotency (Idempotency-Key إلزامي)
+|   → المتحكّم → خدمة الدومين → مورد Public مُنتقى.
+| فئة الحدّ **write** (أثقل من القراءة)، وحارس idempotency على مستوى المسار بعد
+| الـ scope فلا يُنشئ طلبٌ غير مخوَّل سجلّ idempotency. الفاتورة تضيف حدّ الخطة.
 */
+Route::middleware([
+    AuthenticateApiClient::class,
+    PublicApiTenantGuard::class,
+    PublicApiRequestAudit::class,
+    EnforcePublicApiRateLimit::class . ':' . PublicApiRateLimits::CLASS_WRITE,
+    EnsureActiveSubscription::class,
+])->group(function () {
+    Route::middleware([EnsureApiScope::class.':partners:write', EnforceApiIdempotency::class])
+        ->post('partners', [PublicPartnerController::class, 'store'])->name('partners.store');
+
+    Route::middleware([EnsureApiScope::class.':products:write', EnforceApiIdempotency::class])
+        ->post('products', [PublicProductController::class, 'store'])->name('products.store');
+
+    // حدّ خطة الفواتير مُعاد استخدامه من الداخلي (تناسق الاستحقاق عبر السطحين).
+    Route::middleware([EnsureApiScope::class.':invoices:write', EnforcePlanLimit::class.':invoices', EnforceApiIdempotency::class])
+        ->post('invoices', [PublicInvoiceController::class, 'store'])->name('invoices.store');
+});

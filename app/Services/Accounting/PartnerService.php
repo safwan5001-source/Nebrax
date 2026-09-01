@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\JournalEntry;
 use App\Models\Partner;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -25,6 +26,29 @@ class PartnerService
     private const ACC_OPENING     = '3130'; // الأرصدة الافتتاحية (حقوق ملكية)
 
     public function __construct(protected LedgerService $ledger) {}
+
+    /**
+     * إنشاء طرف مع قيد رصيده الافتتاحي في معاملة واحدة — مسار الإنشاء القانوني
+     * الوحيد (يستعمله المتحكّم الداخلي والـ Public API معًا، فلا منطق موازٍ).
+     * فشل القيد يُرجع الطرف كله (لا طرف يتيم بلا قيده). رصيدٌ افتتاحي = 0 لا يولّد
+     * قيدًا (`recordOpeningBalance` تُرجع null)، فإنشاءٌ بلا رصيد لا أثر محاسبي له.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function create(array $data): Partner
+    {
+        return DB::transaction(function () use ($data) {
+            $partner = Partner::create($data); // الأعمدة يحرسها fillable (لا opening_balance)
+
+            $this->recordOpeningBalance(
+                $partner,
+                (int) ($data['opening_balance'] ?? 0),
+                $data['opening_balance_date'] ?? null,
+            );
+
+            return $partner->load(['customerClassification', 'supplierClassification', 'defaultPriceList']);
+        });
+    }
 
     /**
      * يولّد قيد رصيد افتتاحي للطرف عبر المحرك (اتجاهه وفق نوع الطرف).

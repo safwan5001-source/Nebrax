@@ -22,13 +22,21 @@ enum PublicApiScope: string
     case PRODUCTS_READ = 'products:read';
     case INVOICES_READ = 'invoices:read';
 
-    /** صلاحية RBAC المقابلة — seam التفويض المستقبلي (PR-3). */
+    // ── Write (PR-5) — كتابة محكومة. مطابقة تامّة، لا wildcard؛ القراءة لا تعني الكتابة.
+    case PARTNERS_WRITE = 'partners:write';
+    case PRODUCTS_WRITE = 'products:write';
+    case INVOICES_WRITE = 'invoices:write';
+
+    /** صلاحية الأعمال المقابلة في المستودع (القراءة view، والكتابة manage). */
     public function permission(): string
     {
         return match ($this) {
-            self::PARTNERS_READ => 'partners.view',
-            self::PRODUCTS_READ => 'products.view',
-            self::INVOICES_READ => 'invoices.view',
+            self::PARTNERS_READ  => 'partners.view',
+            self::PRODUCTS_READ  => 'products.view',
+            self::INVOICES_READ  => 'invoices.view',
+            self::PARTNERS_WRITE => 'partners.manage',
+            self::PRODUCTS_WRITE => 'products.manage',
+            self::INVOICES_WRITE => 'invoices.manage',
         };
     }
 

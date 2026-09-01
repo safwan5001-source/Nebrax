@@ -25,11 +25,10 @@ use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\ProductExportService;
 use App\Services\ProductImportService;
 use App\Services\ProductLifecycleService;
+use App\Services\ProductService;
 use App\Support\ProductListFilters;
-use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -42,6 +41,7 @@ class ProductController extends ApiController
         protected ProductImportService $imports,
         protected ProductExportService $exports,
         protected ProductLifecycleService $lifecycle,
+        protected ProductService $products,
     ) {}
 
     /**
@@ -187,25 +187,8 @@ class ProductController extends ApiController
             $data['unit'] = $template->base_unit;
         }
 
-        // ذرّية: إنشاء المنتج وقيد الرصيد الافتتاحي معاملة واحدة —
-        // فشل القيد يُرجع المنتج كله (لا منتج يتيم بلا قيده).
-        $userId = $request->user()?->id;
-        $product = $this->domain(fn () => DB::transaction(function () use ($data, $userId) {
-            // SKU هو كود الصنف الداخلي: إن لم يُحدده المستخدم يولّد الخادم الرقم
-            // التالي تحت القفل نفسه، فلا تتصادم عمليات الإنشاء المتزامنة.
-            if (blank($data['sku'] ?? null)) {
-                $prefix = (string) Settings::get('numbering', 'product_prefix');
-                $data['sku'] = Product::nextDocumentNumber($prefix !== '' ? $prefix : 'SKU');
-            }
-
-            $product = Product::create($data); // initial_quantity ليست عموداً — يحرسها fillable
-
-            // رصيد افتتاحي (قيد مدين 1140 / دائن 3130) عند تحديد كمية ابتدائية لمنتج متتبَّع.
-            $this->inventory->recordOpeningStock($product, (int) ($data['initial_quantity'] ?? 0));
-            $this->lifecycle->create($product, $userId);
-
-            return $product;
-        }));
+        // مسار الإنشاء القانوني الموحّد (خدمة الدومين) — نفسه يستعمله الـ Public API.
+        $product = $this->domain(fn () => $this->products->create($data, $request->user()?->id));
 
         return (new ProductResource($product->fresh()))->response()->setStatusCode(201);
     }

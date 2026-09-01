@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\PublicStoreProductRequest;
 use App\Http\Resources\PublicProductResource;
 use App\Models\Product;
+use App\Services\ProductService;
 use App\Support\PublicApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -66,5 +68,22 @@ class PublicProductController extends PublicApiController
         $product = Product::with(['productCategory:id,name', 'productBrand:id,name'])->findOrFail($id);
 
         return PublicApiResponse::resource($request, new PublicProductResource($product));
+    }
+
+    /**
+     * إنشاء منتج (PR-5) — خدمة الدومين نفسها للمتحكّم الداخلي. عقدٌ أساسيٌّ آمن:
+     * لا كمية ابتدائية ولا مراجع ولا حسابات، فلا أثر مخزني ولا محاسبي. النقود
+     * بالوحدات الصغرى (`sale_price_minor` → عمود `sale_price` بالهللات). الفاعل
+     * null (عميل API لا مستخدم بشري). idempotency/حدّ الكتابة/التدقيق في السلسلة.
+     */
+    public function store(PublicStoreProductRequest $request, ProductService $products): JsonResponse
+    {
+        $data = $request->validated();
+        $data['sale_price'] = $data['sale_price_minor']; // الهللات تُخزَّن مباشرةً في العمود
+        unset($data['sale_price_minor']);
+
+        $product = $this->domainWrite(fn () => $products->create($data, null));
+
+        return PublicApiResponse::resource($request, new PublicProductResource($product->fresh()))->setStatusCode(201);
     }
 }
