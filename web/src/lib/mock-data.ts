@@ -3063,7 +3063,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const shiftId = params.get('pos_shift_id');
     const dateFrom = params.get('date_from');
     const dateTo = params.get('date_to');
-    return resolve({ data: mockPosSessions.filter((session) => {
+    const filtered = mockPosSessions.filter((session) => {
       const openedDate = session.opened_at.slice(0, 10);
       return (!status || session.status === status)
         && (!handoverStatus || session.handover_status === handoverStatus)
@@ -3072,7 +3072,17 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         && (!shiftId || session.pos_shift_id === shiftId)
         && (!dateFrom || openedDate >= dateFrom)
         && (!dateTo || openedDate <= dateTo);
-    }), meta: { filters: { devices: mockPosDevices, shifts: mockPosShifts } } });
+    });
+    return resolve({ data: filtered, meta: {
+      summary: {
+        total_count: mockPosSessions.length,
+        open_count: mockPosSessions.filter((session) => session.status === 'open').length,
+        handover_pending_count: mockPosSessions.filter((session) => session.status === 'closed' && session.handover_status === 'pending').length,
+        difference_pending_count: mockPosSessions.filter((session) => session.status === 'closed' && session.difference_status === 'pending').length,
+        handover_confirmed_count: mockPosSessions.filter((session) => session.status === 'closed' && session.handover_status === 'confirmed').length,
+      },
+      filters: { devices: mockPosDevices, shifts: mockPosShifts },
+    } });
   }
   if (clean === '/pos-devices') return resolve({ data: mockPosDevices });
   if (clean === '/pos-shifts') return resolve({ data: mockPosShifts });

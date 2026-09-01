@@ -102,11 +102,12 @@ describe('POS demo contracts', () => {
   });
 
   it('filters the demo session register with the server query contract', async () => {
-    const response = await mockApi<{ data: Array<{ id: string }>; meta: { filters: { devices: unknown[]; shifts: unknown[] } } }>('/pos-sessions?status=closed&handover_status=confirmed&difference_status=not_required&pos_device_id=pd-2&pos_shift_id=pos-shift-evening&date_from=2026-06-27&date_to=2026-06-27');
+    const response = await mockApi<{ data: Array<{ id: string }>; meta: { summary: { total_count: number; open_count: number; handover_confirmed_count: number }; filters: { devices: unknown[]; shifts: unknown[] } } }>('/pos-sessions?status=closed&handover_status=confirmed&difference_status=not_required&pos_device_id=pd-2&pos_shift_id=pos-shift-evening&date_from=2026-06-27&date_to=2026-06-27');
 
     expect(response.data).toEqual([{ id: 'ps-1' }].map(({ id }) => expect.objectContaining({ id })));
     expect(response.meta.filters.devices).toHaveLength(2);
     expect(response.meta.filters.shifts).toHaveLength(2);
+    expect(response.meta.summary).toMatchObject({ total_count: 2, open_count: 1, handover_confirmed_count: 1 });
   });
 
   it('keeps report sales tied to the selected demo session', async () => {

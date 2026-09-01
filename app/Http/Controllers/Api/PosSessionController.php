@@ -44,6 +44,16 @@ class PosSessionController extends ApiController
             'date_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:date_from'],
         ]);
         $visible = $this->scopeToActiveBranch(PosSession::query(), $request);
+        // ملخص الطابور مستقل عن مرشحات القائمة حتى يبقى عدّاد العمل التشغيلي
+        // ثابتاً وقابلاً للانتقال إليه. استعلام تجميعي واحد فقط داخل الفرع النشط.
+        $summary = (clone $visible)->selectRaw(
+            'COUNT(*) AS total_count, '
+            .'SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS open_count, '
+            .'SUM(CASE WHEN status = ? AND handover_status = ? THEN 1 ELSE 0 END) AS handover_pending_count, '
+            .'SUM(CASE WHEN status = ? AND difference_status = ? THEN 1 ELSE 0 END) AS difference_pending_count, '
+            .'SUM(CASE WHEN status = ? AND handover_status = ? THEN 1 ELSE 0 END) AS handover_confirmed_count',
+            ['open', 'closed', 'pending', 'closed', 'pending', 'closed', 'confirmed'],
+        )->first();
         $deviceIds = (clone $visible)->whereNotNull('pos_device_id')->distinct()->pluck('pos_device_id');
         $shiftIds = (clone $visible)->whereNotNull('pos_shift_id')->distinct()->pluck('pos_shift_id');
         $filterDevices = PosDevice::query()->whereIn('id', $deviceIds)->orderBy('name')->get(['id', 'name', 'code', 'is_active']);
@@ -77,6 +87,13 @@ class PosSessionController extends ApiController
         return response()->json([
             'data' => PosSessionResource::collection($query->get())->resolve($request),
             'meta' => [
+                'summary' => [
+                    'total_count' => (int) ($summary?->total_count ?? 0),
+                    'open_count' => (int) ($summary?->open_count ?? 0),
+                    'handover_pending_count' => (int) ($summary?->handover_pending_count ?? 0),
+                    'difference_pending_count' => (int) ($summary?->difference_pending_count ?? 0),
+                    'handover_confirmed_count' => (int) ($summary?->handover_confirmed_count ?? 0),
+                ],
                 'filters' => [
                     'devices' => $filterDevices,
                     'shifts' => $filterShifts,

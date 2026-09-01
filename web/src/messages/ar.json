@@ -3399,6 +3399,7 @@
     "refresh": "تحديث",
     "manage_session": "إدارة الجلسة المفتوحة",
     "register_filters": "مرشحات سجل الجلسات",
+    "queue_overview": "ملخص طابور الجلسات",
     "filter_status": "حالة الجلسة",
     "all_statuses": "كل الحالات",
     "filter_handover_status": "حالة التسليم",

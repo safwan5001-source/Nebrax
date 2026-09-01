@@ -68,6 +68,13 @@ interface SessionEvent {
   created_at: string | null;
   actor?: { id: string; name: string } | null;
 }
+interface SessionRegisterSummary {
+  total_count: number;
+  open_count: number;
+  handover_pending_count: number;
+  difference_pending_count: number;
+  handover_confirmed_count: number;
+}
 
 export default function PosSessionsPage() {
   const router = useRouter();
@@ -79,6 +86,7 @@ export default function PosSessionsPage() {
   const tc = useTranslations('common');
   const { success, error: errorToast } = useToast();
   const [data, setData] = useState<Session[]>([]);
+  const [summary, setSummary] = useState<SessionRegisterSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? '');
@@ -137,15 +145,17 @@ export default function PosSessionsPage() {
     const requestId = ++registerRequestId.current;
     setLoading(true);
     setListError(null);
-    api<{ data: Session[]; meta?: { filters?: { devices?: PosDevice[]; shifts?: PosShift[] } } }>(`/pos-sessions${registerQuery ? `?${registerQuery}` : ''}`)
+    api<{ data: Session[]; meta?: { summary?: SessionRegisterSummary; filters?: { devices?: PosDevice[]; shifts?: PosShift[] } } }>(`/pos-sessions${registerQuery ? `?${registerQuery}` : ''}`)
       .then((r) => {
         if (requestId !== registerRequestId.current) return;
         setData(r.data);
+        setSummary(r.meta?.summary ?? null);
         setFilterDevices(r.meta?.filters?.devices ?? []);
         setFilterShifts(r.meta?.filters?.shifts ?? []);
       })
       .catch((cause) => {
         if (requestId !== registerRequestId.current) return;
+        setSummary(null);
         setListError(cause instanceof ApiError ? cause.message : tc('loadFailed'));
       })
       .finally(() => {
@@ -186,6 +196,22 @@ export default function PosSessionsPage() {
     setShiftFilter('');
     setDateFrom('');
     setDateTo('');
+  }
+
+  function applyQueueView(view: 'open' | 'handover_pending' | 'difference_pending' | 'handover_confirmed') {
+    setDeviceFilter('');
+    setShiftFilter('');
+    setDateFrom('');
+    setDateTo('');
+    if (view === 'open') {
+      setStatusFilter('open'); setHandoverStatusFilter(''); setDifferenceStatusFilter('');
+    } else if (view === 'handover_pending') {
+      setStatusFilter('closed'); setHandoverStatusFilter('pending'); setDifferenceStatusFilter('');
+    } else if (view === 'difference_pending') {
+      setStatusFilter('closed'); setHandoverStatusFilter(''); setDifferenceStatusFilter('pending');
+    } else {
+      setStatusFilter('closed'); setHandoverStatusFilter('confirmed'); setDifferenceStatusFilter('');
+    }
   }
 
   async function submitOpen() {
@@ -384,6 +410,15 @@ export default function PosSessionsPage() {
           <Plus className="h-4 w-4" strokeWidth={1.8} />{t('open')}
         </Button>
       </div>
+
+      {summary && <section aria-label={t('queue_overview')} className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { id: 'open', label: t('open_status'), value: summary.open_count, active: statusFilter === 'open' && !handoverStatusFilter && !differenceStatusFilter },
+          { id: 'handover_pending', label: t('handover_pending'), value: summary.handover_pending_count, active: statusFilter === 'closed' && handoverStatusFilter === 'pending' && !differenceStatusFilter },
+          { id: 'difference_pending', label: t('difference_pending'), value: summary.difference_pending_count, active: statusFilter === 'closed' && !handoverStatusFilter && differenceStatusFilter === 'pending' },
+          { id: 'handover_confirmed', label: t('handover_confirmed'), value: summary.handover_confirmed_count, active: statusFilter === 'closed' && handoverStatusFilter === 'confirmed' && !differenceStatusFilter },
+        ].map((item) => <button key={item.id} type="button" aria-pressed={item.active} onClick={() => applyQueueView(item.id as 'open' | 'handover_pending' | 'difference_pending' | 'handover_confirmed')} className={cn('flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2.5 text-start transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', item.active && 'border-primary bg-primary-soft')}><span className="text-sm text-muted">{item.label}</span><strong className="num text-lg font-semibold text-text">{item.value}</strong></button>)}
+      </section>}
 
       <section aria-label={t('register_filters')} className="rounded border border-border bg-surface p-3">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">

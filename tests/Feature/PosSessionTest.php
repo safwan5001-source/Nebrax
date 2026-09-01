@@ -180,6 +180,11 @@ class PosSessionTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $closedId)
+            ->assertJsonPath('meta.summary.total_count', 2)
+            ->assertJsonPath('meta.summary.open_count', 1)
+            ->assertJsonPath('meta.summary.handover_pending_count', 1)
+            ->assertJsonPath('meta.summary.difference_pending_count', 0)
+            ->assertJsonPath('meta.summary.handover_confirmed_count', 0)
             ->assertJsonCount(2, 'meta.filters.devices')
             ->assertJsonCount(2, 'meta.filters.shifts');
 
