@@ -82,6 +82,8 @@ export default function PosSessionsPage() {
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? '');
+  const [handoverStatusFilter, setHandoverStatusFilter] = useState(searchParams.get('handover_status') ?? '');
+  const [differenceStatusFilter, setDifferenceStatusFilter] = useState(searchParams.get('difference_status') ?? '');
   const [deviceFilter, setDeviceFilter] = useState(searchParams.get('pos_device_id') ?? '');
   const [shiftFilter, setShiftFilter] = useState(searchParams.get('pos_shift_id') ?? '');
   const [dateFrom, setDateFrom] = useState(searchParams.get('date_from') ?? '');
@@ -122,12 +124,14 @@ export default function PosSessionsPage() {
   const registerQuery = useMemo(() => {
     const params = new URLSearchParams();
     if (statusFilter) params.set('status', statusFilter);
+    if (handoverStatusFilter) params.set('handover_status', handoverStatusFilter);
+    if (differenceStatusFilter) params.set('difference_status', differenceStatusFilter);
     if (deviceFilter) params.set('pos_device_id', deviceFilter);
     if (shiftFilter) params.set('pos_shift_id', shiftFilter);
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
     return params.toString();
-  }, [dateFrom, dateTo, deviceFilter, shiftFilter, statusFilter]);
+  }, [dateFrom, dateTo, deviceFilter, differenceStatusFilter, handoverStatusFilter, shiftFilter, statusFilter]);
 
   const load = useCallback(() => {
     const requestId = ++registerRequestId.current;
@@ -172,10 +176,12 @@ export default function PosSessionsPage() {
 
   const activeDevices = useMemo(() => devices.filter((device) => device.is_active), [devices]);
   const activeShifts = useMemo(() => shifts.filter((shift) => shift.is_active), [shifts]);
-  const hasRegisterFilters = Boolean(statusFilter || deviceFilter || shiftFilter || dateFrom || dateTo);
+  const hasRegisterFilters = Boolean(statusFilter || handoverStatusFilter || differenceStatusFilter || deviceFilter || shiftFilter || dateFrom || dateTo);
 
   function clearRegisterFilters() {
     setStatusFilter('');
+    setHandoverStatusFilter('');
+    setDifferenceStatusFilter('');
     setDeviceFilter('');
     setShiftFilter('');
     setDateFrom('');
@@ -380,8 +386,10 @@ export default function PosSessionsPage() {
       </div>
 
       <section aria-label={t('register_filters')} className="rounded border border-border bg-surface p-3">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
           <div className="space-y-1.5"><Label htmlFor="session-status-filter">{t('filter_status')}</Label><select id="session-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_statuses')}</option><option value="open">{t('open_status')}</option><option value="closed">{t('closed_status')}</option></select></div>
+          <div className="space-y-1.5"><Label htmlFor="session-handover-filter">{t('filter_handover_status')}</Label><select id="session-handover-filter" value={handoverStatusFilter} onChange={(event) => setHandoverStatusFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_handover_statuses')}</option><option value="pending">{t('handover_pending')}</option><option value="confirmed">{t('handover_confirmed')}</option></select></div>
+          <div className="space-y-1.5"><Label htmlFor="session-difference-filter">{t('filter_difference_status')}</Label><select id="session-difference-filter" value={differenceStatusFilter} onChange={(event) => setDifferenceStatusFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_difference_statuses')}</option><option value="pending">{t('difference_pending')}</option><option value="acknowledged">{t('difference_acknowledged')}</option><option value="not_required">{t('difference_not_required')}</option></select></div>
           <div className="space-y-1.5"><Label htmlFor="session-device-filter">{t('filter_device')}</Label><select id="session-device-filter" value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_devices')}</option>{filterDevices.map((device) => <option key={device.id} value={device.id}>{device.name}{device.code ? ` · ${device.code}` : ''}</option>)}</select></div>
           <div className="space-y-1.5"><Label htmlFor="session-shift-filter">{t('filter_shift')}</Label><select id="session-shift-filter" value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><option value="">{t('all_shifts')}</option>{filterShifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.name}{shift.code ? ` · ${shift.code}` : ''}</option>)}</select></div>
           <div className="space-y-1.5"><Label htmlFor="session-date-from">{t('date_from')}</Label><Input id="session-date-from" type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} className="num h-9" /></div>

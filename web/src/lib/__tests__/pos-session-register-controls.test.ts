@@ -11,6 +11,8 @@ describe('POS session register controls', () => {
     const page = source('src/app/(app)/pos/sessions/page.tsx');
 
     expect(page).toContain("params.set('status', statusFilter)");
+    expect(page).toContain("params.set('handover_status', handoverStatusFilter)");
+    expect(page).toContain("params.set('difference_status', differenceStatusFilter)");
     expect(page).toContain("params.set('pos_device_id', deviceFilter)");
     expect(page).toContain("params.set('pos_shift_id', shiftFilter)");
     expect(page).toContain("params.set('date_from', dateFrom)");
