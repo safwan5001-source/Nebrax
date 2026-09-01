@@ -58,6 +58,7 @@ cp -r "$CORE_DIR/app/Providers/"*.php            app/Providers/
 cp -r "$CORE_DIR/config/"*.php                   config/
 cp -r "$CORE_DIR/database/migrations/"*.php      database/migrations/
 cp -r "$CORE_DIR/routes/api.php"                 routes/api.php
+cp -r "$CORE_DIR/routes/api_public.php"          routes/api_public.php
 cp -r "$CORE_DIR/routes/console.php"             routes/console.php
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/
 
@@ -67,6 +68,9 @@ if ! grep -q "TenancyServiceProvider" bootstrap/providers.php; then
 fi
 if ! grep -q "DocumentCenterServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\DocumentCenterServiceProvider::class,|" bootstrap/providers.php
+fi
+if ! grep -q "PublicApiServiceProvider" bootstrap/providers.php; then
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\PublicApiServiceProvider::class,|" bootstrap/providers.php
 fi
 
 # حذف users migration الافتراضية (لدينا واحدة خاصة بالمستأجرين)

@@ -133,6 +133,7 @@ jobs:
           cp -r "$CORE/app/Console/Commands/"*.php       app/Console/Commands/ 2>/dev/null || true
           cp -r "$CORE/database/migrations/"*.php         database/migrations/
           cp -r "$CORE/routes/api.php"                    routes/api.php
+          cp -r "$CORE/routes/api_public.php"          routes/api_public.php
           cp -r "$CORE/routes/console.php"                routes/console.php
           cp -r "$CORE/tests/Feature/"*.php               tests/Feature/
 
@@ -143,6 +144,8 @@ jobs:
             sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
           grep -q "DocumentCenterServiceProvider" bootstrap/providers.php || \
             sed -i "s|return \[|return [\n    App\\\\Providers\\\\DocumentCenterServiceProvider::class,|" bootstrap/providers.php
+          grep -q "PublicApiServiceProvider" bootstrap/providers.php || \
+            sed -i "s|return \[|return [\n    App\\\\Providers\\\\PublicApiServiceProvider::class,|" bootstrap/providers.php
           rm -f database/migrations/0001_01_01_000000_create_users_table.php
 
       - name: تهيئة قاعدة البيانات (${{ matrix.db }})
