@@ -23,10 +23,18 @@ final class PublicApiIdempotency
     /** أقصى حجم لجسم استجابة يُخزَّن لإعادة التشغيل (64KB — يسع نطاق text). */
     public const MAX_REPLAY_BYTES = 65535;
 
-    /** عتبة اعتبار سجلٍّ in_progress مهجورًا (قفلٌ من طلبٍ انهار) فيُستعاد. */
-    public const IN_PROGRESS_TTL_SECONDS = 60;
+    /**
+     * عقد إيجار (lease) سجلّ in_progress = مدى صلاحية `expires_at` أثناء التنفيذ.
+     * ما دام سارياً، أيّ طلبٍ متزامنٍ بالمفتاح نفسه يُرفض (409 in_progress) فلا
+     * تنفيذ مزدوج. لا يُستعاد السجلّ إلا بعد **انقضاء** الإيجار (طلبٌ انهار/انتهت
+     * مهلته). يُختار الإيجار أطولَ من أقصى عمرٍ ممكنٍ لطلبٍ على هذه البنية (المهلة
+     * القصوى لـ PHP/Render تقتل الطلب قبله بكثير)، فلا يُستعاد سجلٌّ لطلبٍ لا يزال
+     * حيًّا. كتابةٌ قد تتجاوز الإيجار تحتاج تجديدَ إيجار/heartbeat — مؤجَّل حتى
+     * توجد مسارات كتابة فعلية (PR-5)؛ PR-4 لا يضيف كتابةً.
+     */
+    public const IN_PROGRESS_LEASE_SECONDS = 900;
 
-    /** الاحتفاظ الافتراضي لسجلّ idempotency منذ إنشائه. */
+    /** الاحتفاظ الافتراضي لسجلّ idempotency **مكتمِل** (للإعادة) منذ إكماله. */
     public const RETENTION_HOURS = 48;
 
     public static function isValidKey(string $rawKey): bool
@@ -72,11 +80,23 @@ final class PublicApiIdempotency
         $canonical = implode("\n", [
             strtoupper($method),
             '/' . ltrim($path, '/'),
+            // نوع الوسائط المطبَّع جزءٌ من البصمة: نفس البايتات بنوعٍ مختلف
+            // (JSON مقابل text/plain) يفسّرها الخادم مختلفةً، فهي عمليةٌ مختلفة
+            // ⇒ تعارض لا إعادة تشغيل.
+            self::normalizeMediaType($contentType),
             self::canonicalArray($query),
             self::canonicalBody($rawBody, $contentType),
         ]);
 
         return hash('sha256', $canonical);
+    }
+
+    /** نوع الوسائط بلا معاملات (charset…)، صغيرًا ومُشذَّبًا — لبصمةٍ ثابتة. */
+    private static function normalizeMediaType(string $contentType): string
+    {
+        $type = explode(';', $contentType, 2)[0];
+
+        return strtolower(trim($type));
     }
 
     /** تقنين جسم JSON (ترتيب المفاتيح تعاوديًا)، وإلا البايتات الخام كما هي. */

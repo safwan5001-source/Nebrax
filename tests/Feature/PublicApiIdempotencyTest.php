@@ -288,10 +288,11 @@ class PublicApiIdempotencyTest extends TestCase
         $fingerprint = PublicApiIdempotency::fingerprintParts(
             'POST', 'api/v1/' . self::PROBE_URI, [], json_encode(['amount' => 100]), 'application/json',
         );
-        // قفلٌ أقدم من عتبة الاستعادة (طلبٌ انهار) + غير منتهٍ.
+        // إيجارٌ منقضٍ (طلبٌ انهار قبل الإكمال ولم يُجدَّد إيجاره) ⇒ يُستعاد ويُنفَّذ.
         $this->preInsert(
             $client, $rawKey, $fingerprint, PublicApiIdempotencyKey::STATUS_IN_PROGRESS,
-            now()->subSeconds(PublicApiIdempotency::IN_PROGRESS_TTL_SECONDS + 30),
+            now()->subSeconds(PublicApiIdempotency::IN_PROGRESS_LEASE_SECONDS + 30),
+            now()->subMinute(),
         );
 
         $this->withToken($token)
@@ -367,14 +368,14 @@ class PublicApiIdempotencyTest extends TestCase
 
     // ── مساعدات ───────────────────────────────────────────────────────
 
-    private function preInsert(ApiClient $client, string $rawKey, string $fingerprint, string $status, Carbon $lockedAt): void
+    private function preInsert(ApiClient $client, string $rawKey, string $fingerprint, string $status, Carbon $lockedAt, ?Carbon $expiresAt = null): void
     {
         app(TenantContext::class)->set($client->tenant_id);
-        $this->makeRecord($client, PublicApiIdempotency::hashKey($rawKey), $fingerprint, $status, $lockedAt);
+        $this->makeRecord($client, PublicApiIdempotency::hashKey($rawKey), $fingerprint, $status, $lockedAt, $expiresAt);
         app(TenantContext::class)->forget();
     }
 
-    private function makeRecord(ApiClient $client, string $keyHash, string $fingerprint, string $status, Carbon $lockedAt): void
+    private function makeRecord(ApiClient $client, string $keyHash, string $fingerprint, string $status, Carbon $lockedAt, ?Carbon $expiresAt = null): void
     {
         PublicApiIdempotencyKey::create([
             'tenant_id'           => $client->tenant_id,
@@ -385,7 +386,8 @@ class PublicApiIdempotencyTest extends TestCase
             'request_fingerprint' => $fingerprint,
             'status'              => $status,
             'locked_at'           => $lockedAt,
-            'expires_at'          => now()->addHours(PublicApiIdempotency::RETENTION_HOURS),
+            // الافتراض: إيجارٌ سارٍ (in_progress حيّ) ما لم يُمرَّر إيجارٌ منقضٍ.
+            'expires_at'          => $expiresAt ?? now()->addSeconds(PublicApiIdempotency::IN_PROGRESS_LEASE_SECONDS),
         ]);
     }
 }

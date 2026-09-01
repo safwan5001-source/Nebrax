@@ -139,7 +139,9 @@ class EnforceApiIdempotency
             'request_fingerprint' => $fingerprint,
             'status'              => PublicApiIdempotencyKey::STATUS_IN_PROGRESS,
             'locked_at'           => $now,
-            'expires_at'          => $now->copy()->addHours(PublicApiIdempotency::RETENTION_HOURS),
+            // إيجار (lease) قصير أثناء التنفيذ: ما دام سارياً يُرفض المتزامن (409)
+            // ولا يُستعاد السجلّ. يُمدَّد إلى نافذة الاحتفاظ عند الإكمال (finalize).
+            'expires_at'          => $now->copy()->addSeconds(PublicApiIdempotency::IN_PROGRESS_LEASE_SECONDS),
         ]);
 
         try {
@@ -190,16 +192,11 @@ class EnforceApiIdempotency
             return ['completed', $existing];
         }
 
-        // in_progress: قفلٌ مهجور (طلبٌ انهار قبل الإكمال) ⇒ استعادة.
-        if ($existing->locked_at !== null
-            && $existing->locked_at->lt($now->copy()->subSeconds(PublicApiIdempotency::IN_PROGRESS_TTL_SECONDS))) {
-            $this->release($existing);
-
-            return $attempt + 1 >= self::MAX_CLAIM_ATTEMPTS
-                ? ['in_progress', null]
-                : $this->claim($client, $request, $keyHash, $fingerprint, $routeIdentity, $attempt + 1);
-        }
-
+        // in_progress بإيجارٍ ساري (expires_at لم ينقضِ) ⇒ طلبٌ قد يكون لا يزال
+        // حيًّا: يُرفض بلا تنفيذ (409). **لا نستعيد** قفلًا ضمن الإيجار حتى لا نُنفّذ
+        // عمليةً بينما الأصل يعمل (كان reclaim بعتبةٍ ثابتةٍ يخاطر بذلك لعمليةٍ بطيئة).
+        // الاستعادة تحدث حصراً بعد انقضاء الإيجار — عبر فحص expires_at أعلاه — فالإيجار
+        // يُختار أطولَ من أقصى عمرٍ ممكنٍ لطلبٍ على هذه البنية.
         return ['in_progress', $existing];
     }
 
@@ -236,6 +233,8 @@ class EnforceApiIdempotency
                 'response_body'    => $body,
                 'response_headers' => $safeHeaders,
                 'completed_at'     => now(),
+                // اكتمل: مدِّد الإيجار القصير إلى نافذة الاحتفاظ لتبقى الإعادة متاحة.
+                'expires_at'       => now()->addHours(PublicApiIdempotency::RETENTION_HOURS),
             ])->save();
         } catch (Throwable) {
             // تعذّر التخزين لا يبطل الاستجابة الأصلية؛ حرِّر القفل بهدوء.
