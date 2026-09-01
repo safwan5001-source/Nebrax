@@ -5,9 +5,12 @@ use App\Http\Controllers\Api\PublicInvoiceController;
 use App\Http\Controllers\Api\PublicPartnerController;
 use App\Http\Controllers\Api\PublicProductController;
 use App\Http\Middleware\AuthenticateApiClient;
+use App\Http\Middleware\EnforcePublicApiRateLimit;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApiScope;
+use App\Http\Middleware\PublicApiRequestAudit;
 use App\Http\Middleware\PublicApiTenantGuard;
+use App\Support\PublicApiRateLimits;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -44,6 +47,8 @@ use Illuminate\Support\Facades\Route;
 */
 
 // فحص صحّة عام: بلا مصادقة، بلا مستأجر، بلا قاعدة بيانات، بلا كشف بيانات.
+// **مستثنى عمدًا** من التدقيق وحدّ المعدّل: مسبار Render يطرقه بتواتر، فحجبه أو
+// كتابة صفوف تدقيق له ضجيجٌ بلا قيمة (لا هوية مستأجر، لا بيانات).
 Route::get('health', PublicHealthController::class)->name('health');
 
 /*
@@ -57,10 +62,19 @@ Route::get('health', PublicHealthController::class)->name('health');
 |
 | المستأجر يُشتقّ من العميل حصراً؛ لا سياق فرع (نطاق على مستوى المستأجر). لا كتابة.
 | كل المعرّفات UUID (whereUuid) فيُرفض المشوّه عند التوجيه (404 مغلّف).
+|
+| طبقة الحماية (PR-4) — الترتيب مقصود:
+|   AuthenticateApiClient → PublicApiTenantGuard → PublicApiRequestAudit
+|   → EnforcePublicApiRateLimit:read → EnsureActiveSubscription → EnsureApiScope
+| التدقيق **قبل** محدِّد المعدّل ليكتب `handle` مبكرًا فيلتقط `terminate` استجابة
+| 429 أيضًا. القراءات GET **لا تخضع لـ idempotency** (طرق آمنة) — تلك بذرة PR-5
+| على مسارات الكتابة. حدّ القراءة لكل عميل API (لا IP وحده).
 */
 Route::middleware([
     AuthenticateApiClient::class,
     PublicApiTenantGuard::class,
+    PublicApiRequestAudit::class,
+    EnforcePublicApiRateLimit::class . ':' . PublicApiRateLimits::CLASS_READ,
     EnsureActiveSubscription::class,
 ])->group(function () {
     Route::middleware(EnsureApiScope::class.':partners:read')->group(function () {
@@ -78,3 +92,26 @@ Route::middleware([
         Route::get('invoices/{id}', [PublicInvoiceController::class, 'show'])->whereUuid('id')->name('invoices.show');
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| بذرة تكامل الكتابة (PR-5) — **موثَّقة لا منفَّذة**
+|--------------------------------------------------------------------------
+| توفّر PR-4 طبقةً قابلة لإعادة الاستخدام تحمي أيّ مسار كتابةٍ مستقبلي دون
+| إعادة تصميم. تُحمى الكتابة بالسلسلة نفسها مع فئة معدّلٍ أثقل + حارس idempotency:
+|
+|   Route::middleware([
+|       AuthenticateApiClient::class,
+|       PublicApiTenantGuard::class,
+|       PublicApiRequestAudit::class,
+|       EnforcePublicApiRateLimit::class.':'.PublicApiRateLimits::CLASS_WRITE,
+|       EnsureActiveSubscription::class,
+|       EnsureApiScope::class.':invoices:write',   // scope كتابة يُعرَّف في PR-5
+|       EnforceApiIdempotency::class,              // POST/PUT/PATCH/DELETE فقط
+|   ])->group(function () {
+|       Route::post('invoices', [PublicInvoiceWriteController::class, 'store']);
+|       // المتحكّم يفوّض لخدمة الدومين القائمة (InvoiceService) — لا منطق موازٍ.
+|   });
+|
+| PR-4 لا يضيف أيّ مسار كتابة؛ هذا توثيق seam فقط.
+*/

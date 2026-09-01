@@ -26,11 +26,20 @@ enum PublicApiErrorCode: string
     case INSUFFICIENT_SCOPE      = 'insufficient_scope';
     case RATE_LIMITED            = 'rate_limited';
 
+    // ── Idempotency (PR-4) — تحمي مسارات الكتابة المستقبلية من التنفيذ المزدوج.
+    // 400: مشكلة في مفتاح العميل. 409: تعارض مع طلبٍ سابق يحمل المفتاح نفسه.
+    case IDEMPOTENCY_KEY_REQUIRED = 'idempotency_key_required';
+    case INVALID_IDEMPOTENCY_KEY  = 'invalid_idempotency_key';
+    case IDEMPOTENCY_CONFLICT     = 'idempotency_conflict';
+    case IDEMPOTENCY_IN_PROGRESS  = 'idempotency_in_progress';
+
     /** رمز HTTP الافتراضي لكل رمز خطأ — مرجع واحد يمنع التضارب بين المسارات. */
     public function defaultHttpStatus(): int
     {
         return match ($this) {
-            self::BAD_REQUEST             => 400,
+            self::BAD_REQUEST,
+            self::IDEMPOTENCY_KEY_REQUIRED,
+            self::INVALID_IDEMPOTENCY_KEY => 400,
             self::UNAUTHENTICATED        => 401,
             self::FORBIDDEN,
             self::TENANT_CONTEXT_REQUIRED,
@@ -38,6 +47,8 @@ enum PublicApiErrorCode: string
             self::INSUFFICIENT_SCOPE     => 403,
             self::NOT_FOUND              => 404,
             self::METHOD_NOT_ALLOWED     => 405,
+            self::IDEMPOTENCY_CONFLICT,
+            self::IDEMPOTENCY_IN_PROGRESS => 409,
             self::VALIDATION_FAILED      => 422,
             self::RATE_LIMITED           => 429,
             self::INTERNAL_ERROR         => 500,

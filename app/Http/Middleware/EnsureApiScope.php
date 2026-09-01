@@ -24,6 +24,9 @@ class EnsureApiScope
 {
     public function handle(Request $request, Closure $next, string $scope): Response
     {
+        // أثرٌ لسجلّ التدقيق: يسجّل الـ scope المطلوب حتى عند الرفض (لا يغيّر السلوك).
+        $request->attributes->set('public_api_scope', $scope);
+
         if (! PublicApiScope::isKnown($scope)) {
             return $this->deny($request);
         }
