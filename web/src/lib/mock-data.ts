@@ -3068,19 +3068,20 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const posClosingPreviewMatch = clean.match(/^\/pos-sessions\/([^/]+)\/closing-preview$/);
   if (posClosingPreviewMatch) {
     const session = mockPosSessions.find((item) => item.id === posClosingPreviewMatch[1]) ?? mockPosSessions[0];
+    const blindCountEnabled = demoPosSettings().blind_cash_count_enabled === true;
     return resolve({
       data: {
         cash_drawer: {
           reconciliation_key: 'cash_drawer',
           name: 'الصندوق النقدي',
           settlement_type: 'cash',
-          expected_amount: session.expected_balance ?? session.opening_balance,
+          expected_amount: blindCountEnabled ? null : session.expected_balance ?? session.opening_balance,
         },
         payment_methods: [{
           payment_method_id: 'pm-method-bank',
           payment_method_name: 'تحويل بنكي',
           settlement_type: 'bank',
-          expected_amount: '650.00',
+          expected_amount: blindCountEnabled ? null : '650.00',
         }],
       },
     });
