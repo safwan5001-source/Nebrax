@@ -37,6 +37,20 @@ class PosSessionController extends ApiController
         return PosSessionResource::collection($this->scopeToActiveBranch($query, $request)->get())->response();
     }
 
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $session = $this->visibleSession($id, $request)->load([
+            'posDevice.warehouse',
+            'warehouse',
+            'posShift',
+            'shift',
+            'reconciliations',
+            'handoverConfirmedBy',
+        ]);
+
+        return (new PosSessionResource($session))->response();
+    }
+
     public function open(OpenPosSessionRequest $request): JsonResponse
     {
         $data = $request->validated();

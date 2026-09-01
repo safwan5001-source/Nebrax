@@ -86,4 +86,18 @@ describe('POS demo contracts', () => {
       await mockApi('/sales-config/pos', 'PUT', { data: { blind_cash_count_enabled: false } });
     }
   });
+
+  it('provides the complete session detail workspace contract', async () => {
+    const response = await mockApi<{ data: {
+      id: string;
+      pos_device: { name: string };
+      reconciliations: Array<{ reconciliation_key: string; expected_amount: string }>;
+    } }>('/pos-sessions/ps-1');
+
+    expect(response.data.id).toBe('ps-1');
+    expect(response.data.pos_device.name).toBeTruthy();
+    expect(response.data.reconciliations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ reconciliation_key: 'cash_drawer', expected_amount: '4380.00' }),
+    ]));
+  });
 });

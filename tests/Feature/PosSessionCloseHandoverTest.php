@@ -151,4 +151,31 @@ class PosSessionCloseHandoverTest extends TestCase
         $this->assertSame(1, PosSessionEvent::where('pos_session_id', $sessionId)
             ->where('type', PosSessionEvent::TYPE_SESSION_HANDOVER_CONFIRMED)->count());
     }
+
+    /** @test */
+    public function session_detail_returns_the_branch_scoped_operational_snapshot(): void
+    {
+        $auth = $this->registerTenant('pos-session-detail', 'owner@pos-session-detail.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->open($auth['token'], $this->device($auth['token']), 5000);
+
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$sessionId}/close", [
+            'closing_balance' => 5000,
+            'handover_note' => 'تم تسليم عهدة المطابقة كاملة.',
+        ])->assertOk();
+
+        $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$sessionId}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $sessionId)
+            ->assertJsonPath('data.status', 'closed')
+            ->assertJsonPath('data.handover_status', 'pending')
+            ->assertJsonPath('data.difference_status', 'not_required')
+            ->assertJsonPath('data.handover_note', 'تم تسليم عهدة المطابقة كاملة.')
+            ->assertJsonPath('data.reconciliations.0.reconciliation_key', 'cash_drawer')
+            ->assertJsonPath('data.reconciliations.0.expected_amount', '50.00')
+            ->assertJsonPath('data.reconciliations.0.counted_amount', '50.00');
+
+        $other = $this->registerTenant('pos-session-detail-other', 'owner@pos-session-detail-other.test');
+        $this->withToken($other['token'])->getJson("/api/pos-sessions/{$sessionId}")->assertNotFound();
+    }
 }

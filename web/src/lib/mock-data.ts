@@ -3090,7 +3090,41 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const posReportMatch = clean.match(/^\/pos-sessions\/([^/]+)\/report$/);
   if (posReportMatch) {
     const s = mockPosSessions.find((x) => x.id === posReportMatch[1]) ?? mockPosSessions[0];
-    return resolve({ session: s, report: { cash_sales: '3880.00', sales_count: 12, average: '323.33', expected: '4380.00' } });
+    return resolve({ session: s, report: { cash_sales: '3880.00', cash_refunds: '120.00', cash_in: '50.00', cash_out: '30.00', sales_count: 12, returns_count: 1, returns_total: '120.00', net_sales: '4410.00', average: '367.50', expected: '4380.00' } });
+  }
+  const posCashMovementsMatch = clean.match(/^\/pos-sessions\/([^/]+)\/cash-movements$/);
+  if (posCashMovementsMatch) {
+    return resolve({ data: [{ id: 'pcm-1', pos_session_id: posCashMovementsMatch[1], type: 'cash_in', amount: '50.00', reason: 'تعزيز عهدة الدرج', recorded_at: '2026-06-27T12:30:00Z', recorded_by_user: { id: 'demo-user', name: 'مستخدم المعاينة' } }] });
+  }
+  const posSessionEventsMatch = clean.match(/^\/pos-sessions\/([^/]+)\/events$/);
+  if (posSessionEventsMatch) {
+    return resolve({ data: [
+      { id: 'pse-1', pos_session_id: posSessionEventsMatch[1], type: 'cash_in_recorded', amount: '50.00', reason_note: 'تعزيز عهدة الدرج', created_at: '2026-06-27T12:30:00Z', actor: { id: 'demo-user', name: 'مستخدم المعاينة' } },
+      { id: 'pse-2', pos_session_id: posSessionEventsMatch[1], type: 'session_handover_submitted', amount: null, reason_note: null, created_at: '2026-06-27T20:00:00Z', actor: { id: 'demo-user', name: 'مستخدم المعاينة' } },
+      { id: 'pse-3', pos_session_id: posSessionEventsMatch[1], type: 'session_handover_confirmed', amount: null, reason_note: 'تم استلام العهدة والمستندات.', created_at: '2026-06-27T20:05:00Z', actor: { id: 'demo-manager', name: 'مدير المعاينة' } },
+    ] });
+  }
+  const posSessionDetailMatch = clean.match(/^\/pos-sessions\/([^/]+)$/);
+  if (posSessionDetailMatch) {
+    const session = mockPosSessions.find((item) => item.id === posSessionDetailMatch[1]) ?? mockPosSessions[0];
+    const closed = session.status === 'closed';
+    return resolve({ data: {
+      ...session,
+      pos_device: { id: 'pd-1', name: 'كاشير الفرع الرئيسي', code: 'POS-01' },
+      warehouse: { id: 'wh-1', name: 'المخزن الرئيسي', code: '00001' },
+      pos_shift: { id: 'pos-shift-morning', name: 'الوردية الصباحية', code: 'MORNING' },
+      handover_note: closed ? 'تم تسليم النقد وإيصالات وسائل الدفع.' : null,
+      handover_submitted_at: closed ? '2026-06-27T20:00:00Z' : null,
+      handover_confirmation_note: closed ? 'تم استلام العهدة والمستندات.' : null,
+      handover_receiver: closed ? { id: 'demo-manager', name: 'مدير المعاينة' } : null,
+      difference_acknowledgement: null,
+      variance_journal_entry_id: null,
+      variance_type: null,
+      reconciliations: closed ? [
+        { id: 'rec-cash', reconciliation_key: 'cash_drawer', payment_method_name: 'الصندوق النقدي', settlement_type: 'cash', expected_amount: '4380.00', counted_amount: '4380.00', difference: '0.00', count_source: 'operator' },
+        { id: 'rec-bank', reconciliation_key: 'payment:bank', payment_method_name: 'تحويل بنكي', settlement_type: 'bank', expected_amount: '650.00', counted_amount: '650.00', difference: '0.00', count_source: 'operator' },
+      ] : [],
+    } });
   }
   if (clean === '/appointments') return resolve({ data: mockAppointments });
   if (clean === '/contacts') return resolve({ data: mockContacts });
