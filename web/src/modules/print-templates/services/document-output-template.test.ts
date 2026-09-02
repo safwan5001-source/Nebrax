@@ -171,6 +171,72 @@ describe('thermalPaperForTemplate', () => {
   });
 });
 
+describe('resolveDocumentOutputTemplates for quotation and purchase_order', () => {
+  it('يحل print وpdf المستقلين لمسودة عرض السعر', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'quotation',
+      isPosted: false,
+      livePrint: assignment('quote-print', 'tax-invoice-classic'),
+      livePdf: assignment('quote-pdf', 'tax-invoice-minimal', { footer_text: 'PDF عرض' }),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-classic');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-minimal');
+    expect(outputs.pdf?.footerText).toBe('PDF عرض');
+    expect(outputs.pdfSharesPrintRoot).toBe(false);
+    expect(outputs.thermal).toBeNull();
+  });
+
+  it('يسقط PDF عرض السعر إلى print عند غياب تعيين pdf', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'quotation',
+      isPosted: false,
+      livePrint: assignment('quote-print', 'tax-invoice-modern'),
+    });
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-modern');
+    expect(outputs.pdfSharesPrintRoot).toBe(true);
+  });
+
+  it('يثبّت لقطات عرض السعر الصادر ويتجاهل التعيين الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'quotation',
+      isPosted: true,
+      frozenPrint: revision('issued-print', 'tax-invoice-classic'),
+      frozenPdf: revision('issued-pdf', 'tax-invoice-erp'),
+      livePrint: assignment('newer-print', 'tax-invoice-retail'),
+      livePdf: assignment('newer-pdf', 'tax-invoice-minimal'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-classic');
+    expect(outputs.print?.stampUrl).toBe('issued-print-stamp');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-erp');
+    expect(outputs.pdfSharesPrintRoot).toBe(false);
+  });
+
+  it('يحل print وpdf المستقلين لمسودة أمر الشراء', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'purchase_order',
+      isPosted: false,
+      livePrint: assignment('po-print', 'tax-invoice-classic'),
+      livePdf: assignment('po-pdf', 'tax-invoice-minimal'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-classic');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-minimal');
+    expect(outputs.pdfSharesPrintRoot).toBe(false);
+  });
+
+  it('يثبّت لقطات أمر الشراء الصادر بلا سقوط حراري إلى print', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'purchase_order',
+      isPosted: true,
+      frozenPrint: revision('po-frozen-print', 'tax-invoice-modern'),
+      livePrint: assignment('po-live', 'tax-invoice-classic'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-modern');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-modern');
+    expect(outputs.pdfSharesPrintRoot).toBe(true);
+    expect(outputs.thermal).toBeNull();
+  });
+});
+
 describe('resolvedTemplatesEqual', () => {
   it('يميّز تعريفين مختلفين', () => {
     const classic = resolveDocumentOutputTemplates({

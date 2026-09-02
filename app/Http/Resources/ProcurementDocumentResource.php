@@ -25,6 +25,7 @@ class ProcurementDocumentResource extends JsonResource
             'total'                 => Money::toRiyal($this->total),
             'tax_inclusive'         => (bool) $this->tax_inclusive,
             'notes'                 => $this->notes,
+            'branch_id'             => $this->branch_id,
             'source_document_id'    => $this->source_document_id,
             // رقم المستند المصدر ونوعه — ليكون التتبّع رابطاً مقروءاً لا معرّفاً خاماً.
             'source_number'         => $this->whenLoaded('sourceDocument', fn () => $this->sourceDocument?->number),

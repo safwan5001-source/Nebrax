@@ -1,6 +1,7 @@
 'use client';
 
-import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
+import { useLocale } from 'next-intl';
+import type { Direction, ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import {
   buildPurchaseOrderDocumentModel,
@@ -13,7 +14,7 @@ export type PurchaseOrderDoc = SourcePurchaseOrder;
 export type PurchaseOrderCompany = SourcePurchaseOrderCompany;
 export type PurchaseOrderSupplier = SourcePurchaseOrderSupplier;
 
-/** أمر الشراء الصادر — غلاف رفيع فوق `DocumentView` (النوع purchase_order). */
+/** أمر الشراء — غلاف رفيع فوق `DocumentView` (النوع purchase_order). */
 export function PurchaseOrderDocument({
   order,
   company,
@@ -30,6 +31,7 @@ export function PurchaseOrderDocument({
   logoHeight,
   layout,
   rootId,
+  direction,
 }: {
   order: PurchaseOrderDoc;
   company: PurchaseOrderCompany | null;
@@ -46,10 +48,21 @@ export function PurchaseOrderDocument({
   logoHeight?: number | null;
   layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
+  direction?: Direction;
 }) {
+  const locale = useLocale();
   const model = buildPurchaseOrderDocumentModel({
-    order, company, supplier, footerText, logoUrl, logoHeight,
-    terms, bank, stampUrl, signatureUrl,
+    order,
+    company,
+    supplier,
+    footerText,
+    logoUrl,
+    logoHeight,
+    terms,
+    bank,
+    stampUrl,
+    signatureUrl,
+    direction: direction ?? (locale === 'en' ? 'ltr' : 'rtl'),
   });
 
   return (

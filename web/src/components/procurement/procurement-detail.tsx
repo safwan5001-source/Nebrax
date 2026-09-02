@@ -19,10 +19,12 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
-import { getTemplate } from '@/modules/documents/registry/templates';
+import { getTemplate, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import type { DocSectionLayoutItem, ThemeId } from '@/modules/documents/types';
+import type { LivePrintTemplateAssignment, LiveTemplateRevision, ResolvedLiveTemplate } from '@/modules/print-templates/services/live-template-definition';
+import { resolveDocumentOutputTemplates } from '@/modules/print-templates/services/document-output-template';
 import {
   NEXT_STATUSES,
   NEXT_TARGETS,
@@ -37,27 +39,15 @@ interface Line {
   id: string; description: string | null; quantity: number;
   unit_price: string; tax_rate: number; line_tax: string; line_total: string;
 }
-interface FrozenPrintTemplateDefinition {
-  template_id?: string;
-  theme_id?: ThemeId | null;
-  footer_text?: string | null;
-  terms_text?: string | null;
-  bank_text?: string | null;
-  stamp?: string | null;
-  signature?: string | null;
-  show_logo?: boolean;
-  logo?: string | null;
-  logo_height?: number | null;
-  layout?: DocSectionLayoutItem[] | null;
-}
 
 interface FrozenPrintTemplateRevision {
   id: string;
-  definition: FrozenPrintTemplateDefinition;
+  definition?: LiveTemplateRevision['definition'];
 }
 
 interface Doc {
   id: string; type: ProcurementType; number: string; partner_id: string | null; partner_name?: string | null;
+  branch_id?: string | null;
   status: ProcurementStatus; doc_date: string; due_date: string | null; requested_by: string | null;
   subtotal: string; tax_amount: string; total: string; notes: string | null;
   source_document_id: string | null; source_number?: string | null; source_type?: ProcurementType | null;
@@ -67,6 +57,27 @@ interface Doc {
   pdf_template_revision?: FrozenPrintTemplateRevision | null;
   thermal_template_revision?: FrozenPrintTemplateRevision | null;
   supplier_ids?: string[]; lines: Line[];
+}
+
+function liveAssignment(result: PromiseSettledResult<unknown>): LivePrintTemplateAssignment | null {
+  if (result.status !== 'fulfilled' || !result.value || typeof result.value !== 'object') return null;
+  const data = (result.value as { data?: LivePrintTemplateAssignment | null }).data;
+  return data ?? null;
+}
+
+function documentPropsFromResolved(resolved: ResolvedLiveTemplate) {
+  return {
+    templateId: resolved.templateId,
+    themeId: resolved.themeId,
+    footerText: resolved.footerText,
+    terms: resolved.termsText,
+    bank: resolved.bankText,
+    stampUrl: resolved.stampUrl,
+    signatureUrl: resolved.signatureUrl,
+    showLogo: resolved.showLogo,
+    logoHeight: resolved.logoHeight,
+    layout: resolved.layout,
+  };
 }
 
 /**
@@ -91,6 +102,18 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
   const [busy, setBusy] = useState(false);
   const [outputBusy, setOutputBusy] = useState<null | 'pdf' | 'share'>(null);
   const [preview, setPreview] = useState(false);
+  const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
+  const [themeId, setThemeId] = useState<ThemeId | null>(null);
+  const [footerText, setFooterText] = useState<string | null>(null);
+  const [showLogo, setShowLogo] = useState(true);
+  const [logoHeight, setLogoHeight] = useState<number | null>(null);
+  const [layout, setLayout] = useState<DocSectionLayoutItem[] | null>(null);
+  const [termsText, setTermsText] = useState<string | null>(null);
+  const [bankText, setBankText] = useState<string | null>(null);
+  const [stampUrl, setStampUrl] = useState<string | null>(null);
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [pdfOutput, setPdfOutput] = useState<ResolvedLiveTemplate | null>(null);
+  const [pdfSharesPrintRoot, setPdfSharesPrintRoot] = useState(true);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -99,14 +122,63 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
     api<{ data: Doc }>(`/procurement/${id}`)
       .then(async (response) => {
         setDoc(response.data);
-        if (response.data.type !== 'order' || !response.data.print_issued_at || !response.data.partner_id) return;
+        if (response.data.type !== 'order') return;
 
-        const [partner, me] = await Promise.allSettled([
-          api<{ data: PurchaseOrderSupplier }>(`/partners/${response.data.partner_id}`),
+        const issued = Boolean(response.data.print_issued_at);
+        const branchQuery = response.data.branch_id ? `&branch_id=${encodeURIComponent(response.data.branch_id)}` : '';
+        const skipped = Promise.resolve({ data: null as LivePrintTemplateAssignment | null });
+        const resolveUsage = (usage: 'print' | 'pdf') => (
+          api<{ data: LivePrintTemplateAssignment | null }>(
+            `/print-templates/resolve?document_type=purchase_order&usage=${usage}${branchQuery}`,
+          )
+        );
+        const [partner, me, livePrint, livePdf] = await Promise.allSettled([
+          response.data.partner_id
+            ? api<{ data: PurchaseOrderSupplier }>(`/partners/${response.data.partner_id}`)
+            : skipped,
           api<{ company: PurchaseOrderCompany }>('/me'),
+          issued ? skipped : resolveUsage('print'),
+          issued ? skipped : resolveUsage('pdf'),
         ]);
-        if (partner.status === 'fulfilled') setSupplier(partner.value.data);
+        if (partner.status === 'fulfilled' && response.data.partner_id) {
+          setSupplier((partner.value as { data: PurchaseOrderSupplier }).data);
+        }
         if (me.status === 'fulfilled') setCompany(me.value.company);
+
+        const outputs = resolveDocumentOutputTemplates({
+          documentType: 'purchase_order',
+          isPosted: issued,
+          frozenPrint: response.data.print_template_revision,
+          frozenPdf: response.data.pdf_template_revision,
+          livePrint: liveAssignment(livePrint),
+          livePdf: liveAssignment(livePdf),
+        });
+        const resolved = outputs.print;
+        if (resolved) {
+          setTemplateId(resolved.templateId);
+          setThemeId(resolved.themeId);
+          setFooterText(resolved.footerText);
+          setShowLogo(resolved.showLogo);
+          setLogoHeight(resolved.logoHeight);
+          setLayout(resolved.layout);
+          setTermsText(resolved.termsText);
+          setBankText(resolved.bankText);
+          setStampUrl(resolved.stampUrl);
+          setSignatureUrl(resolved.signatureUrl);
+        } else {
+          setTemplateId(DEFAULT_TEMPLATE_ID);
+          setThemeId(null);
+          setFooterText(null);
+          setShowLogo(true);
+          setLogoHeight(null);
+          setLayout(null);
+          setTermsText(null);
+          setBankText(null);
+          setStampUrl(null);
+          setSignatureUrl(null);
+        }
+        setPdfOutput(outputs.pdf);
+        setPdfSharesPrintRoot(outputs.pdfSharesPrintRoot);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -159,48 +231,12 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
         body: { target, partner_id: doc?.partner_id ?? undefined },
       });
       success(tc('created'));
-      // فاتورة المشتريات تعيش خارج دورة الشراء — لها شاشتها.
       router.push(target === 'purchase'
         ? `/purchases/${created.data.id}`
         : `${PROCUREMENT_ROUTE[target as ProcurementType]}/${created.data.id}`);
     } catch (e) {
       errorToast(e instanceof ApiError ? e.message : tc('saveFailed'));
       setBusy(false);
-    }
-  }
-
-  async function downloadPurchaseOrderPdf() {
-    if (!doc || doc.type !== 'order') return;
-    setOutputBusy('pdf');
-    try {
-      const element = document.getElementById('purchase-order-print-root');
-      if (!element) throw new Error('Purchase order template is unavailable');
-      await documentExporter.download({ element, fileName: doc.number, paper });
-      success(tPrint('downloaded_ok'));
-    } catch {
-      errorToast(tPrint('export_failed'));
-    } finally {
-      setOutputBusy(null);
-    }
-  }
-
-  async function sharePurchaseOrderPdf() {
-    if (!doc || doc.type !== 'order') return;
-    setOutputBusy('share');
-    try {
-      const element = document.getElementById('purchase-order-print-root');
-      if (!element) throw new Error('Purchase order template is unavailable');
-      const result = await documentExporter.share({
-        element,
-        fileName: doc.number,
-        title: t('order.document_title'),
-        paper,
-      });
-      success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
-    } catch (error) {
-      if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
-    } finally {
-      setOutputBusy(null);
     }
   }
 
@@ -217,11 +253,48 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
     ...(doc.due_date ? [[t(`${type}.due_label`), <span key="u" className="num">{doc.due_date}</span>] as [string, React.ReactNode]] : []),
     [t('total'), <span key="t" className="num font-semibold">{formatRiyal(doc.total)}</span>],
   ];
-  const isIssuedPurchaseOrder = type === 'order' && doc.print_issued_at !== null;
-  const frozenPrint = doc.print_template_revision?.definition ?? doc.pdf_template_revision?.definition ?? null;
-  const printTemplateId = frozenPrint?.template_id ?? 'tax-invoice-classic';
-  const paperId = getTemplate(printTemplateId).supportedPaper[0] ?? 'a4';
+  const isPurchaseOrder = type === 'order';
+  const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+  const pdfPaperId = (pdfOutput ? getTemplate(pdfOutput.templateId).supportedPaper[0] : paperId) ?? 'a4';
+  const pdfPaper = { widthMm: PAPER_SIZES[pdfPaperId].widthMm, heightMm: PAPER_SIZES[pdfPaperId].heightMm };
+  const printRootId = 'purchase-order-print-root';
+  const pdfDoc = () => document.getElementById(pdfSharesPrintRoot ? printRootId : 'pdf-print-root');
+
+  async function downloadPurchaseOrderPdf() {
+    if (!doc || doc.type !== 'order') return;
+    setOutputBusy('pdf');
+    try {
+      const element = pdfDoc();
+      if (!element) throw new Error('Purchase order template is unavailable');
+      await documentExporter.download({ element, fileName: doc.number, paper: pdfPaper });
+      success(tPrint('downloaded_ok'));
+    } catch {
+      errorToast(tPrint('export_failed'));
+    } finally {
+      setOutputBusy(null);
+    }
+  }
+
+  async function sharePurchaseOrderPdf() {
+    if (!doc || doc.type !== 'order') return;
+    setOutputBusy('share');
+    try {
+      const element = pdfDoc();
+      if (!element) throw new Error('Purchase order template is unavailable');
+      const result = await documentExporter.share({
+        element,
+        fileName: doc.number,
+        title: t('order.document_title'),
+        paper: pdfPaper,
+      });
+      success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
+    } finally {
+      setOutputBusy(null);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -234,7 +307,7 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
         {doc.print_issued_at && <Badge tone="neutral">{t('issued')}</Badge>}
 
         <div className="ms-auto flex flex-wrap gap-2">
-          {isIssuedPurchaseOrder && (
+          {isPurchaseOrder && (
             <>
               <Button variant="outline" size="sm" onClick={() => setPreview((value) => !value)} disabled={busy || !!outputBusy}>
                 {preview ? <EyeOff className="h-4 w-4" strokeWidth={1.7} /> : <Eye className="h-4 w-4" strokeWidth={1.7} />}
@@ -248,7 +321,7 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
                 <Share2 className="h-4 w-4" strokeWidth={1.7} />
                 {outputBusy === 'share' ? tPrint('generating') : tPrint('share_pdf')}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'purchase-order-print-root')} disabled={busy || !!outputBusy}>
+              <Button variant="outline" size="sm" onClick={() => printDocument(paper, printRootId)} disabled={busy || !!outputBusy}>
                 <Printer className="h-4 w-4" strokeWidth={1.7} />
                 {t('print')}
               </Button>
@@ -303,7 +376,6 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
           {doc.print_issued_at && <p className="mt-3 border-t border-border pt-3 text-sm text-muted">{t('issued_locked_hint')}</p>}
           {doc.revised_from_number && <p className="mt-3 text-sm text-muted">{t('revised_from')}: <span className="num">{doc.revised_from_number}</span></p>}
 
-          {/* سلسلة التتبّع: من أين جاء هذا المستند، وإلى أين انتهى. */}
           {(doc.source_document_id || doc.converted_purchase_id) && (
             <div className="mt-3 flex flex-wrap gap-4 border-t border-border pt-3 text-xs">
               {doc.source_document_id && doc.source_type && (
@@ -372,7 +444,7 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
         </CardContent>
       </Card>
 
-      {isIssuedPurchaseOrder && (
+      {isPurchaseOrder && (
         <Card className={preview ? undefined : 'hidden print:block'}>
           <CardHeader className="no-print"><CardTitle>{tPrint('preview')}</CardTitle></CardHeader>
           <CardContent className="print:p-0">
@@ -382,18 +454,17 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
                   order={doc}
                   company={company}
                   supplier={supplier}
-                  templateId={printTemplateId}
-                  themeId={frozenPrint?.theme_id ?? null}
-                  footerText={frozenPrint?.footer_text ?? null}
-                  terms={frozenPrint?.terms_text ?? null}
-                  bank={frozenPrint?.bank_text ?? null}
-                  stampUrl={frozenPrint?.stamp ?? null}
-                  signatureUrl={frozenPrint?.signature ?? null}
-                  showLogo={frozenPrint?.show_logo !== false}
-                  logoUrl={frozenPrint?.logo ?? null}
-                  logoHeight={frozenPrint?.logo_height ?? null}
-                  layout={Array.isArray(frozenPrint?.layout) && frozenPrint.layout.length ? frozenPrint.layout : null}
-                  rootId="purchase-order-print-root"
+                  templateId={templateId}
+                  themeId={themeId}
+                  footerText={footerText}
+                  terms={termsText}
+                  bank={bankText}
+                  stampUrl={stampUrl}
+                  signatureUrl={signatureUrl}
+                  showLogo={showLogo}
+                  logoHeight={logoHeight}
+                  layout={layout}
+                  rootId={printRootId}
                 />
               </DocumentScaler>
             </div>
@@ -401,7 +472,16 @@ export function ProcurementDetail({ type }: { type: ProcurementType }) {
         </Card>
       )}
 
-      {/* سجلّ التغييرات — نفس المكوّن، بنوع المستند فقط. */}
+      {isPurchaseOrder && !pdfSharesPrintRoot && pdfOutput && (
+        <PurchaseOrderDocument
+          order={doc}
+          company={company}
+          supplier={supplier}
+          {...documentPropsFromResolved(pdfOutput)}
+          rootId="pdf-print-root"
+        />
+      )}
+
       <RevisionLog type="procurement" id={id} />
     </div>
   );

@@ -1,6 +1,7 @@
 'use client';
 
-import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
+import { useLocale } from 'next-intl';
+import type { Direction, ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import { buildQuoteDocumentModel, type SourceQuote } from '@/modules/documents/builder/from-quote';
 import type { SourceCompany, SourceCustomer } from '@/modules/documents/builder/from-invoice';
@@ -26,6 +27,7 @@ export function QuoteDocument({
   logoHeight,
   layout,
   rootId,
+  direction,
 }: {
   quote: QuoteDoc;
   company: QuoteCompany | null;
@@ -42,8 +44,22 @@ export function QuoteDocument({
   logoHeight?: number | null;
   layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
+  direction?: Direction;
 }) {
-  const model = buildQuoteDocumentModel({ quote, company, customer, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl });
+  const locale = useLocale();
+  const model = buildQuoteDocumentModel({
+    quote,
+    company,
+    customer,
+    footerText,
+    logoUrl,
+    logoHeight,
+    terms,
+    bank,
+    stampUrl,
+    signatureUrl,
+    direction: direction ?? (locale === 'en' ? 'ltr' : 'rtl'),
+  });
   return (
     <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />
   );
