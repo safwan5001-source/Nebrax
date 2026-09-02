@@ -168,7 +168,7 @@ Duration    20.22s
 
 ### Frontend build
 
-`npm run build` (Next.js 15.5.19) نجح على الالتزام الأول `d962a31e`. الالتزام الثاني `33d85cf7` تعديل نسب/حشو/اختبارات فقط.
+`npm run build` (Next.js 15.5.19) نجح محلياً على `d962a31e`، وWeb CI أخضر على `cec89b79`.
 
 ---
 
@@ -205,7 +205,7 @@ Duration    20.22s
 | `php artisan test` | غير مشغَّل (لا backend) |
 | `npm run test` | 189 ملفاً / 1122 اختباراً |
 | `npm run build` | نجح على `d962a31e` |
-| GitHub CI | يُراقَب على PR #616 بعد الدفع |
+| GitHub CI | **نجح** على `cec89b79` في [#616](https://github.com/safwan5001-source/Nebrax/pull/616): 5 فحوصات خضراء. لم يُدمَج |
 
 ---
 
@@ -244,9 +244,9 @@ ERP · Classic · Minimal · Retail · Thermal · Quotes · Purchase Orders · C
 - **PR:** [#616](https://github.com/safwan5001-source/Nebrax/pull/616)
 - **Base SHA:** `36525584b4545ef511c839b04ce3bc7f2535aa2e`
 - **Implementation SHA:** `33d85cf7b03cd414f5b50885349a951654a8d0e5`
-- **CI-green SHA:** غير مسجَّل بعد (Web CI بعد هذا الدفع)
-- **Final Head SHA:** سيُذكر بعد التزام هذا التقرير إن وُجد؛ لا التزام لاحق لمجرد مطابقة SHA
-- **عدد commits (كود):** 2
+- **CI-green SHA:** `cec89b79ba74f132f103e839053d07a9c0dee8bd` (5/5 فحوصات خضراء على #616)
+- **Final Head SHA:** التزام توثيق CI هذا (يختلف عن CI-green عمداً؛ لا التزام لاحق لمجرد المطابقة)
+- **عدد commits (كود):** 2 + تقرير + تثبيت CI
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
