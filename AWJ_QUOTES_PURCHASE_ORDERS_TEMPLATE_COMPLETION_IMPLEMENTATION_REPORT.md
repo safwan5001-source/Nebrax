@@ -141,7 +141,7 @@ Duration    19.54s
 | `npm run test` | 185 ملفاً / 1072 اختباراً |
 | `npm run build` (Next.js 15.5.19، يشمل فحص الأنواع) | نجح |
 | `npm run lint` | غير مُعدّ في المشروع (Web CI = test + build فقط) |
-| GitHub CI | PR [#612](https://github.com/safwan5001-source/Nebrax/pull/612) — يُراقَب حتى اكتمال الفحوصات؛ لم يُدمَج |
+| GitHub CI | **نجح** على `bf629365` في [#612](https://github.com/safwan5001-source/Nebrax/pull/612): 5 فحوصات خضراء (sqlite ×2، pgsql ×2، Web CI). لم يُدمَج |
 
 تحقق متصفح تفاعلي **لم يُنفَّذ**: لا جلسة مستأجر مصادق عليها أمام الواجهة في هذه البيئة. البديل: Vitest للعقد + بناء الإنتاج + مجموعة PHP الكاملة.
 
@@ -176,8 +176,9 @@ Duration    19.54s
 - **Base SHA:** `264692dcb7906bdd86d63f54aba6524d8d539978`
 - **Implementation SHA:** `10752a4c6f6a4da517c4d40c6b1222e2864c15e1`
 - **Report SHA:** `6d86303fdfd4bb71439b1e9707473e98b5319969`
-- **Head SHA:** `881bdc7e839ae22b5a60dbfcce1cbce9cd3c20d0`
-- **عدد commits:** 3 (`feat` + تقرير + ربط PR #612)
+- **CI-green SHA:** `bf6293657199cd20730f3fde16c669a7ee860d62` (5/5 فحوصات خضراء)
+- **Head SHA:** `d1eb44013b572b0b26e50663f8bf5b3284983b13` (التزام تسجيل CI؛ SHA الأخضر للفحوصات هو `bf629365`)
+- **عدد commits:** 5
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
