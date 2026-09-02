@@ -34,9 +34,7 @@ import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
 interface FrozenPrintTemplateRevision {
   id: string;
-  version?: number;
-  definition?: CreditNoteTemplateDefinition | Record<string, unknown> | null;
-  document_types?: string[];
+  definition?: Record<string, unknown>;
 }
 
 interface CreditNote {
