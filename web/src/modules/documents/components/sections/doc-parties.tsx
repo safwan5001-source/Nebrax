@@ -118,13 +118,13 @@ export function DocParties({ model }: { model: DocumentModel }) {
     const modernIssuer = isTaxInvoice ? modernFieldLabel('seller', mode) : issuerLabel;
     const modernParty = isTaxInvoice ? modernFieldLabel('buyer', mode) : partyLabel;
     return (
-      <section className={cn('grid grid-cols-2 gap-x-10 gap-y-3 border-b border-[color:var(--border)] pb-4', style.sectionGap)}>
+      <section className={cn('grid grid-cols-2 gap-x-12 gap-y-3 border-b border-[color:var(--border)] pb-4', style.sectionGap)}>
         <div className="min-w-0">
-          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{modernIssuer}</div>
+          <div className="mb-1.5 text-[11px] font-semibold text-black">{modernIssuer}</div>
           {sellerCore}
         </div>
         <div className="min-w-0">
-          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{modernParty}</div>
+          <div className="mb-1.5 text-[11px] font-semibold text-black">{modernParty}</div>
           {buyerDetails}
         </div>
       </section>

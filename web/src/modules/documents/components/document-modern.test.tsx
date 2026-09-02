@@ -73,8 +73,8 @@ describe('Modern V2 visual composition', () => {
     const { container } = renderComposition(MODERN_STYLE, model);
     const img = container.querySelector('header img');
     expect(img).toBeTruthy();
-    expect(img?.getAttribute('class')).toContain('max-h-12');
-    expect(img?.getAttribute('style')).toContain('48px');
+    expect(img?.getAttribute('class')).toContain('max-h-9');
+    expect(img?.getAttribute('style')).toContain('36px');
   });
 
   it('يعرض شارة المسودة والملغى فقط', () => {
@@ -123,7 +123,7 @@ describe('Modern V2 visual composition', () => {
     const { container } = renderComposition(MODERN_STYLE, model);
     const summaryQr = container.querySelector('[data-doc-keep="summary"] svg');
     expect(summaryQr).toBeTruthy();
-    expect(summaryQr?.getAttribute('width')).toBe('88');
+    expect(summaryQr?.getAttribute('width')).toBe('76');
     expect(container.querySelector('header svg')).toBeNull();
   });
 
@@ -176,6 +176,59 @@ describe('Modern V2 visual composition', () => {
     expect(container.querySelector('[data-doc-composition="erp"]')).toBeTruthy();
     expect(container.querySelector('header .h-14')).toBeTruthy();
     expect(container.querySelectorAll('section.grid.grid-cols-12 > div')).toHaveLength(3);
+  });
+
+  it('يعرض المبالغ رقمياً في الخلايا ووحدة ريال في الرأس والإجماليات عربياً', () => {
+    const model = makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: false, showAssets: false });
+    const { container } = renderComposition(MODERN_STYLE, model);
+    const thead = container.querySelector('thead');
+    const tbody = container.querySelector('tbody');
+    const totals = container.querySelector('[data-doc-totals="modern"]');
+    expect(thead?.textContent).toContain('ريال');
+    expect(thead?.textContent).not.toContain('SAR');
+    expect(tbody?.textContent).not.toContain('ريال');
+    expect(tbody?.textContent).not.toContain('SAR');
+    expect(tbody?.textContent).not.toContain('﷼');
+    expect(totals?.textContent).toContain('ريال');
+    expect(totals?.textContent).not.toContain('SAR');
+    expect(totals?.textContent).not.toContain('﷼');
+  });
+
+  it('يعرض SAR في الإنجليزية دون ريال في الرأس أو الإجماليات', () => {
+    locale.current = 'en';
+    const model = makeDocumentQaModel({ scenario: 'five', direction: 'ltr', showQr: false, showAssets: false });
+    const { container } = renderComposition(MODERN_STYLE, model);
+    const thead = container.querySelector('thead');
+    const tbody = container.querySelector('tbody');
+    const totals = container.querySelector('[data-doc-totals="modern"]');
+    expect(thead?.textContent).toContain('SAR');
+    expect(thead?.textContent).not.toContain('ريال');
+    expect(tbody?.textContent).not.toContain('ريال');
+    expect(tbody?.textContent).not.toContain('SAR');
+    expect(tbody?.textContent).not.toContain('﷼');
+    expect(totals?.textContent).toContain('SAR');
+    expect(totals?.textContent).not.toContain('ريال');
+    expect(totals?.textContent).not.toContain('﷼');
+  });
+
+  it('يعرض SAR في الوضع الثنائي دون ريال', () => {
+    locale.current = 'en';
+    const model = makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: false, showAssets: false });
+    const { container } = renderComposition(MODERN_STYLE, model);
+    expect(container.querySelector('h1')?.textContent).toBe('فاتورة ضريبية | Tax Invoice');
+    expect(container.querySelector('thead')?.textContent).toContain('SAR');
+    expect(container.querySelector('[data-doc-totals="modern"]')?.textContent).toContain('SAR');
+    expect(container.querySelector('[data-doc-totals="modern"]')?.textContent).not.toContain('ريال');
+  });
+
+  it('يرصف الملخص بـ flex وjustify-between بلا فراغ شبكة', () => {
+    const model = makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: true, showAssets: false });
+    const { container } = renderComposition(MODERN_STYLE, model);
+    const summary = container.querySelector('[data-doc-keep="summary"]');
+    expect(summary?.className).toContain('justify-between');
+    expect(summary?.className).toContain('flex');
+    expect(summary?.className).not.toContain('grid-cols-12');
+    expect(summary?.className).not.toContain('col-start-8');
   });
 
   it('لا يحوّل Minimal إلى بطاقات ولا يضيف شارة للمرحّل', () => {

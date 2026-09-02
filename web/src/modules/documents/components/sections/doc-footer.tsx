@@ -25,9 +25,9 @@ export function DocFooter({ model }: { model: DocumentModel }) {
 
   return (
     <footer className="mt-auto pt-6">
-      <div className={cn(frame, 'text-center text-[color:var(--muted)]', isModern ? 'text-[9px] leading-relaxed' : 'text-[10px]', blockTextClassName(properties))}>
+      <div className={cn(frame, 'text-center text-[color:var(--muted)]', isModern ? 'text-[10px] leading-relaxed' : 'text-[10px]', blockTextClassName(properties))}>
         {isModern && (phone || mobile) ? (
-          <div className="mb-1 flex flex-wrap justify-center gap-x-4 text-[10px]" dir="ltr">
+          <div className="mb-1 flex flex-wrap justify-center gap-x-4 text-[11px]" dir="ltr">
             {phone ? <span className="num">{phone}</span> : null}
             {mobile ? <span className="num">{mobile}</span> : null}
           </div>

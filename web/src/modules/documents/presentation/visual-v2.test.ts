@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   VISUAL_V2,
   cappedLogoHeight,
+  formatModernAmount,
+  formatModernMoney,
   isNoticeStatus,
   localizedPair,
+  modernCurrencyUnit,
   modernFieldLabel,
   modernItemsColumnWidthClass,
   modernItemsValueCellClass,
+  modernMoneyColumnHeader,
   modernStatusLabel,
   pairLabel,
   resolveDocumentLabelMode,
@@ -77,9 +81,11 @@ describe('modernStatusLabel', () => {
 
 describe('VISUAL_V2', () => {
   it('يبقي الشعار وQR ضمن حدود لا تهيمن على الصفحة', () => {
-    expect(VISUAL_V2.logoMaxPx).toBeLessThanOrEqual(48);
+    expect(VISUAL_V2.logoMaxPx).toBe(36);
+    expect(VISUAL_V2.qrSizePx).toBe(76);
     expect(VISUAL_V2.qrSizePx).toBeLessThan(110);
     expect(VISUAL_V2.qrSizePx).toBeGreaterThanOrEqual(72);
+    expect(VISUAL_V2.totalsMaxClass).toContain('max-w-[300px]');
   });
 
   it('لا يثبّت موضع الشعار بـ left/right الفيزيائي', () => {
@@ -89,9 +95,9 @@ describe('VISUAL_V2', () => {
 });
 
 describe('cappedLogoHeight', () => {
-  it('يقص الارتفاع فوق 48 بكسل ويستخدم السقف عند الغياب', () => {
-    expect(cappedLogoHeight(56)).toBe(48);
-    expect(cappedLogoHeight(null)).toBe(48);
+  it('يقص الارتفاع فوق 36 بكسل ويستخدم السقف عند الغياب', () => {
+    expect(cappedLogoHeight(56)).toBe(36);
+    expect(cappedLogoHeight(null)).toBe(36);
     expect(cappedLogoHeight(32)).toBe(32);
   });
 });
@@ -105,14 +111,52 @@ describe('modern items table tokens', () => {
   });
 
   it('يعطي الوصف والمنتج عرضاً مرناً ولفّاً آمناً والأرقام nowrap', () => {
-    expect(modernItemsColumnWidthClass('description')).toBe('w-[18%]');
-    expect(modernItemsColumnWidthClass('product')).toBe('w-[16%]');
-    expect(modernItemsColumnWidthClass('total')).toBe('w-[10%]');
+    expect(modernItemsColumnWidthClass('number')).toBe('w-[3%]');
+    expect(modernItemsColumnWidthClass('product_code')).toBe('w-[8%]');
+    expect(modernItemsColumnWidthClass('barcode')).toBe('w-[8%]');
+    expect(modernItemsColumnWidthClass('product')).toBe('w-[20%]');
+    expect(modernItemsColumnWidthClass('description')).toBe('w-[24%]');
+    expect(modernItemsColumnWidthClass('quantity')).toBe('w-[5%]');
+    expect(modernItemsColumnWidthClass('unit_price')).toBe('w-[8%]');
+    expect(modernItemsColumnWidthClass('price_before_tax')).toBe('w-[8%]');
+    expect(modernItemsColumnWidthClass('tax')).toBe('w-[7%]');
+    expect(modernItemsColumnWidthClass('total')).toBe('w-[9%]');
     expect(modernItemsValueCellClass('description')).toContain('break-words');
+    expect(modernItemsValueCellClass('description')).toContain('text-[11px]');
+    expect(modernItemsValueCellClass('product_code')).toContain('whitespace-nowrap');
+    expect(modernItemsValueCellClass('product_code')).not.toContain('break-all');
     expect(modernItemsValueCellClass('total')).toContain('whitespace-nowrap');
   });
 
   it('يحافظ على مجموع نسب الأعمدة الافتراضية عند 100%', () => {
     expect(MODERN_DEFAULT_COLUMN_WIDTH_SUM).toBe(100);
+  });
+});
+
+describe('Modern money presentation', () => {
+  it('يعرض SAR كريال في العربية دون رمز الواجهة العام', () => {
+    expect(modernCurrencyUnit('SAR', 'ar')).toBe('ريال');
+    expect(formatModernAmount(100050, 'SAR')).toBe('1,000.50');
+    expect(formatModernMoney(100050, 'SAR', 'ar')).toBe('1,000.50 ريال');
+    expect(formatModernMoney(100050, 'SAR', 'ar')).not.toContain('SAR');
+    expect(formatModernMoney(100050, 'SAR', 'ar')).not.toContain('﷼');
+    expect(modernMoneyColumnHeader('الإجمالي', 'SAR', 'ar')).toBe('الإجمالي (ريال)');
+  });
+
+  it('يعرض SAR بالنص اللاتيني في الإنجليزية والوضع الثنائي', () => {
+    expect(modernCurrencyUnit('SAR', 'en')).toBe('SAR');
+    expect(modernCurrencyUnit('SAR', 'bilingual')).toBe('SAR');
+    expect(formatModernMoney(100050, 'SAR', 'en')).toBe('1,000.50 SAR');
+    expect(formatModernMoney(100050, 'SAR', 'bilingual')).toBe('1,000.50 SAR');
+    expect(formatModernMoney(100050, 'SAR', 'en')).not.toContain('ريال');
+    expect(formatModernMoney(100050, 'SAR', 'bilingual')).not.toContain('ريال');
+    expect(formatModernMoney(100050, 'SAR', 'en')).not.toContain('﷼');
+    expect(modernMoneyColumnHeader('Total', 'SAR', 'en')).toBe('Total (SAR)');
+  });
+
+  it('يبقي رمز العملات غير الريال من السجل القائم', () => {
+    expect(modernCurrencyUnit('USD', 'ar')).toBe('$');
+    expect(formatModernAmount(100050, 'USD')).toBe('1,000.50');
+    expect(formatModernMoney(100050, 'USD', 'en')).toBe('1,000.50 $');
   });
 });

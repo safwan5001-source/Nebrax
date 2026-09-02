@@ -23,7 +23,7 @@ export const MODERN_STYLE: TemplateStyle = {
   composition: 'modern',
   pagePadding: 'p-8',
   cardRadius: 'rounded-none',
-  sectionGap: 'mt-6',
+  sectionGap: 'mt-4',
   tableHead: 'plain',
   tableDensity: 'comfortable',
   brandBar: false,

@@ -3,17 +3,18 @@
  * توكنز تركيبية محلية — لا تُحفظ في المراجعة ولا تغيّر عقود التجميد أو الحساب.
  */
 
+import { getCurrency } from '../constants/currencies';
 import type { DocItemsColumnId } from '../types';
 
 export const VISUAL_V2 = {
   /** فواصل طباعية رفيعة بلا بطاقات. */
   hairline: 'border-[color:var(--border)]',
   sectionLabel: 'text-[10px] font-semibold text-[color:var(--muted)]',
-  /** ارتفاع شعار أقصى حتى لا يهيمن على الرأس. */
-  logoMaxPx: 48,
-  logoMaxWidthClass: 'max-h-12 max-w-[7.5rem] w-auto shrink-0 object-contain',
-  qrSizePx: 88,
-  totalsMaxClass: 'w-full max-w-[280px]',
+  /** ارتفاع شعار أقصى حتى يبقى الاسم القانوني العنصر الأقوى. */
+  logoMaxPx: 36,
+  logoMaxWidthClass: 'max-h-9 max-w-[5.5rem] w-auto shrink-0 object-contain object-start',
+  qrSizePx: 76,
+  totalsMaxClass: 'w-full max-w-[300px]',
 } as const;
 
 export type DocumentLabelMode = 'ar' | 'en' | 'bilingual';
@@ -98,9 +99,20 @@ export function cappedLogoHeight(requested?: number | null): number {
   return Math.min(requested, VISUAL_V2.logoMaxPx);
 }
 
-export const MODERN_ITEMS_TABLE_CLASS = 'w-full table-fixed border-collapse text-[11px] leading-snug';
+export const MODERN_ITEMS_TABLE_CLASS = 'w-full table-fixed border-collapse text-[10px] leading-snug';
 export const MODERN_ITEMS_HEAD_CLASS = 'border-b border-[color:var(--border)] text-black';
 export const MODERN_ITEMS_ROW_CLASS = 'border-b border-[color:var(--border)]';
+
+const MODERN_MONEY_COLUMNS = new Set<DocItemsColumnId>([
+  'unit_price',
+  'price_before_tax',
+  'tax',
+  'total',
+]);
+
+export function isModernMoneyColumn(column: DocItemsColumnId): boolean {
+  return MODERN_MONEY_COLUMNS.has(column);
+}
 
 /**
  * عرض عمود Modern داخل table-fixed.
@@ -109,39 +121,82 @@ export const MODERN_ITEMS_ROW_CLASS = 'border-b border-[color:var(--border)]';
 export function modernItemsColumnWidthClass(column: DocItemsColumnId): string {
   switch (column) {
     case 'number':
-      return 'w-[4%]';
+      return 'w-[3%]';
     case 'product_code':
-      return 'w-[9%]';
-    case 'barcode':
-      return 'w-[10%]';
-    case 'product':
-      return 'w-[16%]';
-    case 'description':
-      return 'w-[18%]';
-    case 'quantity':
-      return 'w-[6%]';
-    case 'unit_price':
-      return 'w-[9%]';
-    case 'price_before_tax':
-      return 'w-[10%]';
-    case 'tax':
       return 'w-[8%]';
+    case 'barcode':
+      return 'w-[8%]';
+    case 'product':
+      return 'w-[20%]';
+    case 'description':
+      return 'w-[24%]';
+    case 'quantity':
+      return 'w-[5%]';
+    case 'unit_price':
+      return 'w-[8%]';
+    case 'price_before_tax':
+      return 'w-[8%]';
+    case 'tax':
+      return 'w-[7%]';
     case 'total':
-      return 'w-[10%]';
+      return 'w-[9%]';
   }
 }
 
 export function modernItemsValueCellClass(column: DocItemsColumnId): string {
   if (column === 'product' || column === 'description') {
-    return 'min-w-0 break-words whitespace-normal';
+    return 'min-w-0 break-words whitespace-normal text-[11px] leading-snug';
   }
   if (column === 'product_code' || column === 'barcode') {
-    return 'min-w-0 break-all';
+    return 'min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10px]';
   }
-  return 'whitespace-nowrap';
+  return 'whitespace-nowrap text-[10px]';
+}
+
+/** حشو أضيق للرأس والخلايا المالية حتى لا تضغط الأرقام الوحدة داخل الخلية. */
+export function modernItemsCellPadding(column: DocItemsColumnId): string {
+  return isModernMoneyColumn(column) || column === 'number' || column === 'quantity'
+    ? 'px-1 py-1.5'
+    : 'px-1.5 py-1.5';
 }
 
 /** مجموع نسب الأعمدة الافتراضية العشرة — حارس ضد التراكب. */
 export const MODERN_DEFAULT_COLUMN_WIDTH_SUM = (
-  ['number', 'product_code', 'barcode', 'product', 'description', 'unit_price', 'quantity', 'price_before_tax', 'tax', 'total'] as const
+  ['number', 'product_code', 'barcode', 'product', 'description', 'quantity', 'unit_price', 'price_before_tax', 'tax', 'total'] as const
 ).reduce((sum, column) => sum + Number(modernItemsColumnWidthClass(column).replace(/[^\d]/g, '')), 0);
+
+/**
+ * وحدة عرض Modern فقط. لا تلمس منسّق الواجهة العام (`formatMoney` / U+20C1).
+ * SAR: «ريال» عربياً، و`SAR` في الإنجليزية والوضع الثنائي. غير SAR يبقى رمز السجل.
+ */
+export function modernCurrencyUnit(currency: string, mode: DocumentLabelMode): string {
+  const code = currency.trim().toUpperCase() || 'SAR';
+  if (code === 'SAR') {
+    return mode === 'ar' ? 'ريال' : 'SAR';
+  }
+  return getCurrency(code).symbol;
+}
+
+/** الرقم فقط بنفس دقة المحرّك (قسمة على 10^precision + Intl en-US). */
+export function formatModernAmount(minor: number, currency: string): string {
+  const cfg = getCurrency(currency);
+  const n = Number(minor);
+  if (!Number.isFinite(n)) return '—';
+  const value = n / 10 ** cfg.precision;
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: cfg.precision,
+    maximumFractionDigits: cfg.precision,
+  }).format(value);
+}
+
+/** رقم + وحدة للإجماليات في Modern. */
+export function formatModernMoney(minor: number, currency: string, mode: DocumentLabelMode): string {
+  const amount = formatModernAmount(minor, currency);
+  if (amount === '—') return amount;
+  return `${amount} ${modernCurrencyUnit(currency, mode)}`;
+}
+
+/** رأس عمود مالي يذكر الوحدة مرة واحدة: «الإجمالي (ريال)» / «Total (SAR)». */
+export function modernMoneyColumnHeader(label: string, currency: string, mode: DocumentLabelMode): string {
+  return `${label} (${modernCurrencyUnit(currency, mode)})`;
+}

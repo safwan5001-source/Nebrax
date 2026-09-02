@@ -7,12 +7,17 @@ import { getDefaultDocumentItemColumns } from '@/modules/documents/registry/docu
 import type { DocBlockAlignment, DocItemsColumn, DocItemsColumnId, DocumentModel, TemplateStyle } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { blockTextClassName, useDocBlockProperties } from '../doc-block-properties-context';
+import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
 import {
   MODERN_ITEMS_HEAD_CLASS,
   MODERN_ITEMS_ROW_CLASS,
   MODERN_ITEMS_TABLE_CLASS,
+  formatModernAmount,
+  isModernMoneyColumn,
+  modernItemsCellPadding,
   modernItemsColumnWidthClass,
   modernItemsValueCellClass,
+  modernMoneyColumnHeader,
 } from '../../presentation/visual-v2';
 
 /**
@@ -69,7 +74,7 @@ function tableClassName(style: TemplateStyle): string {
 
 function cellPadding(style: TemplateStyle): { head: string; body: string } {
   if (style.composition === 'modern') {
-    return { head: 'px-1.5 py-1.5', body: 'px-1.5 py-2' };
+    return { head: 'px-1.5 py-1.5', body: 'px-1.5 py-1.5' };
   }
   switch (style.tableDensity) {
     case 'compact': return { head: 'px-2 py-1.5', body: 'px-2 py-1.5' };
@@ -98,6 +103,7 @@ export function DocItemsTable({
   const t = useTranslations('invoiceDoc');
   const style = useDocStyle();
   const properties = useDocBlockProperties('items');
+  const { mode } = useDocumentLabelMode(model);
   const head = headRow(style);
   const padding = cellPadding(style);
   const columns: readonly DocItemsColumn[] = properties.columns ?? getDefaultDocumentItemColumns(model.type).map((id): DocItemsColumn => ({ id }));
@@ -114,6 +120,9 @@ export function DocItemsTable({
     total: t('total'),
   };
   const isModern = style.composition === 'modern';
+  const moneyValue = isModern
+    ? (minor: number) => formatModernAmount(minor, model.currency)
+    : formatMoney;
 
   const valueFor = (column: DocItemsColumnId, line: DocumentModel['lines'][number], index: number): string | number => {
     switch (column) {
@@ -123,11 +132,18 @@ export function DocItemsTable({
       case 'product_code': return line.productCode || '—';
       case 'barcode': return line.barcode || '—';
       case 'quantity': return line.quantity;
-      case 'price_before_tax': return line.priceBeforeTax === null || line.priceBeforeTax === undefined ? '—' : formatMoney(line.priceBeforeTax);
-      case 'unit_price': return formatMoney(line.unitPrice);
-      case 'tax': return formatMoney(line.tax);
-      case 'total': return formatMoney(line.total);
+      case 'price_before_tax': return line.priceBeforeTax === null || line.priceBeforeTax === undefined ? '—' : moneyValue(line.priceBeforeTax);
+      case 'unit_price': return moneyValue(line.unitPrice);
+      case 'tax': return moneyValue(line.tax);
+      case 'total': return moneyValue(line.total);
     }
+  };
+
+  const headerLabel = (column: DocItemsColumn): string => {
+    const base = column.label?.trim() || labels[column.id];
+    return isModern && isModernMoneyColumn(column.id)
+      ? modernMoneyColumnHeader(base, model.currency, mode)
+      : base;
   };
 
   const table = (
@@ -140,14 +156,15 @@ export function DocItemsTable({
               <th
                 key={column.id}
                 className={cn(
-                  padding.head,
+                  isModern ? modernItemsCellPadding(column.id) : padding.head,
                   'font-semibold',
                   textAlignmentClass(alignment),
                   column.id === 'total' && 'font-bold',
+                  isModern && isModernMoneyColumn(column.id) && 'whitespace-nowrap',
                   isModern && modernItemsColumnWidthClass(column.id),
                 )}
               >
-                {column.label?.trim() || labels[column.id]}
+                {headerLabel(column)}
               </th>
             );
           })}
@@ -162,7 +179,7 @@ export function DocItemsTable({
                 <td
                   key={column.id}
                   className={cn(
-                    padding.body,
+                    isModern ? modernItemsCellPadding(column.id) : padding.body,
                     textAlignmentClass(alignment),
                     usesMonospaceValue(column.id) && 'num',
                     column.id === 'number' && 'text-[color:var(--muted)]',
