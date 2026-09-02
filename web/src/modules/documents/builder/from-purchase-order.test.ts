@@ -46,5 +46,26 @@ describe('buildPurchaseOrderDocumentModel', () => {
       stampUrl: 'https://assets.example/stamp.png',
       signatureUrl: 'https://assets.example/signature.png',
     });
+    expect(model.currency).toBe('SAR');
+    expect(model.direction).toBe('rtl');
+  });
+
+  it('uses the company currency and explicit document direction', () => {
+    const model = buildPurchaseOrderDocumentModel({
+      order: {
+        number: 'PO-USD-1',
+        doc_date: '2026-09-02',
+        due_date: null,
+        subtotal: '10.00',
+        tax_amount: '1.50',
+        total: '11.50',
+        lines: [],
+      },
+      company: { name: 'AWJ Trading', currency: 'USD' },
+      supplier: { name: 'Supplier' },
+      direction: 'ltr',
+    });
+    expect(model.currency).toBe('USD');
+    expect(model.direction).toBe('ltr');
   });
 });

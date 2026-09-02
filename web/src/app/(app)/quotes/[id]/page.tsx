@@ -14,12 +14,13 @@ import { QuoteDocument, type QuoteCompany, type QuoteCustomer } from '@/componen
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
-import { getTemplate } from '@/modules/documents/registry/templates';
+import { getTemplate, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { RevisionLog } from '@/components/documents/revision-log';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
-import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
+import type { LivePrintTemplateAssignment, ResolvedLiveTemplate } from '@/modules/print-templates/services/live-template-definition';
+import { resolveDocumentOutputTemplates } from '@/modules/print-templates/services/document-output-template';
 
 interface Line { id: string; description: string | null; quantity: number; unit_price: string; line_tax: string; line_total: string }
 interface FrozenPrintTemplateRevision {
@@ -42,6 +43,27 @@ const statusTone: Record<string, 'positive' | 'warning' | 'muted' | 'negative' |
   draft: 'muted', sent: 'neutral', accepted: 'positive', rejected: 'negative', converted: 'positive',
 };
 
+function liveAssignment(result: PromiseSettledResult<unknown>): LivePrintTemplateAssignment | null {
+  if (result.status !== 'fulfilled' || !result.value || typeof result.value !== 'object') return null;
+  const data = (result.value as { data?: LivePrintTemplateAssignment | null }).data;
+  return data ?? null;
+}
+
+function documentPropsFromResolved(resolved: ResolvedLiveTemplate) {
+  return {
+    templateId: resolved.templateId,
+    themeId: resolved.themeId,
+    footerText: resolved.footerText,
+    terms: resolved.termsText,
+    bank: resolved.bankText,
+    stampUrl: resolved.stampUrl,
+    signatureUrl: resolved.signatureUrl,
+    showLogo: resolved.showLogo,
+    logoHeight: resolved.logoHeight,
+    layout: resolved.layout,
+  };
+}
+
 export default function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -58,7 +80,7 @@ export default function QuoteDetailPage() {
   const [issuing, setIssuing] = useState(false);
   const [revising, setRevising] = useState(false);
   const [busy, setBusy] = useState<null | 'pdf' | 'share'>(null);
-  const [templateId, setTemplateId] = useState<string>('tax-invoice-classic');
+  const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [themeId, setThemeId] = useState<ThemeId | null>(null);
   const [footerText, setFooterText] = useState<string | null>(null);
   const [showLogo, setShowLogo] = useState(true);
@@ -69,25 +91,22 @@ export default function QuoteDetailPage() {
   const [bankText, setBankText] = useState<string | null>(null);
   const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [pdfOutput, setPdfOutput] = useState<ResolvedLiveTemplate | null>(null);
+  const [pdfSharesPrintRoot, setPdfSharesPrintRoot] = useState(true);
 
-  function resetTemplate() {
-    setTemplateId('tax-invoice-classic');
-    setThemeId(null);
-    setFooterText(null);
-    setShowLogo(true);
-    setLogoUrl(null);
-    setLogoHeight(null);
-    setLayout(null);
-    setTermsText(null);
-    setBankText(null);
-    setStampUrl(null);
-    setSignatureUrl(null);
-  }
-
-  function applyTemplate(assignment: LivePrintTemplateAssignment | null) {
-    const resolved = resolveLiveTemplateDefinition(assignment, 'quotation');
+  function applyPrint(resolved: ResolvedLiveTemplate | null) {
     if (!resolved) {
-      resetTemplate();
+      setTemplateId(DEFAULT_TEMPLATE_ID);
+      setThemeId(null);
+      setFooterText(null);
+      setShowLogo(true);
+      setLogoUrl(null);
+      setLogoHeight(null);
+      setLayout(null);
+      setTermsText(null);
+      setBankText(null);
+      setStampUrl(null);
+      setSignatureUrl(null);
       return;
     }
     setTemplateId(resolved.templateId);
@@ -108,27 +127,34 @@ export default function QuoteDetailPage() {
     api<{ data: Quote }>(`/quotes/${id}`)
       .then(async (r) => {
         setQuote(r.data);
-        const [p, m] = await Promise.allSettled([
+        const issued = Boolean(r.data.print_issued_at);
+        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
+        const skipped = Promise.resolve({ data: null as LivePrintTemplateAssignment | null });
+        const resolveUsage = (usage: 'print' | 'pdf') => (
+          api<{ data: LivePrintTemplateAssignment | null }>(
+            `/print-templates/resolve?document_type=quotation&usage=${usage}${branchQuery}`,
+          )
+        );
+        const [p, m, livePrint, livePdf] = await Promise.allSettled([
           api<{ data: QuoteCustomer }>(`/partners/${r.data.partner_id}`),
           api<{ company: QuoteCompany }>(`/me`),
+          issued ? skipped : resolveUsage('print'),
+          issued ? skipped : resolveUsage('pdf'),
         ]);
         if (p.status === 'fulfilled') setCustomer(p.value.data);
         if (m.status === 'fulfilled') setCompany(m.value.company);
 
-        if (r.data.print_issued_at) {
-          const frozen = r.data.print_template_revision ?? r.data.pdf_template_revision;
-          applyTemplate(frozen ? {
-            print_template_revision_id: frozen.id,
-            revision: frozen,
-          } : null);
-          return;
-        }
-
-        const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const live = await api<{ data: LivePrintTemplateAssignment | null }>(
-          `/print-templates/resolve?document_type=quotation&usage=print${branchQuery}`,
-        ).catch(() => null);
-        applyTemplate(live?.data ?? null);
+        const outputs = resolveDocumentOutputTemplates({
+          documentType: 'quotation',
+          isPosted: issued,
+          frozenPrint: r.data.print_template_revision,
+          frozenPdf: r.data.pdf_template_revision,
+          livePrint: liveAssignment(livePrint),
+          livePdf: liveAssignment(livePdf),
+        });
+        applyPrint(outputs.print);
+        setPdfOutput(outputs.pdf);
+        setPdfSharesPrintRoot(outputs.pdfSharesPrintRoot);
       })
       .finally(() => setLoading(false));
   }
@@ -186,14 +212,17 @@ export default function QuoteDetailPage() {
 
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
+  const pdfPaperId = (pdfOutput ? getTemplate(pdfOutput.templateId).supportedPaper[0] : paperId) ?? 'a4';
+  const pdfPaper = { widthMm: PAPER_SIZES[pdfPaperId].widthMm, heightMm: PAPER_SIZES[pdfPaperId].heightMm };
+  const pdfDoc = () => document.getElementById(pdfSharesPrintRoot ? 'print-root' : 'pdf-print-root');
 
   async function handleDownloadPdf() {
     if (!quote) return;
     setBusy('pdf');
     try {
-      const element = document.getElementById('print-root');
+      const element = pdfDoc();
       if (!element) throw new Error('Quote template is unavailable');
-      await documentExporter.download({ element, fileName: quote.number, paper });
+      await documentExporter.download({ element, fileName: quote.number, paper: pdfPaper });
       success(tPrint('downloaded_ok'));
     } catch {
       errorToast(tPrint('export_failed'));
@@ -206,9 +235,14 @@ export default function QuoteDetailPage() {
     if (!quote) return;
     setBusy('share');
     try {
-      const element = document.getElementById('print-root');
+      const element = pdfDoc();
       if (!element) throw new Error('Quote template is unavailable');
-      const result = await documentExporter.share({ element, fileName: quote.number, title: t('document_title'), paper });
+      const result = await documentExporter.share({
+        element,
+        fileName: quote.number,
+        title: t('document_title'),
+        paper: pdfPaper,
+      });
       success(result === 'shared' ? tPrint('shared_ok') : tPrint('downloaded_ok'));
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') errorToast(tPrint('export_failed'));
@@ -257,7 +291,7 @@ export default function QuoteDetailPage() {
             <Share2 className="h-4 w-4" strokeWidth={1.7} />
             {busy === 'share' ? tPrint('generating') : tPrint('share_pdf')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printDocument(paper)} disabled={!!busy}>
+          <Button variant="outline" size="sm" onClick={() => printDocument(paper, 'print-root')} disabled={!!busy}>
             <Printer className="h-4 w-4" strokeWidth={1.7} />
             {t('print')}
           </Button>
@@ -278,7 +312,6 @@ export default function QuoteDetailPage() {
         </CardContent>
       </Card>
 
-      {/* معاينة مستند عرض السعر (مرئية + مصدر الطباعة/الـ PDF) عبر محرّك المستندات. */}
       <Card>
         <CardHeader className="no-print"><CardTitle>{tPrint('preview')}</CardTitle></CardHeader>
         <CardContent className="print:p-0">
@@ -305,7 +338,16 @@ export default function QuoteDetailPage() {
         </CardContent>
       </Card>
 
-      {/* سجلّ التغييرات — لا يُطبع مع المستند. */}
+      {!pdfSharesPrintRoot && pdfOutput && (
+        <QuoteDocument
+          quote={quote}
+          company={company}
+          customer={customer}
+          {...documentPropsFromResolved(pdfOutput)}
+          rootId="pdf-print-root"
+        />
+      )}
+
       <RevisionLog type="quote" id={id} />
     </div>
   );

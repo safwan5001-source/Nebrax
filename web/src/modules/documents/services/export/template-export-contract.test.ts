@@ -28,4 +28,15 @@ describe('تصدير القالب الحقيقي', () => {
     expect(source).toContain('pdf-print-root');
     expect(source).toContain('usage=${usage}');
   });
+
+  it('يربط عرض السعر وأمر الشراء بالمحوّل وجذر PDF المستقل', () => {
+    const quote = readFileSync(resolve(process.cwd(), 'src/app/(app)/quotes/[id]/page.tsx'), 'utf8');
+    const purchaseOrder = readFileSync(resolve(process.cwd(), 'src/components/procurement/procurement-detail.tsx'), 'utf8');
+    expect(quote).toContain('resolveDocumentOutputTemplates');
+    expect(quote).toContain('pdf-print-root');
+    expect(quote).toContain('usage=${usage}');
+    expect(purchaseOrder).toContain('resolveDocumentOutputTemplates');
+    expect(purchaseOrder).toContain('pdf-print-root');
+    expect(purchaseOrder).toContain('usage=${usage}');
+  });
 });

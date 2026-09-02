@@ -287,6 +287,68 @@ class ProcurementTest extends TestCase
         $this->assertSame(0, StockMovement::count());
     }
 
+    /** @test */
+    public function reassigning_print_after_issue_does_not_change_the_frozen_purchase_order(): void
+    {
+        $request = $this->approvedRequest();
+        $order = $this->procurement->convert($request, 'order', ['partner_id' => $this->supplier->id]);
+        $this->procurement->transition($order, 'submitted');
+        $order = $this->procurement->transition($order->fresh(), 'approved');
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة أمر مجمّدة',
+            'document_types' => ['purchase_order'],
+            'definition' => ['template_id' => 'tax-invoice-classic'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'purchase_order',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+
+        $issued = $this->procurement->issueForPrint($order);
+        $frozenId = $print->published_revision_id;
+
+        $replacement = $templates->publish($templates->create([
+            'name' => 'طباعة أمر لاحقة',
+            'document_types' => ['purchase_order'],
+            'definition' => ['template_id' => 'tax-invoice-retail'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'purchase_order',
+            'usage' => 'print',
+            'print_template_revision_id' => $replacement->published_revision_id,
+        ], null);
+
+        $this->assertSame($frozenId, ProcurementDocument::findOrFail($issued->id)->print_template_revision_id);
+    }
+
+    /** @test */
+    public function issuing_a_purchase_order_without_pdf_assignment_leaves_pdf_revision_null(): void
+    {
+        $request = $this->approvedRequest();
+        $order = $this->procurement->convert($request, 'order', ['partner_id' => $this->supplier->id]);
+        $this->procurement->transition($order, 'submitted');
+        $order = $this->procurement->transition($order->fresh(), 'approved');
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة أمر فقط',
+            'document_types' => ['purchase_order'],
+            'definition' => ['template_id' => 'tax-invoice-classic'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'purchase_order',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+
+        $issued = $this->procurement->issueForPrint($order);
+        $this->assertSame($print->published_revision_id, $issued->print_template_revision_id);
+        $this->assertNull($issued->pdf_template_revision_id);
+    }
+
     /** السلسلة اتجاهها واحد: أمر الشراء لا يعود طلباً. */
     /** @test */
     public function the_chain_only_moves_forward(): void

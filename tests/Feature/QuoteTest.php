@@ -189,6 +189,75 @@ class QuoteTest extends TestCase
     }
 
     /** @test */
+    public function reassigning_print_after_issue_does_not_change_the_frozen_quote(): void
+    {
+        $auth = $this->registerTenant();
+        $partnerId = $this->partner($auth['token']);
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة عرض مجمّدة',
+            'document_types' => ['quotation'],
+            'definition' => ['template_id' => 'tax-invoice-classic'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'quotation',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+
+        $quoteId = $this->withToken($auth['token'])->postJson('/api/quotes', [
+            'partner_id' => $partnerId,
+            'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/quotes/{$quoteId}/issue")->assertOk();
+        $frozenId = $print->published_revision_id;
+
+        $replacement = $templates->publish($templates->create([
+            'name' => 'طباعة لاحقة',
+            'document_types' => ['quotation'],
+            'definition' => ['template_id' => 'tax-invoice-retail'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'quotation',
+            'usage' => 'print',
+            'print_template_revision_id' => $replacement->published_revision_id,
+        ], null);
+
+        $this->assertSame($frozenId, Quote::findOrFail($quoteId)->print_template_revision_id);
+    }
+
+    /** @test */
+    public function issuing_a_quote_without_pdf_assignment_leaves_pdf_revision_null(): void
+    {
+        $auth = $this->registerTenant();
+        $partnerId = $this->partner($auth['token']);
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة عرض فقط',
+            'document_types' => ['quotation'],
+            'definition' => ['template_id' => 'tax-invoice-classic'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'quotation',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+
+        $quoteId = $this->withToken($auth['token'])->postJson('/api/quotes', [
+            'partner_id' => $partnerId,
+            'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated()['data']['id'];
+        $issued = $this->withToken($auth['token'])->postJson("/api/quotes/{$quoteId}/issue")->assertOk();
+
+        $this->assertSame($print->published_revision_id, $issued['data']['print_template_revision_id']);
+        $this->assertNull($issued['data']['pdf_template_revision_id']);
+    }
+
+    /** @test */
     public function quotes_are_tenant_isolated(): void
     {
         $a = $this->registerTenant('acme', 'owner@acme.test');
