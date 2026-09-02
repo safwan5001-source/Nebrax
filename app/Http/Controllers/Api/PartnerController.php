@@ -12,7 +12,6 @@ use App\Tenancy\BranchScope;
 use App\Services\Accounting\PartnerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class PartnerController extends ApiController
 {
@@ -42,19 +41,8 @@ class PartnerController extends ApiController
         $data = $request->validated();
         $this->assertPartnerClassifications($data);
 
-        // ذرّية: إنشاء الطرف وقيد الرصيد الافتتاحي معاملة واحدة —
-        // فشل القيد يُرجع الطرف كله (لا طرف يتيم بلا قيده).
-        $partner = $this->domain(fn () => DB::transaction(function () use ($data) {
-            $partner = Partner::create($data); // opening_balance ليس عموداً — يحرسه fillable
-
-            $this->partners->recordOpeningBalance(
-                $partner,
-                (int) ($data['opening_balance'] ?? 0),
-                $data['opening_balance_date'] ?? null,
-            );
-
-            return $partner->load(['customerClassification', 'supplierClassification', 'defaultPriceList']);
-        }));
+        // مسار الإنشاء القانوني الموحّد (خدمة الدومين) — نفسه يستعمله الـ Public API.
+        $partner = $this->domain(fn () => $this->partners->create($data));
 
         return (new PartnerResource($partner))->response()->setStatusCode(201);
     }

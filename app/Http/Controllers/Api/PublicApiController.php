@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use PDOException;
+use RuntimeException;
 
 /**
  * أساس متحكّمات الـ Public API القرائية (PR-3).
@@ -59,5 +62,51 @@ abstract class PublicApiController extends Controller
     protected function likeTerm(string $search): string
     {
         return '%'.addcslashes(trim($search), '%_\\').'%';
+    }
+
+    // ── كتابة (PR-5) ──────────────────────────────────────────────────
+
+    /**
+     * ينفّذ منطق خدمة الدومين ويحوّل أخطاء العمل (RuntimeException) إلى 422 موحّدة
+     * عبر عارض أخطاء الـ Public. أخطاء قاعدة البيانات (PDOException، ومنها
+     * QueryException) تُعاد رمياً فلا يتسرّب SQL — تتحوّل إلى 500 عامّة.
+     * لا يبتلع أخطاء idempotency/تحقّق (تُرمى قبل بلوغ خدمة الدومين).
+     */
+    protected function domainWrite(Closure $fn): mixed
+    {
+        try {
+            return $fn();
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+    }
+
+    /**
+     * تحقّق ملكية مرجع داخل المستأجر: المعرّف (إن وُجد) يجب أن يراه الـ TenantScope
+     * الحالي، وإلا 422 برسالة «غير موجود» — لا تكشف وجود مرجع مستأجر آخر (§13).
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     */
+    protected function assertTenantOwned(string $model, ?string $id, string $label): void
+    {
+        if ($id !== null && ! $model::whereKey($id)->exists()) {
+            abort(422, "{$label} غير موجود.");
+        }
+    }
+
+    /**
+     * تحقّق ملكية مجموعة معرّفات (سطور المستند) داخل المستأجر دفعة واحدة.
+     *
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  array<int, string|null>  $ids
+     */
+    protected function assertTenantOwnedAll(string $model, array $ids, string $label): void
+    {
+        $ids = array_values(array_unique(array_filter($ids)));
+        if ($ids !== [] && $model::whereKey($ids)->count() !== count($ids)) {
+            abort(422, "{$label} غير موجود.");
+        }
     }
 }

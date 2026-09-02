@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\PublicStorePartnerRequest;
 use App\Http\Resources\PublicPartnerResource;
 use App\Models\Partner;
+use App\Services\Accounting\PartnerService;
 use App\Support\PublicApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,5 +64,17 @@ class PublicPartnerController extends PublicApiController
         $partner = Partner::findOrFail($id);
 
         return PublicApiResponse::resource($request, new PublicPartnerResource($partner));
+    }
+
+    /**
+     * إنشاء طرف (PR-5) — يمرّ بخدمة الدومين نفسها التي يستعملها المتحكّم الداخلي.
+     * المستأجر من العميل المصادَق حصرًا؛ `validated()` يُسقِط أيّ حقلٍ خارج العقد
+     * (tenant_id، رصيد افتتاحي…). idempotency وحدّ الكتابة وتدقيق الطلب في السلسلة.
+     */
+    public function store(PublicStorePartnerRequest $request, PartnerService $partners): JsonResponse
+    {
+        $partner = $this->domainWrite(fn () => $partners->create($request->validated()));
+
+        return PublicApiResponse::resource($request, new PublicPartnerResource($partner))->setStatusCode(201);
     }
 }
