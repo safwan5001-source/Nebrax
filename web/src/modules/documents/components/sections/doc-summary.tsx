@@ -31,7 +31,7 @@ export function DocSummary({
 
   if (style.composition === 'modern') {
     return (
-      <section className={cn('grid grid-cols-12 items-end gap-6', style.sectionGap)}>
+      <section data-doc-keep="summary" className={cn('grid grid-cols-12 items-end gap-6', style.sectionGap)}>
         <div className="col-span-4">{qr}</div>
         <div className="col-span-5 col-start-8 flex justify-end">{totals}</div>
       </section>

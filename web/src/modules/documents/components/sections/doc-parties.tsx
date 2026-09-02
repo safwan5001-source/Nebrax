@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { DocInfoRow } from './doc-info-row';
 import { useDocStyle } from '../doc-style-context';
+import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
+import { modernFieldLabel } from '../../presentation/visual-v2';
 
 /** عناوين بطاقات المستند عربية أيضاً؛ تباعد المحارف يكسر وصلها عند رسم PDF. */
 export const DOCUMENT_PARTY_CARD_LABEL_CLASS = 'mb-1.5 text-[10px] font-bold text-muted';
@@ -17,6 +19,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
   const tDocument = useTranslations('documentPresentation');
   const style = useDocStyle();
   const { seller, buyer, meta } = model;
+  const { mode } = useDocumentLabelMode(model);
   const isTaxInvoice = model.type === 'tax_invoice' || model.type === 'simplified_tax_invoice';
   const isPurchaseInvoice = model.type === 'purchase_invoice';
   const isPurchaseDocument = model.type === 'purchase_order' || isPurchaseInvoice;
@@ -30,21 +33,33 @@ export function DocParties({ model }: { model: DocumentModel }) {
         ? tPrint('customer')
         : t('bill_to');
 
-  const sellerDetails = (
+  const sellerCore = (
     <>
       <div className="break-words font-semibold leading-snug text-black">{seller.name || '—'}</div>
-      <DocInfoRow label={t('vat_number')} value={seller.vatNumber ? <span className="num">{seller.vatNumber}</span> : null} />
-      <DocInfoRow label={t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />
+      <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('vat_number', mode) : t('vat_number')} value={seller.vatNumber ? <span className="num">{seller.vatNumber}</span> : null} />
+      <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('cr_number', mode) : t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />
       <DocInfoRow label={t('national_address')} value={seller.address} />
+    </>
+  );
+
+  const sellerContacts = (
+    <>
       <DocInfoRow label={t('phone')} value={seller.phone ? <span className="num" dir="ltr">{seller.phone}</span> : null} />
       <DocInfoRow label={t('mobile')} value={seller.mobile ? <span className="num" dir="ltr">{seller.mobile}</span> : null} />
+    </>
+  );
+
+  const sellerDetails = (
+    <>
+      {sellerCore}
+      {sellerContacts}
     </>
   );
 
   const buyerDetails = (
     <>
       <div className="break-words font-semibold leading-snug text-black">{buyer.name || '—'}</div>
-      <DocInfoRow label={t('vat_number')} value={buyer.vatNumber ? <span className="num">{buyer.vatNumber}</span> : null} />
+      <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('vat_number', mode) : t('vat_number')} value={buyer.vatNumber ? <span className="num">{buyer.vatNumber}</span> : null} />
       <DocInfoRow label={t('city')} value={buyer.city} />
     </>
   );
@@ -96,20 +111,17 @@ export function DocParties({ model }: { model: DocumentModel }) {
   }
 
   if (style.composition === 'modern') {
-    const surface = cn('border border-[color:var(--border)] p-4', style.cardRadius);
+    const modernIssuer = isTaxInvoice ? modernFieldLabel('seller', mode) : issuerLabel;
+    const modernParty = isTaxInvoice ? modernFieldLabel('buyer', mode) : partyLabel;
     return (
-      <section className={cn('grid grid-cols-12 gap-3', style.sectionGap)}>
-        <div className={cn('col-span-5', surface)}>
-          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{issuerLabel}</div>
-          {sellerDetails}
+      <section className={cn('grid grid-cols-2 gap-x-10 gap-y-3 border-b border-[color:var(--border)] pb-4', style.sectionGap)}>
+        <div className="min-w-0">
+          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{modernIssuer}</div>
+          {sellerCore}
         </div>
-        <div className={cn('col-span-4', surface)}>
-          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{partyLabel}</div>
+        <div className="min-w-0">
+          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{modernParty}</div>
           {buyerDetails}
-        </div>
-        <div className={cn('col-span-3 bg-[color:var(--doc-brand-soft)]', surface)}>
-          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{isTaxInvoice ? t('meta') : tDocument('meta')}</div>
-          {metaDetails}
         </div>
       </section>
     );

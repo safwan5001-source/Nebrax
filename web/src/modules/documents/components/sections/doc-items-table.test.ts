@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { usesMonospaceValue } from './doc-items-table';
+import {
+  MODERN_ITEMS_ROW_CLASS,
+  MODERN_ITEMS_TABLE_CLASS,
+  modernItemsColumnWidthClass,
+  modernItemsValueCellClass,
+} from '../../presentation/visual-v2';
 
 describe('usesMonospaceValue', () => {
   it('يبقي اسم المنتج ووصفه على خط الواجهة الداعم للعربية', () => {
@@ -15,5 +21,19 @@ describe('usesMonospaceValue', () => {
     expect(usesMonospaceValue('unit_price')).toBe(true);
     expect(usesMonospaceValue('tax')).toBe(true);
     expect(usesMonospaceValue('total')).toBe(true);
+  });
+});
+
+describe('Modern items table presentation', () => {
+  it('يثبّت عرضاً ثابتاً بلا overflow أفقي وبدون تناوب ملوّن', () => {
+    expect(MODERN_ITEMS_TABLE_CLASS).toContain('table-fixed');
+    expect(MODERN_ITEMS_ROW_CLASS).not.toMatch(/bg-|brand-soft/);
+  });
+
+  it('يلف الوصف بأمان ويبقي الأرقام في سطر واحد', () => {
+    expect(modernItemsValueCellClass('description')).toContain('break-words');
+    expect(modernItemsValueCellClass('product')).toContain('min-w-0');
+    expect(modernItemsValueCellClass('quantity')).toContain('whitespace-nowrap');
+    expect(modernItemsColumnWidthClass('number')).toBe('w-[6%]');
   });
 });

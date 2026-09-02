@@ -171,4 +171,15 @@
     size: A4;
     margin: 14mm;
   }
+
+  /* Modern V2 فقط: تكرار رأس الجدول ومنع يتم الأرقام/التذييل عبر الصفحات. */
+  [data-doc-composition="modern"] thead {
+    display: table-header-group;
+  }
+  [data-doc-composition="modern"] tr,
+  [data-doc-composition="modern"] [data-doc-keep="summary"],
+  [data-doc-composition="modern"] footer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

@@ -141,6 +141,11 @@ export interface DocumentModel {
   signatureUrl?: string | null;
   /** بيانات السند (قبض/صرف) — للمستندات من نوع voucher فقط. */
   voucher?: DocumentVoucher | null;
+  /**
+   * حالة سير العمل كما وصلت من المصدر (مسودة/مرحّل/ملغى…). عرضية اختيارية؛
+   * لا تُشتق في العارض ولا تغيّر الترحيل. Modern يوسّم المسودة والملغى فقط.
+   */
+  status?: string | null;
 }
 
 /** توكنز الثيم (تُسقَط إلى متغيّرات CSS). */

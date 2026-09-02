@@ -34,6 +34,7 @@ export function DocLayout({
         id={rootId ?? undefined}
         dir={dir}
         style={themeCssVars(theme)}
+        data-doc-composition={style.composition}
         className={cn(
           'mx-auto flex min-h-[277mm] w-[210mm] max-w-[210mm] flex-col bg-white text-[12px] leading-relaxed text-black shadow-sm print:min-h-0 print:w-full print:shadow-none',
           style.pagePadding

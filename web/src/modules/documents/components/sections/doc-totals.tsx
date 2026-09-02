@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
+import { VISUAL_V2 } from '../../presentation/visual-v2';
 
 /** كتلة الإجماليات — تعرض القيم المشتقة كما تصل من نموذج المستند فقط. */
 export function DocTotals({
@@ -25,13 +26,15 @@ export function DocTotals({
     'flex items-baseline justify-between gap-5 px-3 py-1.5',
     isErp ? 'border-t border-[color:var(--border)] text-black' : 'border-t border-[color:var(--border)] text-[color:var(--muted)]',
     isMinimal && 'px-0 py-2 text-black',
+    isModern && 'px-0 py-1.5 text-black',
   );
 
   const outer = cn(
-    'max-w-[300px] overflow-hidden',
+    isModern ? VISUAL_V2.totalsMaxClass : 'max-w-[300px]',
+    !isModern && 'overflow-hidden',
     isModern ? 'w-full' : 'w-[46%]',
     isErp && 'border border-black',
-    isModern && 'rounded-md border border-[color:var(--border)] bg-white',
+    isModern && 'border-y border-[color:var(--border)]',
     isMinimal && 'border-y border-black',
     !isErp && !isModern && !isMinimal && 'rounded-lg border border-gray-200',
   );
@@ -39,18 +42,16 @@ export function DocTotals({
   const totalRow = cn(
     'flex items-baseline justify-between gap-5 px-3 py-2.5 font-bold',
     isErp && 'border-t-2 border-black',
-    isModern && 'border-t-2 border-[color:var(--doc-brand)]',
+    isModern && 'border-t border-[color:var(--doc-brand)] px-0 py-2 text-black',
     isMinimal && 'border-t-2 border-black px-0',
   );
-  const totalStyle = isMinimal
+  const totalStyle = isMinimal || isModern
     ? undefined
-    : isModern
-      ? { background: 'var(--doc-brand-soft)', color: 'var(--doc-brand)' }
-      : { background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' };
+    : { background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' };
 
   return (
-    <div className={outer}>
-      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal ? 'text-black' : 'text-[color:var(--muted)]', isMinimal && 'px-0 py-2')}>
+    <div className={outer} data-doc-totals={style.composition}>
+      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal || isModern ? 'text-black' : 'text-[color:var(--muted)]', (isMinimal || isModern) && 'px-0 py-2')}>
         <span>{t('subtotal')}</span>
         <span className="num">{formatMoney(totals.subtotal)}</span>
       </div>

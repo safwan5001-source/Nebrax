@@ -16,15 +16,15 @@ export const CLASSIC_STYLE: TemplateStyle = {
 };
 
 /**
- * Modern — هوية متوازنة بمساحة تنفس أوضح، ورأس مفصول بصرياً وملخص محاسبي نظيف.
- * لا يستعمل زوايا كبيرة أو ظلالاً حتى لا يتحول المستند إلى بطاقة واجهة.
+ * Modern V2 — مستند مالي رسمي: فواصل رفيعة بلا بطاقات، ورأس جدول plain بلا شريط هوية.
+ * لا زوايا زخرفية ولا ظلال؛ الإبراز بالطباعة والوزن والفاصل لا بالتعبئة الملوّنة.
  */
 export const MODERN_STYLE: TemplateStyle = {
   composition: 'modern',
-  pagePadding: 'p-10',
-  cardRadius: 'rounded-md',
-  sectionGap: 'mt-7',
-  tableHead: 'soft',
+  pagePadding: 'p-8',
+  cardRadius: 'rounded-none',
+  sectionGap: 'mt-6',
+  tableHead: 'plain',
   tableDensity: 'comfortable',
   brandBar: false,
 };

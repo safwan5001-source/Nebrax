@@ -7,6 +7,13 @@ import { getDefaultDocumentItemColumns } from '@/modules/documents/registry/docu
 import type { DocBlockAlignment, DocItemsColumn, DocItemsColumnId, DocumentModel, TemplateStyle } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { blockTextClassName, useDocBlockProperties } from '../doc-block-properties-context';
+import {
+  MODERN_ITEMS_HEAD_CLASS,
+  MODERN_ITEMS_ROW_CLASS,
+  MODERN_ITEMS_TABLE_CLASS,
+  modernItemsColumnWidthClass,
+  modernItemsValueCellClass,
+} from '../../presentation/visual-v2';
 
 /**
  * الخط الأحادي مخصص للأرقام والأكواد القابلة للمقارنة فقط. لا يُطبّق على
@@ -29,6 +36,9 @@ export function usesMonospaceValue(column: DocItemsColumnId): boolean {
 
 /** خصائص صفّ رأس الجدول حسب نمط القالب. */
 function headRow(style: TemplateStyle): { className: string; style?: CSSProperties } {
+  if (style.composition === 'modern') {
+    return { className: MODERN_ITEMS_HEAD_CLASS };
+  }
   switch (style.tableHead) {
     case 'soft':
       return { className: 'border-y border-[color:var(--border)] text-black', style: { background: 'var(--doc-brand-soft)' } };
@@ -51,7 +61,7 @@ function defaultAlignment(column: DocItemsColumnId): DocBlockAlignment {
 function tableClassName(style: TemplateStyle): string {
   switch (style.composition) {
     case 'erp': return 'w-full border-collapse text-[10px] leading-snug';
-    case 'modern': return 'w-full border-collapse text-[11px] leading-relaxed';
+    case 'modern': return MODERN_ITEMS_TABLE_CLASS;
     case 'minimal': return 'w-full border-collapse text-[11px] leading-relaxed';
     default: return 'w-full border-collapse text-[11px]';
   }
@@ -68,7 +78,7 @@ function cellPadding(style: TemplateStyle): { head: string; body: string } {
 function bodyRowClassName(style: TemplateStyle, index: number): string {
   switch (style.composition) {
     case 'erp': return 'border-b border-[color:var(--border)]';
-    case 'modern': return index % 2 ? 'border-b border-[color:var(--border)] bg-[color:var(--doc-brand-soft)]/30' : 'border-b border-[color:var(--border)]';
+    case 'modern': return MODERN_ITEMS_ROW_CLASS;
     case 'minimal': return 'border-b border-[color:var(--border)]';
     default: return index % 2 ? 'bg-gray-50' : '';
   }
@@ -100,6 +110,7 @@ export function DocItemsTable({
     tax: t('tax'),
     total: t('total'),
   };
+  const isModern = style.composition === 'modern';
 
   const valueFor = (column: DocItemsColumnId, line: DocumentModel['lines'][number], index: number): string | number => {
     switch (column) {
@@ -116,8 +127,8 @@ export function DocItemsTable({
     }
   };
 
-  return (
-    <table className={blockTextClassName(properties, cn(tableClassName(style), style.sectionGap))}>
+  const table = (
+    <table className={blockTextClassName(properties, cn(tableClassName(style), !isModern && style.sectionGap))}>
       <thead>
         <tr className={head.className} style={head.style}>
           {columns.map((column) => {
@@ -130,6 +141,7 @@ export function DocItemsTable({
                   'font-semibold',
                   textAlignmentClass(alignment),
                   column.id === 'total' && 'font-bold',
+                  isModern && modernItemsColumnWidthClass(column.id),
                 )}
               >
                 {column.label?.trim() || labels[column.id]}
@@ -154,6 +166,8 @@ export function DocItemsTable({
                     column.id === 'total' && 'font-bold',
                     column.id === 'total' && style.composition === 'erp' && 'bg-[color:var(--doc-brand-soft)]',
                     column.id === 'total' && style.composition === 'minimal' && 'border-s-2 border-black',
+                    isModern && modernItemsColumnWidthClass(column.id),
+                    isModern && modernItemsValueCellClass(column.id),
                   )}
                 >
                   {valueFor(column.id, line, index)}
@@ -165,4 +179,10 @@ export function DocItemsTable({
       </tbody>
     </table>
   );
+
+  if (isModern) {
+    return <div className={cn('overflow-hidden', style.sectionGap)}>{table}</div>;
+  }
+
+  return table;
 }
