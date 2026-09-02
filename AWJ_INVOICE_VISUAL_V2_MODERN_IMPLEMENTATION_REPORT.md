@@ -161,24 +161,43 @@
 
 ---
 
+## جولة التغطية الثنائية (Final Bilingual Coverage)
+
+التصميم البصري المعتمد (نسب الأعمدة 100%، QR 76px، شعار 36px، ملخص `flex justify-between`، `sectionGap: mt-4`) **لم يُغيَّر**. الاستثناء الوحيد: كل رؤوس أعمدة Modern صارت `whitespace-normal break-words` حتى يلتف `العربية | English` داخل العرض الثابت.
+
+عند `labelMode === bilingual` تُعرض التسميات من كتالوج `visual-v2` بصيغة **العربية | English**:
+
+| السطح | المصدر |
+| --- | --- |
+| رأس/ميتا | `modernFieldLabel` + عنوان `localizedPair` |
+| أطراف | بائع/مشتري (أو منشأة/عميل/مورد حسب النوع) + VAT/مدينة |
+| رؤوس الجدول | `modernColumnLabel`؛ العمود المخصّص يبقى كما خُزن |
+| إجماليات | `modernTotalLabel` |
+| ملاحظات/شروط/بنك/توقيع | `modernFieldLabel` |
+| تفقيط | تسمية ثنائية؛ قيمة الحروف لغة واحدة |
+| QR | ملاحظة البيانات إن وُجدت؛ وإلا `zatca_note` ثنائي |
+| تذييل | `footerText`/محتوى القالب إن وُجد؛ وإلا نص ZATCA الثنائي |
+| ختم | بلا تسمية ظاهرة (لم تُختَرع) |
+
+القيم (رقم، تاريخ، مبلغ، كمية، VAT) مرة واحدة. أسماء الشركة/العميل/المنتج/الوصف من البيانات كما هي. العملة في الثنائي **SAR**. العربية والإنجليزية المنفردتان بلا فاصل ` | `.
+
+---
+
 ## Tests
 
-### Vitest — `npm run test` في `web/` (بعد الصقل)
+### Vitest — `npm run test` في `web/` (بعد التغطية الثنائية)
 
 ```
 Test Files  189 passed (189)
-Tests       1129 passed (1129)
-Duration    20.42s
+Tests       1135 passed (1135)
+Duration    20.92s
 ```
 
 منها:
 
-- `visual-v2.test.ts`: 19 (وضع التسمية، سقف الشعار 36px وQR 76px، مجموع نسب 100%، `ريال` عربياً و`SAR` إنجليزي/ثنائي بلا `﷼`).
-- `document-modern.test.tsx`: 17 (غياب المربع الملوّن، شارة draft/cancelled لا posted، QR 76px، table-fixed، ثنائي اللغة، هاتف في التذييل، 1/5/20 بنداً، خلايا بلا وحدة عملة، ملخص `justify-between`، عزل ERP/Minimal).
-- `from-invoice.test.ts`: +2 لتمرير الحالة/الاستحقاق/الإجماليات وحذف الأصفار.
-- `template-styles.test.ts`: يثبت Classic/ERP/Minimal/Retail دون تغيير؛ Modern `sectionGap: mt-4`.
-- `visual-v2-print.test.ts`: عزل CSS الطباعة.
-- الاختبارات القائمة (`doc-items-table` monospace، `doc-parties`، `document-body`، `document-qa-fixtures`، `template-export-contract`) لم تُضعَف.
+- `visual-v2.test.ts`: 22 (كتالوج bilingual لكل حقل/عمود/إجمالي/حالة؛ `#` بلا تكرار؛ رأس المال `الإجمالي | Total (SAR)`).
+- `document-modern.test.tsx`: 20 (كل تسميات Modern الظاهرة ثنائية في `FULL_LAYOUT`؛ تسمية عمود مخصّصة بلا ترجمة؛ عربي/إنجليزي بلا ` | `؛ عزل ERP عن الزوج الثنائي).
+- بقية حراسة الصقل البصري كما هي.
 
 ### PHP
 
@@ -186,13 +205,28 @@ Duration    20.42s
 
 ### Frontend build
 
-`npm run build` (Next.js 15.5.19) نجح محلياً على جولة الصقل. Web CI السابق أخضر على `cec89b79`؛ جولة الصقل بانتظار فحص الفرع بعد الدفع.
+`npm run build` (Next.js 15.5.19) نجح محلياً على جولة التغطية الثنائية.
 
 ---
 
 ## Visual QA
 
-نُفِّذ عبر Playwright على `/document-qa?template=tax-invoice-modern` محلياً (`http://127.0.0.1:3001`)، **بلا جلسة مستأجر**. لقطات `#qa-print-root` في `/opt/cursor/artifacts/`:
+نُفِّذ عبر Playwright على `/document-qa?template=tax-invoice-modern` محلياً (`http://127.0.0.1:3001`)، **بلا جلسة مستأجر**. لقطات `#qa-print-root` في `/opt/cursor/artifacts/`.
+
+### جولة التغطية الثنائية (r3) — إلزامية
+
+locale الواجهة `en` + `direction=rtl` → `labelMode=bilingual`. فحص إحداثيات `th`: **صفر تراكب**. `tableOverflowPx = 0`.
+
+| الملف | السيناريو |
+| --- | --- |
+| `modern_v2_bilingual_rtl_en_five_r3.png` | فاتورة ضريبية، 5 بنود — كل التسميات `العربية \| English`، العملة SAR، القيم مرة واحدة |
+| `modern_v2_bilingual_rtl_en_long_content_r3.png` | محتوى طويل — رؤوس الأعمدة تلتف بلا قصّ أو تراكب |
+| `modern_v2_bilingual_rtl_en_quotation_five_r3.png` | عرض سعر (يُظهر ملاحظات/شروط/بنك/توقيع ثنائية؛ التخطيط الافتراضي للفاتورة يخفيها) |
+| `modern_v2_bilingual_qa_inspect_r3.json` | مقاييس التراكب والنصوص |
+
+ملاحظات البيانات (`رمز تحقق خاص بالمعاينة`) ونص التذييل من الـ fixture بقيا كما هما — ليسا تسميات.
+
+### جولة الصقل السابقة (مرجع)
 
 | الملف | السيناريو |
 | --- | --- |
@@ -228,9 +262,9 @@ Duration    20.42s
 | الأمر | النتيجة |
 | --- | --- |
 | `php artisan test` | غير مشغَّل (لا backend) |
-| `npm run test` | 189 ملفاً / 1129 اختباراً (بعد الصقل) |
-| `npm run build` | نجح محلياً على جولة الصقل |
-| GitHub CI | **نجح** سابقاً على `cec89b79` في [#616](https://github.com/safwan5001-source/Nebrax/pull/616). صقل `217f0e67` مدفوع على نفس الفرع؛ لا دمج |
+| `npm run test` | 189 ملفاً / **1135** اختباراً (بعد التغطية الثنائية) |
+| `npm run build` | نجح محلياً (Next.js 15.5.19) |
+| GitHub CI | **نجح** سابقاً على `cec89b79` و`3ddf2f16`. التزام التغطية الثنائية `534b3911` مدفوع على نفس الفرع؛ لا دمج |
 
 ---
 
@@ -259,7 +293,9 @@ Duration    20.42s
 
 ## Explicit exclusions respected
 
-ERP · Classic · Minimal · Retail · Thermal · Quotes · Purchase Orders · Credit/Debit Notes · Purchase Invoices · Vouchers · ZATCA generation · accounting · API/DB schema · revision freeze contract · second renderer · Merge · Deploy.
+ERP · Classic · Minimal · Retail · Thermal · ZATCA generation · accounting · API/DB schema · revision freeze contract · second renderer · Merge · Deploy.
+
+(تسميات Modern تُطبَّق إن اختير القالب نفسه لنوع تجاري في `/document-qa`؛ لا إعادة تصميم لتلك الأنواع.)
 
 ---
 
@@ -268,9 +304,10 @@ ERP · Classic · Minimal · Retail · Thermal · Quotes · Purchase Orders · C
 - **Branch:** `cursor/invoice-visual-v2-modern-7cc0`
 - **PR:** [#616](https://github.com/safwan5001-source/Nebrax/pull/616)
 - **Base SHA:** `36525584b4545ef511c839b04ce3bc7f2535aa2e`
-- **Implementation SHA:** `217f0e679f2a19915f336b1da92176b57df3d9b3` (آخر التزام كودي للصقل؛ لا التزام لاحق لمجرد مطابقة Head)
+- **Implementation SHA:** `534b3911c770fb87822827c4085a68ee6b0d5cb7` (آخر التزام كودي — التغطية الثنائية؛ لا التزام لاحق لمجرد مطابقة Head)
+- **Implementation SHA (صقل بصري):** `217f0e679f2a19915f336b1da92176b57df3d9b3`
 - **CI-green SHA:** `cec89b79ba74f132f103e839053d07a9c0dee8bd` (5/5 على الجولة الأولى)
-- **عدد commits (كود الصقل):** `3ddf2f16` ثم `217f0e67`
+- **عدد commits (كود هذه الجولة):** `534b3911`
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
