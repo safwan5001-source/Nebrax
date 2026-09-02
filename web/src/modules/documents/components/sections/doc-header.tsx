@@ -10,10 +10,8 @@ import {
   VISUAL_V2,
   cappedLogoHeight,
   isNoticeStatus,
-  localizedPair,
-  modernFieldLabel,
-  modernStatusLabel,
 } from '../../presentation/visual-v2';
+import { ModernDocumentTitle, ModernFieldLabel, ModernStatusLabel } from '../../presentation/modern-bilingual-label';
 
 /** ترويسة المستند: الهوية والعنوان ورقم المستند، باختلاف تركيبي محسوب لكل قالب. */
 export function DocHeader({ model, showLogo = true }: { model: DocumentModel; showLogo?: boolean }) {
@@ -29,11 +27,11 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
   const isTaxInvoice = model.type === 'tax_invoice' || model.type === 'simplified_tax_invoice';
   const isPurchaseInvoice = model.type === 'purchase_invoice';
   const showsPaymentType = isTaxInvoice || isPurchaseInvoice;
-  const dueDateLabel = model.type === 'quotation'
-    ? modernFieldLabel('valid_until', mode)
+  const dueDateField = model.type === 'quotation'
+    ? 'valid_until' as const
     : model.type === 'sales_order' || model.type === 'purchase_order'
-      ? modernFieldLabel('expected_delivery_date', mode)
-      : modernFieldLabel('due_date', mode);
+      ? 'expected_delivery_date' as const
+      : 'due_date' as const;
 
   const identity = (
     <div className="flex min-w-0 items-center gap-3">
@@ -86,8 +84,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
 
   if (style.composition === 'modern') {
     const logoHeight = cappedLogoHeight(seller.logoHeight);
-    const title = localizedPair(locale, dt(model.type), dtAlt(model.type), mode);
-    const invoiceNumberLabel = isTaxInvoice ? modernFieldLabel('number', mode) : modernFieldLabel('document_number', mode);
+    const invoiceNumberField = isTaxInvoice ? 'number' as const : 'document_number' as const;
     return (
       <header className="border-b border-[color:var(--border)] pb-4">
         <div className="flex items-start justify-between gap-8">
@@ -105,28 +102,30 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
               <div className="line-clamp-2 break-words text-[16px] font-bold leading-snug text-black">{seller.name || '—'}</div>
               {seller.tagline ? <div className="mt-0.5 line-clamp-1 break-words text-[10px] text-[color:var(--muted)]">{seller.tagline}</div> : null}
               <div className="mt-1.5 space-y-0.5">
-                <DocInfoRow label={modernFieldLabel('vat_number', mode)} value={seller.vatNumber ? <span className="num">{seller.vatNumber}</span> : null} stacked />
-                <DocInfoRow label={modernFieldLabel('cr_number', mode)} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} stacked />
-                <DocInfoRow label={modernFieldLabel('national_address', mode)} value={seller.address ? <span className="line-clamp-2">{seller.address}</span> : null} stacked />
+                <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
+                <DocInfoRow label={<ModernFieldLabel field="cr_number" mode={mode} />} value={seller.crNumber ? <span className="num" dir="ltr">{seller.crNumber}</span> : null} stacked />
+                <DocInfoRow label={<ModernFieldLabel field="national_address" mode={mode} />} value={seller.address ? <span className="line-clamp-2">{seller.address}</span> : null} stacked />
               </div>
             </div>
           </div>
           <div className="min-w-[176px] max-w-[46%] shrink-0 text-end">
-            <h1 className="text-[20px] font-bold leading-tight text-black">{title}</h1>
+            <h1 className="text-[20px] font-bold leading-tight text-black">
+              <ModernDocumentTitle locale={locale} primary={dt(model.type)} alternate={dtAlt(model.type)} mode={mode} />
+            </h1>
             <div className="mt-1.5 h-px w-full bg-[color:var(--border)]" />
             <div className="mt-2 space-y-0.5">
               <DocInfoRow
-                label={invoiceNumberLabel}
-                value={<span className="num font-bold">{meta.number}</span>}
+                label={<ModernFieldLabel field={invoiceNumberField} mode={mode} />}
+                value={<span className="num font-bold" dir="ltr">{meta.number}</span>}
                 stacked
                 align="end"
               />
-              <DocInfoRow label={modernFieldLabel('date', mode)} value={<span className="num">{meta.date}</span>} stacked align="end" />
-              {meta.dueDate ? <DocInfoRow label={dueDateLabel} value={<span className="num">{meta.dueDate}</span>} stacked align="end" /> : null}
+              <DocInfoRow label={<ModernFieldLabel field="date" mode={mode} />} value={<span className="num" dir="ltr">{meta.date}</span>} stacked align="end" />
+              {meta.dueDate ? <DocInfoRow label={<ModernFieldLabel field={dueDateField} mode={mode} />} value={<span className="num" dir="ltr">{meta.dueDate}</span>} stacked align="end" /> : null}
               {showsPaymentType ? (
                 <DocInfoRow
-                  label={modernFieldLabel('payment_type', mode)}
-                  value={meta.paymentType ? modernFieldLabel(meta.paymentType === 'cash' ? 'cash' : 'credit', mode) : null}
+                  label={<ModernFieldLabel field="payment_type" mode={mode} />}
+                  value={meta.paymentType ? <ModernFieldLabel field={meta.paymentType === 'cash' ? 'cash' : 'credit'} mode={mode} /> : null}
                   stacked
                   align="end"
                 />
@@ -142,7 +141,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
                     : 'border-[color:var(--border)] text-[color:var(--muted)]',
                 )}
               >
-                {modernStatusLabel(model.status, mode)}
+                <ModernStatusLabel status={model.status} mode={mode} />
               </div>
             ) : null}
           </div>

@@ -6,7 +6,7 @@ import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { blockTextClassName, useDocBlockProperties } from '../doc-block-properties-context';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
-import { modernFieldLabel } from '../../presentation/visual-v2';
+import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /** تذييل المستند — يُدفع لأسفل الصفحة (mt-auto داخل غلاف flex-col). */
 export function DocFooter({ model }: { model: DocumentModel }) {
@@ -18,7 +18,7 @@ export function DocFooter({ model }: { model: DocumentModel }) {
   const content =
     properties.static_content ??
     model.footerText ??
-    (isModern ? modernFieldLabel('footer', mode) : t('footer'));
+    (isModern ? <ModernFieldLabel field="footer" mode={mode} /> : t('footer'));
   const frame = style.composition === 'erp'
     ? 'border-t border-black pt-3'
     : isModern

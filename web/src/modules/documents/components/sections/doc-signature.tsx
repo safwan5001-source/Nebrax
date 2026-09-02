@@ -7,7 +7,7 @@ import { useDocStyle } from '../doc-style-context';
 import { useDocBlockProperties } from '../doc-block-properties-context';
 import { getDocumentImagePreviewClass, getDocumentImagePreviewOpacityClass } from '../../utils/block-image-size';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
-import { modernFieldLabel } from '../../presentation/visual-v2';
+import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /** التوقيع — صورة فوق خطّ توقيع. لا يظهر بلا صورة. */
 export function DocSignature({ model }: { model: DocumentModel }) {
@@ -36,7 +36,7 @@ export function DocSignature({ model }: { model: DocumentModel }) {
       {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
       <img src={model.signatureUrl} alt={t('signature')} className={cn(getDocumentImagePreviewClass('signature', properties.image_size), getDocumentImagePreviewOpacityClass('signature', properties.image_opacity))} />
       <div className="mt-1 w-40 border-t border-[color:var(--muted)] pt-1 text-[10px] text-[color:var(--muted)]">
-        {style.composition === 'modern' ? modernFieldLabel('signature', mode) : t('signature')}
+        {style.composition === 'modern' ? <ModernFieldLabel field="signature" mode={mode} /> : t('signature')}
       </div>
     </div>
   );

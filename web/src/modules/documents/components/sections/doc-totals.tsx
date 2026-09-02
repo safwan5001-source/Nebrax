@@ -4,8 +4,9 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
-import { VISUAL_V2, formatModernMoney, modernTotalLabel } from '../../presentation/visual-v2';
+import { VISUAL_V2, formatModernMoney } from '../../presentation/visual-v2';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
+import { ModernTotalLabel } from '../../presentation/modern-bilingual-label';
 
 /** كتلة الإجماليات — تعرض القيم المشتقة كما تصل من نموذج المستند فقط. */
 export function DocTotals({
@@ -27,7 +28,7 @@ export function DocTotals({
     ? (minor: number) => formatModernMoney(minor, model.currency, mode)
     : formatMoney;
   const totalLabel = (key: 'subtotal' | 'discount' | 'shipping' | 'adjustment' | 'vat' | 'grand_total') => {
-    if (isModern) return modernTotalLabel(key, mode);
+    if (isModern) return <ModernTotalLabel field={key} mode={mode} />;
     if (key === 'discount' || key === 'shipping' || key === 'adjustment') return tp(key);
     return t(key);
   };
@@ -36,7 +37,7 @@ export function DocTotals({
     'flex items-baseline justify-between gap-5 px-3 py-1.5',
     isErp ? 'border-t border-[color:var(--border)] text-black' : 'border-t border-[color:var(--border)] text-[color:var(--muted)]',
     isMinimal && 'px-0 py-2 text-black',
-    isModern && 'px-0 py-1.5 text-black',
+    isModern && 'items-start px-0 py-1.5 text-black',
   );
 
   const outer = cn(
@@ -52,7 +53,7 @@ export function DocTotals({
   const totalRow = cn(
     'flex items-baseline justify-between gap-5 px-3 py-2.5 font-bold',
     isErp && 'border-t-2 border-black',
-    isModern && 'border-t border-[color:var(--doc-brand)] px-0 py-2 text-black',
+    isModern && 'items-start border-t border-[color:var(--doc-brand)] px-0 py-2 text-black',
     isMinimal && 'border-t-2 border-black px-0',
   );
   const totalStyle = isMinimal || isModern
@@ -61,35 +62,35 @@ export function DocTotals({
 
   return (
     <div className={outer} data-doc-totals={style.composition}>
-      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal || isModern ? 'text-black' : 'text-[color:var(--muted)]', (isMinimal || isModern) && 'px-0 py-2')}>
+      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal || isModern ? 'text-black' : 'text-[color:var(--muted)]', (isMinimal || isModern) && 'px-0 py-2', isModern && 'items-start')}>
         <span>{totalLabel('subtotal')}</span>
-        <span className="num">{displayMoney(totals.subtotal)}</span>
+        <span className="num shrink-0" dir="ltr">{displayMoney(totals.subtotal)}</span>
       </div>
       {totals.discount && totals.discount > 0 ? (
         <div className={baseRow}>
           <span>{totalLabel('discount')}</span>
-          <span className="num">− {displayMoney(totals.discount)}</span>
+          <span className="num shrink-0" dir="ltr">− {displayMoney(totals.discount)}</span>
         </div>
       ) : null}
       {totals.shipping && totals.shipping > 0 ? (
         <div className={baseRow}>
           <span>{totalLabel('shipping')}</span>
-          <span className="num">{displayMoney(totals.shipping)}</span>
+          <span className="num shrink-0" dir="ltr">{displayMoney(totals.shipping)}</span>
         </div>
       ) : null}
       {totals.adjustment ? (
         <div className={baseRow}>
           <span>{totalLabel('adjustment')}</span>
-          <span className="num">{totals.adjustment < 0 ? '− ' : ''}{displayMoney(Math.abs(totals.adjustment))}</span>
+          <span className="num shrink-0" dir="ltr">{totals.adjustment < 0 ? '− ' : ''}{displayMoney(Math.abs(totals.adjustment))}</span>
         </div>
       ) : null}
       <div className={baseRow}>
         <span>{totalLabel('vat')}</span>
-        <span className="num">{displayMoney(totals.tax)}</span>
+        <span className="num shrink-0" dir="ltr">{displayMoney(totals.tax)}</span>
       </div>
       <div className={totalRow} style={totalStyle}>
         <span>{totalLabel('grand_total')}</span>
-        <span className="num text-base">{displayMoney(totals.total)}</span>
+        <span className="num shrink-0 text-base" dir="ltr">{displayMoney(totals.total)}</span>
       </div>
     </div>
   );

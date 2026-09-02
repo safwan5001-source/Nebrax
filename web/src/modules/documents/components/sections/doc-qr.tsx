@@ -5,7 +5,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
-import { VISUAL_V2, modernFieldLabel } from '../../presentation/visual-v2';
+import { VISUAL_V2 } from '../../presentation/visual-v2';
+import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /** رمز ZATCA (QR) — يُرسَم SVG آمناً؛ يُبقي مساحة فارغة حين لا يوجد رمز. */
 export function DocQr({ model }: { model: DocumentModel }) {
@@ -24,7 +25,7 @@ export function DocQr({ model }: { model: DocumentModel }) {
             <QRCodeSVG value={qr} size={size} level="M" />
           </div>
           <div className={isModern ? 'text-[9px] text-[color:var(--muted)]' : 'text-[9px] text-gray-400'}>
-            {model.qr?.note ?? (isModern ? modernFieldLabel('zatca_note', mode) : t('zatca_note'))}
+            {model.qr?.note ?? (isModern ? <ModernFieldLabel field="zatca_note" mode={mode} /> : t('zatca_note'))}
           </div>
         </>
       ) : (

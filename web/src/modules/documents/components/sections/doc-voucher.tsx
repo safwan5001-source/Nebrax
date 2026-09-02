@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
-import { modernFieldLabel } from '../../presentation/visual-v2';
+import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /**
  * جسم السند (قبض/صرف) — بديل جدول البنود لمستند لا يحمل ضريبة:
@@ -27,7 +27,7 @@ export function DocVoucher({
   const isModern = style.composition === 'modern';
   const voucherLabel = (
     key: 'received_from' | 'paid_to' | 'amount' | 'method' | 'reference' | 'applied_to',
-  ) => (isModern ? modernFieldLabel(key, mode) : t(key));
+  ) => (isModern ? <ModernFieldLabel field={key} mode={mode} /> : t(key));
 
   const party = model.buyer.name || '—';
   const phrase = v.direction === 'received' ? voucherLabel('received_from') : voucherLabel('paid_to');

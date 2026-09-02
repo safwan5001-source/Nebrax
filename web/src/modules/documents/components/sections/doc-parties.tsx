@@ -6,7 +6,7 @@ import type { DocumentModel } from '../../types';
 import { DocInfoRow } from './doc-info-row';
 import { useDocStyle } from '../doc-style-context';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
-import { modernFieldLabel } from '../../presentation/visual-v2';
+import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /** عناوين بطاقات المستند عربية أيضاً؛ تباعد المحارف يكسر وصلها عند رسم PDF. */
 export const DOCUMENT_PARTY_CARD_LABEL_CLASS = 'mb-1.5 text-[10px] font-bold text-muted';
@@ -36,7 +36,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
   const sellerCore = (
     <>
       <div className="break-words font-semibold leading-snug text-black">{seller.name || '—'}</div>
-      <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('vat_number', mode) : t('vat_number')} value={seller.vatNumber ? <span className="num">{seller.vatNumber}</span> : null} />
+      <DocInfoRow label={style.composition === 'modern' ? <ModernFieldLabel field="vat_number" mode={mode} /> : t('vat_number')} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} />
       {style.composition === 'modern' ? null : (
         <>
           <DocInfoRow label={t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />
@@ -63,8 +63,8 @@ export function DocParties({ model }: { model: DocumentModel }) {
   const buyerDetails = (
     <>
       <div className="break-words font-semibold leading-snug text-black">{buyer.name || '—'}</div>
-      <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('vat_number', mode) : t('vat_number')} value={buyer.vatNumber ? <span className="num">{buyer.vatNumber}</span> : null} />
-      <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('city', mode) : t('city')} value={buyer.city} />
+      <DocInfoRow label={style.composition === 'modern' ? <ModernFieldLabel field="vat_number" mode={mode} /> : t('vat_number')} value={buyer.vatNumber ? <span className="num" dir="ltr">{buyer.vatNumber}</span> : null} />
+      <DocInfoRow label={style.composition === 'modern' ? <ModernFieldLabel field="city" mode={mode} /> : t('city')} value={buyer.city} />
     </>
   );
 
@@ -78,7 +78,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
 
   const metaDetails = (
     <>
-      <DocInfoRow label={isDeliveryNote ? tDocument('delivery_date') : t('date')} value={<span className="num">{meta.date}</span>} stacked={stackMetaRows} />
+      <DocInfoRow label={isDeliveryNote ? tDocument('delivery_date') : t('date')} value={<span className="num" dir="ltr">{meta.date}</span>} stacked={stackMetaRows} />
       {showsPaymentType && (
         <DocInfoRow
           label={t('payment_type')}
@@ -87,10 +87,10 @@ export function DocParties({ model }: { model: DocumentModel }) {
         />
       )}
       {!isDeliveryNote && !showsPaymentType && meta.dueDate && (
-        <DocInfoRow label={dueDateLabel} value={<span className="num">{meta.dueDate}</span>} stacked={stackMetaRows} />
+        <DocInfoRow label={dueDateLabel} value={<span className="num" dir="ltr">{meta.dueDate}</span>} stacked={stackMetaRows} />
       )}
       {isPurchaseInvoice && meta.dueDate && (
-        <DocInfoRow label={tDocument('payment_due_date')} value={<span className="num">{meta.dueDate}</span>} stacked={stackMetaRows} />
+        <DocInfoRow label={tDocument('payment_due_date')} value={<span className="num" dir="ltr">{meta.dueDate}</span>} stacked={stackMetaRows} />
       )}
     </>
   );
@@ -115,26 +115,26 @@ export function DocParties({ model }: { model: DocumentModel }) {
   }
 
   if (style.composition === 'modern') {
-    const modernIssuer = isPurchaseDocument
-      ? modernFieldLabel('purchase_buyer', mode)
+    const issuerField = isPurchaseDocument
+      ? 'purchase_buyer' as const
       : isTaxInvoice
-        ? modernFieldLabel('seller', mode)
-        : modernFieldLabel('company', mode);
-    const modernParty = isDeliveryNote
-      ? modernFieldLabel('recipient', mode)
+        ? 'seller' as const
+        : 'company' as const;
+    const partyField = isDeliveryNote
+      ? 'recipient' as const
       : model.type === 'payment_voucher' || model.type === 'debit_note' || isPurchaseDocument
-        ? modernFieldLabel('supplier', mode)
+        ? 'supplier' as const
         : model.type === 'receipt_voucher' || model.type === 'quotation' || model.type === 'sales_order' || model.type === 'credit_note'
-          ? modernFieldLabel('customer', mode)
-          : modernFieldLabel('buyer', mode);
+          ? 'customer' as const
+          : 'buyer' as const;
     return (
       <section className={cn('grid grid-cols-2 gap-x-12 gap-y-3 border-b border-[color:var(--border)] pb-4', style.sectionGap)}>
         <div className="min-w-0">
-          <div className="mb-1.5 text-[11px] font-semibold text-black">{modernIssuer}</div>
+          <div className="mb-1.5 text-[11px] font-semibold text-black"><ModernFieldLabel field={issuerField} mode={mode} /></div>
           {sellerCore}
         </div>
         <div className="min-w-0">
-          <div className="mb-1.5 text-[11px] font-semibold text-black">{modernParty}</div>
+          <div className="mb-1.5 text-[11px] font-semibold text-black"><ModernFieldLabel field={partyField} mode={mode} /></div>
           {buyerDetails}
         </div>
       </section>

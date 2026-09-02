@@ -6,7 +6,7 @@ import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { blockTextClassName, useDocBlockProperties } from '../doc-block-properties-context';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
-import { modernFieldLabel } from '../../presentation/visual-v2';
+import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /** البيانات البنكية — لا يظهر القسم بلا نصّ. */
 export function DocBank({ model }: { model: DocumentModel }) {
@@ -24,7 +24,7 @@ export function DocBank({ model }: { model: DocumentModel }) {
       : style.composition === 'minimal'
         ? 'border-t border-black py-3'
         : cn('border border-gray-200 p-3', style.cardRadius);
-  const title = style.composition === 'modern' ? modernFieldLabel('bank', mode) : t('bank');
+  const title = style.composition === 'modern' ? <ModernFieldLabel field="bank" mode={mode} /> : t('bank');
 
   return (
     <section className={cn(frame, style.sectionGap)}>

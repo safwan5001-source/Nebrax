@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { getDefaultDocumentItemColumns } from '@/modules/documents/registry/document-types';
 import type { DocBlockAlignment, DocItemsColumn, DocItemsColumnId, DocumentModel, TemplateStyle } from '../../types';
@@ -14,12 +14,12 @@ import {
   MODERN_ITEMS_TABLE_CLASS,
   formatModernAmount,
   isModernMoneyColumn,
-  modernColumnLabel,
   modernItemsCellPadding,
   modernItemsColumnWidthClass,
   modernItemsValueCellClass,
   modernMoneyColumnHeader,
 } from '../../presentation/visual-v2';
+import { ModernColumnHeader } from '../../presentation/modern-bilingual-label';
 
 /**
  * الخط الأحادي مخصص للأرقام والأكواد القابلة للمقارنة فقط. لا يُطبّق على
@@ -141,10 +141,17 @@ export function DocItemsTable({
   };
 
   const headerLabel = (column: DocItemsColumn): string => {
-    const base = column.label?.trim() || (isModern ? modernColumnLabel(column.id, mode) : labels[column.id]);
+    const base = column.label?.trim() || labels[column.id];
     return isModern && isModernMoneyColumn(column.id)
       ? modernMoneyColumnHeader(base, model.currency, mode)
       : base;
+  };
+
+  const headerContent = (column: DocItemsColumn): React.ReactNode => {
+    const custom = column.label?.trim();
+    if (custom) return headerLabel(column);
+    if (isModern) return <ModernColumnHeader column={column.id} mode={mode} currency={model.currency} />;
+    return labels[column.id];
   };
 
   const table = (
@@ -165,7 +172,7 @@ export function DocItemsTable({
                   isModern && modernItemsColumnWidthClass(column.id),
                 )}
               >
-                {headerLabel(column)}
+                {headerContent(column)}
               </th>
             );
           })}
@@ -190,6 +197,7 @@ export function DocItemsTable({
                     isModern && modernItemsColumnWidthClass(column.id),
                     isModern && modernItemsValueCellClass(column.id),
                   )}
+                  dir={isModern && usesMonospaceValue(column.id) ? 'ltr' : undefined}
                 >
                   {valueFor(column.id, line, index)}
                 </td>

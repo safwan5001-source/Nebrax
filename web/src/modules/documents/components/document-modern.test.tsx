@@ -6,11 +6,15 @@ import { ERP_STYLE, MINIMAL_STYLE, MODERN_STYLE } from '../templates/template-st
 import { makeDocumentQaModel } from '../qa/document-qa-fixtures';
 import { getTheme } from '../themes';
 import {
+  MODERN_COLUMN_LABELS,
+  MODERN_FIELD_LABELS,
+  MODERN_TOTAL_LABELS,
+  isModernMoneyColumn,
   modernColumnLabel,
   modernFieldLabel,
-  modernMoneyColumnHeader,
   modernTotalLabel,
 } from '../presentation/visual-v2';
+import { DEFAULT_DOCUMENT_ITEMS_COLUMNS } from '../registry/document-types';
 import type { DocSectionLayoutItem, DocumentModel, TemplateStyle } from '../types';
 
 const locale = { current: 'ar' };
@@ -41,20 +45,40 @@ const FULL_LAYOUT: DocSectionLayoutItem[] = [
   { key: 'footer', visible: true },
 ];
 
-const ARABIC_SCRIPT = /[\u0600-\u06FF]/;
-const LATIN_SCRIPT = /[A-Za-z]/;
 const ENGLISH_COLUMN_WORDS = /\b(Product|Description|Qty|Barcode|Tax|Subtotal|Shipping|Adjustment)\b/;
 
 function normalizeLabel(text: string | null | undefined): string {
   return (text ?? '').replace(/\s+/g, ' ').trim();
 }
 
-function expectBilingualLabel(text: string | null | undefined, context: string) {
-  const value = normalizeLabel(text);
-  expect(value, context).not.toBe('');
-  expect(value, `${context}:separator`).toContain(' | ');
-  expect(value, `${context}:arabic`).toMatch(ARABIC_SCRIPT);
-  expect(value, `${context}:latin`).toMatch(LATIN_SCRIPT);
+function bilingualRoots(container: ParentNode): HTMLElement[] {
+  return [...container.querySelectorAll<HTMLElement>('[data-modern-bilingual="label"]')];
+}
+
+function bilingualPair(root: Element): { ar: string; en: string } {
+  return {
+    ar: root.querySelector('[dir="rtl"]')?.textContent ?? '',
+    en: root.querySelector('[dir="ltr"]')?.textContent ?? '',
+  };
+}
+
+function findBilingual(container: ParentNode, ar: string, en: string) {
+  return bilingualRoots(container).find((node) => {
+    const pair = bilingualPair(node);
+    return pair.ar === ar && pair.en === en;
+  });
+}
+
+function expectIsolatedBilingual(root: Element | null | undefined, ar: string, en: string, context: string) {
+  expect(root, context).toBeTruthy();
+  expect(root!.querySelector('[dir="rtl"]')?.textContent, `${context}:ar`).toBe(ar);
+  expect(root!.querySelector('[dir="ltr"]')?.textContent, `${context}:en`).toBe(en);
+  expect(root!.textContent, `${context}:no-pipe`).not.toContain(' | ');
+}
+
+function expectFieldPresent(container: ParentNode, field: keyof typeof MODERN_FIELD_LABELS) {
+  const pair = MODERN_FIELD_LABELS[field];
+  expect(findBilingual(container, pair.ar, pair.en), String(field)).toBeTruthy();
 }
 
 function renderComposition(style: TemplateStyle, model: DocumentModel, layout?: DocSectionLayoutItem[] | null) {
@@ -170,7 +194,15 @@ describe('Modern V2 visual composition', () => {
     locale.current = 'en';
     const model = makeDocumentQaModel({ scenario: 'single', direction: 'rtl', showQr: false, showAssets: false });
     const { container } = renderComposition(MODERN_STYLE, model);
-    expect(container.querySelector('h1')?.textContent).toBe('فاتورة ضريبية | Tax Invoice');
+    expectIsolatedBilingual(
+      container.querySelector('h1 [data-modern-bilingual="label"]'),
+      'فاتورة ضريبية',
+      'Tax Invoice',
+      'h1',
+    );
+    expect(container.querySelector('h1')?.textContent).not.toContain(' | ');
+    expect(container.querySelector('h1')?.textContent).toContain('فاتورة ضريبية');
+    expect(container.querySelector('h1')?.textContent).toContain('Tax Invoice');
   });
 
   it('يبقي هاتف المنشأة في التذييل لا في بطاقة طرف', () => {
@@ -201,6 +233,7 @@ describe('Modern V2 visual composition', () => {
     expect(container.querySelector('header .h-14')).toBeTruthy();
     expect(container.querySelectorAll('section.grid.grid-cols-12 > div')).toHaveLength(3);
     expect(container.querySelector('h1')?.textContent).toBe('Tax Invoice');
+    expect(container.querySelector('[data-modern-bilingual]')).toBeNull();
     expect(container.textContent).not.toContain('فاتورة ضريبية | Tax Invoice');
     expect(container.textContent).not.toContain(modernFieldLabel('seller', 'bilingual'));
   });
@@ -242,13 +275,18 @@ describe('Modern V2 visual composition', () => {
     locale.current = 'en';
     const model = makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: false, showAssets: false });
     const { container } = renderComposition(MODERN_STYLE, model);
-    expect(container.querySelector('h1')?.textContent).toBe('فاتورة ضريبية | Tax Invoice');
+    expectIsolatedBilingual(
+      container.querySelector('h1 [data-modern-bilingual="label"]'),
+      'فاتورة ضريبية',
+      'Tax Invoice',
+      'h1-sar',
+    );
     expect(container.querySelector('thead')?.textContent).toContain('SAR');
     expect(container.querySelector('[data-doc-totals="modern"]')?.textContent).toContain('SAR');
     expect(container.querySelector('[data-doc-totals="modern"]')?.textContent).not.toContain('ريال');
   });
 
-  it('يطبق العربية | English على كل تسميات Modern الظاهرة في الوضع الثنائي', () => {
+  it('يعزل تسميات Modern الثنائية في عقدتين دون خلط القيمة أو فاصل نصي', () => {
     locale.current = 'en';
     const base = makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: true, showAssets: true });
     const model: DocumentModel = {
@@ -260,53 +298,101 @@ describe('Modern V2 visual composition', () => {
     const { container } = renderComposition(MODERN_STYLE, model, FULL_LAYOUT);
     const text = container.textContent ?? '';
 
-    const expected = [
-      modernFieldLabel('vat_number', 'bilingual'),
-      modernFieldLabel('cr_number', 'bilingual'),
-      modernFieldLabel('national_address', 'bilingual'),
-      modernFieldLabel('number', 'bilingual'),
-      modernFieldLabel('date', 'bilingual'),
-      modernFieldLabel('due_date', 'bilingual'),
-      modernFieldLabel('payment_type', 'bilingual'),
-      modernFieldLabel('credit', 'bilingual'),
-      modernFieldLabel('seller', 'bilingual'),
-      modernFieldLabel('buyer', 'bilingual'),
-      modernFieldLabel('city', 'bilingual'),
-      modernFieldLabel('notes', 'bilingual'),
-      modernFieldLabel('terms', 'bilingual'),
-      modernFieldLabel('bank', 'bilingual'),
-      modernFieldLabel('signature', 'bilingual'),
-      modernFieldLabel('amount_words', 'bilingual'),
-      modernFieldLabel('zatca_note', 'bilingual'),
-      modernFieldLabel('footer', 'bilingual'),
-    ];
-    expect(container.querySelector('[data-doc-status-notice="draft"]')?.textContent).toBe('مسودة | Draft');
-    for (const label of expected) {
-      expect(text, label).toContain(label);
+    expect(text).not.toContain(' | ');
+    expect(bilingualRoots(container).length).toBeGreaterThan(10);
+    for (const root of bilingualRoots(container)) {
+      const pair = bilingualPair(root);
+      expect(pair.ar, root.textContent).not.toBe('');
+      expect(pair.en, root.textContent).not.toBe('');
+      expect(pair.ar).not.toBe(pair.en);
+      expect(root.querySelector('[dir="rtl"]')).toBeTruthy();
+      expect(root.querySelector('[dir="ltr"]')).toBeTruthy();
     }
 
-    const headers = [...container.querySelectorAll('thead th')].map((node) => normalizeLabel(node.textContent));
-    expect(headers).toContain('#');
-    for (const column of ['product', 'description', 'product_code', 'barcode', 'quantity'] as const) {
-      expect(headers).toContain(modernColumnLabel(column, 'bilingual'));
+    const visibleFields = [
+      'vat_number', 'cr_number', 'national_address', 'number', 'date', 'due_date',
+      'payment_type', 'credit', 'seller', 'buyer', 'city', 'notes', 'terms', 'bank',
+      'signature', 'amount_words', 'zatca_note', 'footer',
+    ] as const;
+    for (const field of visibleFields) expectFieldPresent(container, field);
+
+    expectIsolatedBilingual(
+      container.querySelector('[data-doc-status-notice="draft"] [data-modern-bilingual="label"]'),
+      'مسودة',
+      'Draft',
+      'status',
+    );
+
+    for (const label of container.querySelectorAll('[data-doc-info-label]')) {
+      const row = label.parentElement;
+      const value = row?.querySelector('[data-doc-info-value]');
+      const labelNode = label.querySelector('[data-modern-bilingual="label"]');
+      expect(value, 'info-value').toBeTruthy();
+      expect(labelNode?.contains(value!), 'value-inside-label').toBe(false);
+      expect(value!.closest('[data-modern-bilingual]')).toBeNull();
     }
-    for (const column of ['unit_price', 'price_before_tax', 'tax', 'total'] as const) {
-      expect(headers).toContain(modernMoneyColumnHeader(modernColumnLabel(column, 'bilingual'), 'SAR', 'bilingual'));
-    }
-    for (const header of headers) {
-      if (header === '#') {
-        expect(header).not.toContain(' | ');
-        continue;
+
+    const numberPair = MODERN_FIELD_LABELS.number;
+    const numberLabel = findBilingual(container, numberPair.ar, numberPair.en);
+    const numberRow = numberLabel?.closest('div');
+    expect(numberRow?.querySelector('[data-doc-info-value]')?.textContent).toBe(model.meta.number);
+    expect(numberLabel?.textContent).not.toContain(model.meta.number);
+    expect(numberRow?.querySelector('[data-doc-info-value] .num')?.getAttribute('dir')).toBe('ltr');
+
+    const datePair = MODERN_FIELD_LABELS.date;
+    const dateLabel = findBilingual(container, datePair.ar, datePair.en);
+    expect(dateLabel?.closest('div')?.querySelector('[data-doc-info-value]')?.textContent).toBe(model.meta.date);
+
+    const vatPair = MODERN_FIELD_LABELS.vat_number;
+    const vatLabel = findBilingual(container, vatPair.ar, vatPair.en);
+    expect(vatLabel?.closest('div')?.querySelector('[data-doc-info-value] .num')?.getAttribute('dir')).toBe('ltr');
+    expect(vatLabel?.closest('div')?.querySelector('[data-doc-info-value]')?.textContent).toBe(model.seller.vatNumber);
+
+    const addressPair = MODERN_FIELD_LABELS.national_address;
+    const addressLabel = findBilingual(container, addressPair.ar, addressPair.en);
+    const addressValue = addressLabel?.closest('div')?.querySelector('[data-doc-info-value]');
+    expect(addressValue?.querySelector('[dir="ltr"]')).toBeNull();
+    expect(addressValue?.querySelector('.num')).toBeNull();
+    expect(addressValue?.textContent).toContain(model.seller.address ?? '');
+
+    const paymentPair = MODERN_FIELD_LABELS.payment_type;
+    const paymentLabel = findBilingual(container, paymentPair.ar, paymentPair.en);
+    const paymentValue = paymentLabel?.closest('div')?.querySelector('[data-doc-info-value] [data-modern-bilingual="label"]');
+    expectIsolatedBilingual(paymentValue, MODERN_FIELD_LABELS.credit.ar, MODERN_FIELD_LABELS.credit.en, 'payment-value');
+
+    const headers = [...container.querySelectorAll('thead th')];
+    expect(headers).toHaveLength(DEFAULT_DOCUMENT_ITEMS_COLUMNS.length);
+    headers.forEach((th, index) => {
+      const column = DEFAULT_DOCUMENT_ITEMS_COLUMNS[index];
+      if (column === 'number') {
+        expect(th.querySelector('[data-modern-bilingual]')).toBeNull();
+        expect(normalizeLabel(th.textContent)).toBe('#');
+        return;
       }
-      expectBilingualLabel(header, `thead:${header}`);
-    }
+      const pair = MODERN_COLUMN_LABELS[column];
+      const en = isModernMoneyColumn(column) ? `${pair.en} (SAR)` : pair.en;
+      expectIsolatedBilingual(th.querySelector('[data-modern-bilingual="label"]'), pair.ar, en, `th:${column}`);
+      if (isModernMoneyColumn(column)) {
+        expect(th.querySelector('[dir="rtl"]')?.textContent).not.toContain('SAR');
+        expect(th.querySelector('[dir="ltr"]')?.textContent).toContain('SAR');
+      } else {
+        expect(th.textContent).not.toContain('SAR');
+      }
+    });
+    expect(container.querySelector('tbody')?.textContent).not.toContain('SAR');
+    expect(container.querySelector('tbody')?.textContent).not.toContain('ريال');
 
-    const totalLabels = [...container.querySelectorAll('[data-doc-totals="modern"] > div > span:first-child')]
-      .map((node) => normalizeLabel(node.textContent));
+    const totalRows = [...container.querySelectorAll('[data-doc-totals="modern"] > div')];
     for (const key of ['subtotal', 'discount', 'shipping', 'adjustment', 'vat', 'grand_total'] as const) {
-      expect(totalLabels).toContain(modernTotalLabel(key, 'bilingual'));
+      const pair = MODERN_TOTAL_LABELS[key];
+      const row = totalRows.find((node) => node.querySelector('[dir="rtl"]')?.textContent === pair.ar);
+      expect(row, key).toBeTruthy();
+      expectIsolatedBilingual(row!.querySelector('[data-modern-bilingual="label"]'), pair.ar, pair.en, `total:${key}`);
+      const amount = row!.querySelector('.num');
+      expect(amount, `${key}:amount`).toBeTruthy();
+      expect(amount!.closest('[data-modern-bilingual]')).toBeNull();
+      expect(row!.className).toContain('items-start');
     }
-    for (const label of totalLabels) expectBilingualLabel(label, `totals:${label}`);
 
     expect(text.split(model.meta.number).length - 1).toBe(1);
     expect(text.split(model.meta.date).length - 1).toBe(1);
@@ -328,20 +414,33 @@ describe('Modern V2 visual composition', () => {
       { key: 'items', visible: true, properties: { columns: [{ id: 'product' }, { id: 'description', label: 'بيان البند' }, { id: 'total' }] } },
       { key: 'summary', visible: true },
     ]);
-    const headers = [...container.querySelectorAll('thead th')].map((node) => normalizeLabel(node.textContent));
-    expect(headers).toContain('بيان البند');
-    expect(headers).toContain(modernColumnLabel('product', 'bilingual'));
-    expect(headers).toContain(modernMoneyColumnHeader(modernColumnLabel('total', 'bilingual'), 'SAR', 'bilingual'));
-    expect(headers.some((header) => header.includes('Description'))).toBe(false);
+    const headers = [...container.querySelectorAll('thead th')];
+    expect(headers.some((node) => normalizeLabel(node.textContent) === 'بيان البند')).toBe(true);
+    expectIsolatedBilingual(
+      headers.find((node) => node.querySelector('[dir="rtl"]')?.textContent === MODERN_COLUMN_LABELS.product.ar)
+        ?.querySelector('[data-modern-bilingual="label"]'),
+      MODERN_COLUMN_LABELS.product.ar,
+      MODERN_COLUMN_LABELS.product.en,
+      'custom-product',
+    );
+    expectIsolatedBilingual(
+      headers.find((node) => node.querySelector('[dir="rtl"]')?.textContent === MODERN_COLUMN_LABELS.total.ar)
+        ?.querySelector('[data-modern-bilingual="label"]'),
+      MODERN_COLUMN_LABELS.total.ar,
+      `${MODERN_COLUMN_LABELS.total.en} (SAR)`,
+      'custom-total',
+    );
+    expect(headers.some((node) => (node.textContent ?? '').includes('Description'))).toBe(false);
   });
 
-  it('يبقي العربية والإنجليزية المنفردتين بلا فاصل ثنائي', () => {
+  it('يبقي العربية والإنجليزية المنفردتين بلا فاصل ثنائي ولا وسم عزل', () => {
     const arabic = renderComposition(
       MODERN_STYLE,
       makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: false, showAssets: false }),
     );
     const arabicHead = arabic.container.querySelector('thead')?.textContent ?? '';
     const arabicTotals = arabic.container.querySelector('[data-doc-totals="modern"]')?.textContent ?? '';
+    expect(arabic.container.querySelector('[data-modern-bilingual]')).toBeNull();
     expect(arabicHead).toContain(modernColumnLabel('product', 'ar'));
     expect(arabicHead).not.toContain(' | ');
     expect(arabicHead).not.toMatch(ENGLISH_COLUMN_WORDS);
@@ -357,12 +456,36 @@ describe('Modern V2 visual composition', () => {
     );
     const englishHead = english.container.querySelector('thead')?.textContent ?? '';
     const englishTotals = english.container.querySelector('[data-doc-totals="modern"]')?.textContent ?? '';
+    expect(english.container.querySelector('[data-modern-bilingual]')).toBeNull();
     expect(englishHead).toContain(modernColumnLabel('product', 'en'));
     expect(englishHead).not.toContain(' | ');
     expect(englishHead).not.toContain('المنتج');
     expect(englishTotals).toContain(modernTotalLabel('grand_total', 'en'));
     expect(englishTotals).not.toContain(' | ');
     expect(englishTotals).not.toContain('الإجمالي شامل الضريبة');
+  });
+
+  it('لا يلوّث ERP أو Minimal بعقد السطرين الثنائيين حتى مع locale=en واتجاه RTL', () => {
+    locale.current = 'en';
+    const quotation = makeDocumentQaModel({
+      documentType: 'quotation',
+      scenario: 'five',
+      direction: 'rtl',
+      showQr: false,
+      showAssets: false,
+    });
+    const erp = renderComposition(ERP_STYLE, quotation);
+    expect(erp.container.querySelector('[data-doc-composition="erp"]')).toBeTruthy();
+    expect(erp.container.querySelector('[data-modern-bilingual]')).toBeNull();
+    expect(erp.container.querySelector('h1')?.textContent).toBe('Tax Invoice');
+    expect(erp.container.textContent).not.toContain(' | ');
+    erp.unmount();
+
+    const invoice = makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: false, showAssets: false });
+    const minimal = renderComposition(MINIMAL_STYLE, invoice);
+    expect(minimal.container.querySelector('[data-doc-composition="minimal"]')).toBeTruthy();
+    expect(minimal.container.querySelector('[data-modern-bilingual]')).toBeNull();
+    expect(minimal.container.textContent).not.toContain(' | ');
   });
 
   it('يرصف الملخص بـ flex وjustify-between بلا فراغ شبكة', () => {
