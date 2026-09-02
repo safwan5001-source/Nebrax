@@ -167,7 +167,7 @@ Duration    20.77s
 | `npm run test` | 186 ملفاً / 1086 اختباراً |
 | `npm run build` | نجح |
 | `npm run lint` | غير مُعدّ (Web CI = test + build) |
-| GitHub CI | **نجح** على `fd00028c` في [#614](https://github.com/safwan5001-source/Nebrax/pull/614): 5 فحوصات خضراء (sqlite ×2، pgsql ×2، Web CI). سبقه أخضر على `dc5af2dd`. لم يُدمَج |
+| GitHub CI | **نجح** على `fd8e3f8a` في [#614](https://github.com/safwan5001-source/Nebrax/pull/614): 5 فحوصات خضراء (sqlite ×2، pgsql ×2، Web CI). لم يُدمَج |
 
 ---
 
@@ -205,9 +205,9 @@ Credit Notes (سلوك #613) · Thermal جديد · Purchase Invoices · الس�
 - **PR number/link:** [#614](https://github.com/safwan5001-source/Nebrax/pull/614)
 - **Base SHA:** `c10455d8ee8541e5b3bdf7f51fc6f43a939e58fc`
 - **Implementation SHA:** `007e7ce6750bd7bd698841011f714c18ce10981b`
-- **CI-green SHA:** `fd00028ca63cb098c7d54422fbe17d44c914fdbe` (5/5 فحوصات خضراء؛ كذلك `dc5af2dd` قبله)
-- **Final Head SHA:** `88d33645bee9ab5869da75704e39ab03813de7fe`
-- **عدد commits:** 8
+- **CI-green SHA:** `fd8e3f8a44874f930def4add73377b4d6ab0d4f0` (5/5 فحوصات خضراء)
+- **Final Head SHA:** `fd8e3f8a44874f930def4add73377b4d6ab0d4f0`
+- **عدد commits:** 9
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
