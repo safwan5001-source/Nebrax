@@ -206,8 +206,8 @@ Credit Notes (سلوك #613) · Thermal جديد · Purchase Invoices · الس�
 - **Base SHA:** `c10455d8ee8541e5b3bdf7f51fc6f43a939e58fc`
 - **Implementation SHA:** `007e7ce6750bd7bd698841011f714c18ce10981b`
 - **CI-green SHA:** `fd00028ca63cb098c7d54422fbe17d44c914fdbe` (5/5 فحوصات خضراء؛ كذلك `dc5af2dd` قبله)
-- **Final Head SHA:** `fd00028ca63cb098c7d54422fbe17d44c914fdbe`
-- **عدد commits:** 7
+- **Final Head SHA:** `88d33645bee9ab5869da75704e39ab03813de7fe`
+- **عدد commits:** 8
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
