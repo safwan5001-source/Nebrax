@@ -129,7 +129,7 @@ Duration    20.25s
 | `npm run test` | 186 ملفاً / 1080 اختباراً |
 | `npm run build` | نجح |
 | `npm run lint` | غير مُعدّ (Web CI = test + build) |
-| GitHub CI | PR [#613](https://github.com/safwan5001-source/Nebrax/pull/613) — يُراقَب؛ لم يُدمَج |
+| GitHub CI | **نجح** على `3ad2c93d` في [#613](https://github.com/safwan5001-source/Nebrax/pull/613): 5 فحوصات خضراء (sqlite ×2، pgsql ×2، Web CI). لم يُدمَج |
 
 ---
 
@@ -167,8 +167,9 @@ Debit Notes · Thermal جديد · Purchase Invoices · السندات · Design
 - **PR number/link:** [#613](https://github.com/safwan5001-source/Nebrax/pull/613)
 - **Base SHA:** `a2d91184720796b4568dfafb7c6f537b1e9db3cc`
 - **Implementation SHA:** `d3b86763bc9012f1df7b2e818ac719ea565cc8c4`
-- **Head SHA:** `4e538d1af852dcf3d5ed9c1c2264810aa0ea4c06`
-- **عدد commits:** 6
+- **CI-green SHA:** `3ad2c93dc4a0e102caa6b10af17de98b198ee3da` (5/5 فحوصات خضراء)
+- **Head SHA:** `3ad2c93dc4a0e102caa6b10af17de98b198ee3da`
+- **عدد commits:** 7
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
