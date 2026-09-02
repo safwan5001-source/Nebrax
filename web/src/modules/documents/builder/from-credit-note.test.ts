@@ -45,4 +45,17 @@ describe('buildCreditNoteDocumentModel', () => {
     });
     expect(model.currency).toBe('SAR');
   });
+
+  it('maps a purchase note to debit_note with company currency and explicit direction', () => {
+    const model = buildCreditNoteDocumentModel({
+      note: { ...note, number: 'DN-2026-0001', type: 'purchase' },
+      company: { name: 'AWJ Trading', currency: 'EUR', logo: 'https://assets.example/logo.png' },
+      customer: { name: 'Supplier' },
+      direction: 'ltr',
+    });
+    expect(model.type).toBe('debit_note');
+    expect(model.currency).toBe('EUR');
+    expect(model.direction).toBe('ltr');
+    expect(model.seller.logoUrl).toBe('https://assets.example/logo.png');
+  });
 });

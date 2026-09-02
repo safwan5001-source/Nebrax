@@ -262,6 +262,102 @@ class CreditNoteTest extends TestCase
     }
 
     /** @test */
+    public function reassigning_print_after_post_does_not_change_the_frozen_purchase_debit_note(): void
+    {
+        $auth = $this->registerTenant();
+        $partnerId = $this->partner($auth['token'], 'supplier');
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة إشعار مدين مجمّدة',
+            'document_types' => ['debit_note'],
+            'definition' => ['template_id' => 'debit-note-v1'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'debit_note',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+
+        $noteId = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
+            'partner_id' => $partnerId,
+            'type' => 'purchase',
+            'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/credit-notes/{$noteId}/post")->assertOk();
+        $frozenId = $print->published_revision_id;
+
+        $replacement = $templates->publish($templates->create([
+            'name' => 'طباعة إشعار مدين لاحقة',
+            'document_types' => ['debit_note'],
+            'definition' => ['template_id' => 'tax-invoice-retail'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'debit_note',
+            'usage' => 'print',
+            'print_template_revision_id' => $replacement->published_revision_id,
+        ], null);
+
+        $this->assertSame($frozenId, CreditNote::findOrFail($noteId)->print_template_revision_id);
+    }
+
+    /** @test */
+    public function posting_a_purchase_debit_note_without_pdf_assignment_leaves_pdf_revision_null(): void
+    {
+        $auth = $this->registerTenant();
+        $partnerId = $this->partner($auth['token'], 'supplier');
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة إشعار مدين فقط',
+            'document_types' => ['debit_note'],
+            'definition' => ['template_id' => 'debit-note-v1'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'debit_note',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+
+        $noteId = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
+            'partner_id' => $partnerId,
+            'type' => 'purchase',
+            'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated()['data']['id'];
+        $posted = $this->withToken($auth['token'])->postJson("/api/credit-notes/{$noteId}/post")->assertOk();
+
+        $this->assertSame($print->published_revision_id, $posted['data']['print_template_revision_id']);
+        $this->assertNull($posted['data']['pdf_template_revision_id']);
+
+        $entry = JournalEntry::with('lines.account')
+            ->where('source_type', CreditNote::class)->where('source_id', $noteId)->firstOrFail();
+        $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
+        $this->assertEquals(115000, $entry->lines->sum('debit'));
+        $this->assertEquals(115000, $this->line($entry, '2110')->debit);
+        $this->assertEquals(100000, $this->line($entry, '5115')->credit);
+        $this->assertNull($this->line($entry, '1140'));
+        $this->assertEquals(15000, $this->line($entry, '1150')->credit);
+    }
+
+    /** @test */
+    public function purchase_debit_notes_are_tenant_isolated(): void
+    {
+        $a = $this->registerTenant('debit-acme', 'owner@debit-acme.test');
+        $supplierA = $this->partner($a['token'], 'supplier');
+        $id = $this->withToken($a['token'])->postJson('/api/credit-notes', [
+            'partner_id' => $supplierA,
+            'type' => 'purchase',
+            'items' => [['quantity' => 1, 'unit_price' => 10000]],
+        ])['data']['id'];
+
+        $b = $this->registerTenant('debit-globex', 'owner@debit-globex.test');
+        $this->withToken($b['token'])->getJson("/api/credit-notes/{$id}")->assertNotFound();
+        $this->withToken($b['token'])->getJson('/api/credit-notes?type=purchase')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    /** @test */
     public function cash_refund_credits_the_cash_account(): void
     {
         $auth = $this->registerTenant();

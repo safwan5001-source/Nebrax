@@ -17,14 +17,8 @@ import { documentExporter, printDocument } from '@/modules/documents/services/ex
 import { getTemplate, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
+import { type CreditNoteTemplateDefinition } from '@/modules/credit-notes/services/credit-note-template-design';
 import {
-  resolveCreditNoteTemplateDesign,
-  resolveLiveCreditNoteTemplateDesign,
-  type CreditNoteTemplateDefinition,
-  type ResolvedCreditNoteTemplateDesign,
-} from '@/modules/credit-notes/services/credit-note-template-design';
-import {
-  resolveLiveTemplateDefinition,
   type LivePrintTemplateAssignment,
   type ResolvedLiveTemplate,
 } from '@/modules/print-templates/services/live-template-definition';
@@ -126,29 +120,12 @@ export default function CreditNoteDetailPage() {
     setSignatureUrl(resolved.signatureUrl);
   }
 
-  function applyDebitDesign(design: ResolvedCreditNoteTemplateDesign) {
-    setTemplateId(design.templateId);
-    setThemeId(design.themeId);
-    setFooterText(design.footerText);
-    setShowLogo(design.showLogo);
-    setLogoUrl(design.logoUrl);
-    setLogoHeight(design.logoHeight);
-    setLayout(design.layout);
-    setTermsText(design.termsText);
-    setBankText(design.bankText);
-    setStampUrl(design.stampUrl);
-    setSignatureUrl(design.signatureUrl);
-    setPdfOutput(null);
-    setPdfSharesPrintRoot(true);
-  }
-
   function load() {
     setLoading(true);
     api<{ data: CreditNote }>(`/credit-notes/${id}`)
       .then(async (r) => {
         setNote(r.data);
-        const isSalesCreditNote = r.data.type !== 'purchase';
-        const documentType = isSalesCreditNote ? 'credit_note' : 'debit_note';
+        const documentType = r.data.type === 'purchase' ? 'debit_note' : 'credit_note';
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
         const skipped = Promise.resolve({ data: null as LivePrintTemplateAssignment | null });
         const resolveUsage = (usage: 'print' | 'pdf') => (
@@ -157,30 +134,6 @@ export default function CreditNoteDetailPage() {
           )
         );
         const posted = r.data.status === 'posted';
-
-        if (!isSalesCreditNote) {
-          const [p, m, live] = await Promise.allSettled([
-            api<{ data: CreditNoteCustomer }>(`/partners/${r.data.partner_id}`),
-            api<{ company: CreditNoteCompany }>(`/me`),
-            api<{ data: LivePrintTemplateAssignment | null }>(
-              `/print-templates/resolve?document_type=${documentType}&usage=print${branchQuery}`,
-            ),
-          ]);
-          if (p.status === 'fulfilled') setCustomer(p.value.data);
-          if (m.status === 'fulfilled') setCompany(m.value.company);
-          const frozen = (r.data.print_template_revision?.definition as CreditNoteTemplateDefinition | undefined) ?? null;
-          const liveDesign = frozen || live.status !== 'fulfilled'
-            ? null
-            : resolveLiveCreditNoteTemplateDesign(
-              resolveLiveTemplateDefinition(live.value.data, documentType),
-            );
-          applyDebitDesign(
-            frozen
-              ? resolveCreditNoteTemplateDesign(frozen, null)
-              : liveDesign ?? resolveCreditNoteTemplateDesign(null, null),
-          );
-          return;
-        }
 
         const [p, m, livePrint, livePdf] = await Promise.allSettled([
           api<{ data: CreditNoteCustomer }>(`/partners/${r.data.partner_id}`),
@@ -192,7 +145,7 @@ export default function CreditNoteDetailPage() {
         if (m.status === 'fulfilled') setCompany(m.value.company);
 
         const outputs = resolveDocumentOutputTemplates({
-          documentType: 'credit_note',
+          documentType,
           isPosted: posted,
           frozenPrint: r.data.print_template_revision,
           frozenPdf: r.data.pdf_template_revision,
@@ -227,7 +180,6 @@ export default function CreditNoteDetailPage() {
   if (!note) return <div className="text-muted">{t('not_found')}</div>;
 
   const isDebitNote = note.type === 'purchase';
-  const isSalesCreditNote = !isDebitNote;
   const counterpartLabel = isDebitNote ? t('supplier') : t('partner');
   const treatmentLabel = isDebitNote
     ? t('debit_document_subtitle')
@@ -241,11 +193,9 @@ export default function CreditNoteDetailPage() {
 
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
-  const pdfPaperId = (isSalesCreditNote && pdfOutput ? getTemplate(pdfOutput.templateId).supportedPaper[0] : paperId) ?? 'a4';
+  const pdfPaperId = (pdfOutput ? getTemplate(pdfOutput.templateId).supportedPaper[0] : paperId) ?? 'a4';
   const pdfPaper = { widthMm: PAPER_SIZES[pdfPaperId].widthMm, heightMm: PAPER_SIZES[pdfPaperId].heightMm };
-  const pdfDoc = () => document.getElementById(
-    isSalesCreditNote && !pdfSharesPrintRoot ? 'pdf-print-root' : 'print-root',
-  );
+  const pdfDoc = () => document.getElementById(pdfSharesPrintRoot ? 'print-root' : 'pdf-print-root');
   const frozenThermalDefinition = (note.thermal_template_revision?.definition as CreditNoteTemplateDefinition | undefined) ?? null;
   const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
   const thermalPaperId = thermalTemplateId
@@ -364,7 +314,7 @@ export default function CreditNoteDetailPage() {
         </CardContent>
       </Card>
 
-      {isSalesCreditNote && !pdfSharesPrintRoot && pdfOutput && (
+      {!pdfSharesPrintRoot && pdfOutput && (
         <CreditNoteDocument
           note={note}
           company={company}
