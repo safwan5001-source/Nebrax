@@ -33,6 +33,8 @@ interface Session {
   number: string;
   status: 'open' | 'closed';
   handover_status: 'pending' | 'confirmed' | null;
+  opened_by: string | null;
+  closed_by: string | null;
   opening_balance: string;
   expected_balance: string | null;
   closing_balance: string | null;
@@ -105,6 +107,7 @@ export default function PosSessionDetailPage() {
   const [canAcknowledgeDifference, setCanAcknowledgeDifference] = useState(false);
   const [canConfirmHandover, setCanConfirmHandover] = useState(false);
   const [canViewAccounts, setCanViewAccounts] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const formatDate = useCallback(
     (value: string | null) => formatDateTime(value, locale),
@@ -134,14 +137,15 @@ export default function PosSessionDetailPage() {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    const apply = (permissions: string[] | undefined) => {
-      setCanAcknowledgeDifference(Boolean(permissions?.includes('*') || permissions?.includes('pos.variance.approve')));
-      setCanConfirmHandover(Boolean(permissions?.includes('*') || permissions?.includes('pos.session.handover.confirm')));
-      setCanViewAccounts(Boolean(permissions?.includes('*') || permissions?.includes('accounts.view')));
+    const apply = (identity: { id: string; permissions?: string[] }) => {
+      setCurrentUserId(identity.id);
+      setCanAcknowledgeDifference(Boolean(identity.permissions?.includes('*') || identity.permissions?.includes('pos.variance.approve')));
+      setCanConfirmHandover(Boolean(identity.permissions?.includes('*') || identity.permissions?.includes('pos.session.handover.confirm')));
+      setCanViewAccounts(Boolean(identity.permissions?.includes('*') || identity.permissions?.includes('accounts.view')));
     };
     const user = currentUser();
-    if (user?.permissions !== undefined) apply(user.permissions);
-    else api<{ user: { permissions?: string[] } }>('/me').then((result) => apply(result.user.permissions)).catch(() => {});
+    if (user?.permissions !== undefined) apply(user);
+    else api<{ user: { id: string; permissions?: string[] } }>('/me').then((result) => apply(result.user)).catch(() => {});
   }, []);
 
   const eventLabels = useMemo<Record<string, string>>(() => ({
@@ -219,6 +223,14 @@ export default function PosSessionDetailPage() {
     [t('returns_total'), report.returns_total], [t('net_sales'), report.net_sales],
     [t('average'), report.average], [t('expected'), report.expected],
   ] : [];
+  const isOwnSession = currentUserId !== null && (session.opened_by === currentUserId || session.closed_by === currentUserId);
+  const handoverDisabledReason = !canConfirmHandover
+    ? t('handover_approver_only')
+    : isOwnSession
+      ? t('handover_self_confirmation_blocked')
+      : session.difference_status === 'pending'
+        ? t('handover_resolve_variance_first')
+        : undefined;
 
   return <div className="space-y-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -233,7 +245,7 @@ export default function PosSessionDetailPage() {
         {session.status === 'open' && <Button asChild variant="outline"><Link href="/pos/sessions"><LockKeyhole className="h-4 w-4" strokeWidth={1.7} />{t('manage_session')}</Link></Button>}
         {session.status === 'closed' && session.difference_status === 'pending' && <Button variant="outline" disabled={!canAcknowledgeDifference || busy} title={!canAcknowledgeDifference ? t('approver_only') : undefined} onClick={() => { setAction('acknowledge'); setActionNote(''); setActionError(null); }}><ClipboardCheck className="h-4 w-4" strokeWidth={1.7} />{t('acknowledge_difference')}</Button>}
         {session.status === 'closed' && session.difference_status === 'acknowledged' && !session.variance_journal_entry_id && <Button variant="outline" disabled={!canAcknowledgeDifference || busy} title={!canAcknowledgeDifference ? t('approver_only') : undefined} onClick={() => void settleVariance()}><BookOpenCheck className="h-4 w-4" strokeWidth={1.7} />{t('settle_variance')}</Button>}
-        {session.status === 'closed' && session.handover_status === 'pending' && <Button variant="outline" disabled={!canConfirmHandover || session.difference_status === 'pending' || busy} title={!canConfirmHandover ? t('handover_approver_only') : session.difference_status === 'pending' ? t('handover_resolve_variance_first') : undefined} onClick={() => { setAction('handover'); setActionNote(''); setActionError(null); }}><ShieldCheck className="h-4 w-4" strokeWidth={1.7} />{t('confirm_handover')}</Button>}
+        {session.status === 'closed' && session.handover_status === 'pending' && <Button variant="outline" disabled={Boolean(handoverDisabledReason) || busy} title={handoverDisabledReason} onClick={() => { setAction('handover'); setActionNote(''); setActionError(null); }}><ShieldCheck className="h-4 w-4" strokeWidth={1.7} />{t('confirm_handover')}</Button>}
         <Button variant="outline" onClick={() => void load()}>{t('refresh')}</Button>
       </div>
     </div>

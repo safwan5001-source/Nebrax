@@ -44,4 +44,13 @@ describe('POS session detail workspace', () => {
     expect(page).toContain('session.variance_journal_entry_id && canViewAccounts');
     expect(page).toContain("permissions?.includes('accounts.view')");
   });
+
+  it('keeps the second-user handover rule visible in the detail workspace', () => {
+    const page = source('src/app/(app)/pos/sessions/[id]/page.tsx');
+
+    expect(page).toContain('session.opened_by === currentUserId');
+    expect(page).toContain('session.closed_by === currentUserId');
+    expect(page).toContain("t('handover_self_confirmation_blocked')");
+    expect(page).toContain('Boolean(handoverDisabledReason) || busy');
+  });
 });

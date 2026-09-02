@@ -25,6 +25,8 @@ interface Session {
   number: string;
   status: string;
   handover_status: 'pending' | 'confirmed' | null;
+  opened_by: string | null;
+  closed_by: string | null;
   pos_device_id: string | null;
   warehouse_id: string | null;
   pos_shift_id: string | null;
@@ -127,6 +129,7 @@ export default function PosSessionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [canAcknowledgeDifference, setCanAcknowledgeDifference] = useState(false);
   const [canConfirmHandover, setCanConfirmHandover] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const registerRequestId = useRef(0);
 
   const registerQuery = useMemo(() => {
@@ -173,15 +176,16 @@ export default function PosSessionsPage() {
   }, []);
   useEffect(() => {
     const user = currentUser();
-    const applyPermissions = (permissions: string[] | undefined) => {
-      setCanAcknowledgeDifference(Boolean(permissions?.includes('*') || permissions?.includes('pos.variance.approve')));
-      setCanConfirmHandover(Boolean(permissions?.includes('*') || permissions?.includes('pos.session.handover.confirm')));
+    const applyUser = (identity: { id: string; permissions?: string[] }) => {
+      setCurrentUserId(identity.id);
+      setCanAcknowledgeDifference(Boolean(identity.permissions?.includes('*') || identity.permissions?.includes('pos.variance.approve')));
+      setCanConfirmHandover(Boolean(identity.permissions?.includes('*') || identity.permissions?.includes('pos.session.handover.confirm')));
     };
     if (user?.permissions !== undefined) {
-      applyPermissions(user.permissions);
+      applyUser(user);
       return;
     }
-    api<{ user: { permissions?: string[] } }>('/me').then((result) => applyPermissions(result.user.permissions)).catch(() => {});
+    api<{ user: { id: string; permissions?: string[] } }>('/me').then((result) => applyUser(result.user)).catch(() => {});
   }, []);
 
   const activeDevices = useMemo(() => devices.filter((device) => device.is_active), [devices]);
@@ -343,21 +347,20 @@ export default function PosSessionsPage() {
         cell: ({ row }) => row.original.difference === null ? <div className="text-end text-muted">—</div>
           : <div className={cn('num text-end', isNegative(row.original.difference) && 'text-negative')}>{formatRiyal(row.original.difference)}</div>,
       },
+      { id: 'sessionStatus', header: t('session_status'), cell: ({ row }) => <Badge tone={row.original.status === 'open' ? 'warning' : 'neutral'}>{row.original.status === 'open' ? t('open_status') : t('closed_status')}</Badge> },
       {
-        id: 'differenceStatus', header: t('status'),
-        cell: ({ row }) => row.original.status === 'open'
-          ? <Badge tone="warning">{t('open_status')}</Badge>
-          : row.original.difference_status === 'pending'
-            ? <Badge tone="warning">{differenceLabels.pending}</Badge>
-            : row.original.handover_status === 'pending'
-              ? <Badge tone="warning">{t('handover_pending')}</Badge>
-              : row.original.handover_status === 'confirmed'
-                ? <Badge tone="positive">{t('handover_confirmed')}</Badge>
-                : row.original.variance_journal_entry_id
+        id: 'differenceStatus', header: t('difference_state'),
+        cell: ({ row }) => row.original.status === 'open' || !row.original.difference_status
+          ? <span className="text-muted">—</span>
+          : row.original.variance_journal_entry_id
             ? <Badge tone="positive">{t('variance_settled')}</Badge>
-            : row.original.difference_status
-              ? <Badge tone="positive">{differenceLabels[row.original.difference_status]}</Badge>
-              : <Badge tone="positive">{t('closed_status')}</Badge>,
+            : <Badge tone={row.original.difference_status === 'pending' ? 'warning' : 'positive'}>{differenceLabels[row.original.difference_status]}</Badge>,
+      },
+      {
+        id: 'handoverStatus', header: t('handover_state'),
+        cell: ({ row }) => row.original.status === 'open' || !row.original.handover_status
+          ? <span className="text-muted">—</span>
+          : <Badge tone={row.original.handover_status === 'pending' ? 'warning' : 'positive'}>{row.original.handover_status === 'pending' ? t('handover_pending') : t('handover_confirmed')}</Badge>,
       },
       {
         id: 'actions', header: t('actions'),
@@ -390,16 +393,18 @@ export default function PosSessionsPage() {
                 <ClipboardCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('settle_variance')}
               </Button>
             )}
-            {row.original.status === 'closed' && row.original.handover_status === 'pending' && (
-              <Button variant="outline" size="sm" disabled={!canConfirmHandover || row.original.difference_status === 'pending' || busy} title={!canConfirmHandover ? t('handover_approver_only') : row.original.difference_status === 'pending' ? t('handover_resolve_variance_first') : undefined} onClick={() => { setHandoverSessionId(row.original.id); setHandoverConfirmationNote(''); setError(null); }}>
+            {row.original.status === 'closed' && row.original.handover_status === 'pending' && (() => {
+              const isOwnSession = currentUserId !== null && (row.original.opened_by === currentUserId || row.original.closed_by === currentUserId);
+              const disabledReason = !canConfirmHandover ? t('handover_approver_only') : isOwnSession ? t('handover_self_confirmation_blocked') : row.original.difference_status === 'pending' ? t('handover_resolve_variance_first') : undefined;
+              return <Button variant="outline" size="sm" disabled={Boolean(disabledReason) || busy} title={disabledReason} onClick={() => { setHandoverSessionId(row.original.id); setHandoverConfirmationNote(''); setError(null); }}>
                 <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.7} />{t('confirm_handover')}
-              </Button>
-            )}
+              </Button>;
+            })()}
           </div>
         ),
       },
     ],
-    [busy, canAcknowledgeDifference, canConfirmHandover, differenceLabels, t, tp],
+    [busy, canAcknowledgeDifference, canConfirmHandover, currentUserId, differenceLabels, t, tp],
   );
 
   return (

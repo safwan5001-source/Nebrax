@@ -42,4 +42,22 @@ describe('POS session register controls', () => {
     expect(page).not.toMatch(/#[0-9a-f]{3,8}/i);
     expect(page).not.toContain('gradient');
   });
+
+  it('keeps session, difference, and handover states independently visible', () => {
+    const page = source('src/app/(app)/pos/sessions/page.tsx');
+
+    expect(page).toContain("id: 'sessionStatus', header: t('session_status')");
+    expect(page).toContain("id: 'differenceStatus', header: t('difference_state')");
+    expect(page).toContain("id: 'handoverStatus', header: t('handover_state')");
+    expect(page).toContain("row.original.variance_journal_entry_id");
+  });
+
+  it('blocks self-confirmation before submitting the protected handover endpoint', () => {
+    const page = source('src/app/(app)/pos/sessions/page.tsx');
+
+    expect(page).toContain('row.original.opened_by === currentUserId');
+    expect(page).toContain('row.original.closed_by === currentUserId');
+    expect(page).toContain("t('handover_self_confirmation_blocked')");
+    expect(page).toContain("permissions?.includes('pos.session.handover.confirm')");
+  });
 });
