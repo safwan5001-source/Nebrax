@@ -141,7 +141,7 @@ Duration    19.54s
 | `npm run test` | 185 ملفاً / 1072 اختباراً |
 | `npm run build` (Next.js 15.5.19، يشمل فحص الأنواع) | نجح |
 | `npm run lint` | غير مُعدّ في المشروع (Web CI = test + build فقط) |
-| GitHub CI | يُحدَّث بعد فتح PR |
+| GitHub CI | PR [#612](https://github.com/safwan5001-source/Nebrax/pull/612) — يُراقَب حتى اكتمال الفحوصات؛ لم يُدمَج |
 
 تحقق متصفح تفاعلي **لم يُنفَّذ**: لا جلسة مستأجر مصادق عليها أمام الواجهة في هذه البيئة. البديل: Vitest للعقد + بناء الإنتاج + مجموعة PHP الكاملة.
 
@@ -172,11 +172,14 @@ Duration    19.54s
 ## Git Metadata
 
 - **Branch:** `cursor/quotes-po-template-wiring-7cc0`
-- **PR number/link:** يُحدَّث بعد الفتح
+- **PR number/link:** [#612](https://github.com/safwan5001-source/Nebrax/pull/612)
 - **Base SHA:** `264692dcb7906bdd86d63f54aba6524d8d539978`
 - **Implementation SHA:** `10752a4c6f6a4da517c4d40c6b1222e2864c15e1`
-- **Head SHA:** يُثبَّت بعد التزام التقرير
-- **عدد commits على الفرع قبل التقرير:** 1 (`feat(quotes,po): ربط إخراج Print/PDF بمراجعات القوالب`)
+- **Report SHA:** `6d86303fdfd4bb71439b1e9707473e98b5319969`
+- **Head SHA:** يُثبَّت في التزام ربط التقرير بهذا الـ PR
+- **عدد commits:** 2 قبل ربط الـ PR (`feat` + تقرير) + هذا الالتزام
+- **Merge:** لم يُدمَج
+- **Deploy:** لم يُنشَر
 
 ---
 
