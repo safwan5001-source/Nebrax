@@ -4,6 +4,14 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
+import { DocInfoRow } from './doc-info-row';
+import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
+import {
+  VISUAL_V2,
+  cappedLogoHeight,
+  isNoticeStatus,
+} from '../../presentation/visual-v2';
+import { ModernDocumentTitle, ModernFieldLabel, ModernStatusLabel } from '../../presentation/modern-bilingual-label';
 
 /** ترويسة المستند: الهوية والعنوان ورقم المستند، باختلاف تركيبي محسوب لكل قالب. */
 export function DocHeader({ model, showLogo = true }: { model: DocumentModel; showLogo?: boolean }) {
@@ -15,6 +23,15 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
   const { seller, meta } = model;
   const numberLabel = model.type === 'tax_invoice' ? t('number') : tPrint('document_number');
   const isRedesignedComposition = style.composition === 'erp' || style.composition === 'modern' || style.composition === 'minimal';
+  const { locale, mode } = useDocumentLabelMode(model);
+  const isTaxInvoice = model.type === 'tax_invoice' || model.type === 'simplified_tax_invoice';
+  const isPurchaseInvoice = model.type === 'purchase_invoice';
+  const showsPaymentType = isTaxInvoice || isPurchaseInvoice;
+  const dueDateField = model.type === 'quotation'
+    ? 'valid_until' as const
+    : model.type === 'sales_order' || model.type === 'purchase_order'
+      ? 'expected_delivery_date' as const
+      : 'due_date' as const;
 
   const identity = (
     <div className="flex min-w-0 items-center gap-3">
@@ -61,6 +78,74 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
           </div>
         </div>
         <div className="mt-3 h-1" style={{ background: 'var(--doc-brand)' }} />
+      </header>
+    );
+  }
+
+  if (style.composition === 'modern_v2') {
+    const logoHeight = cappedLogoHeight(seller.logoHeight);
+    const invoiceNumberField = isTaxInvoice ? 'number' as const : 'document_number' as const;
+    return (
+      <header className="border-b border-[color:var(--border)] pb-4">
+        <div className="flex items-start justify-between gap-8">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            {showLogo && seller.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL؛ لا يناسبه next/image
+              <img
+                src={seller.logoUrl}
+                alt={seller.name}
+                className={VISUAL_V2.logoMaxWidthClass}
+                style={{ height: `${logoHeight}px` }}
+              />
+            ) : null}
+            <div className="min-w-0">
+              <div className="line-clamp-2 break-words text-[16px] font-bold leading-snug text-black">{seller.name || '—'}</div>
+              {seller.tagline ? <div className="mt-0.5 line-clamp-1 break-words text-[10px] text-[color:var(--muted)]">{seller.tagline}</div> : null}
+              <div className="mt-1.5 space-y-0.5">
+                <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
+                <DocInfoRow label={<ModernFieldLabel field="cr_number" mode={mode} />} value={seller.crNumber ? <span className="num" dir="ltr">{seller.crNumber}</span> : null} stacked />
+                <DocInfoRow label={<ModernFieldLabel field="national_address" mode={mode} />} value={seller.address ? <span className="line-clamp-2">{seller.address}</span> : null} stacked />
+              </div>
+            </div>
+          </div>
+          <div className="min-w-[176px] max-w-[46%] shrink-0 text-end">
+            <h1 className="text-[20px] font-bold leading-tight text-black">
+              <ModernDocumentTitle locale={locale} primary={dt(model.type)} alternate={dtAlt(model.type)} mode={mode} />
+            </h1>
+            <div className="mt-1.5 h-px w-full bg-[color:var(--border)]" />
+            <div className="mt-2 space-y-0.5">
+              <DocInfoRow
+                label={<ModernFieldLabel field={invoiceNumberField} mode={mode} />}
+                value={<span className="num font-bold" dir="ltr">{meta.number}</span>}
+                stacked
+                align="end"
+              />
+              <DocInfoRow label={<ModernFieldLabel field="date" mode={mode} />} value={<span className="num" dir="ltr">{meta.date}</span>} stacked align="end" />
+              {meta.dueDate ? <DocInfoRow label={<ModernFieldLabel field={dueDateField} mode={mode} />} value={<span className="num" dir="ltr">{meta.dueDate}</span>} stacked align="end" /> : null}
+              {showsPaymentType ? (
+                <DocInfoRow
+                  label={<ModernFieldLabel field="payment_type" mode={mode} />}
+                  value={meta.paymentType ? <ModernFieldLabel field={meta.paymentType === 'cash' ? 'cash' : 'credit'} mode={mode} /> : null}
+                  stacked
+                  align="end"
+                />
+              ) : null}
+            </div>
+            {isNoticeStatus(model.status) ? (
+              <div
+                data-doc-status-notice={model.status}
+                className={cn(
+                  'mt-2 inline-block border px-2 py-0.5 text-[10px] font-semibold',
+                  model.status === 'cancelled'
+                    ? 'border-[color:var(--negative)] text-[color:var(--negative)]'
+                    : 'border-[color:var(--border)] text-[color:var(--muted)]',
+                )}
+              >
+                <ModernStatusLabel status={model.status} mode={mode} />
+              </div>
+            ) : null}
+          </div>
+        </div>
       </header>
     );
   }

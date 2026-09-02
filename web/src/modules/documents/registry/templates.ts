@@ -1,6 +1,7 @@
 import type { TemplateDescriptor } from '../types';
 import { TaxInvoiceClassic } from '../templates/tax-invoice-classic';
 import { TaxInvoiceModern } from '../templates/tax-invoice-modern';
+import { TaxInvoiceModernV2 } from '../templates/tax-invoice-modern-v2';
 import { TaxInvoiceErp } from '../templates/tax-invoice-erp';
 import { TaxInvoiceMinimal } from '../templates/tax-invoice-minimal';
 import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
@@ -22,6 +23,13 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     id: 'tax-invoice-modern',
     nameKey: 'modern',
     component: TaxInvoiceModern,
+    defaultTheme: 'blue',
+    supportedPaper: ['a4', 'letter', 'legal'],
+  },
+  'tax-invoice-modern-v2': {
+    id: 'tax-invoice-modern-v2',
+    nameKey: 'modern_v2',
+    component: TaxInvoiceModernV2,
     defaultTheme: 'blue',
     supportedPaper: ['a4', 'letter', 'legal'],
   },

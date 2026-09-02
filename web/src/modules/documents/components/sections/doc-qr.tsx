@@ -3,20 +3,30 @@
 import { useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
 import type { DocumentModel } from '../../types';
+import { useDocStyle } from '../doc-style-context';
+import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
+import { VISUAL_V2 } from '../../presentation/visual-v2';
+import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /** رمز ZATCA (QR) — يُرسَم SVG آمناً؛ يُبقي مساحة فارغة حين لا يوجد رمز. */
 export function DocQr({ model }: { model: DocumentModel }) {
   const t = useTranslations('invoiceDoc');
+  const style = useDocStyle();
+  const { mode } = useDocumentLabelMode(model);
   const qr = model.qr?.value ?? null;
+  const isModernV2 = style.composition === 'modern_v2';
+  const size = isModernV2 ? VISUAL_V2.qrSizePx : 110;
 
   return (
     <div className="flex flex-col items-center gap-1">
       {qr ? (
         <>
-          <div className="rounded-lg border border-gray-200 p-2">
-            <QRCodeSVG value={qr} size={110} level="M" />
+          <div className={isModernV2 ? 'border border-[color:var(--border)] p-1' : 'rounded-lg border border-gray-200 p-2'}>
+            <QRCodeSVG value={qr} size={size} level="M" />
           </div>
-          <div className="text-[9px] text-gray-400">{model.qr?.note ?? t('zatca_note')}</div>
+          <div className={isModernV2 ? 'text-[9px] text-[color:var(--muted)]' : 'text-[9px] text-gray-400'}>
+            {model.qr?.note ?? (isModernV2 ? <ModernFieldLabel field="zatca_note" mode={mode} /> : t('zatca_note'))}
+          </div>
         </>
       ) : (
         <div />

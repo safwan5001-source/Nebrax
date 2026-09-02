@@ -121,4 +121,62 @@ describe('buildInvoiceDocumentModel', () => {
 
     expect(model.currency).toBe('SAR');
   });
+
+  it('يمرّر الحالة والاستحقاق والإجماليات الاختيارية من بيانات الفاتورة القائمة دون إعادة حساب', () => {
+    const model = buildInvoiceDocumentModel({
+      invoice: {
+        number: 'INV-2026-0099',
+        invoice_date: '2026-08-20',
+        due_date: '2026-09-20',
+        payment_type: 'credit',
+        status: 'draft',
+        subtotal: '1000.00',
+        discount: '50.00',
+        shipping: '25.00',
+        adjustment: '-10.00',
+        tax_amount: '150.00',
+        total: '1115.00',
+        lines: [],
+      },
+      company: null,
+      customer: null,
+      qr: null,
+    });
+
+    expect(model.status).toBe('draft');
+    expect(model.meta.dueDate).toBe('2026-09-20');
+    expect(model.totals).toMatchObject({
+      subtotal: 100000,
+      discount: 5000,
+      shipping: 2500,
+      adjustment: -1000,
+      tax: 15000,
+      total: 111500,
+    });
+  });
+
+  it('يحذف الخصم والشحن الصفريين ولا يخترع استحقاقاً أو حالة', () => {
+    const model = buildInvoiceDocumentModel({
+      invoice: {
+        number: 'INV-2026-0100',
+        invoice_date: '2026-08-21',
+        payment_type: 'cash',
+        subtotal: '10.00',
+        discount: '0.00',
+        shipping: '0.00',
+        tax_amount: '1.50',
+        total: '11.50',
+        lines: [],
+      },
+      company: null,
+      customer: null,
+      qr: null,
+    });
+
+    expect(model.status).toBeNull();
+    expect(model.meta.dueDate).toBeNull();
+    expect(model.totals.discount).toBeUndefined();
+    expect(model.totals.shipping).toBeUndefined();
+    expect(model.totals.adjustment).toBeUndefined();
+  });
 });

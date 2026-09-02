@@ -2067,6 +2067,7 @@
   "invoiceTemplates": {
     "classic": "كلاسيكي",
     "modern": "عصري",
+    "modern_v2": "عصري V2",
     "erp": "ERP",
     "minimal": "مبسّط",
     "retail": "تجزئة",

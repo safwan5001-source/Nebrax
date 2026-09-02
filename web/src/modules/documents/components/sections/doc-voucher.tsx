@@ -4,6 +4,8 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
+import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
+import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /**
  * جسم السند (قبض/صرف) — بديل جدول البنود لمستند لا يحمل ضريبة:
@@ -18,11 +20,17 @@ export function DocVoucher({
 }) {
   const t = useTranslations('voucherDoc');
   const style = useDocStyle();
+  const { mode } = useDocumentLabelMode(model);
   const v = model.voucher;
   if (!v) return null;
 
+  const isModernV2 = style.composition === 'modern_v2';
+  const voucherLabel = (
+    key: 'received_from' | 'paid_to' | 'amount' | 'method' | 'reference' | 'applied_to',
+  ) => (isModernV2 ? <ModernFieldLabel field={key} mode={mode} /> : t(key));
+
   const party = model.buyer.name || '—';
-  const phrase = v.direction === 'received' ? t('received_from') : t('paid_to');
+  const phrase = v.direction === 'received' ? voucherLabel('received_from') : voucherLabel('paid_to');
 
   return (
     <div className={cn('space-y-3', style.sectionGap)}>
@@ -36,7 +44,7 @@ export function DocVoucher({
           <div className="text-base font-bold text-black">{party}</div>
         </div>
         <div className="text-end">
-          <div className="text-[11px] text-gray-500">{t('amount')}</div>
+          <div className="text-[11px] text-gray-500">{voucherLabel('amount')}</div>
           <div className="num text-2xl font-bold" style={{ color: 'var(--doc-brand)' }}>
             {formatMoney(v.amount)}
           </div>
@@ -46,12 +54,12 @@ export function DocVoucher({
       {/* الطريقة والمرجع. */}
       <div className="grid grid-cols-2 gap-3 text-[12px]">
         <div className="flex justify-between border-b border-gray-100 pb-1">
-          <span className="text-gray-500">{t('method')}</span>
+          <span className="text-gray-500">{voucherLabel('method')}</span>
           <span className="font-medium text-black">{v.method}</span>
         </div>
         {v.reference && (
           <div className="flex justify-between border-b border-gray-100 pb-1">
-            <span className="text-gray-500">{t('reference')}</span>
+            <span className="text-gray-500">{voucherLabel('reference')}</span>
             <span className="num font-medium text-black">{v.reference}</span>
           </div>
         )}
@@ -61,7 +69,7 @@ export function DocVoucher({
       {v.allocations && v.allocations.length > 0 && (
         <div className={cn('overflow-hidden border border-gray-200', style.cardRadius)}>
           <div className="bg-gray-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-            {t('applied_to')}
+            {voucherLabel('applied_to')}
           </div>
           <table className="w-full text-[12px]">
             <tbody>

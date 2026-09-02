@@ -4,6 +4,9 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
+import { VISUAL_V2, formatModernMoney } from '../../presentation/visual-v2';
+import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
+import { ModernTotalLabel } from '../../presentation/modern-bilingual-label';
 
 /** كتلة الإجماليات — تعرض القيم المشتقة كما تصل من نموذج المستند فقط. */
 export function DocTotals({
@@ -17,68 +20,82 @@ export function DocTotals({
   const tp = useTranslations('purchaseForm');
   const style = useDocStyle();
   const { totals } = model;
-
+  const { mode } = useDocumentLabelMode(model);
   const isErp = style.composition === 'erp';
-  const isModern = style.composition === 'modern';
+  const isModernV2 = style.composition === 'modern_v2';
+  const isLegacyModern = style.composition === 'modern';
   const isMinimal = style.composition === 'minimal';
+  const displayMoney = isModernV2
+    ? (minor: number) => formatModernMoney(minor, model.currency, mode)
+    : formatMoney;
+  const totalLabel = (key: 'subtotal' | 'discount' | 'shipping' | 'adjustment' | 'vat' | 'grand_total') => {
+    if (isModernV2) return <ModernTotalLabel field={key} mode={mode} />;
+    if (key === 'discount' || key === 'shipping' || key === 'adjustment') return tp(key);
+    return t(key);
+  };
+
   const baseRow = cn(
     'flex items-baseline justify-between gap-5 px-3 py-1.5',
     isErp ? 'border-t border-[color:var(--border)] text-black' : 'border-t border-[color:var(--border)] text-[color:var(--muted)]',
     isMinimal && 'px-0 py-2 text-black',
+    isModernV2 && 'items-start px-0 py-1.5 text-black',
   );
 
   const outer = cn(
-    'max-w-[300px] overflow-hidden',
-    isModern ? 'w-full' : 'w-[46%]',
+    isModernV2 ? VISUAL_V2.totalsMaxClass : 'max-w-[300px]',
+    !isModernV2 && 'overflow-hidden',
+    isModernV2 || isLegacyModern ? 'w-full' : 'w-[46%]',
     isErp && 'border border-black',
-    isModern && 'rounded-md border border-[color:var(--border)] bg-white',
+    isModernV2 && 'border-y border-[color:var(--border)]',
+    isLegacyModern && 'rounded-md border border-[color:var(--border)] bg-white',
     isMinimal && 'border-y border-black',
-    !isErp && !isModern && !isMinimal && 'rounded-lg border border-gray-200',
+    !isErp && !isModernV2 && !isLegacyModern && !isMinimal && 'rounded-lg border border-gray-200',
   );
 
   const totalRow = cn(
     'flex items-baseline justify-between gap-5 px-3 py-2.5 font-bold',
     isErp && 'border-t-2 border-black',
-    isModern && 'border-t-2 border-[color:var(--doc-brand)]',
+    isModernV2 && 'items-start border-t border-[color:var(--doc-brand)] px-0 py-2 text-black',
+    isLegacyModern && 'border-t-2 border-[color:var(--doc-brand)]',
     isMinimal && 'border-t-2 border-black px-0',
   );
-  const totalStyle = isMinimal
+  const totalStyle = isMinimal || isModernV2
     ? undefined
-    : isModern
+    : isLegacyModern
       ? { background: 'var(--doc-brand-soft)', color: 'var(--doc-brand)' }
       : { background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' };
 
   return (
-    <div className={outer}>
-      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal ? 'text-black' : 'text-[color:var(--muted)]', isMinimal && 'px-0 py-2')}>
-        <span>{t('subtotal')}</span>
-        <span className="num">{formatMoney(totals.subtotal)}</span>
+    <div className={outer} data-doc-totals={style.composition}>
+      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal || isModernV2 ? 'text-black' : 'text-[color:var(--muted)]', (isMinimal || isModernV2) && 'px-0 py-2', isModernV2 && 'items-start')}>
+        <span>{totalLabel('subtotal')}</span>
+        <span className="num shrink-0" dir="ltr">{displayMoney(totals.subtotal)}</span>
       </div>
       {totals.discount && totals.discount > 0 ? (
         <div className={baseRow}>
-          <span>{tp('discount')}</span>
-          <span className="num">− {formatMoney(totals.discount)}</span>
+          <span>{totalLabel('discount')}</span>
+          <span className="num shrink-0" dir="ltr">− {displayMoney(totals.discount)}</span>
         </div>
       ) : null}
       {totals.shipping && totals.shipping > 0 ? (
         <div className={baseRow}>
-          <span>{tp('shipping')}</span>
-          <span className="num">{formatMoney(totals.shipping)}</span>
+          <span>{totalLabel('shipping')}</span>
+          <span className="num shrink-0" dir="ltr">{displayMoney(totals.shipping)}</span>
         </div>
       ) : null}
       {totals.adjustment ? (
         <div className={baseRow}>
-          <span>{tp('adjustment')}</span>
-          <span className="num">{totals.adjustment < 0 ? '− ' : ''}{formatMoney(Math.abs(totals.adjustment))}</span>
+          <span>{totalLabel('adjustment')}</span>
+          <span className="num shrink-0" dir="ltr">{totals.adjustment < 0 ? '− ' : ''}{displayMoney(Math.abs(totals.adjustment))}</span>
         </div>
       ) : null}
       <div className={baseRow}>
-        <span>{t('vat')}</span>
-        <span className="num">{formatMoney(totals.tax)}</span>
+        <span>{totalLabel('vat')}</span>
+        <span className="num shrink-0" dir="ltr">{displayMoney(totals.tax)}</span>
       </div>
       <div className={totalRow} style={totalStyle}>
-        <span>{t('grand_total')}</span>
-        <span className="num text-base">{formatMoney(totals.total)}</span>
+        <span>{totalLabel('grand_total')}</span>
+        <span className="num shrink-0 text-base" dir="ltr">{displayMoney(totals.total)}</span>
       </div>
     </div>
   );

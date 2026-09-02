@@ -27,6 +27,12 @@ export interface SourceInvoice {
   tax_amount: string;
   total: string;
   notes?: string | null;
+  /** حقول قائمة على عقد الفاتورة؛ اختيارية حتى لا ينكسر مستدعو POS والمعاينة. */
+  due_date?: string | null;
+  status?: string | null;
+  discount?: string;
+  shipping?: string;
+  adjustment?: string;
   lines: SourceInvoiceLine[];
 }
 export interface SourceCompany {
@@ -70,6 +76,17 @@ function buildNationalAddress(company: SourceCompany | null): string | null {
   ].filter((part): part is string => Boolean(part));
 
   return parts.length > 0 ? parts.join('، ') : (company.short_address?.trim() || null);
+}
+
+/**
+ * يمرّر مبلغاً قائماً من المصدر إلى الهللات إن وُجد وكان غير صفر.
+ * لا يشتق الإجماليات ولا يملأ صفراً يُعرض كسطر فارغ.
+ */
+function optionalSourceMinor(value?: string | null): number | undefined {
+  if (value === undefined || value === null || String(value).trim() === '') return undefined;
+  const n = riyalToMinor(value);
+  if (!Number.isFinite(n) || n === 0) return undefined;
+  return n;
 }
 
 /**
@@ -126,6 +143,7 @@ export function buildInvoiceDocumentModel(input: {
     meta: {
       number: invoice.number,
       date: invoice.invoice_date,
+      dueDate: invoice.due_date?.trim() || null,
       paymentType: invoice.payment_type === 'cash' ? 'cash' : 'credit',
     },
     lines: invoice.lines.map((l) => ({
@@ -144,9 +162,13 @@ export function buildInvoiceDocumentModel(input: {
     })),
     totals: {
       subtotal: riyalToMinor(invoice.subtotal),
+      discount: optionalSourceMinor(invoice.discount),
+      shipping: optionalSourceMinor(invoice.shipping),
+      adjustment: optionalSourceMinor(invoice.adjustment),
       tax: riyalToMinor(invoice.tax_amount),
       total: riyalToMinor(invoice.total),
     },
+    status: invoice.status?.trim() || null,
     qr: qr ? { value: qr } : null,
     footerText: footerText && footerText.trim() !== '' ? footerText : null,
     notes: invoice.notes ?? null,

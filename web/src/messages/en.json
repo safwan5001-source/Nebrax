@@ -2067,6 +2067,7 @@
   "invoiceTemplates": {
     "classic": "Classic",
     "modern": "Modern",
+    "modern_v2": "Modern V2",
     "erp": "ERP",
     "minimal": "Minimal",
     "retail": "Retail",

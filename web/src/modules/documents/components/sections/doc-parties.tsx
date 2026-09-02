@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { DocInfoRow } from './doc-info-row';
 import { useDocStyle } from '../doc-style-context';
+import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
+import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /** عناوين بطاقات المستند عربية أيضاً؛ تباعد المحارف يكسر وصلها عند رسم PDF. */
 export const DOCUMENT_PARTY_CARD_LABEL_CLASS = 'mb-1.5 text-[10px] font-bold text-muted';
@@ -17,6 +19,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
   const tDocument = useTranslations('documentPresentation');
   const style = useDocStyle();
   const { seller, buyer, meta } = model;
+  const { mode } = useDocumentLabelMode(model);
   const isTaxInvoice = model.type === 'tax_invoice' || model.type === 'simplified_tax_invoice';
   const isPurchaseInvoice = model.type === 'purchase_invoice';
   const isPurchaseDocument = model.type === 'purchase_order' || isPurchaseInvoice;
@@ -30,22 +33,38 @@ export function DocParties({ model }: { model: DocumentModel }) {
         ? tPrint('customer')
         : t('bill_to');
 
-  const sellerDetails = (
+  const sellerCore = (
     <>
       <div className="break-words font-semibold leading-snug text-black">{seller.name || '—'}</div>
-      <DocInfoRow label={t('vat_number')} value={seller.vatNumber ? <span className="num">{seller.vatNumber}</span> : null} />
-      <DocInfoRow label={t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />
-      <DocInfoRow label={t('national_address')} value={seller.address} />
+      <DocInfoRow label={style.composition === 'modern_v2' ? <ModernFieldLabel field="vat_number" mode={mode} /> : t('vat_number')} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} />
+      {style.composition === 'modern_v2' ? null : (
+        <>
+          <DocInfoRow label={t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />
+          <DocInfoRow label={t('national_address')} value={seller.address} />
+        </>
+      )}
+    </>
+  );
+
+  const sellerContacts = (
+    <>
       <DocInfoRow label={t('phone')} value={seller.phone ? <span className="num" dir="ltr">{seller.phone}</span> : null} />
       <DocInfoRow label={t('mobile')} value={seller.mobile ? <span className="num" dir="ltr">{seller.mobile}</span> : null} />
+    </>
+  );
+
+  const sellerDetails = (
+    <>
+      {sellerCore}
+      {sellerContacts}
     </>
   );
 
   const buyerDetails = (
     <>
       <div className="break-words font-semibold leading-snug text-black">{buyer.name || '—'}</div>
-      <DocInfoRow label={t('vat_number')} value={buyer.vatNumber ? <span className="num">{buyer.vatNumber}</span> : null} />
-      <DocInfoRow label={t('city')} value={buyer.city} />
+      <DocInfoRow label={style.composition === 'modern_v2' ? <ModernFieldLabel field="vat_number" mode={mode} /> : t('vat_number')} value={buyer.vatNumber ? <span className="num" dir="ltr">{buyer.vatNumber}</span> : null} />
+      <DocInfoRow label={style.composition === 'modern_v2' ? <ModernFieldLabel field="city" mode={mode} /> : t('city')} value={buyer.city} />
     </>
   );
 
@@ -59,7 +78,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
 
   const metaDetails = (
     <>
-      <DocInfoRow label={isDeliveryNote ? tDocument('delivery_date') : t('date')} value={<span className="num">{meta.date}</span>} stacked={stackMetaRows} />
+      <DocInfoRow label={isDeliveryNote ? tDocument('delivery_date') : t('date')} value={<span className="num" dir="ltr">{meta.date}</span>} stacked={stackMetaRows} />
       {showsPaymentType && (
         <DocInfoRow
           label={t('payment_type')}
@@ -68,10 +87,10 @@ export function DocParties({ model }: { model: DocumentModel }) {
         />
       )}
       {!isDeliveryNote && !showsPaymentType && meta.dueDate && (
-        <DocInfoRow label={dueDateLabel} value={<span className="num">{meta.dueDate}</span>} stacked={stackMetaRows} />
+        <DocInfoRow label={dueDateLabel} value={<span className="num" dir="ltr">{meta.dueDate}</span>} stacked={stackMetaRows} />
       )}
       {isPurchaseInvoice && meta.dueDate && (
-        <DocInfoRow label={tDocument('payment_due_date')} value={<span className="num">{meta.dueDate}</span>} stacked={stackMetaRows} />
+        <DocInfoRow label={tDocument('payment_due_date')} value={<span className="num" dir="ltr">{meta.dueDate}</span>} stacked={stackMetaRows} />
       )}
     </>
   );
@@ -90,6 +109,33 @@ export function DocParties({ model }: { model: DocumentModel }) {
         <div className="col-span-3 py-3 ps-4">
           <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{isTaxInvoice ? t('meta') : tDocument('meta')}</div>
           {metaDetails}
+        </div>
+      </section>
+    );
+  }
+
+  if (style.composition === 'modern_v2') {
+    const issuerField = isPurchaseDocument
+      ? 'purchase_buyer' as const
+      : isTaxInvoice
+        ? 'seller' as const
+        : 'company' as const;
+    const partyField = isDeliveryNote
+      ? 'recipient' as const
+      : model.type === 'payment_voucher' || model.type === 'debit_note' || isPurchaseDocument
+        ? 'supplier' as const
+        : model.type === 'receipt_voucher' || model.type === 'quotation' || model.type === 'sales_order' || model.type === 'credit_note'
+          ? 'customer' as const
+          : 'buyer' as const;
+    return (
+      <section className={cn('grid grid-cols-2 gap-x-12 gap-y-3 border-b border-[color:var(--border)] pb-4', style.sectionGap)}>
+        <div className="min-w-0">
+          <div className="mb-1.5 text-[11px] font-semibold text-black"><ModernFieldLabel field={issuerField} mode={mode} /></div>
+          {sellerCore}
+        </div>
+        <div className="min-w-0">
+          <div className="mb-1.5 text-[11px] font-semibold text-black"><ModernFieldLabel field={partyField} mode={mode} /></div>
+          {buyerDetails}
         </div>
       </section>
     );
