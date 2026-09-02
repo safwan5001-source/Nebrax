@@ -13,6 +13,24 @@
 
 العارض بقي كما هو: `InvoiceDocument` → `DocumentView` → `DocumentBody` → `#print-root` / `#pdf-print-root`. لم يُمسّ `document-output-template.ts`. الحقول الاختيارية (`status`، `due_date`، `discount`، `shipping`، `adjustment`) تُمرَّر من بيانات الفاتورة القائمة للعرض فقط — **بلا إعادة حساب**.
 
+### جولة الصقل البصري (PR #616 — متابعة)
+
+مصدر الازدحام بعد الجولة الأولى: عشر أعمدة + تكرار وحدة العملة داخل كل خلية (`﷼` يظهر كـ «ريال») + شبكة الملخص `col-start-8` تترك فراغاً أفقياً.
+
+| المحور | بعد الصقل |
+| --- | --- |
+| نسب الأعمدة | 3 / 8 / 8 / 19 / 21 / 5 / 8 / 10 / 8 / 10 — المجموع **100%**؛ المنتج+الوصف ما زالا الأوسع |
+| خلايا المال | رقم فقط (`nowrap` + `num`)؛ الوحدة في الرأس: `الإجمالي (ريال)` / `Total (SAR)` |
+| عملة Modern | `ريال` في `ar`، و`SAR` في `en` و`bilingual`. لم يُمس `currency.ts` ولا `money.ts` |
+| رؤوس المال | تلتف داخل الخلية (لا `nowrap`) حتى لا تتراكب تسميات `(ريال)`/`(SAR)` في `table-fixed` |
+| الأكواد | رمز المنتج يلتف عند `-`؛ الباركود `ellipsis` بلا `break-all` |
+| الشعار | سقف **36px** و`max-w-[5.5rem]`؛ الاسم `text-[16px] font-bold` |
+| خط التمييز | `h-px` بـ `--border` بدل شريط `--doc-brand` |
+| الملخص | `flex items-end justify-between gap-6`؛ QR **76px**؛ إجماليات `max-w-[300px]` |
+| الفراغ | `MODERN_STYLE.sectionGap`: `mt-4` |
+| الأطراف | `gap-x-12` وعناوين `text-[11px] font-semibold` |
+| التذييل | `text-[10px]` وهواتف `text-[11px] num` |
+
 ---
 
 ## Audit Findings
@@ -37,7 +55,7 @@
 - أطراف بثلاث بطاقات ذات حدود؛ ميتا المستند في عمود ثالث.
 - رأس جدول `soft` بخلفية `--doc-brand-soft` وتناوب صفوف ملوّن.
 - إجماليات داخل بطاقة `rounded-md` بخلفية brand-soft.
-- QR 110px داخل `rounded-lg`.
+- QR 110px داخل `rounded-lg` (صار 76px بعد الصقل).
 - ملاحظات/بنك/شروط كبطاقات.
 - لا CSS لتكرار `thead` أو `break-inside: avoid`.
 
@@ -57,7 +75,7 @@
 
 ### الرأس
 
-منطقتان: هوية المنشأة (شعار `object-contain` ≤48px، اسم `line-clamp-2`، VAT/CR/عنوان) | هوية المستند (عنوان ثنائي مضغوط، رقم مرة واحدة، تاريخ، استحقاق إن وُجد، نوع الدفع). بلا مربع احتياطي ملوّن عند غياب الشعار. شارة `draft`/`cancelled` فقط — ليس `posted`.
+منطقتان: هوية المنشأة (شعار `object-contain` ≤**36px** و`max-w-[5.5rem]`، اسم `text-[16px] font-bold` مع `line-clamp-2`، VAT/CR/عنوان) | هوية المستند (عنوان ثنائي مضغوط، رقم مرة واحدة، تاريخ، استحقاق إن وُجد، نوع الدفع). بلا مربع احتياطي ملوّن عند غياب الشعار. خط التمييز تحت العنوان `h-px` بـ `--border`. شارة `draft`/`cancelled` فقط — ليس `posted`.
 
 ### الأطراف
 
@@ -65,11 +83,11 @@
 
 ### الجدول
 
-`table-fixed`، نسب الأعمدة العشرة الافتراضية مجموعها **100%** (حارس اختبار)، وصف/منتج `break-words`، أكواد `break-all`، أرقام `num` + `nowrap`. بلا تناوب ملوّن. تكرار `thead` في الطباعة مقيّد بـ `[data-doc-composition="modern"]`.
+`table-fixed`، نسب الأعمدة العشرة الافتراضية مجموعها **100%** (حارس اختبار). وصف/منتج `break-words` و`text-[11px]`. رمز المنتج يلتف عند `-`؛ الباركود `ellipsis`. خلايا المال رقم فقط؛ الوحدة مرة في الرأس. رؤوس المال تلتف داخل عرض العمود. بلا تناوب ملوّن. تكرار `thead` في الطباعة مقيّد بـ `[data-doc-composition="modern"]`.
 
 ### الإجماليات وQR والتذييل
 
-إجماليات بلا بطاقة زرقاء؛ إبراز بالوزن وفاصل `--doc-brand` رفيع. QR 88px إن وُجد، قرب الملخص. ملاحظات/بنك/شروط: فاصل + عنوان، تنهار عند الفراغ. التذييل هادئ `mt-auto` مع هاتف/جوال.
+إجماليات بلا بطاقة زرقاء؛ إبراز بالوزن وفاصل `--doc-brand` رفيع؛ `max-w-[300px]`. الملخص `flex justify-between` (QR عند `start`، الإجماليات عند `end`). QR **76px** إن وُجد. ملاحظات/بنك/شروط: فاصل + عنوان، تنهار عند الفراغ. التذييل هادئ `mt-auto` مع هاتف/جوال `text-[11px]`.
 
 ### تمرير البيانات (عرض فقط)
 
@@ -81,21 +99,21 @@
 
 | ملف | الدور |
 | --- | --- |
-| `web/src/modules/documents/presentation/visual-v2.ts` | توكنز V2، تسميات ثنائية، نسب الأعمدة، سقف الشعار/QR |
+| `web/src/modules/documents/presentation/visual-v2.ts` | توكنز V2، تسميات ثنائية، نسب الأعمدة 100%، سقف الشعار 36px وQR 76px، مساعدات عملة Modern |
 | `web/src/modules/documents/presentation/use-document-label-mode.ts` | حسم ar/en/bilingual من locale والاتجاه |
-| `web/src/modules/documents/presentation/visual-v2.test.ts` | عقد الأساس |
+| `web/src/modules/documents/presentation/visual-v2.test.ts` | عقد الأساس + عملة ريال/SAR |
 | `web/src/modules/documents/presentation/visual-v2-print.test.ts` | عزل CSS الطباعة عن بقية القوالب |
-| `web/src/modules/documents/templates/template-styles.ts` | `MODERN_STYLE`: بلا بطاقات، `tableHead: plain` |
+| `web/src/modules/documents/templates/template-styles.ts` | `MODERN_STYLE`: بلا بطاقات، `tableHead: plain`، `sectionGap: mt-4` |
 | `web/src/modules/documents/templates/tax-invoice-modern.tsx` | تعليق الهوية الرسمية |
 | `web/src/modules/documents/types/index.ts` | `status?` عرضي على النموذج |
 | `web/src/modules/documents/builder/from-invoice.ts` | تمرير الحقول الاختيارية القائمة |
 | `web/src/modules/documents/components/sections/doc-layout.tsx` | `data-doc-composition` |
 | `web/src/modules/documents/components/sections/doc-header.tsx` | رأس Modern |
-| `web/src/modules/documents/components/sections/doc-parties.tsx` | عمودان بلا بطاقات |
-| `web/src/modules/documents/components/sections/doc-items-table.tsx` | table-fixed + نسب 100% |
-| `web/src/modules/documents/components/sections/doc-totals.tsx` | بلا بطاقة brand-soft |
-| `web/src/modules/documents/components/sections/doc-qr.tsx` | 88px |
-| `web/src/modules/documents/components/sections/doc-summary.tsx` | `data-doc-keep=summary` |
+| `web/src/modules/documents/components/sections/doc-parties.tsx` | عمودان بلا بطاقات، `gap-x-12` |
+| `web/src/modules/documents/components/sections/doc-items-table.tsx` | table-fixed + نسب 100% + مبالغ رقمية |
+| `web/src/modules/documents/components/sections/doc-totals.tsx` | بلا بطاقة brand-soft؛ `formatModernMoney` |
+| `web/src/modules/documents/components/sections/doc-qr.tsx` | 76px |
+| `web/src/modules/documents/components/sections/doc-summary.tsx` | `flex justify-between` و`data-doc-keep=summary` |
 | `web/src/modules/documents/components/sections/doc-notes.tsx` / `doc-terms.tsx` / `doc-bank.tsx` | فاصل بدل بطاقة |
 | `web/src/modules/documents/components/sections/doc-footer.tsx` | هاتف/جوال |
 | `web/src/modules/documents/components/sections/doc-signature.tsx` | تسمية Modern |
@@ -115,7 +133,7 @@
 | لا قالب بمعرّف جديد | الافتراض عند غياب جواب: إعادة تصميم `tax-invoice-modern` |
 | `cardRadius: rounded-none` و`tableHead: plain` | مستند رسمي لا بطاقة UI |
 | بلا مربع شعار ملوّن | يخالف «لا صناديق ملوّنة»؛ الغياب = اسم فقط |
-| سقف شعار 48px وQR 88px | لا يهيمنان على الرأس/الملخص |
+| سقف شعار 36px وQR 76px | الاسم القانوني أقوى من الشعار؛ QR لا يهيمن على الملخص |
 | ميتا المستند في الرأس لا عمود ثالث | بطاقة لكل حقل تضعف الجدول |
 | أطراف عمودين؛ البائع بدون تكرار السجل/العنوان | الهوية القانونية في الرأس؛ الفاتورة إلى للمشتري |
 | نسب أعمدة مجموعها 100% | أول لقطة LTR أظهرت تراكب باركود/منتج عندما تجاوز المجموع 100% |
@@ -145,20 +163,20 @@
 
 ## Tests
 
-### Vitest — `npm run test` في `web/`
+### Vitest — `npm run test` في `web/` (بعد الصقل)
 
 ```
 Test Files  189 passed (189)
-Tests       1122 passed (1122)
-Duration    20.22s
+Tests       1129 passed (1129)
+Duration    20.42s
 ```
 
 منها:
 
-- `visual-v2.test.ts`: 16 (وضع التسمية، عدم تكرار القيمة، سقف الشعار/QR، مجموع نسب 100%).
-- `document-modern.test.tsx`: 13 (غياب المربع الملوّن، شارة draft/cancelled لا posted، طي الأقسام، QR 88px، table-fixed، ثنائي اللغة، هاتف في التذييل، 1/5/20 بنداً، عزل ERP/Minimal).
+- `visual-v2.test.ts`: 19 (وضع التسمية، سقف الشعار 36px وQR 76px، مجموع نسب 100%، `ريال` عربياً و`SAR` إنجليزي/ثنائي بلا `﷼`).
+- `document-modern.test.tsx`: 17 (غياب المربع الملوّن، شارة draft/cancelled لا posted، QR 76px، table-fixed، ثنائي اللغة، هاتف في التذييل، 1/5/20 بنداً، خلايا بلا وحدة عملة، ملخص `justify-between`، عزل ERP/Minimal).
 - `from-invoice.test.ts`: +2 لتمرير الحالة/الاستحقاق/الإجماليات وحذف الأصفار.
-- `template-styles.test.ts`: يثبت Classic/ERP/Minimal/Retail دون تغيير.
+- `template-styles.test.ts`: يثبت Classic/ERP/Minimal/Retail دون تغيير؛ Modern `sectionGap: mt-4`.
 - `visual-v2-print.test.ts`: عزل CSS الطباعة.
 - الاختبارات القائمة (`doc-items-table` monospace، `doc-parties`، `document-body`، `document-qa-fixtures`، `template-export-contract`) لم تُضعَف.
 
@@ -168,27 +186,34 @@ Duration    20.22s
 
 ### Frontend build
 
-`npm run build` (Next.js 15.5.19) نجح محلياً على `d962a31e`، وWeb CI أخضر على `cec89b79`.
+`npm run build` (Next.js 15.5.19) نجح محلياً على جولة الصقل. Web CI السابق أخضر على `cec89b79`؛ جولة الصقل بانتظار فحص الفرع بعد الدفع.
 
 ---
 
 ## Visual QA
 
-نُفِّذ عبر Playwright على `/document-qa` محلياً (`http://127.0.0.1:3001`) بعد `next dev`، **بلا جلسة مستأجر**. اللقطات في `/opt/cursor/artifacts/`:
+نُفِّذ عبر Playwright على `/document-qa?template=tax-invoice-modern` محلياً (`http://127.0.0.1:3001`)، **بلا جلسة مستأجر**. لقطات `#qa-print-root` في `/opt/cursor/artifacts/`:
 
 | الملف | السيناريو |
 | --- | --- |
-| `modern_invoice_rtl_five_v2.png` | فاتورة ضريبية، Modern، RTL، 5 بنود |
-| `modern_invoice_ltr_single_v2.png` | LTR إنجليزي، بند واحد |
-| `modern_invoice_rtl_long_content_v2.png` | محتوى طويل RTL |
-| لقطات `_document` الأولى | كشفت تراكب الأعمدة في LTR قبل إصلاح النسب |
+| `modern_polish_rtl_ar_single.png` | RTL عربي، بند واحد |
+| `modern_polish_rtl_ar_five.png` | RTL عربي، 5 بنود |
+| `modern_polish_rtl_ar_twenty.png` | RTL عربي، 20 بنداً |
+| `modern_polish_rtl_ar_multipage.png` | RTL عربي، 40 بنداً (multipage) |
+| `modern_polish_ltr_en_single.png` | LTR إنجليزي، بند واحد |
+| `modern_polish_ltr_en_five.png` | LTR إنجليزي، 5 بنود |
+| `modern_polish_bilingual_five.png` | ثنائي: `direction=rtl` + locale `en`، 5 بنود |
+| `modern_polish_rtl_ar_long_content.png` | محتوى طويل + شعار + QR |
 
-ما ظهر بعد الإصلاح:
+فحص آلي لإحداثيات `th`: **صفر تراكب** في عربي RTL وإنجليزي LTR وثنائي. `tableOverflowPx = 0`. خلايا الجدول بلا `ريال`/`SAR`/`﷼`. الإجماليات: `ريال` عربياً و`SAR` إنجليزي/ثنائي. الملخص `flex justify-between`. الشعار 36px وQR 76px.
+
+ما ظهر:
 
 - رأس منطقتين، بلا بطاقات أطراف، تاريخ/استحقاق/دفع في هوية المستند.
-- QR قرب الإجماليات لا في الرأس.
+- QR عند بداية الملخص والإجماليات عند نهايته (RTL وLTR).
 - خصم/شحن/تسوية ظاهرة من قيم الـ fixture (ليست حساباً في العارض).
 - شعار QA الأزرق هو **صورة الـ fixture** (`logoUrl`)، ليس مربع الاحتياط الذي حُذف عند الغياب.
+- التخطيط الافتراضي لـ `tax_invoice` ما زال يخفي الملاحظات/البنك/الختم على `/document-qa` ما لم يُفعَّل التخطيط الكامل.
 
 ما لم يُنفَّذ:
 
@@ -203,9 +228,9 @@ Duration    20.22s
 | الأمر | النتيجة |
 | --- | --- |
 | `php artisan test` | غير مشغَّل (لا backend) |
-| `npm run test` | 189 ملفاً / 1122 اختباراً |
-| `npm run build` | نجح على `d962a31e` |
-| GitHub CI | **نجح** على `cec89b79` في [#616](https://github.com/safwan5001-source/Nebrax/pull/616): 5 فحوصات خضراء. لم يُدمَج |
+| `npm run test` | 189 ملفاً / 1129 اختباراً (بعد الصقل) |
+| `npm run build` | نجح محلياً على جولة الصقل |
+| GitHub CI | **نجح** سابقاً على `cec89b79` في [#616](https://github.com/safwan5001-source/Nebrax/pull/616). صقل `217f0e67` مدفوع على نفس الفرع؛ لا دمج |
 
 ---
 
@@ -225,7 +250,7 @@ Duration    20.22s
 ## Risks / Remaining Work
 
 - التخطيط الافتراضي للفاتورة الضريبية ما زال يخفي الملاحظات/البنك/الختم حتى يفعّلها تصميم القالب — قد يظن المراجع أن الأقسام «لا تعمل» على `/document-qa` بنوع `tax_invoice`.
-- عشرة أعمدة افتراضية على A4 تبقى كثيفة؛ النسب 100% تمنع التراكب لكن الأرقام+رمز الريال تضغط الخلايا. تخصيص الأعمدة من المصمّم هو صمام الأمان.
+- عشرة أعمدة افتراضية على A4 تبقى كثيفة؛ نقل الوحدة إلى الرأس وإتاحة التفاف الرأس يمنع تراكب `(ريال)`/`(SAR)`. تخصيص الأعمدة من المصمّم يبقى صمام الأمان.
 - ثنائي اللغة يعتمد locale الواجهة × اتجاه المستند؛ لا حقل API `bilingual`.
 - Classic/Retail لم يُعاد تصميمهما (خارج النطاق).
 - التحقق اليدوي على فاتورة مرحّلة بمستأجر تجريبي ما زال مفيداً قبل الدمج.
@@ -243,10 +268,9 @@ ERP · Classic · Minimal · Retail · Thermal · Quotes · Purchase Orders · C
 - **Branch:** `cursor/invoice-visual-v2-modern-7cc0`
 - **PR:** [#616](https://github.com/safwan5001-source/Nebrax/pull/616)
 - **Base SHA:** `36525584b4545ef511c839b04ce3bc7f2535aa2e`
-- **Implementation SHA:** `33d85cf7b03cd414f5b50885349a951654a8d0e5`
-- **CI-green SHA:** `cec89b79ba74f132f103e839053d07a9c0dee8bd` (5/5 فحوصات خضراء على #616)
-- **Final Head SHA:** التزام توثيق CI هذا (يختلف عن CI-green عمداً؛ لا التزام لاحق لمجرد المطابقة)
-- **عدد commits (كود):** 2 + تقرير + تثبيت CI
+- **Implementation SHA:** `217f0e679f2a19915f336b1da92176b57df3d9b3` (آخر التزام كودي للصقل؛ لا التزام لاحق لمجرد مطابقة Head)
+- **CI-green SHA:** `cec89b79ba74f132f103e839053d07a9c0dee8bd` (5/5 على الجولة الأولى)
+- **عدد commits (كود الصقل):** `3ddf2f16` ثم `217f0e67`
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
