@@ -99,7 +99,7 @@ class PublicInvoiceController extends PublicApiController
 
         // عزل المستأجر لكل مرجع (حقن معرّف مستأجر آخر ⇒ 422 «غير موجود»).
         $this->assertTenantOwned(Partner::class, $input['partner_id'], 'العميل');
-        $this->assertTenantOwned(Warehouse::class, $input['warehouse_id'] ?? null, 'المستودع');
+        $this->assertActiveWarehouse($input['warehouse_id'] ?? null);
         $this->assertTenantOwnedAll(Product::class, array_column($input['items'], 'product_id'), 'المنتج');
 
         $branchId = $this->resolveBranch($input['branch_id'] ?? null);
@@ -138,7 +138,11 @@ class PublicInvoiceController extends PublicApiController
             }
         });
 
-        return PublicApiResponse::resource($request, (new PublicInvoiceResource($invoice->load('lines')))->withLines())->setStatusCode(201);
+        // **تمثيل إنشاء محدود الحجم** (بلا سطور): استجابة الإنشاء تُخزَّن لإعادة
+        // تشغيل idempotency، وحدّها 64KB؛ فاتورةٌ بمئتَي سطرٍ بأوصافٍ طويلة قد
+        // تتجاوزه فيُحرَّر المفتاح وتتكرّر الفاتورة عند إعادة المحاولة. الرأس وحده
+        // مضمونُ الحجم فيبقى كلُّ إنشاءٍ قابلاً لإعادة التشغيل. للسطور: GET /invoices/{id}.
+        return PublicApiResponse::resource($request, new PublicInvoiceResource($invoice))->setStatusCode(201);
     }
 
     /**
@@ -154,5 +158,21 @@ class PublicInvoiceController extends PublicApiController
         }
 
         return Branch::main()?->id;
+    }
+
+    /**
+     * المستودع (إن حُدِّد) يجب أن يخصّ المستأجر **ونشطًا** — كالمسار الداخلي: مسودّةٌ
+     * بمستودعٍ موقوف لا تُرحَّل لاحقًا. المعرّف غير المرئي (مستأجر آخر) أو الموقوف
+     * ⇒ 422 برسالةٍ واحدة لا تكشف وجود مستودع مستأجر آخر.
+     */
+    private function assertActiveWarehouse(?string $warehouseId): void
+    {
+        if ($warehouseId === null) {
+            return;
+        }
+
+        if (! Warehouse::whereKey($warehouseId)->where('is_active', true)->exists()) {
+            abort(422, 'المستودع غير موجود أو غير نشط.');
+        }
     }
 }

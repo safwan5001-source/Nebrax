@@ -31,11 +31,13 @@ class PublicStoreInvoiceRequest extends FormRequest
             'invoice_date' => ['nullable', 'date'],
             'due_date'     => ['nullable', 'date'],
             'payment_type' => ['nullable', 'in:cash,credit'],
-            'notes'        => ['nullable', 'string', 'max:2000'],
+            // حدود مطابقة لأعمدة قاعدة البيانات (varchar(255)) فيُرفض الطويل 422
+            // لا 500. الأعمدة: invoices.notes و invoice_lines.description كلاهما 255.
+            'notes'        => ['nullable', 'string', 'max:255'],
 
             'items'                    => ['required', 'array', 'min:1', 'max:200'],
             'items.*.product_id'       => ['nullable', 'uuid'],
-            'items.*.description'      => ['nullable', 'string', 'max:1000'],
+            'items.*.description'      => ['nullable', 'string', 'max:255'],
             'items.*.quantity'         => ['required', 'integer', 'min:1', 'max:1000000'],
             'items.*.unit'             => ['nullable', 'string', 'max:255'],
             'items.*.unit_price_minor' => ['required', 'integer', 'min:0', 'max:100000000000'],

@@ -10,6 +10,7 @@ use App\Models\Partner;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Tenant;
+use App\Models\Warehouse;
 use App\Services\ApiClientKeyService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -237,6 +238,77 @@ class PublicApiInvoiceWriteTest extends TestCase
         $this->withToken($s['token'])->postJson(self::URI, $this->payload($s, [
             'items' => [['product_id' => $s['product']->id, 'quantity' => 5, 'unit_price_minor' => 10000, 'tax_rate' => 15]],
         ]), $this->idem('inv-conflict'))->assertStatus(409)->assertJsonPath('error.code', 'idempotency_conflict');
+        $this->assertSame(1, Invoice::count());
+    }
+
+    // ── review-round fixes ────────────────────────────────────────────
+
+    /** @test */
+    public function a_large_invoice_replays_without_duplicating(): void
+    {
+        // لو ضُمّت السطور في استجابة الإنشاء لتجاوزت حدّ الإعادة (64KB) فيُحرَّر
+        // المفتاح وتتكرّر الفاتورة. الرأس وحده محدود، فتبقى الإعادة تشغيلاً لا إنشاءً.
+        $s = $this->seedInvoiceContext();
+        // 200 سطرًا بأوصافٍ عند حدّ العمود (255) — لو ضُمّت السطور في الاستجابة
+        // لتجاوز مجموعُها 64KB. الرأس وحده محدود، فتبقى الإعادة تشغيلاً لا إنشاءً.
+        $lines = [];
+        for ($i = 0; $i < 200; $i++) {
+            // ASCII بطول العمود (255) — مستقلٌّ عن ترميز قاعدة الاختبار المحلية.
+            $lines[] = ['description' => str_repeat('x', 255), 'quantity' => 1, 'unit_price_minor' => 1000, 'tax_rate' => 15];
+        }
+        $payload = ['partner_id' => $s['partner']->id, 'items' => $lines];
+
+        $a = $this->withToken($s['token'])->postJson(self::URI, $payload, $this->idem('big-invoice'))->assertStatus(201);
+        $b = $this->withToken($s['token'])->postJson(self::URI, $payload, $this->idem('big-invoice'))
+            ->assertStatus(201)->assertHeader('Idempotency-Replayed', 'true');
+
+        $this->assertSame($a->json('data.id'), $b->json('data.id'));
+        $this->assertSame(1, Invoice::count(), 'إعادة فاتورة كبيرة لا تُنشئ ثانية');
+    }
+
+    /** @test */
+    public function an_over_long_line_description_is_a_clean_422(): void
+    {
+        // العقد محدود بحجم العمود (255) فيُرفض الطويل تحقّقًا (لا 500 من قاعدة البيانات).
+        $s = $this->seedInvoiceContext();
+        $this->withToken($s['token'])->postJson(self::URI, $this->payload($s, [
+            'items' => [['product_id' => $s['product']->id, 'quantity' => 1, 'unit_price_minor' => 1000, 'description' => str_repeat('x', 256)]],
+        ]), $this->idem())->assertStatus(422)->assertJsonPath('error.code', 'validation_failed');
+        $this->assertSame(0, Invoice::count());
+    }
+
+    /** @test */
+    public function an_inactive_warehouse_is_rejected(): void
+    {
+        $s = $this->seedInvoiceContext();
+        app(TenantContext::class)->set($s['tenant']->id);
+        $warehouse = Warehouse::create([
+            'tenant_id' => $s['tenant']->id, 'code' => 'WH-OFF', 'name' => 'مخزن موقوف', 'is_active' => false,
+        ]);
+        app(TenantContext::class)->forget();
+
+        $this->withToken($s['token'])->postJson(self::URI, $this->payload($s, ['warehouse_id' => $warehouse->id]), $this->idem())
+            ->assertStatus(422)->assertJsonPath('error.code', 'validation_failed');
+        $this->assertSame(0, Invoice::count());
+    }
+
+    /** @test */
+    public function a_retry_replays_even_at_the_plan_quota_boundary(): void
+    {
+        $s = $this->seedInvoiceContext();
+        $s['tenant']->forceFill(['plan_limits' => ['invoices_per_month' => 1]])->save();
+
+        // يستهلك الحصّة الوحيدة.
+        $this->withToken($s['token'])->postJson(self::URI, $this->payload($s), $this->idem('quota-key'))->assertStatus(201);
+
+        // إعادة نفس المفتاح تُعيد تشغيل الـ201 المخزَّنة (idempotency قبل حدّ الخطة).
+        $this->withToken($s['token'])->postJson(self::URI, $this->payload($s), $this->idem('quota-key'))
+            ->assertStatus(201)->assertHeader('Idempotency-Replayed', 'true');
+
+        // مفتاح جديد بعد بلوغ الحدّ ⇒ 422 (الحدّ ما زال مفروضًا على الطلب الجديد).
+        $this->withToken($s['token'])->postJson(self::URI, $this->payload($s, ['notes' => 'جديد']), $this->idem('quota-key-2'))
+            ->assertStatus(422);
+
         $this->assertSame(1, Invoice::count());
     }
 }

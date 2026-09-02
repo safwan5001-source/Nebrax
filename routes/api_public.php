@@ -124,7 +124,9 @@ Route::middleware([
     Route::middleware([EnsureApiScope::class.':products:write', EnforceApiIdempotency::class])
         ->post('products', [PublicProductController::class, 'store'])->name('products.store');
 
-    // حدّ خطة الفواتير مُعاد استخدامه من الداخلي (تناسق الاستحقاق عبر السطحين).
-    Route::middleware([EnsureApiScope::class.':invoices:write', EnforcePlanLimit::class.':invoices', EnforceApiIdempotency::class])
+    // idempotency **قبل** حدّ الخطة: إعادةُ طلبٍ استهلك الحصّة الأخيرة يجب أن تُعيد
+    // تشغيل الـ201 المخزَّنة، لا أن يرفضها حدُّ الخطة (العدّاد بلغ الحدّ). الطلب
+    // الجديد (مفتاح جديد) يبلغ حدَّ الخطة بعد المطالبة فيُرفض 422 — الحدّ محفوظ.
+    Route::middleware([EnsureApiScope::class.':invoices:write', EnforceApiIdempotency::class, EnforcePlanLimit::class.':invoices'])
         ->post('invoices', [PublicInvoiceController::class, 'store'])->name('invoices.store');
 });
