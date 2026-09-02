@@ -121,9 +121,13 @@ use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Middleware\EnsureCommercialApplicationAccess;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformAdministrator;
+use App\Http\Middleware\EnsureUserPrincipal;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\SetBranch;
 use App\Http\Middleware\SetTenant;
+use App\Http\Controllers\Api\DeveloperApiClientController;
+use App\Http\Controllers\Api\DeveloperWebhookController;
+use App\Http\Controllers\Api\DeveloperWebhookDeliveryController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -1115,4 +1119,33 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
 
         }); // نهاية مجموعة الاشتراك النشط
     });
+
+    // ── إدارة المطوّرين (PR-7.5) ────────────────────────────────────────────
+    // سطح إدارة داخلي (ليس Public API): مصادقة جلسة + EnsureUserPrincipal (يرفض
+    // توكن ApiClient صراحةً، **قبل** SetTenant) + عزل المستأجر + RBAC. لا SetBranch:
+    // موارد التكامل CompanyWide لا تعتمد الفرع (§15). يعيد استخدام خدمات PR-2/PR-7.
+    Route::middleware(['auth:sanctum', EnsureUserPrincipal::class, SetTenant::class, EnsureActiveSubscription::class])
+        ->prefix('developer')
+        ->group(function () {
+            $perm = fn (string $p) => EnsurePermission::class . ':' . $p;
+
+            // عملاء Public API ومفاتيحها (تعيد استخدام ApiClientKeyService)
+            Route::get('api-clients', [DeveloperApiClientController::class, 'index'])->middleware($perm('developer.view'));
+            Route::post('api-clients', [DeveloperApiClientController::class, 'store'])->middleware($perm('developer.manage'));
+            Route::get('api-clients/{apiClient}', [DeveloperApiClientController::class, 'show'])->whereUuid('apiClient')->middleware($perm('developer.view'));
+            Route::post('api-clients/{apiClient}/keys', [DeveloperApiClientController::class, 'issueKey'])->whereUuid('apiClient')->middleware($perm('developer.manage'));
+            Route::delete('api-clients/{apiClient}/keys/{tokenId}', [DeveloperApiClientController::class, 'revokeKey'])->whereUuid('apiClient')->whereNumber('tokenId')->middleware($perm('developer.manage'));
+            Route::post('api-clients/{apiClient}/deactivate', [DeveloperApiClientController::class, 'deactivate'])->whereUuid('apiClient')->middleware($perm('developer.manage'));
+
+            // اشتراكات الـ Webhooks (تعيد استخدام WebhookSubscriptionService وحماياتها)
+            Route::get('webhooks', [DeveloperWebhookController::class, 'index'])->middleware($perm('developer.view'));
+            Route::post('webhooks', [DeveloperWebhookController::class, 'store'])->middleware($perm('developer.manage'));
+            Route::get('webhooks/{endpoint}', [DeveloperWebhookController::class, 'show'])->whereUuid('endpoint')->middleware($perm('developer.view'));
+            Route::patch('webhooks/{endpoint}', [DeveloperWebhookController::class, 'update'])->whereUuid('endpoint')->middleware($perm('developer.manage'));
+            Route::delete('webhooks/{endpoint}', [DeveloperWebhookController::class, 'destroy'])->whereUuid('endpoint')->middleware($perm('developer.manage'));
+            Route::post('webhooks/{endpoint}/rotate-secret', [DeveloperWebhookController::class, 'rotateSecret'])->whereUuid('endpoint')->middleware($perm('developer.manage'));
+
+            // سجلّ تسليم الـ Webhooks — قراءة فقط
+            Route::get('webhook-deliveries', [DeveloperWebhookDeliveryController::class, 'index'])->middleware($perm('developer.view'));
+        });
 });
