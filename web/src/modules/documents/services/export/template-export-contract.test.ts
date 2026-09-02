@@ -45,6 +45,15 @@ describe('تصدير القالب الحقيقي', () => {
     expect(source).toContain('resolveDocumentOutputTemplates');
     expect(source).toContain('pdf-print-root');
     expect(source).toContain('usage=${usage}');
-    expect(source).toContain("documentType: 'credit_note'");
+    expect(source).toContain("'credit_note'");
+  });
+
+  it('يربط الإشعار المدين بالمحوّل وجذر PDF المستقل', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/credit-notes/[id]/page.tsx'), 'utf8');
+    expect(source).toContain('resolveDocumentOutputTemplates');
+    expect(source).toContain('pdf-print-root');
+    expect(source).toContain('usage=${usage}');
+    expect(source).toContain("'debit_note'");
+    expect(source).not.toContain('applyDebitDesign');
   });
 });
