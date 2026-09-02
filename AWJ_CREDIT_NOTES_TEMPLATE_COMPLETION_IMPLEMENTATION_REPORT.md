@@ -167,8 +167,8 @@ Debit Notes · Thermal جديد · Purchase Invoices · السندات · Design
 - **PR number/link:** [#613](https://github.com/safwan5001-source/Nebrax/pull/613)
 - **Base SHA:** `a2d91184720796b4568dfafb7c6f537b1e9db3cc`
 - **Implementation SHA:** `d3b86763bc9012f1df7b2e818ac719ea565cc8c4`
-- **Head SHA:** `626599ee3de805c65816faf7e8586201f7161782`
-- **عدد commits:** 3 (`feat` + تقرير + تثبيت SHA)
+- **Head SHA:** `8c8e9025e0ba4fa526c5a9e664a73c7f3606b91f`
+- **عدد commits:** 6
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
