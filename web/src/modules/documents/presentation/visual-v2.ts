@@ -60,15 +60,41 @@ export const MODERN_FIELD_LABELS = {
   vat_number: { ar: 'الرقم الضريبي', en: 'VAT No.' },
   cr_number: { ar: 'السجل التجاري', en: 'CR' },
   number: { ar: 'رقم الفاتورة', en: 'Invoice No.' },
+  document_number: { ar: 'رقم المستند', en: 'Document number' },
   date: { ar: 'التاريخ', en: 'Date' },
   due_date: { ar: 'الاستحقاق', en: 'Due' },
   payment_type: { ar: 'نوع الدفع', en: 'Payment' },
+  cash: { ar: 'نقدي', en: 'Cash' },
+  credit: { ar: 'آجل', en: 'Credit' },
   seller: { ar: 'المورد / المنشأة', en: 'From' },
+  company: { ar: 'المنشأة', en: 'Company' },
   buyer: { ar: 'فاتورة إلى', en: 'Bill to' },
+  purchase_buyer: { ar: 'المشتري', en: 'Buyer' },
+  customer: { ar: 'العميل', en: 'Customer' },
+  supplier: { ar: 'المورد', en: 'Supplier' },
+  recipient: { ar: 'المستلم', en: 'Recipient' },
   notes: { ar: 'ملاحظات', en: 'Notes' },
   terms: { ar: 'الشروط', en: 'Terms' },
   bank: { ar: 'البيانات البنكية', en: 'Bank' },
   signature: { ar: 'التوقيع', en: 'Signature' },
+  national_address: { ar: 'العنوان الوطني', en: 'National address' },
+  city: { ar: 'المدينة', en: 'City' },
+  zatca_note: { ar: 'رمز الاستجابة السريعة (هيئة الزكاة والضريبة)', en: 'QR code (ZATCA)' },
+  amount_words: { ar: 'المبلغ بالحروف', en: 'Amount in words' },
+  valid_until: { ar: 'صالح حتى', en: 'Valid until' },
+  expected_delivery_date: { ar: 'التاريخ المتوقع للتسليم', en: 'Expected delivery date' },
+  delivery_date: { ar: 'تاريخ التسليم', en: 'Delivery date' },
+  payment_due_date: { ar: 'تاريخ الاستحقاق', en: 'Due date' },
+  received_from: { ar: 'استلمنا من', en: 'Received from' },
+  paid_to: { ar: 'صرفنا إلى', en: 'Paid to' },
+  amount: { ar: 'المبلغ', en: 'Amount' },
+  method: { ar: 'طريقة الدفع', en: 'Payment method' },
+  reference: { ar: 'المرجع', en: 'Reference' },
+  applied_to: { ar: 'مخصوم من المستندات', en: 'Applied to documents' },
+  footer: {
+    ar: 'هذه فاتورة إلكترونية صادرة وفق متطلبات هيئة الزكاة والضريبة والجمارك (ZATCA).',
+    en: 'This is an electronic invoice issued per ZATCA (Zakat, Tax and Customs Authority) requirements.',
+  },
 } as const;
 
 export function modernFieldLabel(
@@ -76,6 +102,41 @@ export function modernFieldLabel(
   mode: DocumentLabelMode,
 ): string {
   const pair = MODERN_FIELD_LABELS[key];
+  return pairLabel(pair.ar, pair.en, mode);
+}
+
+export const MODERN_COLUMN_LABELS: Record<DocItemsColumnId, { ar: string; en: string }> = {
+  number: { ar: '#', en: '#' },
+  product: { ar: 'المنتج', en: 'Product' },
+  description: { ar: 'الوصف', en: 'Description' },
+  product_code: { ar: 'رمز المنتج', en: 'Product code' },
+  barcode: { ar: 'الباركود', en: 'Barcode' },
+  quantity: { ar: 'الكمية', en: 'Qty' },
+  unit_price: { ar: 'سعر الوحدة', en: 'Unit price' },
+  price_before_tax: { ar: 'السعر قبل الضريبة', en: 'Price before tax' },
+  tax: { ar: 'الضريبة', en: 'Tax' },
+  total: { ar: 'الإجمالي', en: 'Total' },
+};
+
+export function modernColumnLabel(column: DocItemsColumnId, mode: DocumentLabelMode): string {
+  const pair = MODERN_COLUMN_LABELS[column];
+  return pairLabel(pair.ar, pair.en, mode);
+}
+
+export const MODERN_TOTAL_LABELS = {
+  subtotal: { ar: 'المجموع قبل الضريبة', en: 'Subtotal (excl. VAT)' },
+  discount: { ar: 'خصم الفاتورة', en: 'Invoice discount' },
+  shipping: { ar: 'الشحن', en: 'Shipping' },
+  adjustment: { ar: 'تسوية / تقريب', en: 'Adjustment' },
+  vat: { ar: 'ضريبة القيمة المضافة (15%)', en: 'VAT (15%)' },
+  grand_total: { ar: 'الإجمالي شامل الضريبة', en: 'Total (incl. VAT)' },
+} as const;
+
+export function modernTotalLabel(
+  key: keyof typeof MODERN_TOTAL_LABELS,
+  mode: DocumentLabelMode,
+): string {
+  const pair = MODERN_TOTAL_LABELS[key];
   return pairLabel(pair.ar, pair.en, mode);
 }
 

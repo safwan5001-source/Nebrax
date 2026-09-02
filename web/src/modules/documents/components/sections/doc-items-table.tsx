@@ -14,6 +14,7 @@ import {
   MODERN_ITEMS_TABLE_CLASS,
   formatModernAmount,
   isModernMoneyColumn,
+  modernColumnLabel,
   modernItemsCellPadding,
   modernItemsColumnWidthClass,
   modernItemsValueCellClass,
@@ -140,7 +141,7 @@ export function DocItemsTable({
   };
 
   const headerLabel = (column: DocItemsColumn): string => {
-    const base = column.label?.trim() || labels[column.id];
+    const base = column.label?.trim() || (isModern ? modernColumnLabel(column.id, mode) : labels[column.id]);
     return isModern && isModernMoneyColumn(column.id)
       ? modernMoneyColumnHeader(base, model.currency, mode)
       : base;
@@ -160,7 +161,7 @@ export function DocItemsTable({
                   'font-semibold',
                   textAlignmentClass(alignment),
                   column.id === 'total' && 'font-bold',
-                  isModern && isModernMoneyColumn(column.id) && 'whitespace-normal break-words leading-tight',
+                  isModern && 'whitespace-normal break-words leading-tight',
                   isModern && modernItemsColumnWidthClass(column.id),
                 )}
               >

@@ -5,14 +5,20 @@ import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { blockTextClassName, useDocBlockProperties } from '../doc-block-properties-context';
+import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
+import { modernFieldLabel } from '../../presentation/visual-v2';
 
 /** تذييل المستند — يُدفع لأسفل الصفحة (mt-auto داخل غلاف flex-col). */
 export function DocFooter({ model }: { model: DocumentModel }) {
   const t = useTranslations('invoiceDoc');
   const style = useDocStyle();
   const properties = useDocBlockProperties('footer');
-  const content = properties.static_content ?? model.footerText ?? t('footer');
+  const { mode } = useDocumentLabelMode(model);
   const isModern = style.composition === 'modern';
+  const content =
+    properties.static_content ??
+    model.footerText ??
+    (isModern ? modernFieldLabel('footer', mode) : t('footer'));
   const frame = style.composition === 'erp'
     ? 'border-t border-black pt-3'
     : isModern

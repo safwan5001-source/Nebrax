@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
-import { VISUAL_V2, formatModernMoney } from '../../presentation/visual-v2';
+import { VISUAL_V2, formatModernMoney, modernTotalLabel } from '../../presentation/visual-v2';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
 
 /** كتلة الإجماليات — تعرض القيم المشتقة كما تصل من نموذج المستند فقط. */
@@ -20,13 +20,18 @@ export function DocTotals({
   const style = useDocStyle();
   const { totals } = model;
   const { mode } = useDocumentLabelMode(model);
-  const displayMoney = style.composition === 'modern'
-    ? (minor: number) => formatModernMoney(minor, model.currency, mode)
-    : formatMoney;
-
   const isErp = style.composition === 'erp';
   const isModern = style.composition === 'modern';
   const isMinimal = style.composition === 'minimal';
+  const displayMoney = isModern
+    ? (minor: number) => formatModernMoney(minor, model.currency, mode)
+    : formatMoney;
+  const totalLabel = (key: 'subtotal' | 'discount' | 'shipping' | 'adjustment' | 'vat' | 'grand_total') => {
+    if (isModern) return modernTotalLabel(key, mode);
+    if (key === 'discount' || key === 'shipping' || key === 'adjustment') return tp(key);
+    return t(key);
+  };
+
   const baseRow = cn(
     'flex items-baseline justify-between gap-5 px-3 py-1.5',
     isErp ? 'border-t border-[color:var(--border)] text-black' : 'border-t border-[color:var(--border)] text-[color:var(--muted)]',
@@ -57,33 +62,33 @@ export function DocTotals({
   return (
     <div className={outer} data-doc-totals={style.composition}>
       <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal || isModern ? 'text-black' : 'text-[color:var(--muted)]', (isMinimal || isModern) && 'px-0 py-2')}>
-        <span>{t('subtotal')}</span>
+        <span>{totalLabel('subtotal')}</span>
         <span className="num">{displayMoney(totals.subtotal)}</span>
       </div>
       {totals.discount && totals.discount > 0 ? (
         <div className={baseRow}>
-          <span>{tp('discount')}</span>
+          <span>{totalLabel('discount')}</span>
           <span className="num">− {displayMoney(totals.discount)}</span>
         </div>
       ) : null}
       {totals.shipping && totals.shipping > 0 ? (
         <div className={baseRow}>
-          <span>{tp('shipping')}</span>
+          <span>{totalLabel('shipping')}</span>
           <span className="num">{displayMoney(totals.shipping)}</span>
         </div>
       ) : null}
       {totals.adjustment ? (
         <div className={baseRow}>
-          <span>{tp('adjustment')}</span>
+          <span>{totalLabel('adjustment')}</span>
           <span className="num">{totals.adjustment < 0 ? '− ' : ''}{displayMoney(Math.abs(totals.adjustment))}</span>
         </div>
       ) : null}
       <div className={baseRow}>
-        <span>{t('vat')}</span>
+        <span>{totalLabel('vat')}</span>
         <span className="num">{displayMoney(totals.tax)}</span>
       </div>
       <div className={totalRow} style={totalStyle}>
-        <span>{t('grand_total')}</span>
+        <span>{totalLabel('grand_total')}</span>
         <span className="num text-base">{displayMoney(totals.total)}</span>
       </div>
     </div>

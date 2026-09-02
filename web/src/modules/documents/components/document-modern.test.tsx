@@ -5,6 +5,12 @@ import { DocumentBody } from './document-body';
 import { ERP_STYLE, MINIMAL_STYLE, MODERN_STYLE } from '../templates/template-styles';
 import { makeDocumentQaModel } from '../qa/document-qa-fixtures';
 import { getTheme } from '../themes';
+import {
+  modernColumnLabel,
+  modernFieldLabel,
+  modernMoneyColumnHeader,
+  modernTotalLabel,
+} from '../presentation/visual-v2';
 import type { DocSectionLayoutItem, DocumentModel, TemplateStyle } from '../types';
 
 const locale = { current: 'ar' };
@@ -26,6 +32,7 @@ const FULL_LAYOUT: DocSectionLayoutItem[] = [
   { key: 'parties', visible: true },
   { key: 'items', visible: true },
   { key: 'summary', visible: true },
+  { key: 'amountWords', visible: true },
   { key: 'notes', visible: true },
   { key: 'terms', visible: true },
   { key: 'bank', visible: true },
@@ -33,6 +40,22 @@ const FULL_LAYOUT: DocSectionLayoutItem[] = [
   { key: 'signature', visible: true },
   { key: 'footer', visible: true },
 ];
+
+const ARABIC_SCRIPT = /[\u0600-\u06FF]/;
+const LATIN_SCRIPT = /[A-Za-z]/;
+const ENGLISH_COLUMN_WORDS = /\b(Product|Description|Qty|Barcode|Tax|Subtotal|Shipping|Adjustment)\b/;
+
+function normalizeLabel(text: string | null | undefined): string {
+  return (text ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function expectBilingualLabel(text: string | null | undefined, context: string) {
+  const value = normalizeLabel(text);
+  expect(value, context).not.toBe('');
+  expect(value, `${context}:separator`).toContain(' | ');
+  expect(value, `${context}:arabic`).toMatch(ARABIC_SCRIPT);
+  expect(value, `${context}:latin`).toMatch(LATIN_SCRIPT);
+}
 
 function renderComposition(style: TemplateStyle, model: DocumentModel, layout?: DocSectionLayoutItem[] | null) {
   return render(
@@ -171,11 +194,15 @@ describe('Modern V2 visual composition', () => {
   });
 
   it('لا يغيّر تركيب ERP: شريط هوية ومربع شعار احتياطي وثلاث مناطق أطراف', () => {
+    locale.current = 'en';
     const model = makeDocumentQaModel({ scenario: 'single', direction: 'rtl', showQr: false, showAssets: false });
     const { container } = renderComposition(ERP_STYLE, model);
     expect(container.querySelector('[data-doc-composition="erp"]')).toBeTruthy();
     expect(container.querySelector('header .h-14')).toBeTruthy();
     expect(container.querySelectorAll('section.grid.grid-cols-12 > div')).toHaveLength(3);
+    expect(container.querySelector('h1')?.textContent).toBe('Tax Invoice');
+    expect(container.textContent).not.toContain('فاتورة ضريبية | Tax Invoice');
+    expect(container.textContent).not.toContain(modernFieldLabel('seller', 'bilingual'));
   });
 
   it('يعرض المبالغ رقمياً في الخلايا ووحدة ريال في الرأس والإجماليات عربياً', () => {
@@ -219,6 +246,123 @@ describe('Modern V2 visual composition', () => {
     expect(container.querySelector('thead')?.textContent).toContain('SAR');
     expect(container.querySelector('[data-doc-totals="modern"]')?.textContent).toContain('SAR');
     expect(container.querySelector('[data-doc-totals="modern"]')?.textContent).not.toContain('ريال');
+  });
+
+  it('يطبق العربية | English على كل تسميات Modern الظاهرة في الوضع الثنائي', () => {
+    locale.current = 'en';
+    const base = makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: true, showAssets: true });
+    const model: DocumentModel = {
+      ...base,
+      footerText: null,
+      qr: base.qr ? { ...base.qr, note: null } : null,
+      status: 'draft',
+    };
+    const { container } = renderComposition(MODERN_STYLE, model, FULL_LAYOUT);
+    const text = container.textContent ?? '';
+
+    const expected = [
+      modernFieldLabel('vat_number', 'bilingual'),
+      modernFieldLabel('cr_number', 'bilingual'),
+      modernFieldLabel('national_address', 'bilingual'),
+      modernFieldLabel('number', 'bilingual'),
+      modernFieldLabel('date', 'bilingual'),
+      modernFieldLabel('due_date', 'bilingual'),
+      modernFieldLabel('payment_type', 'bilingual'),
+      modernFieldLabel('credit', 'bilingual'),
+      modernFieldLabel('seller', 'bilingual'),
+      modernFieldLabel('buyer', 'bilingual'),
+      modernFieldLabel('city', 'bilingual'),
+      modernFieldLabel('notes', 'bilingual'),
+      modernFieldLabel('terms', 'bilingual'),
+      modernFieldLabel('bank', 'bilingual'),
+      modernFieldLabel('signature', 'bilingual'),
+      modernFieldLabel('amount_words', 'bilingual'),
+      modernFieldLabel('zatca_note', 'bilingual'),
+      modernFieldLabel('footer', 'bilingual'),
+    ];
+    expect(container.querySelector('[data-doc-status-notice="draft"]')?.textContent).toBe('مسودة | Draft');
+    for (const label of expected) {
+      expect(text, label).toContain(label);
+    }
+
+    const headers = [...container.querySelectorAll('thead th')].map((node) => normalizeLabel(node.textContent));
+    expect(headers).toContain('#');
+    for (const column of ['product', 'description', 'product_code', 'barcode', 'quantity'] as const) {
+      expect(headers).toContain(modernColumnLabel(column, 'bilingual'));
+    }
+    for (const column of ['unit_price', 'price_before_tax', 'tax', 'total'] as const) {
+      expect(headers).toContain(modernMoneyColumnHeader(modernColumnLabel(column, 'bilingual'), 'SAR', 'bilingual'));
+    }
+    for (const header of headers) {
+      if (header === '#') {
+        expect(header).not.toContain(' | ');
+        continue;
+      }
+      expectBilingualLabel(header, `thead:${header}`);
+    }
+
+    const totalLabels = [...container.querySelectorAll('[data-doc-totals="modern"] > div > span:first-child')]
+      .map((node) => normalizeLabel(node.textContent));
+    for (const key of ['subtotal', 'discount', 'shipping', 'adjustment', 'vat', 'grand_total'] as const) {
+      expect(totalLabels).toContain(modernTotalLabel(key, 'bilingual'));
+    }
+    for (const label of totalLabels) expectBilingualLabel(label, `totals:${label}`);
+
+    expect(text.split(model.meta.number).length - 1).toBe(1);
+    expect(text.split(model.meta.date).length - 1).toBe(1);
+    expect(text.split(model.buyer.vatNumber ?? '').length - 1).toBe(1);
+    expect(text).not.toContain(`${model.seller.vatNumber} | ${model.seller.vatNumber}`);
+    expect(text).not.toContain(`${model.meta.number} | ${model.meta.number}`);
+    expect(text).not.toContain(`${model.meta.date} | ${model.meta.date}`);
+    expect(text).toContain(model.seller.name);
+    expect(text).toContain(model.lines[0]?.productName ?? '');
+    expect(text).not.toContain('Nebrax QA Trading Company');
+    expect(text).not.toContain('Enterprise service line 1');
+  });
+
+  it('يبقي التسمية المخصّصة كما خُزنت ولا يترجم بيانات الأعمال في الوضع الثنائي', () => {
+    locale.current = 'en';
+    const model = makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: false, showAssets: false });
+    const { container } = renderComposition(MODERN_STYLE, model, [
+      { key: 'header', visible: true },
+      { key: 'items', visible: true, properties: { columns: [{ id: 'product' }, { id: 'description', label: 'بيان البند' }, { id: 'total' }] } },
+      { key: 'summary', visible: true },
+    ]);
+    const headers = [...container.querySelectorAll('thead th')].map((node) => normalizeLabel(node.textContent));
+    expect(headers).toContain('بيان البند');
+    expect(headers).toContain(modernColumnLabel('product', 'bilingual'));
+    expect(headers).toContain(modernMoneyColumnHeader(modernColumnLabel('total', 'bilingual'), 'SAR', 'bilingual'));
+    expect(headers.some((header) => header.includes('Description'))).toBe(false);
+  });
+
+  it('يبقي العربية والإنجليزية المنفردتين بلا فاصل ثنائي', () => {
+    const arabic = renderComposition(
+      MODERN_STYLE,
+      makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: false, showAssets: false }),
+    );
+    const arabicHead = arabic.container.querySelector('thead')?.textContent ?? '';
+    const arabicTotals = arabic.container.querySelector('[data-doc-totals="modern"]')?.textContent ?? '';
+    expect(arabicHead).toContain(modernColumnLabel('product', 'ar'));
+    expect(arabicHead).not.toContain(' | ');
+    expect(arabicHead).not.toMatch(ENGLISH_COLUMN_WORDS);
+    expect(arabicTotals).toContain(modernTotalLabel('subtotal', 'ar'));
+    expect(arabicTotals).not.toContain(' | ');
+    expect(arabicTotals).not.toContain('Subtotal');
+    arabic.unmount();
+
+    locale.current = 'en';
+    const english = renderComposition(
+      MODERN_STYLE,
+      makeDocumentQaModel({ scenario: 'five', direction: 'ltr', showQr: false, showAssets: false }),
+    );
+    const englishHead = english.container.querySelector('thead')?.textContent ?? '';
+    const englishTotals = english.container.querySelector('[data-doc-totals="modern"]')?.textContent ?? '';
+    expect(englishHead).toContain(modernColumnLabel('product', 'en'));
+    expect(englishHead).not.toContain(' | ');
+    expect(englishHead).not.toContain('المنتج');
+    expect(englishTotals).toContain(modernTotalLabel('grand_total', 'en'));
+    expect(englishTotals).not.toContain(' | ');
+    expect(englishTotals).not.toContain('الإجمالي شامل الضريبة');
   });
 
   it('يرصف الملخص بـ flex وjustify-between بلا فراغ شبكة', () => {

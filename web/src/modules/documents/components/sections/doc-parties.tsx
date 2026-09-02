@@ -64,7 +64,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
     <>
       <div className="break-words font-semibold leading-snug text-black">{buyer.name || '—'}</div>
       <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('vat_number', mode) : t('vat_number')} value={buyer.vatNumber ? <span className="num">{buyer.vatNumber}</span> : null} />
-      <DocInfoRow label={t('city')} value={buyer.city} />
+      <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('city', mode) : t('city')} value={buyer.city} />
     </>
   );
 
@@ -115,8 +115,18 @@ export function DocParties({ model }: { model: DocumentModel }) {
   }
 
   if (style.composition === 'modern') {
-    const modernIssuer = isTaxInvoice ? modernFieldLabel('seller', mode) : issuerLabel;
-    const modernParty = isTaxInvoice ? modernFieldLabel('buyer', mode) : partyLabel;
+    const modernIssuer = isPurchaseDocument
+      ? modernFieldLabel('purchase_buyer', mode)
+      : isTaxInvoice
+        ? modernFieldLabel('seller', mode)
+        : modernFieldLabel('company', mode);
+    const modernParty = isDeliveryNote
+      ? modernFieldLabel('recipient', mode)
+      : model.type === 'payment_voucher' || model.type === 'debit_note' || isPurchaseDocument
+        ? modernFieldLabel('supplier', mode)
+        : model.type === 'receipt_voucher' || model.type === 'quotation' || model.type === 'sales_order' || model.type === 'credit_note'
+          ? modernFieldLabel('customer', mode)
+          : modernFieldLabel('buyer', mode);
     return (
       <section className={cn('grid grid-cols-2 gap-x-12 gap-y-3 border-b border-[color:var(--border)] pb-4', style.sectionGap)}>
         <div className="min-w-0">

@@ -6,18 +6,24 @@ import {
   formatModernMoney,
   isNoticeStatus,
   localizedPair,
+  modernColumnLabel,
   modernCurrencyUnit,
   modernFieldLabel,
   modernItemsColumnWidthClass,
   modernItemsValueCellClass,
   modernMoneyColumnHeader,
   modernStatusLabel,
+  modernTotalLabel,
   pairLabel,
   resolveDocumentLabelMode,
+  MODERN_COLUMN_LABELS,
   MODERN_DEFAULT_COLUMN_WIDTH_SUM,
+  MODERN_FIELD_LABELS,
   MODERN_ITEMS_HEAD_CLASS,
   MODERN_ITEMS_ROW_CLASS,
   MODERN_ITEMS_TABLE_CLASS,
+  MODERN_STATUS_LABELS,
+  MODERN_TOTAL_LABELS,
 } from './visual-v2';
 
 describe('resolveDocumentLabelMode', () => {
@@ -60,6 +66,43 @@ describe('localizedPair', () => {
 describe('modernFieldLabel', () => {
   it('يختصر الرقم الضريبي في الوضع الثنائي', () => {
     expect(modernFieldLabel('vat_number', 'bilingual')).toBe('الرقم الضريبي | VAT No.');
+  });
+});
+
+describe('Modern bilingual catalog coverage', () => {
+  function expectPairedCatalog<T extends Record<string, { ar: string; en: string }>>(
+    catalog: T,
+    label: (key: keyof T & string, mode: 'ar' | 'en' | 'bilingual') => string,
+  ) {
+    for (const key of Object.keys(catalog) as Array<keyof T & string>) {
+      const pair = catalog[key];
+      expect(label(key, 'ar'), `${key}:ar`).toBe(pair.ar);
+      expect(label(key, 'en'), `${key}:en`).toBe(pair.en);
+      expect(label(key, 'ar'), `${key}:ar-pipe`).not.toContain(' | ');
+      if (pair.ar === pair.en) {
+        expect(label(key, 'bilingual'), `${key}:bilingual-same`).toBe(pair.ar);
+        expect(label(key, 'bilingual'), `${key}:bilingual-same-pipe`).not.toContain(' | ');
+      } else {
+        expect(label(key, 'bilingual'), `${key}:bilingual`).toBe(`${pair.ar} | ${pair.en}`);
+      }
+    }
+  }
+
+  it('يجعل كل تسميات الحقول والأعمدة والإجماليات والحالات ثنائية بالعربية أولاً', () => {
+    expectPairedCatalog(MODERN_FIELD_LABELS, modernFieldLabel);
+    expectPairedCatalog(MODERN_COLUMN_LABELS, modernColumnLabel);
+    expectPairedCatalog(MODERN_TOTAL_LABELS, modernTotalLabel);
+    expectPairedCatalog(MODERN_STATUS_LABELS, modernStatusLabel);
+  });
+
+  it('لا يكرر رأس عمود الرقم في الوضع الثنائي', () => {
+    expect(modernColumnLabel('number', 'bilingual')).toBe('#');
+  });
+
+  it('يركب رأس المال الثنائي دون تكرار وحدة SAR', () => {
+    expect(modernMoneyColumnHeader(modernColumnLabel('total', 'bilingual'), 'SAR', 'bilingual')).toBe('الإجمالي | Total (SAR)');
+    expect(modernMoneyColumnHeader(modernColumnLabel('unit_price', 'ar'), 'SAR', 'ar')).toBe('سعر الوحدة (ريال)');
+    expect(modernMoneyColumnHeader(modernColumnLabel('tax', 'en'), 'SAR', 'en')).toBe('Tax (SAR)');
   });
 });
 
