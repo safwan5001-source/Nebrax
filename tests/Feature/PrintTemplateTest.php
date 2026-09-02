@@ -7,6 +7,7 @@ use App\Models\PrintTemplate;
 use App\Models\PrintTemplateRevision;
 use App\Models\Tenant;
 use App\Services\PrintTemplates\PrintTemplateService;
+use App\Support\PrintTemplateContract;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -637,6 +638,57 @@ class PrintTemplateTest extends TestCase
             ->assertJsonPath('data.scope', 'company')
             ->assertJsonPath('data.branch_id', null)
             ->assertJsonPath('data.print_template_revision_id', $companyRevisionId);
+    }
+
+    /** @test */
+    public function invoice_document_type_maps_zatca_simplified_independently(): void
+    {
+        $this->assertSame('simplified_tax_invoice', PrintTemplateContract::invoiceDocumentType('simplified'));
+        $this->assertSame('tax_invoice', PrintTemplateContract::invoiceDocumentType('standard'));
+        $this->assertSame('tax_invoice', PrintTemplateContract::invoiceDocumentType(null));
+    }
+
+    /** @test */
+    public function live_resolution_endpoint_resolves_pdf_independently_from_print(): void
+    {
+        ['token' => $token] = $this->registerTenant('template-pdf-resolve', 'owner@template-pdf-resolve.test');
+
+        $print = $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'قالب طباعة مستقل',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-classic'],
+        ])->assertCreated();
+        $printRevisionId = $this->withToken($token)
+            ->postJson('/api/print-templates/'.$print['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+
+        $pdf = $this->withToken($token)->postJson('/api/print-templates', [
+            'name' => 'قالب PDF مستقل',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-minimal'],
+        ])->assertCreated();
+        $pdfRevisionId = $this->withToken($token)
+            ->postJson('/api/print-templates/'.$pdf['data']['id'].'/publish')
+            ->assertOk()['data']['published_revision']['id'];
+
+        $this->withToken($token)->putJson('/api/print-templates/assignments/default', [
+            'document_type' => 'tax_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $printRevisionId,
+        ])->assertOk();
+        $this->withToken($token)->putJson('/api/print-templates/assignments/default', [
+            'document_type' => 'tax_invoice',
+            'usage' => 'pdf',
+            'print_template_revision_id' => $pdfRevisionId,
+        ])->assertOk();
+
+        $this->withToken($token)->getJson('/api/print-templates/resolve?document_type=tax_invoice&usage=print')
+            ->assertOk()
+            ->assertJsonPath('data.print_template_revision_id', $printRevisionId);
+        $this->withToken($token)->getJson('/api/print-templates/resolve?document_type=tax_invoice&usage=pdf')
+            ->assertOk()
+            ->assertJsonPath('data.print_template_revision_id', $pdfRevisionId);
+        $this->assertNotSame($printRevisionId, $pdfRevisionId);
     }
 
     /** @test */

@@ -153,6 +153,141 @@ class InvoiceTest extends TestCase
         $this->assertSame($frozenThermalRevisionId, $frozenInvoice->thermal_template_revision_id);
         $this->assertSame('tax-invoice-thermal80', $frozenInvoice->thermalTemplateRevision?->definition['template_id']);
         $this->assertNotSame($frozenRevisionId, $newlyPublished->published_revision_id);
+
+        $replacement = $templates->create([
+            'name' => 'قالب لاحق لا يغيّر التاريخ',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-retail'],
+        ], null);
+        $replacement = $templates->publish($replacement);
+        $templates->assign([
+            'document_type' => 'tax_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $replacement->published_revision_id,
+        ], null);
+        $this->assertSame($frozenRevisionId, Invoice::findOrFail($posted->id)->print_template_revision_id);
+    }
+
+    /** @test */
+    public function posting_a_simplified_invoice_freezes_simplified_assignments_over_tax_invoice(): void
+    {
+        $templates = app(PrintTemplateService::class);
+        $taxPrint = $templates->publish($templates->create([
+            'name' => 'طباعة ضريبية قياسية',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-classic'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'tax_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $taxPrint->published_revision_id,
+        ], null);
+
+        $simplePrint = $templates->publish($templates->create([
+            'name' => 'طباعة مبسطة',
+            'document_types' => ['simplified_tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-modern'],
+        ], null));
+        $simplePdf = $templates->publish($templates->create([
+            'name' => 'PDF مبسط',
+            'document_types' => ['simplified_tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-minimal'],
+        ], null));
+        $simpleThermal = $templates->publish($templates->create([
+            'name' => 'حراري مبسط',
+            'document_types' => ['simplified_tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-thermal58'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'simplified_tax_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $simplePrint->published_revision_id,
+        ], null);
+        $templates->assign([
+            'document_type' => 'simplified_tax_invoice',
+            'usage' => 'pdf',
+            'print_template_revision_id' => $simplePdf->published_revision_id,
+        ], null);
+        $templates->assign([
+            'document_type' => 'simplified_tax_invoice',
+            'usage' => 'thermal',
+            'print_template_revision_id' => $simpleThermal->published_revision_id,
+        ], null);
+
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'zatca_document_type' => 'simplified'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $posted = $this->invoices->post($invoice);
+
+        $this->assertSame('simplified', $posted->zatca_document_type);
+        $this->assertSame($simplePrint->published_revision_id, $posted->print_template_revision_id);
+        $this->assertSame($simplePdf->published_revision_id, $posted->pdf_template_revision_id);
+        $this->assertSame($simpleThermal->published_revision_id, $posted->thermal_template_revision_id);
+        $this->assertNotSame($taxPrint->published_revision_id, $posted->print_template_revision_id);
+    }
+
+    /** @test */
+    public function posting_without_pdf_or_thermal_assignments_leaves_those_revisions_null(): void
+    {
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة فقط',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-classic'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'tax_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $posted = $this->invoices->post($invoice);
+
+        $this->assertSame($print->published_revision_id, $posted->print_template_revision_id);
+        $this->assertNull($posted->pdf_template_revision_id);
+        $this->assertNull($posted->thermal_template_revision_id);
+    }
+
+    /** @test */
+    public function posting_a_simplified_invoice_falls_back_to_tax_invoice_assignments_when_simplified_is_unassigned(): void
+    {
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة ضريبية قائمة',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-classic'],
+        ], null));
+        $thermal = $templates->publish($templates->create([
+            'name' => 'حراري ضريبي قائم',
+            'document_types' => ['tax_invoice'],
+            'definition' => ['template_id' => 'tax-invoice-thermal80'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'tax_invoice',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+        $templates->assign([
+            'document_type' => 'tax_invoice',
+            'usage' => 'thermal',
+            'print_template_revision_id' => $thermal->published_revision_id,
+        ], null);
+
+        $invoice = $this->invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'zatca_document_type' => 'simplified'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $posted = $this->invoices->post($invoice);
+
+        $this->assertSame('simplified', $posted->zatca_document_type);
+        $this->assertSame($print->published_revision_id, $posted->print_template_revision_id);
+        $this->assertSame($thermal->published_revision_id, $posted->thermal_template_revision_id);
+        $this->assertNull($posted->pdf_template_revision_id);
     }
 
     /** @test */

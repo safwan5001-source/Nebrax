@@ -110,6 +110,15 @@ class PrintTemplateContract
     }
 
     /**
+     * يحوّل نوع مستند ZATCA المخزَّن على الفاتورة إلى نوع كتالوج القوالب.
+     * لا يخلط الأنواع ولا يخترع أولوية تعيين؛ المستدعي يحلّ النوع الناتج فقط.
+     */
+    public static function invoiceDocumentType(?string $zatcaDocumentType): string
+    {
+        return $zatcaDocumentType === 'simplified' ? 'simplified_tax_invoice' : 'tax_invoice';
+    }
+
+    /**
      * الاستعمال الحراري ليس مجرد وسم إخراج: يجب أن يشير إلى عارض حراري مسجل.
      * يبقى هذا الحارس داخل عقد المحرك، فيسري على كل عميل API ولا يعتمد على فلترة
      * واجهة POS وحدها.

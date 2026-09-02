@@ -1,5 +1,6 @@
 import { riyalToMinor } from '@/lib/money';
-import type { DocumentModel } from '../types';
+import { getCurrency } from '../constants/currencies';
+import type { CurrencyCode, Direction, DocumentModel, DocumentTypeId } from '../types';
 
 /**
  * أشكال المصدر (عقد الـ API للفاتورة) — المبالغ بالريال نصّاً كما يعيدها الـ backend.
@@ -43,6 +44,8 @@ export interface SourceCompany {
   city?: string | null;
   postal_code?: string | null;
   short_address?: string | null;
+  /** عملة المؤسسة من /me؛ المحرّك ينسّق بها ولا يفترض SAR. */
+  currency?: string | null;
 }
 export interface SourceCustomer {
   name: string;
@@ -89,13 +92,18 @@ export function buildInvoiceDocumentModel(input: {
   bank?: string | null;
   stampUrl?: string | null;
   signatureUrl?: string | null;
+  /** نوع الكتالوج؛ الافتراضي فاتورة ضريبية قياسية للتوافق مع المستدعين القدامى. */
+  type?: DocumentTypeId;
+  /** اتجاه المستند؛ الافتراضي RTL لسياق أَوْج. */
+  direction?: Direction;
 }): DocumentModel {
   const { invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
+  const currency = getCurrency(company?.currency).code as CurrencyCode;
 
   return {
-    type: 'tax_invoice',
-    currency: 'SAR',
-    direction: 'rtl',
+    type: input.type ?? 'tax_invoice',
+    currency,
+    direction: input.direction ?? 'rtl',
     seller: {
       name: company?.name ?? '—',
       vatNumber: company?.vat_number ?? null,

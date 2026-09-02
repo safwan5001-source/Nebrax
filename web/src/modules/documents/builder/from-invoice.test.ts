@@ -74,5 +74,51 @@ describe('buildInvoiceDocumentModel', () => {
       phone: '0123456789',
       mobile: '0551234567',
     });
+    expect(model.currency).toBe('SAR');
+    expect(model.direction).toBe('rtl');
+    expect(model.type).toBe('tax_invoice');
+  });
+
+  it('uses the company currency and explicit document direction and catalog type', () => {
+    const model = buildInvoiceDocumentModel({
+      invoice: {
+        number: 'INV-USD-1',
+        invoice_date: '2026-08-18',
+        payment_type: 'cash',
+        subtotal: '10.00',
+        tax_amount: '1.50',
+        total: '11.50',
+        lines: [],
+      },
+      company: { name: 'AWJ Trading', currency: 'USD' },
+      customer: null,
+      qr: 'zatca-qr',
+      type: 'simplified_tax_invoice',
+      direction: 'ltr',
+    });
+
+    expect(model.currency).toBe('USD');
+    expect(model.direction).toBe('ltr');
+    expect(model.type).toBe('simplified_tax_invoice');
+    expect(model.qr).toEqual({ value: 'zatca-qr' });
+  });
+
+  it('falls back to SAR for an unknown company currency', () => {
+    const model = buildInvoiceDocumentModel({
+      invoice: {
+        number: 'INV-UNK-1',
+        invoice_date: '2026-08-18',
+        payment_type: 'cash',
+        subtotal: '10.00',
+        tax_amount: '1.50',
+        total: '11.50',
+        lines: [],
+      },
+      company: { name: 'AWJ', currency: 'XYZ' },
+      customer: null,
+      qr: null,
+    });
+
+    expect(model.currency).toBe('SAR');
   });
 });

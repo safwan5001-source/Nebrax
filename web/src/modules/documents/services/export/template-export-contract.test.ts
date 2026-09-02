@@ -21,4 +21,11 @@ describe('تصدير القالب الحقيقي', () => {
     expect(source).toContain('documentExporter.share');
     expect(source).not.toMatch(legacyVectorExport);
   });
+
+  it('يربط فاتورة التفاصيل بمراجع PDF/Thermal عبر المحوّل وجذر PDF المستقل', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/invoices/[id]/page.tsx'), 'utf8');
+    expect(source).toContain('resolveDocumentOutputTemplates');
+    expect(source).toContain('pdf-print-root');
+    expect(source).toContain('usage=${usage}');
+  });
 });
