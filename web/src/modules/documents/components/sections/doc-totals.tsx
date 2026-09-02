@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
 import { VISUAL_V2, formatModernMoney } from '../../presentation/visual-v2';
+import { ERP_V2 } from '../../presentation/erp-v2';
 import { useDocumentLabelMode } from '../../presentation/use-document-label-mode';
 import { ModernTotalLabel } from '../../presentation/modern-bilingual-label';
 
@@ -22,14 +23,16 @@ export function DocTotals({
   const { totals } = model;
   const { mode } = useDocumentLabelMode(model);
   const isErp = style.composition === 'erp';
+  const isErpV2 = style.composition === 'erp_v2';
   const isModernV2 = style.composition === 'modern_v2';
   const isLegacyModern = style.composition === 'modern';
   const isMinimal = style.composition === 'minimal';
-  const displayMoney = isModernV2
+  const usesV2Labels = isModernV2 || isErpV2;
+  const displayMoney = usesV2Labels
     ? (minor: number) => formatModernMoney(minor, model.currency, mode)
     : formatMoney;
   const totalLabel = (key: 'subtotal' | 'discount' | 'shipping' | 'adjustment' | 'vat' | 'grand_total') => {
-    if (isModernV2) return <ModernTotalLabel field={key} mode={mode} />;
+    if (usesV2Labels) return <ModernTotalLabel field={key} mode={mode} />;
     if (key === 'discount' || key === 'shipping' || key === 'adjustment') return tp(key);
     return t(key);
   };
@@ -39,27 +42,30 @@ export function DocTotals({
     isErp ? 'border-t border-[color:var(--border)] text-black' : 'border-t border-[color:var(--border)] text-[color:var(--muted)]',
     isMinimal && 'px-0 py-2 text-black',
     isModernV2 && 'items-start px-0 py-1.5 text-black',
+    isErpV2 && 'items-start px-0 py-1 text-black text-[10px]',
   );
 
   const outer = cn(
-    isModernV2 ? VISUAL_V2.totalsMaxClass : 'max-w-[300px]',
-    !isModernV2 && 'overflow-hidden',
-    isModernV2 || isLegacyModern ? 'w-full' : 'w-[46%]',
+    isModernV2 ? VISUAL_V2.totalsMaxClass : isErpV2 ? ERP_V2.totalsMaxClass : 'max-w-[300px]',
+    !usesV2Labels && 'overflow-hidden',
+    isModernV2 || isLegacyModern || isErpV2 ? 'w-full' : 'w-[46%]',
     isErp && 'border border-black',
     isModernV2 && 'border-y border-[color:var(--border)]',
+    isErpV2 && 'border-s-2 border-black ps-3',
     isLegacyModern && 'rounded-md border border-[color:var(--border)] bg-white',
     isMinimal && 'border-y border-black',
-    !isErp && !isModernV2 && !isLegacyModern && !isMinimal && 'rounded-lg border border-gray-200',
+    !isErp && !isModernV2 && !isErpV2 && !isLegacyModern && !isMinimal && 'rounded-lg border border-gray-200',
   );
 
   const totalRow = cn(
     'flex items-baseline justify-between gap-5 px-3 py-2.5 font-bold',
     isErp && 'border-t-2 border-black',
     isModernV2 && 'items-start border-t border-[color:var(--doc-brand)] px-0 py-2 text-black',
+    isErpV2 && 'items-start border-t-2 border-black px-0 py-1.5 text-black text-[12px]',
     isLegacyModern && 'border-t-2 border-[color:var(--doc-brand)]',
     isMinimal && 'border-t-2 border-black px-0',
   );
-  const totalStyle = isMinimal || isModernV2
+  const totalStyle = isMinimal || isModernV2 || isErpV2
     ? undefined
     : isLegacyModern
       ? { background: 'var(--doc-brand-soft)', color: 'var(--doc-brand)' }
@@ -67,7 +73,7 @@ export function DocTotals({
 
   return (
     <div className={outer} data-doc-totals={style.composition}>
-      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal || isModernV2 ? 'text-black' : 'text-[color:var(--muted)]', (isMinimal || isModernV2) && 'px-0 py-2', isModernV2 && 'items-start')}>
+      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal || isModernV2 || isErpV2 ? 'text-black' : 'text-[color:var(--muted)]', (isMinimal || isModernV2) && 'px-0 py-2', isModernV2 && 'items-start', isErpV2 && 'items-start px-0 py-1 text-[10px]')}>
         <span>{totalLabel('subtotal')}</span>
         <span className="num shrink-0" dir="ltr">{displayMoney(totals.subtotal)}</span>
       </div>

@@ -114,6 +114,36 @@ export function DocParties({ model }: { model: DocumentModel }) {
     );
   }
 
+  if (style.composition === 'erp_v2') {
+    const issuerField = isPurchaseDocument
+      ? 'purchase_buyer' as const
+      : isTaxInvoice
+        ? 'seller' as const
+        : 'company' as const;
+    const partyField = isDeliveryNote
+      ? 'recipient' as const
+      : model.type === 'payment_voucher' || model.type === 'debit_note' || isPurchaseDocument
+        ? 'supplier' as const
+        : model.type === 'receipt_voucher' || model.type === 'quotation' || model.type === 'sales_order' || model.type === 'credit_note'
+          ? 'customer' as const
+          : 'buyer' as const;
+    return (
+      <section className={cn('grid grid-cols-2 border-y border-black', style.sectionGap)}>
+        <div className="min-w-0 border-e border-black py-2 pe-3">
+          <div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-black"><ModernFieldLabel field={issuerField} mode={mode} /></div>
+          <div className="break-words text-[11px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
+          <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} />
+        </div>
+        <div className="min-w-0 py-2 ps-3">
+          <div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-black"><ModernFieldLabel field={partyField} mode={mode} /></div>
+          <div className="break-words text-[11px] font-semibold leading-snug text-black">{buyer.name || '—'}</div>
+          <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={buyer.vatNumber ? <span className="num" dir="ltr">{buyer.vatNumber}</span> : null} />
+          <DocInfoRow label={<ModernFieldLabel field="city" mode={mode} />} value={buyer.city} />
+        </div>
+      </section>
+    );
+  }
+
   if (style.composition === 'modern_v2') {
     const issuerField = isPurchaseDocument
       ? 'purchase_buyer' as const

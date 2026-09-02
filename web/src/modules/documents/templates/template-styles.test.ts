@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLASSIC_STYLE, ERP_STYLE, MINIMAL_STYLE, MODERN_STYLE, MODERN_V2_STYLE, RETAIL_STYLE, isLegacyModern, isModernV2 } from './template-styles';
+import { CLASSIC_STYLE, ERP_STYLE, ERP_V2_STYLE, MINIMAL_STYLE, MODERN_STYLE, MODERN_V2_STYLE, RETAIL_STYLE, isErpV2, isLegacyErp, isLegacyModern, isModernV2 } from './template-styles';
 
 describe('أساليب قوالب المستندات الرسمية', () => {
   it('يفصل ERP وModern التاريخي وModern V2 وMinimal بهويات تركيبية مختلفة', () => {
@@ -11,7 +11,7 @@ describe('أساليب قوالب المستندات الرسمية', () => {
     expect(ERP_STYLE.tableDensity).toBe('compact');
     expect(MODERN_STYLE.tableDensity).toBe('comfortable');
     expect(MINIMAL_STYLE.tableDensity).toBe('spacious');
-    expect(new Set([ERP_STYLE.composition, MODERN_STYLE.composition, MODERN_V2_STYLE.composition, MINIMAL_STYLE.composition]).size).toBe(4);
+    expect(new Set([ERP_STYLE.composition, ERP_V2_STYLE.composition, MODERN_STYLE.composition, MODERN_V2_STYLE.composition, MINIMAL_STYLE.composition]).size).toBe(5);
   });
 
   it('يبقي Modern التاريخي ببطاقات ناعمة وV2 رسمياً بلا بطاقات', () => {
@@ -73,5 +73,20 @@ describe('أساليب قوالب المستندات الرسمية', () => {
     expect(isLegacyModern(MODERN_V2_STYLE)).toBe(false);
     expect(isLegacyModern(ERP_STYLE)).toBe(false);
     expect(isModernV2(MINIMAL_STYLE)).toBe(false);
+    expect(isLegacyErp(ERP_STYLE)).toBe(true);
+    expect(isErpV2(ERP_STYLE)).toBe(false);
+    expect(isErpV2(ERP_V2_STYLE)).toBe(true);
+    expect(isLegacyErp(ERP_V2_STYLE)).toBe(false);
+    expect(ERP_V2_STYLE).toMatchObject({
+      composition: 'erp_v2',
+      pagePadding: 'p-5',
+      cardRadius: 'rounded-none',
+      sectionGap: 'mt-3',
+      tableHead: 'plain',
+      tableDensity: 'compact',
+      brandBar: false,
+    });
+    expect(ERP_V2_STYLE.pagePadding).not.toBe(MODERN_V2_STYLE.pagePadding);
+    expect(ERP_V2_STYLE.sectionGap).not.toBe(MODERN_V2_STYLE.sectionGap);
   });
 });

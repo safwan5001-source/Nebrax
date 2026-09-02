@@ -11,6 +11,7 @@ import {
   cappedLogoHeight,
   isNoticeStatus,
 } from '../../presentation/visual-v2';
+import { ERP_V2, cappedErpLogoHeight } from '../../presentation/erp-v2';
 import { ModernDocumentTitle, ModernFieldLabel, ModernStatusLabel } from '../../presentation/modern-bilingual-label';
 
 /** ترويسة المستند: الهوية والعنوان ورقم المستند، باختلاف تركيبي محسوب لكل قالب. */
@@ -78,6 +79,70 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
           </div>
         </div>
         <div className="mt-3 h-1" style={{ background: 'var(--doc-brand)' }} />
+      </header>
+    );
+  }
+
+  if (style.composition === 'erp_v2') {
+    const logoHeight = cappedErpLogoHeight(seller.logoHeight);
+    const invoiceNumberField = isTaxInvoice ? 'number' as const : 'document_number' as const;
+    return (
+      <header className="border-b-2 border-black pb-2">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            {showLogo && seller.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL؛ لا يناسبه next/image
+              <img
+                src={seller.logoUrl}
+                alt={seller.name}
+                className={ERP_V2.logoMaxWidthClass}
+                style={{ height: `${logoHeight}px` }}
+              />
+            ) : null}
+            <div className="min-w-0">
+              <div className="line-clamp-2 break-words text-[13px] font-bold leading-tight text-black">{seller.name || '—'}</div>
+              <div className="mt-1 space-y-0">
+                <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
+                <DocInfoRow label={<ModernFieldLabel field="cr_number" mode={mode} />} value={seller.crNumber ? <span className="num" dir="ltr">{seller.crNumber}</span> : null} stacked />
+                <DocInfoRow label={<ModernFieldLabel field="national_address" mode={mode} />} value={seller.address ? <span className="line-clamp-2">{seller.address}</span> : null} stacked />
+              </div>
+            </div>
+          </div>
+          <div className="min-w-[168px] max-w-[42%] shrink-0 border-s-2 border-black ps-3 text-end">
+            <h1 className="text-[16px] font-bold leading-tight text-black">
+              <ModernDocumentTitle locale={locale} primary={dt(model.type)} alternate={dtAlt(model.type)} mode={mode} />
+            </h1>
+            <div className="mt-1.5 space-y-0">
+              <DocInfoRow
+                label={<ModernFieldLabel field={invoiceNumberField} mode={mode} />}
+                value={<span className="num font-bold" dir="ltr">{meta.number}</span>}
+                stacked
+                align="end"
+              />
+              <DocInfoRow label={<ModernFieldLabel field="date" mode={mode} />} value={<span className="num" dir="ltr">{meta.date}</span>} stacked align="end" />
+              {meta.dueDate ? <DocInfoRow label={<ModernFieldLabel field={dueDateField} mode={mode} />} value={<span className="num" dir="ltr">{meta.dueDate}</span>} stacked align="end" /> : null}
+              {showsPaymentType ? (
+                <DocInfoRow
+                  label={<ModernFieldLabel field="payment_type" mode={mode} />}
+                  value={meta.paymentType ? <ModernFieldLabel field={meta.paymentType === 'cash' ? 'cash' : 'credit'} mode={mode} /> : null}
+                  stacked
+                  align="end"
+                />
+              ) : null}
+            </div>
+            {isNoticeStatus(model.status) ? (
+              <div
+                data-doc-status-notice={model.status}
+                className={cn(
+                  'mt-1.5 inline-block border border-black px-1.5 py-0.5 text-[9px] font-semibold',
+                  model.status === 'cancelled' ? 'text-[color:var(--negative)]' : 'text-black',
+                )}
+              >
+                <ModernStatusLabel status={model.status} mode={mode} />
+              </div>
+            ) : null}
+          </div>
+        </div>
       </header>
     );
   }

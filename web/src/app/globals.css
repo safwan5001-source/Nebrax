@@ -182,4 +182,15 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
+  /* ERP V2 فقط: نفس قواعد الصفحات دون لمس erp التاريخي أو modern_v2. */
+  [data-doc-composition="erp_v2"] thead {
+    display: table-header-group;
+  }
+  [data-doc-composition="erp_v2"] tr,
+  [data-doc-composition="erp_v2"] [data-doc-keep="summary"],
+  [data-doc-composition="erp_v2"] footer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

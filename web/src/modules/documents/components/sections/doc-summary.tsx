@@ -29,6 +29,15 @@ export function DocSummary({
     );
   }
 
+  if (style.composition === 'erp_v2') {
+    return (
+      <section data-doc-keep="summary" className={cn('flex items-end justify-between gap-4', style.sectionGap)}>
+        <div className="shrink-0">{qr}</div>
+        {totals}
+      </section>
+    );
+  }
+
   if (style.composition === 'modern_v2') {
     return (
       <section data-doc-keep="summary" className={cn('flex items-end justify-between gap-6', style.sectionGap)}>

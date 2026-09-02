@@ -14,6 +14,7 @@ const SCENARIOS = ['single', 'five', 'twenty', 'multipage', 'long_content'] as c
 const DIRECTIONS = ['rtl', 'ltr'] as const;
 const TEMPLATES = [
   { id: 'tax-invoice-erp', labelKey: 'erp' },
+  { id: 'tax-invoice-erp-v2', labelKey: 'erp_v2' },
   { id: 'tax-invoice-modern', labelKey: 'modern' },
   { id: 'tax-invoice-modern-v2', labelKey: 'modern_v2' },
   { id: 'tax-invoice-minimal', labelKey: 'minimal' },
@@ -142,7 +143,7 @@ export default function DocumentQaPage() {
           <DocumentView
             model={model}
             templateId={templateId}
-            themeId={templateId === 'tax-invoice-erp' ? 'gray' : templateId === 'tax-invoice-minimal' ? 'black' : 'blue'}
+            themeId={templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' ? 'gray' : templateId === 'tax-invoice-minimal' ? 'black' : 'blue'}
             showLogo={showLogo}
             layout={layout}
             rootId="qa-print-root"

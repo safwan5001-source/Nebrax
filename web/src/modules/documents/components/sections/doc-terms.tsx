@@ -17,7 +17,7 @@ export function DocTerms({ model }: { model: DocumentModel }) {
   const content = properties.static_content ?? model.terms;
   if (!content || content.trim() === '') return null;
 
-  const frame = style.composition === 'erp'
+  const frame = style.composition === 'erp' || style.composition === 'erp_v2'
     ? 'border-t-2 border-black py-3'
     : style.composition === 'modern_v2'
       ? 'border-t border-[color:var(--border)] py-3'
@@ -26,7 +26,7 @@ export function DocTerms({ model }: { model: DocumentModel }) {
         : style.composition === 'minimal'
           ? 'border-t border-black py-3'
           : 'rounded-lg bg-gray-50 p-3';
-  const title = style.composition === 'modern_v2' ? <ModernFieldLabel field="terms" mode={mode} /> : t('terms');
+  const title = style.composition === 'modern_v2' || style.composition === 'erp_v2' ? <ModernFieldLabel field="terms" mode={mode} /> : t('terms');
 
   return (
     <section className={cn(frame, style.sectionGap)}>
