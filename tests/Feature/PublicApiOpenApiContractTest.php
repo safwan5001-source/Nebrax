@@ -195,7 +195,7 @@ class PublicApiOpenApiContractTest extends TestCase
             $this->assertTrue($names['Idempotency-Key'], "ترويسة Idempotency-Key يجب أن تكون إلزامية في {$op['path']}.");
         }
 
-        $this->assertSame(3, $writes, 'يُتوقَّع ثلاث عمليات كتابة (طرف/منتج/مسودّة فاتورة).');
+        $this->assertSame(5, $writes, 'يُتوقَّع خمس عمليات كتابة POST (طرف/منتج/مسودّة فاتورة/إنشاء webhook/تدوير سرّ).');
     }
 
     // ── (ج) حماية انحراف المخطّط — القراءة (حيّة) ───────────────────────

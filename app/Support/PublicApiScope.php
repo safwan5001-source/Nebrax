@@ -27,6 +27,10 @@ enum PublicApiScope: string
     case PRODUCTS_WRITE = 'products:write';
     case INVOICES_WRITE = 'invoices:write';
 
+    // ── Webhooks (PR-7) — إدارة اشتراكات التسليم الصادر. مطابقة تامّة كسابقاتها.
+    case WEBHOOKS_READ = 'webhooks:read';
+    case WEBHOOKS_WRITE = 'webhooks:write';
+
     /** صلاحية الأعمال المقابلة في المستودع (القراءة view، والكتابة manage). */
     public function permission(): string
     {
@@ -37,6 +41,10 @@ enum PublicApiScope: string
             self::PARTNERS_WRITE => 'partners.manage',
             self::PRODUCTS_WRITE => 'products.manage',
             self::INVOICES_WRITE => 'invoices.manage',
+            // الـ Webhooks بنية تكامل على مستوى المؤسسة (كالتطبيقات)، يديرها المالك/المدير
+            // — فتُسقَط على صلاحيتَي التطبيقات القائمتين لا صلاحية جديدة في المصفوفة.
+            self::WEBHOOKS_READ  => 'apps.view',
+            self::WEBHOOKS_WRITE => 'apps.manage',
         };
     }
 
