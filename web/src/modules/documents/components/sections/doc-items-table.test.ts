@@ -34,6 +34,6 @@ describe('Modern items table presentation', () => {
     expect(modernItemsValueCellClass('description')).toContain('break-words');
     expect(modernItemsValueCellClass('product')).toContain('min-w-0');
     expect(modernItemsValueCellClass('quantity')).toContain('whitespace-nowrap');
-    expect(modernItemsColumnWidthClass('number')).toBe('w-[6%]');
+    expect(modernItemsColumnWidthClass('number')).toBe('w-[4%]');
   });
 });

@@ -10,6 +10,7 @@ import {
   modernStatusLabel,
   pairLabel,
   resolveDocumentLabelMode,
+  MODERN_DEFAULT_COLUMN_WIDTH_SUM,
   MODERN_ITEMS_HEAD_CLASS,
   MODERN_ITEMS_ROW_CLASS,
   MODERN_ITEMS_TABLE_CLASS,
@@ -104,10 +105,14 @@ describe('modern items table tokens', () => {
   });
 
   it('يعطي الوصف والمنتج عرضاً مرناً ولفّاً آمناً والأرقام nowrap', () => {
-    expect(modernItemsColumnWidthClass('description')).toBe('w-[22%]');
-    expect(modernItemsColumnWidthClass('product')).toBe('w-[22%]');
-    expect(modernItemsColumnWidthClass('total')).toBe('w-[12%]');
+    expect(modernItemsColumnWidthClass('description')).toBe('w-[18%]');
+    expect(modernItemsColumnWidthClass('product')).toBe('w-[16%]');
+    expect(modernItemsColumnWidthClass('total')).toBe('w-[10%]');
     expect(modernItemsValueCellClass('description')).toContain('break-words');
     expect(modernItemsValueCellClass('total')).toContain('whitespace-nowrap');
+  });
+
+  it('يحافظ على مجموع نسب الأعمدة الافتراضية عند 100%', () => {
+    expect(MODERN_DEFAULT_COLUMN_WIDTH_SUM).toBe(100);
   });
 });

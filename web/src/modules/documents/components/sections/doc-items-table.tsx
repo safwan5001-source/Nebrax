@@ -68,6 +68,9 @@ function tableClassName(style: TemplateStyle): string {
 }
 
 function cellPadding(style: TemplateStyle): { head: string; body: string } {
+  if (style.composition === 'modern') {
+    return { head: 'px-1.5 py-1.5', body: 'px-1.5 py-2' };
+  }
   switch (style.tableDensity) {
     case 'compact': return { head: 'px-2 py-1.5', body: 'px-2 py-1.5' };
     case 'spacious': return { head: 'px-3 py-2.5', body: 'px-3 py-3' };

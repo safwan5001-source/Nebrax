@@ -102,21 +102,32 @@ export const MODERN_ITEMS_TABLE_CLASS = 'w-full table-fixed border-collapse text
 export const MODERN_ITEMS_HEAD_CLASS = 'border-b border-[color:var(--border)] text-black';
 export const MODERN_ITEMS_ROW_CLASS = 'border-b border-[color:var(--border)]';
 
-/** عرض عمود Modern داخل table-fixed — الوصف/المنتج يأخذان الحيز المرن. */
+/**
+ * عرض عمود Modern داخل table-fixed.
+ * مجموع الأعمدة العشرة الافتراضية = 100% حتى لا يتراكب الباركود مع المنتج.
+ */
 export function modernItemsColumnWidthClass(column: DocItemsColumnId): string {
   switch (column) {
     case 'number':
-      return 'w-[6%]';
-    case 'product':
-    case 'description':
-      return 'w-[22%]';
+      return 'w-[4%]';
     case 'product_code':
+      return 'w-[9%]';
     case 'barcode':
-      return 'w-[12%]';
+      return 'w-[10%]';
+    case 'product':
+      return 'w-[16%]';
+    case 'description':
+      return 'w-[18%]';
     case 'quantity':
+      return 'w-[6%]';
+    case 'unit_price':
+      return 'w-[9%]';
+    case 'price_before_tax':
+      return 'w-[10%]';
+    case 'tax':
       return 'w-[8%]';
-    default:
-      return 'w-[12%]';
+    case 'total':
+      return 'w-[10%]';
   }
 }
 
@@ -124,5 +135,13 @@ export function modernItemsValueCellClass(column: DocItemsColumnId): string {
   if (column === 'product' || column === 'description') {
     return 'min-w-0 break-words whitespace-normal';
   }
+  if (column === 'product_code' || column === 'barcode') {
+    return 'min-w-0 break-all';
+  }
   return 'whitespace-nowrap';
 }
+
+/** مجموع نسب الأعمدة الافتراضية العشرة — حارس ضد التراكب. */
+export const MODERN_DEFAULT_COLUMN_WIDTH_SUM = (
+  ['number', 'product_code', 'barcode', 'product', 'description', 'unit_price', 'quantity', 'price_before_tax', 'tax', 'total'] as const
+).reduce((sum, column) => sum + Number(modernItemsColumnWidthClass(column).replace(/[^\d]/g, '')), 0);

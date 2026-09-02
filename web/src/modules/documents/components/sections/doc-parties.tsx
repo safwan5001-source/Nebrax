@@ -37,8 +37,12 @@ export function DocParties({ model }: { model: DocumentModel }) {
     <>
       <div className="break-words font-semibold leading-snug text-black">{seller.name || '—'}</div>
       <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('vat_number', mode) : t('vat_number')} value={seller.vatNumber ? <span className="num">{seller.vatNumber}</span> : null} />
-      <DocInfoRow label={style.composition === 'modern' ? modernFieldLabel('cr_number', mode) : t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />
-      <DocInfoRow label={t('national_address')} value={seller.address} />
+      {style.composition === 'modern' ? null : (
+        <>
+          <DocInfoRow label={t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />
+          <DocInfoRow label={t('national_address')} value={seller.address} />
+        </>
+      )}
     </>
   );
 
