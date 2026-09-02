@@ -35,7 +35,7 @@ cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
 mkdir -p app/Contracts app/Models/Concerns app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
-         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature routes
+         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature routes docs/openapi
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
 cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php app/Jobs/DocumentCenter/
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php app/Models/Concerns/
@@ -61,6 +61,8 @@ cp -r "$CORE_DIR/routes/api.php"                 routes/api.php
 cp -r "$CORE_DIR/routes/api_public.php"          routes/api_public.php
 cp -r "$CORE_DIR/routes/console.php"             routes/console.php
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/
+# عقد OpenAPI (توثيق فقط) — يقرأه اختبار المطابقة عبر base_path('docs/openapi/…')
+cp -r "$CORE_DIR/docs/openapi/"*.yaml            docs/openapi/
 
 # تسجيل TenancyServiceProvider (حاسم للعزل) إن لم يكن مسجلاً
 if ! grep -q "TenancyServiceProvider" bootstrap/providers.php; then

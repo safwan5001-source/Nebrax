@@ -107,7 +107,7 @@ jobs:
           mkdir -p app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
-                   app/Models/Concerns tests/Feature routes config
+                   app/Models/Concerns tests/Feature routes config docs/openapi
           cp -r "$CORE/app/Models/"*.php                  app/Models/
           cp -r "$CORE/app/Contracts/"*.php                app/Contracts/
           cp -r "$CORE/app/Jobs/DocumentCenter/"*.php      app/Jobs/DocumentCenter/
@@ -136,6 +136,8 @@ jobs:
           cp -r "$CORE/routes/api_public.php"          routes/api_public.php
           cp -r "$CORE/routes/console.php"                routes/console.php
           cp -r "$CORE/tests/Feature/"*.php               tests/Feature/
+          # عقد OpenAPI (توثيق فقط) — يقرأه اختبار المطابقة عبر base_path('docs/openapi/…')
+          cp -r "$CORE/docs/openapi/"*.yaml               docs/openapi/
 
       - name: تسجيل TenancyServiceProvider + حذف users migration الافتراضية
         working-directory: ${{ env.APP_DIR }}
