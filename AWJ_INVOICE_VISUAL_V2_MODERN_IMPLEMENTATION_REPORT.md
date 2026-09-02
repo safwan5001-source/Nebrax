@@ -3,15 +3,24 @@
 **المشروع:** نبراس / أَوْج ERP  
 **المستودع:** `safwan5001-source/Nebrax`  
 **التاريخ:** 2026-09-02  
-**القاعدة:** أساس بصري V2 + إعادة تصميم قالب `tax-invoice-modern` للفاتورة فقط — معاينة/طباعة/PDF، عربي/إنجليزي/ثنائي. لا ERP/Classic/Minimal/Retail، لا عروض/أوامر شراء/إشعارات/فواتير مشتريات/سندات، لا محاسبة/ZATCA/schema، لا محرّك عارض ثانٍ، لا دمج، لا نشر.
+**القاعدة:** أساس بصري V2 + قالب Modern رسمي. **الجولة الحالية:** فصل هوية السجل حتى يبقى `tax-invoice-modern` على الشكل التاريخي (ما قبل #616) ويُختار V2 صراحةً عبر `tax-invoice-modern-v2`. لا migration، لا إعادة كتابة تعيينات/مراجعات، لا محاسبة/ZATCA/schema، لا محرّك عارض ثانٍ، لا دمج، لا نشر.
 
 ---
 
 ## Executive Summary
 
-أُعيد تصميم قالب **Modern** (`tax-invoice-modern`) ليبدو مستنداً مالياً رسمياً بدل بطاقة واجهة: رأس بهويتين (منشأة | مستند)، طرفان بلا بطاقات، جدول بنود `table-fixed` بطل الصفحة، إجماليات بفاصل هوية رفيع، وQR أصغر قرب الملخص. الأساس في `visual-v2.ts` توكنز عرض محلية لا تُحفظ في المراجعة.
+أُعيد تصميم قالب **Modern V2** ليبدو مستنداً مالياً رسمياً بدل بطاقة واجهة: رأس بهويتين (منشأة | مستند)، طرفان بلا بطاقات، جدول بنود `table-fixed` بطل الصفحة، إجماليات بفاصل هوية رفيع، وQR أصغر قرب الملخص. الأساس في `visual-v2.ts` توكنز عرض محلية لا تُحفظ في المراجعة.
 
-العارض بقي كما هو: `InvoiceDocument` → `DocumentView` → `DocumentBody` → `#print-root` / `#pdf-print-root`. لم يُمسّ `document-output-template.ts`. الحقول الاختيارية (`status`، `due_date`، `discount`، `shipping`، `adjustment`) تُمرَّر من بيانات الفاتورة القائمة للعرض فقط — **بلا إعادة حساب**.
+**عقد الهويات (جولة ثبات المظهر التاريخي):** التجميد يخزّن UUID مراجعة + JSON فيه `template_id` نصي، **لا** يجمّد مكوّن React. لذلك لا يكفي تعديل `composition === 'modern'` in-place:
+
+| الهوية | التركيب | الشكل |
+| --- | --- | --- |
+| `tax-invoice-modern` | `modern` | الشكل التاريخي ما قبل #616 (بطاقات، رأس بشريط جانبي، QR 110px) |
+| `tax-invoice-modern-v2` | `modern_v2` | التصميم المعتمد في #616 (فواصل رفيعة، bilingual/Bidi، QR 76px) |
+
+التعيينات الحية الحالية على `tax-invoice-modern` ترجع تلقائياً للشكل القديم لأن العارض يحلّ المعرّف كما هو. V2 خيار كتالوج جديد فقط. المسودة تتبع التعيين الحي؛ المرحّل يتبع المراجعة المجمّدة. `DEFAULT_TEMPLATE_ID` يبقى `tax-invoice-classic`. لا alias من modern إلى v2.
+
+العارض بقي كما هو: `InvoiceDocument` → `DocumentView` → `DocumentBody` → `#print-root` / `#pdf-print-root`. لم يُمسّ `document-output-template.ts` دلالياً. الحقول الاختيارية (`status`، `due_date`، `discount`، `shipping`، `adjustment`) تُمرَّر من بيانات الفاتورة القائمة للعرض فقط — **بلا إعادة حساب**.
 
 ### جولة الصقل البصري (PR #616 — متابعة)
 
@@ -63,15 +72,15 @@
 
 ### قرار القالب
 
-لم يُنشأ معرّف قالب V2 جديد. أُعيد تصميم `tax-invoice-modern` فقط.
+الجولة الأولى أعادت تصميم `tax-invoice-modern` in-place. **الجولة الحالية تعكس ذلك القرار بصرياً على تلك الهوية** وتسجّل `tax-invoice-modern-v2` للمعتمد، حتى لا تُعاد تفسير التعيينات والمراجعات التاريخية.
 
-لا blocker محاسبي أو ZATCA أو schema. لا PHP.
+لا blocker محاسبي أو ZATCA أو schema. لا PHP. لا migration.
 
 ---
 
 ## Implementation
 
-فروع `style.composition === 'modern'` فقط. ERP / Minimal / Classic / Retail لم تُغيَّر توكنزها (محروس باختبار).
+فروع `style.composition === 'modern_v2'` للتصميم المعتمد، و`modern` للشكل التاريخي. ERP / Minimal / Classic / Retail لم تُغيَّر توكنزها (محروس باختبار).
 
 ### الرأس
 
@@ -83,7 +92,7 @@
 
 ### الجدول
 
-`table-fixed`، نسب الأعمدة العشرة الافتراضية مجموعها **100%** (حارس اختبار). وصف/منتج `break-words` و`text-[11px]`. رمز المنتج يلتف عند `-`؛ الباركود `ellipsis`. خلايا المال رقم فقط؛ الوحدة مرة في الرأس. رؤوس المال تلتف داخل عرض العمود. بلا تناوب ملوّن. تكرار `thead` في الطباعة مقيّد بـ `[data-doc-composition="modern"]`.
+`table-fixed`، نسب الأعمدة العشرة الافتراضية مجموعها **100%** (حارس اختبار). وصف/منتج `break-words` و`text-[11px]`. رمز المنتج يلتف عند `-`؛ الباركود `ellipsis`. خلايا المال رقم فقط؛ الوحدة مرة في الرأس. رؤوس المال تلتف داخل عرض العمود. بلا تناوب ملوّن. تكرار `thead` في الطباعة مقيّد بـ `[data-doc-composition="modern_v2"]`.
 
 ### الإجماليات وQR والتذييل
 
@@ -92,6 +101,20 @@
 ### تمرير البيانات (عرض فقط)
 
 `SourceInvoice` يقبل اختيارياً: `status`، `due_date`، `discount`، `shipping`، `adjustment`. التحويل إلى هللات عبر `riyalToMinor` القائم. الصفر يُحذف فلا يظهر سطراً فارغاً. POS والمعاينة بلا هذه الحقول يبقيان كما هما.
+
+### جولة فصل الهويات (تنفيذ معتمد)
+
+| المحور | النتيجة |
+| --- | --- |
+| سجل الواجهة | `tax-invoice-modern-v2` مدخل جديد في `TEMPLATES`؛ `getTemplate` المجهول يسقط إلى classic كما كان |
+| التركيب | فروع V2 على `modern_v2`؛ فروع `modern` مستعادة من `36525584` |
+| التعيينات الحية | بلا كتابة: من كان على `tax-invoice-modern` يرى التاريخي تلقائياً |
+| المرحّل | `resolveDocumentOutputTemplates` يمرّر `template_id` كما جُمِّد؛ لا alias |
+| المسودة | تتبع التعيين الحي (`modern` أو `modern-v2`) |
+| Print / PDF | كلا المعرّفين A4 متاحان في الكتالوج (`listTemplates`) والاستوديو؛ PDF يسقط إلى print عند غياب تعيين pdf كما كان |
+| Thermal | بلا تغيير؛ القائمة البيضاء تبقى `thermal58`/`thermal80` فقط |
+| Backend | لم يُمس. `PrintTemplateContract` لا يبيّض معرّفات A4؛ لا migration |
+| الافتراضي | `DEFAULT_TEMPLATE_ID = tax-invoice-classic` |
 
 ---
 
@@ -105,8 +128,11 @@
 | `web/src/modules/documents/presentation/use-document-label-mode.ts` | حسم ar/en/bilingual من locale والاتجاه |
 | `web/src/modules/documents/presentation/visual-v2.test.ts` | عقد الأساس + عملة ريال/SAR |
 | `web/src/modules/documents/presentation/visual-v2-print.test.ts` | عزل CSS الطباعة عن بقية القوالب |
-| `web/src/modules/documents/templates/template-styles.ts` | `MODERN_STYLE`: بلا بطاقات، `tableHead: plain`، `sectionGap: mt-4` |
-| `web/src/modules/documents/templates/tax-invoice-modern.tsx` | تعليق الهوية الرسمية |
+| `web/src/modules/documents/templates/template-styles.ts` | `MODERN_STYLE` تاريخي + `MODERN_V2_STYLE` معتمد |
+| `web/src/modules/documents/templates/tax-invoice-modern.tsx` | يغلف `DocumentBody` بـ `MODERN_STYLE` التاريخي |
+| `web/src/modules/documents/templates/tax-invoice-modern-v2.tsx` | هوية V2 الجديدة |
+| `web/src/modules/documents/registry/templates.ts` | سجل الهويتين؛ بلا alias؛ الافتراضي classic |
+| `web/src/app/globals.css` | قواعد طباعة مقيّدة بـ `modern_v2` |
 | `web/src/modules/documents/types/index.ts` | `status?` عرضي على النموذج |
 | `web/src/modules/documents/builder/from-invoice.ts` | تمرير الحقول الاختيارية القائمة |
 | `web/src/modules/documents/components/sections/doc-layout.tsx` | `data-doc-composition` |
@@ -120,8 +146,9 @@
 | `web/src/modules/documents/components/sections/doc-footer.tsx` | هاتف/جوال |
 | `web/src/modules/documents/components/sections/doc-signature.tsx` | تسمية Modern |
 | `web/src/modules/documents/components/sections/doc-info-row.tsx` | محاذاة end اختيارية |
-| `web/src/app/globals.css` | قواعد طباعة مقيّدة بـ modern |
-| `web/src/modules/documents/components/document-modern.test.tsx` | عرض jsdom لتركيب Modern |
+| `web/src/modules/documents/components/document-modern.test.tsx` | عرض jsdom لتركيب `modern_v2` |
+| `web/src/modules/documents/components/document-legacy-modern.test.tsx` | انحدار الشكل التاريخي |
+| `web/src/modules/documents/registry/templates.test.ts` | استقلال الهويتين |
 | اختبارات styles / from-invoice / items-table | حراسة عدم كسر القوالب الأخرى |
 
 لم يُمسّ: `document-output-template.ts`، قوالب ERP/Classic/Minimal/Retail، PHP، الهجرات، ZATCA generation.
@@ -132,7 +159,7 @@
 
 | القرار | السبب |
 | --- | --- |
-| لا قالب بمعرّف جديد | الافتراض عند غياب جواب: إعادة تصميم `tax-invoice-modern` |
+| لا قالب بمعرّف جديد *(نُقض لاحقاً)* | الجولة الأولى أعادت تصميم `tax-invoice-modern`؛ الجولة الحالية تسجّل `tax-invoice-modern-v2` لثبات التاريخ |
 | `cardRadius: rounded-none` و`tableHead: plain` | مستند رسمي لا بطاقة UI |
 | بلا مربع شعار ملوّن | يخالف «لا صناديق ملوّنة»؛ الغياب = اسم فقط |
 | سقف شعار 36px وQR 76px | الاسم القانوني أقوى من الشعار؛ QR لا يهيمن على الملخص |
@@ -140,7 +167,7 @@
 | أطراف عمودين؛ البائع بدون تكرار السجل/العنوان | الهوية القانونية في الرأس؛ الفاتورة إلى للمشتري |
 | نسب أعمدة مجموعها 100% | أول لقطة LTR أظهرت تراكب باركود/منتج عندما تجاوز المجموع 100% |
 | شارة المسودة/الملغى فقط | المرحّل هو الحالة الطبيعية فلا وسْم |
-| قواعد `thead`/`break-inside` تحت `[data-doc-composition=modern]` | لا تُطبَّق على ERP/Minimal |
+| قواعد `thead`/`break-inside` تحت `[data-doc-composition=modern_v2]` | لا تُطبَّق على Modern التاريخي ولا ERP/Minimal |
 | اتجاه منطقي `start`/`end` | لا `left`/`right` في توكنز الشعار |
 
 الثيم ما زال عبر `--doc-brand*`؛ لا hex مبعثر في الأقسام.
@@ -153,7 +180,7 @@
 | --- | --- |
 | ERP / Classic / Minimal / Retail | توكنزها ثابتة باختبار `template-styles.test.ts`؛ فروع التركيب لم تُمس |
 | عقد التصدير | `#print-root` / `#pdf-print-root` كما في #611–#614 |
-| المراجعات المجمّدة | ما زالت تختار `tax-invoice-modern`؛ المظهر الجديد يسري على القالب لا على layout المحفوظ |
+| المراجعات المجمّدة | `template_id` النصي هو مصدر الشكل: `tax-invoice-modern` → تاريخي، `tax-invoice-modern-v2` → V2. تغيير التعيين الحي بعد الترحيل لا يغيّر المرحّل |
 | تخطيط الكتل المحفوظ | أعمدة قابلة للضبط ما زالت تُحترم (اختبار label مخصّص) |
 | POS / معاينة بلا due_date | حقول اختيارية؛ `optionalSourceMinor` لا يخترع أصفاراً |
 | الاتجاه | `model.direction` + `resolveDirection`؛ ثنائي اللغة عند اختلاف locale عن الاتجاه |
@@ -204,19 +231,22 @@
 
 ## Tests
 
-### Vitest — `npm run test` في `web/` (بعد تصحيح Bidi)
+### Vitest — `npm run test` في `web/` (بعد فصل الهويات)
 
 ```
-Test Files  190 passed (190)
-Tests       1140 passed (1140)
-Duration    20.59s
+Test Files  192 passed (192)
+Tests       1155 passed (1155)
+Duration    21.39s
 ```
 
 منها:
 
+- `templates.test.ts`: 3 — `getTemplate('tax-invoice-modern')` ≠ V2؛ المجهول → classic؛ لا alias.
+- `document-output-template.test.ts`: تجميد modern يبقى تاريخياً، تجميد v2 يبقى v2، المسودة تتبع الحي، الملف بلا alias.
+- `document-legacy-modern.test.tsx`: 6 — `composition=modern`، 3 بطاقات، مربع شعار احتياطي، QR 110px، بلا `data-modern-bilingual`.
+- `document-modern.test.tsx`: 21 — بقيت على `MODERN_V2_STYLE` / `data-doc-composition="modern_v2"`.
 - `visual-v2.test.ts`: 22 (كتالوج bilingual ما زال `"ar | en"`).
 - `modern-bilingual-label.test.tsx`: 4 (عقدتان معزولتان؛ `#` سطر واحد؛ ar/en بلا وسم؛ SAR على الإنجليزي فقط).
-- `document-modern.test.tsx`: 21 (بنية معزولة لكل تسمية ظاهرة؛ القيمة خارج عقدة التسمية؛ 10 أعمدة؛ إجماليات منفصلة عن `.num`؛ عربي/إنجليزي بلا وسم؛ عرض سعر + ERP وMinimal بلا تلوّث).
 
 ### PHP
 
@@ -224,13 +254,21 @@ Duration    20.59s
 
 ### Frontend build
 
-`npm run build` (Next.js 15.5.19) نجح محلياً على جولة تصحيح Bidi.
+`npm run build` (Next.js 15.5.19) نجح محلياً بعد فصل الهويات.
 
 ---
 
 ## Visual QA
 
 نُفِّذ عبر Playwright على `/document-qa` محلياً (`http://127.0.0.1:3001`)، **بلا جلسة مستأجر**. لقطات `#qa-print-root` في `/opt/cursor/artifacts/` — أسماء جديدة بلا overwrite.
+
+### جولة فصل الهويات (r5) — إلزامية
+
+| الملف | السيناريو | المقاييس |
+| --- | --- | --- |
+| `identity_split_legacy_modern_rtl_ar_five.png` | `tax-invoice-modern`، عربي RTL، 5 بنود | `composition=modern`، 3 بطاقات أطراف، QR 110px، صفر bilingual، `tableOverflowPx=0` |
+| `identity_split_modern_v2_bilingual_five.png` | `tax-invoice-modern-v2`، locale=en + RTL، 5 بنود | `composition=modern_v2`، 29 عقدة ثنائية، QR 76px، `data-doc-keep=summary`، بلا ` \| `، صفر تراكب |
+| `identity_split_qa_inspect.json` | مقاييس التركيب | يؤكد أن الهويتين لا تشتركان في `composition` |
 
 ### جولة تصحيح Bidi (r4) — إلزامية
 
@@ -294,9 +332,9 @@ locale الواجهة `en` + `direction=rtl` → `labelMode=bilingual`. فحص �
 | الأمر | النتيجة |
 | --- | --- |
 | `php artisan test` | غير مشغَّل (لا backend) |
-| `npm run test` | 190 ملفاً / **1140** اختباراً (بعد تصحيح Bidi) |
+| `npm run test` | 192 ملفاً / **1155** اختباراً (بعد فصل الهويات) |
 | `npm run build` | نجح محلياً (Next.js 15.5.19) |
-| GitHub CI | **نجح** سابقاً على `cec89b79` و`3ddf2f16`. التزام Bidi `529ddd2e` مدفوع على نفس الفرع؛ لا دمج |
+| GitHub CI | **نجح** سابقاً على `cec89b79` و`3ddf2f16`. التزام الفصل `7048684d` مدفوع على نفس الفرع؛ لا دمج |
 
 ---
 
@@ -309,7 +347,7 @@ locale الواجهة `en` + `direction=rtl` → `labelMode=bilingual`. فحص �
 | **Accounting** | **لا قيد.** لا `LedgerService`. لا كتابة `journal_*` |
 | **ZATCA** | QR يُعرض إن وُجد؛ لا توليد TLV/UBL |
 | **migrations** | لا |
-| **تجميد المراجعات** | العقد كما هو؛ تغيّر مظهر القالب المختار `tax-invoice-modern` فقط |
+| **تجميد المراجعات** | العقد كما هو (UUID + `template_id` نصي). لا إعادة كتابة بيانات. الشكل يتبع الهوية لا آخر تصميم in-place |
 
 ---
 
@@ -319,15 +357,15 @@ locale الواجهة `en` + `direction=rtl` → `labelMode=bilingual`. فحص �
 - عشرة أعمدة افتراضية على A4 تبقى كثيفة؛ نقل الوحدة إلى الرأس وإتاحة التفاف الرأس يمنع تراكب `(ريال)`/`(SAR)`. تخصيص الأعمدة من المصمّم يبقى صمام الأمان.
 - ثنائي اللغة يعتمد locale الواجهة × اتجاه المستند؛ لا حقل API `bilingual`. العرض الثنائي عقدتان معزولتان لا سلسلة `|`.
 - Classic/Retail لم يُعاد تصميمهما (خارج النطاق).
-- التحقق اليدوي على فاتورة مرحّلة بمستأجر تجريبي ما زال مفيداً قبل الدمج.
+- التحقق اليدوي على فاتورة مرحّلة بمستأجر تجريبي ما زال مفيداً قبل الدمج: تعيين حي `tax-invoice-modern` يجب أن يظهر تاريخياً؛ اختيار V2 يتم من الكتالوج صراحةً.
 
 ---
 
 ## Explicit exclusions respected
 
-ERP · Classic · Minimal · Retail · Thermal · ZATCA generation · accounting · API/DB schema · revision freeze contract · second renderer · Merge · Deploy.
+ERP · Classic · Minimal · Retail · Thermal · ZATCA generation · accounting · API/DB schema · إعادة كتابة التعيينات/المراجعات · migrations · second renderer · Merge · Deploy.
 
-(تسميات Modern تُطبَّق إن اختير القالب نفسه لنوع تجاري في `/document-qa`؛ لا إعادة تصميم لتلك الأنواع.)
+(تسميات Modern V2 تُطبَّق إن اختير `tax-invoice-modern-v2` لنوع تجاري في `/document-qa`؛ الهوية التاريخية `tax-invoice-modern` لا تحمل bilingual/Bidi.)
 
 ---
 
@@ -336,11 +374,11 @@ ERP · Classic · Minimal · Retail · Thermal · ZATCA generation · accounting
 - **Branch:** `cursor/invoice-visual-v2-modern-7cc0`
 - **PR:** [#616](https://github.com/safwan5001-source/Nebrax/pull/616)
 - **Base SHA:** `36525584b4545ef511c839b04ce3bc7f2535aa2e`
-- **Implementation SHA:** `529ddd2ed597b8dc085ae97ff03065d765edf8ce` (آخر التزام كودي — عزل Bidi للتسميات الثنائية؛ لا التزام لاحق لمجرد مطابقة Head)
+- **Implementation SHA (فصل الهويات — كود):** `7048684d`
+- **Implementation SHA (Bidi):** `529ddd2ed597b8dc085ae97ff03065d765edf8ce`
 - **Implementation SHA (تغطية ثنائية سابقة):** `534b3911c770fb87822827c4085a68ee6b0d5cb7`
 - **Implementation SHA (صقل بصري):** `217f0e679f2a19915f336b1da92176b57df3d9b3`
 - **CI-green SHA:** `cec89b79ba74f132f103e839053d07a9c0dee8bd` (5/5 على الجولة الأولى)
-- **عدد commits (كود هذه الجولة):** `529ddd2e`
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
@@ -348,9 +386,12 @@ ERP · Classic · Minimal · Retail · Thermal · ZATCA generation · accounting
 
 ## Next Step
 
-مراجعة [#616](https://github.com/safwan5001-source/Nebrax/pull/616) بصرياً على `/document-qa?template=tax-invoice-modern` ثم دمجها يدوياً. لم يُدمَج من هذا الوكيل.
+مراجعة [#616](https://github.com/safwan5001-source/Nebrax/pull/616) بصرياً على:
 
-الخطوة التالية المقترحة (دون تنفيذ): Classic أو Minimal بنفس أساس V2، أو تمرير `status` في fixtures صفحة QA لعرض شارة المسودة.
+- `/document-qa?template=tax-invoice-modern` → الشكل التاريخي
+- `/document-qa?template=tax-invoice-modern-v2` → V2 المعتمد
+
+لم يُدمَج ولم يُنشَر من هذا الوكيل. لا migration لاحقة لهذا الفصل.
 
 ---
 
