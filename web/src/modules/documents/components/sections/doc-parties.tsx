@@ -36,8 +36,8 @@ export function DocParties({ model }: { model: DocumentModel }) {
   const sellerCore = (
     <>
       <div className="break-words font-semibold leading-snug text-black">{seller.name || '—'}</div>
-      <DocInfoRow label={style.composition === 'modern' ? <ModernFieldLabel field="vat_number" mode={mode} /> : t('vat_number')} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} />
-      {style.composition === 'modern' ? null : (
+      <DocInfoRow label={style.composition === 'modern_v2' ? <ModernFieldLabel field="vat_number" mode={mode} /> : t('vat_number')} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} />
+      {style.composition === 'modern_v2' ? null : (
         <>
           <DocInfoRow label={t('cr_number')} value={seller.crNumber ? <span className="num">{seller.crNumber}</span> : null} />
           <DocInfoRow label={t('national_address')} value={seller.address} />
@@ -63,8 +63,8 @@ export function DocParties({ model }: { model: DocumentModel }) {
   const buyerDetails = (
     <>
       <div className="break-words font-semibold leading-snug text-black">{buyer.name || '—'}</div>
-      <DocInfoRow label={style.composition === 'modern' ? <ModernFieldLabel field="vat_number" mode={mode} /> : t('vat_number')} value={buyer.vatNumber ? <span className="num" dir="ltr">{buyer.vatNumber}</span> : null} />
-      <DocInfoRow label={style.composition === 'modern' ? <ModernFieldLabel field="city" mode={mode} /> : t('city')} value={buyer.city} />
+      <DocInfoRow label={style.composition === 'modern_v2' ? <ModernFieldLabel field="vat_number" mode={mode} /> : t('vat_number')} value={buyer.vatNumber ? <span className="num" dir="ltr">{buyer.vatNumber}</span> : null} />
+      <DocInfoRow label={style.composition === 'modern_v2' ? <ModernFieldLabel field="city" mode={mode} /> : t('city')} value={buyer.city} />
     </>
   );
 
@@ -114,7 +114,7 @@ export function DocParties({ model }: { model: DocumentModel }) {
     );
   }
 
-  if (style.composition === 'modern') {
+  if (style.composition === 'modern_v2') {
     const issuerField = isPurchaseDocument
       ? 'purchase_buyer' as const
       : isTaxInvoice
@@ -136,6 +136,26 @@ export function DocParties({ model }: { model: DocumentModel }) {
         <div className="min-w-0">
           <div className="mb-1.5 text-[11px] font-semibold text-black"><ModernFieldLabel field={partyField} mode={mode} /></div>
           {buyerDetails}
+        </div>
+      </section>
+    );
+  }
+
+  if (style.composition === 'modern') {
+    const surface = cn('border border-[color:var(--border)] p-4', style.cardRadius);
+    return (
+      <section className={cn('grid grid-cols-12 gap-3', style.sectionGap)}>
+        <div className={cn('col-span-5', surface)}>
+          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{issuerLabel}</div>
+          {sellerDetails}
+        </div>
+        <div className={cn('col-span-4', surface)}>
+          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{partyLabel}</div>
+          {buyerDetails}
+        </div>
+        <div className={cn('col-span-3 bg-[color:var(--doc-brand-soft)]', surface)}>
+          <div className={DOCUMENT_PARTY_CARD_LABEL_CLASS}>{isTaxInvoice ? t('meta') : tDocument('meta')}</div>
+          {metaDetails}
         </div>
       </section>
     );

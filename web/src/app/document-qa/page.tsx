@@ -15,6 +15,7 @@ const DIRECTIONS = ['rtl', 'ltr'] as const;
 const TEMPLATES = [
   { id: 'tax-invoice-erp', labelKey: 'erp' },
   { id: 'tax-invoice-modern', labelKey: 'modern' },
+  { id: 'tax-invoice-modern-v2', labelKey: 'modern_v2' },
   { id: 'tax-invoice-minimal', labelKey: 'minimal' },
 ] as const;
 const DOCUMENT_TYPES = [

@@ -19,12 +19,14 @@ export function DocTerms({ model }: { model: DocumentModel }) {
 
   const frame = style.composition === 'erp'
     ? 'border-t-2 border-black py-3'
-    : style.composition === 'modern'
+    : style.composition === 'modern_v2'
       ? 'border-t border-[color:var(--border)] py-3'
-      : style.composition === 'minimal'
-        ? 'border-t border-black py-3'
-        : 'rounded-lg bg-gray-50 p-3';
-  const title = style.composition === 'modern' ? <ModernFieldLabel field="terms" mode={mode} /> : t('terms');
+      : style.composition === 'modern'
+        ? 'rounded-md border border-[color:var(--border)] bg-[color:var(--doc-brand-soft)] p-4'
+        : style.composition === 'minimal'
+          ? 'border-t border-black py-3'
+          : 'rounded-lg bg-gray-50 p-3';
+  const title = style.composition === 'modern_v2' ? <ModernFieldLabel field="terms" mode={mode} /> : t('terms');
 
   return (
     <section className={cn(frame, style.sectionGap)}>

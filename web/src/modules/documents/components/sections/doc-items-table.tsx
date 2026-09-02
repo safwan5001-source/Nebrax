@@ -42,7 +42,7 @@ export function usesMonospaceValue(column: DocItemsColumnId): boolean {
 
 /** خصائص صفّ رأس الجدول حسب نمط القالب. */
 function headRow(style: TemplateStyle): { className: string; style?: CSSProperties } {
-  if (style.composition === 'modern') {
+  if (style.composition === 'modern_v2') {
     return { className: MODERN_ITEMS_HEAD_CLASS };
   }
   switch (style.tableHead) {
@@ -67,14 +67,15 @@ function defaultAlignment(column: DocItemsColumnId): DocBlockAlignment {
 function tableClassName(style: TemplateStyle): string {
   switch (style.composition) {
     case 'erp': return 'w-full border-collapse text-[10px] leading-snug';
-    case 'modern': return MODERN_ITEMS_TABLE_CLASS;
+    case 'modern_v2': return MODERN_ITEMS_TABLE_CLASS;
+    case 'modern': return 'w-full border-collapse text-[11px] leading-relaxed';
     case 'minimal': return 'w-full border-collapse text-[11px] leading-relaxed';
     default: return 'w-full border-collapse text-[11px]';
   }
 }
 
 function cellPadding(style: TemplateStyle): { head: string; body: string } {
-  if (style.composition === 'modern') {
+  if (style.composition === 'modern_v2') {
     return { head: 'px-1.5 py-1.5', body: 'px-1.5 py-1.5' };
   }
   switch (style.tableDensity) {
@@ -87,7 +88,8 @@ function cellPadding(style: TemplateStyle): { head: string; body: string } {
 function bodyRowClassName(style: TemplateStyle, index: number): string {
   switch (style.composition) {
     case 'erp': return 'border-b border-[color:var(--border)]';
-    case 'modern': return MODERN_ITEMS_ROW_CLASS;
+    case 'modern_v2': return MODERN_ITEMS_ROW_CLASS;
+    case 'modern': return index % 2 ? 'border-b border-[color:var(--border)] bg-[color:var(--doc-brand-soft)]/30' : 'border-b border-[color:var(--border)]';
     case 'minimal': return 'border-b border-[color:var(--border)]';
     default: return index % 2 ? 'bg-gray-50' : '';
   }
@@ -120,8 +122,8 @@ export function DocItemsTable({
     tax: t('tax'),
     total: t('total'),
   };
-  const isModern = style.composition === 'modern';
-  const moneyValue = isModern
+  const isModernV2 = style.composition === 'modern_v2';
+  const moneyValue = isModernV2
     ? (minor: number) => formatModernAmount(minor, model.currency)
     : formatMoney;
 
@@ -142,7 +144,7 @@ export function DocItemsTable({
 
   const headerLabel = (column: DocItemsColumn): string => {
     const base = column.label?.trim() || labels[column.id];
-    return isModern && isModernMoneyColumn(column.id)
+    return isModernV2 && isModernMoneyColumn(column.id)
       ? modernMoneyColumnHeader(base, model.currency, mode)
       : base;
   };
@@ -150,12 +152,12 @@ export function DocItemsTable({
   const headerContent = (column: DocItemsColumn): React.ReactNode => {
     const custom = column.label?.trim();
     if (custom) return headerLabel(column);
-    if (isModern) return <ModernColumnHeader column={column.id} mode={mode} currency={model.currency} />;
+    if (isModernV2) return <ModernColumnHeader column={column.id} mode={mode} currency={model.currency} />;
     return labels[column.id];
   };
 
   const table = (
-    <table className={blockTextClassName(properties, cn(tableClassName(style), !isModern && style.sectionGap))}>
+    <table className={blockTextClassName(properties, cn(tableClassName(style), !isModernV2 && style.sectionGap))}>
       <thead>
         <tr className={head.className} style={head.style}>
           {columns.map((column) => {
@@ -164,12 +166,12 @@ export function DocItemsTable({
               <th
                 key={column.id}
                 className={cn(
-                  isModern ? modernItemsCellPadding(column.id) : padding.head,
+                  isModernV2 ? modernItemsCellPadding(column.id) : padding.head,
                   'font-semibold',
                   textAlignmentClass(alignment),
                   column.id === 'total' && 'font-bold',
-                  isModern && 'whitespace-normal break-words leading-tight',
-                  isModern && modernItemsColumnWidthClass(column.id),
+                  isModernV2 && 'whitespace-normal break-words leading-tight',
+                  isModernV2 && modernItemsColumnWidthClass(column.id),
                 )}
               >
                 {headerContent(column)}
@@ -187,17 +189,17 @@ export function DocItemsTable({
                 <td
                   key={column.id}
                   className={cn(
-                    isModern ? modernItemsCellPadding(column.id) : padding.body,
+                    isModernV2 ? modernItemsCellPadding(column.id) : padding.body,
                     textAlignmentClass(alignment),
                     usesMonospaceValue(column.id) && 'num',
                     column.id === 'number' && 'text-[color:var(--muted)]',
                     column.id === 'total' && 'font-bold',
                     column.id === 'total' && style.composition === 'erp' && 'bg-[color:var(--doc-brand-soft)]',
                     column.id === 'total' && style.composition === 'minimal' && 'border-s-2 border-black',
-                    isModern && modernItemsColumnWidthClass(column.id),
-                    isModern && modernItemsValueCellClass(column.id),
+                    isModernV2 && modernItemsColumnWidthClass(column.id),
+                    isModernV2 && modernItemsValueCellClass(column.id),
                   )}
-                  dir={isModern && usesMonospaceValue(column.id) ? 'ltr' : undefined}
+                  dir={isModernV2 && usesMonospaceValue(column.id) ? 'ltr' : undefined}
                 >
                   {valueFor(column.id, line, index)}
                 </td>
@@ -209,7 +211,7 @@ export function DocItemsTable({
     </table>
   );
 
-  if (isModern) {
+  if (isModernV2) {
     return <div className={cn('overflow-hidden', style.sectionGap)}>{table}</div>;
   }
 

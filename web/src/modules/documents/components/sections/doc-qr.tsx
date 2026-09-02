@@ -14,18 +14,18 @@ export function DocQr({ model }: { model: DocumentModel }) {
   const style = useDocStyle();
   const { mode } = useDocumentLabelMode(model);
   const qr = model.qr?.value ?? null;
-  const isModern = style.composition === 'modern';
-  const size = isModern ? VISUAL_V2.qrSizePx : 110;
+  const isModernV2 = style.composition === 'modern_v2';
+  const size = isModernV2 ? VISUAL_V2.qrSizePx : 110;
 
   return (
     <div className="flex flex-col items-center gap-1">
       {qr ? (
         <>
-          <div className={isModern ? 'border border-[color:var(--border)] p-1' : 'rounded-lg border border-gray-200 p-2'}>
+          <div className={isModernV2 ? 'border border-[color:var(--border)] p-1' : 'rounded-lg border border-gray-200 p-2'}>
             <QRCodeSVG value={qr} size={size} level="M" />
           </div>
-          <div className={isModern ? 'text-[9px] text-[color:var(--muted)]' : 'text-[9px] text-gray-400'}>
-            {model.qr?.note ?? (isModern ? <ModernFieldLabel field="zatca_note" mode={mode} /> : t('zatca_note'))}
+          <div className={isModernV2 ? 'text-[9px] text-[color:var(--muted)]' : 'text-[9px] text-gray-400'}>
+            {model.qr?.note ?? (isModernV2 ? <ModernFieldLabel field="zatca_note" mode={mode} /> : t('zatca_note'))}
           </div>
         </>
       ) : (

@@ -22,13 +22,14 @@ export function DocTotals({
   const { totals } = model;
   const { mode } = useDocumentLabelMode(model);
   const isErp = style.composition === 'erp';
-  const isModern = style.composition === 'modern';
+  const isModernV2 = style.composition === 'modern_v2';
+  const isLegacyModern = style.composition === 'modern';
   const isMinimal = style.composition === 'minimal';
-  const displayMoney = isModern
+  const displayMoney = isModernV2
     ? (minor: number) => formatModernMoney(minor, model.currency, mode)
     : formatMoney;
   const totalLabel = (key: 'subtotal' | 'discount' | 'shipping' | 'adjustment' | 'vat' | 'grand_total') => {
-    if (isModern) return <ModernTotalLabel field={key} mode={mode} />;
+    if (isModernV2) return <ModernTotalLabel field={key} mode={mode} />;
     if (key === 'discount' || key === 'shipping' || key === 'adjustment') return tp(key);
     return t(key);
   };
@@ -37,32 +38,36 @@ export function DocTotals({
     'flex items-baseline justify-between gap-5 px-3 py-1.5',
     isErp ? 'border-t border-[color:var(--border)] text-black' : 'border-t border-[color:var(--border)] text-[color:var(--muted)]',
     isMinimal && 'px-0 py-2 text-black',
-    isModern && 'items-start px-0 py-1.5 text-black',
+    isModernV2 && 'items-start px-0 py-1.5 text-black',
   );
 
   const outer = cn(
-    isModern ? VISUAL_V2.totalsMaxClass : 'max-w-[300px]',
-    !isModern && 'overflow-hidden',
-    isModern ? 'w-full' : 'w-[46%]',
+    isModernV2 ? VISUAL_V2.totalsMaxClass : 'max-w-[300px]',
+    !isModernV2 && 'overflow-hidden',
+    isModernV2 || isLegacyModern ? 'w-full' : 'w-[46%]',
     isErp && 'border border-black',
-    isModern && 'border-y border-[color:var(--border)]',
+    isModernV2 && 'border-y border-[color:var(--border)]',
+    isLegacyModern && 'rounded-md border border-[color:var(--border)] bg-white',
     isMinimal && 'border-y border-black',
-    !isErp && !isModern && !isMinimal && 'rounded-lg border border-gray-200',
+    !isErp && !isModernV2 && !isLegacyModern && !isMinimal && 'rounded-lg border border-gray-200',
   );
 
   const totalRow = cn(
     'flex items-baseline justify-between gap-5 px-3 py-2.5 font-bold',
     isErp && 'border-t-2 border-black',
-    isModern && 'items-start border-t border-[color:var(--doc-brand)] px-0 py-2 text-black',
+    isModernV2 && 'items-start border-t border-[color:var(--doc-brand)] px-0 py-2 text-black',
+    isLegacyModern && 'border-t-2 border-[color:var(--doc-brand)]',
     isMinimal && 'border-t-2 border-black px-0',
   );
-  const totalStyle = isMinimal || isModern
+  const totalStyle = isMinimal || isModernV2
     ? undefined
-    : { background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' };
+    : isLegacyModern
+      ? { background: 'var(--doc-brand-soft)', color: 'var(--doc-brand)' }
+      : { background: 'var(--doc-brand)', color: 'var(--doc-brand-contrast)' };
 
   return (
     <div className={outer} data-doc-totals={style.composition}>
-      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal || isModern ? 'text-black' : 'text-[color:var(--muted)]', (isMinimal || isModern) && 'px-0 py-2', isModern && 'items-start')}>
+      <div className={cn('flex items-baseline justify-between gap-5 px-3 py-1.5', isErp || isMinimal || isModernV2 ? 'text-black' : 'text-[color:var(--muted)]', (isMinimal || isModernV2) && 'px-0 py-2', isModernV2 && 'items-start')}>
         <span>{totalLabel('subtotal')}</span>
         <span className="num shrink-0" dir="ltr">{displayMoney(totals.subtotal)}</span>
       </div>

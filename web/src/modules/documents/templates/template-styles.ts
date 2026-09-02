@@ -16,11 +16,25 @@ export const CLASSIC_STYLE: TemplateStyle = {
 };
 
 /**
- * Modern V2 — مستند مالي رسمي: فواصل رفيعة بلا بطاقات، ورأس جدول plain بلا شريط هوية.
- * لا زوايا زخرفية ولا ظلال؛ الإبراز بالطباعة والوزن والفاصل لا بالتعبئة الملوّنة.
+ * Modern (تاريخي) — الشكل ما قبل #616. يبقى مربوطاً بـ `tax-invoice-modern`.
+ * لا يُعاد تفسيره بعارض V2.
  */
 export const MODERN_STYLE: TemplateStyle = {
   composition: 'modern',
+  pagePadding: 'p-10',
+  cardRadius: 'rounded-md',
+  sectionGap: 'mt-7',
+  tableHead: 'soft',
+  tableDensity: 'comfortable',
+  brandBar: false,
+};
+
+/**
+ * Modern V2 — مستند مالي رسمي: فواصل رفيعة بلا بطاقات، ورأس جدول plain بلا شريط هوية.
+ * مربوط بـ `tax-invoice-modern-v2` فقط.
+ */
+export const MODERN_V2_STYLE: TemplateStyle = {
+  composition: 'modern_v2',
   pagePadding: 'p-8',
   cardRadius: 'rounded-none',
   sectionGap: 'mt-4',
@@ -28,6 +42,14 @@ export const MODERN_STYLE: TemplateStyle = {
   tableDensity: 'comfortable',
   brandBar: false,
 };
+
+export function isModernV2(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'modern_v2';
+}
+
+export function isLegacyModern(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'modern';
+}
 
 /**
  * ERP — القالب المرجعي الكثيف: جدول عملي، فواصل حادة، وأولوية صارمة للأرقام.

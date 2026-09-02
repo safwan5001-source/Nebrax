@@ -29,11 +29,20 @@ export function DocSummary({
     );
   }
 
-  if (style.composition === 'modern') {
+  if (style.composition === 'modern_v2') {
     return (
       <section data-doc-keep="summary" className={cn('flex items-end justify-between gap-6', style.sectionGap)}>
         <div className="shrink-0">{qr}</div>
         {totals}
+      </section>
+    );
+  }
+
+  if (style.composition === 'modern') {
+    return (
+      <section className={cn('grid grid-cols-12 items-end gap-6', style.sectionGap)}>
+        <div className="col-span-4">{qr}</div>
+        <div className="col-span-5 col-start-8 flex justify-end">{totals}</div>
       </section>
     );
   }

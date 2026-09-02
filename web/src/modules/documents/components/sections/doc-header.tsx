@@ -82,7 +82,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
     );
   }
 
-  if (style.composition === 'modern') {
+  if (style.composition === 'modern_v2') {
     const logoHeight = cappedLogoHeight(seller.logoHeight);
     const invoiceNumberField = isTaxInvoice ? 'number' as const : 'document_number' as const;
     return (
@@ -144,6 +144,21 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
                 <ModernStatusLabel status={model.status} mode={mode} />
               </div>
             ) : null}
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  if (style.composition === 'modern') {
+    return (
+      <header className="border-b border-[color:var(--border)] pb-5">
+        <div className="flex items-start justify-between gap-8">
+          {identity}
+          <div className="min-w-[188px] shrink-0 border-s-2 ps-4 text-end" style={{ borderColor: 'var(--doc-brand)' }}>
+            <div className="text-[10px] font-semibold" style={{ color: 'var(--doc-brand)' }}>{dtAlt(model.type)}</div>
+            <h1 className="mt-1 text-[25px] font-bold leading-tight text-black">{dt(model.type)}</h1>
+            <div className="mt-3">{number}</div>
           </div>
         </div>
       </header>

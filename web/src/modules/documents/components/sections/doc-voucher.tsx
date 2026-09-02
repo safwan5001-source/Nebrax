@@ -24,10 +24,10 @@ export function DocVoucher({
   const v = model.voucher;
   if (!v) return null;
 
-  const isModern = style.composition === 'modern';
+  const isModernV2 = style.composition === 'modern_v2';
   const voucherLabel = (
     key: 'received_from' | 'paid_to' | 'amount' | 'method' | 'reference' | 'applied_to',
-  ) => (isModern ? <ModernFieldLabel field={key} mode={mode} /> : t(key));
+  ) => (isModernV2 ? <ModernFieldLabel field={key} mode={mode} /> : t(key));
 
   const party = model.buyer.name || '—';
   const phrase = v.direction === 'received' ? voucherLabel('received_from') : voucherLabel('paid_to');
