@@ -95,6 +95,10 @@ class Rbac
             'pos.investigations.assign', 'pos.investigations.resolve', 'pos.investigations.export',
             'pos.cctv.bookmark.manage',
             'apps.view', 'apps.manage',
+            // إدارة المطوّرين (PR-7.5): عرض/إدارة عملاء الـ API ومفاتيحها واشتراكات
+            // الـ Webhooks وسجلّ التسليم — سطح إدارة داخليّ للمستأجر. المالك/المدير
+            // يملكانها عبر `*`؛ ولا تُضاف لأدوار accountant/staff تلقائياً.
+            'developer.view', 'developer.manage',
             // Fuel Stations: يمنحها المالك/المدير عبر `*`، ولا تُضاف للأدوار
             // المقيدة تلقائياً؛ تُسند فقط عبر دور مخصص أو قرار مستأجر صريح.
             'fuel_stations.view', 'fuel_stations.manage',
