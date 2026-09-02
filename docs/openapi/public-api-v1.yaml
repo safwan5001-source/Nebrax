@@ -1,0 +1,970 @@
+openapi: 3.1.0
+
+info:
+  title: AWJ Public API
+  version: v1
+  summary: Tenant-facing machine-to-machine API for the AWJ ERP.
+  description: >
+    The AWJ Public API is an additive, versioned surface (`/api/v1`) for
+    machine-to-machine (M2M) integrations. It is separate from the internal
+    application API and exposes only curated, stable contracts.
+
+
+    ## Authentication
+
+    Requests authenticate with a **tenant-owned API Client key** presented as an
+    HTTP Bearer token (`Authorization: Bearer <key>`). Keys are issued to an API
+    Client that belongs to exactly one tenant; the tenant is derived from the
+    credential on the server and can never be supplied or switched by the client.
+    A key is not an end-user session — there is no user login here.
+
+
+    ## Scopes
+
+    Each key carries one or more least-privilege **scopes** that are enforced
+    server-side (exact match; a read scope never implies write). Scopes are a
+    property of the API Client credential, not an OAuth flow. The scope required
+    by each operation is given in its `x-required-scope` field.
+
+
+    ## Envelopes
+
+    Every response uses a stable envelope. Success: `{ "data": …, "meta": { … } }`.
+    Error: `{ "error": { "code", "message", "details?" }, "meta": { "request_id" } }`.
+    `meta.request_id` is always present and also returned in the `X-Request-Id`
+    response header for correlation. A client may supply its own `X-Request-Id`
+    request header (see the shared parameter); a valid value is echoed back,
+    otherwise the server generates one.
+
+
+    ## Money
+
+    Monetary amounts are integer **minor units** (e.g. halalas: 100.50 SAR = 10050),
+    never floating point, and are accompanied by a `currency` (ISO-4217) field.
+
+
+    ## Versioning
+
+    The base path `/api/v1` is the first major version. As a design principle,
+    a breaking change to these contracts would be introduced under a new major
+    API version rather than mutating `v1`.
+  contact:
+    name: AWJ ERP
+
+servers:
+  - url: '{baseUrl}/api/v1'
+    description: >
+      Public API base. `baseUrl` is the deployment origin; no production host is
+      hard-coded here because it is environment-specific.
+    variables:
+      baseUrl:
+        default: https://api.example.com
+        description: Deployment origin (scheme + host), configured per environment.
+
+tags:
+  - name: Health
+    description: Unauthenticated service liveness.
+  - name: Partners
+    description: Customers and suppliers (read and controlled create).
+  - name: Products
+    description: Catalog products (read and controlled create).
+  - name: Invoices
+    description: Sales invoices (read and controlled draft create).
+
+security:
+  - bearerApiKey: []
+
+paths:
+  /health:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: getHealth
+      tags: [Health]
+      summary: Service liveness
+      description: >
+        Unauthenticated liveness probe. Returns no tenant data and touches no
+        database. Not rate-limited or audited.
+      security: []
+      responses:
+        '200':
+          description: Service is up.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+              example:
+                data: { status: ok, service: awj-public-api, version: v1 }
+                meta: { request_id: 5f0b1e2c-8a1d-4c9a-9d2e-0b7a1c2d3e4f }
+
+  /partners:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: listPartners
+      tags: [Partners]
+      summary: List partners
+      description: Paginated, tenant-scoped list of partners (customers/suppliers).
+      x-required-scope: partners:read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/PartnersSearch'
+        - $ref: '#/components/parameters/PartnersType'
+        - $ref: '#/components/parameters/PartnersActive'
+        - $ref: '#/components/parameters/PartnersSort'
+      responses:
+        '200':
+          description: A page of partners.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartnerListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      operationId: createPartner
+      tags: [Partners]
+      summary: Create a partner
+      description: >
+        Creates a customer/supplier from a curated field set. `tenant_id` and any
+        field outside the documented schema are ignored. Requires an idempotency key.
+      x-required-scope: partners:write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PartnerCreate' }
+            example:
+              name: شركة الطموح
+              type: customer
+              vat_number: '300000000000003'
+              email: billing@example.test
+      responses:
+        '201':
+          description: Partner created (or the original response replayed on retry).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+            Idempotency-Replayed: { $ref: '#/components/headers/IdempotencyReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartnerResponse' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /partners/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: getPartner
+      tags: [Partners]
+      summary: Get a partner
+      x-required-scope: partners:read
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: The partner.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartnerResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /products:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: listProducts
+      tags: [Products]
+      summary: List products
+      description: Paginated, tenant-scoped catalog list.
+      x-required-scope: products:read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/ProductsSearch'
+        - $ref: '#/components/parameters/ProductsSku'
+        - $ref: '#/components/parameters/ProductsBarcode'
+        - $ref: '#/components/parameters/ProductsType'
+        - $ref: '#/components/parameters/ProductsActive'
+        - $ref: '#/components/parameters/ProductsSort'
+      responses:
+        '200':
+          description: A page of products.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      operationId: createProduct
+      tags: [Products]
+      summary: Create a product
+      description: >
+        Creates a basic catalog product. Does not create inventory movements,
+        stock balances, or accounting entries. Money is in minor units
+        (`sale_price_minor`). Requires an idempotency key.
+      x-required-scope: products:write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductCreate' }
+            example:
+              name: خدمة استشارية
+              type: service
+              sale_price_minor: 15000
+              tax_rate: 15
+      responses:
+        '201':
+          description: Product created (or the original response replayed on retry).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            Idempotency-Replayed: { $ref: '#/components/headers/IdempotencyReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: getProduct
+      tags: [Products]
+      summary: Get a product
+      x-required-scope: products:read
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: The product.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /invoices:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: listInvoices
+      tags: [Invoices]
+      summary: List invoices
+      description: Paginated, tenant-scoped list of sales invoices (all statuses).
+      x-required-scope: invoices:read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/InvoicesSearch'
+        - $ref: '#/components/parameters/InvoicesStatus'
+        - $ref: '#/components/parameters/InvoicesPaymentStatus'
+        - $ref: '#/components/parameters/InvoicesPartnerId'
+        - $ref: '#/components/parameters/InvoicesDateFrom'
+        - $ref: '#/components/parameters/InvoicesDateTo'
+        - $ref: '#/components/parameters/InvoicesSort'
+      responses:
+        '200':
+          description: A page of invoice summaries.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvoiceListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      operationId: createInvoiceDraft
+      tags: [Invoices]
+      summary: Create an invoice draft
+      description: >
+        Creates a **draft** sales invoice. The invoice is NOT posted to the
+        ledger, does NOT create cost-of-goods or inventory movements, does NOT
+        record a payment, and is NOT submitted, reported, or cleared to ZATCA by
+        this operation. Totals are computed by the server from the line items;
+        client-supplied totals are ignored. Every referenced entity
+        (partner, product, warehouse, branch) must belong to the caller's tenant.
+        The 201 response is a bounded invoice summary (without line items); fetch
+        the invoice by id to read its lines. Requires an idempotency key.
+      x-required-scope: invoices:write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvoiceCreate' }
+            example:
+              partner_id: 6f0b1e2c-8a1d-4c9a-9d2e-0b7a1c2d3e4f
+              invoice_date: '2026-01-15'
+              payment_type: credit
+              items:
+                - product_id: 7a1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e
+                  quantity: 2
+                  unit_price_minor: 10000
+                  tax_rate: 15
+      responses:
+        '201':
+          description: >
+            Draft created (or the original response replayed on retry). The body is
+            a bounded invoice summary without line items.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            Idempotency-Replayed: { $ref: '#/components/headers/IdempotencyReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvoiceSummaryResponse' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /invoices/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: getInvoice
+      tags: [Invoices]
+      summary: Get an invoice
+      description: Returns the invoice with its line items.
+      x-required-scope: invoices:read
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: The invoice with line items.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvoiceDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+components:
+  securitySchemes:
+    bearerApiKey:
+      type: http
+      scheme: bearer
+      description: >
+        Tenant-owned API Client key presented as `Authorization: Bearer <key>`.
+        Issued server-side; the raw secret is shown only once at issuance and is
+        stored hashed. Keys can be rotated and revoked. The bearer scheme carries
+        no OAuth flow; scopes are attached to the key and enforced per operation.
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      description: Resource identifier (UUID).
+      schema: { $ref: '#/components/schemas/Uuid' }
+    Page:
+      name: page
+      in: query
+      required: false
+      description: 1-based page number.
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      description: Page size. Defaults to 25; hard maximum 100.
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: >
+        Optional client-supplied correlation id. When present and matching
+        `^[A-Za-z0-9._-]{8,128}$` it is echoed in the `X-Request-Id` response
+        header and `meta.request_id`; when absent or malformed the server
+        generates one. Applies to every operation, health included.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._-]{8,128}$'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >
+        Client-generated key that makes the write safe to retry. 8–255 characters
+        matching `^[A-Za-z0-9._:-]+$`. Bound to the tenant, API client, method,
+        route, and a fingerprint of the request payload.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 255
+        pattern: '^[A-Za-z0-9._:\-]{8,255}$'
+    PartnersSearch:
+      name: search
+      in: query
+      required: false
+      description: Free-text match on name, English name, code, or VAT number.
+      schema: { type: string, maxLength: 120 }
+    PartnersType:
+      name: type
+      in: query
+      required: false
+      description: Filter by partner role.
+      schema: { type: string, enum: [customer, supplier] }
+    PartnersActive:
+      name: is_active
+      in: query
+      required: false
+      schema: { type: boolean }
+    PartnersSort:
+      name: sort
+      in: query
+      required: false
+      description: >
+        Sort field with optional leading `-` for descending. Default `-created_at`.
+      schema: { type: string, enum: [name, code, created_at, '-name', '-code', '-created_at'] }
+    ProductsSearch:
+      name: search
+      in: query
+      required: false
+      description: Free-text match on name, English name, SKU, or barcode.
+      schema: { type: string, maxLength: 120 }
+    ProductsSku:
+      name: sku
+      in: query
+      required: false
+      schema: { type: string, maxLength: 120 }
+    ProductsBarcode:
+      name: barcode
+      in: query
+      required: false
+      schema: { type: string, maxLength: 120 }
+    ProductsType:
+      name: type
+      in: query
+      required: false
+      schema: { type: string, enum: [good, service] }
+    ProductsActive:
+      name: is_active
+      in: query
+      required: false
+      schema: { type: boolean }
+    ProductsSort:
+      name: sort
+      in: query
+      required: false
+      description: Sort field with optional leading `-`. Default `name`.
+      schema:
+        type: string
+        enum: [name, sku, sale_price, created_at, '-name', '-sku', '-sale_price', '-created_at']
+    InvoicesSearch:
+      name: search
+      in: query
+      required: false
+      description: Free-text match on invoice number or partner name.
+      schema: { type: string, maxLength: 120 }
+    InvoicesStatus:
+      name: status
+      in: query
+      required: false
+      schema: { type: string, enum: [draft, posted, cancelled] }
+    InvoicesPaymentStatus:
+      name: payment_status
+      in: query
+      required: false
+      schema: { type: string, enum: [unpaid, partial, paid] }
+    InvoicesPartnerId:
+      name: partner_id
+      in: query
+      required: false
+      schema: { $ref: '#/components/schemas/Uuid' }
+    InvoicesDateFrom:
+      name: date_from
+      in: query
+      required: false
+      schema: { type: string, format: date }
+    InvoicesDateTo:
+      name: date_to
+      in: query
+      required: false
+      description: Must be on or after `date_from`.
+      schema: { type: string, format: date }
+    InvoicesSort:
+      name: sort
+      in: query
+      required: false
+      description: Sort field with optional leading `-`. Default `-invoice_date`.
+      schema:
+        type: string
+        enum: [invoice_date, number, total, created_at, '-invoice_date', '-number', '-total', '-created_at']
+
+  headers:
+    XRequestId:
+      description: Correlation id for this request (also present as `meta.request_id`).
+      schema: { type: string }
+    XRateLimitLimit:
+      description: The request quota for the applicable window.
+      schema: { type: integer }
+    XRateLimitRemaining:
+      description: Remaining requests in the current window.
+      schema: { type: integer }
+    RetryAfter:
+      description: Seconds to wait before retrying (present on 429).
+      schema: { type: integer }
+    XRateLimitReset:
+      description: Unix timestamp when the window resets (present on 429).
+      schema: { type: integer }
+    IdempotencyReplayed:
+      description: Set to `true` when the response is a replay of an earlier identical request.
+      schema: { type: string, enum: ['true'] }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            error: { code: unauthenticated, message: API authentication is required or invalid. }
+            meta: { request_id: 5f0b1e2c-8a1d-4c9a-9d2e-0b7a1c2d3e4f }
+    Forbidden:
+      description: >
+        Authenticated but not permitted — insufficient scope, inactive client,
+        missing tenant context, or inactive subscription.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            error: { code: insufficient_scope, message: The key lacks the required scope. }
+            meta: { request_id: 5f0b1e2c-8a1d-4c9a-9d2e-0b7a1c2d3e4f }
+    NotFound:
+      description: >
+        The resource does not exist within the caller's tenant. Identifiers from
+        other tenants are reported as not found without revealing their existence.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            error: { code: not_found, message: Resource not found. }
+            meta: { request_id: 5f0b1e2c-8a1d-4c9a-9d2e-0b7a1c2d3e4f }
+    ValidationError:
+      description: The request failed validation. `details` maps fields to messages.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            error:
+              code: validation_failed
+              message: The input is invalid.
+              details: { name: [The name field is required.] }
+            meta: { request_id: 5f0b1e2c-8a1d-4c9a-9d2e-0b7a1c2d3e4f }
+    IdempotencyKeyError:
+      description: The `Idempotency-Key` header is missing or malformed.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            error: { code: idempotency_key_required, message: The Idempotency-Key header is required for this operation. }
+            meta: { request_id: 5f0b1e2c-8a1d-4c9a-9d2e-0b7a1c2d3e4f }
+    IdempotencyConflict:
+      description: >
+        The same `Idempotency-Key` was reused for a different payload/operation
+        (`idempotency_conflict`), or an earlier request with the same key is still
+        being processed (`idempotency_in_progress`).
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            error: { code: idempotency_conflict, message: The Idempotency-Key was reused for a different operation or payload. }
+            meta: { request_id: 5f0b1e2c-8a1d-4c9a-9d2e-0b7a1c2d3e4f }
+    TooManyRequests:
+      description: The per-client rate limit was exceeded.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+        X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+        X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+        X-RateLimit-Reset: { $ref: '#/components/headers/XRateLimitReset' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            error: { code: rate_limited, message: Rate limit exceeded; retry later. }
+            meta: { request_id: 5f0b1e2c-8a1d-4c9a-9d2e-0b7a1c2d3e4f }
+
+  schemas:
+    Uuid:
+      type: string
+      format: uuid
+    CurrencyCode:
+      type: string
+      description: ISO-4217 currency code.
+      examples: [SAR]
+    MinorAmount:
+      type: integer
+      format: int64
+      description: Monetary amount in integer minor units (e.g. halalas). 100.50 SAR = 10050.
+
+    Meta:
+      type: object
+      required: [request_id]
+      properties:
+        request_id: { type: string }
+      additionalProperties: true
+    Pagination:
+      type: object
+      required: [page, per_page, total, last_page, has_more]
+      properties:
+        page: { type: integer }
+        per_page: { type: integer }
+        total: { type: integer }
+        last_page: { type: integer }
+        has_more: { type: boolean }
+    PaginationMeta:
+      type: object
+      required: [request_id, pagination]
+      properties:
+        request_id: { type: string }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          enum:
+            - internal_error
+            - bad_request
+            - not_found
+            - method_not_allowed
+            - validation_failed
+            - unauthenticated
+            - forbidden
+            - tenant_context_required
+            - client_inactive
+            - insufficient_scope
+            - rate_limited
+            - idempotency_key_required
+            - invalid_idempotency_key
+            - idempotency_conflict
+            - idempotency_in_progress
+        message: { type: string }
+        details:
+          type: object
+          description: Optional structured detail (e.g. per-field validation messages).
+          additionalProperties: true
+    ErrorResponse:
+      type: object
+      required: [error, meta]
+      properties:
+        error: { $ref: '#/components/schemas/Error' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    HealthData:
+      type: object
+      required: [status, service, version]
+      properties:
+        status: { type: string, examples: [ok] }
+        service: { type: string, examples: [awj-public-api] }
+        version: { type: string, examples: [v1] }
+    HealthResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/HealthData' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    PartnerAddress:
+      type: object
+      description: Nested address block on the partner read representation.
+      properties:
+        address: { type: [string, 'null'] }
+        city: { type: [string, 'null'] }
+        district: { type: [string, 'null'] }
+        street: { type: [string, 'null'] }
+        building_no: { type: [string, 'null'] }
+        postal_code: { type: [string, 'null'] }
+        country: { type: [string, 'null'] }
+    Partner:
+      type: object
+      required: [id, code, type, entity_type, name, name_en, vat_number, cr_number, email, phone, mobile, address, is_active, created_at, updated_at]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        code: { type: [string, 'null'] }
+        type: { type: string, enum: [customer, supplier, both] }
+        entity_type: { type: [string, 'null'], enum: [individual, commercial, null] }
+        name: { type: string }
+        name_en: { type: [string, 'null'] }
+        vat_number: { type: [string, 'null'] }
+        cr_number: { type: [string, 'null'] }
+        email: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        mobile: { type: [string, 'null'] }
+        address: { $ref: '#/components/schemas/PartnerAddress' }
+        is_active: { type: boolean }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+    PartnerCreate:
+      type: object
+      required: [name, type]
+      additionalProperties: false
+      description: >
+        Curated create fields. Address fields are flat here (unlike the nested
+        read representation). Fields outside this set are ignored by the server.
+      properties:
+        name: { type: string, maxLength: 255 }
+        name_en: { type: [string, 'null'], maxLength: 255 }
+        type: { type: string, enum: [customer, supplier, both] }
+        entity_type: { type: [string, 'null'], enum: [individual, commercial, null] }
+        code: { type: [string, 'null'], maxLength: 255 }
+        vat_number: { type: [string, 'null'], minLength: 15, maxLength: 15 }
+        cr_number: { type: [string, 'null'], maxLength: 255 }
+        email: { type: [string, 'null'], format: email, maxLength: 255 }
+        phone: { type: [string, 'null'], maxLength: 255 }
+        mobile: { type: [string, 'null'], maxLength: 255 }
+        address: { type: [string, 'null'], maxLength: 255 }
+        city: { type: [string, 'null'], maxLength: 255 }
+        building_no: { type: [string, 'null'], maxLength: 255 }
+        street: { type: [string, 'null'], maxLength: 255 }
+        district: { type: [string, 'null'], maxLength: 255 }
+        postal_code: { type: [string, 'null'], maxLength: 255 }
+        country: { type: [string, 'null'], maxLength: 255 }
+        is_active: { type: [boolean, 'null'] }
+    PartnerResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/Partner' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    PartnerListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Partner' } }
+        meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+    Product:
+      type: object
+      required: [id, sku, barcode, name, name_en, description, type, unit, category, brand, currency, sale_price_minor, tax_rate, track_inventory, is_active, created_at, updated_at]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        sku: { type: [string, 'null'] }
+        barcode: { type: [string, 'null'] }
+        name: { type: string }
+        name_en: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        type: { type: string, enum: [good, service] }
+        unit: { type: [string, 'null'] }
+        category: { type: [string, 'null'] }
+        brand: { type: [string, 'null'] }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        sale_price_minor: { $ref: '#/components/schemas/MinorAmount' }
+        tax_rate: { type: integer }
+        track_inventory: { type: boolean }
+        is_active: { type: boolean }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+    ProductCreate:
+      type: object
+      required: [name, sale_price_minor]
+      additionalProperties: false
+      description: >
+        Curated create fields. Excludes cost, stock/quantity, accounting accounts,
+        and supplier/category/brand references. SKU is generated if omitted.
+      properties:
+        name: { type: string, maxLength: 255 }
+        name_en: { type: [string, 'null'], maxLength: 255 }
+        type: { type: [string, 'null'], enum: [good, service, null] }
+        unit: { type: [string, 'null'], maxLength: 255 }
+        description: { type: [string, 'null'], maxLength: 2000 }
+        sku: { type: [string, 'null'], maxLength: 255, description: 'Unique within the tenant; generated when omitted.' }
+        barcode: { type: [string, 'null'], maxLength: 255, description: 'Unique within the tenant.' }
+        sale_price_minor: { $ref: '#/components/schemas/MinorAmount' }
+        tax_rate: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        is_active: { type: [boolean, 'null'] }
+    ProductResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/Product' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ProductListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Product' } }
+        meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+    InvoicePartnerRef:
+      type: [object, 'null']
+      description: Compact partner reference, included when the partner is loaded (list and detail).
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        code: { type: [string, 'null'] }
+    InvoiceSummary:
+      type: object
+      required:
+        [id, number, status, type, payment_type, payment_status, is_paid, tax_inclusive,
+         invoice_date, due_date, partner_id, currency, subtotal_minor, discount_minor,
+         shipping_minor, adjustment_minor, tax_minor, total_minor, paid_minor, balance_minor,
+         created_at, updated_at]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        number: { type: string }
+        status: { type: string, enum: [draft, posted, cancelled] }
+        type: { type: string, examples: [sale] }
+        payment_type: { type: [string, 'null'], enum: [cash, credit, null] }
+        payment_status: { type: string, enum: [unpaid, partial, paid] }
+        is_paid: { type: boolean }
+        tax_inclusive: { type: boolean }
+        invoice_date: { type: [string, 'null'], format: date }
+        due_date: { type: [string, 'null'], format: date }
+        partner_id: { $ref: '#/components/schemas/Uuid' }
+        partner: { $ref: '#/components/schemas/InvoicePartnerRef' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        subtotal_minor: { $ref: '#/components/schemas/MinorAmount' }
+        discount_minor: { $ref: '#/components/schemas/MinorAmount' }
+        shipping_minor: { $ref: '#/components/schemas/MinorAmount' }
+        adjustment_minor: { $ref: '#/components/schemas/MinorAmount' }
+        tax_minor: { $ref: '#/components/schemas/MinorAmount' }
+        total_minor: { $ref: '#/components/schemas/MinorAmount' }
+        paid_minor: { $ref: '#/components/schemas/MinorAmount' }
+        balance_minor: { $ref: '#/components/schemas/MinorAmount' }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+    InvoiceLine:
+      type: object
+      required: [product_id, product_name, product_sku, barcode, description, quantity, unit_name, tax_rate, currency, unit_price_minor, line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor]
+      properties:
+        product_id: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        product_name: { type: [string, 'null'] }
+        product_sku: { type: [string, 'null'] }
+        barcode: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        quantity: { type: integer }
+        unit_name: { type: [string, 'null'] }
+        tax_rate: { type: integer }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        unit_price_minor: { $ref: '#/components/schemas/MinorAmount' }
+        line_subtotal_minor: { $ref: '#/components/schemas/MinorAmount' }
+        line_discount_minor: { $ref: '#/components/schemas/MinorAmount' }
+        line_tax_minor: { $ref: '#/components/schemas/MinorAmount' }
+        line_total_minor: { $ref: '#/components/schemas/MinorAmount' }
+    InvoiceDetail:
+      allOf:
+        - $ref: '#/components/schemas/InvoiceSummary'
+        - type: object
+          required: [lines]
+          properties:
+            lines: { type: array, items: { $ref: '#/components/schemas/InvoiceLine' } }
+    InvoiceLineCreate:
+      type: object
+      required: [quantity, unit_price_minor]
+      additionalProperties: false
+      properties:
+        product_id: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }], description: 'Tenant-owned product, or null for a description-only line.' }
+        description: { type: [string, 'null'], maxLength: 255 }
+        quantity: { type: integer, minimum: 1, maximum: 1000000 }
+        unit: { type: [string, 'null'], maxLength: 255 }
+        unit_price_minor: { allOf: [{ $ref: '#/components/schemas/MinorAmount' }], minimum: 0 }
+        tax_rate: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        discount_minor: { type: [integer, 'null'], minimum: 0 }
+    InvoiceCreate:
+      type: object
+      required: [partner_id, items]
+      additionalProperties: false
+      description: >
+        Curated draft-create fields. Totals are computed server-side and are not
+        accepted from the client. `branch_id` (if given) must be a tenant-owned
+        branch; when omitted the tenant's main branch is used. No `X-Branch-Id`
+        header is honored.
+      properties:
+        partner_id: { $ref: '#/components/schemas/Uuid' }
+        branch_id: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        warehouse_id: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }], description: 'Tenant-owned, active warehouse.' }
+        invoice_date: { type: [string, 'null'], format: date }
+        due_date: { type: [string, 'null'], format: date }
+        payment_type: { type: [string, 'null'], enum: [cash, credit, null] }
+        notes: { type: [string, 'null'], maxLength: 255 }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/InvoiceLineCreate' }
+    InvoiceSummaryResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/InvoiceSummary' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    InvoiceDetailResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/InvoiceDetail' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    InvoiceListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/InvoiceSummary' } }
+        meta: { $ref: '#/components/schemas/PaginationMeta' }
