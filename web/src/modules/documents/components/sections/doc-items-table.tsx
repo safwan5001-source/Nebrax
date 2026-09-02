@@ -160,7 +160,7 @@ export function DocItemsTable({
                   'font-semibold',
                   textAlignmentClass(alignment),
                   column.id === 'total' && 'font-bold',
-                  isModern && isModernMoneyColumn(column.id) && 'whitespace-nowrap',
+                  isModern && isModernMoneyColumn(column.id) && 'whitespace-normal break-words leading-tight',
                   isModern && modernItemsColumnWidthClass(column.id),
                 )}
               >

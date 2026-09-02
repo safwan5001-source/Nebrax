@@ -127,19 +127,19 @@ export function modernItemsColumnWidthClass(column: DocItemsColumnId): string {
     case 'barcode':
       return 'w-[8%]';
     case 'product':
-      return 'w-[20%]';
+      return 'w-[19%]';
     case 'description':
-      return 'w-[24%]';
+      return 'w-[21%]';
     case 'quantity':
       return 'w-[5%]';
     case 'unit_price':
       return 'w-[8%]';
     case 'price_before_tax':
-      return 'w-[8%]';
+      return 'w-[10%]';
     case 'tax':
-      return 'w-[7%]';
+      return 'w-[8%]';
     case 'total':
-      return 'w-[9%]';
+      return 'w-[10%]';
   }
 }
 
@@ -147,7 +147,10 @@ export function modernItemsValueCellClass(column: DocItemsColumnId): string {
   if (column === 'product' || column === 'description') {
     return 'min-w-0 break-words whitespace-normal text-[11px] leading-snug';
   }
-  if (column === 'product_code' || column === 'barcode') {
+  if (column === 'product_code') {
+    return 'min-w-0 break-words whitespace-normal text-[10px] leading-tight';
+  }
+  if (column === 'barcode') {
     return 'min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10px]';
   }
   return 'whitespace-nowrap text-[10px]';

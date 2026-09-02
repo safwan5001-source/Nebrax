@@ -114,17 +114,19 @@ describe('modern items table tokens', () => {
     expect(modernItemsColumnWidthClass('number')).toBe('w-[3%]');
     expect(modernItemsColumnWidthClass('product_code')).toBe('w-[8%]');
     expect(modernItemsColumnWidthClass('barcode')).toBe('w-[8%]');
-    expect(modernItemsColumnWidthClass('product')).toBe('w-[20%]');
-    expect(modernItemsColumnWidthClass('description')).toBe('w-[24%]');
+    expect(modernItemsColumnWidthClass('product')).toBe('w-[19%]');
+    expect(modernItemsColumnWidthClass('description')).toBe('w-[21%]');
     expect(modernItemsColumnWidthClass('quantity')).toBe('w-[5%]');
     expect(modernItemsColumnWidthClass('unit_price')).toBe('w-[8%]');
-    expect(modernItemsColumnWidthClass('price_before_tax')).toBe('w-[8%]');
-    expect(modernItemsColumnWidthClass('tax')).toBe('w-[7%]');
-    expect(modernItemsColumnWidthClass('total')).toBe('w-[9%]');
+    expect(modernItemsColumnWidthClass('price_before_tax')).toBe('w-[10%]');
+    expect(modernItemsColumnWidthClass('tax')).toBe('w-[8%]');
+    expect(modernItemsColumnWidthClass('total')).toBe('w-[10%]');
     expect(modernItemsValueCellClass('description')).toContain('break-words');
     expect(modernItemsValueCellClass('description')).toContain('text-[11px]');
-    expect(modernItemsValueCellClass('product_code')).toContain('whitespace-nowrap');
+    expect(modernItemsValueCellClass('product_code')).toContain('break-words');
     expect(modernItemsValueCellClass('product_code')).not.toContain('break-all');
+    expect(modernItemsValueCellClass('barcode')).toContain('whitespace-nowrap');
+    expect(modernItemsValueCellClass('barcode')).not.toContain('break-all');
     expect(modernItemsValueCellClass('total')).toContain('whitespace-nowrap');
   });
 
