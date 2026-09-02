@@ -167,7 +167,7 @@ Duration    20.77s
 | `npm run test` | 186 ملفاً / 1086 اختباراً |
 | `npm run build` | نجح |
 | `npm run lint` | غير مُعدّ (Web CI = test + build) |
-| GitHub CI | **نجح** على `fd8e3f8a` في [#614](https://github.com/safwan5001-source/Nebrax/pull/614): 5 فحوصات خضراء (sqlite ×2، pgsql ×2، Web CI). لم يُدمَج |
+| GitHub CI | **نجح** على `b33f3211` في [#614](https://github.com/safwan5001-source/Nebrax/pull/614): 5 فحوصات خضراء (sqlite ×2، pgsql ×2، Web CI). لم يُدمَج |
 
 ---
 
@@ -205,9 +205,9 @@ Credit Notes (سلوك #613) · Thermal جديد · Purchase Invoices · الس�
 - **PR number/link:** [#614](https://github.com/safwan5001-source/Nebrax/pull/614)
 - **Base SHA:** `c10455d8ee8541e5b3bdf7f51fc6f43a939e58fc`
 - **Implementation SHA:** `007e7ce6750bd7bd698841011f714c18ce10981b`
-- **CI-green SHA:** `fd8e3f8a44874f930def4add73377b4d6ab0d4f0` (5/5 فحوصات خضراء)
-- **Final Head SHA:** `52df8b0f6dc824c165df2739eb0b75b2159ca36f`
-- **عدد commits:** 10
+- **CI-green SHA:** `b33f32115df7d25318f7b21cb9ad7a9ed3fe2310` (5/5 فحوصات خضراء)
+- **Final Head SHA:** `b33f32115df7d25318f7b21cb9ad7a9ed3fe2310`
+- **عدد commits:** 11
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
@@ -215,7 +215,7 @@ Credit Notes (سلوك #613) · Thermal جديد · Purchase Invoices · الس�
 
 ## Next Step
 
-مراجعة #614 ودمجها يدوياً عند اخضرار CI. لا خطوة مستند تالية إلزامية من سلسلة القوالب هذه ما لم يُطلب Thermal حي أو مستندات أخرى.
+مراجعة [#614](https://github.com/safwan5001-source/Nebrax/pull/614) ودمجها يدوياً. لم يُدمَج من هذا الوكيل.
 
 ---
 
