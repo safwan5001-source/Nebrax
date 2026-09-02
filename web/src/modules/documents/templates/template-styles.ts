@@ -65,6 +65,28 @@ export const ERP_STYLE: TemplateStyle = {
 };
 
 /**
+ * ERP V2 — دفتر يومي كثيف مستقل عن `tax-invoice-erp` التاريخي وعن Modern V2.
+ * مربوط بـ `tax-invoice-erp-v2` فقط.
+ */
+export const ERP_V2_STYLE: TemplateStyle = {
+  composition: 'erp_v2',
+  pagePadding: 'p-5',
+  cardRadius: 'rounded-none',
+  sectionGap: 'mt-3',
+  tableHead: 'plain',
+  tableDensity: 'compact',
+  brandBar: false,
+};
+
+export function isErpV2(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'erp_v2';
+}
+
+export function isLegacyErp(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'erp';
+}
+
+/**
  * Minimal — يعتمد الطباعة والفواصل والبياض؛ لا شريط هوية ولا خلفيات زخرفية.
  */
 export const MINIMAL_STYLE: TemplateStyle = {

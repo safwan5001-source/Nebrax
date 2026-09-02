@@ -3,6 +3,7 @@ import { TaxInvoiceClassic } from '../templates/tax-invoice-classic';
 import { TaxInvoiceModern } from '../templates/tax-invoice-modern';
 import { TaxInvoiceModernV2 } from '../templates/tax-invoice-modern-v2';
 import { TaxInvoiceErp } from '../templates/tax-invoice-erp';
+import { TaxInvoiceErpV2 } from '../templates/tax-invoice-erp-v2';
 import { TaxInvoiceMinimal } from '../templates/tax-invoice-minimal';
 import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
 import { TaxReceiptThermal58, TaxReceiptThermal80 } from '../templates/thermal-receipt';
@@ -37,6 +38,13 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     id: 'tax-invoice-erp',
     nameKey: 'erp',
     component: TaxInvoiceErp,
+    defaultTheme: 'gray',
+    supportedPaper: ['a4', 'letter', 'legal'],
+  },
+  'tax-invoice-erp-v2': {
+    id: 'tax-invoice-erp-v2',
+    nameKey: 'erp_v2',
+    component: TaxInvoiceErpV2,
     defaultTheme: 'gray',
     supportedPaper: ['a4', 'letter', 'legal'],
   },

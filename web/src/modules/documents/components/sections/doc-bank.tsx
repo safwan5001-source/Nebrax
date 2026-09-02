@@ -17,7 +17,7 @@ export function DocBank({ model }: { model: DocumentModel }) {
   const content = properties.static_content ?? model.bank;
   if (!content || content.trim() === '') return null;
 
-  const frame = style.composition === 'erp'
+  const frame = style.composition === 'erp' || style.composition === 'erp_v2'
     ? 'border-y border-black py-3'
     : style.composition === 'modern_v2'
       ? 'border-t border-[color:var(--border)] py-3'
@@ -26,7 +26,7 @@ export function DocBank({ model }: { model: DocumentModel }) {
         : style.composition === 'minimal'
           ? 'border-t border-black py-3'
           : cn('border border-gray-200 p-3', style.cardRadius);
-  const title = style.composition === 'modern_v2' ? <ModernFieldLabel field="bank" mode={mode} /> : t('bank');
+  const title = style.composition === 'modern_v2' || style.composition === 'erp_v2' ? <ModernFieldLabel field="bank" mode={mode} /> : t('bank');
 
   return (
     <section className={cn(frame, style.sectionGap)}>

@@ -400,6 +400,58 @@ describe('تجميد Modern التاريخي مقابل Modern V2', () => {
   });
 });
 
+describe('تجميد ERP التاريخي مقابل ERP V2', () => {
+  it('لا يعيد تفسير قالب A4 ولا يضيف alias من erp إلى v2', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/modules/print-templates/services/document-output-template.ts'), 'utf8');
+    expect(source).not.toContain('tax-invoice-erp-v2');
+    expect(source).not.toMatch(/erp['"]\s*\?\s*['"]tax-invoice-erp-v2/);
+  });
+
+  it('يثبّت فاتورة مرحّلة على tax-invoice-erp ولا يتبع تعيين V2 الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: true,
+      frozenPrint: revision('frozen-legacy-erp', 'tax-invoice-erp'),
+      livePrint: assignment('live-erp-v2', 'tax-invoice-erp-v2'),
+      livePdf: assignment('live-erp-v2-pdf', 'tax-invoice-erp-v2'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-erp');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-erp');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('tax-invoice-erp');
+    expect(getTemplate(outputs.print?.templateId).component).not.toBe(getTemplate('tax-invoice-erp-v2').component);
+  });
+
+  it('يثبّت فاتورة مرحّلة على tax-invoice-erp-v2 ولا يرجع إلى التاريخي الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: true,
+      frozenPrint: revision('frozen-erp-v2', 'tax-invoice-erp-v2'),
+      livePrint: assignment('live-legacy-erp', 'tax-invoice-erp'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-erp-v2');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-erp-v2');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('tax-invoice-erp-v2');
+  });
+
+  it('يجعل المسودة تتبع التعيين الحي: erp التاريخي أو V2', () => {
+    const legacyDraft = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: false,
+      livePrint: assignment('draft-legacy-erp', 'tax-invoice-erp'),
+    });
+    expect(legacyDraft.print?.templateId).toBe('tax-invoice-erp');
+
+    const v2Draft = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: false,
+      livePrint: assignment('draft-erp-v2', 'tax-invoice-erp-v2'),
+    });
+    expect(v2Draft.print?.templateId).toBe('tax-invoice-erp-v2');
+    expect(v2Draft.pdf?.templateId).toBe('tax-invoice-erp-v2');
+    expect(v2Draft.pdfSharesPrintRoot).toBe(true);
+  });
+});
+
 describe('resolvedTemplatesEqual', () => {
   it('يميّز تعريفين مختلفين', () => {
     const classic = resolveDocumentOutputTemplates({

@@ -19,6 +19,7 @@ export function DocStamp({ model }: { model: DocumentModel }) {
         blockJustifyClassName(properties),
         style.sectionGap,
         style.composition === 'erp' && 'border-t border-black pt-3',
+        style.composition === 'erp_v2' && 'border-t border-black pt-3',
         style.composition === 'minimal' && 'border-t border-black pt-3',
         style.composition === 'modern' && 'border-t border-[color:var(--border)] pt-3',
         style.composition === 'modern_v2' && 'border-t border-[color:var(--border)] pt-3',
