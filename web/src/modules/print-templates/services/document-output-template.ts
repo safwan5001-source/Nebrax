@@ -1,7 +1,7 @@
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { getTemplate } from '@/modules/documents/registry/templates';
 import type { DocumentTypeId } from '@/modules/documents/types';
-import { resolveFrozenOutputDefinition } from './frozen-output-template';
+import { resolveFrozenOutputDefinition, type FrozenOutputTemplateRevision } from './frozen-output-template';
 import {
   resolveLiveTemplateDefinition,
   resolveTemplateRevisionDefinition,
@@ -45,10 +45,10 @@ function revisionFromDefinition(
 
 function frozenRevision(
   revision: LiveTemplateRevision | null | undefined,
-): { definition: Record<string, unknown> } | null {
+): FrozenOutputTemplateRevision<Record<string, unknown>> | null {
   const definition = revision?.definition;
   if (!definition || typeof definition !== 'object') return null;
-  return { definition };
+  return { definition: { ...definition } as Record<string, unknown> };
 }
 
 /**
