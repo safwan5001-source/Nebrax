@@ -237,6 +237,60 @@ describe('resolveDocumentOutputTemplates for quotation and purchase_order', () =
   });
 });
 
+describe('resolveDocumentOutputTemplates for credit_note', () => {
+  it('يحل print وpdf المستقلين لمسودة الإشعار الدائن', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'credit_note',
+      isPosted: false,
+      livePrint: assignment('cn-print', 'tax-invoice-classic'),
+      livePdf: assignment('cn-pdf', 'tax-invoice-minimal', { footer_text: 'PDF إشعار' }),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-classic');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-minimal');
+    expect(outputs.pdf?.footerText).toBe('PDF إشعار');
+    expect(outputs.pdfSharesPrintRoot).toBe(false);
+    expect(outputs.thermal).toBeNull();
+  });
+
+  it('يسقط PDF الإشعار الدائن إلى print عند غياب تعيين pdf', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'credit_note',
+      isPosted: false,
+      livePrint: assignment('cn-print', 'tax-invoice-modern'),
+    });
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-modern');
+    expect(outputs.pdfSharesPrintRoot).toBe(true);
+  });
+
+  it('يثبّت لقطات الإشعار الدائن المرحّل ويتجاهل التعيين الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'credit_note',
+      isPosted: true,
+      frozenPrint: revision('posted-print', 'tax-invoice-classic'),
+      frozenPdf: revision('posted-pdf', 'tax-invoice-erp'),
+      livePrint: assignment('newer-print', 'tax-invoice-retail'),
+      livePdf: assignment('newer-pdf', 'tax-invoice-minimal'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-classic');
+    expect(outputs.print?.stampUrl).toBe('posted-print-stamp');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-erp');
+    expect(outputs.pdfSharesPrintRoot).toBe(false);
+  });
+
+  it('يسقط PDF المرحّل إلى لقطة print التاريخية عند غياب لقطة pdf', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'credit_note',
+      isPosted: true,
+      frozenPrint: revision('posted-print-only', 'tax-invoice-modern'),
+      livePrint: assignment('live-after-post', 'tax-invoice-classic'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-modern');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-modern');
+    expect(outputs.pdfSharesPrintRoot).toBe(true);
+    expect(outputs.thermal).toBeNull();
+  });
+});
+
 describe('resolvedTemplatesEqual', () => {
   it('يميّز تعريفين مختلفين', () => {
     const classic = resolveDocumentOutputTemplates({

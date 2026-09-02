@@ -1,5 +1,6 @@
 import { riyalToMinor } from '@/lib/money';
-import type { DocumentModel } from '../types';
+import { getCurrency } from '../constants/currencies';
+import type { CurrencyCode, Direction, DocumentModel } from '../types';
 import type { SourceCompany, SourceCustomer } from './from-invoice';
 
 /** أشكال مصدر الإشعار الدائن (عقد الـ API) — المبالغ بالريال نصّاً. */
@@ -35,20 +36,22 @@ export function buildCreditNoteDocumentModel(input: {
   bank?: string | null;
   stampUrl?: string | null;
   signatureUrl?: string | null;
+  direction?: Direction;
 }): DocumentModel {
   const { note, company, customer, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
+  const currency = getCurrency(company?.currency).code as CurrencyCode;
 
   return {
     type: note.type === 'purchase' ? 'debit_note' : 'credit_note',
-    currency: 'SAR',
-    direction: 'rtl',
+    currency,
+    direction: input.direction ?? 'rtl',
     seller: {
       name: company?.name ?? '—',
       vatNumber: company?.vat_number ?? null,
       crNumber: company?.cr_number ?? null,
       tagline: null,
       logoText: null,
-      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : null,
+      logoUrl: logoUrl && logoUrl.trim() !== '' ? logoUrl : (company?.logo ?? null),
       logoHeight: logoHeight ?? null,
     },
     buyer: {
