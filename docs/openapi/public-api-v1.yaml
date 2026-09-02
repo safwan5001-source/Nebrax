@@ -48,6 +48,38 @@ info:
     The base path `/api/v1` is the first major version. As a design principle,
     a breaking change to these contracts would be introduced under a new major
     API version rather than mutating `v1`.
+
+
+    ## Webhooks
+
+    Tenants register outbound webhook subscriptions (see the Webhooks endpoints)
+    to receive events when resources are created. The current event catalog is
+    `partner.created`, `product.created`, and `invoice.created` (invoices are
+    created as drafts via this API — see `data.status` in the payload). Events are
+    emitted at the domain level, so any interface that creates the resource
+    produces the event.
+
+
+    **Delivery envelope** (JSON body): `{ id, type, api_version, created_at,
+    tenant: { id }, data }`, where `id` is a stable event id (retained across
+    retries — deduplicate on it) and `data` is the same curated resource shape
+    used by the REST reads.
+
+
+    **Signature.** Every delivery is signed with HMAC-SHA256 over
+    `"{timestamp}.{raw_request_body}"` using the subscription's signing secret
+    (shown only once, at creation/rotation). Headers sent with each delivery:
+    `X-AWJ-Signature: t=<unix_ts>,v1=<hex>`, `X-AWJ-Webhook-Id` (event id),
+    `X-AWJ-Webhook-Delivery` (delivery id), `X-AWJ-Webhook-Event` (type),
+    `X-AWJ-Webhook-Attempt`, and `X-AWJ-Webhook-Timestamp`.
+
+
+    **To verify:** recompute the HMAC over `"{X-AWJ-Webhook-Timestamp}.{raw body}"`
+    with your secret, compare to the `v1` value in `X-AWJ-Signature` in
+    constant time, check the timestamp is within your tolerance, and deduplicate
+    by `X-AWJ-Webhook-Id`. Respond `2xx` to acknowledge; any other status (or a
+    timeout) is retried with bounded exponential backoff. Deliveries follow no
+    redirects and time out quickly, so respond fast and do heavy work async.
   contact:
     name: AWJ ERP
 
@@ -70,6 +102,8 @@ tags:
     description: Catalog products (read and controlled create).
   - name: Invoices
     description: Sales invoices (read and controlled draft create).
+  - name: Webhooks
+    description: Tenant-owned outbound webhook subscriptions (management + secure signed delivery).
 
 security:
   - bearerApiKey: []
@@ -386,6 +420,178 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
+  /webhooks:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: listWebhooks
+      tags: [Webhooks]
+      summary: List webhook subscriptions
+      description: Paginated, tenant-scoped list of webhook subscriptions. Secrets are never returned.
+      x-required-scope: webhooks:read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/WebhooksStatus'
+        - $ref: '#/components/parameters/WebhooksSort'
+      responses:
+        '200':
+          description: A page of webhook subscriptions.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      operationId: createWebhook
+      tags: [Webhooks]
+      summary: Create a webhook subscription
+      description: >
+        Registers a tenant-owned webhook subscription. The destination URL is
+        SSRF-validated (HTTPS required; private, loopback, link-local and other
+        non-public addresses are rejected) and event types must be in the
+        catalog. The server generates the signing secret and returns it **once**
+        in this response (`data.secret`); it is stored encrypted and can never be
+        retrieved again — only rotated. Requires an idempotency key.
+      x-required-scope: webhooks:write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookCreate' }
+            example:
+              url: https://example.com/awj/webhooks
+              event_types: [invoice.created, partner.created]
+              description: Billing integration
+      responses:
+        '201':
+          description: Subscription created. `data.secret` is present **only** here.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            Idempotency-Replayed: { $ref: '#/components/headers/IdempotencyReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookSecretResponse' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /webhooks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: getWebhook
+      tags: [Webhooks]
+      summary: Get a webhook subscription
+      x-required-scope: webhooks:read
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: The webhook subscription (without secret).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    patch:
+      operationId: updateWebhook
+      tags: [Webhooks]
+      summary: Update a webhook subscription
+      description: >
+        Partial update of a subscription (URL, event types, description, enable/
+        disable). A changed URL is re-validated for SSRF. The signing secret is
+        unchanged (rotate it via the dedicated operation).
+      x-required-scope: webhooks:write
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookUpdate' }
+            example:
+              status: disabled
+      responses:
+        '200':
+          description: The updated subscription (without secret).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    delete:
+      operationId: deleteWebhook
+      tags: [Webhooks]
+      summary: Delete a webhook subscription
+      description: Permanently removes the subscription and its pending deliveries. Tenant-isolated.
+      x-required-scope: webhooks:write
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: The subscription was deleted.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookDeletedResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /webhooks/{id}/rotate-secret:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    post:
+      operationId: rotateWebhookSecret
+      tags: [Webhooks]
+      summary: Rotate a webhook signing secret
+      description: >
+        Generates a new signing secret and returns it **once** (`data.secret`).
+        Signatures made with the previous secret stop verifying immediately.
+        Requires an idempotency key.
+      x-required-scope: webhooks:write
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The subscription with a freshly rotated `data.secret` (present only here).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            Idempotency-Replayed: { $ref: '#/components/headers/IdempotencyReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookSecretResponse' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
 components:
   securitySchemes:
     bearerApiKey:
@@ -541,6 +747,17 @@ components:
       schema:
         type: string
         enum: [invoice_date, number, total, created_at, '-invoice_date', '-number', '-total', '-created_at']
+    WebhooksStatus:
+      name: status
+      in: query
+      required: false
+      schema: { type: string, enum: [enabled, disabled] }
+    WebhooksSort:
+      name: sort
+      in: query
+      required: false
+      description: Sort field with optional leading `-`. Default `-created_at`.
+      schema: { type: string, enum: [created_at, '-created_at'] }
 
   headers:
     XRequestId:
@@ -968,3 +1185,92 @@ components:
       properties:
         data: { type: array, items: { $ref: '#/components/schemas/InvoiceSummary' } }
         meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+    WebhookEventType:
+      type: string
+      description: An event type from the webhook catalog.
+      enum: [partner.created, product.created, invoice.created]
+    Webhook:
+      type: object
+      description: A webhook subscription read representation. The signing secret is never included.
+      required: [id, api_client_id, url, description, event_types, status, secret_prefix, disabled_at, last_success_at, last_failure_at, created_at, updated_at]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        api_client_id: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        url: { type: string }
+        description: { type: [string, 'null'] }
+        event_types: { type: array, items: { $ref: '#/components/schemas/WebhookEventType' } }
+        status: { type: string, enum: [enabled, disabled] }
+        secret_prefix: { type: string, description: 'Non-secret identifier for the signing secret (a short prefix).' }
+        disabled_at: { type: [string, 'null'], format: date-time }
+        last_success_at: { type: [string, 'null'], format: date-time }
+        last_failure_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+    WebhookWithSecret:
+      description: A webhook subscription including the one-time raw signing secret (creation/rotation only).
+      allOf:
+        - $ref: '#/components/schemas/Webhook'
+        - type: object
+          required: [secret]
+          properties:
+            secret:
+              type: string
+              description: >
+                The raw signing secret — returned ONLY once, at creation or
+                rotation. Store it securely; it is kept encrypted server-side and
+                cannot be retrieved again.
+    WebhookCreate:
+      type: object
+      required: [url, event_types]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: 'HTTPS destination. SSRF-validated: non-public addresses (private, loopback, link-local, etc.) are rejected.'
+        event_types:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/WebhookEventType' }
+        description: { type: [string, 'null'], maxLength: 255 }
+    WebhookUpdate:
+      type: object
+      additionalProperties: false
+      description: Partial update; supply only the fields to change.
+      properties:
+        url: { type: string, format: uri, maxLength: 2048 }
+        event_types: { type: array, minItems: 1, items: { $ref: '#/components/schemas/WebhookEventType' } }
+        description: { type: [string, 'null'], maxLength: 255 }
+        status: { type: string, enum: [enabled, disabled] }
+    WebhookDeleted:
+      type: object
+      required: [id, deleted]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        deleted: { type: boolean, enum: [true] }
+    WebhookResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/Webhook' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    WebhookSecretResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/WebhookWithSecret' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    WebhookListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Webhook' } }
+        meta: { $ref: '#/components/schemas/PaginationMeta' }
+    WebhookDeletedResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/WebhookDeleted' }
+        meta: { $ref: '#/components/schemas/Meta' }

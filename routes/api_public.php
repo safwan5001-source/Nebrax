@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\PublicHealthController;
 use App\Http\Controllers\Api\PublicInvoiceController;
 use App\Http\Controllers\Api\PublicPartnerController;
 use App\Http\Controllers\Api\PublicProductController;
+use App\Http\Controllers\Api\PublicWebhookController;
 use App\Http\Middleware\AuthenticateApiClient;
 use App\Http\Middleware\EnforceApiIdempotency;
 use App\Http\Middleware\EnforcePlanLimit;
@@ -93,6 +94,12 @@ Route::middleware([
         Route::get('invoices', [PublicInvoiceController::class, 'index'])->name('invoices.index');
         Route::get('invoices/{id}', [PublicInvoiceController::class, 'show'])->whereUuid('id')->name('invoices.show');
     });
+
+    // إدارة اشتراكات الـ Webhooks (PR-7) — قراءة. لا يُكشف السرّ في أيّ قراءة.
+    Route::middleware(EnsureApiScope::class.':webhooks:read')->group(function () {
+        Route::get('webhooks', [PublicWebhookController::class, 'index'])->name('webhooks.index');
+        Route::get('webhooks/{id}', [PublicWebhookController::class, 'show'])->whereUuid('id')->name('webhooks.show');
+    });
 });
 
 /*
@@ -129,4 +136,18 @@ Route::middleware([
     // الجديد (مفتاح جديد) يبلغ حدَّ الخطة بعد المطالبة فيُرفض 422 — الحدّ محفوظ.
     Route::middleware([EnsureApiScope::class.':invoices:write', EnforceApiIdempotency::class, EnforcePlanLimit::class.':invoices'])
         ->post('invoices', [PublicInvoiceController::class, 'store'])->name('invoices.store');
+
+    // إدارة اشتراكات الـ Webhooks (PR-7) — كتابة. الإنشاء والتدوير (POST) بمفتاح
+    // idempotency إلزاميّ (لا إنشاء/تدوير مزدوج عند إعادة المحاولة). PATCH/DELETE
+    // متغيّرا حالةٍ طبيعيّا الجَمْعِيّة فلا يحملان الحارس. السرّ يُعرَض مرّة واحدة.
+    Route::middleware(EnsureApiScope::class.':webhooks:write')->group(function () {
+        Route::post('webhooks', [PublicWebhookController::class, 'store'])
+            ->middleware(EnforceApiIdempotency::class)->name('webhooks.store');
+        Route::patch('webhooks/{id}', [PublicWebhookController::class, 'update'])
+            ->whereUuid('id')->name('webhooks.update');
+        Route::delete('webhooks/{id}', [PublicWebhookController::class, 'destroy'])
+            ->whereUuid('id')->name('webhooks.destroy');
+        Route::post('webhooks/{id}/rotate-secret', [PublicWebhookController::class, 'rotateSecret'])
+            ->whereUuid('id')->middleware(EnforceApiIdempotency::class)->name('webhooks.rotate-secret');
+    });
 });

@@ -74,6 +74,9 @@ fi
 if ! grep -q "PublicApiServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\PublicApiServiceProvider::class,|" bootstrap/providers.php
 fi
+if ! grep -q "WebhookServiceProvider" bootstrap/providers.php; then
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\WebhookServiceProvider::class,|" bootstrap/providers.php
+fi
 
 # حذف users migration الافتراضية (لدينا واحدة خاصة بالمستأجرين)
 rm -f database/migrations/*_create_users_table.php \
