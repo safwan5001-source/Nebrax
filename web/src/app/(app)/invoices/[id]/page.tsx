@@ -32,7 +32,12 @@ import { RevisionLog } from '@/components/documents/revision-log';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
 import { exportXlsx } from '@/lib/xlsx';
-import { resolveLiveTemplateDefinition, type LivePrintTemplateAssignment } from '@/modules/print-templates/services/live-template-definition';
+import type { LivePrintTemplateAssignment, ResolvedLiveTemplate } from '@/modules/print-templates/services/live-template-definition';
+import {
+  invoiceCatalogDocumentType,
+  resolveDocumentOutputTemplates,
+  thermalPaperForTemplate,
+} from '@/modules/print-templates/services/document-output-template';
 
 interface Line {
   id: string;
@@ -62,6 +67,7 @@ interface FrozenPrintTemplateRevision {
     bank_text?: string;
     stamp?: string;
     signature?: string;
+    logo_height?: number;
   };
   document_types: string[];
 }
@@ -84,6 +90,7 @@ interface Invoice {
   paid_amount: string;
   remaining: string;
   notes: string | null;
+  zatca_document_type?: string | null;
   cost_center?: { id: string; code: string; name: string } | null;
   lines: Line[];
   print_template_revision_id?: string | null;
@@ -153,6 +160,31 @@ const payTone: Record<string, 'positive' | 'warning' | 'muted'> = {
   unpaid: 'muted',
 };
 
+const PAGE_TEMPLATES = listTemplates().filter((definition) => (
+  !definition.supportedPaper.some((paper) => paper.startsWith('thermal_'))
+));
+
+function liveAssignment(result: PromiseSettledResult<unknown>): LivePrintTemplateAssignment | null {
+  if (result.status !== 'fulfilled' || !result.value || typeof result.value !== 'object') return null;
+  const data = (result.value as { data?: LivePrintTemplateAssignment | null }).data;
+  return data ?? null;
+}
+
+function documentPropsFromResolved(resolved: ResolvedLiveTemplate) {
+  return {
+    templateId: resolved.templateId,
+    themeId: resolved.themeId,
+    footerText: resolved.footerText,
+    terms: resolved.termsText,
+    bank: resolved.bankText,
+    stampUrl: resolved.stampUrl,
+    signatureUrl: resolved.signatureUrl,
+    showLogo: resolved.showLogo,
+    logoHeight: resolved.logoHeight,
+    layout: resolved.layout,
+  };
+}
+
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -196,6 +228,10 @@ export default function InvoiceDetailPage() {
   const [bankText, setBankText] = useState<string | null>(null);
   const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [pdfOutput, setPdfOutput] = useState<ResolvedLiveTemplate | null>(null);
+  const [thermalOutput, setThermalOutput] = useState<ResolvedLiveTemplate | null>(null);
+  const [pdfSharesPrintRoot, setPdfSharesPrintRoot] = useState(true);
+  const [printLocked, setPrintLocked] = useState(false);
   const tt = useTranslations('invoiceTemplates');
 
   const partnerName = customer?.name ?? '—';
@@ -213,11 +249,24 @@ export default function InvoiceDetailPage() {
       .then(async (r) => {
         setInvoice(r.data);
         const branchQuery = r.data.branch_id ? `&branch_id=${encodeURIComponent(r.data.branch_id)}` : '';
-        const [p, z, m, live, paymentRelations, noteRelations, inventoryRelations, accountingRelations] = await Promise.allSettled([
+        const catalogType = invoiceCatalogDocumentType(r.data.zatca_document_type);
+        const posted = r.data.status !== 'draft';
+        const skipped = Promise.resolve({ data: null as LivePrintTemplateAssignment | null });
+        const resolveUsage = (documentType: string, usage: 'print' | 'pdf' | 'thermal') => (
+          api<{ data: LivePrintTemplateAssignment | null }>(
+            `/print-templates/resolve?document_type=${documentType}&usage=${usage}${branchQuery}`,
+          )
+        );
+        const [p, z, m, livePrint, livePdf, liveThermal, fallbackPrint, fallbackPdf, fallbackThermal, paymentRelations, noteRelations, inventoryRelations, accountingRelations] = await Promise.allSettled([
           api<{ data: Customer }>(`/partners/${r.data.partner_id}`),
           api<Zatca>(`/invoices/${id}/zatca`),
           api<{ company: Company }>(`/me`),
-          api<{ data: LivePrintTemplateAssignment | null }>(`/print-templates/resolve?document_type=tax_invoice&usage=print${branchQuery}`),
+          posted ? skipped : resolveUsage(catalogType, 'print'),
+          posted ? skipped : resolveUsage(catalogType, 'pdf'),
+          posted ? skipped : resolveUsage(catalogType, 'thermal'),
+          posted || catalogType !== 'simplified_tax_invoice' ? skipped : resolveUsage('tax_invoice', 'print'),
+          posted || catalogType !== 'simplified_tax_invoice' ? skipped : resolveUsage('tax_invoice', 'pdf'),
+          posted || catalogType !== 'simplified_tax_invoice' ? skipped : resolveUsage('tax_invoice', 'thermal'),
           api<{ data: InvoicePayment[] }>(`/invoices/${id}/payments`),
           api<{ data: InvoiceNote[] }>(`/invoices/${id}/notes`),
           api<{ data: InvoiceInventoryMovement[] }>(`/invoices/${id}/inventory`),
@@ -234,39 +283,51 @@ export default function InvoiceDetailPage() {
         setRelationsLoading(false);
 
         // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
-        // إعدادات الهوية تفسير مستند تاريخي. المسودات والبيانات القديمة تستخدم
-        // إعدادات التوافق الحية إلى أن تصدر.
-        const frozen = r.data.print_template_revision?.definition;
-        if (frozen) {
-          setTemplateId(frozen.template_id ?? DEFAULT_TEMPLATE_ID);
-          setThemeId(frozen.theme_id ?? null);
-          setFooterText(frozen.footer_text ?? null);
-          setShowLogo(frozen.show_logo !== false);
-          setLayout(Array.isArray(frozen.layout) && frozen.layout.length ? frozen.layout : null);
+        // إعدادات الهوية تفسير مستند تاريخي. المسودات تستخدم التعيين الحي لكل
+        // usage حتى لحظة الترحيل.
+        const outputs = resolveDocumentOutputTemplates({
+          documentType: catalogType,
+          isPosted: posted,
+          frozenPrint: r.data.print_template_revision,
+          frozenPdf: r.data.pdf_template_revision,
+          frozenThermal: r.data.thermal_template_revision,
+          livePrint: liveAssignment(livePrint),
+          livePdf: liveAssignment(livePdf),
+          liveThermal: liveAssignment(liveThermal),
+          fallbackLivePrint: liveAssignment(fallbackPrint),
+          fallbackLivePdf: liveAssignment(fallbackPdf),
+          fallbackLiveThermal: liveAssignment(fallbackThermal),
+        });
+        const resolved = outputs.print;
+        if (resolved) {
+          setTemplateId(resolved.templateId);
+          setThemeId(resolved.themeId);
+          setFooterText(resolved.footerText);
+          setShowLogo(resolved.showLogo);
+          setLayout(resolved.layout);
+          setLogoUrl(null);
+          setLogoHeight(resolved.logoHeight);
+          setTermsText(resolved.termsText);
+          setBankText(resolved.bankText);
+          setStampUrl(resolved.stampUrl);
+          setSignatureUrl(resolved.signatureUrl);
+        } else {
+          setTemplateId(DEFAULT_TEMPLATE_ID);
+          setThemeId(null);
+          setFooterText(null);
+          setShowLogo(true);
+          setLayout(null);
           setLogoUrl(null);
           setLogoHeight(null);
-          setTermsText(frozen.terms_text ?? null);
-          setBankText(frozen.bank_text ?? null);
+          setTermsText(null);
+          setBankText(null);
           setStampUrl(null);
           setSignatureUrl(null);
-        } else {
-          const resolved = live.status === 'fulfilled'
-            ? resolveLiveTemplateDefinition(live.value.data, 'tax_invoice')
-            : null;
-          if (resolved) {
-            setTemplateId(resolved.templateId);
-            setThemeId(resolved.themeId);
-            setFooterText(resolved.footerText);
-            setShowLogo(resolved.showLogo);
-            setLogoUrl(null);
-            setLogoHeight(resolved.logoHeight);
-            setLayout(resolved.layout);
-            setTermsText(resolved.termsText);
-            setBankText(resolved.bankText);
-            setStampUrl(resolved.stampUrl);
-            setSignatureUrl(resolved.signatureUrl);
-          }
         }
+        setPdfOutput(outputs.pdf);
+        setThermalOutput(outputs.thermal);
+        setPdfSharesPrintRoot(outputs.pdfSharesPrintRoot);
+        setPrintLocked(posted || resolved !== null);
       })
       .catch(() => setLoadError(true)) // فشل التحميل ≠ سجل غير موجود (تمييز الخطأ عن الغياب)
       .finally(() => setLoading(false));
@@ -388,25 +449,21 @@ export default function InvoiceDetailPage() {
         : relationSection === 'accounting' ? accountingContent : null;
   const toggleRelationSection = (section: RelationSection) => setRelationSection((current) => current === section ? null : section);
 
-  const doc = () => document.getElementById('print-root');
+  const pdfDoc = () => document.getElementById(pdfSharesPrintRoot ? 'print-root' : 'pdf-print-root');
   const paperId = getTemplate(templateId).supportedPaper[0] ?? 'a4';
   const paper = { widthMm: PAPER_SIZES[paperId].widthMm, heightMm: PAPER_SIZES[paperId].heightMm };
-  const frozenThermalDefinition = invoice.thermal_template_revision?.definition ?? null;
-  const thermalTemplateId = frozenThermalDefinition?.template_id ?? null;
-  const thermalPaperId = thermalTemplateId
-    ? getTemplate(thermalTemplateId).supportedPaper.find((candidate) => candidate.startsWith('thermal_'))
-    : null;
-  const thermalPaper = thermalPaperId
-    ? { widthMm: PAPER_SIZES[thermalPaperId].widthMm, heightMm: PAPER_SIZES[thermalPaperId].heightMm }
-    : null;
+  const pdfPaperId = (pdfOutput ? getTemplate(pdfOutput.templateId).supportedPaper[0] : paperId) ?? 'a4';
+  const pdfPaper = { widthMm: PAPER_SIZES[pdfPaperId].widthMm, heightMm: PAPER_SIZES[pdfPaperId].heightMm };
+  const thermalPaper = thermalPaperForTemplate(thermalOutput?.templateId ?? null);
+  const catalogType = invoiceCatalogDocumentType(invoice.zatca_document_type);
 
   async function handleDownloadPdf() {
     if (!invoice) return;
     setBusy('pdf');
     try {
-      const element = doc();
+      const element = pdfDoc();
       if (!element) throw new Error('Invoice template is unavailable');
-      await documentExporter.download({ element, fileName: invoice.number, paper });
+      await documentExporter.download({ element, fileName: invoice.number, paper: pdfPaper });
       success(t('downloaded_ok'));
     } catch {
       errorToast(t('export_failed'));
@@ -419,9 +476,9 @@ export default function InvoiceDetailPage() {
     if (!invoice) return;
     setBusy('share');
     try {
-      const element = doc();
+      const element = pdfDoc();
       if (!element) throw new Error('Invoice template is unavailable');
-      const result = await documentExporter.share({ element, fileName: invoice.number, title: invoice.number, paper });
+      const result = await documentExporter.share({ element, fileName: invoice.number, title: invoice.number, paper: pdfPaper });
       success(result === 'shared' ? t('shared_ok') : t('downloaded_ok'));
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') errorToast(t('export_failed'));
@@ -517,8 +574,8 @@ export default function InvoiceDetailPage() {
       <DropdownItem icon={Download} onClick={handleDownloadPdf}>{busy === 'pdf' ? t('generating') : t('download_pdf')}</DropdownItem>
       <DropdownItem icon={Share2} onClick={handleShare}>{t('share')}</DropdownItem>
       <DropdownItem icon={FileSpreadsheet} onClick={handleExcel}>{t('excel')}</DropdownItem>
-      {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
-        <DropdownItem icon={Printer} onClick={() => printDocument(thermalPaper, 'thermal-print-root')}>{tPrint('thermal_print')}</DropdownItem>
+      {thermalPaper && (
+        <DropdownItem icon={Printer} onClick={() => printDocument(thermalPaper.paper, 'thermal-print-root')}>{tPrint('thermal_print')}</DropdownItem>
       )}
       {isDraft && <DropdownItem icon={Trash2} tone="danger" onClick={() => setPendingAction('delete')}>{t('delete')}</DropdownItem>}
     </>
@@ -557,6 +614,7 @@ export default function InvoiceDetailPage() {
               logoUrl={logoUrl}
               logoHeight={logoHeight}
               layout={layout}
+              documentType={catalogType}
             />
           </DocumentScaler>
         </div>
@@ -611,6 +669,7 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
 
+        {!printLocked && (
         <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-surface px-3 py-2.5">
           <span className="text-sm font-medium text-text">{t('template')}</span>
           <Dropdown
@@ -626,11 +685,12 @@ export default function InvoiceDetailPage() {
               </>
             }
           >
-            {listTemplates().map((definition) => (
+            {PAGE_TEMPLATES.map((definition) => (
               <DropdownItem key={definition.id} onClick={() => setTemplateId(definition.id)}>{tt(definition.nameKey)}</DropdownItem>
             ))}
           </Dropdown>
         </div>
+        )}
       </header>
 
       {documentPreview}
@@ -693,17 +753,26 @@ export default function InvoiceDetailPage() {
         <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => toggleRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => toggleRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => toggleRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => toggleRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
 
-      {frozenThermalDefinition && thermalPaper && thermalTemplateId && (
+      {!pdfSharesPrintRoot && pdfOutput && (
         <InvoiceDocument
           invoice={invoice}
           company={company}
           customer={customer}
           qr={zatca?.qr ?? null}
-          templateId={thermalTemplateId}
-          themeId={frozenThermalDefinition.theme_id ?? null}
-          footerText={frozenThermalDefinition.footer_text ?? null}
-          showLogo={frozenThermalDefinition.show_logo !== false}
-          layout={Array.isArray(frozenThermalDefinition.layout) && frozenThermalDefinition.layout.length ? frozenThermalDefinition.layout : null}
+          {...documentPropsFromResolved(pdfOutput)}
+          documentType={catalogType}
+          rootId="pdf-print-root"
+        />
+      )}
+
+      {thermalPaper && thermalOutput && (
+        <InvoiceDocument
+          invoice={invoice}
+          company={company}
+          customer={customer}
+          qr={zatca?.qr ?? null}
+          {...documentPropsFromResolved(thermalOutput)}
+          documentType={catalogType}
           rootId="thermal-print-root"
         />
       )}

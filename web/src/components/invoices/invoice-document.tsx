@@ -1,6 +1,7 @@
 'use client';
 
-import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
+import { useLocale } from 'next-intl';
+import type { Direction, DocumentTypeId, ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import {
   buildInvoiceDocumentModel,
@@ -35,6 +36,8 @@ export function InvoiceDocument({
   logoHeight,
   layout,
   rootId,
+  documentType,
+  direction,
 }: {
   invoice: InvoiceDoc;
   company: Company | null;
@@ -52,8 +55,25 @@ export function InvoiceDocument({
   logoHeight?: number | null;
   layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
+  documentType?: DocumentTypeId;
+  direction?: Direction;
 }) {
-  const model = buildInvoiceDocumentModel({ invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl });
+  const locale = useLocale();
+  const model = buildInvoiceDocumentModel({
+    invoice,
+    company,
+    customer,
+    qr,
+    footerText,
+    logoUrl,
+    logoHeight,
+    terms,
+    bank,
+    stampUrl,
+    signatureUrl,
+    type: documentType,
+    direction: direction ?? (locale === 'en' ? 'ltr' : 'rtl'),
+  });
   return (
     <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />
   );

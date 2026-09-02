@@ -11,6 +11,7 @@ use App\Models\InvoiceLineCostCenterAllocation;
 use App\Models\JournalLine;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\PrintTemplateContract;
 use App\Support\Settings;
 use App\Services\PrintTemplates\PrintTemplateService;
 use App\Services\ClassificationService;
@@ -821,16 +822,23 @@ class InvoiceService
 
             // تُحل المراجعة داخل معاملة الترحيل وتُخزَّن لقطةً؛ لا تغيّر
             // تعيينات الفرع أو القالب لاحقاً إعادة طباعة فاتورة صدرت بالفعل.
-            $printAssignment = $this->printTemplates->resolve('tax_invoice', 'print', $invoice->branch_id);
-            $pdfAssignment = $this->printTemplates->resolve('tax_invoice', 'pdf', $invoice->branch_id);
-            $thermalAssignment = $this->printTemplates->resolve('tax_invoice', 'thermal', $invoice->branch_id);
+            $documentType = PrintTemplateContract::invoiceDocumentType($invoice->zatca_document_type);
+            $revisionIds = $this->printTemplates->resolveOutputRevisionIds($documentType, $invoice->branch_id);
+            // تعيينات tax_invoice السابقة تبقى صالحة للفاتورة المبسطة ما لم يوجد
+            // تعيين مبسطة صريح؛ وإلا تنكسر إيصالات POS والمستأجرون القائمون.
+            if ($documentType === 'simplified_tax_invoice') {
+                $legacyIds = $this->printTemplates->resolveOutputRevisionIds('tax_invoice', $invoice->branch_id);
+                foreach (['print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id'] as $key) {
+                    $revisionIds[$key] ??= $legacyIds[$key];
+                }
+            }
 
             $invoice->update([
                 'status'              => 'posted',
                 'zatca_document_type' => $invoice->zatca_document_type,
-                'print_template_revision_id' => $printAssignment?->print_template_revision_id,
-                'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
-                'thermal_template_revision_id' => $thermalAssignment?->print_template_revision_id,
+                'print_template_revision_id' => $revisionIds['print_template_revision_id'],
+                'pdf_template_revision_id' => $revisionIds['pdf_template_revision_id'],
+                'thermal_template_revision_id' => $revisionIds['thermal_template_revision_id'],
                 'subtotal'            => $subtotal,
                 'discount'            => $discount,
                 'shipping'            => $shipping,

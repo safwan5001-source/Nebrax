@@ -37,6 +37,7 @@ class ZatcaCredentialTest extends TestCase
 [ req ]
 distinguished_name = req_distinguished_name
 prompt = no
+default_bits = 2048
 
 [ req_distinguished_name ]
 CN = Nebrax ZATCA Test
