@@ -21,7 +21,7 @@
 
 ## 4. Final HEAD SHA
 
-`98e4c1c21b5d8936e3ea52132642b65cca4dc25e`
+`626d0010ba2fec1703690af993a269d35a1dbcde`
 
 ## 5. Audit findings قبل التنفيذ
 
@@ -248,7 +248,7 @@ Tests       1062 passed (1062)
 
 ## 24. PR number/link إن تم إنشاؤه
 
-يُستكمل بعد فتح الـ PR عبر أداة إدارة الطلبات. الفرع: `cursor/document-templates-completion-7cc0`.
+[#611](https://github.com/safwan5001-source/Nebrax/pull/611) — فرع `cursor/document-templates-completion-7cc0`.
 
 ## 25. Merge status
 
