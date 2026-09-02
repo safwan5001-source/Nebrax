@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CreditNote;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
+use App\Services\PrintTemplates\PrintTemplateService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -186,6 +187,78 @@ class CreditNoteTest extends TestCase
             ->assertJsonPath('data.pdf_template_revision.definition.template_id', 'credit-note-v1')
             ->assertJsonPath('data.thermal_template_revision_id', $creditThermalRevisionId)
             ->assertJsonPath('data.thermal_template_revision.definition.template_id', 'tax-invoice-thermal58');
+    }
+
+    /** @test */
+    public function reassigning_print_after_post_does_not_change_the_frozen_sales_credit_note(): void
+    {
+        $auth = $this->registerTenant();
+        $partnerId = $this->partner($auth['token']);
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة إشعار دائن مجمّدة',
+            'document_types' => ['credit_note'],
+            'definition' => ['template_id' => 'credit-note-v1'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'credit_note',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+
+        $noteId = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
+            'partner_id' => $partnerId,
+            'type' => 'sales',
+            'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/credit-notes/{$noteId}/post")->assertOk();
+        $frozenId = $print->published_revision_id;
+
+        $replacement = $templates->publish($templates->create([
+            'name' => 'طباعة إشعار لاحقة',
+            'document_types' => ['credit_note'],
+            'definition' => ['template_id' => 'tax-invoice-retail'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'credit_note',
+            'usage' => 'print',
+            'print_template_revision_id' => $replacement->published_revision_id,
+        ], null);
+
+        $this->assertSame($frozenId, CreditNote::findOrFail($noteId)->print_template_revision_id);
+    }
+
+    /** @test */
+    public function posting_a_sales_credit_note_without_pdf_assignment_leaves_pdf_revision_null(): void
+    {
+        $auth = $this->registerTenant();
+        $partnerId = $this->partner($auth['token']);
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $templates = app(PrintTemplateService::class);
+        $print = $templates->publish($templates->create([
+            'name' => 'طباعة إشعار دائن فقط',
+            'document_types' => ['credit_note'],
+            'definition' => ['template_id' => 'credit-note-v1'],
+        ], null));
+        $templates->assign([
+            'document_type' => 'credit_note',
+            'usage' => 'print',
+            'print_template_revision_id' => $print->published_revision_id,
+        ], null);
+
+        $noteId = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
+            'partner_id' => $partnerId,
+            'type' => 'sales',
+            'items' => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated()['data']['id'];
+        $posted = $this->withToken($auth['token'])->postJson("/api/credit-notes/{$noteId}/post")->assertOk();
+
+        $this->assertSame($print->published_revision_id, $posted['data']['print_template_revision_id']);
+        $this->assertNull($posted['data']['pdf_template_revision_id']);
+        $this->assertSame(1, JournalEntry::where('source_type', CreditNote::class)->where('source_id', $noteId)->count());
     }
 
     /** @test */
