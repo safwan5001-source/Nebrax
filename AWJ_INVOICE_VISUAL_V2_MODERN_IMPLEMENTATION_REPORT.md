@@ -100,6 +100,8 @@
 | ملف | الدور |
 | --- | --- |
 | `web/src/modules/documents/presentation/visual-v2.ts` | توكنز V2، تسميات ثنائية، نسب الأعمدة 100%، سقف الشعار 36px وQR 76px، مساعدات عملة Modern |
+| `web/src/modules/documents/presentation/modern-bilingual-label.tsx` | عقدتان معزولتان للتسمية الثنائية في تركيب Modern فقط |
+| `web/src/modules/documents/presentation/modern-bilingual-label.test.tsx` | عزل dir ووحدة SAR على السطر الإنجليزي |
 | `web/src/modules/documents/presentation/use-document-label-mode.ts` | حسم ar/en/bilingual من locale والاتجاه |
 | `web/src/modules/documents/presentation/visual-v2.test.ts` | عقد الأساس + عملة ريال/SAR |
 | `web/src/modules/documents/presentation/visual-v2-print.test.ts` | عزل CSS الطباعة عن بقية القوالب |
@@ -183,21 +185,38 @@
 
 ---
 
+## جولة تصحيح Bidi (تسميات Modern الثنائية)
+
+التغطية الثنائية **مقبولة** ولم تُعد ترجمتها ولا أُعيد تصميم Modern. العيب كان أن `pairLabel` يبني `"${ar} | ${en}"` كنص DOM واحد داخل فقرة RTL، فيعيد المتصفح ترتيب الرقم/`|`/اللاتينية (مثال شبيه بـ `Invoice No.TAX_INVOICE... | رقم الفاتورة`).
+
+**القرار البصري:** في `bilingual` تُعرض التسمية **سطرين** معزولين — عربي `dir="rtl"` ثم إنجليزي `dir="ltr"` — والقيمة عقدة منفصلة. لا أحرف اتجاه يونيكود داخل سلاسل الأعمال. العربية-فقط والإنجليزية-فقط تبقيان سطراً واحداً. نسب الأعمدة 100% وQR 76px وشعار 36px لم تُمس.
+
+| السطح | بعد التصحيح |
+| --- | --- |
+| مكوّن | `ModernBilingualLabel` — وسم `data-modern-bilingual="label"` عندما `ar !== en` |
+| كتالوج | `pairLabel` / `modernFieldLabel(..., 'bilingual')` يبقيان `"ar \| en"` للاختبارات الوحدوية — **ممنوع** كنص DOM ثنائي في Modern |
+| `DocInfoRow` | `label: React.ReactNode`؛ القيمة في `[data-doc-info-value]`؛ أرقام/معرّفات لاتينية `dir="ltr"`؛ العنوان الوطني باتجاه المستند |
+| رؤوس المال | `Unit price (SAR)` على السطر الإنجليزي فقط؛ الخلايا رقم بلا وحدة |
+| إجماليات | تسمية معزولة عن `.num`؛ صفوف Modern `items-start` |
+| ERP/Minimal | بلا `data-modern-bilingual` حتى مع `locale=en` + `direction=rtl` |
+
+---
+
 ## Tests
 
-### Vitest — `npm run test` في `web/` (بعد التغطية الثنائية)
+### Vitest — `npm run test` في `web/` (بعد تصحيح Bidi)
 
 ```
-Test Files  189 passed (189)
-Tests       1135 passed (1135)
-Duration    20.92s
+Test Files  190 passed (190)
+Tests       1140 passed (1140)
+Duration    20.59s
 ```
 
 منها:
 
-- `visual-v2.test.ts`: 22 (كتالوج bilingual لكل حقل/عمود/إجمالي/حالة؛ `#` بلا تكرار؛ رأس المال `الإجمالي | Total (SAR)`).
-- `document-modern.test.tsx`: 20 (كل تسميات Modern الظاهرة ثنائية في `FULL_LAYOUT`؛ تسمية عمود مخصّصة بلا ترجمة؛ عربي/إنجليزي بلا ` | `؛ عزل ERP عن الزوج الثنائي).
-- بقية حراسة الصقل البصري كما هي.
+- `visual-v2.test.ts`: 22 (كتالوج bilingual ما زال `"ar | en"`).
+- `modern-bilingual-label.test.tsx`: 4 (عقدتان معزولتان؛ `#` سطر واحد؛ ar/en بلا وسم؛ SAR على الإنجليزي فقط).
+- `document-modern.test.tsx`: 21 (بنية معزولة لكل تسمية ظاهرة؛ القيمة خارج عقدة التسمية؛ 10 أعمدة؛ إجماليات منفصلة عن `.num`؛ عربي/إنجليزي بلا وسم؛ عرض سعر + ERP وMinimal بلا تلوّث).
 
 ### PHP
 
@@ -205,15 +224,28 @@ Duration    20.92s
 
 ### Frontend build
 
-`npm run build` (Next.js 15.5.19) نجح محلياً على جولة التغطية الثنائية.
+`npm run build` (Next.js 15.5.19) نجح محلياً على جولة تصحيح Bidi.
 
 ---
 
 ## Visual QA
 
-نُفِّذ عبر Playwright على `/document-qa?template=tax-invoice-modern` محلياً (`http://127.0.0.1:3001`)، **بلا جلسة مستأجر**. لقطات `#qa-print-root` في `/opt/cursor/artifacts/`.
+نُفِّذ عبر Playwright على `/document-qa` محلياً (`http://127.0.0.1:3001`)، **بلا جلسة مستأجر**. لقطات `#qa-print-root` في `/opt/cursor/artifacts/` — أسماء جديدة بلا overwrite.
 
-### جولة التغطية الثنائية (r3) — إلزامية
+### جولة تصحيح Bidi (r4) — إلزامية
+
+فحص إحداثيات `th`: **صفر تراكب**. `tableOverflowPx = 0`. في bilingual: 29 عقدة معزولة، بلا ` | ` داخل التسميات، القيمة خارج عقدة التسمية، `#` سطر واحد، `SAR` على السطر الإنجليزي في رؤوس المال، الخلايا بلا وحدة.
+
+| الملف | السيناريو |
+| --- | --- |
+| `modern_v2_bidi_bilingual_five_r4.png` | فاتورة Modern، bilingual، 5 بنود — سطران عربي ثم إنجليزي؛ الرقم تحت التسمية |
+| `modern_v2_bidi_bilingual_long_content_r4.png` | bilingual + محتوى عربي طويل — بلا قصّ/تراكب |
+| `modern_v2_bidi_arabic_rtl_five_r4.png` | انحدار عربي RTL — سطر واحد، بلا `data-modern-bilingual` |
+| `modern_v2_bidi_english_ltr_five_r4.png` | انحدار إنجليزي LTR — سطر واحد، بلا الوسم |
+| `modern_v2_bidi_erp_quotation_five_r4.png` | انحدار مشترك: عرض سعر + قالب ERP — صفر عقد ثنائية |
+| `modern_v2_bidi_qa_inspect_r4.json` | مقاييس العزل والتراكب |
+
+### جولة التغطية الثنائية (r3) — مرجع
 
 locale الواجهة `en` + `direction=rtl` → `labelMode=bilingual`. فحص إحداثيات `th`: **صفر تراكب**. `tableOverflowPx = 0`.
 
@@ -262,9 +294,9 @@ locale الواجهة `en` + `direction=rtl` → `labelMode=bilingual`. فحص �
 | الأمر | النتيجة |
 | --- | --- |
 | `php artisan test` | غير مشغَّل (لا backend) |
-| `npm run test` | 189 ملفاً / **1135** اختباراً (بعد التغطية الثنائية) |
+| `npm run test` | 190 ملفاً / **1140** اختباراً (بعد تصحيح Bidi) |
 | `npm run build` | نجح محلياً (Next.js 15.5.19) |
-| GitHub CI | **نجح** سابقاً على `cec89b79` و`3ddf2f16`. التزام التغطية الثنائية `534b3911` مدفوع على نفس الفرع؛ لا دمج |
+| GitHub CI | **نجح** سابقاً على `cec89b79` و`3ddf2f16`. التزام Bidi `529ddd2e` مدفوع على نفس الفرع؛ لا دمج |
 
 ---
 
@@ -285,7 +317,7 @@ locale الواجهة `en` + `direction=rtl` → `labelMode=bilingual`. فحص �
 
 - التخطيط الافتراضي للفاتورة الضريبية ما زال يخفي الملاحظات/البنك/الختم حتى يفعّلها تصميم القالب — قد يظن المراجع أن الأقسام «لا تعمل» على `/document-qa` بنوع `tax_invoice`.
 - عشرة أعمدة افتراضية على A4 تبقى كثيفة؛ نقل الوحدة إلى الرأس وإتاحة التفاف الرأس يمنع تراكب `(ريال)`/`(SAR)`. تخصيص الأعمدة من المصمّم يبقى صمام الأمان.
-- ثنائي اللغة يعتمد locale الواجهة × اتجاه المستند؛ لا حقل API `bilingual`.
+- ثنائي اللغة يعتمد locale الواجهة × اتجاه المستند؛ لا حقل API `bilingual`. العرض الثنائي عقدتان معزولتان لا سلسلة `|`.
 - Classic/Retail لم يُعاد تصميمهما (خارج النطاق).
 - التحقق اليدوي على فاتورة مرحّلة بمستأجر تجريبي ما زال مفيداً قبل الدمج.
 
@@ -304,10 +336,11 @@ ERP · Classic · Minimal · Retail · Thermal · ZATCA generation · accounting
 - **Branch:** `cursor/invoice-visual-v2-modern-7cc0`
 - **PR:** [#616](https://github.com/safwan5001-source/Nebrax/pull/616)
 - **Base SHA:** `36525584b4545ef511c839b04ce3bc7f2535aa2e`
-- **Implementation SHA:** `534b3911c770fb87822827c4085a68ee6b0d5cb7` (آخر التزام كودي — التغطية الثنائية؛ لا التزام لاحق لمجرد مطابقة Head)
+- **Implementation SHA:** `529ddd2ed597b8dc085ae97ff03065d765edf8ce` (آخر التزام كودي — عزل Bidi للتسميات الثنائية؛ لا التزام لاحق لمجرد مطابقة Head)
+- **Implementation SHA (تغطية ثنائية سابقة):** `534b3911c770fb87822827c4085a68ee6b0d5cb7`
 - **Implementation SHA (صقل بصري):** `217f0e679f2a19915f336b1da92176b57df3d9b3`
 - **CI-green SHA:** `cec89b79ba74f132f103e839053d07a9c0dee8bd` (5/5 على الجولة الأولى)
-- **عدد commits (كود هذه الجولة):** `534b3911`
+- **عدد commits (كود هذه الجولة):** `529ddd2e`
 - **Merge:** لم يُدمَج
 - **Deploy:** لم يُنشَر
 
