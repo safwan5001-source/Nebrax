@@ -196,7 +196,7 @@ Four distinct modes are modeled in `DocumentIntelligence` and resolved by `Docum
 - **Branch:** `claude/document-intelligence-foundation-japfgd`
 - **Base SHA:** `2ea1ff72c23b44a6b28db105ddf8abc214a0a5cc`
 - **Head SHA:** `4cb6c254276caa447649c77afefcf237fd35ed03`
-- **PR:** _(pending user decision — not merged, not deployed)_
+- **PR:** [#630](https://github.com/safwan5001-source/Nebrax/pull/630) — ready for review, **not merged, not deployed**
 
 ---
 
