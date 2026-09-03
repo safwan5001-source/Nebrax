@@ -165,13 +165,14 @@ describe('resolveDocumentOutputTemplates', () => {
   });
 
   it('يفضّل تجاوز المسودة على التعيين الحي لـ print وpdf', () => {
+    const chosen = revision('override-a4', 'tax-invoice-modern');
     const outputs = resolveDocumentOutputTemplates({
       documentType: 'tax_invoice',
       isPosted: false,
       livePrint: assignment('live-print', 'tax-invoice-classic'),
       livePdf: assignment('live-pdf', 'tax-invoice-minimal'),
-      draftOverridePrint: revision('override-print', 'tax-invoice-modern'),
-      draftOverridePdf: revision('override-pdf', 'tax-invoice-modern'),
+      draftOverridePrint: chosen,
+      draftOverridePdf: chosen,
     });
     expect(outputs.print?.templateId).toBe('tax-invoice-modern');
     expect(outputs.pdf?.templateId).toBe('tax-invoice-modern');
