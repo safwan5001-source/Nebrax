@@ -262,7 +262,7 @@ i18n: مفاتيح `invoiceForm.design_*` في `ar.json` / `en.json`.
 | القاعدة | `origin/main` عند `b7638d8e` |
 | الميزة | `c1b883a5` feat(invoices): per-document print template override on draft invoices |
 | إصلاح الاختبار | `5fd2c874` test(web): use shared override revision in document output template tests |
-| تقرير التنفيذ + QA المتصفح |  docs: Final Browser QA |
+| تقرير التنفيذ + QA المتصفح | `8bc03a79` docs: Final Browser QA |
 | PR | https://github.com/safwan5001-source/Nebrax/pull/633 — **مسودة** |
 
 ---
@@ -368,7 +368,7 @@ Layout مضغوط صحيح، Dialog المعاينة `max` بلا قصّ، RTL �
 - GitHub PHP CI على `c1b883a5`: أخضر (sqlite+pgsql)
 - GitHub Web CI على `5fd2c874`: أخضر
 
-Final Head SHA: 
+Final Head SHA: `8bc03a79a3d90abf72ee75193e03322bc9fdf156` (محتوى §16). أي التزام لاحق لتثبيت هذا السطر لا يغيّر كود المنتج. 
 
 ### القرار
 
