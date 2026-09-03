@@ -114,7 +114,7 @@ Duration    20.90s
 | `php artisan test` | غير مشغَّل (لا backend) |
 | `npm run test` | 198 ملفاً / **1218** اختباراً |
 | `npm run build` | نجح محلياً (Next.js 15.5.19) |
-| GitHub CI | قيد التشغيل على [#621](https://github.com/safwan5001-source/Nebrax/pull/621) بعد دفع التنفيذ؛ يُحدَّث عند الاكتمال |
+| GitHub CI | **نجح** 5/5 على `af2558ef1cd98f6c43e50d4f42defc36ed7e8da4`؛ لا دمج |
 
 ---
 
@@ -201,8 +201,8 @@ Merge PR #619: Invoice Visual V2 Classic V2.
 ## 13. Implementation SHA vs Head
 
 - **Implementation SHA (كود الهويات والأقسام والاختبارات):** `323603bc968e6e51313ca83bd64f3eef4aacda98`
-- **CI-green SHA:** يُسجَّل بعد نجاح GitHub CI (توثيق لاحق؛ لا التزام لمجرد مزامنة الهاش داخل الملف).
-- **Head SHA:** التزام هذا التقرير بعد التنفيذ.
+- **CI-green SHA:** `af2558ef1cd98f6c43e50d4f42defc36ed7e8da4` (تقرير التنفيذ؛ 5/5)
+- **Head SHA:** التزام تسجيل نجاح CI (توثيق لاحق؛ لا التزام لمجرد مزامنة الهاش داخل الملف).
 
 ---
 
