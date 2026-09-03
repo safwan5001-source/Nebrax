@@ -175,3 +175,21 @@ export function isRetailV2(style: Pick<TemplateStyle, 'composition'>): boolean {
 export function isLegacyRetail(style: Pick<TemplateStyle, 'composition'>): boolean {
   return style.composition === 'retail';
 }
+
+/**
+ * Quotation Proposal — عرض سعر مهني مستقل عن كل هويات الفاتورة.
+ * مربوط بـ `quotation-proposal` فقط. بلا شريط هوية وبلا QR.
+ */
+export const QUOTATION_PROPOSAL_STYLE: TemplateStyle = {
+  composition: 'quotation_proposal',
+  pagePadding: 'p-9',
+  cardRadius: 'rounded-none',
+  sectionGap: 'mt-5',
+  tableHead: 'plain',
+  tableDensity: 'comfortable',
+  brandBar: false,
+};
+
+export function isQuotationProposal(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'quotation_proposal';
+}

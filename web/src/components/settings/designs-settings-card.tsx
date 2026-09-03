@@ -16,7 +16,7 @@ import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { api } from '@/lib/api';
 import { notifyCompanyUpdated } from '@/lib/company';
 import { fileToResizedDataUrl } from '@/lib/image';
-import { listTemplates } from '@/modules/documents/registry/templates';
+import { listTemplatesForDocumentType } from '@/modules/documents/registry/templates';
 import { THEME_IDS, themeSwatch } from '@/modules/documents/themes';
 import { DEFAULT_SECTION_ORDER, type ThemeId, type DocSectionLayoutItem } from '@/modules/documents/types';
 
@@ -139,7 +139,7 @@ export function DesignsSettingsCard({ canManage }: { canManage: boolean }) {
               <div className="space-y-1.5">
                 <Label htmlFor="tpl">{t('template')}</Label>
                 <Select id="tpl" value={cfg.template} disabled={!canManage} onChange={(e) => patch({ template: e.target.value })}>
-                  {listTemplates().map((d) => (
+                  {listTemplatesForDocumentType('tax_invoice').map((d) => (
                     <option key={d.id} value={d.nameKey}>{tt(d.nameKey)}</option>
                   ))}
                 </Select>

@@ -1,4 +1,4 @@
-import type { TemplateDescriptor } from '../types';
+import type { DocumentTypeId, TemplateDescriptor } from '../types';
 import { TaxInvoiceClassic } from '../templates/tax-invoice-classic';
 import { TaxInvoiceClassicV2 } from '../templates/tax-invoice-classic-v2';
 import { TaxInvoiceModern } from '../templates/tax-invoice-modern';
@@ -9,6 +9,7 @@ import { TaxInvoiceMinimal } from '../templates/tax-invoice-minimal';
 import { TaxInvoiceMinimalV2 } from '../templates/tax-invoice-minimal-v2';
 import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
 import { TaxInvoiceRetailV2 } from '../templates/tax-invoice-retail-v2';
+import { QuotationProposal } from '../templates/quotation-proposal';
 import { TaxReceiptThermal58, TaxReceiptThermal80 } from '../templates/thermal-receipt';
 
 /**
@@ -100,6 +101,14 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     defaultTheme: 'black',
     supportedPaper: ['thermal_80'],
   },
+  'quotation-proposal': {
+    id: 'quotation-proposal',
+    nameKey: 'quotation_proposal',
+    component: QuotationProposal,
+    defaultTheme: 'blue',
+    supportedPaper: ['a4', 'a4_landscape', 'letter', 'legal'],
+    documentTypes: ['quotation'],
+  },
 };
 
 export const DEFAULT_TEMPLATE_ID = 'tax-invoice-classic';
@@ -110,4 +119,21 @@ export function getTemplate(id?: string | null): TemplateDescriptor {
 
 export function listTemplates(): TemplateDescriptor[] {
   return Object.values(TEMPLATES);
+}
+
+/** غياب `documentTypes` يبقي القالب متاحاً لكل الأنواع (قوالب الفاتورة التاريخية). */
+export function templateSupportsDocumentType(
+  template: TemplateDescriptor,
+  type: DocumentTypeId,
+): boolean {
+  return !template.documentTypes || template.documentTypes.includes(type);
+}
+
+export function listTemplatesForDocumentType(type: DocumentTypeId): TemplateDescriptor[] {
+  return listTemplates().filter((template) => templateSupportsDocumentType(template, type));
+}
+
+export function listTemplatesForDocumentTypes(types: readonly DocumentTypeId[]): TemplateDescriptor[] {
+  if (types.length === 0) return listTemplates();
+  return listTemplates().filter((template) => types.every((type) => templateSupportsDocumentType(template, type)));
 }

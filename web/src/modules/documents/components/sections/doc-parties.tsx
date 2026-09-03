@@ -300,6 +300,39 @@ export function DocParties({ model }: { model: DocumentModel }) {
     );
   }
 
+  if (style.composition === 'quotation_proposal') {
+    const issuerField = isPurchaseDocument
+      ? 'purchase_buyer' as const
+      : isTaxInvoice
+        ? 'seller' as const
+        : 'company' as const;
+    const partyField = isDeliveryNote
+      ? 'recipient' as const
+      : model.type === 'payment_voucher' || model.type === 'debit_note' || isPurchaseDocument
+        ? 'supplier' as const
+        : model.type === 'receipt_voucher' || model.type === 'quotation' || model.type === 'sales_order' || model.type === 'credit_note'
+          ? 'customer' as const
+          : 'buyer' as const;
+    return (
+      <section className={cn('grid grid-cols-2 gap-x-14 gap-y-3 border-b border-[color:var(--border)] pb-4', style.sectionGap)}>
+        <div className="min-w-0">
+          <div className="mb-1.5 text-[10px] font-medium tracking-wide text-[color:var(--muted)]"><ModernFieldLabel field={issuerField} mode={mode} /></div>
+          <div className="break-words text-[13px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
+          <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} />
+          <DocInfoRow label={<ModernFieldLabel field="cr_number" mode={mode} />} value={seller.crNumber ? <span className="num" dir="ltr">{seller.crNumber}</span> : null} />
+          <DocInfoRow label={t('phone')} value={seller.phone ? <span className="num" dir="ltr">{seller.phone}</span> : null} />
+        </div>
+        <div className="min-w-0">
+          <div className="mb-1.5 text-[10px] font-medium tracking-wide text-[color:var(--muted)]"><ModernFieldLabel field={partyField} mode={mode} /></div>
+          <div className="break-words text-[13px] font-semibold leading-snug text-black">{buyer.name || '—'}</div>
+          <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={buyer.vatNumber ? <span className="num" dir="ltr">{buyer.vatNumber}</span> : null} />
+          <DocInfoRow label={<ModernFieldLabel field="city" mode={mode} />} value={buyer.city} />
+          <DocInfoRow label={t('national_address')} value={buyer.address} />
+        </div>
+      </section>
+    );
+  }
+
   const card = cn('border border-gray-200 p-3', style.cardRadius);
   return (
     <div className={cn('grid grid-cols-3 gap-4', style.sectionGap)}>

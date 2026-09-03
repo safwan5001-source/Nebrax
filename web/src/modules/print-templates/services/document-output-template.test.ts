@@ -608,6 +608,58 @@ describe('تجميد Retail التاريخي مقابل Retail V2', () => {
   });
 });
 
+describe('تجميد عرض السعر مقابل quotation-proposal', () => {
+  it('لا يعيد تفسير قالب A4 ولا يضيف alias من فاتورة إلى quotation-proposal', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/modules/print-templates/services/document-output-template.ts'), 'utf8');
+    expect(source).not.toContain('quotation-proposal');
+    expect(source).not.toMatch(/quotation['"]\s*\?\s*['"]quotation-proposal/);
+  });
+
+  it('يثبّت عرض سعر صادر على tax-invoice-classic ولا يتبع تعيين quotation-proposal الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'quotation',
+      isPosted: true,
+      frozenPrint: revision('frozen-quote-classic', 'tax-invoice-classic'),
+      livePrint: assignment('live-quote-proposal', 'quotation-proposal'),
+      livePdf: assignment('live-quote-proposal-pdf', 'quotation-proposal'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-classic');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-classic');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('tax-invoice-classic');
+    expect(getTemplate(outputs.print?.templateId).component).not.toBe(getTemplate('quotation-proposal').component);
+  });
+
+  it('يثبّت عرض سعر صادر على quotation-proposal ولا يرجع إلى classic الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'quotation',
+      isPosted: true,
+      frozenPrint: revision('frozen-quote-proposal', 'quotation-proposal'),
+      livePrint: assignment('live-quote-classic', 'tax-invoice-classic'),
+    });
+    expect(outputs.print?.templateId).toBe('quotation-proposal');
+    expect(outputs.pdf?.templateId).toBe('quotation-proposal');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('quotation-proposal');
+  });
+
+  it('يجعل مسودة عرض السعر تتبع التعيين الحي: classic أو quotation-proposal', () => {
+    const legacyDraft = resolveDocumentOutputTemplates({
+      documentType: 'quotation',
+      isPosted: false,
+      livePrint: assignment('draft-quote-classic', 'tax-invoice-classic'),
+    });
+    expect(legacyDraft.print?.templateId).toBe('tax-invoice-classic');
+
+    const proposalDraft = resolveDocumentOutputTemplates({
+      documentType: 'quotation',
+      isPosted: false,
+      livePrint: assignment('draft-quote-proposal', 'quotation-proposal'),
+    });
+    expect(proposalDraft.print?.templateId).toBe('quotation-proposal');
+    expect(proposalDraft.pdf?.templateId).toBe('quotation-proposal');
+    expect(proposalDraft.pdfSharesPrintRoot).toBe(true);
+  });
+});
+
 describe('resolvedTemplatesEqual', () => {
   it('يميّز تعريفين مختلفين', () => {
     const classic = resolveDocumentOutputTemplates({

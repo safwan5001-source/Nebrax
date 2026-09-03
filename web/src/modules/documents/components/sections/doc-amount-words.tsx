@@ -24,7 +24,7 @@ export function DocAmountWords({ model }: { model: DocumentModel }) {
   return (
     <div className={cn('border border-gray-200 bg-gray-50 px-3 py-2', style.cardRadius, style.sectionGap)}>
       <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
-        {style.composition === 'modern_v2' || style.composition === 'erp_v2' || style.composition === 'classic_v2' || style.composition === 'minimal_v2' || style.composition === 'retail_v2' ? <ModernFieldLabel field="amount_words" mode={mode} /> : t('amount_words')}:{' '}
+        {style.composition === 'modern_v2' || style.composition === 'erp_v2' || style.composition === 'classic_v2' || style.composition === 'minimal_v2' || style.composition === 'retail_v2' || style.composition === 'quotation_proposal' ? <ModernFieldLabel field="amount_words" mode={mode} /> : t('amount_words')}:{' '}
       </span>
       <span className="text-[12px] font-medium text-gray-800">{words}</span>
     </div>

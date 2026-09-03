@@ -22,6 +22,7 @@ describe('عزل قواعد طباعة Modern V2', () => {
     expect(header).toContain("style.composition === 'classic_v2'");
     expect(header).toContain("style.composition === 'minimal_v2'");
     expect(header).toContain("style.composition === 'retail_v2'");
+    expect(header).toContain("style.composition === 'quotation_proposal'");
     expect(exporter).toContain('pdfSharesPrintRoot');
   });
 });
@@ -65,5 +66,15 @@ describe('عزل قواعد طباعة Retail V2', () => {
     expect(css).toContain('[data-doc-composition="classic_v2"] thead');
     expect(css).toContain('[data-doc-composition="minimal_v2"] thead');
     expect(css).not.toContain('[data-doc-composition="retail"] thead');
+  });
+});
+
+describe('عزل قواعد طباعة Quotation Proposal', () => {
+  it('يقيّد تكرار thead بتركيب quotation_proposal دون لمس قوالب الفاتورة', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    expect(css).toContain('[data-doc-composition="quotation_proposal"] thead');
+    expect(css).toContain('[data-doc-composition="modern_v2"] thead');
+    expect(css).toContain('[data-doc-composition="retail_v2"] thead');
+    expect(css).not.toContain('[data-doc-composition="classic"] thead');
   });
 });

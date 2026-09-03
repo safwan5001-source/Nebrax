@@ -226,4 +226,15 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
+  /* Quotation Proposal فقط: لا تُطبَّق على قوالب الفاتورة. */
+  [data-doc-composition="quotation_proposal"] thead {
+    display: table-header-group;
+  }
+  [data-doc-composition="quotation_proposal"] tr,
+  [data-doc-composition="quotation_proposal"] [data-doc-keep="summary"],
+  [data-doc-composition="quotation_proposal"] footer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
