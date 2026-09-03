@@ -622,7 +622,7 @@ Created from current `origin/main` (not the stale local snapshot).
 
 ## 18. Head SHA
 
-Filled in the commit that adds this file; see `git log -1 --format=%H` on `cursor/railway-db-migration-audit-3b54`.
+`266e91784fb8cdd236b80a568e825355c15d8d5f` (documentation commit on `cursor/railway-db-migration-audit-3b54`). Branch tip after the SHA stamp commit will be one commit ahead of this hash.
 
 ---
 
