@@ -2062,7 +2062,21 @@
     "price_list_apply": "تطبيق الأسعار",
     "price_list_applying": "جارٍ التطبيق…",
     "price_list_hint": "القائمة تقترح أسعار السطور. اختر «تطبيق الأسعار» لتحديث السطور القائمة؛ السعر المحفوظ في الفاتورة يبقى لقطة مستقلة.",
-    "price_list_inactive": "معطلة"
+    "price_list_inactive": "معطلة",
+    "design_label": "تصميم الفاتورة",
+    "design_default_badge": "افتراضي",
+    "design_custom_badge": "مخصص لهذه الفاتورة",
+    "design_change": "تغيير التصميم",
+    "design_reset": "إعادة للافتراضي",
+    "design_preview": "معاينة",
+    "design_preview_title": "معاينة التصميم",
+    "design_preview_hint": "معاينة تجريبية للتصميم، ليست لقطة نهائية لبيانات هذه الفاتورة.",
+    "design_picker_title": "اختيار تصميم الفاتورة",
+    "design_safe_default": "التصميم الافتراضي الآمن",
+    "design_loading": "جارٍ تحميل التصاميم…",
+    "design_load_error": "تعذّر تحميل التصاميم. يمكن الحفظ بالتصميم الافتراضي.",
+    "design_empty": "لا توجد تصاميم منشورة متوافقة. سيُستخدم التصميم الافتراضي الآمن.",
+    "design_incompatible": "التصميم المختار لا يطابق نوع مستند ZATCA. أعد الاختيار أو عُد للافتراضي قبل الحفظ."
   },
   "invoiceTemplates": {
     "classic": "كلاسيكي",

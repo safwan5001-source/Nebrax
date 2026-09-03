@@ -119,6 +119,48 @@ class PrintTemplateContract
     }
 
     /**
+     * تعريف حراري مسجّل: لا يصلح لاختيار تصميم فاتورة A4 (print/pdf).
+     *
+     * @param  array<string, mixed>  $definition
+     */
+    public static function isThermalDefinition(array $definition): bool
+    {
+        $templateId = $definition['template_id'] ?? null;
+
+        return is_string($templateId) && in_array($templateId, self::THERMAL_TEMPLATE_IDS, true);
+    }
+
+    /**
+     * أنواع الكتالوج المقبولة لتجاوز تصميم فاتورة المسودة.
+     * المبسطة تقبل قوالب tax_invoice كما يسقط التعيين الحي عند غياب تعيين مبسطة.
+     *
+     * @return array<int, string>
+     */
+    public static function invoiceOverrideCompatibleDocumentTypes(string $catalogDocumentType): array
+    {
+        return $catalogDocumentType === 'simplified_tax_invoice'
+            ? ['simplified_tax_invoice', 'tax_invoice']
+            : ['tax_invoice'];
+    }
+
+    /**
+     * هل مراجعة منشورة تصلح لتجاوز تصميم هذه الفاتورة (غير حراري ومتوافق نوعاً)؟
+     *
+     * @param  array<int, mixed>  $documentTypes
+     */
+    public static function revisionSupportsInvoiceOverride(array $documentTypes, string $catalogDocumentType): bool
+    {
+        $allowed = self::invoiceOverrideCompatibleDocumentTypes($catalogDocumentType);
+        foreach ($documentTypes as $type) {
+            if (is_string($type) && in_array($type, $allowed, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * الاستعمال الحراري ليس مجرد وسم إخراج: يجب أن يشير إلى عارض حراري مسجل.
      * يبقى هذا الحارس داخل عقد المحرك، فيسري على كل عميل API ولا يعتمد على فلترة
      * واجهة POS وحدها.

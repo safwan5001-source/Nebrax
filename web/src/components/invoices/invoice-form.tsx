@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FieldGrid, FieldSpan, FormActions, FormAlert, FormPage, FormSection } from '@/components/nebrax';
 import { InvoiceLineRow, LINE_GRID } from '@/components/invoices/invoice-line-row';
+import { InvoiceTemplateSelector } from '@/components/invoices/invoice-template-selector';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberPreviewField } from '@/components/ui/number-preview-field';
@@ -55,9 +56,12 @@ interface ApiLine {
 }
 interface ApiInvoice {
   status: string; partner_id: string; warehouse_id: string | null; price_list_id?: string | null; payment_type: string; invoice_date: string; due_date: string | null;
+  branch_id?: string | null;
   cost_center_id: string | null; salesperson_id: string | null; discount: string; shipping: string;
   adjustment: string; tax_inclusive: boolean; zatca_document_type: 'standard' | 'simplified' | null; notes: string | null; lines: ApiLine[];
   is_paid?: boolean; payment_method?: string | null; payment_reference?: string | null; cash_account_id?: string | null;
+  print_template_override_revision_id?: string | null;
+  pdf_template_override_revision_id?: string | null;
 }
 interface TaxDef { name: string; rate: number; inclusive: boolean }
 
@@ -163,6 +167,9 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [newPartner, setNewPartner] = useState(false);
   // السطر الذي فُتحت من منتقيه نافذة «منتج جديد» — ليُختار فيه فور الحفظ.
   const [newProductFor, setNewProductFor] = useState<string | null>(null);
+  const [designOverrideRevisionId, setDesignOverrideRevisionId] = useState<string | null>(null);
+  const [designCompatible, setDesignCompatible] = useState(true);
+  const [invoiceBranchId, setInvoiceBranchId] = useState<string | null>(null);
   const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('invoice', { date, enabled: !editId });
 
   const selectPartner = useCallback((nextPartnerId: string, availablePartners = partners) => {
@@ -253,6 +260,10 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         // لا نحوّل المسودات السابقة ذات القيمة null إلى Simplified في الواجهة؛
         // يبقى القرار غير محسوم كي يطبّق الخادم استدلال VAT الموحّد عند الحفظ.
         setZatcaDocumentType(inv.zatca_document_type);
+        setInvoiceBranchId(inv.branch_id ?? null);
+        setDesignOverrideRevisionId(
+          inv.print_template_override_revision_id ?? inv.pdf_template_override_revision_id ?? null,
+        );
         setDiscountMode('amount'); // يُخزَّن الخصم كمبلغ مطلق
         setDiscountInput(Number(inv.discount) > 0 ? inv.discount : '');
         setLines(
@@ -518,8 +529,8 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const missingQty = lines.some((line) => !isUntouchedLine(line) && !hasValidQty(line));
 
   const canSave = useMemo(
-    () => !!partnerId && !saving && !loadingDoc && !missingQty && !lines.some((line) => allocationError(line)),
-    [partnerId, saving, loadingDoc, missingQty, lines, taxInclusive, t]
+    () => !!partnerId && !saving && !loadingDoc && !missingQty && designCompatible && !lines.some((line) => allocationError(line)),
+    [partnerId, saving, loadingDoc, missingQty, designCompatible, lines, taxInclusive, t]
   );
 
   async function submit(post: boolean) {
@@ -573,6 +584,8 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       payment_method: isPaid ? payMethod : null,
       payment_reference: isPaid ? payReference || null : null,
       cash_account_id: isPaid ? cashAccountId || null : null,
+      print_template_override_revision_id: designOverrideRevisionId,
+      pdf_template_override_revision_id: designOverrideRevisionId,
     };
     try {
       const id = editId
@@ -648,6 +661,14 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       {dialogs}
 
       {!editId && <section className="flex flex-col gap-3 rounded border border-primary/25 bg-primary-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-medium text-text">{td('invoiceDraftAction')}</h2><p className="mt-1 text-sm text-muted">{td('invoiceDraftBoundaryHint')}</p></div><Button asChild variant="outline" className="shrink-0"><Link href="/delivery-notes/invoice-draft"><FileText className="h-4 w-4" strokeWidth={1.7} />{td('invoiceDraftAction')}</Link></Button></section>}
+
+      <InvoiceTemplateSelector
+        zatcaDocumentType={zatcaDocumentType}
+        branchId={invoiceBranchId}
+        overrideRevisionId={designOverrideRevisionId}
+        onChange={setDesignOverrideRevisionId}
+        onCompatibilityChange={setDesignCompatible}
+      />
 
       {/* ═══ ١. العميل وهويّة الفاتورة ═══
           العميل أولاً لأنه يقرّر قائمة الأسعار وشروط السداد، ثم ما يعرّف المستند. */}

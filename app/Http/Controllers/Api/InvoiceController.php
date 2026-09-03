@@ -128,13 +128,14 @@ class InvoiceController extends ApiController
 
         $invoice = $this->domain(fn () => $this->invoices->create($data, $data['items']));
 
-        return (new InvoiceResource($invoice->load('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter')))->response()->setStatusCode(201);
+        return (new InvoiceResource($invoice->load('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision')))->response()->setStatusCode(201);
     }
 
     public function show(string $id): JsonResponse
     {
         return (new InvoiceResource(Invoice::with([
             'priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
+            'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision',
             'deliveryNoteAllocations.deliveryNote', 'deliveryNoteAllocations.lineLinks',
         ])->findOrFail($id)))->response();
     }
@@ -271,7 +272,7 @@ class InvoiceController extends ApiController
 
         $updated = $this->domain(fn () => $this->invoices->update($invoice, $data, $data['items']));
 
-        return (new InvoiceResource($updated->load('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter')))->response();
+        return (new InvoiceResource($updated->load('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision')))->response();
     }
 
     /**
@@ -317,7 +318,7 @@ class InvoiceController extends ApiController
         $this->assertWarehouseAllowed($invoice->warehouse_id, $invoice->branch_id);
         $posted = $this->domain(fn () => $this->invoices->post($invoice));
 
-        return (new InvoiceResource($posted->load(['priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
+        return (new InvoiceResource($posted->load(['priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision', 'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision'])))->response();
     }
 
     public function zatca(string $id): JsonResponse

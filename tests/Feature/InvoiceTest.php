@@ -390,6 +390,8 @@ class InvoiceTest extends TestCase
         $this->assertNull($copy->zatca_qr);
         $this->assertNull($copy->zatca_uuid);
         $this->assertNull($copy->print_template_revision_id);
+        $this->assertNull($copy->print_template_override_revision_id);
+        $this->assertNull($copy->pdf_template_override_revision_id);
         $this->assertCount(1, $copy->lines);
         $this->assertSame($source->lines->first()->line_total, $copy->lines->first()->line_total);
         $this->assertSame(2, $copy->lines->first()->costCenterAllocations()->count());

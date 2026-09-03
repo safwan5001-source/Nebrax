@@ -2062,7 +2062,21 @@
     "price_list_apply": "Apply prices",
     "price_list_applying": "Applying…",
     "price_list_hint": "The list suggests line prices. Select Apply prices to update existing lines; the saved invoice price remains an independent snapshot.",
-    "price_list_inactive": "Inactive"
+    "price_list_inactive": "Inactive",
+    "design_label": "Invoice design",
+    "design_default_badge": "Default",
+    "design_custom_badge": "Custom for this invoice",
+    "design_change": "Change design",
+    "design_reset": "Reset to default",
+    "design_preview": "Preview",
+    "design_preview_title": "Design preview",
+    "design_preview_hint": "This is a sample preview of the design, not a final snapshot of this invoice.",
+    "design_picker_title": "Choose invoice design",
+    "design_safe_default": "Safe default design",
+    "design_loading": "Loading designs…",
+    "design_load_error": "Could not load designs. You can still save with the default design.",
+    "design_empty": "No published compatible designs. The safe default design will be used.",
+    "design_incompatible": "The selected design does not match this ZATCA document type. Choose another design or reset to default before saving."
   },
   "invoiceTemplates": {
     "classic": "Classic",

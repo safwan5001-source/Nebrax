@@ -55,11 +55,14 @@ function frozenRevision(
  * يحلّ مراجعات الإخراج الثلاثة لعارض المستند نفسه.
  *
  * المرحّل: اللقطات المثبتة فقط — PDF يفضّل لقطة pdf ثم لقطة print التاريخية.
- * المسودة: التعيينات الحية لكل usage، وPDF بلا تعيين يسقط إلى print الحي.
- * الحراري لا يسقط إلى print أبداً.
+ * المسودة: تجاوز المستند إن وُجد، وإلا التعيينات الحية لكل usage، وPDF بلا تعيين
+ * يسقط إلى print الحي. الحراري لا يسقط إلى print أبداً ولا يقرأ التجاوز.
  *
  * `fallbackLive*` اختياري لتوافق تعيينات `tax_invoice` القائمة حين يكون نوع
  * الكتالوج `simplified_tax_invoice` بلا تعيين صريح بعد.
+ *
+ * `draftOverridePrint` / `draftOverridePdf` يتجاوزان التعيين الحي للمسودة فقط.
+ * المسار المرحّل يتجاهلهما ويقرأ اللقطات المجمّدة حصراً.
  */
 export function resolveDocumentOutputTemplates(input: {
   documentType: DocumentTypeId;
@@ -73,10 +76,13 @@ export function resolveDocumentOutputTemplates(input: {
   fallbackLivePrint?: LivePrintTemplateAssignment | null;
   fallbackLivePdf?: LivePrintTemplateAssignment | null;
   fallbackLiveThermal?: LivePrintTemplateAssignment | null;
+  draftOverridePrint?: LiveTemplateRevision | null;
+  draftOverridePdf?: LiveTemplateRevision | null;
 }): DocumentOutputTemplates {
   const print = input.isPosted
     ? resolveTemplateRevisionDefinition(input.frozenPrint, input.documentType)
-    : resolveLiveTemplateDefinition(input.livePrint, input.documentType)
+    : resolveTemplateRevisionDefinition(input.draftOverridePrint, input.documentType)
+      ?? resolveLiveTemplateDefinition(input.livePrint, input.documentType)
       ?? resolveLiveTemplateDefinition(input.fallbackLivePrint, input.documentType);
 
   const pdfDirect = input.isPosted
@@ -84,7 +90,8 @@ export function resolveDocumentOutputTemplates(input: {
       revisionFromDefinition(resolveFrozenOutputDefinition(frozenRevision(input.frozenPdf), frozenRevision(input.frozenPrint))),
       input.documentType,
     )
-    : resolveLiveTemplateDefinition(input.livePdf, input.documentType)
+    : resolveTemplateRevisionDefinition(input.draftOverridePdf, input.documentType)
+      ?? resolveLiveTemplateDefinition(input.livePdf, input.documentType)
       ?? resolveLiveTemplateDefinition(input.fallbackLivePdf, input.documentType);
 
   const pdf = pdfDirect ?? print;
