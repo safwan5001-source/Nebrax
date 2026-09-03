@@ -91,7 +91,7 @@ Duration    21.80s
 | `php artisan test` | غير مشغَّل (لا backend) |
 | `npm run test` | 202 ملفاً / **1266** اختباراً |
 | `npm run build` | نجح محلياً (Next.js 15.5.19) Compiled successfully + Lint/types |
-| GitHub CI | Web CI نجح على الـ SHA البرمجي. PostgreSQL ما زال قيد التشغيل عند كتابة هذا التقرير؛ لا Merge حتى يخضر بالكامل |
+| GitHub CI | **نجح** 5/5 على `92ce6a2e124df0c32ee69e4fa6aac5c98ca03632` في [#625](https://github.com/safwan5001-source/Nebrax/pull/625): sqlite ×2، pgsql ×2، Web CI. لا دمج |
 
 ---
 
@@ -183,7 +183,7 @@ https://github.com/safwan5001-source/Nebrax/pull/625
 ## 14. Head SHA
 
 كود القالب: `42bb675bf36942582108ae1e42626072ec658d23`  
-تقرير التنفيذ: `a7b70c5579352b48dd20916cf4cbced7a022781a`
+Head الذي أخضر عليه CI: `92ce6a2e124df0c32ee69e4fa6aac5c98ca03632`
 
 ---
 
