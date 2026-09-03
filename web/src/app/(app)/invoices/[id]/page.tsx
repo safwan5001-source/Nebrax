@@ -99,6 +99,10 @@ interface Invoice {
   pdf_template_revision?: FrozenPrintTemplateRevision | null;
   thermal_template_revision_id?: string | null;
   thermal_template_revision?: FrozenPrintTemplateRevision | null;
+  print_template_override_revision_id?: string | null;
+  print_template_override_revision?: FrozenPrintTemplateRevision | null;
+  pdf_template_override_revision_id?: string | null;
+  pdf_template_override_revision?: FrozenPrintTemplateRevision | null;
 }
 interface InvoicePayment {
   id: string;
@@ -283,8 +287,8 @@ export default function InvoiceDetailPage() {
         setRelationsLoading(false);
 
         // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
-        // إعدادات الهوية تفسير مستند تاريخي. المسودات تستخدم التعيين الحي لكل
-        // usage حتى لحظة الترحيل.
+        // إعدادات الهوية تفسير مستند تاريخي. المسودات تستخدم تجاوز المستند إن وُجد،
+        // وإلا التعيين الحي لكل usage حتى لحظة الترحيل.
         const outputs = resolveDocumentOutputTemplates({
           documentType: catalogType,
           isPosted: posted,
@@ -297,6 +301,8 @@ export default function InvoiceDetailPage() {
           fallbackLivePrint: liveAssignment(fallbackPrint),
           fallbackLivePdf: liveAssignment(fallbackPdf),
           fallbackLiveThermal: liveAssignment(fallbackThermal),
+          draftOverridePrint: posted ? null : r.data.print_template_override_revision,
+          draftOverridePdf: posted ? null : r.data.pdf_template_override_revision,
         });
         const resolved = outputs.print;
         if (resolved) {

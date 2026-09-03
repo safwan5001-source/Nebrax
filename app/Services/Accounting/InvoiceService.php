@@ -82,11 +82,13 @@ class InvoiceService
             // لكن توليد الرقم يسبق ذلك. وإلا وُلّد رقم السلسلة بلا فرع ثم حُفظ
             // في فرع نشط، فيتصادم أول رقم بين فرعين رغم أن نطاق الترقيم فرعي.
             $branchId = $data['branch_id'] ?? app(BranchContext::class)->id();
+            $zatcaType = $this->zatcaDocumentType($data, $data['partner_id']);
+            $overrides = $this->designOverrideAttributes($data, $zatcaType);
 
             $invoice = Invoice::create([
                 'number'            => $data['number'] ?? $this->nextNumber($date, $branchId),
                 'partner_id'        => $data['partner_id'],
-                'zatca_document_type' => $this->zatcaDocumentType($data, $data['partner_id']),
+                'zatca_document_type' => $zatcaType,
                 'branch_id'         => $branchId,
                 'warehouse_id'      => $data['warehouse_id'] ?? null,
                 'price_list_id'     => $priceListId,
@@ -107,6 +109,8 @@ class InvoiceService
                 'status'            => 'draft',
                 'notes'             => $data['notes'] ?? null,
                 'created_by'        => $data['created_by'] ?? null,
+                'print_template_override_revision_id' => $overrides['print_template_override_revision_id'],
+                'pdf_template_override_revision_id' => $overrides['pdf_template_override_revision_id'],
             ]);
 
             $this->applyItemsAndTotals($invoice, $items, $data);
@@ -171,10 +175,12 @@ class InvoiceService
             // «مدفوع بالفعل» نيّةٌ على المسوّدة: الغياب يُبقيها كما هي، فتعديلُ
             // سطرٍ لا يُلغي سداداً أعلنه المستخدم في حفظٍ سابق.
             $isPaid = (bool) ($keep('is_paid', $invoice->is_paid) ?? false);
+            $zatcaType = $this->zatcaDocumentType($data, $data['partner_id'], $invoice->zatca_document_type);
+            $overrides = $this->designOverrideAttributes($data, $zatcaType, $invoice);
 
             $invoice->update([
                 'partner_id'        => $data['partner_id'],
-                'zatca_document_type' => $this->zatcaDocumentType($data, $data['partner_id'], $invoice->zatca_document_type),
+                'zatca_document_type' => $zatcaType,
                 'warehouse_id'      => $keep('warehouse_id', $invoice->warehouse_id),
                 'price_list_id'     => $keep('price_list_id', $invoice->price_list_id),
                 'payment_type'      => $this->paymentType($keep('payment_type', $invoice->payment_type) ?? $invoice->payment_type, $isPaid),
@@ -188,6 +194,8 @@ class InvoiceService
                 'salesperson_id'    => $keep('salesperson_id', $invoice->salesperson_id),
                 'tax_inclusive'     => (bool) ($keep('tax_inclusive', $invoice->tax_inclusive) ?? $invoice->tax_inclusive),
                 'notes'             => $keep('notes', $invoice->notes),
+                'print_template_override_revision_id' => $overrides['print_template_override_revision_id'],
+                'pdf_template_override_revision_id' => $overrides['pdf_template_override_revision_id'],
             ]);
 
             $this->applyItemsAndTotals($invoice, $items, $data);
@@ -296,6 +304,74 @@ class InvoiceService
     protected function paymentType(?string $requested, bool $isPaid): string
     {
         return $isPaid ? 'credit' : ($requested ?: 'credit');
+    }
+
+    /**
+     * تجاوز تصميم المسودة: الغياب يُبقي القيمة عند التعديل، وnull يصفّر الاختيار.
+     * مراجعة باطلة تُرفض برسالة صريحة بلا سقوط إلى التعيين الحي.
+     *
+     * @return array{print_template_override_revision_id: ?string, pdf_template_override_revision_id: ?string}
+     */
+    private function designOverrideAttributes(array $data, string $zatcaDocumentType, ?Invoice $existing = null): array
+    {
+        $print = $existing === null
+            ? ($data['print_template_override_revision_id'] ?? null)
+            : (array_key_exists('print_template_override_revision_id', $data)
+                ? $data['print_template_override_revision_id']
+                : $existing->print_template_override_revision_id);
+        $pdf = $existing === null
+            ? ($data['pdf_template_override_revision_id'] ?? null)
+            : (array_key_exists('pdf_template_override_revision_id', $data)
+                ? $data['pdf_template_override_revision_id']
+                : $existing->pdf_template_override_revision_id);
+
+        $catalog = PrintTemplateContract::invoiceDocumentType($zatcaDocumentType);
+        if ($print !== null) {
+            $this->printTemplates->assertInvoiceDesignOverride((string) $print, $catalog);
+        }
+        if ($pdf !== null) {
+            $this->printTemplates->assertInvoiceDesignOverride((string) $pdf, $catalog);
+        }
+
+        return [
+            'print_template_override_revision_id' => $print,
+            'pdf_template_override_revision_id' => $pdf,
+        ];
+    }
+
+    /**
+     * لقطة الإخراج عند الترحيل: تجاوز المسودة المتحقق منه يجمَّد في print/pdf،
+     * والحراري يبقى من الحل الحي (#611) بما فيه سقوط المبسطة إلى tax_invoice.
+     *
+     * @return array{print_template_revision_id: ?string, pdf_template_revision_id: ?string, thermal_template_revision_id: ?string}
+     */
+    private function freezeOutputRevisionIds(Invoice $invoice): array
+    {
+        $documentType = PrintTemplateContract::invoiceDocumentType($invoice->zatca_document_type);
+        $revisionIds = $this->printTemplates->resolveOutputRevisionIds($documentType, $invoice->branch_id);
+        if ($documentType === 'simplified_tax_invoice') {
+            $legacyIds = $this->printTemplates->resolveOutputRevisionIds('tax_invoice', $invoice->branch_id);
+            foreach (['print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id'] as $key) {
+                $revisionIds[$key] ??= $legacyIds[$key];
+            }
+        }
+
+        if ($invoice->print_template_override_revision_id !== null) {
+            $this->printTemplates->assertInvoiceDesignOverride(
+                $invoice->print_template_override_revision_id,
+                $documentType,
+            );
+            $revisionIds['print_template_revision_id'] = $invoice->print_template_override_revision_id;
+        }
+        if ($invoice->pdf_template_override_revision_id !== null) {
+            $this->printTemplates->assertInvoiceDesignOverride(
+                $invoice->pdf_template_override_revision_id,
+                $documentType,
+            );
+            $revisionIds['pdf_template_revision_id'] = $invoice->pdf_template_override_revision_id;
+        }
+
+        return $revisionIds;
     }
 
     /**
@@ -822,16 +898,7 @@ class InvoiceService
 
             // تُحل المراجعة داخل معاملة الترحيل وتُخزَّن لقطةً؛ لا تغيّر
             // تعيينات الفرع أو القالب لاحقاً إعادة طباعة فاتورة صدرت بالفعل.
-            $documentType = PrintTemplateContract::invoiceDocumentType($invoice->zatca_document_type);
-            $revisionIds = $this->printTemplates->resolveOutputRevisionIds($documentType, $invoice->branch_id);
-            // تعيينات tax_invoice السابقة تبقى صالحة للفاتورة المبسطة ما لم يوجد
-            // تعيين مبسطة صريح؛ وإلا تنكسر إيصالات POS والمستأجرون القائمون.
-            if ($documentType === 'simplified_tax_invoice') {
-                $legacyIds = $this->printTemplates->resolveOutputRevisionIds('tax_invoice', $invoice->branch_id);
-                foreach (['print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id'] as $key) {
-                    $revisionIds[$key] ??= $legacyIds[$key];
-                }
-            }
+            $revisionIds = $this->freezeOutputRevisionIds($invoice);
 
             $invoice->update([
                 'status'              => 'posted',

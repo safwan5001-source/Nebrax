@@ -32,6 +32,7 @@ class Invoice extends BaseModel
         'notes', 'journal_entry_id', 'cogs_entry_id', 'created_by',
         'zatca_qr', 'zatca_hash',
         'zatca_uuid', 'zatca_icv', 'zatca_previous_hash', 'zatca_xml', 'zatca_cleared_xml', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id',
+        'print_template_override_revision_id', 'pdf_template_override_revision_id',
     ];
 
     protected $casts = [
@@ -156,6 +157,18 @@ class Invoice extends BaseModel
     public function thermalTemplateRevision(): BelongsTo
     {
         return $this->belongsTo(PrintTemplateRevision::class, 'thermal_template_revision_id');
+    }
+
+    /** مراجعة print المختارة لهذه المسودة فقط؛ لا تغيّر تعيين الشركة/الفرع. */
+    public function printTemplateOverrideRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'print_template_override_revision_id');
+    }
+
+    /** مراجعة PDF المختارة لهذه المسودة فقط؛ مستقلة معمارياً عن لقطة التجميد. */
+    public function pdfTemplateOverrideRevision(): BelongsTo
+    {
+        return $this->belongsTo(PrintTemplateRevision::class, 'pdf_template_override_revision_id');
     }
 
     public function isDraft(): bool

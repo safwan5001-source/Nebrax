@@ -163,6 +163,48 @@ describe('resolveDocumentOutputTemplates', () => {
     });
     expect(outputs.print?.templateId).toBe('tax-invoice-modern');
   });
+
+  it('يفضّل تجاوز المسودة على التعيين الحي لـ print وpdf', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: false,
+      livePrint: assignment('live-print', 'tax-invoice-classic'),
+      livePdf: assignment('live-pdf', 'tax-invoice-minimal'),
+      draftOverridePrint: revision('override-print', 'tax-invoice-modern'),
+      draftOverridePdf: revision('override-pdf', 'tax-invoice-modern'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-modern');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-modern');
+    expect(outputs.pdfSharesPrintRoot).toBe(true);
+    expect(outputs.thermal).toBeNull();
+  });
+
+  it('يتجاهل تجاوز المسودة بعد الترحيل ويقرأ التجميد فقط', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: true,
+      frozenPrint: revision('frozen-print', 'tax-invoice-classic'),
+      frozenPdf: revision('frozen-pdf', 'tax-invoice-classic'),
+      livePrint: assignment('live-print', 'tax-invoice-erp'),
+      draftOverridePrint: revision('override-print', 'tax-invoice-modern'),
+      draftOverridePdf: revision('override-pdf', 'tax-invoice-modern'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-classic');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-classic');
+  });
+
+  it('لا يغيّر الحراري عندما يكون للمسودة تجاوز print/pdf', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: false,
+      livePrint: assignment('live-print', 'tax-invoice-classic'),
+      liveThermal: assignment('live-thermal', 'tax-invoice-thermal80'),
+      draftOverridePrint: revision('override-print', 'tax-invoice-retail'),
+      draftOverridePdf: revision('override-pdf', 'tax-invoice-retail'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-retail');
+    expect(outputs.thermal?.templateId).toBe('tax-invoice-thermal80');
+  });
 });
 
 describe('thermalPaperForTemplate', () => {

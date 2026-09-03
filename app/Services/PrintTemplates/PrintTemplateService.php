@@ -251,6 +251,33 @@ class PrintTemplateService
     }
 
     /**
+     * يتحقق من مراجعة صالحة لتجاوز تصميم فاتورة مسودة: موجودة في المستأجر،
+     * منشورة، غير حرارية، ومتوافقة مع نوع كتالوج الفاتورة. لا سقوط صامت.
+     */
+    public function assertInvoiceDesignOverride(string $revisionId, string $catalogDocumentType): PrintTemplateRevision
+    {
+        $revision = PrintTemplateRevision::with('template')->whereKey($revisionId)->first();
+        if ($revision === null || $revision->template === null) {
+            throw new RuntimeException('مراجعة تصميم الفاتورة غير موجودة.');
+        }
+        if ($revision->status !== PrintTemplateRevision::STATUS_PUBLISHED) {
+            throw new RuntimeException('لا يمكن اختيار مراجعة غير منشورة لتصميم الفاتورة.');
+        }
+
+        $definition = is_array($revision->definition) ? $revision->definition : [];
+        if (PrintTemplateContract::isThermalDefinition($definition)) {
+            throw new RuntimeException('التصميم الحراري غير مدعوم لاختيار فاتورة طباعة أو PDF.');
+        }
+
+        $types = is_array($revision->document_types) ? $revision->document_types : [];
+        if (! PrintTemplateContract::revisionSupportsInvoiceOverride($types, $catalogDocumentType)) {
+            throw new RuntimeException('مراجعة القالب لا تدعم نوع مستند هذه الفاتورة.');
+        }
+
+        return $revision;
+    }
+
+    /**
      * يحل لقطة الإخراج الكاملة عند لحظة إصدار واحدة. تبقى القيمة null إن لم
      * يوجد تعيين؛ يقرأ المستهلك عندها العارض الافتراضي الآمن، لا تعييناً حياً
      * ينشأ لاحقاً.

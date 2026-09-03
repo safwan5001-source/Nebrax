@@ -55,6 +55,13 @@ const { api, push, replace, translate } = vi.hoisted(() => {
     summary_hint: 'Posting creates the journal entry.', summary_title: 'Invoice summary',
     save_draft: 'Save draft', save_post: 'Save and post', need_line: 'Add at least one valid line.',
     saveFailed: 'Could not save.', created: 'Created', updated: 'Updated',
+    design_label: 'Invoice design', design_default_badge: 'Default',
+    design_custom_badge: 'Custom for this invoice', design_change: 'Change design',
+    design_reset: 'Reset to default', design_preview: 'Preview',
+    design_preview_title: 'Design preview', design_preview_hint: 'Sample preview, not this invoice.',
+    design_picker_title: 'Choose invoice design', design_safe_default: 'Safe default design',
+    design_loading: 'Loading designs…', design_load_error: 'Could not load designs.',
+    design_empty: 'No published designs.', design_incompatible: 'Selected design does not match the ZATCA type.',
   };
   const translator = Object.assign(
     (key: string, values?: Record<string, unknown>) =>
@@ -86,6 +93,12 @@ vi.mock('@/lib/use-number-preview', () => ({
 }));
 vi.mock('@/components/partners/partner-dialog', () => ({ PartnerDialog: () => null }));
 vi.mock('@/components/products/product-dialog', () => ({ ProductDialog: () => null }));
+vi.mock('@/modules/documents/components/document-view', () => ({
+  DocumentView: () => <div data-testid="document-view" />,
+}));
+vi.mock('@/modules/documents/components/document-scaler', () => ({
+  DocumentScaler: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
 // الـ`Combobox` نافذةٌ منبثقة؛ بديلٌ أصليّ يكفي لإثبات الربط، ويحفظ `sub`/`hint`
 // في السمات ليُتحقَّق من محتوى البحث.
 vi.mock('@/components/ui/combobox', () => ({

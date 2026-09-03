@@ -41,6 +41,9 @@ class StoreInvoiceRequest extends FormRequest
             'classification_id'   => ['nullable', 'uuid'],
             'salesperson_id'      => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],
+            // تجاوز تصميم المسودة: الغياب يُبقي القيمة، وnull يصفّر الاختيار.
+            'print_template_override_revision_id' => ['nullable', 'uuid'],
+            'pdf_template_override_revision_id'   => ['nullable', 'uuid'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
             'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — خصم على مستوى السطر

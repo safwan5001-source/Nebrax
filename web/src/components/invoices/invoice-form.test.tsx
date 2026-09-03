@@ -57,6 +57,13 @@ const { api, push, replace, translate } = vi.hoisted(() => {
     summary_hint: 'Posting creates the journal entry.', summary_title: 'Invoice summary',
     save_draft: 'Save draft', save_post: 'Save and post', need_line: 'Add at least one valid line.',
     saveFailed: 'Could not save.', created: 'Created', updated: 'Updated',
+    design_label: 'Invoice design', design_default_badge: 'Default',
+    design_custom_badge: 'Custom for this invoice', design_change: 'Change design',
+    design_reset: 'Reset to default', design_preview: 'Preview',
+    design_preview_title: 'Design preview', design_preview_hint: 'Sample preview, not this invoice.',
+    design_picker_title: 'Choose invoice design', design_safe_default: 'Safe default design',
+    design_loading: 'Loading designs…', design_load_error: 'Could not load designs.',
+    design_empty: 'No published designs.', design_incompatible: 'Selected design does not match the ZATCA type.',
   };
   const translator = Object.assign(
     (key: string, values?: Record<string, unknown>) =>
@@ -88,6 +95,12 @@ vi.mock('@/lib/use-number-preview', () => ({
 }));
 vi.mock('@/components/partners/partner-dialog', () => ({ PartnerDialog: () => null }));
 vi.mock('@/components/products/product-dialog', () => ({ ProductDialog: () => null }));
+vi.mock('@/modules/documents/components/document-view', () => ({
+  DocumentView: () => <div data-testid="document-view" />,
+}));
+vi.mock('@/modules/documents/components/document-scaler', () => ({
+  DocumentScaler: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
 // الـ`Combobox` نافذةٌ منبثقة؛ بديلٌ أصليّ يكفي لإثبات الربط، ويحفظ `sub`/`hint`
 // في السمات ليُتحقَّق من محتوى البحث.
 vi.mock('@/components/ui/combobox', () => ({
@@ -565,6 +578,20 @@ describe('InvoiceForm — totals, saving and errors', () => {
     expect(screen.getByRole('alert').textContent).toContain('Add at least one valid line.');
   });
 
+  it('shows the compact invoice design row and sends a null override with the draft', async () => {
+    await ready();
+    expect(screen.getByText('Invoice design')).toBeTruthy();
+    expect(screen.getByText('Default')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices', expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({
+        print_template_override_revision_id: null,
+        pdf_template_override_revision_id: null,
+      }),
+    })));
+  });
+
 });
 
 describe('InvoiceForm — edit mode', () => {
@@ -580,6 +607,7 @@ describe('InvoiceForm — edit mode', () => {
     invoice_date: '2026-06-20', due_date: '2026-07-20', cost_center_id: null, salesperson_id: null,
     discount: '0', shipping: '0', adjustment: '0', tax_inclusive: false, zatca_document_type: 'standard', notes: 'Delivered to site',
     is_paid: true, payment_method: 'card', payment_reference: 'CARD-7', cash_account_id: null,
+    print_template_override_revision_id: null, pdf_template_override_revision_id: null,
     lines: [{
       product_id: 'pr1', description: 'A4 paper carton', quantity: 7, unit_name: null,
       unit_price: '95.00', tax_rate: 15, line_discount: '0',
@@ -647,6 +675,50 @@ describe('InvoiceForm — edit mode', () => {
     await userEvent.click(save);
 
     await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices/inv-1', expect.objectContaining({ method: 'PUT' })));
+  });
+
+  it('restores a saved design override on a draft and keeps it on PUT', async () => {
+    const overridden = {
+      ...draft,
+      print_template_override_revision_id: 'rev-modern',
+      pdf_template_override_revision_id: 'rev-modern',
+    };
+    const library = [{
+      id: 'tpl-modern',
+      name: 'Modern A4',
+      document_types: ['tax_invoice'],
+      published_revision_id: 'rev-modern',
+      published_revision: {
+        id: 'rev-modern',
+        status: 'published',
+        document_types: ['tax_invoice'],
+        definition: { template_id: 'tax-invoice-modern' },
+      },
+    }];
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/invoices/inv-1' && options?.method === 'PUT') return Promise.resolve({ data: { id: 'inv-1' } });
+      if (path === '/invoices/inv-1') return Promise.resolve({ data: overridden });
+      if (path.startsWith('/print-templates/resolve')) return Promise.resolve({ data: null });
+      if (path.startsWith('/print-templates')) return Promise.resolve({ data: library });
+      if (path.startsWith('/partners')) return Promise.resolve({ data: [customer] });
+      if (path.startsWith('/products')) return Promise.resolve({ data: [product] });
+      return Promise.resolve({ data: [] });
+    });
+    render(<InvoiceForm editId="inv-1" />);
+    await waitFor(async () => expect((await firstQty()).value).toBe('7'));
+    expect(await screen.findByText('Modern A4')).toBeTruthy();
+    expect(screen.getByText('Custom for this invoice')).toBeTruthy();
+
+    const save = screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+    await userEvent.click(save);
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/invoices/inv-1', expect.objectContaining({
+      method: 'PUT',
+      body: expect.objectContaining({
+        print_template_override_revision_id: 'rev-modern',
+        pdf_template_override_revision_id: 'rev-modern',
+      }),
+    })));
   });
 
   it('shows an alert instead of a blank form when the load fails', async () => {
