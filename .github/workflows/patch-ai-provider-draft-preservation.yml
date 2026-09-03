@@ -1,0 +1,33 @@
+name: Patch AI provider draft preservation
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.ref_name == 'fix/platform-ai-provider-save-action'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove provider test reload
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('web/src/app/platform/integrations/page.tsx')
+          s=p.read_text()
+          start=s.index('  async function testAiProvider')
+          end=s.index('\n  if (loading && !overview)', start)
+          block=s[start:end]
+          old='      setNotice(response.data);\n      await load();'
+          if old not in block:
+              raise SystemExit('target not found')
+          block=block.replace(old, '      setNotice(response.data);', 1)
+          p.write_text(s[:start]+block+s[end:])
+          PY
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/src/app/platform/integrations/page.tsx
+          git commit -m 'fix(platform): preserve unsaved provider fields after connection test'
+          git push
