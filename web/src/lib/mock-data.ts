@@ -2937,6 +2937,65 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       }
       return resolve({ data: section === 'pos' ? demoPosSettings() : mockSalesConfig[section] ?? payload });
     }
+    if (clean === '/pos-sessions/open' && m === 'POST') {
+      const input = (body ?? {}) as { opening_balance?: unknown; pos_device_id?: string; pos_shift_id?: string };
+      const opening = Number(input.opening_balance);
+      const rejectOpen = (message: string) => Promise.reject(Object.assign(new Error(message), { status: 422 }));
+      // المحاكي يعكس عقد الخادم للعرض فقط؛ العزل الحقيقي يبقى في API.
+      if (!Number.isInteger(opening) || opening < 0) {
+        return rejectOpen('الرصيد الافتتاحي لا يكون سالباً.');
+      }
+      if (!input.pos_device_id) {
+        return rejectOpen('جهاز نقطة البيع مطلوب.');
+      }
+      const device = mockPosDevices.find((item) => item.id === input.pos_device_id);
+      if (!device) {
+        return rejectOpen('جهاز نقطة البيع لا يخص الفرع النشط.');
+      }
+      if (!device.is_active) {
+        return rejectOpen('لا يمكن فتح وردية على جهاز نقطة بيع معطّل.');
+      }
+      const posShift = input.pos_shift_id
+        ? mockPosShifts.find((item) => item.id === input.pos_shift_id) ?? null
+        : null;
+      if (input.pos_shift_id && !posShift) {
+        return rejectOpen('وردية نقاط البيع غير موجودة أو لا تخص الفرع النشط.');
+      }
+      if (posShift && !posShift.is_active) {
+        return rejectOpen('وردية نقاط البيع المحددة معطّلة.');
+      }
+      const forceEmpty = typeof window !== 'undefined'
+        && Boolean((window as Window & { __POS_SESSIONS_FORCE_EMPTY?: boolean }).__POS_SESSIONS_FORCE_EMPTY);
+      if (!forceEmpty && mockPosSessions.some((session) => session.status === 'open' && session.pos_device_id === device.id)) {
+        return rejectOpen('توجد وردية مفتوحة على جهاز نقطة البيع المحدد — أغلقها أولاً.');
+      }
+      if (!forceEmpty && mockPosSessions.some((session) => session.status === 'open')) {
+        return rejectOpen('لدى الكاشير جلسة نقطة بيع مفتوحة بالفعل — أغلقها قبل فتح جلسة على جهاز آخر.');
+      }
+      return resolve({
+        data: {
+          id: 'ps-demo-opened',
+          number: 'POS-2026-DEMO',
+          status: 'open',
+          handover_status: null,
+          pos_device_id: device.id,
+          warehouse_id: device.warehouse_id,
+          pos_shift_id: posShift?.id ?? null,
+          shift_id: null,
+          pos_device: device,
+          pos_shift: posShift,
+          warehouse: device.warehouse,
+          opening_balance: (opening / 100).toFixed(2),
+          closing_balance: null,
+          expected_balance: null,
+          difference: null,
+          difference_status: null,
+          opened_at: new Date().toISOString(),
+          closed_at: null,
+          handover_confirmed_at: null,
+        },
+      });
+    }
     return resolve({ data: { id: 'demo-new' } });
   }
 

@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { openPosSellingWorkspace } from './helpers/open-pos';
 
 const evidenceDir = path.resolve(process.cwd(), '../docs/visual-qa/pr-549');
 const ignoredConsole = /net::ERR_ABORTED|\.css\.map|_rsc=|404 \(Not Found\)|Failed to load resource/;
 const SEARCH = /ابحث بالاسم|Search by name|ابحث في المنتجات|Search products/;
-const SESSION = /فتح جلسة جديدة|Open new session/;
 
 test.describe.configure({ mode: 'serial' });
 
@@ -144,21 +144,7 @@ async function applyAppearance(page: Page, options: { locale: 'ar' | 'en'; theme
 }
 
 async function openPos(page: Page) {
-  await page.goto('/pos', { waitUntil: 'load' });
-  const search = page.getByPlaceholder(SEARCH);
-  const session = page.getByText(SESSION);
-  await expect(search.or(session)).toBeVisible({ timeout: 30_000 });
-  if (await session.isVisible().catch(() => false) && !(await search.isVisible().catch(() => false))) {
-    const device = page.locator('#pos-device');
-    if (await device.isEnabled().catch(() => false)) {
-      const options = await device.locator('option').allTextContents();
-      const firstReal = options.find((label) => label.trim() && !/select|اختر/i.test(label));
-      if (firstReal) await device.selectOption({ label: firstReal });
-    }
-    await page.locator('#ob').fill('100');
-    await page.getByRole('button', { name: /فتح جلسة|Open/ }).click();
-  }
-  await expect(page.getByPlaceholder(SEARCH)).toBeVisible({ timeout: 30_000 });
+  await openPosSellingWorkspace(page);
 }
 
 async function expectSaleShell(page: Page) {
