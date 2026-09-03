@@ -2,7 +2,7 @@
 
 **المشروع:** نبراس / أَوْج ERP  
 **المستودع:** `safwan5001-source/Nebrax`  
-**التاريخ:** 2026-09-03  
+**التاريخ:** 2026-09-03 (أُعيد أساس الفرع على `origin/main` = `b7638d8e` قبل الاعتماد)  
 **القاعدة:** مسار واجهة معزول قبل البيع. إعادة استخدام أساس الجلسة الحالي (PR #595) بعقد `pos_shift_id`. لا backend/API/database، لا محاسبة، لا checkout، لا ZATCA، لا إغلاق/تسليم، لا تعديل `pos-cart-snapshot.ts`، لا Merge، لا Deploy.
 
 ---
@@ -127,12 +127,14 @@ Tests       36 passed (36)
 
 ### Vitest كامل — `npm run test` في `web/`
 
-على Head `ad3250cb`:
+بعد الـ rebase على `origin/main` (`b7638d8e`):
 
 ```
-Test Files  213 passed (213)
-Tests       1325 passed (1325)
+Test Files  215 passed (215)
+Tests       1352 passed (1352)
 ```
+
+(الزيادة عن 213/1325 من اختبارات `main` بعد PR #629/#630، ليست من نطاق هذا PR.)
 
 ### Build — `npm run build` في `web/`
 
@@ -149,7 +151,7 @@ Tests       1325 passed (1325)
 | `pos-hybrid-adaptive-visual` | **passed** |
 | `pos-interaction-mode` | **passed** |
 | `pos-responsive-mobile` | **passed** |
-| `pos-checkout-reliability` | **failed** — `strict mode`: محدد نص نجاح الدفع يطابق عنصرين. **خارج النطاق** (checkout)، بعد دخول POS بنجاح عبر المساعد الجديد |
+| `pos-checkout-reliability` | **failed على هذا الفرع وعلى `origin/main` بنفس الخطأ** — ليس regression من PR #631. انظر §6.1 |
 
 ### تحقق متصفح (demo إنتاجي على :3000)
 
@@ -157,9 +159,20 @@ Tests       1325 passed (1325)
 2. التبويب الجديد يستأنف `/pos` (جلسة demo مفتوحة) — بحث المنتجات ظاهر، **لا حوار HR `shift_id`**, لا شريط ERP.
 3. `/pos/start?reason=closed` مع جلسات فارغة: عنوان «فتح جلسة بيع»، بانر الإغلاق عن بُعد، جهاز + وردية POS مطلوبان، عهدة افتراضية `0`، زر الإرسال معطّل حتى الاختيار، RTL، إلغاء → `/dashboard`.
 
+### 6.1 مقارنة `pos-checkout-reliability` مع أحدث `main`
+
+شُغّل **نفس الاختبار** ضد `next start` إنتاجي على الفرعين (بدون تعديل Checkout):
+
+| | SHA | النتيجة |
+| --- | --- | --- |
+| `origin/main` | `b7638d8e` | **failed** — السطر 82: `getByText(/تمّ البيع|…|تم تأكيد البيع|…/)` strict mode: عنصران (`تمّ البيع بنجاح` و`تم تأكيد البيع بنجاح`) |
+| PR #631 بعد الـ rebase | `384d6356` | **failed** — نفس المحدد، نفس العنصرين، نفس رقم السطر |
+
+المحدد موجود حرفياً على `main` قبل هذا PR. اختلاف الفرع الوحيد في هذا الملف هو `openPos()` (حوار HR سابقاً مقابل `openPosSellingWorkspace`). الفشل يحدث **بعد** نجاح الدفع، لذلك ليس من مسار فتح الجلسة. **لم يُصلح Checkout في هذا PR.**
+
 ### PHP / Backend
 
-لا PHP/Composer في بيئة التنفيذ المحلية. لا ملفات PHP في الـ diff. GitHub CI على `cfb777eb` و`ad3250cb` و`4034c23d` (آخرها يشمل ملف هذا التقرير):
+لا PHP/Composer في بيئة التنفيذ المحلية. لا ملفات PHP في الـ diff. بعد الـ rebase على `b7638d8e`، GitHub CI على Head `384d6356`:
 
 | | |
 | --- | --- |
@@ -173,22 +186,12 @@ Tests       1325 passed (1325)
 
 ## 7. Build / CI
 
-كل فحوصات GitHub على الـ SHAs الثلاثة خضراء (PHP sqlite + pgsql + Web CI).
+`npm run build` نجح محلياً بعد الـ rebase (Next.js 15.5.19، يشمل `/pos/start`).
 
-### `cfb777eb` — كود المسار
+### بعد الـ rebase — Head `384d6356` — كل الفحوصات خضراء
 
-- CI sqlite + pgsql: https://github.com/safwan5001-source/Nebrax/actions/runs/33811472893
-- Web CI: https://github.com/safwan5001-source/Nebrax/actions/runs/33811472966
-
-### `ad3250cb` — تثبيت جلسة المعاينة + `isValidRiyal`/`isNegative`
-
-- CI: https://github.com/safwan5001-source/Nebrax/actions/runs/33814010474
-- Web CI: https://github.com/safwan5001-source/Nebrax/actions/runs/33814010469
-
-### `4034c23d` — Head الذي أخضر عليه CI بعد إضافة هذا التقرير
-
-- CI sqlite **2217 passed, 1 skipped** + pgsql **2218 passed**: https://github.com/safwan5001-source/Nebrax/actions/runs/33814257587
-- Web CI: https://github.com/safwan5001-source/Nebrax/actions/runs/33814257572
+- CI sqlite **2217 passed, 1 skipped** + pgsql **2218 passed**: https://github.com/safwan5001-source/Nebrax/actions/runs/33815296015
+- Web CI: https://github.com/safwan5001-source/Nebrax/actions/runs/33815296033
 
 ---
 
@@ -217,8 +220,7 @@ shiftId: input.session.shift_id ?? 'no-shift',
 - تصفية `is_active` في الواجهة UX فقط؛ الحماية في backend (Tenant/Branch Isolation + رفض الجهاز/الوردية المعطّلين).
 - `pos_shift_id` ما زال اختيارياً في FormRequest للتوافق — لم يُضيَّق العقد حتى لا تُكسر اختبارات تفتح بـ `pos_device_id` فقط.
 - `next dev` + مفاتيح `developer.events` المنقّطة: عطل سابق لـ e2e عبر `npm run test:e2e` الافتراضي.
-- فشل `pos-checkout-reliability` (strict mode على رسالة البيع) يحتاج تصحيحاً منفصلاً إن أُريد اخضرار e2e الكامل.
-- لم يُعاد أساس الفرع على `origin/main` الأحدث (`b7638d8e`، PR #630)؛ الدمج ممكن دون تعارض ظاهر وقت كتابة التقرير.
+- فشل `pos-checkout-reliability` موجود على أحدث `main` (`b7638d8e`) بنفس الـ strict mode؛ ليس regression من هذا PR ولم يُصلح Checkout هنا.
 
 ---
 
@@ -237,23 +239,25 @@ https://github.com/safwan5001-source/Nebrax/pull/631
 
 ## 12. Base SHA
 
-`2ea1ff72c23b44a6b28db105ddf8abc214a0a5cc`  
-(`origin/main` عند التفريع؛ دمج PR #628)
+`b7638d8edf3c676771e67b2dc1c39f5f56644154`  
+(`origin/main` بعد rebase؛ PR #630 Document Intelligence)
 
-`origin/main` وقت كتابة التقرير: `b7638d8edf3c676771e67b2dc1c39f5f56644154` (PR #630)
+نقطة التفريع الأصلية كانت `2ea1ff72` (PR #628). أُعيد الأساس على أحدث `main` قبل الاعتماد.
 
 ---
 
 ## 13. Head SHA
 
-كود التنفيذ: `ad3250cbfd8434a7ca9ccf58e16ae06e5ede4149`  
-Head الذي أخضر عليه CI بعد إضافة ملف التقرير: `4034c23de9374cb89ef1ad6efc3f3fb65d984b08`
+بعد الـ rebase، Head الذي أخضر عليه CI: `384d63562cbcfd985e8decaf7243e2f624fcf8c0`
 
-Commits:
+كود التنفيذ بعد الـ rebase: `3a104b5aae05e56881d1d1fc0ca4d37f9a1d3ee7`
 
-1. `cfb777eb` — `feat(web): open selling session workspace before POS`
-2. `ad3250cb` — `fix(web): persist demo POS open session and use money helpers`
-3. `4034c23d` — `docs: تقرير تنفيذ فتح جلسة البيع قبل POS`
+Commits بعد الـ rebase (الأقدم فالأحدث):
+
+1. `79de33ac` — `feat(web): open selling session workspace before POS`
+2. `3a104b5a` — `fix(web): persist demo POS open session and use money helpers`
+3. `0af0d085` — `docs: تقرير تنفيذ فتح جلسة البيع قبل POS`
+4. `384d6356` — `docs: نتيجة GitHub CI الخضراء لفتح جلسة البيع`
 
 ---
 
