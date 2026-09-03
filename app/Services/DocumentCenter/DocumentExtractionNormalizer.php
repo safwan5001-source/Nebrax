@@ -15,6 +15,12 @@ final class DocumentExtractionNormalizer
             'Return JSON only. Never create, approve, post, or suggest accounting entries.',
             'Return financial amounts as integer minor units; do not return floating point numbers.',
             'Use null for unknown values. Include page_number, bounding_box, confidence and source when available.',
+            // The document may be a mobile photo of a printed form carrying handwritten values,
+            // in Arabic, English or mixed. Read handwriting and handwritten numbers carefully.
+            'Documents may combine printed layout with handwritten values (Arabic, English, or mixed); read handwriting carefully.',
+            'For each field you may include a matching "<field>_evidence" object with confidence (0.0000-1.0000) and a source of exactly one of: printed, handwritten, mixed, unknown. Use "unknown" when provenance cannot be reliably determined; never claim a provenance you cannot tell.',
+            // Anti-fabrication is a hard safety rule: an uncertain guess is worse than a null.
+            'Never fabricate, infer, or complete a value. If a value is missing, illegible, or uncertain, return null and lower its confidence instead of guessing.',
             'Use this exact top-level shape: {"document_type":"string|null","language":"string|null","confidence":"0.0000-1.0000|null","fields":{},"lines":[],"warnings":[]}.',
             "Requested document type: {$requestedDocumentType}.",
             "Default document language: {$defaultLanguage}.",

@@ -36,6 +36,11 @@ class DocumentExtractionService
         if (config('queue.default') === 'sync' || ! $policy->enabled() || ! DocumentProviderNetworkGate::allowsExternalRequests()) {
             return 0;
         }
+        // بوّابة المستأجر (PR #630): لا يُرسَل مستند إلى المزود ما لم يُفعّل المستأجر
+        // المعالجة الذكية ويُدرج نوعه ضمن المسموح. المستند يبقى في المركز متاحاً.
+        if (! $this->tenantAllowsExtraction($batch)) {
+            return 0;
+        }
 
         $files = $batch->files()->orderBy('created_at')->get();
         if ($files->isEmpty() || ! $policy->allowsBatchFileCount($files->count())) {
@@ -95,8 +100,10 @@ class DocumentExtractionService
     public function process(DocumentProcessingRun $run, DocumentFile $file): void
     {
         $policy = $this->settings->documentExtractionPolicy();
-        if (! $policy->enabled() || ! DocumentProviderNetworkGate::allowsExternalRequests() || $file->scan_status !== DocumentScanStatus::CLEAN || $file->purged_at !== null) {
-            $this->failRun($run, 'extraction_not_permitted', 'لم يعد الاستخراج مسموحاً وفق سياسة المنصة أو حالة الملف.');
+        // إعادة فحص بوّابة المستأجر داخل العامل: قد يُعطِّل المستأجر المعالجة أو
+        // يزيل النوع بين لحظة الجدولة والتشغيل، فنفشل بأمان بلا أي استدعاء للمزود.
+        if (! $policy->enabled() || ! DocumentProviderNetworkGate::allowsExternalRequests() || ! $this->tenantAllowsExtraction($run->batch) || $file->scan_status !== DocumentScanStatus::CLEAN || $file->purged_at !== null) {
+            $this->failRun($run, 'extraction_not_permitted', 'لم يعد الاستخراج مسموحاً وفق سياسة المنصة أو المستأجر أو حالة الملف.');
 
             return;
         }
@@ -186,6 +193,16 @@ class DocumentExtractionService
         }
 
         $this->failRun($run, 'extraction_failed', 'فشل الاستخراج بعد استنفاد المزودين والمحاولات المسموح بها.');
+    }
+
+    /**
+     * بوّابة المستأجر المستقلّة (PR #630): تفعيل المعالجة الذكية **و** إدراج نوع
+     * المستند ضمن الأنواع المسموح بها. مستقلّة تماماً عن سياسة المنصة (المحرك
+     * والشبكة والمزود) وعن سياسة الاحتفاظ بالأصل — تفعيل الذكاء لا يمسّ الاحتفاظ.
+     */
+    private function tenantAllowsExtraction(DocumentBatch $batch): bool
+    {
+        return DocumentIntelligencePolicy::forTenant()->shouldProcessDocumentType((string) $batch->document_type);
     }
 
     private function hasReadyPrimaryProvider(DocumentExtractionPolicy $policy): bool

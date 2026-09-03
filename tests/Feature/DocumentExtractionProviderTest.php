@@ -23,7 +23,9 @@ use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\EntitlementGrantService;
 use App\Services\PlatformIntegrationResolver;
 use App\Support\DocumentScanStatus;
+use App\Support\DocumentTypeCatalog;
 use App\Support\DocumentWorkflowStatus;
+use App\Support\Settings;
 use App\Support\EntitlementAccessMode;
 use App\Support\EntitlementSourceType;
 use App\Tenancy\BranchContext;
@@ -403,6 +405,12 @@ class DocumentExtractionProviderTest extends TestCase
         $branchId = Branch::query()->where('tenant_id', $auth['tenant_id'])->value('id');
         app(BranchContext::class)->set($branchId);
         app(EntitlementGrantService::class)->grant(Tenant::findOrFail($auth['tenant_id']), 'document_center.core', EntitlementAccessMode::FULL, EntitlementSourceType::ADDON, now('UTC')->subMinute(), null, 'document-center-pr4-test', (string) Str::uuid());
+        // بوّابة المستأجر (PR #630): تفعيل المعالجة الذكية وإتاحة كل الأنواع — الشرط
+        // المسبق الجديد لوصول المستند إلى المزود. الاحتفاظ يبقى على افتراضه (مستقلّ).
+        Settings::put('document_intelligence', [
+            'processing_enabled' => true,
+            'allowed_document_types' => DocumentTypeCatalog::all(),
+        ]);
 
         return [...$auth, 'branch_id' => $branchId];
     }
