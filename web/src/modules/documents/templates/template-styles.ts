@@ -121,6 +121,28 @@ export const MINIMAL_STYLE: TemplateStyle = {
   brandBar: false,
 };
 
+/**
+ * Minimal V2 — بياض وطبعة، مستقل عن `tax-invoice-minimal` التاريخي وعن عائلات V2 الأخرى.
+ * مربوط بـ `tax-invoice-minimal-v2` فقط.
+ */
+export const MINIMAL_V2_STYLE: TemplateStyle = {
+  composition: 'minimal_v2',
+  pagePadding: 'p-10',
+  cardRadius: 'rounded-none',
+  sectionGap: 'mt-6',
+  tableHead: 'plain',
+  tableDensity: 'spacious',
+  brandBar: false,
+};
+
+export function isMinimalV2(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'minimal_v2';
+}
+
+export function isLegacyMinimal(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'minimal';
+}
+
 /** Retail — مضغوط لنقاط البيع، مع باركود المستند. */
 export const RETAIL_STYLE: TemplateStyle = {
   composition: 'retail',

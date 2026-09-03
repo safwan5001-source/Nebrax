@@ -32,6 +32,7 @@ export function DocSignature({ model }: { model: DocumentModel }) {
         style.composition === 'erp_v2' && 'border-t border-black pt-3',
         style.composition === 'classic_v2' && 'border-t border-black pt-3',
         style.composition === 'minimal' && 'border-t border-black pt-3',
+        style.composition === 'minimal_v2' && 'border-t border-[color:var(--border)] pt-3',
         style.composition === 'modern' && 'border-t border-[color:var(--border)] pt-3',
         style.composition === 'modern_v2' && 'border-t border-[color:var(--border)] pt-3',
       )}
@@ -39,7 +40,7 @@ export function DocSignature({ model }: { model: DocumentModel }) {
       {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
       <img src={model.signatureUrl} alt={t('signature')} className={cn(getDocumentImagePreviewClass('signature', properties.image_size), getDocumentImagePreviewOpacityClass('signature', properties.image_opacity))} />
       <div className="mt-1 w-40 border-t border-[color:var(--muted)] pt-1 text-[10px] text-[color:var(--muted)]">
-        {style.composition === 'modern_v2' || style.composition === 'erp_v2' || style.composition === 'classic_v2' ? <ModernFieldLabel field="signature" mode={mode} /> : t('signature')}
+        {style.composition === 'modern_v2' || style.composition === 'erp_v2' || style.composition === 'classic_v2' || style.composition === 'minimal_v2' ? <ModernFieldLabel field="signature" mode={mode} /> : t('signature')}
       </div>
     </div>
   );

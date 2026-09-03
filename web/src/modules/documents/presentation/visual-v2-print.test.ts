@@ -20,6 +20,7 @@ describe('عزل قواعد طباعة Modern V2', () => {
     expect(header).toContain("style.composition === 'erp'");
     expect(header).toContain("style.composition === 'erp_v2'");
     expect(header).toContain("style.composition === 'classic_v2'");
+    expect(header).toContain("style.composition === 'minimal_v2'");
     expect(exporter).toContain('pdfSharesPrintRoot');
   });
 });
@@ -40,5 +41,16 @@ describe('عزل قواعد طباعة Classic V2', () => {
     expect(css).toContain('[data-doc-composition="modern_v2"] thead');
     expect(css).toContain('[data-doc-composition="erp_v2"] thead');
     expect(css).not.toContain('[data-doc-composition="classic"] thead');
+  });
+});
+
+describe('عزل قواعد طباعة Minimal V2', () => {
+  it('يقيّد تكرار thead بتركيب minimal_v2 دون لمس minimal التاريخي أو V2 الأخرى', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    expect(css).toContain('[data-doc-composition="minimal_v2"] thead');
+    expect(css).toContain('[data-doc-composition="modern_v2"] thead');
+    expect(css).toContain('[data-doc-composition="erp_v2"] thead');
+    expect(css).toContain('[data-doc-composition="classic_v2"] thead');
+    expect(css).not.toContain('[data-doc-composition="minimal"] thead');
   });
 });

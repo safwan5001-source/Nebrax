@@ -18,7 +18,7 @@ export function DocFooter({ model }: { model: DocumentModel }) {
   const isErpV2 = style.composition === 'erp_v2';
   const isClassicV2 = style.composition === 'classic_v2';
   const isLegacyModern = style.composition === 'modern';
-  const usesV2Labels = isModernV2 || isErpV2 || isClassicV2;
+  const usesV2Labels = isModernV2 || isErpV2 || isClassicV2 || style.composition === 'minimal_v2';
   const content =
     properties.static_content ??
     model.footerText ??
@@ -27,7 +27,7 @@ export function DocFooter({ model }: { model: DocumentModel }) {
     ? 'border-t border-black pt-3'
     : isClassicV2
       ? 'border-t border-black pt-3'
-      : isModernV2 || isLegacyModern
+      : isModernV2 || isLegacyModern || style.composition === 'minimal_v2'
       ? 'border-t border-[color:var(--border)] pt-3'
       : style.composition === 'minimal'
         ? 'border-t border-black pt-3'
