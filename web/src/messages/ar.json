@@ -2066,6 +2066,7 @@
   },
   "invoiceTemplates": {
     "classic": "كلاسيكي",
+    "classic_v2": "كلاسيكي V2",
     "modern": "عصري",
     "modern_v2": "عصري V2",
     "erp": "ERP",

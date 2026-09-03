@@ -16,6 +16,28 @@ export const CLASSIC_STYLE: TemplateStyle = {
 };
 
 /**
+ * Classic V2 — مستند رسمي تقليدي متوسط الكثافة، مستقل عن `tax-invoice-classic`
+ * التاريخي وعن Modern/ERP V2. مربوط بـ `tax-invoice-classic-v2` فقط.
+ */
+export const CLASSIC_V2_STYLE: TemplateStyle = {
+  composition: 'classic_v2',
+  pagePadding: 'p-7',
+  cardRadius: 'rounded-none',
+  sectionGap: 'mt-4',
+  tableHead: 'plain',
+  tableDensity: 'comfortable',
+  brandBar: false,
+};
+
+export function isClassicV2(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'classic_v2';
+}
+
+export function isLegacyClassic(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'classic';
+}
+
+/**
  * Modern (تاريخي) — الشكل ما قبل #616. يبقى مربوطاً بـ `tax-invoice-modern`.
  * لا يُعاد تفسيره بعارض V2.
  */
