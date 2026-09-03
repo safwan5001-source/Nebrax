@@ -8,6 +8,7 @@ import {
   Banknote,
   BarChart3,
   BookOpen,
+  BookText,
   Boxes,
   Building,
   Building2,
@@ -20,6 +21,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Clock,
+  Compass,
   Contact,
   CreditCard,
   Factory,
@@ -48,9 +50,11 @@ import {
   ScrollText,
   Send,
   Settings,
+  ShieldCheck,
   ShoppingCart,
   SlidersHorizontal,
   Store,
+  Terminal,
   Timer,
   Truck,
   type LucideIcon,
@@ -60,6 +64,7 @@ import {
   Users,
   WalletCards,
   Warehouse,
+  Webhook,
   Workflow,
   Wrench,
   X,
@@ -103,6 +108,12 @@ interface NavGroup {
   items: NavItem[];
   /** بديل `appKey` على مستوى المجموعة كاملة — يخفيها بعناصرها دفعة واحدة. */
   appKey?: string;
+  /**
+   * صلاحية RBAC على مستوى المجموعة كاملة — تُفحَص بمرآة `Rbac::allows` نفسها،
+   * فتختفي المجموعة بعناصرها لمن لا يملكها (بدل ترك رأسٍ بلا عناصر). تُستعمل
+   * حين تشترك كل عناصر المجموعة في صلاحية واحدة (كمجموعة المطورين).
+   */
+  permission?: string;
 }
 
 const POS_NAV_ICONS: Record<(typeof POS_SIDEBAR_LAUNCH_ITEMS)[number]['key'], LucideIcon> = {
@@ -289,6 +300,21 @@ const GROUPS: NavGroup[] = [
       { href: '/settings', icon: Settings, key: 'accountSettings', built: true },
     ],
   },
+  {
+    // المطورون — مساحة تكامل من الدرجة الأولى داخل أَوْج المصادَق. تُخفى كاملةً لمن
+    // لا يملك `developer.view` (المالك/المدير افتراضياً)، فلا يظهر رأسٌ بلا عناصر.
+    // بلا appKey: ليست في كتالوج التطبيقات — الحراسة صلاحيةٌ لا استحقاق تجاري.
+    title: 'developer',
+    icon: Terminal,
+    permission: 'developer.view',
+    items: [
+      { href: '/developer', icon: Compass, key: 'devOverview', built: true },
+      { href: '/developer/keys', icon: KeyRound, key: 'devKeys', built: true },
+      { href: '/developer/docs', icon: BookText, key: 'devDocs', built: true },
+      { href: '/developer/webhooks', icon: Webhook, key: 'devWebhooks', built: true },
+      { href: '/developer/security', icon: ShieldCheck, key: 'devSecurity', built: true },
+    ],
+  },
 ];
 
 /**
@@ -298,13 +324,13 @@ const GROUPS: NavGroup[] = [
  * الخافت يقسمها إلى أربع كتل تُمسَح بنظرة. **هو عنوان لا زرّ**: لا يُفتح ولا
  * يُطوى ولا يُنقر — وإلا صار مستوى ثالثاً في شجرة عمقُها اثنان يكفيان.
  *
- * التغطية كاملة بلا بقايا: ٣ + ٤ + ٣ + ٢ = ١٢.
+ * التغطية كاملة بلا بقايا: ٣ + ٤ + ٣ + ٣ = ١٣.
  */
 const SUPER_GROUPS: { label: string; titles: string[] }[] = [
   { label: 'revenue', titles: ['sales', 'pos', 'customers'] },
   { label: 'operations', titles: ['inventory', 'purchases', 'logistics', 'fuelStations'] },
   { label: 'finance', titles: ['accounting', 'finance', 'hr', 'operations'] },
-  { label: 'admin', titles: ['branches', 'settings'] },
+  { label: 'admin', titles: ['branches', 'settings', 'developer'] },
 ];
 
 export function Sidebar({
@@ -354,7 +380,7 @@ export function Sidebar({
   }, []);
 
   const user = currentUser();
-  const groupHidden = (group: NavGroup) => !isNavEntryVisible({ appKey: group.appKey }, hiddenAppKeys, user);
+  const groupHidden = (group: NavGroup) => !isNavEntryVisible({ appKey: group.appKey, permission: group.permission }, hiddenAppKeys, user);
   const visibleItems = (group: NavGroup) =>
     group.items.filter((item) => isNavEntryVisible(item, hiddenAppKeys, user));
 
