@@ -176,7 +176,7 @@ No frontend changes were made in this PR (the platform AI integration UI and i18
 - **Branch:** `claude/document-intelligence-foundation-japfgd`
 - **Base SHA:** `b7638d8edf3c676771e67b2dc1c39f5f56644154`
 - **Head SHA:** `82836f434dfa26637ec1384ace7f905fdad94b13`
-- **PR:** _(opened for review — not merged, not deployed)_
+- **PR:** [#632](https://github.com/safwan5001-source/Nebrax/pull/632) — opened for review, **not merged, not deployed**
 
 ---
 
