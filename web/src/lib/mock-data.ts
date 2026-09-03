@@ -2972,29 +2972,31 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       if (!forceEmpty && mockPosSessions.some((session) => session.status === 'open')) {
         return rejectOpen('لدى الكاشير جلسة نقطة بيع مفتوحة بالفعل — أغلقها قبل فتح جلسة على جهاز آخر.');
       }
-      return resolve({
-        data: {
-          id: 'ps-demo-opened',
-          number: 'POS-2026-DEMO',
-          status: 'open',
-          handover_status: null,
-          pos_device_id: device.id,
-          warehouse_id: device.warehouse_id,
-          pos_shift_id: posShift?.id ?? null,
-          shift_id: null,
-          pos_device: device,
-          pos_shift: posShift,
-          warehouse: device.warehouse,
-          opening_balance: (opening / 100).toFixed(2),
-          closing_balance: null,
-          expected_balance: null,
-          difference: null,
-          difference_status: null,
-          opened_at: new Date().toISOString(),
-          closed_at: null,
-          handover_confirmed_at: null,
-        },
-      });
+      const opened = {
+        id: 'ps-demo-opened',
+        number: 'POS-2026-DEMO',
+        status: 'open' as const,
+        handover_status: null,
+        pos_device_id: device.id,
+        warehouse_id: device.warehouse_id,
+        pos_shift_id: posShift?.id ?? null,
+        shift_id: null,
+        pos_device: device,
+        pos_shift: posShift,
+        warehouse: device.warehouse,
+        opening_balance: (opening / 100).toFixed(2),
+        closing_balance: null,
+        expected_balance: null,
+        difference: null,
+        difference_status: null,
+        opened_at: new Date().toISOString(),
+        closed_at: null,
+        handover_confirmed_at: null,
+      };
+      const existing = mockPosSessions.findIndex((session) => session.id === opened.id);
+      if (existing >= 0) mockPosSessions.splice(existing, 1);
+      mockPosSessions.unshift(opened as typeof mockPosSessions[number]);
+      return resolve({ data: opened });
     }
     return resolve({ data: { id: 'demo-new' } });
   }

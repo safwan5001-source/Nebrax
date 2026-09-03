@@ -124,6 +124,8 @@ describe('حارس مسار فتح الجلسة في الواجهة', () => {
     expect(startPage).toContain("'/pos-shifts'");
     expect(startPage).not.toContain("'/shifts'");
     expect(helper).toContain('pos_shift_id');
+    expect(helper).toContain('isValidRiyal');
+    expect(helper).toContain('isNegative');
     expect(helper).not.toMatch(/(?:^|[^a-z_])shift_id(?:[^a-z_]|$)/m);
   });
 });

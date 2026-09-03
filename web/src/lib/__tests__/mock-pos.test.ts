@@ -132,6 +132,8 @@ describe('POS demo contracts', () => {
         shift_id: string | null;
         opening_balance: string;
         pos_device_id: string;
+        id: string;
+        status: string;
       } }>('/pos-sessions/open', 'POST', {
         opening_balance: 0,
         pos_device_id: 'pd-1',
@@ -143,7 +145,14 @@ describe('POS demo contracts', () => {
         shift_id: null,
         opening_balance: '0.00',
       });
+      const mine = await mockApi<{ data: Array<{ id: string; status: string; pos_shift_id: string | null }> }>('/pos-sessions?mine=1');
+      expect(mine.data.find((session) => session.status === 'open')).toMatchObject({
+        id: created.data.id,
+        pos_shift_id: 'pos-shift-morning',
+      });
     } finally {
+      const createdIdx = mockPosSessions.findIndex((session) => session.id === 'ps-demo-opened');
+      if (createdIdx >= 0) mockPosSessions.splice(createdIdx, 1);
       if (previouslyOpen) previouslyOpen.status = 'open';
     }
   });

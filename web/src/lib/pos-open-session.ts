@@ -1,4 +1,4 @@
-import { riyalToMinor } from '@/lib/money';
+import { isNegative, isValidRiyal, riyalToMinor } from '@/lib/money';
 
 /**
  * عقد فتح جلسة POS من الواجهة الحديثة.
@@ -41,11 +41,12 @@ export function buildPosSessionOpenPayload(input: PosSessionOpenInput): PosOpenS
   if (!input.posDeviceId.trim()) return { ok: false, error: 'device_required' };
   if (!input.posShiftId.trim()) return { ok: false, error: 'shift_required' };
 
-  const openingBalance = riyalToMinor(input.openingBalanceRiyal);
-  // الصفر صالح في عقد الخادم (`min:0`). لا نرفضه لأنه falsy بعد التحويل.
-  if (!Number.isFinite(openingBalance) || openingBalance < 0) {
+  // القبول كصفحة الجلسات: isValidRiyal && !isNegative — الصفر و'' يُطبَّعان إلى 0.
+  // ممنوع فحص `if (!opening_balance)` بعد التحويل لأن الصفر falsy في JS.
+  if (!isValidRiyal(input.openingBalanceRiyal) || isNegative(input.openingBalanceRiyal)) {
     return { ok: false, error: 'opening_balance_invalid' };
   }
+  const openingBalance = riyalToMinor(input.openingBalanceRiyal);
 
   return {
     ok: true,
