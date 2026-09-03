@@ -381,3 +381,37 @@ describe('DataTable row selection', () => {
     expect(container.textContent).not.toMatch(/[؀-ۿ]/);
   });
 });
+
+describe('DataTable optional row activation', () => {
+  it('does not change default rows when no row click handler is supplied', () => {
+    renderIntl(<DataTable columns={columns} data={rows} showToolbar={false} />);
+    expect(screen.getByRole('table').querySelector('[data-state="active"]')).toBeNull();
+  });
+
+  it('opens from a non-interactive cell and ignores existing row controls', async () => {
+    const onRowClick = vi.fn();
+    const withAction: ColumnDef<Row, unknown>[] = [
+      ...columns,
+      { id: 'open', header: 'Open', cell: () => <button type="button">Open</button> },
+    ];
+    renderIntl(
+      <DataTable
+        columns={withAction}
+        data={rows}
+        showToolbar={false}
+        onRowClick={(row) => onRowClick(row.id)}
+        isRowActive={(row) => row.id === '1'}
+      />,
+    );
+
+    const table = screen.getByRole('table');
+    expect(table.querySelector('[data-state="active"]')).toBeTruthy();
+
+    await userEvent.click(within(table).getByText('مؤسسة الطموح'));
+    expect(onRowClick).toHaveBeenCalledWith('1');
+
+    onRowClick.mockClear();
+    await userEvent.click(within(table).getByRole('button', { name: 'Open' }));
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+});

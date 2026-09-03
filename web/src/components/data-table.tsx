@@ -22,6 +22,13 @@ import { toCsv, downloadCsv } from '@/lib/export';
 import { cn } from '@/lib/utils';
 import { normalizeProtectedColumns, type DataTableColumnVisibilityControl } from '@/lib/data-explorer/table-layout';
 
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    numeric?: boolean;
+  }
+}
+
 /**
  * فرز خادميّ — حين تُمرَّر هذه الخاصية يصبح الخادم **مصدر الحقيقة الوحيد**
  * للفرز، ويُطفأ فرز TanStack المحلي.
@@ -76,6 +83,30 @@ interface DataTableProps<T> {
   columnVisibility?: DataTableColumnVisibilityControl;
   /** يثبت رأس الجدول داخل حاوية التمرير عند الحاجة إلى مسح قوائم كثيفة. */
   stickyHeader?: boolean;
+  /** تسمية وصول لحالة التحميل — إن غابت يبقى نص `nebrax.loading`. */
+  loadingLabel?: string;
+  /** تمييز صف نشط (معاينة مفتوحة مثلاً) دون فرض تحديد جماعي. */
+  isRowActive?: (row: T) => boolean;
+  /**
+   * نقر الصف يفتح تفصيلاً/معاينة. يُتجاهل إن كان الهدف زراً أو رابطاً أو حقلاً
+   * قائماً حتى لا تُسرَق إجراءات الصف. اختياري بالكامل — القوائم الأخرى بلا تغيير.
+   */
+  onRowClick?: (row: T) => void;
+}
+
+function isNumericColumn(columnDef: { meta?: unknown }): boolean {
+  return Boolean(
+    columnDef.meta
+    && typeof columnDef.meta === 'object'
+    && 'numeric' in columnDef.meta
+    && (columnDef.meta as { numeric?: boolean }).numeric,
+  );
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(
+    target.closest('a, button, input, select, textarea, label, [role="menuitem"], [role="option"]'),
+  );
 }
 
 export function DataTable<T>({
@@ -98,6 +129,9 @@ export function DataTable<T>({
   selection,
   columnVisibility,
   stickyHeader = false,
+  loadingLabel,
+  isRowActive,
+  onRowClick,
 }: DataTableProps<T>) {
   const t = useTranslations('nebrax');
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -250,7 +284,7 @@ export function DataTable<T>({
       {error ? (
         <ErrorState message={error} onRetry={onRetry} retryLabel={retryLabel} surface="bare" />
       ) : loading ? (
-        <LoadingState surface="bare" />
+        <LoadingState surface="bare" label={loadingLabel} />
       ) : rows.length === 0 ? (
         <EmptyState title={emptyLabel ?? t('noResults')} description={emptyDescription} action={emptyAction} surface="bare" />
       ) : (
@@ -277,10 +311,12 @@ export function DataTable<T>({
                       const sorted = header.column.getIsSorted();
                       const SortIcon = sorted === 'asc' ? ArrowUp : sorted === 'desc' ? ArrowDown : ChevronsUpDown;
                       const sortable = header.column.getCanSort() && canSort(header.column.id);
+                      const numeric = isNumericColumn(header.column.columnDef);
                       return (
                         <TH
                           key={header.id}
                           aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
+                          className={numeric ? 'text-end' : undefined}
                         >
                           {header.isPlaceholder ? null : sortable ? (
                             <button
@@ -293,6 +329,7 @@ export function DataTable<T>({
                               className={cn(
                                 'inline-flex cursor-pointer select-none items-center gap-1 rounded transition-colors hover:text-text',
                                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                                numeric && 'w-full justify-end',
                                 sorted && 'text-primary'
                               )}
                             >
@@ -316,8 +353,21 @@ export function DataTable<T>({
               <TBody>
                 {rows.map((row) => {
                   const rowId = selection?.getRowId(row.original);
+                  const active = Boolean(isRowActive?.(row.original));
                   return (
-                    <TR key={row.id}>
+                    <TR
+                      key={row.id}
+                      aria-selected={active || undefined}
+                      data-state={active ? 'active' : undefined}
+                      className={cn(
+                        onRowClick && 'cursor-pointer',
+                        active && 'bg-primary-soft hover:bg-primary-soft',
+                      )}
+                      onClick={onRowClick ? (event) => {
+                        if (isInteractiveTarget(event.target)) return;
+                        onRowClick(row.original);
+                      } : undefined}
+                    >
                       {selection && rowId != null ? (
                         <TD className="w-10">
                           <input
@@ -330,7 +380,12 @@ export function DataTable<T>({
                         </TD>
                       ) : null}
                       {row.getVisibleCells().map((cell) => (
-                        <TD key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TD>
+                        <TD
+                          key={cell.id}
+                          className={isNumericColumn(cell.column.columnDef) ? 'text-end' : undefined}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TD>
                       ))}
                     </TR>
                   );
@@ -360,8 +415,21 @@ export function DataTable<T>({
                 </div>
               );
 
+              const active = Boolean(isRowActive?.(row.original));
               return (
-                <li key={row.id}>
+                <li
+                  key={row.id}
+                  aria-selected={active || undefined}
+                  data-state={active ? 'active' : undefined}
+                  className={cn(
+                    onRowClick && 'cursor-pointer',
+                    active && 'bg-primary-soft',
+                  )}
+                  onClick={onRowClick ? (event) => {
+                    if (isInteractiveTarget(event.target)) return;
+                    onRowClick(row.original);
+                  } : undefined}
+                >
                   {selection && rowId != null ? (
                     <div className="flex items-start gap-2">
                       <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center ps-2">

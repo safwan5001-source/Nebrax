@@ -69,6 +69,7 @@ export interface MockInvoice {
   status: string;
   payment_status: string;
   invoice_date: string;
+  due_date: string | null;
   subtotal: string;
   tax_amount: string;
   total: string;
@@ -93,6 +94,12 @@ function line(id: string, description: string, quantity: number, unitPrice: numb
   };
 }
 
+function addIsoDays(iso: string, days: number): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const date = new Date(year, month - 1, day + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function invoice(
   id: string,
   number: string,
@@ -115,6 +122,7 @@ function invoice(
     status,
     payment_status,
     invoice_date,
+    due_date: addIsoDays(invoice_date, 14),
     subtotal: subtotal.toFixed(2),
     tax_amount: tax.toFixed(2),
     total: total.toFixed(2),
@@ -3196,7 +3204,59 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       : mockPartners;
     return resolve({ data: list });
   }
-  if (clean === '/invoices') return resolve({ data: mockInvoices });
+  if (clean === '/invoices') {
+    const params = new URLSearchParams(path.split('?')[1] ?? '');
+    let list = [...mockInvoices];
+    const search = (params.get('search') ?? '').trim().toLowerCase();
+    if (search) {
+      list = list.filter((invoice) => {
+        const partner = mockPartners.find((item) => item.id === invoice.partner_id);
+        return invoice.number.toLowerCase().includes(search)
+          || Boolean(partner?.name.toLowerCase().includes(search));
+      });
+    }
+    for (const key of ['status', 'payment_status', 'partner_id'] as const) {
+      const value = params.get(key);
+      if (value) list = list.filter((invoice) => invoice[key] === value);
+    }
+    const dateFrom = params.get('date_from');
+    const dateTo = params.get('date_to');
+    if (dateFrom) list = list.filter((invoice) => invoice.invoice_date >= dateFrom);
+    if (dateTo) list = list.filter((invoice) => invoice.invoice_date <= dateTo);
+    const dueFrom = params.get('due_from');
+    const dueTo = params.get('due_to');
+    if (dueFrom) list = list.filter((invoice) => (invoice.due_date ?? '') >= dueFrom);
+    if (dueTo) list = list.filter((invoice) => (invoice.due_date ?? '') <= dueTo);
+
+    const sort = params.get('sort');
+    if (sort) {
+      const descending = sort.startsWith('-');
+      const key = (descending ? sort.slice(1) : sort) as keyof MockInvoice;
+      list = [...list].sort((left, right) => {
+        const av = left[key];
+        const bv = right[key];
+        let result = 0;
+        if (key === 'total' || key === 'remaining' || key === 'paid_amount' || key === 'subtotal' || key === 'tax_amount') {
+          result = Number(av ?? 0) - Number(bv ?? 0);
+        } else {
+          result = String(av ?? '').localeCompare(String(bv ?? ''), 'en');
+        }
+        return descending ? -result : result;
+      });
+    }
+
+    const perPage = Number(params.get('per_page') ?? '0');
+    if (perPage > 0) {
+      const page = Math.max(1, Number(params.get('page') ?? '1'));
+      const lastPage = Math.max(1, Math.ceil(list.length / perPage) || 1);
+      const start = (page - 1) * perPage;
+      return resolve({
+        data: list.slice(start, start + perPage),
+        meta: { current_page: page, last_page: lastPage, per_page: perPage, total: list.length },
+      });
+    }
+    return resolve({ data: list });
+  }
   if (clean === '/quotes') return resolve({ data: mockQuotes });
   if (clean === '/credit-notes') {
     const nt = new URLSearchParams(path.split('?')[1] ?? '').get('type');

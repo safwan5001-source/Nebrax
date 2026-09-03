@@ -8,7 +8,9 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
-import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
+import { InvoicePreviewPanel } from '@/components/invoices/invoice-preview-panel';
+import { InvoicesListToolbar } from '@/components/invoices/invoices-list-toolbar';
+import { PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -16,6 +18,14 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
 import { type BranchView } from '@/lib/branch-view';
+import { toCsv, downloadCsv } from '@/lib/export';
+import {
+  hasActiveInvoiceQuery,
+  INVOICE_LIST_SORT_COLUMNS,
+  INVOICE_SUPPORTING_COLUMN_DEFAULTS,
+  isInvoiceDraft,
+  isInvoiceOverdue,
+} from '@/lib/invoices/workspace';
 import { formatRiyal } from '@/lib/money';
 import { useDataTableColumnVisibility } from '@/lib/data-explorer/table-layout';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
@@ -25,6 +35,7 @@ import {
   replaceFilter,
   serializeExplorerState,
 } from '@/lib/data-explorer/url-state';
+import { cn } from '@/lib/utils';
 
 interface Invoice {
   id: string;
@@ -32,6 +43,8 @@ interface Invoice {
   partner_id: string;
   invoice_date: string;
   due_date: string | null;
+  subtotal?: string;
+  tax_amount?: string;
   total: string;
   paid_amount: string;
   remaining: string;
@@ -63,20 +76,6 @@ const payTone: Record<string, 'positive' | 'warning' | 'muted'> = {
   unpaid: 'muted',
 };
 
-const INVOICE_SORT_COLUMNS = ['number', 'invoice_date', 'total', 'remaining'];
-
-const sortOptions: SortOption[] = [
-  { value: '-invoice_date', label: 'الأحدث أولًا' },
-  { value: 'invoice_date', label: 'الأقدم أولًا' },
-  { value: '-due_date', label: 'الاستحقاق الأبعد' },
-  { value: 'due_date', label: 'الاستحقاق الأقرب' },
-  { value: '-total', label: 'الإجمالي: الأعلى' },
-  { value: 'total', label: 'الإجمالي: الأقل' },
-  { value: '-remaining', label: 'المتبقي: الأعلى' },
-  { value: 'remaining', label: 'المتبقي: الأقل' },
-  { value: 'number', label: 'رقم الفاتورة' },
-];
-
 function isEmptyFilter(filter: ActiveFilter): boolean {
   return Array.isArray(filter.value)
     ? filter.value.every((value) => String(value).trim() === '')
@@ -94,6 +93,50 @@ function appendMoneyFilter(params: URLSearchParams, key: 'total' | 'remaining', 
   } else {
     params.set(`${key}_gte`, value);
   }
+}
+
+function DocumentStatus({
+  invoice,
+  ts,
+  overdueLabel,
+}: {
+  invoice: Invoice;
+  ts: (key: string) => string;
+  overdueLabel: string;
+}) {
+  const overdue = isInvoiceOverdue(invoice);
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
+      {overdue ? <Badge tone="warning">{overdueLabel}</Badge> : null}
+    </div>
+  );
+}
+
+function MoneyCell({
+  value,
+  emphasize = false,
+  muted = false,
+  warning = false,
+}: {
+  value: string | number | null | undefined;
+  emphasize?: boolean;
+  muted?: boolean;
+  warning?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'num whitespace-nowrap text-end tabular-nums',
+        emphasize && 'font-medium text-text',
+        warning && 'text-warning',
+        muted && !warning && 'text-muted',
+        !emphasize && !muted && !warning && 'text-text',
+      )}
+    >
+      {formatRiyal(value)}
+    </div>
+  );
 }
 
 export default function InvoicesPage() {
@@ -116,10 +159,12 @@ export default function InvoicesPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [toDelete, setToDelete] = useState<Invoice | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [view, setView] = useState<BranchView>('current');
   const storedColumnVisibility = useDataTableColumnVisibility('invoices');
   const columnVisibility = useMemo(() => ({
     ...storedColumnVisibility,
+    value: { ...INVOICE_SUPPORTING_COLUMN_DEFAULTS, ...storedColumnVisibility.value },
     protectedColumnIds: ['number', 'actions'],
     labels: { actions: t('actions') },
   }), [storedColumnVisibility, t]);
@@ -128,8 +173,33 @@ export default function InvoicesPage() {
     () => Object.fromEntries(partners.map((partner) => [partner.id, partner.name])),
     [partners]
   );
+  const previewInvoice = invoices.find((invoice) => invoice.id === previewId) ?? null;
+  const filteredQuery = hasActiveInvoiceQuery(explorer.search, explorer.filters);
+
+  const sortOptions = useMemo<SortOption[]>(() => [
+    { value: '-invoice_date', label: t('sort_newest') },
+    { value: 'invoice_date', label: t('sort_oldest') },
+    { value: '-due_date', label: t('sort_due_far') },
+    { value: 'due_date', label: t('sort_due_near') },
+    { value: '-total', label: t('sort_total_high') },
+    { value: 'total', label: t('sort_total_low') },
+    { value: '-remaining', label: t('sort_remaining_high') },
+    { value: 'remaining', label: t('sort_remaining_low') },
+    { value: 'number', label: t('sort_number') },
+  ], [t]);
 
   const definitions = useMemo<FilterDefinition[]>(() => [
+    {
+      key: 'partner_id', label: t('partner'), kind: 'entity', quick: true,
+      searchPlaceholder: t('partner_search'),
+      emptyText: t('partner_empty'),
+      options: partners.map((partner) => ({
+        value: partner.id,
+        label: partner.name,
+        sub: partner.vat_number ?? partner.id,
+        hint: partner.phone ?? undefined,
+      })),
+    },
     {
       key: 'status', label: t('status'), kind: 'select', quick: true,
       options: [
@@ -146,21 +216,10 @@ export default function InvoicesPage() {
         { value: 'paid', label: ts('paid') },
       ],
     },
-    {
-      key: 'partner_id', label: t('partner'), kind: 'entity', quick: true,
-      searchPlaceholder: 'ابحث بالاسم، الهاتف أو الرقم التعريفي',
-      emptyText: 'لا يوجد عميل مطابق',
-      options: partners.map((partner) => ({
-        value: partner.id,
-        label: partner.name,
-        sub: partner.vat_number ?? partner.id,
-        hint: partner.phone ?? undefined,
-      })),
-    },
     { key: 'invoice_date', label: t('date'), kind: 'dateRange' },
-    { key: 'due_date', label: 'تاريخ الاستحقاق', kind: 'dateRange' },
+    { key: 'due_date', label: t('due_date'), kind: 'dateRange' },
     { key: 'total', label: t('total'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
-    { key: 'remaining', label: 'المتبقي', kind: 'money', operators: ['gte', 'lte', 'eq'] },
+    { key: 'remaining', label: t('remaining'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
   ], [partners, t, ts]);
 
   const labelledFilters = useMemo(
@@ -244,12 +303,17 @@ export default function InvoicesPage() {
     }));
   }
 
+  function openPreview(invoice: Invoice) {
+    setPreviewId(invoice.id);
+  }
+
   async function confirmDelete() {
     if (!toDelete) return;
     setDeleting(true);
     try {
       await api(`/invoices/${toDelete.id}`, { method: 'DELETE' });
       success(t('deleted'));
+      if (previewId === toDelete.id) setPreviewId(null);
       setToDelete(null);
       load();
     } catch (e) {
@@ -259,83 +323,137 @@ export default function InvoicesPage() {
     }
   }
 
+  function exportCurrentPage() {
+    downloadCsv('invoices', toCsv(
+      [t('number'), t('partner'), t('date'), t('due_date'), t('total'), t('remaining'), t('status'), t('payment_status')],
+      invoices.map((invoice) => [
+        invoice.number,
+        partnerNames[invoice.partner_id] ?? '',
+        invoice.invoice_date,
+        invoice.due_date ?? '',
+        invoice.total,
+        invoice.remaining,
+        ts(invoice.status),
+        ts(invoice.payment_status),
+      ]),
+    ));
+  }
+
   const rowActions = useCallback((invoice: Invoice) => {
-    const isDraft = invoice.status === 'draft';
+    const draft = isInvoiceDraft(invoice.status);
     return (
-      <>
-        <Button asChild variant="ghost" size="icon" aria-label={t('view')}>
-          <Link href={`/invoices/${invoice.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link>
+      <div className="flex items-center justify-end gap-0.5" onClick={(event) => event.stopPropagation()}>
+        <Button type="button" variant="ghost" size="icon" aria-label={t('view')} aria-haspopup="dialog" onClick={() => openPreview(invoice)}>
+          <Eye className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
         </Button>
-        {isDraft ? (
+        {draft ? (
           <Button asChild variant="ghost" size="icon" aria-label={t('edit')} title={t('edit')}>
-            <Link href={`/invoices/${invoice.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
+            <Link href={`/invoices/${invoice.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /></Link>
           </Button>
         ) : (
-          <Button variant="ghost" size="icon" aria-label={t('edit')} disabled title={t('posted_locked')}>
-            <Pencil className="h-4 w-4" strokeWidth={1.7} />
+          <Button type="button" variant="ghost" size="icon" aria-label={t('edit')} disabled title={t('posted_locked')}>
+            <Pencil className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
           </Button>
         )}
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           aria-label={t('delete')}
-          disabled={!isDraft}
-          title={isDraft ? t('delete') : t('posted_locked')}
+          disabled={!draft}
+          title={draft ? t('delete') : t('posted_locked')}
           onClick={() => setToDelete(invoice)}
         >
-          <Trash2 className={`h-4 w-4 ${isDraft ? 'text-negative' : ''}`} strokeWidth={1.7} />
+          <Trash2 className={cn('h-4 w-4', draft && 'text-negative')} strokeWidth={1.7} aria-hidden="true" />
         </Button>
-      </>
+      </div>
     );
   }, [t]);
 
   const columns = useMemo<ColumnDef<Invoice, unknown>[]>(() => [
     {
       accessorKey: 'number', header: t('number'),
-      cell: ({ row }) => <Link href={`/invoices/${row.original.id}`} className="num whitespace-nowrap text-primary hover:underline">{row.original.number}</Link>,
+      cell: ({ row }) => (
+        <button
+          type="button"
+          onClick={() => openPreview(row.original)}
+          aria-haspopup="dialog"
+          className="num whitespace-nowrap text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          dir="ltr"
+        >
+          {row.original.number}
+        </button>
+      ),
     },
     {
       id: 'partner', header: t('partner'), enableSorting: false,
       accessorFn: (row) => partnerNames[row.partner_id] ?? '—',
-      // اسم الطرف يُقصّ عند حدٍّ معقول بدل أن يكسر الصف إلى خمسة أسطر:
-      // النص كاملٌ في الـ DOM (فيقرأه القارئ الصوتي) وفي `title` عند التحويم.
       cell: ({ row }) => {
         const name = partnerNames[row.original.partner_id] ?? '—';
         return <span className="block max-w-64 truncate" title={name}>{name}</span>;
       },
     },
     {
-      accessorKey: 'invoice_date', header: t('date'),
-      cell: ({ row }) => <span className="num whitespace-nowrap text-muted">{row.original.invoice_date}</span>,
-    },
-    {
-      accessorKey: 'total', header: t('total'),
-      cell: ({ row }) => <div className="num whitespace-nowrap text-end">{formatRiyal(row.original.total)}</div>,
-    },
-    {
-      accessorKey: 'remaining', header: 'المتبقي',
-      cell: ({ row }) => <div className="num whitespace-nowrap text-end">{formatRiyal(row.original.remaining)}</div>,
-    },
-    {
       accessorKey: 'status', header: t('status'), enableSorting: false,
-      cell: ({ row }) => <Badge tone={statusTone[row.original.status] ?? 'muted'}>{ts(row.original.status)}</Badge>,
+      cell: ({ row }) => <DocumentStatus invoice={row.original} ts={ts} overdueLabel={t('overdue')} />,
     },
     {
       accessorKey: 'payment_status', header: t('payment_status'), enableSorting: false,
       cell: ({ row }) => <Badge tone={payTone[row.original.payment_status] ?? 'muted'}>{ts(row.original.payment_status)}</Badge>,
     },
     {
-      id: 'actions', header: '', enableSorting: false,
-      cell: ({ row }) => <div className="flex items-center justify-end gap-0.5">{rowActions(row.original)}</div>,
+      accessorKey: 'total', header: t('total'), meta: { numeric: true },
+      cell: ({ row }) => <MoneyCell value={row.original.total} emphasize />,
+    },
+    {
+      accessorKey: 'remaining', header: t('remaining'), meta: { numeric: true },
+      cell: ({ row }) => (
+        <MoneyCell
+          value={row.original.remaining}
+          muted
+          warning={isInvoiceOverdue(row.original)}
+        />
+      ),
+    },
+    {
+      accessorKey: 'invoice_date', header: t('date'),
+      cell: ({ row }) => <span className="num whitespace-nowrap text-muted" dir="ltr">{row.original.invoice_date}</span>,
+    },
+    {
+      accessorKey: 'due_date', header: t('due_date'),
+      cell: ({ row }) => {
+        const overdue = isInvoiceOverdue(row.original);
+        return (
+          <span className={cn('num whitespace-nowrap', overdue ? 'text-warning' : 'text-muted')} dir="ltr" title={overdue ? t('overdue') : undefined}>
+            {row.original.due_date ?? '—'}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'subtotal', header: t('subtotal'), meta: { numeric: true },
+      cell: ({ row }) => <MoneyCell value={row.original.subtotal} muted />,
+    },
+    {
+      accessorKey: 'tax_amount', header: t('tax_amount'), meta: { numeric: true },
+      cell: ({ row }) => <MoneyCell value={row.original.tax_amount} muted />,
+    },
+    {
+      accessorKey: 'paid_amount', header: t('paid_amount'), meta: { numeric: true },
+      cell: ({ row }) => <MoneyCell value={row.original.paid_amount} muted />,
+    },
+    {
+      id: 'actions', header: () => <span className="sr-only">{t('actions')}</span>, enableSorting: false,
+      cell: ({ row }) => rowActions(row.original),
     },
   ], [partnerNames, rowActions, t, ts]);
 
   const headerActions: PageAction[] = [
-    { key: 'create', label: t('create'), icon: Plus, href: '/invoices/new', variant: 'primary' },
+    { key: 'create', label: t('create'), icon: Plus, href: '/invoices/new', variant: 'primary', emphasis: 'primary' },
   ];
 
   return (
-    <div className="space-y-4">
+    <div className={cn('space-y-4', previewId && 'xl:pe-[26.5rem]')}>
       <PageHeader
         title={t('title')}
         context={
@@ -347,11 +465,12 @@ export default function InvoicesPage() {
         actions={headerActions}
       />
 
-      <ListToolbar
+      <InvoicesListToolbar
         search={searchInput}
         onSearchChange={setSearchInput}
-        searchPlaceholder="ابحث برقم الفاتورة، العميل أو مرجع الدفع"
-        searchLabel={t('title')}
+        searchPlaceholder={t('search_placeholder')}
+        searchLabel={t('search')}
+        dateLabel={t('date')}
         definitions={definitions}
         filters={labelledFilters}
         onFilterChange={updateFilter}
@@ -364,45 +483,76 @@ export default function InvoicesPage() {
           options: sortOptions,
         }}
         resultCount={meta.total}
+        onExport={exportCurrentPage}
+        exportDisabled={loading || invoices.length === 0}
       />
 
-      <DataTable
-        columns={columns}
-        data={invoices}
-        loading={loading}
-        error={error}
-        onRetry={load}
-        retryLabel={t('retry')}
-        emptyLabel={t('empty')}
-        exportName="invoices"
-        showToolbar={false}
-        serverSort={{
-          value: explorer.sort ?? '-invoice_date',
-          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
-          columns: INVOICE_SORT_COLUMNS,
-        }}
-        columnVisibility={columnVisibility}
-        stickyHeader
-        mobileRecord={(invoice) => ({
-          title: (
-            <Link href={`/invoices/${invoice.id}`} className="num text-primary hover:underline">
-              {invoice.number}
-            </Link>
-          ),
-          subtitle: partnerNames[invoice.partner_id] ?? '—',
-          amountLabel: t('total'),
-          amount: formatRiyal(invoice.total),
-          secondary: { label: 'المتبقي', value: formatRiyal(invoice.remaining) },
-          status: (
-            <>
-              <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
-              <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
-            </>
-          ),
-          meta: invoice.invoice_date,
-          actions: rowActions(invoice),
-        })}
-      />
+      <div className="[&_td]:py-1.5 [&_th]:py-1.5">
+        <DataTable
+          columns={columns}
+          data={invoices}
+          loading={loading}
+          error={error}
+          onRetry={load}
+          retryLabel={t('retry')}
+          emptyLabel={filteredQuery ? t('no_results') : t('empty')}
+          emptyDescription={filteredQuery ? t('no_results_hint') : t('empty_hint')}
+          emptyAction={
+            filteredQuery ? (
+              <Button type="button" variant="outline" onClick={() => { setSearchInput(''); setExplorer((current) => ({ ...current, page: 1, search: '', filters: [] })); }}>
+                {t('clear_filters')}
+              </Button>
+            ) : (
+              <Button asChild>
+                <Link href="/invoices/new">{t('create')}</Link>
+              </Button>
+            )
+          }
+          exportName="invoices"
+          showToolbar={false}
+          loadingLabel={t('loading')}
+          onRowClick={openPreview}
+          isRowActive={(invoice) => invoice.id === previewId}
+          serverSort={{
+            value: explorer.sort ?? '-invoice_date',
+            onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+            columns: [...INVOICE_LIST_SORT_COLUMNS],
+          }}
+          columnVisibility={columnVisibility}
+          stickyHeader
+          mobileRecord={(invoice) => ({
+            title: (
+              <button
+                type="button"
+                onClick={() => openPreview(invoice)}
+                className="num text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                dir="ltr"
+              >
+                {invoice.number}
+              </button>
+            ),
+            subtitle: partnerNames[invoice.partner_id] ?? '—',
+            amountLabel: t('total'),
+            amount: formatRiyal(invoice.total),
+            secondary: {
+              label: t('remaining'),
+              value: (
+                <span className={cn(isInvoiceOverdue(invoice) && 'text-warning')}>
+                  {formatRiyal(invoice.remaining)}
+                </span>
+              ),
+            },
+            status: (
+              <>
+                <DocumentStatus invoice={invoice} ts={ts} overdueLabel={t('overdue')} />
+                <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
+              </>
+            ),
+            meta: invoice.invoice_date,
+            actions: rowActions(invoice),
+          })}
+        />
+      </div>
 
       <Pagination
         page={meta.current_page}
@@ -422,8 +572,17 @@ export default function InvoicesPage() {
         onApply={(filters) => setExplorer((current) => ({ ...current, page: 1, filters }))}
       />
 
+      {previewId ? (
+        <InvoicePreviewPanel
+          invoiceId={previewId}
+          customerName={previewInvoice ? (partnerNames[previewInvoice.partner_id] ?? '—') : '—'}
+          listStatus={previewInvoice?.status}
+          onClose={() => setPreviewId(null)}
+        />
+      ) : null}
+
       <Dialog open={!!toDelete} onClose={() => (deleting ? null : setToDelete(null))} title={t('delete_title')}>
-        <p className="text-sm text-text">{t('delete_confirm')} <span className="num font-medium">{toDelete?.number}</span>؟</p>
+        <p className="text-sm text-text">{t('delete_confirm')} <span className="num font-medium" dir="ltr">{toDelete?.number}</span>؟</p>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setToDelete(null)} disabled={deleting}>{t('retry_cancel')}</Button>
           <Button variant="danger" onClick={confirmDelete} disabled={deleting}>{deleting ? t('generating_delete') : t('delete')}</Button>
