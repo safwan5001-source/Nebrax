@@ -159,7 +159,7 @@ Tests       1325 passed (1325)
 
 ### PHP / Backend
 
-لا PHP/Composer في بيئة التنفيذ المحلية. لا ملفات PHP في الـ diff. GitHub CI على commit `cfb777eb`:
+لا PHP/Composer في بيئة التنفيذ المحلية. لا ملفات PHP في الـ diff. GitHub CI على `cfb777eb` و`ad3250cb` و`4034c23d` (آخرها يشمل ملف هذا التقرير):
 
 | | |
 | --- | --- |
@@ -173,16 +173,22 @@ Tests       1325 passed (1325)
 
 ## 7. Build / CI
 
-### Head السابق `cfb777eb` — كل الفحوصات خضراء
+كل فحوصات GitHub على الـ SHAs الثلاثة خضراء (PHP sqlite + pgsql + Web CI).
+
+### `cfb777eb` — كود المسار
 
 - CI sqlite + pgsql: https://github.com/safwan5001-source/Nebrax/actions/runs/33811472893
 - Web CI: https://github.com/safwan5001-source/Nebrax/actions/runs/33811472966
 
-(تشغيل مكرر لنفس الـ SHA نجح أيضاً: CI `33811442660`، Web CI `33811442772`.)
+### `ad3250cb` — تثبيت جلسة المعاينة + `isValidRiyal`/`isNegative`
 
-### Head الحالي `ad3250cb`
+- CI: https://github.com/safwan5001-source/Nebrax/actions/runs/33814010474
+- Web CI: https://github.com/safwan5001-source/Nebrax/actions/runs/33814010469
 
-بعد تثبيت جلسة المعاينة في الذاكرة ومواءمة `isValidRiyal`/`isNegative`. الفحوصات أُعيد تشغيلها على هذا الـ SHA (Web CI + PHP sqlite/pgsql). النتيجة المحلية: Vitest 1325 passed و`npm run build` نجح. نتيجة GitHub CI لهذا الـ SHA تُحدَّث على صفحة الـ PR عند اكتمالها.
+### `4034c23d` — Head الذي أخضر عليه CI بعد إضافة هذا التقرير
+
+- CI sqlite **2217 passed, 1 skipped** + pgsql **2218 passed**: https://github.com/safwan5001-source/Nebrax/actions/runs/33814257587
+- Web CI: https://github.com/safwan5001-source/Nebrax/actions/runs/33814257572
 
 ---
 
@@ -240,12 +246,14 @@ https://github.com/safwan5001-source/Nebrax/pull/631
 
 ## 13. Head SHA
 
-`ad3250cbfd8434a7ca9ccf58e16ae06e5ede4149`
+كود التنفيذ: `ad3250cbfd8434a7ca9ccf58e16ae06e5ede4149`  
+Head الذي أخضر عليه CI بعد إضافة ملف التقرير: `4034c23de9374cb89ef1ad6efc3f3fb65d984b08`
 
 Commits:
 
 1. `cfb777eb` — `feat(web): open selling session workspace before POS`
 2. `ad3250cb` — `fix(web): persist demo POS open session and use money helpers`
+3. `4034c23d` — `docs: تقرير تنفيذ فتح جلسة البيع قبل POS`
 
 ---
 
