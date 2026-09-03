@@ -5,7 +5,7 @@
 **التاريخ:** 2026-09-03  
 **الفرع:** `cursor/sales-invoices-workspace-v2-7187`  
 **الـ PR:** https://github.com/safwan5001-source/Nebrax/pull/627  
-**SHA:** `601acc4ae337adf3eda33ecdd1fa3b2fefc27312`
+**SHA:** `cd1ec683` (صقل بصري + تصحيح نوع تسميات الأعمدة)
 
 **القاعدة:** طيار واجهة فقط لشاشة قائمة فواتير المبيعات (`/invoices`). لا إعادة تشغيل للمهمة، لا توسيع لشاشات قوائم أخرى، لا دمج، لا نشر، لا backend/محاسبة/ZATCA/ترقيم/عقد API.
 
@@ -41,7 +41,7 @@
 | `web/src/components/invoices/invoice-preview-panel.test.tsx` | أفعال المعاينة، المسودة، Escape، إعادة المحاولة |
 | `web/src/lib/invoices/workspace.ts` | اشتقاق العرض: مسودة، تأخير، أعمدة داعمة مخفية افتراضيًا |
 | `web/src/lib/invoices/workspace.test.ts` | قواعد العرض دون اختراع حالة مجال |
-| `web/src/components/data-table.tsx` | خصائص اختيارية: `onRowClick` / `isRowActive` / `loadingLabel` / `meta.numeric` — القوائم الأخرى بلا تغيير |
+| `web/src/components/data-table.tsx` | خصائص اختيارية: `onRowClick` / `isRowActive` / `loadingLabel` / `meta.numeric` / `showColumnMenu` (افتراضي true) / `meta.hideBelow` — القوائم الأخرى بلا تغيير |
 | `web/src/components/data-table.test.tsx` | حراسة تفعيل الصف الاختياري |
 | `web/src/components/data-explorer/search-bar.tsx` | `inputRef` و`aria-keyshortcuts` اختياريان |
 | `web/src/lib/mock-data.ts` | `due_date`، تصفية/ترقيم/فرز ديمو لمسار القائمة فقط |
@@ -53,7 +53,9 @@
 
 ## 3. المكوّنات المعاد استخدامها
 
-`PageHeader` · `DataTable` · `Pagination` · `Badge` · `Button` · `Dialog` · `SearchBar` · `QuickFilters` · `ActiveFilterChips` · `AdvancedFilterDialog` · `ColumnLayoutMenu` · `BranchViewToggle` · `EmptyState` / `ErrorState` / `LoadingState` · `MobileRecordItem` · `formatRiyal`.
+`DataTable` · `Pagination` · `Badge` · `Button` · `Dialog` · `Dropdown` · `SearchBar` · `QuickFilters` · `ActiveFilterChips` · `AdvancedFilterDialog` · `ColumnLayoutMenu` · `BranchViewToggle` · `EmptyState` / `ErrorState` / `LoadingState` · `MobileRecordItem` · `formatRiyal`.
+
+رأس هذه الشاشة محلي مضغوط؛ `PageHeader` العام لم يُغيَّر ولم يُستخدم هنا بعد الصقل.
 
 لم يُعمَّم شريط الفواتير على قوائم أخرى.
 
@@ -130,8 +132,7 @@ cd web && npm test
 
 ```
 Test Files  205 passed (205)
-Tests       1284 passed (1284)
-Duration    22.24s
+Tests       1289 passed (1289)
 ```
 
 ### البناء (Web CI يفرضه)
@@ -150,19 +151,18 @@ cd web && npm run build
 
 | الملف | المحتوى |
 | --- | --- |
-| `desktop-ar-light.png` | قائمة عربية فاتحة |
-| `desktop-ar-preview.png` | معاينة مرحّلة متأخرة — فتح الفاتورة فقط |
-| `desktop-ar-no-results.png` | بحث بلا نتائج |
+| `desktop-ar-light.png` | قائمة عربية فاتحة: رأس صف واحد، شريط ملتصق بالجدول |
+| `desktop-ar-preview.png` | معاينة ~21rem لمرحّلة متأخرة — فتح الفاتورة فقط |
 | `desktop-ar-sidebar-collapsed.png` | الشريط مطوي |
 | `desktop-ar-dark.png` | قائمة داكنة |
-| `desktop-ar-dark-preview.png` | معاينة داكنة لفاتورة مدفوعة |
+| `desktop-ar-dark-preview.png` | معاينة داكنة |
 | `desktop-en-ltr.png` | إنجليزي LTR |
-| `tablet-ar.png` | لوحي |
-| `mobile-ar-light.png` | جوال فاتح |
+| `tablet-ar.png` | لوحي 768: أعمدة حرجة بلا تمرير فوري + زر فلاتر |
+| `mobile-ar-light.png` | جوال: بحث + فلاتر ثم أول سجل |
+| `mobile-ar-filters.png` | حوار الفلاتر مفتوح |
 | `mobile-ar-dark.png` | جوال داكن |
-| `mobile-ar-preview.png` | معاينة جوال |
+| `mobile-ar-preview.png` | معاينة جوال كاملة العرض |
 | `mobile-ar-nav-drawer.png` | درج التنقل القائم |
-| `desktop-ar-zoom-125.png` / `150.png` | تكبير |
 
 ---
 
@@ -179,3 +179,44 @@ cd web && npm run build
 ## 11. أصغر خطوة تالية
 
 إبقاء هذا طيارًا على `/invoices` حتى مراجعة الكثافة والمعاينة الخفيفة. لا تعميم الشريط أو اللوحة على المشتريات/المدفوعات قبل موافقة صريحة. لا عمل backend لمسار ملخص أو حالة «متأخرة» في العقد.
+
+---
+
+## 12. مرجع القرارات — الصقل البصري
+
+المفهوم المعتمد وُجِّه **التسلسل والكثافة** فقط. التنفيذ على توكنز أَوْج (`border-border`, `bg-surface`, `text-text`, `text-muted`, `--warning` للتأخير). لا تدرجات، لا ظل ثقيل، لا بطاقات مؤشرات، لا شريط مفهوم، لا تبويبات مدفوعات/مرفقات.
+
+| قرار | المصدر المترجم | ما لم يُنسخ |
+| --- | --- | --- |
+| رأس صف تشغيلي واحد محلي (`h1` + فرع + إنشاء) | Linear للإيقاع المضغوط | وصف صفحة طويل، أيقونة زخرفية، قائمة «...» بلا أفعال |
+| شريط ملتصق بسطح الجدول؛ فلاتر عالية التكرار ثم ثانوية | Ramp/Brex للتسلسل، Linear لسطح بلا صندوق مستقل | تحديد جماعي، إجراءات دفعات |
+| جوال: بحث + زر فلاتر → حوار `Dialog` محلي | كثافة الجوال | مكوّن Sheet عالمي |
+| `posted` محايد؛ الأخضر للمسدَّد فقط | تهدئة Slash/Column | شارات «مستحق» كحالة مجال |
+| التأخير إشارة واحدة: شارة + متبقٍ `text-warning` | — | طلاء الاستحقاق والإجمالي معاً |
+| `hideBelow: 'xl'` على التاريخ/الاستحقاق/السداد | أولوية اللوحي | حذف الأعمدة من النموذج |
+| قائمة «المزيد» على سطح المكتب؛ تعديل/حذف لمس على الجوال | — | أفعال قبض/ترحيل/طباعة |
+| معاينة ~21rem عند `xl` مع overlay شفاف و`start-56` | Stripe/Linear لتسلسل التفاصيل | تبويبات، إرسال، طباعة، نسخ الرقم، بطاقة مالية زرقاء |
+
+`PageHeader` العام و`sidebar.tsx` لم يُمسا. `DataTable` أضاف فقط `showColumnMenu` (افتراضي `true`) و`meta.hideBelow`.
+
+### حكم قابلية الاستخدام (لقطات تشغيلية)
+
+- **سطح مكتب 1440:** رأس في صف واحد؛ البحث عند ~186px؛ أول سجل ظاهر عند ~318px؛ فيض الصفحة `0`. الشريط الثانوي يلتف سطراً ثانياً داخل السطح نفسه وهذا مقصود.
+- **معاينة xl:** إزاحة `pe-[21.5rem]`؛ فيض الصفحة `0`. تمرير أفقي *داخل* حاوية الجدول (~161px) لأن أعمدة التاريخ تظهر عند `xl` — ليس فيض صفحة.
+- **لوحي 768:** الأعمدة الحرجة (رقم، عميل، حالة، إجمالي، متبقٍ، إجراءات) ظاهرة **بلا تمرير فوري** (`tableOverflow: 0`). شريط الجوال: بحث + حالة + فلاتر.
+- **جوال 390:** البحث وزر الفلاتر ثم بطاقات السجلات في الشاشة الأولى؛ لا تكديس فلاتر سطح المكتب. حوار الفلاتر يحمل التاريخ/العميل/السداد/الفرز/التصدير/المتقدمة.
+
+### تحقق بعد الصقل
+
+```bash
+cd web && npx vitest run \
+  src/lib/invoices/workspace.test.ts \
+  src/components/invoices/invoice-preview-panel.test.tsx \
+  src/app/\(app\)/invoices/page.test.tsx \
+  src/components/data-table.test.tsx
+# 51 passed
+cd web && npm test   # 205 files, 1289 tests
+cd web && npm run build  # نجح — 144 صفحة
+```
+
+لا دفعة CI إضافية: فشل GitHub السابق كان فوترة الحساب («job was not started… spending limit») لا فشل اختبار.
