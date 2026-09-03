@@ -556,6 +556,58 @@ describe('تجميد Minimal التاريخي مقابل Minimal V2', () => {
   });
 });
 
+describe('تجميد Retail التاريخي مقابل Retail V2', () => {
+  it('لا يعيد تفسير قالب A4 ولا يضيف alias من retail إلى v2', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/modules/print-templates/services/document-output-template.ts'), 'utf8');
+    expect(source).not.toContain('tax-invoice-retail-v2');
+    expect(source).not.toMatch(/retail['"]\s*\?\s*['"]tax-invoice-retail-v2/);
+  });
+
+  it('يثبّت فاتورة مرحّلة على tax-invoice-retail ولا يتبع تعيين V2 الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: true,
+      frozenPrint: revision('frozen-legacy-retail', 'tax-invoice-retail'),
+      livePrint: assignment('live-retail-v2', 'tax-invoice-retail-v2'),
+      livePdf: assignment('live-retail-v2-pdf', 'tax-invoice-retail-v2'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-retail');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-retail');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('tax-invoice-retail');
+    expect(getTemplate(outputs.print?.templateId).component).not.toBe(getTemplate('tax-invoice-retail-v2').component);
+  });
+
+  it('يثبّت فاتورة مرحّلة على tax-invoice-retail-v2 ولا يرجع إلى التاريخي الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: true,
+      frozenPrint: revision('frozen-retail-v2', 'tax-invoice-retail-v2'),
+      livePrint: assignment('live-legacy-retail', 'tax-invoice-retail'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-retail-v2');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-retail-v2');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('tax-invoice-retail-v2');
+  });
+
+  it('يجعل المسودة تتبع التعيين الحي: retail التاريخي أو V2', () => {
+    const legacyDraft = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: false,
+      livePrint: assignment('draft-legacy-retail', 'tax-invoice-retail'),
+    });
+    expect(legacyDraft.print?.templateId).toBe('tax-invoice-retail');
+
+    const v2Draft = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: false,
+      livePrint: assignment('draft-retail-v2', 'tax-invoice-retail-v2'),
+    });
+    expect(v2Draft.print?.templateId).toBe('tax-invoice-retail-v2');
+    expect(v2Draft.pdf?.templateId).toBe('tax-invoice-retail-v2');
+    expect(v2Draft.pdfSharesPrintRoot).toBe(true);
+  });
+});
+
 describe('resolvedTemplatesEqual', () => {
   it('يميّز تعريفين مختلفين', () => {
     const classic = resolveDocumentOutputTemplates({

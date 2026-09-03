@@ -9,6 +9,7 @@ import { VISUAL_V2 } from '../../presentation/visual-v2';
 import { ERP_V2 } from '../../presentation/erp-v2';
 import { CLASSIC_V2 } from '../../presentation/classic-v2';
 import { MINIMAL_V2 } from '../../presentation/minimal-v2';
+import { RETAIL_V2 } from '../../presentation/retail-v2';
 import { ModernFieldLabel } from '../../presentation/modern-bilingual-label';
 
 /** رمز ZATCA (QR) — يُرسَم SVG آمناً؛ يُبقي مساحة فارغة حين لا يوجد رمز. */
@@ -21,14 +22,15 @@ export function DocQr({ model }: { model: DocumentModel }) {
   const isErpV2 = style.composition === 'erp_v2';
   const isClassicV2 = style.composition === 'classic_v2';
   const isMinimalV2 = style.composition === 'minimal_v2';
-  const usesV2Labels = isModernV2 || isErpV2 || isClassicV2 || isMinimalV2;
-  const size = isMinimalV2 ? MINIMAL_V2.qrSizePx : isErpV2 ? ERP_V2.qrSizePx : isClassicV2 ? CLASSIC_V2.qrSizePx : isModernV2 ? VISUAL_V2.qrSizePx : 110;
+  const isRetailV2 = style.composition === 'retail_v2';
+  const usesV2Labels = isModernV2 || isErpV2 || isClassicV2 || isMinimalV2 || isRetailV2;
+  const size = isRetailV2 ? RETAIL_V2.qrSizePx : isMinimalV2 ? MINIMAL_V2.qrSizePx : isErpV2 ? ERP_V2.qrSizePx : isClassicV2 ? CLASSIC_V2.qrSizePx : isModernV2 ? VISUAL_V2.qrSizePx : 110;
 
   return (
     <div className="flex flex-col items-center gap-1">
       {qr ? (
         <>
-          <div className={isErpV2 ? 'border border-black p-0.5' : isClassicV2 ? 'border border-black p-1' : isModernV2 || isMinimalV2 ? 'border border-[color:var(--border)] p-1' : 'rounded-lg border border-gray-200 p-2'}>
+          <div className={isErpV2 ? 'border border-black p-0.5' : isClassicV2 ? 'border border-black p-1' : isModernV2 || isMinimalV2 || isRetailV2 ? 'border border-[color:var(--border)] p-1' : 'rounded-lg border border-gray-200 p-2'}>
             <QRCodeSVG value={qr} size={size} level="M" />
           </div>
           <div className={usesV2Labels ? 'text-[9px] text-[color:var(--muted)]' : 'text-[9px] text-gray-400'}>

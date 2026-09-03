@@ -8,6 +8,8 @@ import { TaxInvoiceModern } from '../templates/tax-invoice-modern';
 import { TaxInvoiceModernV2 } from '../templates/tax-invoice-modern-v2';
 import { TaxInvoiceMinimal } from '../templates/tax-invoice-minimal';
 import { TaxInvoiceMinimalV2 } from '../templates/tax-invoice-minimal-v2';
+import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
+import { TaxInvoiceRetailV2 } from '../templates/tax-invoice-retail-v2';
 
 describe('سجل قوالب المستندات', () => {
   it('يبقي الافتراضي classic ولا يعيد تفسير modern كـ v2', () => {
@@ -114,5 +116,30 @@ describe('سجل قوالب المستندات', () => {
     expect(ids).toContain('tax-invoice-minimal-v2');
     expect(ids.filter((id) => id === 'tax-invoice-minimal')).toHaveLength(1);
     expect(ids.filter((id) => id === 'tax-invoice-minimal-v2')).toHaveLength(1);
+  });
+
+  it('يسجّل tax-invoice-retail وtax-invoice-retail-v2 كهويتين مستقلتين بلا alias', () => {
+    const retail = getTemplate('tax-invoice-retail');
+    const retailV2 = getTemplate('tax-invoice-retail-v2');
+
+    expect(retail.id).toBe('tax-invoice-retail');
+    expect(retail.nameKey).toBe('retail');
+    expect(retail.component).toBe(TaxInvoiceRetail);
+    expect(retail.defaultTheme).toBe('blue');
+
+    expect(retailV2.id).toBe('tax-invoice-retail-v2');
+    expect(retailV2.nameKey).toBe('retail_v2');
+    expect(retailV2.component).toBe(TaxInvoiceRetailV2);
+    expect(retailV2.defaultTheme).toBe('blue');
+
+    expect(retail.component).not.toBe(retailV2.component);
+    expect(retail).not.toBe(retailV2);
+    expect(DEFAULT_TEMPLATE_ID).toBe('tax-invoice-classic');
+
+    const ids = listTemplates().map((template) => template.id);
+    expect(ids).toContain('tax-invoice-retail');
+    expect(ids).toContain('tax-invoice-retail-v2');
+    expect(ids.filter((id) => id === 'tax-invoice-retail')).toHaveLength(1);
+    expect(ids.filter((id) => id === 'tax-invoice-retail-v2')).toHaveLength(1);
   });
 });

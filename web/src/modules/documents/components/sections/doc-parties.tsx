@@ -270,6 +270,36 @@ export function DocParties({ model }: { model: DocumentModel }) {
     );
   }
 
+  if (style.composition === 'retail_v2') {
+    const issuerField = isPurchaseDocument
+      ? 'purchase_buyer' as const
+      : isTaxInvoice
+        ? 'seller' as const
+        : 'company' as const;
+    const partyField = isDeliveryNote
+      ? 'recipient' as const
+      : model.type === 'payment_voucher' || model.type === 'debit_note' || isPurchaseDocument
+        ? 'supplier' as const
+        : model.type === 'receipt_voucher' || model.type === 'quotation' || model.type === 'sales_order' || model.type === 'credit_note'
+          ? 'customer' as const
+          : 'buyer' as const;
+    return (
+      <section className={cn('grid grid-cols-2 gap-x-10 gap-y-2 border-b border-[color:var(--border)] pb-2.5', style.sectionGap)}>
+        <div className="min-w-0">
+          <div className="mb-1 text-[9px] font-semibold tracking-wide text-[color:var(--muted)]"><ModernFieldLabel field={issuerField} mode={mode} /></div>
+          <div className="break-words text-[12px] font-bold leading-snug text-black">{seller.name || '—'}</div>
+          <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} />
+        </div>
+        <div className="min-w-0">
+          <div className="mb-1 text-[9px] font-semibold tracking-wide text-[color:var(--muted)]"><ModernFieldLabel field={partyField} mode={mode} /></div>
+          <div className="break-words text-[12px] font-bold leading-snug text-black">{buyer.name || '—'}</div>
+          <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={buyer.vatNumber ? <span className="num" dir="ltr">{buyer.vatNumber}</span> : null} />
+          <DocInfoRow label={<ModernFieldLabel field="city" mode={mode} />} value={buyer.city} />
+        </div>
+      </section>
+    );
+  }
+
   const card = cn('border border-gray-200 p-3', style.cardRadius);
   return (
     <div className={cn('grid grid-cols-3 gap-4', style.sectionGap)}>

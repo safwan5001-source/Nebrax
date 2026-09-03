@@ -125,6 +125,19 @@ describe('محول تعريف القالب الحي', () => {
     expect(resolved?.footerText).toBe('تذييل Minimal V2');
   });
 
+  it('يحافظ على هوية tax-invoice-retail-v2 دون سقوط إلى التاريخي', () => {
+    const resolved = resolveLiveTemplateDefinition({
+      print_template_revision_id: 'retail-v2-revision',
+      revision: {
+        id: 'retail-v2-revision',
+        definition: { template_id: 'tax-invoice-retail-v2', footer_text: 'تذييل Retail V2' },
+      },
+    }, 'tax_invoice');
+
+    expect(resolved?.templateId).toBe('tax-invoice-retail-v2');
+    expect(resolved?.footerText).toBe('تذييل Retail V2');
+  });
+
   it('يطبق تعريف السند الحي على كتلة السند والبيانات البنكية', () => {
     const resolved = resolveLiveTemplateDefinition({
       print_template_revision_id: 'voucher-revision',

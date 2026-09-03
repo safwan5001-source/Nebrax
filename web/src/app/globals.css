@@ -215,4 +215,15 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
+  /* Retail V2 فقط: لا تُطبَّق على retail التاريخي ولا عائلات V2 الأخرى. */
+  [data-doc-composition="retail_v2"] thead {
+    display: table-header-group;
+  }
+  [data-doc-composition="retail_v2"] tr,
+  [data-doc-composition="retail_v2"] [data-doc-keep="summary"],
+  [data-doc-composition="retail_v2"] footer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

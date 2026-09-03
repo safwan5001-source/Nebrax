@@ -8,6 +8,7 @@ import { TaxInvoiceErpV2 } from '../templates/tax-invoice-erp-v2';
 import { TaxInvoiceMinimal } from '../templates/tax-invoice-minimal';
 import { TaxInvoiceMinimalV2 } from '../templates/tax-invoice-minimal-v2';
 import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
+import { TaxInvoiceRetailV2 } from '../templates/tax-invoice-retail-v2';
 import { TaxReceiptThermal58, TaxReceiptThermal80 } from '../templates/thermal-receipt';
 
 /**
@@ -75,6 +76,13 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     id: 'tax-invoice-retail',
     nameKey: 'retail',
     component: TaxInvoiceRetail,
+    defaultTheme: 'blue',
+    supportedPaper: ['a4', 'letter'],
+  },
+  'tax-invoice-retail-v2': {
+    id: 'tax-invoice-retail-v2',
+    nameKey: 'retail_v2',
+    component: TaxInvoiceRetailV2,
     defaultTheme: 'blue',
     supportedPaper: ['a4', 'letter'],
   },

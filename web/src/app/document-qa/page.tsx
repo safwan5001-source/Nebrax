@@ -21,6 +21,8 @@ const TEMPLATES = [
   { id: 'tax-invoice-modern-v2', labelKey: 'modern_v2' },
   { id: 'tax-invoice-minimal', labelKey: 'minimal' },
   { id: 'tax-invoice-minimal-v2', labelKey: 'minimal_v2' },
+  { id: 'tax-invoice-retail', labelKey: 'retail' },
+  { id: 'tax-invoice-retail-v2', labelKey: 'retail_v2' },
 ] as const;
 const DOCUMENT_TYPES = [
   'tax_invoice',
@@ -64,8 +66,9 @@ export default function DocumentQaPage() {
   );
   const layout = useMemo(() => getDefaultDocumentLayout(documentType).map((item) => ({
     ...item,
-    visible: item.visible && (showAssets || !['bank', 'stamp', 'signature'].includes(item.key)),
-  })), [documentType, showAssets]);
+    visible: (item.visible && (showAssets || !['bank', 'stamp', 'signature'].includes(item.key)))
+      || (item.key === 'barcode' && (templateId === 'tax-invoice-retail' || templateId === 'tax-invoice-retail-v2')),
+  })), [documentType, showAssets, templateId]);
 
   const updateQuery = (key: 'type' | 'template' | 'scenario' | 'direction', value: string) => {
     const next = new URLSearchParams({
