@@ -115,7 +115,7 @@ Duration    21.47s
 | `php artisan test` | غير مشغَّل (لا backend) |
 | `npm run test` | 200 ملفاً / **1240** اختباراً |
 | `npm run build` | نجح محلياً (Next.js 15.5.19) |
-| GitHub CI | قيد الانتظار على رأس الفرع بعد تقرير التنفيذ؛ يُحدَّث عند الاكتمال |
+| GitHub CI | **نجح** 5/5 على `e5a9eafe67f6f8b39fa52bd3199302fd29d1e3d7`؛ لا دمج |
 
 ---
 
@@ -205,7 +205,8 @@ Merge PR #621: Invoice Visual V2 Minimal V2.
 ## 13. Implementation SHA vs Head
 
 - **Implementation SHA (كود الهويات والأقسام والاختبارات):** `07b085b00f70ad514157d805ced2ba2565a14319`
-- **CI-green SHA:** يُسجَّل بعد نجاح GitHub CI 5/5 (توثيق لاحق؛ لا التزام لمجرد مزامنة الهاش داخل الملف).
+- **CI-green SHA:** `e5a9eafe67f6f8b39fa52bd3199302fd29d1e3d7` (تقرير التنفيذ؛ 5/5)
+- **Head SHA:** التزام تسجيل نجاح CI (توثيق لاحق؛ لا التزام لمجرد مزامنة الهاش داخل الملف).
 
 ---
 
