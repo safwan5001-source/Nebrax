@@ -152,6 +152,20 @@ describe('محول تعريف القالب الحي', () => {
     expect(resolved?.layout.map((block) => block.key)).toContain('summary');
   });
 
+  it('يحافظ على هوية purchase-order-formal دون سقوط إلى classic أو عرض السعر', () => {
+    const resolved = resolveLiveTemplateDefinition({
+      print_template_revision_id: 'po-formal-revision',
+      revision: {
+        id: 'po-formal-revision',
+        definition: { template_id: 'purchase-order-formal', footer_text: 'تذييل أمر الشراء' },
+      },
+    }, 'purchase_order');
+
+    expect(resolved?.templateId).toBe('purchase-order-formal');
+    expect(resolved?.footerText).toBe('تذييل أمر الشراء');
+    expect(resolved?.layout.map((block) => block.key)).toContain('summary');
+  });
+
   it('يطبق تعريف السند الحي على كتلة السند والبيانات البنكية', () => {
     const resolved = resolveLiveTemplateDefinition({
       print_template_revision_id: 'voucher-revision',

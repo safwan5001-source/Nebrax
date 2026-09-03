@@ -193,3 +193,21 @@ export const QUOTATION_PROPOSAL_STYLE: TemplateStyle = {
 export function isQuotationProposal(style: Pick<TemplateStyle, 'composition'>): boolean {
   return style.composition === 'quotation_proposal';
 }
+
+/**
+ * Purchase Order Formal — أمر شراء تشغيلي مستقل عن عرض السعر وعن كل هويات الفاتورة.
+ * مربوط بـ `purchase-order-formal` فقط. بلا شريط هوية وبلا QR.
+ */
+export const PURCHASE_ORDER_FORMAL_STYLE: TemplateStyle = {
+  composition: 'purchase_order_formal',
+  pagePadding: 'p-7',
+  cardRadius: 'rounded-none',
+  sectionGap: 'mt-4',
+  tableHead: 'plain',
+  tableDensity: 'compact',
+  brandBar: false,
+};
+
+export function isPurchaseOrderFormal(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'purchase_order_formal';
+}

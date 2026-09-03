@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLASSIC_STYLE, CLASSIC_V2_STYLE, ERP_STYLE, ERP_V2_STYLE, MINIMAL_STYLE, MINIMAL_V2_STYLE, MODERN_STYLE, MODERN_V2_STYLE, QUOTATION_PROPOSAL_STYLE, RETAIL_STYLE, RETAIL_V2_STYLE, isClassicV2, isErpV2, isLegacyClassic, isLegacyErp, isLegacyMinimal, isLegacyModern, isLegacyRetail, isMinimalV2, isModernV2, isQuotationProposal, isRetailV2 } from './template-styles';
+import { CLASSIC_STYLE, CLASSIC_V2_STYLE, ERP_STYLE, ERP_V2_STYLE, MINIMAL_STYLE, MINIMAL_V2_STYLE, MODERN_STYLE, MODERN_V2_STYLE, PURCHASE_ORDER_FORMAL_STYLE, QUOTATION_PROPOSAL_STYLE, RETAIL_STYLE, RETAIL_V2_STYLE, isClassicV2, isErpV2, isLegacyClassic, isLegacyErp, isLegacyMinimal, isLegacyModern, isLegacyRetail, isMinimalV2, isModernV2, isPurchaseOrderFormal, isQuotationProposal, isRetailV2 } from './template-styles';
 
 describe('أساليب قوالب المستندات الرسمية', () => {
   it('يفصل ERP وModern التاريخي وModern V2 وMinimal بهويات تركيبية مختلفة', () => {
@@ -11,7 +11,7 @@ describe('أساليب قوالب المستندات الرسمية', () => {
     expect(ERP_STYLE.tableDensity).toBe('compact');
     expect(MODERN_STYLE.tableDensity).toBe('comfortable');
     expect(MINIMAL_STYLE.tableDensity).toBe('spacious');
-    expect(new Set([CLASSIC_STYLE.composition, CLASSIC_V2_STYLE.composition, ERP_STYLE.composition, ERP_V2_STYLE.composition, MODERN_STYLE.composition, MODERN_V2_STYLE.composition, MINIMAL_STYLE.composition, MINIMAL_V2_STYLE.composition, RETAIL_STYLE.composition, RETAIL_V2_STYLE.composition, QUOTATION_PROPOSAL_STYLE.composition]).size).toBe(11);
+    expect(new Set([CLASSIC_STYLE.composition, CLASSIC_V2_STYLE.composition, ERP_STYLE.composition, ERP_V2_STYLE.composition, MODERN_STYLE.composition, MODERN_V2_STYLE.composition, MINIMAL_STYLE.composition, MINIMAL_V2_STYLE.composition, RETAIL_STYLE.composition, RETAIL_V2_STYLE.composition, QUOTATION_PROPOSAL_STYLE.composition, PURCHASE_ORDER_FORMAL_STYLE.composition]).size).toBe(12);
   });
 
   it('يبقي Modern التاريخي ببطاقات ناعمة وV2 رسمياً بلا بطاقات', () => {
@@ -160,5 +160,21 @@ describe('أساليب قوالب المستندات الرسمية', () => {
     expect(QUOTATION_PROPOSAL_STYLE.pagePadding).not.toBe(RETAIL_V2_STYLE.pagePadding);
     expect(QUOTATION_PROPOSAL_STYLE.pagePadding).not.toBe(MINIMAL_V2_STYLE.pagePadding);
     expect(QUOTATION_PROPOSAL_STYLE.pagePadding).not.toBe(ERP_V2_STYLE.pagePadding);
+    expect(isPurchaseOrderFormal(PURCHASE_ORDER_FORMAL_STYLE)).toBe(true);
+    expect(isPurchaseOrderFormal(QUOTATION_PROPOSAL_STYLE)).toBe(false);
+    expect(isPurchaseOrderFormal(CLASSIC_STYLE)).toBe(false);
+    expect(isQuotationProposal(PURCHASE_ORDER_FORMAL_STYLE)).toBe(false);
+    expect(PURCHASE_ORDER_FORMAL_STYLE).toMatchObject({
+      composition: 'purchase_order_formal',
+      pagePadding: 'p-7',
+      cardRadius: 'rounded-none',
+      sectionGap: 'mt-4',
+      tableHead: 'plain',
+      tableDensity: 'compact',
+      brandBar: false,
+    });
+    expect(PURCHASE_ORDER_FORMAL_STYLE.pagePadding).not.toBe(QUOTATION_PROPOSAL_STYLE.pagePadding);
+    expect(PURCHASE_ORDER_FORMAL_STYLE.tableDensity).not.toBe(QUOTATION_PROPOSAL_STYLE.tableDensity);
+    expect(PURCHASE_ORDER_FORMAL_STYLE.sectionGap).not.toBe(QUOTATION_PROPOSAL_STYLE.sectionGap);
   });
 });

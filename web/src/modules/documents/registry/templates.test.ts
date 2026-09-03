@@ -11,6 +11,7 @@ import { TaxInvoiceMinimalV2 } from '../templates/tax-invoice-minimal-v2';
 import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
 import { TaxInvoiceRetailV2 } from '../templates/tax-invoice-retail-v2';
 import { QuotationProposal } from '../templates/quotation-proposal';
+import { PurchaseOrderFormal } from '../templates/purchase-order-formal';
 
 describe('سجل قوالب المستندات', () => {
   it('يبقي الافتراضي classic ولا يعيد تفسير modern كـ v2', () => {
@@ -177,5 +178,45 @@ describe('سجل قوالب المستندات', () => {
     expect(thermalIds).toContain('tax-invoice-thermal58');
     expect(thermalIds).toContain('tax-invoice-thermal80');
     expect(thermalIds).not.toContain('quotation-proposal');
+  });
+
+  it('يسجّل purchase-order-formal بهوية مستقلة بلا alias إلى الفاتورة أو عرض السعر', () => {
+    const formal = getTemplate('purchase-order-formal');
+    expect(formal.id).toBe('purchase-order-formal');
+    expect(formal.nameKey).toBe('purchase_order_formal');
+    expect(formal.component).toBe(PurchaseOrderFormal);
+    expect(formal.defaultTheme).toBe('gray');
+    expect(formal.documentTypes).toEqual(['purchase_order']);
+    expect(formal.supportedPaper).toEqual(['a4', 'a4_landscape', 'letter', 'legal']);
+    expect(DEFAULT_TEMPLATE_ID).toBe('tax-invoice-classic');
+    expect(getTemplate('unknown-template-id').id).toBe('tax-invoice-classic');
+    expect(getTemplate('purchase-order-formal').component).not.toBe(TaxInvoiceClassic);
+    expect(getTemplate('purchase-order-formal').component).not.toBe(QuotationProposal);
+
+    const ids = listTemplates().map((template) => template.id);
+    expect(ids).toContain('purchase-order-formal');
+    expect(ids.filter((id) => id === 'purchase-order-formal')).toHaveLength(1);
+    expect(ids).not.toContain('tax-invoice-purchase-order');
+    expect(ids).not.toContain('quotation-proposal-purchase');
+  });
+
+  it('يظهر purchase-order-formal في كتالوج أمر الشراء فقط لا الفاتورة ولا عرض السعر ولا الحراري', () => {
+    const purchaseOrderIds = listTemplatesForDocumentType('purchase_order').map((template) => template.id);
+    const quotationIds = listTemplatesForDocumentType('quotation').map((template) => template.id);
+    const invoiceIds = listTemplatesForDocumentType('tax_invoice').map((template) => template.id);
+    const thermalIds = listTemplatesForDocumentType('tax_invoice')
+      .filter((template) => template.supportedPaper.some((paper) => paper.startsWith('thermal_')))
+      .map((template) => template.id);
+
+    expect(purchaseOrderIds).toContain('purchase-order-formal');
+    expect(purchaseOrderIds).toContain('tax-invoice-classic');
+    expect(purchaseOrderIds).not.toContain('quotation-proposal');
+    expect(quotationIds).not.toContain('purchase-order-formal');
+    expect(quotationIds).toContain('quotation-proposal');
+    expect(invoiceIds).not.toContain('purchase-order-formal');
+    expect(invoiceIds).toContain('tax-invoice-classic');
+    expect(thermalIds).toContain('tax-invoice-thermal58');
+    expect(thermalIds).toContain('tax-invoice-thermal80');
+    expect(thermalIds).not.toContain('purchase-order-formal');
   });
 });
