@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLASSIC_STYLE, CLASSIC_V2_STYLE, ERP_STYLE, ERP_V2_STYLE, MINIMAL_STYLE, MINIMAL_V2_STYLE, MODERN_STYLE, MODERN_V2_STYLE, RETAIL_STYLE, isClassicV2, isErpV2, isLegacyClassic, isLegacyErp, isLegacyMinimal, isLegacyModern, isMinimalV2, isModernV2 } from './template-styles';
+import { CLASSIC_STYLE, CLASSIC_V2_STYLE, ERP_STYLE, ERP_V2_STYLE, MINIMAL_STYLE, MINIMAL_V2_STYLE, MODERN_STYLE, MODERN_V2_STYLE, RETAIL_STYLE, RETAIL_V2_STYLE, isClassicV2, isErpV2, isLegacyClassic, isLegacyErp, isLegacyMinimal, isLegacyModern, isLegacyRetail, isMinimalV2, isModernV2, isRetailV2 } from './template-styles';
 
 describe('أساليب قوالب المستندات الرسمية', () => {
   it('يفصل ERP وModern التاريخي وModern V2 وMinimal بهويات تركيبية مختلفة', () => {
@@ -11,7 +11,7 @@ describe('أساليب قوالب المستندات الرسمية', () => {
     expect(ERP_STYLE.tableDensity).toBe('compact');
     expect(MODERN_STYLE.tableDensity).toBe('comfortable');
     expect(MINIMAL_STYLE.tableDensity).toBe('spacious');
-    expect(new Set([CLASSIC_STYLE.composition, CLASSIC_V2_STYLE.composition, ERP_STYLE.composition, ERP_V2_STYLE.composition, MODERN_STYLE.composition, MODERN_V2_STYLE.composition, MINIMAL_STYLE.composition, MINIMAL_V2_STYLE.composition]).size).toBe(8);
+    expect(new Set([CLASSIC_STYLE.composition, CLASSIC_V2_STYLE.composition, ERP_STYLE.composition, ERP_V2_STYLE.composition, MODERN_STYLE.composition, MODERN_V2_STYLE.composition, MINIMAL_STYLE.composition, MINIMAL_V2_STYLE.composition, RETAIL_STYLE.composition, RETAIL_V2_STYLE.composition]).size).toBe(10);
   });
 
   it('يبقي Modern التاريخي ببطاقات ناعمة وV2 رسمياً بلا بطاقات', () => {
@@ -122,5 +122,25 @@ describe('أساليب قوالب المستندات الرسمية', () => {
     expect(MINIMAL_V2_STYLE.pagePadding).not.toBe(CLASSIC_V2_STYLE.pagePadding);
     expect(MINIMAL_V2_STYLE.pagePadding).not.toBe(ERP_V2_STYLE.pagePadding);
     expect(MINIMAL_V2_STYLE.sectionGap).not.toBe(MINIMAL_STYLE.sectionGap);
+    expect(isLegacyRetail(RETAIL_STYLE)).toBe(true);
+    expect(isRetailV2(RETAIL_STYLE)).toBe(false);
+    expect(isRetailV2(RETAIL_V2_STYLE)).toBe(true);
+    expect(isLegacyRetail(RETAIL_V2_STYLE)).toBe(false);
+    expect(RETAIL_V2_STYLE).toMatchObject({
+      composition: 'retail_v2',
+      pagePadding: 'p-6',
+      cardRadius: 'rounded-none',
+      sectionGap: 'mt-3',
+      tableHead: 'plain',
+      tableDensity: 'compact',
+      brandBar: false,
+    });
+    expect(RETAIL_V2_STYLE.pagePadding).toBe(RETAIL_STYLE.pagePadding);
+    expect(RETAIL_V2_STYLE.sectionGap).not.toBe(RETAIL_STYLE.sectionGap);
+    expect(RETAIL_V2_STYLE.tableHead).not.toBe(RETAIL_STYLE.tableHead);
+    expect(RETAIL_V2_STYLE.brandBar).not.toBe(RETAIL_STYLE.brandBar);
+    expect(RETAIL_V2_STYLE.pagePadding).not.toBe(ERP_V2_STYLE.pagePadding);
+    expect(RETAIL_V2_STYLE.pagePadding).not.toBe(CLASSIC_V2_STYLE.pagePadding);
+    expect(RETAIL_V2_STYLE.pagePadding).not.toBe(MINIMAL_V2_STYLE.pagePadding);
   });
 });

@@ -153,3 +153,25 @@ export const RETAIL_STYLE: TemplateStyle = {
   tableDensity: 'compact',
   brandBar: true,
 };
+
+/**
+ * Retail V2 — تجاري سريع المسح، مستقل عن `tax-invoice-retail` التاريخي وعن عائلات V2 الأخرى.
+ * مربوط بـ `tax-invoice-retail-v2` فقط.
+ */
+export const RETAIL_V2_STYLE: TemplateStyle = {
+  composition: 'retail_v2',
+  pagePadding: 'p-6',
+  cardRadius: 'rounded-none',
+  sectionGap: 'mt-3',
+  tableHead: 'plain',
+  tableDensity: 'compact',
+  brandBar: false,
+};
+
+export function isRetailV2(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'retail_v2';
+}
+
+export function isLegacyRetail(style: Pick<TemplateStyle, 'composition'>): boolean {
+  return style.composition === 'retail';
+}

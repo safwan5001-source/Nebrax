@@ -83,6 +83,15 @@ export function DocSummary({
     );
   }
 
+  if (style.composition === 'retail_v2') {
+    return (
+      <section data-doc-keep="summary" className={cn('flex items-end justify-between gap-5', style.sectionGap)}>
+        <div className="shrink-0">{qr}</div>
+        {totals}
+      </section>
+    );
+  }
+
   return (
     <div className={cn('flex items-start justify-between gap-6', style.sectionGap)}>
       {qr ?? <div />}

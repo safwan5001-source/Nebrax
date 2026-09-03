@@ -203,7 +203,7 @@ export interface TemplateConfig {
  * الهوية التركيبية للقالب. هذه قيمة عرضية محلية فقط؛ لا تحفظ داخل تعريف الكتلة
  * ولا تعيد تفسير المراجعات المثبتة أو نموذج المستند.
  */
-export type TemplateComposition = 'classic' | 'classic_v2' | 'erp' | 'erp_v2' | 'modern' | 'modern_v2' | 'minimal' | 'minimal_v2' | 'retail';
+export type TemplateComposition = 'classic' | 'classic_v2' | 'erp' | 'erp_v2' | 'modern' | 'modern_v2' | 'minimal' | 'minimal_v2' | 'retail' | 'retail_v2';
 
 export interface TemplateStyle {
   /** الهوية التركيبية للقالب ضمن الأقسام المشتركة. */
