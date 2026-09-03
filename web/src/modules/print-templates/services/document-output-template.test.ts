@@ -504,6 +504,58 @@ describe('تجميد Classic التاريخي مقابل Classic V2', () => {
   });
 });
 
+describe('تجميد Minimal التاريخي مقابل Minimal V2', () => {
+  it('لا يعيد تفسير قالب A4 ولا يضيف alias من minimal إلى v2', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/modules/print-templates/services/document-output-template.ts'), 'utf8');
+    expect(source).not.toContain('tax-invoice-minimal-v2');
+    expect(source).not.toMatch(/minimal['"]\s*\?\s*['"]tax-invoice-minimal-v2/);
+  });
+
+  it('يثبّت فاتورة مرحّلة على tax-invoice-minimal ولا يتبع تعيين V2 الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: true,
+      frozenPrint: revision('frozen-legacy-minimal', 'tax-invoice-minimal'),
+      livePrint: assignment('live-minimal-v2', 'tax-invoice-minimal-v2'),
+      livePdf: assignment('live-minimal-v2-pdf', 'tax-invoice-minimal-v2'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-minimal');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-minimal');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('tax-invoice-minimal');
+    expect(getTemplate(outputs.print?.templateId).component).not.toBe(getTemplate('tax-invoice-minimal-v2').component);
+  });
+
+  it('يثبّت فاتورة مرحّلة على tax-invoice-minimal-v2 ولا يرجع إلى التاريخي الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: true,
+      frozenPrint: revision('frozen-minimal-v2', 'tax-invoice-minimal-v2'),
+      livePrint: assignment('live-legacy-minimal', 'tax-invoice-minimal'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-minimal-v2');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-minimal-v2');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('tax-invoice-minimal-v2');
+  });
+
+  it('يجعل المسودة تتبع التعيين الحي: minimal التاريخي أو V2', () => {
+    const legacyDraft = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: false,
+      livePrint: assignment('draft-legacy-minimal', 'tax-invoice-minimal'),
+    });
+    expect(legacyDraft.print?.templateId).toBe('tax-invoice-minimal');
+
+    const v2Draft = resolveDocumentOutputTemplates({
+      documentType: 'tax_invoice',
+      isPosted: false,
+      livePrint: assignment('draft-minimal-v2', 'tax-invoice-minimal-v2'),
+    });
+    expect(v2Draft.print?.templateId).toBe('tax-invoice-minimal-v2');
+    expect(v2Draft.pdf?.templateId).toBe('tax-invoice-minimal-v2');
+    expect(v2Draft.pdfSharesPrintRoot).toBe(true);
+  });
+});
+
 describe('resolvedTemplatesEqual', () => {
   it('يميّز تعريفين مختلفين', () => {
     const classic = resolveDocumentOutputTemplates({

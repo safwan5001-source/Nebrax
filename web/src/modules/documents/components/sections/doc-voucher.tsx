@@ -27,9 +27,10 @@ export function DocVoucher({
   const isModernV2 = style.composition === 'modern_v2';
   const isErpV2 = style.composition === 'erp_v2';
   const isClassicV2 = style.composition === 'classic_v2';
+  const isMinimalV2 = style.composition === 'minimal_v2';
   const voucherLabel = (
     key: 'received_from' | 'paid_to' | 'amount' | 'method' | 'reference' | 'applied_to',
-  ) => (isModernV2 || isErpV2 || isClassicV2 ? <ModernFieldLabel field={key} mode={mode} /> : t(key));
+  ) => (isModernV2 || isErpV2 || isClassicV2 || isMinimalV2 ? <ModernFieldLabel field={key} mode={mode} /> : t(key));
 
   const party = model.buyer.name || '—';
   const phrase = v.direction === 'received' ? voucherLabel('received_from') : voucherLabel('paid_to');
