@@ -176,7 +176,7 @@ export default function InvoicesPage() {
     ...storedColumnVisibility,
     value: { ...INVOICE_SUPPORTING_COLUMN_DEFAULTS, ...storedColumnVisibility.value },
     protectedColumnIds: ['number', 'actions'],
-    labels: { actions: t('actions') },
+    labels: { actions: t('actions') } as Record<string, string>,
   }), [storedColumnVisibility, t]);
 
   const partnerNames = useMemo(
