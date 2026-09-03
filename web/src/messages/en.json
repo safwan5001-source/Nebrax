@@ -3445,6 +3445,25 @@
     "handover_receiver": "Handover receiver",
     "view_variance_journal": "View variance settlement entry"
   },
+  "posOpenSession": {
+    "title": "Open Selling Session",
+    "description": "Select the POS device and work shift, then enter the opening cash float before selling.",
+    "device": "POS device",
+    "select_device": "Select a device",
+    "no_device": "No active POS device is available in this branch.",
+    "pos_shift": "POS shift",
+    "select_shift": "Select a shift",
+    "no_shift": "No active POS shift is available in this branch.",
+    "opening_cash": "Opening cash float",
+    "opening_cash_hint": "Cash received at the start of the shift",
+    "submit": "Open Session & Start Selling",
+    "cancel": "Cancel",
+    "resuming": "Open selling session found — continuing to POS…",
+    "session_closed_remote": "The POS shift was closed elsewhere. Open a new session to continue.",
+    "device_required": "Device is required.",
+    "shift_required": "POS shift is required.",
+    "opening_balance_invalid": "Enter a valid amount that is not negative."
+  },
   "posAudit": {
     "exceptions": "Exceptions",
     "riskIndicators": "Review indicators",

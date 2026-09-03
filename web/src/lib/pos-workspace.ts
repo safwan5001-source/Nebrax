@@ -1,15 +1,17 @@
 /**
  * سياسة فتح مساحة نقطة البيع المخصّصة.
  *
- * «بدء البيع» وحده يفتح `/pos` في تبويب متصفح جديد عبر رابط دلالي
+ * «بدء البيع» وحده يفتح `/pos/start` في تبويب متصفح جديد عبر رابط دلالي
  * (`target="_blank"`) من إيماءة المستخدم مباشرة — بلا `window.open`
  * بعد انتظار شبكة، وبلا نافذة بأبعاد ثابتة.
  *
  * الجلسة المالية تبقى من الخادم (`GET /pos-sessions?mine=1` ثم فتح
- * صريح). هذا الملف لا يفتح وردية ولا يجعل localStorage مصدر حقيقة محاسبية.
+ * صريح بـ `pos_shift_id`). هذا الملف لا يفتح وردية ولا يجعل localStorage
+ * مصدر حقيقة محاسبية.
  */
 
-export const POS_START_HREF = '/pos' as const;
+export const POS_START_HREF = '/pos/start' as const;
+export const POS_SELLING_HREF = '/pos' as const;
 export const POS_RETURN_HREF = '/dashboard' as const;
 export const POS_NEW_TAB_TARGET = '_blank' as const;
 export const POS_NEW_TAB_REL = 'noopener noreferrer' as const;

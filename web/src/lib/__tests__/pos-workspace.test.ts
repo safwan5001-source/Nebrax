@@ -25,11 +25,11 @@ function source(file: string) {
 describe('فتح مساحة POS في تبويب مستقل', () => {
   it('يعيد href وtarget وrel الدلالية لبدء البيع', () => {
     expect(posStartNewTabProps()).toEqual({
-      href: '/pos',
+      href: '/pos/start',
       target: '_blank',
       rel: 'noopener noreferrer',
     });
-    expect(POS_START_HREF).toBe('/pos');
+    expect(POS_START_HREF).toBe('/pos/start');
     expect(POS_NEW_TAB_TARGET).toBe('_blank');
     expect(POS_NEW_TAB_REL).toBe('noopener noreferrer');
   });
@@ -45,7 +45,7 @@ describe('فتح مساحة POS في تبويب مستقل', () => {
 
   it('يجعل posStart وحده عنصر الشريط الذي يفتح تبويباً جديداً', () => {
     const newTab = posSidebarItemsOpeningInNewTab();
-    expect(newTab).toEqual([{ key: 'posStart', href: '/pos', openInNewTab: true }]);
+    expect(newTab).toEqual([{ key: 'posStart', href: '/pos/start', openInNewTab: true }]);
     expect(POS_SIDEBAR_LAUNCH_ITEMS.filter((item) => !item.openInNewTab).map((item) => item.href)).toEqual([
       '/pos/sessions',
       '/pos/report',

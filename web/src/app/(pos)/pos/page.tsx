@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -16,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
 import { logout } from '@/lib/auth';
-import { POS_RETURN_HREF, decidePosUnsavedExit } from '@/lib/pos-workspace';
+import { POS_RETURN_HREF, POS_START_HREF, decidePosUnsavedExit } from '@/lib/pos-workspace';
 import {
   POS_CART_FAB_CLASS,
   POS_CART_PAY_FOOTER_CLASS,
@@ -153,7 +152,6 @@ interface Product {
   is_active: boolean;
 }
 interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null; cash_drawer?: { configured: boolean } }
-interface WorkShift { id: string; name: string; is_active: boolean }
 interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
 interface PosCheckoutResponse {
   data: {
@@ -251,10 +249,6 @@ export default function PosPage() {
   const [sessionInvalid, setSessionInvalid] = useState(false);
   const [sessionRevalidating, setSessionRevalidating] = useState(false);
   const [devices, setDevices] = useState<PosDevice[]>([]);
-  const [shifts, setShifts] = useState<WorkShift[]>([]);
-  const [deviceId, setDeviceId] = useState('');
-  const [shiftId, setShiftId] = useState('');
-  const [openBal, setOpenBal] = useState('');
   const [closeOpen, setCloseOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [exchangeOpen, setExchangeOpen] = useState(false);
@@ -530,9 +524,8 @@ export default function PosPage() {
       .finally(() => setPaymentMethodsLoading(false));
     getSystemTaxInclusive().then(setSystemTaxInclusive).catch(() => {});
     api<{ data: PosDevice[] }>('/pos-devices').then((r) => setDevices(r.data.filter((device) => device.is_active))).catch(() => {});
-    api<{ data: WorkShift[] }>('/shifts').then((r) => setShifts(r.data.filter((shift) => shift.is_active))).catch(() => {});
-    // الوردية المفتوحة الحالية (إن وُجدت) — وإلا تُعرض بوابة فتح وردية. يثبّت
-    // مخزن الجهاز على الشاشة حتى لا تعرض اختياراً سيرفضه الخادم لاحقاً.
+    // الجلسة المفتوحة الحالية (إن وُجدت) تُتبنّى هنا. بلا جلسة تُحوَّل الصفحة
+    // إلى `/pos/start` — لا بوابة HR shift_id داخل شاشة البيع.
     api<{ data: PosSession[] }>('/pos-sessions?mine=1')
       .then((r) => {
         const current = r.data.find((item) => item.status === 'open') ?? null;
@@ -546,6 +539,11 @@ export default function PosPage() {
       if (raw) setFavs(new Set(JSON.parse(raw)));
     } catch { /* ignore */ }
   }, [t, tc]);
+
+  useEffect(() => {
+    if (!sessionReady || session) return;
+    router.replace(sessionInvalid ? `${POS_START_HREF}?reason=closed` : POS_START_HREF);
+  }, [router, session, sessionInvalid, sessionReady]);
 
   const toggleFav = useCallback((id: string) => {
     setFavs((prev) => {
@@ -1011,26 +1009,6 @@ export default function PosPage() {
     { subMinor: 0, taxMinor: 0, totalMinor: 0, discMinor: 0 },
   );
   const count = cart.reduce((s, l) => s + l.qty, 0);
-
-  async function openSession(e: React.FormEvent) {
-    e.preventDefault();
-    setSessionBusy(true);
-    setSessionError(null);
-    try {
-      const r = await api<{ data: PosSession }>('/pos-sessions/open', {
-        method: 'POST',
-        body: { opening_balance: riyalToMinor(openBal), pos_device_id: deviceId, shift_id: shiftId || null },
-      });
-      setSession(r.data);
-      setSessionInvalid(false);
-      if (r.data.warehouse_id) setWarehouseId(r.data.warehouse_id);
-      setOpenBal('');
-    } catch (err) {
-      setSessionError(err instanceof ApiError ? err.message : tc('saveFailed'));
-    } finally {
-      setSessionBusy(false);
-    }
-  }
 
   async function finishCloseSession() {
     if (!session) return;
@@ -1742,6 +1720,14 @@ export default function PosPage() {
     </aside>
   );
 
+  if (!sessionReady || !session) {
+    return (
+      <div className="grid h-full place-items-center bg-background text-sm text-muted">
+        …
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex h-full flex-col overflow-hidden bg-background"
@@ -1945,37 +1931,6 @@ export default function PosPage() {
           />
           <div className="flex justify-end"><Button type="button" className="min-h-11" onClick={() => setNoteOpen(false)}>{ts('save')}</Button></div>
         </div>
-      </PosDialog>
-
-      {/* بوابة الوردية: لا بيع قبل فتح وردية — الإغلاق = مغادرة نقطة البيع. */}
-      <PosDialog open={sessionReady && !session} onClose={() => router.push('/dashboard')} title={ts('open_title')}>
-        <form onSubmit={openSession} className="space-y-3">
-          <p className="text-xs text-muted">{sessionInvalid ? t('session_closed_remote') : t('open_to_start')}</p>
-          <div className="space-y-1.5">
-            <Label htmlFor="pos-device">{ts('device')}</Label>
-            <select id="pos-device" value={deviceId} onChange={(e) => setDeviceId(e.target.value)} required disabled={sessionBusy || devices.length === 0} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60">
-              <option value="">{ts('select_device')}</option>
-              {devices.map((device) => <option key={device.id} value={device.id}>{device.name}{device.code ? ` · ${device.code}` : ''}{device.warehouse ? ` — ${device.warehouse.name}` : ''}</option>)}
-            </select>
-            {devices.length === 0 && <p className="text-xs text-warning">{ts('no_device')}</p>}
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="pos-shift">{ts('work_shift')} <span className="text-muted">({ts('optional')})</span></Label>
-            <select id="pos-shift" value={shiftId} onChange={(e) => setShiftId(e.target.value)} disabled={sessionBusy} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60">
-              <option value="">{ts('optional')}</option>
-              {shifts.map((shift) => <option key={shift.id} value={shift.id}>{shift.name}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="ob">{ts('opening_balance')}</Label>
-            <Input id="ob" className="num text-end" inputMode="decimal" value={openBal} onChange={(e) => setOpenBal(e.target.value)} required autoFocus />
-          </div>
-          {sessionError && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{sessionError}</p>}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button asChild type="button" variant="outline" className="min-h-11"><Link href='/dashboard'>{t('leave')}</Link></Button>
-            <Button type="submit" className="min-h-11" disabled={sessionBusy || !deviceId}>{ts('open')}</Button>
-          </div>
-        </form>
       </PosDialog>
 
       <PosDialog open={unsavedExitAction !== null} onClose={() => setUnsavedExitAction(null)} title={t('unsaved_carts_exit_title')}>

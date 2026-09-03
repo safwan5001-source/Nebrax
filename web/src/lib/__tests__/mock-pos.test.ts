@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mockApi } from '@/lib/mock-data';
+import { mockApi, mockPosSessions } from '@/lib/mock-data';
 
 describe('POS demo contracts', () => {
   it('provides a sellable POS catalogue instead of an empty demo state', async () => {
@@ -121,5 +121,47 @@ describe('POS demo contracts', () => {
     expect(open.sales).toHaveLength(open.report.sales_count);
     expect(open.returns).toHaveLength(open.report.returns_count);
     expect(open.sales.map((sale) => sale.id)).not.toEqual(closed.sales.map((sale) => sale.id));
+  });
+
+  it('opens a demo POS session with pos_shift_id and minor-unit opening_balance', async () => {
+    const previouslyOpen = mockPosSessions.find((session) => session.status === 'open');
+    if (previouslyOpen) previouslyOpen.status = 'closed';
+    try {
+      const created = await mockApi<{ data: {
+        pos_shift_id: string | null;
+        shift_id: string | null;
+        opening_balance: string;
+        pos_device_id: string;
+        id: string;
+        status: string;
+      } }>('/pos-sessions/open', 'POST', {
+        opening_balance: 0,
+        pos_device_id: 'pd-1',
+        pos_shift_id: 'pos-shift-morning',
+      });
+      expect(created.data).toMatchObject({
+        pos_device_id: 'pd-1',
+        pos_shift_id: 'pos-shift-morning',
+        shift_id: null,
+        opening_balance: '0.00',
+      });
+      const mine = await mockApi<{ data: Array<{ id: string; status: string; pos_shift_id: string | null }> }>('/pos-sessions?mine=1');
+      expect(mine.data.find((session) => session.status === 'open')).toMatchObject({
+        id: created.data.id,
+        pos_shift_id: 'pos-shift-morning',
+      });
+    } finally {
+      const createdIdx = mockPosSessions.findIndex((session) => session.id === 'ps-demo-opened');
+      if (createdIdx >= 0) mockPosSessions.splice(createdIdx, 1);
+      if (previouslyOpen) previouslyOpen.status = 'open';
+    }
+  });
+
+  it('rejects an inactive demo POS device on open like the backend would', async () => {
+    await expect(mockApi('/pos-sessions/open', 'POST', {
+      opening_balance: 0,
+      pos_device_id: 'pd-2',
+      pos_shift_id: 'pos-shift-morning',
+    })).rejects.toMatchObject({ status: 422 });
   });
 });
