@@ -14,6 +14,32 @@ APP_DIR="${NIBRAS_APP_DIR:-$HOME/nibras-app}"
 export COMPOSER_NO_INTERACTION=1
 export COMPOSER_MEMORY_LIMIT=-1
 
+SUDO=""
+[ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo"
+
+# ── 0/4  System toolchain (idempotent; skipped if PHP is already present) ──
+# Keeps the environment self-contained on Cursor's default base image, so it
+# needs no prebuilt snapshot. Captured in the build snapshot, so a booted pod
+# does not re-run apt.
+if ! command -v php >/dev/null 2>&1; then
+  echo "▶ 0/4  Installing PHP 8.3 + system dependencies..."
+  $SUDO apt-get update -qq
+  $SUDO DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    php8.3-cli php8.3-mbstring php8.3-sqlite3 php8.3-pgsql php8.3-bcmath \
+    php8.3-intl php8.3-zip php8.3-xml php8.3-curl php8.3-gd php8.3-opcache \
+    unzip zip poppler-utils libxml2-utils
+else
+  echo "▶ 0/4  PHP already present ($(php -r 'echo PHP_VERSION;')) — skipping apt."
+fi
+
+if ! command -v composer >/dev/null 2>&1; then
+  echo "▶      Installing Composer..."
+  php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');"
+  php /tmp/composer-setup.php --quiet --install-dir=/tmp --filename=composer
+  $SUDO mv /tmp/composer /usr/local/bin/composer
+  rm -f /tmp/composer-setup.php
+fi
+
 # Composer 2.10+ blocks Laravel 11 (security-only) advisories by default.
 # Laravel 11 is in security-only support, so allow it in this dev environment.
 composer config --global policy.advisories.block false >/dev/null 2>&1 || true
