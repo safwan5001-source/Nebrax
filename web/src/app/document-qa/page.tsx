@@ -23,6 +23,7 @@ const TEMPLATES = [
   { id: 'tax-invoice-minimal-v2', labelKey: 'minimal_v2' },
   { id: 'tax-invoice-retail', labelKey: 'retail' },
   { id: 'tax-invoice-retail-v2', labelKey: 'retail_v2' },
+  { id: 'quotation-proposal', labelKey: 'quotation_proposal' },
 ] as const;
 const DOCUMENT_TYPES = [
   'tax_invoice',

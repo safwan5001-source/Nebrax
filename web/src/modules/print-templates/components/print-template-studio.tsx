@@ -38,7 +38,7 @@ import {
   getDefaultDocumentLayout,
   getDocumentTypeDefinition,
 } from '@/modules/documents/registry/document-types';
-import { listTemplates } from '@/modules/documents/registry/templates';
+import { listTemplates, templateSupportsDocumentType } from '@/modules/documents/registry/templates';
 import { THEME_IDS } from '@/modules/documents/themes';
 import type { DocSectionKey, DocSectionLayoutItem, DocumentTypeId, ThemeId } from '@/modules/documents/types';
 
@@ -419,7 +419,10 @@ export function PrintTemplateStudio({ canManage }: { canManage: boolean }) {
     return () => cancelAnimationFrame(frame);
   }, [selected.id, studioFocus, surface]);
 
-  const templatesCatalog = listTemplates();
+  const templatesCatalog = listTemplates().filter((template) => (
+    revision.document_types.every((type) => templateSupportsDocumentType(template, type))
+    || template.id === definition.template_id
+  ));
   const selectedName = selected.name || t('preview_template_name');
   const savedAt = lastSavedAt ?? revision.published_at ?? revision.created_at ?? null;
   const lastSaveLabel = savedAt

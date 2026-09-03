@@ -24,6 +24,7 @@ export function DocStamp({ model }: { model: DocumentModel }) {
         style.composition === 'minimal' && 'border-t border-black pt-3',
         style.composition === 'minimal_v2' && 'border-t border-[color:var(--border)] pt-3',
         style.composition === 'retail_v2' && 'border-t border-[color:var(--border)] pt-3',
+        style.composition === 'quotation_proposal' && 'border-t border-[color:var(--border)] pt-3',
         style.composition === 'modern' && 'border-t border-[color:var(--border)] pt-3',
         style.composition === 'modern_v2' && 'border-t border-[color:var(--border)] pt-3',
       )}

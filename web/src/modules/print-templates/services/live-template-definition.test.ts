@@ -138,6 +138,20 @@ describe('محول تعريف القالب الحي', () => {
     expect(resolved?.footerText).toBe('تذييل Retail V2');
   });
 
+  it('يحافظ على هوية quotation-proposal دون سقوط إلى classic أو فاتورة', () => {
+    const resolved = resolveLiveTemplateDefinition({
+      print_template_revision_id: 'quote-proposal-revision',
+      revision: {
+        id: 'quote-proposal-revision',
+        definition: { template_id: 'quotation-proposal', footer_text: 'تذييل عرض السعر' },
+      },
+    }, 'quotation');
+
+    expect(resolved?.templateId).toBe('quotation-proposal');
+    expect(resolved?.footerText).toBe('تذييل عرض السعر');
+    expect(resolved?.layout.map((block) => block.key)).toContain('summary');
+  });
+
   it('يطبق تعريف السند الحي على كتلة السند والبيانات البنكية', () => {
     const resolved = resolveLiveTemplateDefinition({
       print_template_revision_id: 'voucher-revision',

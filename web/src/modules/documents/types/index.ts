@@ -203,7 +203,7 @@ export interface TemplateConfig {
  * الهوية التركيبية للقالب. هذه قيمة عرضية محلية فقط؛ لا تحفظ داخل تعريف الكتلة
  * ولا تعيد تفسير المراجعات المثبتة أو نموذج المستند.
  */
-export type TemplateComposition = 'classic' | 'classic_v2' | 'erp' | 'erp_v2' | 'modern' | 'modern_v2' | 'minimal' | 'minimal_v2' | 'retail' | 'retail_v2';
+export type TemplateComposition = 'classic' | 'classic_v2' | 'erp' | 'erp_v2' | 'modern' | 'modern_v2' | 'minimal' | 'minimal_v2' | 'retail' | 'retail_v2' | 'quotation_proposal';
 
 export interface TemplateStyle {
   /** الهوية التركيبية للقالب ضمن الأقسام المشتركة. */
@@ -309,4 +309,9 @@ export interface TemplateDescriptor {
   component: React.ComponentType<DocumentTemplateProps>;
   defaultTheme: ThemeId;
   supportedPaper: PaperSizeId[];
+  /**
+   * إن وُجد، يظهر القالب في الكتالوج/التعيين لهذه الأنواع فقط.
+   * غيابه يبقي السلوك التاريخي: متاح لكل الأنواع (قوالب الفاتورة).
+   */
+  documentTypes?: readonly DocumentTypeId[];
 }

@@ -15,6 +15,7 @@ import { ERP_V2, cappedErpLogoHeight } from '../../presentation/erp-v2';
 import { CLASSIC_V2, cappedClassicLogoHeight } from '../../presentation/classic-v2';
 import { MINIMAL_V2, cappedMinimalLogoHeight } from '../../presentation/minimal-v2';
 import { RETAIL_V2, cappedRetailLogoHeight } from '../../presentation/retail-v2';
+import { QUOTATION_PROPOSAL, cappedQuotationLogoHeight } from '../../presentation/quotation-proposal';
 import { ModernDocumentTitle, ModernFieldLabel, ModernStatusLabel } from '../../presentation/modern-bilingual-label';
 
 /** ترويسة المستند: الهوية والعنوان ورقم المستند، باختلاف تركيبي محسوب لكل قالب. */
@@ -431,6 +432,62 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
                 data-doc-status-notice={model.status}
                 className={cn(
                   'mt-1.5 inline-block px-0 py-0.5 text-[9px] font-semibold',
+                  model.status === 'cancelled' ? 'text-[color:var(--negative)]' : 'text-[color:var(--muted)]',
+                )}
+              >
+                <ModernStatusLabel status={model.status} mode={mode} />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  if (style.composition === 'quotation_proposal') {
+    const logoHeight = cappedQuotationLogoHeight(seller.logoHeight);
+    return (
+      <header className="border-b border-[color:var(--border)] pb-4">
+        <div className="flex items-start justify-between gap-8">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            {showLogo && seller.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL؛ لا يناسبه next/image
+              <img
+                src={seller.logoUrl}
+                alt={seller.name}
+                className={QUOTATION_PROPOSAL.logoMaxWidthClass}
+                style={{ height: `${logoHeight}px` }}
+              />
+            ) : null}
+            <div className="min-w-0">
+              <div className="line-clamp-2 break-words text-[16px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
+              {seller.tagline ? <div className="mt-0.5 line-clamp-1 break-words text-[10px] text-[color:var(--muted)]">{seller.tagline}</div> : null}
+              <div className="mt-2 space-y-0.5">
+                <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
+                <DocInfoRow label={<ModernFieldLabel field="cr_number" mode={mode} />} value={seller.crNumber ? <span className="num" dir="ltr">{seller.crNumber}</span> : null} stacked />
+                <DocInfoRow label={<ModernFieldLabel field="national_address" mode={mode} />} value={seller.address ? <span className="line-clamp-2">{seller.address}</span> : null} stacked />
+              </div>
+            </div>
+          </div>
+          <div className="min-w-[176px] max-w-[44%] shrink-0 text-end">
+            <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-black">
+              <ModernDocumentTitle locale={locale} primary={dt(model.type)} alternate={dtAlt(model.type)} mode={mode} />
+            </h1>
+            <div className="mt-2 space-y-0.5">
+              <DocInfoRow
+                label={<ModernFieldLabel field="document_number" mode={mode} />}
+                value={<span className="num font-semibold" dir="ltr">{meta.number}</span>}
+                stacked
+                align="end"
+              />
+              <DocInfoRow label={<ModernFieldLabel field="date" mode={mode} />} value={<span className="num" dir="ltr">{meta.date}</span>} stacked align="end" />
+              {meta.dueDate ? <DocInfoRow label={<ModernFieldLabel field={dueDateField} mode={mode} />} value={<span className="num" dir="ltr">{meta.dueDate}</span>} stacked align="end" /> : null}
+            </div>
+            {isNoticeStatus(model.status) ? (
+              <div
+                data-doc-status-notice={model.status}
+                className={cn(
+                  'mt-2 inline-block px-0 py-0.5 text-[10px] font-medium',
                   model.status === 'cancelled' ? 'text-[color:var(--negative)]' : 'text-[color:var(--muted)]',
                 )}
               >

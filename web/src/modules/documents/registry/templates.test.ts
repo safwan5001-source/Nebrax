@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TEMPLATE_ID, getTemplate, listTemplates } from './templates';
+import { DEFAULT_TEMPLATE_ID, getTemplate, listTemplates, listTemplatesForDocumentType } from './templates';
 import { TaxInvoiceClassic } from '../templates/tax-invoice-classic';
 import { TaxInvoiceClassicV2 } from '../templates/tax-invoice-classic-v2';
 import { TaxInvoiceErp } from '../templates/tax-invoice-erp';
@@ -10,6 +10,7 @@ import { TaxInvoiceMinimal } from '../templates/tax-invoice-minimal';
 import { TaxInvoiceMinimalV2 } from '../templates/tax-invoice-minimal-v2';
 import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
 import { TaxInvoiceRetailV2 } from '../templates/tax-invoice-retail-v2';
+import { QuotationProposal } from '../templates/quotation-proposal';
 
 describe('سجل قوالب المستندات', () => {
   it('يبقي الافتراضي classic ولا يعيد تفسير modern كـ v2', () => {
@@ -141,5 +142,40 @@ describe('سجل قوالب المستندات', () => {
     expect(ids).toContain('tax-invoice-retail-v2');
     expect(ids.filter((id) => id === 'tax-invoice-retail')).toHaveLength(1);
     expect(ids.filter((id) => id === 'tax-invoice-retail-v2')).toHaveLength(1);
+  });
+
+  it('يسجّل quotation-proposal بهوية مستقلة بلا alias إلى الفاتورة', () => {
+    const proposal = getTemplate('quotation-proposal');
+    expect(proposal.id).toBe('quotation-proposal');
+    expect(proposal.nameKey).toBe('quotation_proposal');
+    expect(proposal.component).toBe(QuotationProposal);
+    expect(proposal.defaultTheme).toBe('blue');
+    expect(proposal.documentTypes).toEqual(['quotation']);
+    expect(proposal.supportedPaper).toEqual(['a4', 'a4_landscape', 'letter', 'legal']);
+    expect(DEFAULT_TEMPLATE_ID).toBe('tax-invoice-classic');
+    expect(getTemplate('unknown-template-id').id).toBe('tax-invoice-classic');
+    expect(getTemplate('quotation-proposal').component).not.toBe(TaxInvoiceClassic);
+
+    const ids = listTemplates().map((template) => template.id);
+    expect(ids).toContain('quotation-proposal');
+    expect(ids.filter((id) => id === 'quotation-proposal')).toHaveLength(1);
+    expect(ids).not.toContain('tax-invoice-quotation');
+  });
+
+  it('يظهر quotation-proposal في كتالوج عرض السعر فقط لا الفاتورة ولا الحراري', () => {
+    const quotationIds = listTemplatesForDocumentType('quotation').map((template) => template.id);
+    const invoiceIds = listTemplatesForDocumentType('tax_invoice').map((template) => template.id);
+    const thermalIds = listTemplatesForDocumentType('tax_invoice')
+      .filter((template) => template.supportedPaper.some((paper) => paper.startsWith('thermal_')))
+      .map((template) => template.id);
+
+    expect(quotationIds).toContain('quotation-proposal');
+    expect(quotationIds).toContain('tax-invoice-classic');
+    expect(invoiceIds).not.toContain('quotation-proposal');
+    expect(invoiceIds).toContain('tax-invoice-classic');
+    expect(invoiceIds).toContain('tax-invoice-classic-v2');
+    expect(thermalIds).toContain('tax-invoice-thermal58');
+    expect(thermalIds).toContain('tax-invoice-thermal80');
+    expect(thermalIds).not.toContain('quotation-proposal');
   });
 });

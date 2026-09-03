@@ -21,7 +21,7 @@ import { api } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { printDocument } from '@/modules/documents/services/export';
 import { createPaymentPdf, downloadPaymentPdf, sharePaymentPdf } from '@/modules/payments/services/payment-pdf';
-import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
+import { getTemplate, listTemplatesForDocumentType, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { PAPER_SIZES } from '@/modules/documents/constants/paper';
@@ -339,7 +339,7 @@ export default function PaymentDetailPage() {
                 </>
               }
             >
-              {listTemplates().map((d) => (
+              {listTemplatesForDocumentType('payment_voucher').map((d) => (
                 <DropdownItem key={d.id} onClick={() => setTemplateId(d.id)}>
                   {tt(d.nameKey)}
                 </DropdownItem>

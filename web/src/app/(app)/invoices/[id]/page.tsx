@@ -26,7 +26,7 @@ import { InvoiceNoteDialog } from '@/components/invoices/invoice-note-dialog';
 import { api, downloadFile } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
-import { getTemplate, listTemplates, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
+import { getTemplate, listTemplatesForDocumentType, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
 import { RevisionLog } from '@/components/documents/revision-log';
 import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
@@ -160,7 +160,7 @@ const payTone: Record<string, 'positive' | 'warning' | 'muted'> = {
   unpaid: 'muted',
 };
 
-const PAGE_TEMPLATES = listTemplates().filter((definition) => (
+const PAGE_TEMPLATES = listTemplatesForDocumentType('tax_invoice').filter((definition) => (
   !definition.supportedPaper.some((paper) => paper.startsWith('thermal_'))
 ));
 
