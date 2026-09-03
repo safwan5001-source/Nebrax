@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DeliveryNoteController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\DocumentIntakeController;
+use App\Http\Controllers\Api\DocumentIntelligenceSettingsController;
 use App\Http\Controllers\Api\DocumentOperationsController;
 use App\Http\Controllers\Api\DocumentRevisionController;
 use App\Http\Controllers\Api\DocumentReviewController;
@@ -283,6 +284,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('document-redactions', [DocumentOperationsController::class, 'redact'])->middleware([$perm('documents.center.settings'), $commercialApp('document_center.core', 'write')]);
         Route::get('document-audit/export', [DocumentOperationsController::class, 'auditExport'])->middleware([$perm('documents.center.audit_export'), $commercialApp('document_center.core'), 'throttle:3,1']);
         Route::get('document-batches/{batch}/diagnostics', [DocumentOperationsController::class, 'diagnostics'])->middleware([$perm('documents.center.operations'), $commercialApp('document_center.core')]);
+
+        // إعدادات الذكاء المستندي — تفضيلٌ خامل لكل مستأجر (المعالجة/الاحتفاظ
+        // مفهومان مستقلّان). حارسه صلاحية الإعداد وحدها؛ لا يبدأ اتصالاً خارجياً.
+        Route::get('document-intelligence-settings', [DocumentIntelligenceSettingsController::class, 'show'])->middleware($perm('documents.center.settings'));
+        Route::put('document-intelligence-settings', [DocumentIntelligenceSettingsController::class, 'update'])->middleware($perm('documents.center.settings'));
 
         // الأطراف
         Route::get('partners', [PartnerController::class, 'index'])->middleware($perm('partners.view'));

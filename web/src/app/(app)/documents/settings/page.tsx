@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DocumentOperationsNav } from '@/components/documents/document-operations-nav';
+import { DocumentIntelligenceSettings } from '@/components/documents/document-intelligence-settings';
 
 type Governance = {
   policy: { retention_days: number; enabled: boolean; purge_mode: string; policy_source: string; last_run_at: string | null };
@@ -64,6 +65,9 @@ export default function DocumentSettingsPage() {
       </header>
 
       <DocumentOperationsNav />
+
+      {/* الإعدادات القابلة للضبط لكل مستأجر — المعالجة الذكية والاحتفاظ بالأصل. */}
+      <DocumentIntelligenceSettings />
 
       {loading ? (
         <Card><CardContent className="py-10 text-sm text-muted">{t('loading')}</CardContent></Card>

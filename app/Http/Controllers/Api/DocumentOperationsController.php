@@ -10,6 +10,7 @@ use App\Models\DocumentRedactionOverlay;
 use App\Models\DocumentRetentionHold;
 use App\Services\DocumentCenter\DocumentDiagnosticsService;
 use App\Services\DocumentCenter\DocumentGovernanceService;
+use App\Services\DocumentCenter\DocumentIntelligencePolicy;
 use App\Services\DocumentCenter\DocumentOperationsExportService;
 use App\Services\DocumentCenter\DocumentOperationsService;
 use App\Services\DocumentCenter\DocumentRedactionProjector;
@@ -75,6 +76,9 @@ final class DocumentOperationsController extends ApiController
                 'purge_mode' => $effective['purge_mode'], 'policy_source' => $effective['policy'] === null ? 'config_default' : 'platform_policy',
                 'last_run_at' => $effective['last_run']?->finished_at?->toIso8601String(),
             ],
+            // القرار الفعّال لسياسة المستأجر (المعالجة الذكية + مصير الأصل)،
+            // مقروءاً من نفس المصدر الذي تراه الخدمات — لا اشتقاق موازٍ.
+            'document_intelligence' => DocumentIntelligencePolicy::forTenant()->toArray(),
             'active_holds' => DocumentRetentionHold::query()->where('branch_id', $branchId)->active()->latest()->limit(100)->get()->map(fn (DocumentRetentionHold $hold) => $this->hold($hold)),
             'redactions' => DocumentRedactionOverlay::query()->where('branch_id', $branchId)->latest('redacted_at')->limit(100)->get()->map(fn (DocumentRedactionOverlay $overlay) => [
                 'id' => $overlay->id, 'result_id' => $overlay->document_extraction_result_id, 'field_path' => $overlay->field_path,
