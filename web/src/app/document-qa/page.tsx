@@ -13,6 +13,8 @@ import type { DocumentTypeId } from '@/modules/documents/types';
 const SCENARIOS = ['single', 'five', 'twenty', 'multipage', 'long_content'] as const satisfies readonly DocumentQaScenario[];
 const DIRECTIONS = ['rtl', 'ltr'] as const;
 const TEMPLATES = [
+  { id: 'tax-invoice-classic', labelKey: 'classic' },
+  { id: 'tax-invoice-classic-v2', labelKey: 'classic_v2' },
   { id: 'tax-invoice-erp', labelKey: 'erp' },
   { id: 'tax-invoice-erp-v2', labelKey: 'erp_v2' },
   { id: 'tax-invoice-modern', labelKey: 'modern' },

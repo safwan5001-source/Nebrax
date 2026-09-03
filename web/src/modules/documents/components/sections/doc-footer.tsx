@@ -16,15 +16,18 @@ export function DocFooter({ model }: { model: DocumentModel }) {
   const { mode } = useDocumentLabelMode(model);
   const isModernV2 = style.composition === 'modern_v2';
   const isErpV2 = style.composition === 'erp_v2';
+  const isClassicV2 = style.composition === 'classic_v2';
   const isLegacyModern = style.composition === 'modern';
-  const usesV2Labels = isModernV2 || isErpV2;
+  const usesV2Labels = isModernV2 || isErpV2 || isClassicV2;
   const content =
     properties.static_content ??
     model.footerText ??
     (usesV2Labels ? <ModernFieldLabel field="footer" mode={mode} /> : t('footer'));
   const frame = style.composition === 'erp' || isErpV2
     ? 'border-t border-black pt-3'
-    : isModernV2 || isLegacyModern
+    : isClassicV2
+      ? 'border-t border-black pt-3'
+      : isModernV2 || isLegacyModern
       ? 'border-t border-[color:var(--border)] pt-3'
       : style.composition === 'minimal'
         ? 'border-t border-black pt-3'

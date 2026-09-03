@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLASSIC_STYLE, ERP_STYLE, ERP_V2_STYLE, MINIMAL_STYLE, MODERN_STYLE, MODERN_V2_STYLE, RETAIL_STYLE, isErpV2, isLegacyErp, isLegacyModern, isModernV2 } from './template-styles';
+import { CLASSIC_STYLE, CLASSIC_V2_STYLE, ERP_STYLE, ERP_V2_STYLE, MINIMAL_STYLE, MODERN_STYLE, MODERN_V2_STYLE, RETAIL_STYLE, isClassicV2, isErpV2, isLegacyClassic, isLegacyErp, isLegacyModern, isModernV2 } from './template-styles';
 
 describe('أساليب قوالب المستندات الرسمية', () => {
   it('يفصل ERP وModern التاريخي وModern V2 وMinimal بهويات تركيبية مختلفة', () => {
@@ -11,7 +11,7 @@ describe('أساليب قوالب المستندات الرسمية', () => {
     expect(ERP_STYLE.tableDensity).toBe('compact');
     expect(MODERN_STYLE.tableDensity).toBe('comfortable');
     expect(MINIMAL_STYLE.tableDensity).toBe('spacious');
-    expect(new Set([ERP_STYLE.composition, ERP_V2_STYLE.composition, MODERN_STYLE.composition, MODERN_V2_STYLE.composition, MINIMAL_STYLE.composition]).size).toBe(5);
+    expect(new Set([CLASSIC_STYLE.composition, CLASSIC_V2_STYLE.composition, ERP_STYLE.composition, ERP_V2_STYLE.composition, MODERN_STYLE.composition, MODERN_V2_STYLE.composition, MINIMAL_STYLE.composition]).size).toBe(7);
   });
 
   it('يبقي Modern التاريخي ببطاقات ناعمة وV2 رسمياً بلا بطاقات', () => {
@@ -88,5 +88,21 @@ describe('أساليب قوالب المستندات الرسمية', () => {
     });
     expect(ERP_V2_STYLE.pagePadding).not.toBe(MODERN_V2_STYLE.pagePadding);
     expect(ERP_V2_STYLE.sectionGap).not.toBe(MODERN_V2_STYLE.sectionGap);
+    expect(isLegacyClassic(CLASSIC_STYLE)).toBe(true);
+    expect(isClassicV2(CLASSIC_STYLE)).toBe(false);
+    expect(isClassicV2(CLASSIC_V2_STYLE)).toBe(true);
+    expect(isLegacyClassic(CLASSIC_V2_STYLE)).toBe(false);
+    expect(CLASSIC_V2_STYLE).toMatchObject({
+      composition: 'classic_v2',
+      pagePadding: 'p-7',
+      cardRadius: 'rounded-none',
+      sectionGap: 'mt-4',
+      tableHead: 'plain',
+      tableDensity: 'comfortable',
+      brandBar: false,
+    });
+    expect(CLASSIC_V2_STYLE.pagePadding).not.toBe(CLASSIC_STYLE.pagePadding);
+    expect(CLASSIC_V2_STYLE.pagePadding).not.toBe(MODERN_V2_STYLE.pagePadding);
+    expect(CLASSIC_V2_STYLE.pagePadding).not.toBe(ERP_V2_STYLE.pagePadding);
   });
 });

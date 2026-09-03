@@ -27,6 +27,14 @@ import {
   erpItemsColumnWidthClass,
   erpItemsValueCellClass,
 } from '../../presentation/erp-v2';
+import {
+  CLASSIC_V2_ITEMS_HEAD_CLASS,
+  CLASSIC_V2_ITEMS_ROW_CLASS,
+  CLASSIC_V2_ITEMS_TABLE_CLASS,
+  classicItemsCellPadding,
+  classicItemsColumnWidthClass,
+  classicItemsValueCellClass,
+} from '../../presentation/classic-v2';
 import { ModernColumnHeader } from '../../presentation/modern-bilingual-label';
 
 /**
@@ -56,6 +64,9 @@ function headRow(style: TemplateStyle): { className: string; style?: CSSProperti
   if (style.composition === 'erp_v2') {
     return { className: ERP_V2_ITEMS_HEAD_CLASS };
   }
+  if (style.composition === 'classic_v2') {
+    return { className: CLASSIC_V2_ITEMS_HEAD_CLASS };
+  }
   switch (style.tableHead) {
     case 'soft':
       return { className: 'border-y border-[color:var(--border)] text-black', style: { background: 'var(--doc-brand-soft)' } };
@@ -79,6 +90,7 @@ function tableClassName(style: TemplateStyle): string {
   switch (style.composition) {
     case 'erp': return 'w-full border-collapse text-[10px] leading-snug';
     case 'erp_v2': return ERP_V2_ITEMS_TABLE_CLASS;
+    case 'classic_v2': return CLASSIC_V2_ITEMS_TABLE_CLASS;
     case 'modern_v2': return MODERN_ITEMS_TABLE_CLASS;
     case 'modern': return 'w-full border-collapse text-[11px] leading-relaxed';
     case 'minimal': return 'w-full border-collapse text-[11px] leading-relaxed';
@@ -93,6 +105,9 @@ function cellPadding(style: TemplateStyle): { head: string; body: string } {
   if (style.composition === 'erp_v2') {
     return { head: 'px-1 py-1', body: 'px-1 py-1' };
   }
+  if (style.composition === 'classic_v2') {
+    return { head: 'px-1.5 py-1.5', body: 'px-1.5 py-1.5' };
+  }
   switch (style.tableDensity) {
     case 'compact': return { head: 'px-2 py-1.5', body: 'px-2 py-1.5' };
     case 'spacious': return { head: 'px-3 py-2.5', body: 'px-3 py-3' };
@@ -104,6 +119,7 @@ function bodyRowClassName(style: TemplateStyle, index: number): string {
   switch (style.composition) {
     case 'erp': return 'border-b border-[color:var(--border)]';
     case 'erp_v2': return ERP_V2_ITEMS_ROW_CLASS;
+    case 'classic_v2': return CLASSIC_V2_ITEMS_ROW_CLASS;
     case 'modern_v2': return MODERN_ITEMS_ROW_CLASS;
     case 'modern': return index % 2 ? 'border-b border-[color:var(--border)] bg-[color:var(--doc-brand-soft)]/30' : 'border-b border-[color:var(--border)]';
     case 'minimal': return 'border-b border-[color:var(--border)]';
@@ -140,7 +156,8 @@ export function DocItemsTable({
   };
   const isModernV2 = style.composition === 'modern_v2';
   const isErpV2 = style.composition === 'erp_v2';
-  const usesV2Labels = isModernV2 || isErpV2;
+  const isClassicV2 = style.composition === 'classic_v2';
+  const usesV2Labels = isModernV2 || isErpV2 || isClassicV2;
   const moneyValue = usesV2Labels
     ? (minor: number) => formatModernAmount(minor, model.currency)
     : formatMoney;
@@ -175,13 +192,13 @@ export function DocItemsTable({
   };
 
   const columnWidthClass = (columnId: DocItemsColumnId) => (
-    isErpV2 ? erpItemsColumnWidthClass(columnId) : isModernV2 ? modernItemsColumnWidthClass(columnId) : undefined
+    isClassicV2 ? classicItemsColumnWidthClass(columnId) : isErpV2 ? erpItemsColumnWidthClass(columnId) : isModernV2 ? modernItemsColumnWidthClass(columnId) : undefined
   );
   const valueCellClass = (columnId: DocItemsColumnId) => (
-    isErpV2 ? erpItemsValueCellClass(columnId) : isModernV2 ? modernItemsValueCellClass(columnId) : undefined
+    isClassicV2 ? classicItemsValueCellClass(columnId) : isErpV2 ? erpItemsValueCellClass(columnId) : isModernV2 ? modernItemsValueCellClass(columnId) : undefined
   );
   const v2Padding = (columnId: DocItemsColumnId) => (
-    isErpV2 ? erpItemsCellPadding(columnId) : modernItemsCellPadding(columnId)
+    isClassicV2 ? classicItemsCellPadding(columnId) : isErpV2 ? erpItemsCellPadding(columnId) : modernItemsCellPadding(columnId)
   );
 
   const table = (

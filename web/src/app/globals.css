@@ -193,4 +193,15 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
+  /* Classic V2 فقط: لا تُطبَّق على classic التاريخي ولا modern_v2 ولا erp_v2. */
+  [data-doc-composition="classic_v2"] thead {
+    display: table-header-group;
+  }
+  [data-doc-composition="classic_v2"] tr,
+  [data-doc-composition="classic_v2"] [data-doc-keep="summary"],
+  [data-doc-composition="classic_v2"] footer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

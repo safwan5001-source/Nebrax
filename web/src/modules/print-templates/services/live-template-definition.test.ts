@@ -99,6 +99,19 @@ describe('محول تعريف القالب الحي', () => {
     expect(resolved?.footerText).toBe('تذييل ERP V2');
   });
 
+  it('يحافظ على هوية tax-invoice-classic-v2 دون سقوط إلى التاريخي', () => {
+    const resolved = resolveLiveTemplateDefinition({
+      print_template_revision_id: 'classic-v2-revision',
+      revision: {
+        id: 'classic-v2-revision',
+        definition: { template_id: 'tax-invoice-classic-v2', footer_text: 'تذييل Classic V2' },
+      },
+    }, 'tax_invoice');
+
+    expect(resolved?.templateId).toBe('tax-invoice-classic-v2');
+    expect(resolved?.footerText).toBe('تذييل Classic V2');
+  });
+
   it('يطبق تعريف السند الحي على كتلة السند والبيانات البنكية', () => {
     const resolved = resolveLiveTemplateDefinition({
       print_template_revision_id: 'voucher-revision',

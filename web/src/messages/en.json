@@ -2066,6 +2066,7 @@
   },
   "invoiceTemplates": {
     "classic": "Classic",
+    "classic_v2": "Classic V2",
     "modern": "Modern",
     "modern_v2": "Modern V2",
     "erp": "ERP",

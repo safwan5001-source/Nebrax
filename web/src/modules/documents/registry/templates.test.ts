@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TEMPLATE_ID, getTemplate, listTemplates } from './templates';
 import { TaxInvoiceClassic } from '../templates/tax-invoice-classic';
+import { TaxInvoiceClassicV2 } from '../templates/tax-invoice-classic-v2';
 import { TaxInvoiceErp } from '../templates/tax-invoice-erp';
 import { TaxInvoiceErpV2 } from '../templates/tax-invoice-erp-v2';
 import { TaxInvoiceModern } from '../templates/tax-invoice-modern';
@@ -61,5 +62,30 @@ describe('سجل قوالب المستندات', () => {
     expect(ids).toContain('tax-invoice-erp-v2');
     expect(ids.filter((id) => id === 'tax-invoice-erp')).toHaveLength(1);
     expect(ids.filter((id) => id === 'tax-invoice-erp-v2')).toHaveLength(1);
+  });
+
+  it('يسجّل tax-invoice-classic وtax-invoice-classic-v2 كهويتين مستقلتين بلا alias', () => {
+    const classic = getTemplate('tax-invoice-classic');
+    const classicV2 = getTemplate('tax-invoice-classic-v2');
+
+    expect(classic.id).toBe('tax-invoice-classic');
+    expect(classic.nameKey).toBe('classic');
+    expect(classic.component).toBe(TaxInvoiceClassic);
+    expect(classic.defaultTheme).toBe('blue');
+
+    expect(classicV2.id).toBe('tax-invoice-classic-v2');
+    expect(classicV2.nameKey).toBe('classic_v2');
+    expect(classicV2.component).toBe(TaxInvoiceClassicV2);
+    expect(classicV2.defaultTheme).toBe('blue');
+
+    expect(classic.component).not.toBe(classicV2.component);
+    expect(classic).not.toBe(classicV2);
+    expect(DEFAULT_TEMPLATE_ID).toBe('tax-invoice-classic');
+
+    const ids = listTemplates().map((template) => template.id);
+    expect(ids).toContain('tax-invoice-classic');
+    expect(ids).toContain('tax-invoice-classic-v2');
+    expect(ids.filter((id) => id === 'tax-invoice-classic')).toHaveLength(1);
+    expect(ids.filter((id) => id === 'tax-invoice-classic-v2')).toHaveLength(1);
   });
 });
