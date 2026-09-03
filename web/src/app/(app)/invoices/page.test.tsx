@@ -50,6 +50,8 @@ const { api, translate } = vi.hoisted(() => {
     load_error: 'Could not load invoices.',
     retry: 'Retry',
     view: 'View',
+    more_actions: 'More',
+    filters: 'Filters',
     actions: 'Actions',
     edit: 'Edit',
     delete: 'Delete',
@@ -246,11 +248,28 @@ describe('Sales invoices workspace', () => {
     respond([draft, posted]);
     render(<InvoicesPage />);
     const table = await screen.findByRole('table');
-    const edits = within(table).getAllByLabelText('Edit');
-    const draftEdit = edits.find((element) => element.tagName === 'A');
-    const lockedEdit = edits.find((element) => element.tagName === 'BUTTON' && (element as HTMLButtonElement).disabled);
-    expect(draftEdit?.getAttribute('href')).toContain('/invoices/inv-draft/edit');
-    expect(lockedEdit).toBeTruthy();
+    const more = within(table).getAllByRole('button', { name: 'More' });
+
+    await userEvent.click(more[0]);
+    const draftMenu = await screen.findByRole('menu');
+    expect(within(draftMenu).getByRole('menuitem', { name: 'Edit' }).getAttribute('href')).toContain('/invoices/inv-draft/edit');
+    expect((within(draftMenu).getByRole('menuitem', { name: 'Delete' }) as HTMLButtonElement).disabled).toBe(false);
+
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(more[1]);
+    const postedMenu = await screen.findByRole('menu');
+    expect((within(postedMenu).getByRole('menuitem', { name: 'Edit' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(postedMenu).getByRole('menuitem', { name: 'Delete' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(postedMenu).getByRole('menuitem', { name: 'Edit' }).getAttribute('title')).toBe('Posted — locked');
+  });
+
+  it('opens a local filters dialog from the compact filters control', async () => {
+    respond([posted]);
+    render(<InvoicesPage />);
+    await screen.findByRole('table');
+    await userEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeTruthy();
+    expect(within(screen.getByRole('dialog', { name: 'Filters' })).getByLabelText('Sort')).toBeTruthy();
   });
 
   it('surfaces a retryable load error instead of an empty list', async () => {

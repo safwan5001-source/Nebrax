@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowUpDown, Download } from 'lucide-react';
+import { ArrowUpDown, Download, SlidersHorizontal } from 'lucide-react';
 import { ActiveFilterChips } from '@/components/data-explorer/active-filter-chips';
 import { QuickFilters } from '@/components/data-explorer/quick-filters';
 import { SearchBar } from '@/components/data-explorer/search-bar';
 import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { displayLocale } from '@/lib/formatting';
@@ -20,9 +21,95 @@ function dateRange(filters: ActiveFilter[]): [string, string] {
   return [String(active.value[0] ?? ''), String(active.value[1] ?? '')];
 }
 
+function StatusFilter({
+  definitions,
+  filters,
+  onFilterChange,
+  className,
+}: {
+  definitions: FilterDefinition[];
+  filters: ActiveFilter[];
+  onFilterChange: (filter: ActiveFilter) => void;
+  className?: string;
+}) {
+  const definition = definitions.find((item) => item.key === 'status');
+  if (!definition?.options?.length) return null;
+  const active = filters.find((filter) => filter.key === 'status');
+  const value = active && !Array.isArray(active.value) ? String(active.value) : '';
+
+  return (
+    <Select
+      value={value}
+      onChange={(event) =>
+        onFilterChange({
+          key: definition.key,
+          operator: 'eq',
+          value: event.target.value,
+          label: definition.label,
+        })
+      }
+      aria-label={definition.label}
+      className={cn('h-9 w-auto min-w-[7.5rem] bg-surface text-sm', className)}
+    >
+      <option value="">{definition.label}</option>
+      {definition.options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </Select>
+  );
+}
+
+function DateRangeFields({
+  dateLabel,
+  fromLabel,
+  toLabel,
+  from,
+  to,
+  onFrom,
+  onTo,
+  stacked = false,
+}: {
+  dateLabel: string;
+  fromLabel: string;
+  toLabel: string;
+  from: string;
+  to: string;
+  onFrom: (value: string) => void;
+  onTo: (value: string) => void;
+  stacked?: boolean;
+}) {
+  return (
+    <fieldset className={cn('flex min-w-0 items-center gap-1.5', stacked && 'w-full flex-col items-stretch sm:flex-row sm:items-center')}>
+      <legend className="sr-only">{dateLabel}</legend>
+      <label className="flex min-w-0 items-center gap-1.5">
+        <span className="shrink-0 text-xs text-muted">{fromLabel}</span>
+        <Input
+          type="date"
+          value={from}
+          aria-label={`${dateLabel} — ${fromLabel}`}
+          onChange={(event) => onFrom(event.target.value)}
+          className="h-9 w-[9.75rem]"
+        />
+      </label>
+      <label className="flex min-w-0 items-center gap-1.5">
+        <span className="shrink-0 text-xs text-muted">{toLabel}</span>
+        <Input
+          type="date"
+          value={to}
+          aria-label={`${dateLabel} — ${toLabel}`}
+          onChange={(event) => onTo(event.target.value)}
+          className="h-9 w-[9.75rem]"
+        />
+      </label>
+    </fieldset>
+  );
+}
+
 /**
- * شريط اكتشاف قائمة الفواتير: بحث → تاريخ → عميل/حالة → المزيد.
- * محلي لهذه الشاشة عمداً حتى لا يُعمَّم ترتيب الفلاتر على قوائم أخرى.
+ * شريط اكتشاف قائمة الفواتير: سطح مكتب صف واحد ملتصق بالجدول؛
+ * جوال بحث + فلاتر في حوار محلي. محلي لهذه الشاشة عمداً.
  */
 export function InvoicesListToolbar({
   search,
@@ -40,6 +127,7 @@ export function InvoicesListToolbar({
   resultCount,
   onExport,
   exportDisabled,
+  columnMenu,
   className,
 }: {
   search: string;
@@ -57,12 +145,14 @@ export function InvoicesListToolbar({
   resultCount: number;
   onExport: () => void;
   exportDisabled: boolean;
+  columnMenu?: ReactNode;
   className?: string;
 }) {
   const t = useTranslations('nebrax');
   const ti = useTranslations('invoices');
   const locale = useLocale();
   const searchRef = useRef<HTMLInputElement>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const num = (value: number) => value.toLocaleString(displayLocale(locale));
   const mono = (chunks: ReactNode) => <span className="num">{chunks}</span>;
   const [from, to] = dateRange(filters);
@@ -94,13 +184,66 @@ export function InvoicesListToolbar({
     });
   }
 
-  return (
-    <section
-      aria-label={t('searchAndFilter')}
-      className={cn('space-y-3 rounded border border-border bg-surface p-3 sm:p-4', className)}
+  function openAdvancedFromSheet() {
+    setFiltersOpen(false);
+    onOpenAdvanced();
+  }
+
+  const sortControl = (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <ArrowUpDown className="hidden h-3.5 w-3.5 shrink-0 text-muted lg:block" strokeWidth={1.7} aria-hidden="true" />
+      <Select
+        value={sort.value}
+        onChange={(event) => sort.onChange(event.target.value)}
+        aria-label={sort.label ?? t('sortResults')}
+        className="h-9 w-full bg-surface text-sm lg:w-44"
+      >
+        {sort.options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+    </div>
+  );
+
+  const exportButton = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-9 gap-1.5"
+      onClick={onExport}
+      disabled={exportDisabled}
     >
+      <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
+      {t('exportCsv')}
+    </Button>
+  );
+
+  const advancedButton = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={filtersOpen ? openAdvancedFromSheet : onOpenAdvanced}
+      className="h-9 gap-1.5"
+    >
+      <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.7} />
+      {t('advancedFilters')}
+    </Button>
+  );
+
+  const resultLabel = (
+    <p className="text-xs text-muted" aria-live="polite">
+      {t.rich('resultCount', { n: resultCount, count: num(resultCount), num: mono })}
+    </p>
+  );
+
+  return (
+    <section aria-label={t('searchAndFilter')} className={cn(className)}>
       <p className="sr-only">{ti('search_shortcut')}</p>
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+      <div className="flex flex-wrap items-center gap-1.5 px-3 py-2">
         <SearchBar
           value={search}
           onChange={onSearchChange}
@@ -108,80 +251,93 @@ export function InvoicesListToolbar({
           ariaLabel={searchLabel}
           inputRef={searchRef}
           keyShortcuts="/"
-          className="min-w-0 lg:flex-1"
+          inputClassName="h-9"
+          className="min-w-[12rem] flex-1 basis-48"
         />
 
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <fieldset className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <legend className="sr-only">{dateLabel}</legend>
-            <label className="flex min-w-0 items-center gap-1.5">
-              <span className="shrink-0 text-xs text-muted">{t('from')}</span>
-              <Input
-                type="date"
-                value={from}
-                aria-label={`${dateLabel} — ${t('from')}`}
-                onChange={(event) => setDatePart('from', event.target.value)}
-                className="h-9 w-full min-w-[9.5rem] sm:w-[10.75rem]"
-              />
-            </label>
-            <label className="flex min-w-0 items-center gap-1.5">
-              <span className="shrink-0 text-xs text-muted">{t('to')}</span>
-              <Input
-                type="date"
-                value={to}
-                aria-label={`${dateLabel} — ${t('to')}`}
-                onChange={(event) => setDatePart('to', event.target.value)}
-                className="h-9 w-full min-w-[9.5rem] sm:w-[10.75rem]"
-              />
-            </label>
-          </fieldset>
-
-          <div className="flex items-center gap-2 sm:shrink-0">
-            <ArrowUpDown className="hidden h-4 w-4 shrink-0 text-muted sm:block" strokeWidth={1.7} aria-hidden="true" />
-            <Select
-              value={sort.value}
-              onChange={(event) => sort.onChange(event.target.value)}
-              aria-label={sort.label ?? t('sortResults')}
-              className="h-9 w-full bg-surface text-sm sm:w-48"
-            >
-              {sort.options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </div>
+        <div className="hidden lg:contents">
+          <DateRangeFields
+            dateLabel={dateLabel}
+            fromLabel={t('from')}
+            toLabel={t('to')}
+            from={from}
+            to={to}
+            onFrom={(value) => setDatePart('from', value)}
+            onTo={(value) => setDatePart('to', value)}
+          />
+          <QuickFilters
+            definitions={definitions}
+            filters={filters}
+            onChange={onFilterChange}
+            className="contents"
+          />
+          {sortControl}
+          {exportButton}
+          {advancedButton}
+          {columnMenu ? <div className="hidden lg:block">{columnMenu}</div> : null}
+          {resultLabel}
         </div>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <QuickFilters
+        <StatusFilter
           definitions={definitions}
           filters={filters}
-          onChange={onFilterChange}
-          onOpenAdvanced={onOpenAdvanced}
+          onFilterChange={onFilterChange}
+          className="hidden max-w-[8.5rem] sm:block lg:hidden"
         />
+
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="ms-auto h-9 gap-1.5"
-          onClick={onExport}
-          disabled={exportDisabled}
+          className="h-9 shrink-0 gap-1.5 lg:hidden"
+          onClick={() => setFiltersOpen(true)}
+          aria-haspopup="dialog"
         >
-          <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
-          {t('exportCsv')}
+          <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+          {ti('filters')}
+          {filters.length > 0 ? (
+            <span className="num inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-medium text-primary-foreground">
+              {filters.length}
+            </span>
+          ) : null}
         </Button>
       </div>
 
-      {filters.length > 0 || typeof resultCount === 'number' ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+      {filters.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-1.5">
           <ActiveFilterChips filters={filters} onRemove={onRemoveFilter} onClear={onClearFilters} />
-          <p className="ms-auto text-xs text-muted" aria-live="polite">
-            {t.rich('resultCount', { n: resultCount, count: num(resultCount), num: mono })}
-          </p>
+          <div className="ms-auto lg:hidden">{resultLabel}</div>
         </div>
       ) : null}
+
+      <Dialog open={filtersOpen} onClose={() => setFiltersOpen(false)} title={ti('filters')}>
+        <div className="space-y-3">
+          <DateRangeFields
+            dateLabel={dateLabel}
+            fromLabel={t('from')}
+            toLabel={t('to')}
+            from={from}
+            to={to}
+            onFrom={(value) => setDatePart('from', value)}
+            onTo={(value) => setDatePart('to', value)}
+            stacked
+          />
+          <QuickFilters
+            definitions={definitions}
+            filters={filters}
+            onChange={onFilterChange}
+          />
+          {sortControl}
+          <div className="flex flex-wrap items-center gap-2">
+            {exportButton}
+            {advancedButton}
+          </div>
+          {filters.length > 0 ? (
+            <ActiveFilterChips filters={filters} onRemove={onRemoveFilter} onClear={onClearFilters} />
+          ) : null}
+          {resultLabel}
+        </div>
+      </Dialog>
     </section>
   );
 }

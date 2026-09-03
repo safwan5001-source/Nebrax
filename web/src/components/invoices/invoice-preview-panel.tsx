@@ -37,7 +37,7 @@ interface PreviewInvoice {
 }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = {
-  posted: 'positive',
+  posted: 'muted',
   draft: 'muted',
   cancelled: 'negative',
 };
@@ -148,7 +148,7 @@ export function InvoicePreviewPanel({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/40 xl:bg-black/15"
+        className="fixed inset-y-0 start-0 end-0 z-40 bg-black/40 xl:start-56 xl:bg-transparent"
         aria-hidden
         onClick={onClose}
       />
@@ -158,18 +158,26 @@ export function InvoicePreviewPanel({
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={trapTab}
-        className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-border bg-surface sm:max-w-md"
+        className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-border bg-surface sm:max-w-[22rem] xl:w-[21rem] xl:max-w-[21rem]"
       >
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted">{t('preview_title')}</p>
-            <h2 id={titleId} className="truncate text-sm font-semibold text-text">
-              {number ? (
-                <span className="num" dir="ltr">{number}</span>
-              ) : (
-                t('preview_title')
-              )}
-            </h2>
+        <header className="flex shrink-0 items-start gap-2 border-b border-border px-3 py-2.5">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h2 id={titleId} className="truncate text-sm font-semibold text-text">
+                {number ? (
+                  <span className="num" dir="ltr">{number}</span>
+                ) : (
+                  t('preview_title')
+                )}
+              </h2>
+              {invoice ? (
+                <>
+                  <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
+                  <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
+                  {overdue ? <Badge tone="warning">{t('overdue')}</Badge> : null}
+                </>
+              ) : null}
+            </div>
           </div>
           <button
             ref={closeRef}
@@ -182,7 +190,7 @@ export function InvoicePreviewPanel({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           {error ? (
             <ErrorState
               message={td('load_error')}
@@ -200,44 +208,36 @@ export function InvoicePreviewPanel({
           ) : loading ? (
             <LoadingState rows={8} surface="bare" label={t('preview_loading')} />
           ) : invoice ? (
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
-                <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
-                {overdue ? <Badge tone="warning">{t('overdue')}</Badge> : null}
-              </div>
-
-              <dl className="grid grid-cols-1 gap-3 text-sm">
-                <div>
+            <div className="space-y-4">
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                <div className="col-span-2">
                   <dt className="text-xs text-muted">{t('partner')}</dt>
-                  <dd className="mt-1 truncate text-sm font-medium text-text" title={customerName}>{customerName}</dd>
+                  <dd className="mt-0.5 truncate font-medium text-text" title={customerName}>{customerName}</dd>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <dt className="text-xs text-muted">{t('date')}</dt>
-                    <dd className="num mt-1 text-text" dir="ltr">{invoice.invoice_date}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted">{t('due_date')}</dt>
-                    <dd className={cn('num mt-1', overdue ? 'text-warning' : 'text-text')} dir="ltr">
-                      {invoice.due_date ?? '—'}
-                    </dd>
-                  </div>
+                <div>
+                  <dt className="text-xs text-muted">{t('date')}</dt>
+                  <dd className="num mt-0.5 text-muted" dir="ltr">{invoice.invoice_date}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted">{t('due_date')}</dt>
+                  <dd className="num mt-0.5 text-muted" dir="ltr" title={overdue ? t('overdue') : undefined}>
+                    {invoice.due_date ?? '—'}
+                  </dd>
                 </div>
               </dl>
 
               <section aria-label={td('financial_summary')}>
                 <h3 className="text-xs font-medium text-muted">{td('financial_summary')}</h3>
-                <dl className="mt-2 divide-y divide-border border-t border-border">
+                <dl className="mt-1.5 divide-y divide-border border-y border-border">
                   {financials?.map((row) => {
                     const totalRow = row.emphasize === 'total';
                     const remainingRow = row.emphasize === 'remaining';
                     return (
-                      <div key={row.label} className={cn('flex items-baseline justify-between gap-3 py-2', totalRow && 'py-2.5')}>
+                      <div key={row.label} className="flex items-baseline justify-between gap-3 py-1.5">
                         <dt className={totalRow || remainingRow ? 'text-sm font-medium text-text' : 'text-sm text-muted'}>{row.label}</dt>
                         <dd className={cn(
                           'num text-end tabular-nums',
-                          totalRow && 'text-base font-semibold text-text',
+                          totalRow && 'text-sm font-semibold text-text',
                           remainingRow && overdue && 'text-sm font-medium text-warning',
                           remainingRow && !overdue && 'text-sm font-medium text-text',
                           !totalRow && !remainingRow && 'text-sm text-muted',
@@ -255,13 +255,13 @@ export function InvoicePreviewPanel({
                 {previewLines.length === 0 ? (
                   <p className="mt-2 text-sm text-muted">{t('preview_no_lines')}</p>
                 ) : (
-                  <div className="mt-2 overflow-x-auto">
-                    <table className="w-full min-w-[16rem] text-sm">
+                  <div className="mt-1.5 overflow-x-auto">
+                    <table className="w-full text-sm">
                       <thead className="border-b border-border text-xs text-muted">
                         <tr>
-                          <th className="py-1.5 pe-2 text-start font-medium">{td('description')}</th>
-                          <th className="py-1.5 pe-2 text-end font-medium">{td('qty')}</th>
-                          <th className="py-1.5 text-end font-medium">{t('total')}</th>
+                          <th className="py-1 pe-2 text-start font-medium">{td('description')}</th>
+                          <th className="py-1 pe-2 text-end font-medium">{td('qty')}</th>
+                          <th className="py-1 text-end font-medium">{t('total')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -269,9 +269,9 @@ export function InvoicePreviewPanel({
                           const name = line.product_name ?? line.description ?? '—';
                           return (
                             <tr key={line.id}>
-                              <td className="max-w-[12rem] truncate py-1.5 pe-2 text-text" title={name}>{name}</td>
-                              <td className="num py-1.5 pe-2 text-end text-muted">{line.quantity}</td>
-                              <td className="num py-1.5 text-end font-medium text-text">{formatRiyal(line.line_total)}</td>
+                              <td className="max-w-[10rem] truncate py-1 pe-2 text-text" title={name}>{name}</td>
+                              <td className="num py-1 pe-2 text-end text-muted">{line.quantity}</td>
+                              <td className="num py-1 text-end font-medium text-text">{formatRiyal(line.line_total)}</td>
                             </tr>
                           );
                         })}

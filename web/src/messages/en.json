@@ -2123,6 +2123,8 @@
     "load_error": "Could not load invoices.",
     "retry": "Retry",
     "view": "View",
+    "more_actions": "More",
+    "filters": "Filters",
     "actions": "Actions",
     "edit": "Edit",
     "delete": "Delete",

@@ -22,10 +22,17 @@ import { toCsv, downloadCsv } from '@/lib/export';
 import { cn } from '@/lib/utils';
 import { normalizeProtectedColumns, type DataTableColumnVisibilityControl } from '@/lib/data-explorer/table-layout';
 
+type ColumnHideBelow = 'md' | 'lg' | 'xl';
+
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData, TValue> {
     numeric?: boolean;
+    /**
+     * إخفاء بصري تحت هذا العرض (لا حذف من النموذج ولا من قائمة الأعمدة).
+     * الجدول نفسه يظهر من `md`؛ `hideBelow: 'xl'` يُبقي الأعمدة الحرجة على اللوحي.
+     */
+    hideBelow?: ColumnHideBelow;
   }
 }
 
@@ -92,15 +99,27 @@ interface DataTableProps<T> {
    * قائماً حتى لا تُسرَق إجراءات الصف. اختياري بالكامل — القوائم الأخرى بلا تغيير.
    */
   onRowClick?: (row: T) => void;
+  /**
+   * قائمة الأعمدة داخل شريط الجدول أو شريطه المختصر. الافتراضي `true` حتى
+   * لا تتغيّر الشاشات الأخرى. قائمة الفواتير تمرّر `false` وتستضيف القائمة في شريطها.
+   */
+  showColumnMenu?: boolean;
+}
+
+function columnMeta(columnDef: { meta?: unknown }): { numeric?: boolean; hideBelow?: ColumnHideBelow } {
+  if (!columnDef.meta || typeof columnDef.meta !== 'object') return {};
+  return columnDef.meta as { numeric?: boolean; hideBelow?: ColumnHideBelow };
 }
 
 function isNumericColumn(columnDef: { meta?: unknown }): boolean {
-  return Boolean(
-    columnDef.meta
-    && typeof columnDef.meta === 'object'
-    && 'numeric' in columnDef.meta
-    && (columnDef.meta as { numeric?: boolean }).numeric,
-  );
+  return Boolean(columnMeta(columnDef).numeric);
+}
+
+function hideBelowClass(hideBelow?: ColumnHideBelow): string | undefined {
+  if (hideBelow === 'md') return 'hidden md:table-cell';
+  if (hideBelow === 'lg') return 'hidden lg:table-cell';
+  if (hideBelow === 'xl') return 'hidden xl:table-cell';
+  return undefined;
 }
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
@@ -132,6 +151,7 @@ export function DataTable<T>({
   loadingLabel,
   isRowActive,
   onRowClick,
+  showColumnMenu = true,
 }: DataTableProps<T>) {
   const t = useTranslations('nebrax');
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -244,7 +264,7 @@ export function DataTable<T>({
             placeholder={searchPlaceholder}
             className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
           />
-          {columnVisibility ? (
+          {columnVisibility && showColumnMenu ? (
             // بطاقة الجوال المخصصة تبني حقولها خارج خلايا الجدول، فلا يجوز أن
             // نعرض لها متحكماً يوحي بأن إخفاء العمود سيخفي تلك الحقول.
             <div className={mobileRecord ? 'hidden md:block' : undefined}>
@@ -269,7 +289,7 @@ export function DataTable<T>({
             CSV
           </Button>
         </div>
-      ) : columnVisibility ? (
+      ) : columnVisibility && showColumnMenu ? (
         <div className={cn('flex justify-end border-b border-border p-2', mobileRecord && 'hidden md:flex')}>
           <ColumnLayoutMenu
             items={columnLayoutItems}
@@ -311,12 +331,12 @@ export function DataTable<T>({
                       const sorted = header.column.getIsSorted();
                       const SortIcon = sorted === 'asc' ? ArrowUp : sorted === 'desc' ? ArrowDown : ChevronsUpDown;
                       const sortable = header.column.getCanSort() && canSort(header.column.id);
-                      const numeric = isNumericColumn(header.column.columnDef);
+                      const meta = columnMeta(header.column.columnDef);
                       return (
                         <TH
                           key={header.id}
                           aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
-                          className={numeric ? 'text-end' : undefined}
+                          className={cn(meta.numeric && 'text-end', hideBelowClass(meta.hideBelow))}
                         >
                           {header.isPlaceholder ? null : sortable ? (
                             <button
@@ -329,7 +349,7 @@ export function DataTable<T>({
                               className={cn(
                                 'inline-flex cursor-pointer select-none items-center gap-1 rounded transition-colors hover:text-text',
                                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-                                numeric && 'w-full justify-end',
+                                meta.numeric && 'w-full justify-end',
                                 sorted && 'text-primary'
                               )}
                             >
@@ -382,7 +402,10 @@ export function DataTable<T>({
                       {row.getVisibleCells().map((cell) => (
                         <TD
                           key={cell.id}
-                          className={isNumericColumn(cell.column.columnDef) ? 'text-end' : undefined}
+                          className={cn(
+                            isNumericColumn(cell.column.columnDef) && 'text-end',
+                            hideBelowClass(columnMeta(cell.column.columnDef).hideBelow),
+                          )}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TD>

@@ -40,6 +40,13 @@ export const INVOICE_SUPPORTING_COLUMN_DEFAULTS: Record<string, boolean> = {
   paid_amount: false,
 };
 
+/** تُخفى بصرياً تحت `xl` حتى يبقى الحرج ظاهراً على اللوحي. تبقى في قائمة الأعمدة. */
+export const INVOICE_HIDE_BELOW_XL_COLUMNS = ['invoice_date', 'due_date', 'payment_status'] as const;
+
+export function invoiceColumnHideBelow(columnId: string): 'xl' | undefined {
+  return (INVOICE_HIDE_BELOW_XL_COLUMNS as readonly string[]).includes(columnId) ? 'xl' : undefined;
+}
+
 export function hasActiveInvoiceQuery(search: string, filters: { key: string }[]): boolean {
   return Boolean(search.trim() || filters.length > 0);
 }

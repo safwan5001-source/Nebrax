@@ -415,3 +415,44 @@ describe('DataTable optional row activation', () => {
     expect(onRowClick).not.toHaveBeenCalled();
   });
 });
+
+describe('DataTable optional column menu and breakpoint hiding', () => {
+  it('still offers the column menu by default when the toolbar is hidden', () => {
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showToolbar={false}
+        columnVisibility={{ value: {}, onChange: vi.fn(), protectedColumnIds: ['number'] }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: nebraxText('ar', 'columns') })).toBeTruthy();
+  });
+
+  it('hides the standalone column menu when showColumnMenu is false', () => {
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showToolbar={false}
+        showColumnMenu={false}
+        columnVisibility={{ value: {}, onChange: vi.fn(), protectedColumnIds: ['number'] }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: nebraxText('ar', 'columns') })).toBeNull();
+  });
+
+  it('keeps hideBelow columns in the table with a visual breakpoint class', () => {
+    const withHidden: ColumnDef<Row, unknown>[] = [
+      { accessorKey: 'number', header: 'الرقم' },
+      { accessorKey: 'date', header: 'التاريخ', meta: { hideBelow: 'xl' } },
+    ];
+    renderIntl(<DataTable columns={withHidden} data={rows} showToolbar={false} />);
+
+    const header = screen.getByRole('columnheader', { name: 'التاريخ' });
+    expect(header.className).toContain('hidden');
+    expect(header.className).toContain('xl:table-cell');
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasActiveInvoiceQuery, isInvoiceDraft, isInvoiceOverdue, todayIsoDate } from './workspace';
+import { hasActiveInvoiceQuery, INVOICE_HIDE_BELOW_XL_COLUMNS, isInvoiceDraft, isInvoiceOverdue, todayIsoDate } from './workspace';
 
 describe('invoice workspace presentation rules', () => {
   it('treats only draft invoices as editable drafts', () => {
@@ -27,6 +27,10 @@ describe('invoice workspace presentation rules', () => {
     expect(isInvoiceOverdue({ status: 'posted', remaining: '0.00', due_date: '2026-08-01' }, today)).toBe(false);
     expect(isInvoiceOverdue({ status: 'posted', remaining: '150.00', due_date: null }, today)).toBe(false);
     expect(isInvoiceOverdue({ status: 'posted', remaining: '150.00', due_date: today }, today)).toBe(false);
+  });
+
+  it('collapses secondary table columns below xl without dropping them from the model', () => {
+    expect([...INVOICE_HIDE_BELOW_XL_COLUMNS]).toEqual(['invoice_date', 'due_date', 'payment_status']);
   });
 
   it('distinguishes a filtered query from an empty tenant list', () => {

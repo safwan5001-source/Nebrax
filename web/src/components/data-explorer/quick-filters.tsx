@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { Select } from '@/components/ui/select';
 import type { ActiveFilter, FilterDefinition } from '@/lib/data-explorer/types';
+import { cn } from '@/lib/utils';
 
 interface QuickFiltersProps {
   definitions: FilterDefinition[];
   filters: ActiveFilter[];
   onChange: (filter: ActiveFilter) => void;
   onOpenAdvanced?: () => void;
+  className?: string;
 }
 
 export function QuickFilters({
@@ -19,12 +21,13 @@ export function QuickFilters({
   filters,
   onChange,
   onOpenAdvanced,
+  className,
 }: QuickFiltersProps) {
   const t = useTranslations('nebrax');
   const quick = definitions.filter((definition) => definition.quick);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
       {quick.map((definition) => {
         if (!definition.options?.length) return null;
 

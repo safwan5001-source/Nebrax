@@ -5,15 +5,17 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
+import { ColumnLayoutMenu } from '@/components/data-explorer/column-layout-menu';
 import { InvoicePreviewPanel } from '@/components/invoices/invoice-preview-panel';
 import { InvoicesListToolbar } from '@/components/invoices/invoices-list-toolbar';
-import { PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
+import { Pagination, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { BranchViewToggle } from '@/components/ui/branch-view-toggle';
@@ -21,13 +23,14 @@ import { type BranchView } from '@/lib/branch-view';
 import { toCsv, downloadCsv } from '@/lib/export';
 import {
   hasActiveInvoiceQuery,
+  invoiceColumnHideBelow,
   INVOICE_LIST_SORT_COLUMNS,
   INVOICE_SUPPORTING_COLUMN_DEFAULTS,
   isInvoiceDraft,
   isInvoiceOverdue,
 } from '@/lib/invoices/workspace';
 import { formatRiyal } from '@/lib/money';
-import { useDataTableColumnVisibility } from '@/lib/data-explorer/table-layout';
+import { normalizeProtectedColumns, useDataTableColumnVisibility } from '@/lib/data-explorer/table-layout';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import {
   parseExplorerState,
@@ -66,7 +69,7 @@ interface PaginationMeta {
 interface InvoiceResponse { data: Invoice[]; meta?: PaginationMeta }
 
 const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = {
-  posted: 'positive',
+  posted: 'muted',
   draft: 'muted',
   cancelled: 'negative',
 };
@@ -93,6 +96,12 @@ function appendMoneyFilter(params: URLSearchParams, key: 'total' | 'remaining', 
   } else {
     params.set(`${key}_gte`, value);
   }
+}
+
+function columnId(column: ColumnDef<Invoice, unknown>): string {
+  if (column.id) return column.id;
+  if ('accessorKey' in column && column.accessorKey != null) return String(column.accessorKey);
+  return '';
 }
 
 function DocumentStatus({
@@ -142,6 +151,7 @@ function MoneyCell({
 export default function InvoicesPage() {
   const t = useTranslations('invoices');
   const ts = useTranslations('status');
+  const tn = useTranslations('nebrax');
   const router = useRouter();
   const searchParams = useSearchParams();
   const { success, error: errorToast } = useToast();
@@ -339,13 +349,40 @@ export default function InvoicesPage() {
     ));
   }
 
-  const rowActions = useCallback((invoice: Invoice) => {
+  const desktopRowActions = useCallback((invoice: Invoice) => {
+    const draft = isInvoiceDraft(invoice.status);
+    return (
+      <div className="flex items-center justify-end" onClick={(event) => event.stopPropagation()}>
+        <Dropdown
+          trigger={<MoreHorizontal className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
+          triggerLabel={t('more_actions')}
+          menuLabel={t('actions')}
+          triggerClassName="flex h-8 w-8 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-text"
+        >
+          <DropdownItem icon={Eye} onClick={() => openPreview(invoice)}>{t('view')}</DropdownItem>
+          {draft ? (
+            <DropdownItem icon={Pencil} href={`/invoices/${invoice.id}/edit`}>{t('edit')}</DropdownItem>
+          ) : (
+            <DropdownItem icon={Pencil} disabled title={t('posted_locked')}>{t('edit')}</DropdownItem>
+          )}
+          <DropdownItem
+            icon={Trash2}
+            tone="danger"
+            disabled={!draft}
+            title={draft ? t('delete') : t('posted_locked')}
+            onClick={() => setToDelete(invoice)}
+          >
+            {t('delete')}
+          </DropdownItem>
+        </Dropdown>
+      </div>
+    );
+  }, [t]);
+
+  const mobileRowActions = useCallback((invoice: Invoice) => {
     const draft = isInvoiceDraft(invoice.status);
     return (
       <div className="flex items-center justify-end gap-0.5" onClick={(event) => event.stopPropagation()}>
-        <Button type="button" variant="ghost" size="icon" aria-label={t('view')} aria-haspopup="dialog" onClick={() => openPreview(invoice)}>
-          <Eye className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
-        </Button>
         {draft ? (
           <Button asChild variant="ghost" size="icon" aria-label={t('edit')} title={t('edit')}>
             <Link href={`/invoices/${invoice.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /></Link>
@@ -390,7 +427,22 @@ export default function InvoicesPage() {
       accessorFn: (row) => partnerNames[row.partner_id] ?? '—',
       cell: ({ row }) => {
         const name = partnerNames[row.original.partner_id] ?? '—';
-        return <span className="block max-w-64 truncate" title={name}>{name}</span>;
+        return <span className="block max-w-48 truncate" title={name}>{name}</span>;
+      },
+    },
+    {
+      accessorKey: 'invoice_date', header: t('date'), meta: { hideBelow: invoiceColumnHideBelow('invoice_date') },
+      cell: ({ row }) => <span className="num whitespace-nowrap text-muted" dir="ltr">{row.original.invoice_date}</span>,
+    },
+    {
+      accessorKey: 'due_date', header: t('due_date'), meta: { hideBelow: invoiceColumnHideBelow('due_date') },
+      cell: ({ row }) => {
+        const overdue = isInvoiceOverdue(row.original);
+        return (
+          <span className="num whitespace-nowrap text-muted" dir="ltr" title={overdue ? t('overdue') : undefined}>
+            {row.original.due_date ?? '—'}
+          </span>
+        );
       },
     },
     {
@@ -398,7 +450,7 @@ export default function InvoicesPage() {
       cell: ({ row }) => <DocumentStatus invoice={row.original} ts={ts} overdueLabel={t('overdue')} />,
     },
     {
-      accessorKey: 'payment_status', header: t('payment_status'), enableSorting: false,
+      accessorKey: 'payment_status', header: t('payment_status'), enableSorting: false, meta: { hideBelow: invoiceColumnHideBelow('payment_status') },
       cell: ({ row }) => <Badge tone={payTone[row.original.payment_status] ?? 'muted'}>{ts(row.original.payment_status)}</Badge>,
     },
     {
@@ -416,21 +468,6 @@ export default function InvoicesPage() {
       ),
     },
     {
-      accessorKey: 'invoice_date', header: t('date'),
-      cell: ({ row }) => <span className="num whitespace-nowrap text-muted" dir="ltr">{row.original.invoice_date}</span>,
-    },
-    {
-      accessorKey: 'due_date', header: t('due_date'),
-      cell: ({ row }) => {
-        const overdue = isInvoiceOverdue(row.original);
-        return (
-          <span className={cn('num whitespace-nowrap', overdue ? 'text-warning' : 'text-muted')} dir="ltr" title={overdue ? t('overdue') : undefined}>
-            {row.original.due_date ?? '—'}
-          </span>
-        );
-      },
-    },
-    {
       accessorKey: 'subtotal', header: t('subtotal'), meta: { numeric: true },
       cell: ({ row }) => <MoneyCell value={row.original.subtotal} muted />,
     },
@@ -444,114 +481,149 @@ export default function InvoicesPage() {
     },
     {
       id: 'actions', header: () => <span className="sr-only">{t('actions')}</span>, enableSorting: false,
-      cell: ({ row }) => rowActions(row.original),
+      cell: ({ row }) => desktopRowActions(row.original),
     },
-  ], [partnerNames, rowActions, t, ts]);
+  ], [desktopRowActions, partnerNames, t, ts]);
 
-  const headerActions: PageAction[] = [
-    { key: 'create', label: t('create'), icon: Plus, href: '/invoices/new', variant: 'primary', emphasis: 'primary' },
-  ];
+  const columnMenu = useMemo(() => (
+    <ColumnLayoutMenu
+      items={columns.map((column) => {
+        const id = columnId(column);
+        const header = typeof column.header === 'string'
+          ? column.header
+          : (columnVisibility.labels?.[id] ?? id);
+        return {
+          id,
+          label: header,
+          visible: columnVisibility.value[id] !== false,
+          canHide: !columnVisibility.protectedColumnIds?.includes(id),
+        };
+      }).filter((item) => item.id)}
+      labels={{
+        columns: tn('columns'),
+        moveColumn: tn('moveColumn'),
+        moveUp: tn('moveUp'),
+        moveDown: tn('moveDown'),
+      }}
+      onReorder={() => {}}
+      onVisibilityChange={(id, visible) => {
+        columnVisibility.onChange(normalizeProtectedColumns(
+          { ...columnVisibility.value, [id]: visible },
+          columnVisibility.protectedColumnIds,
+        ));
+      }}
+      allowReorder={false}
+    />
+  ), [columnVisibility, columns, tn]);
 
   return (
-    <div className={cn('space-y-4', previewId && 'xl:pe-[26.5rem]')}>
-      <PageHeader
-        title={t('title')}
-        context={
-          <BranchViewToggle
-            value={view}
-            onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }}
-          />
-        }
-        actions={headerActions}
-      />
+    <div className={cn('space-y-3', previewId && 'xl:pe-[21.5rem]')}>
+      <header className="flex flex-wrap items-center gap-2">
+        <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+        <BranchViewToggle
+          value={view}
+          onChange={(next) => { setView(next); setExplorer((current) => ({ ...current, page: 1 })); }}
+          className="order-last w-full sm:order-none sm:w-auto"
+        />
+        <Button asChild className="ms-auto">
+          <Link href="/invoices/new">
+            <Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+            {t('create')}
+          </Link>
+        </Button>
+      </header>
 
-      <InvoicesListToolbar
-        search={searchInput}
-        onSearchChange={setSearchInput}
-        searchPlaceholder={t('search_placeholder')}
-        searchLabel={t('search')}
-        dateLabel={t('date')}
-        definitions={definitions}
-        filters={labelledFilters}
-        onFilterChange={updateFilter}
-        onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
-        onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
-        onOpenAdvanced={() => setAdvancedOpen(true)}
-        sort={{
-          value: explorer.sort ?? '-invoice_date',
-          onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
-          options: sortOptions,
-        }}
-        resultCount={meta.total}
-        onExport={exportCurrentPage}
-        exportDisabled={loading || invoices.length === 0}
-      />
-
-      <div className="[&_td]:py-1.5 [&_th]:py-1.5">
-        <DataTable
-          columns={columns}
-          data={invoices}
-          loading={loading}
-          error={error}
-          onRetry={load}
-          retryLabel={t('retry')}
-          emptyLabel={filteredQuery ? t('no_results') : t('empty')}
-          emptyDescription={filteredQuery ? t('no_results_hint') : t('empty_hint')}
-          emptyAction={
-            filteredQuery ? (
-              <Button type="button" variant="outline" onClick={() => { setSearchInput(''); setExplorer((current) => ({ ...current, page: 1, search: '', filters: [] })); }}>
-                {t('clear_filters')}
-              </Button>
-            ) : (
-              <Button asChild>
-                <Link href="/invoices/new">{t('create')}</Link>
-              </Button>
-            )
-          }
-          exportName="invoices"
-          showToolbar={false}
-          loadingLabel={t('loading')}
-          onRowClick={openPreview}
-          isRowActive={(invoice) => invoice.id === previewId}
-          serverSort={{
+      <div className="overflow-hidden rounded border border-border bg-surface">
+        <InvoicesListToolbar
+          search={searchInput}
+          onSearchChange={setSearchInput}
+          searchPlaceholder={t('search_placeholder')}
+          searchLabel={t('search')}
+          dateLabel={t('date')}
+          definitions={definitions}
+          filters={labelledFilters}
+          onFilterChange={updateFilter}
+          onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
+          onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
+          onOpenAdvanced={() => setAdvancedOpen(true)}
+          sort={{
             value: explorer.sort ?? '-invoice_date',
             onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
-            columns: [...INVOICE_LIST_SORT_COLUMNS],
+            options: sortOptions,
           }}
-          columnVisibility={columnVisibility}
-          stickyHeader
-          mobileRecord={(invoice) => ({
-            title: (
-              <button
-                type="button"
-                onClick={() => openPreview(invoice)}
-                className="num text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                dir="ltr"
-              >
-                {invoice.number}
-              </button>
-            ),
-            subtitle: partnerNames[invoice.partner_id] ?? '—',
-            amountLabel: t('total'),
-            amount: formatRiyal(invoice.total),
-            secondary: {
-              label: t('remaining'),
-              value: (
-                <span className={cn(isInvoiceOverdue(invoice) && 'text-warning')}>
-                  {formatRiyal(invoice.remaining)}
-                </span>
-              ),
-            },
-            status: (
-              <>
-                <DocumentStatus invoice={invoice} ts={ts} overdueLabel={t('overdue')} />
-                <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
-              </>
-            ),
-            meta: invoice.invoice_date,
-            actions: rowActions(invoice),
-          })}
+          resultCount={meta.total}
+          onExport={exportCurrentPage}
+          exportDisabled={loading || invoices.length === 0}
+          columnMenu={columnMenu}
         />
+
+        <div className="border-t border-border [&>div]:rounded-none [&>div]:border-0 [&_td]:py-1.5 [&_th]:py-1.5">
+          <DataTable
+            columns={columns}
+            data={invoices}
+            loading={loading}
+            error={error}
+            onRetry={load}
+            retryLabel={t('retry')}
+            emptyLabel={filteredQuery ? t('no_results') : t('empty')}
+            emptyDescription={filteredQuery ? t('no_results_hint') : t('empty_hint')}
+            emptyAction={
+              filteredQuery ? (
+                <Button type="button" variant="outline" onClick={() => { setSearchInput(''); setExplorer((current) => ({ ...current, page: 1, search: '', filters: [] })); }}>
+                  {t('clear_filters')}
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link href="/invoices/new">{t('create')}</Link>
+                </Button>
+              )
+            }
+            exportName="invoices"
+            showToolbar={false}
+            showColumnMenu={false}
+            loadingLabel={t('loading')}
+            onRowClick={openPreview}
+            isRowActive={(invoice) => invoice.id === previewId}
+            serverSort={{
+              value: explorer.sort ?? '-invoice_date',
+              onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
+              columns: [...INVOICE_LIST_SORT_COLUMNS],
+            }}
+            columnVisibility={columnVisibility}
+            stickyHeader
+            mobileRecord={(invoice) => ({
+              title: (
+                <button
+                  type="button"
+                  onClick={() => openPreview(invoice)}
+                  className="num text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  dir="ltr"
+                >
+                  {invoice.number}
+                </button>
+              ),
+              subtitle: partnerNames[invoice.partner_id] ?? '—',
+              amountLabel: t('total'),
+              amount: formatRiyal(invoice.total),
+              secondary: {
+                label: t('remaining'),
+                value: (
+                  <span className={cn(isInvoiceOverdue(invoice) && 'text-warning')}>
+                    {formatRiyal(invoice.remaining)}
+                  </span>
+                ),
+              },
+              status: (
+                <>
+                  <DocumentStatus invoice={invoice} ts={ts} overdueLabel={t('overdue')} />
+                  <Badge tone={payTone[invoice.payment_status] ?? 'muted'}>{ts(invoice.payment_status)}</Badge>
+                </>
+              ),
+              meta: invoice.invoice_date,
+              actions: mobileRowActions(invoice),
+            })}
+          />
+        </div>
       </div>
 
       <Pagination

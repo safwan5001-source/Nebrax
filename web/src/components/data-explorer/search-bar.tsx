@@ -16,6 +16,8 @@ interface SearchBarProps {
   inputRef?: Ref<HTMLInputElement>;
   /** اختصار لوحة مفاتيح معلَن وصولياً، مثل `/`. */
   keyShortcuts?: string;
+  /** ارتفاع/حشوة الحقل — افتراضي `h-10`. الشاشات الكثيفة تمرّر `h-9` دون تغيير الباقي. */
+  inputClassName?: string;
 }
 
 export function SearchBar({
@@ -26,6 +28,7 @@ export function SearchBar({
   ariaLabel,
   inputRef,
   keyShortcuts,
+  inputClassName,
 }: SearchBarProps) {
   const t = useTranslations('nebrax');
 
@@ -45,7 +48,7 @@ export function SearchBar({
         aria-label={ariaLabel ?? t('search')}
         aria-keyshortcuts={keyShortcuts}
         autoComplete="off"
-        className="h-10 pe-10 ps-9 text-sm"
+        className={cn('h-10 pe-10 ps-9 text-sm', inputClassName)}
       />
       {value ? (
         <Button
