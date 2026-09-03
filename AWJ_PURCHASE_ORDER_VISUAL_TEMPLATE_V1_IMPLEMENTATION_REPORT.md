@@ -176,15 +176,13 @@ Duration    22.45s
 
 ## 17. GitHub CI
 
-PR [#629](https://github.com/safwan5001-source/Nebrax/pull/629) على `4030c03ba66a0c6bd4e66b7d7a8fc102dc9416dc`:
+**نجح** على `fc0e3fcf852c9f1d97751c2f9a8492e4fd19d943` في [#629](https://github.com/safwan5001-source/Nebrax/pull/629): sqlite، pgsql، Web CI. لا دمج.
 
 | الفحص | الحالة |
 | --- | --- |
-| php artisan test (L11, sqlite) | نجح |
-| web build (Next.js) | نجح |
-| php artisan test (L11, pgsql) | قيد التشغيل عند كتابة هذا التقرير؛ يُحدَّث عند الاكتمال |
-
-لا دمج.
+| php artisan test (L11, sqlite) | نجح (4m1s) |
+| php artisan test (L11, pgsql) | نجح (8m56s) |
+| web build (Next.js) | نجح (2m0s) |
 
 ---
 
@@ -267,7 +265,7 @@ https://github.com/safwan5001-source/Nebrax/pull/629
 ## 26. Head SHA
 
 كود القالب: `4030c03ba66a0c6bd4e66b7d7a8fc102dc9416dc`  
-تقرير التنفيذ: `84bd2e1de926413281e9f15399b661a082c10198`
+Head الذي أخضر عليه CI: `fc0e3fcf852c9f1d97751c2f9a8492e4fd19d943`
 
 ---
 
