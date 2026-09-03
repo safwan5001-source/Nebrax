@@ -100,6 +100,14 @@ export function DocSummary({
     );
   }
 
+  if (style.composition === 'purchase_order_formal') {
+    return (
+      <section data-doc-keep="summary" className={cn('flex items-end justify-end', style.sectionGap)}>
+        {totals}
+      </section>
+    );
+  }
+
   return (
     <div className={cn('flex items-start justify-between gap-6', style.sectionGap)}>
       {qr ?? <div />}

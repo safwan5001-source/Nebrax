@@ -10,6 +10,7 @@ import { TaxInvoiceMinimalV2 } from '../templates/tax-invoice-minimal-v2';
 import { TaxInvoiceRetail } from '../templates/tax-invoice-retail';
 import { TaxInvoiceRetailV2 } from '../templates/tax-invoice-retail-v2';
 import { QuotationProposal } from '../templates/quotation-proposal';
+import { PurchaseOrderFormal } from '../templates/purchase-order-formal';
 import { TaxReceiptThermal58, TaxReceiptThermal80 } from '../templates/thermal-receipt';
 
 /**
@@ -108,6 +109,14 @@ export const TEMPLATES: Record<string, TemplateDescriptor> = {
     defaultTheme: 'blue',
     supportedPaper: ['a4', 'a4_landscape', 'letter', 'legal'],
     documentTypes: ['quotation'],
+  },
+  'purchase-order-formal': {
+    id: 'purchase-order-formal',
+    nameKey: 'purchase_order_formal',
+    component: PurchaseOrderFormal,
+    defaultTheme: 'gray',
+    supportedPaper: ['a4', 'a4_landscape', 'letter', 'legal'],
+    documentTypes: ['purchase_order'],
   },
 };
 

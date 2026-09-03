@@ -24,6 +24,7 @@ const TEMPLATES = [
   { id: 'tax-invoice-retail', labelKey: 'retail' },
   { id: 'tax-invoice-retail-v2', labelKey: 'retail_v2' },
   { id: 'quotation-proposal', labelKey: 'quotation_proposal' },
+  { id: 'purchase-order-formal', labelKey: 'purchase_order_formal' },
 ] as const;
 const DOCUMENT_TYPES = [
   'tax_invoice',
@@ -150,7 +151,7 @@ export default function DocumentQaPage() {
           <DocumentView
             model={model}
             templateId={templateId}
-            themeId={templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
+            themeId={templateId === 'tax-invoice-erp' || templateId === 'tax-invoice-erp-v2' || templateId === 'purchase-order-formal' ? 'gray' : templateId === 'tax-invoice-minimal' || templateId === 'tax-invoice-minimal-v2' ? 'black' : 'blue'}
             showLogo={showLogo}
             layout={layout}
             rootId="qa-print-root"

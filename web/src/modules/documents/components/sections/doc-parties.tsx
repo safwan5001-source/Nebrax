@@ -333,6 +333,29 @@ export function DocParties({ model }: { model: DocumentModel }) {
     );
   }
 
+  if (style.composition === 'purchase_order_formal') {
+    const issuerField = 'purchase_buyer' as const;
+    const partyField = 'supplier' as const;
+    return (
+      <section className={cn('grid grid-cols-2 gap-x-10 gap-y-2 border-b border-[color:var(--border)] pb-3', style.sectionGap)}>
+        <div className="min-w-0">
+          <div className="mb-1 text-[9px] font-semibold tracking-wide text-[color:var(--muted)]"><ModernFieldLabel field={issuerField} mode={mode} /></div>
+          <div className="break-words text-[12px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
+          <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} />
+          <DocInfoRow label={<ModernFieldLabel field="cr_number" mode={mode} />} value={seller.crNumber ? <span className="num" dir="ltr">{seller.crNumber}</span> : null} />
+          <DocInfoRow label={t('phone')} value={seller.phone ? <span className="num" dir="ltr">{seller.phone}</span> : null} />
+        </div>
+        <div className="min-w-0">
+          <div className="mb-1 text-[9px] font-semibold tracking-wide text-[color:var(--muted)]"><ModernFieldLabel field={partyField} mode={mode} /></div>
+          <div className="break-words text-[12px] font-semibold leading-snug text-black">{buyer.name || '—'}</div>
+          <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={buyer.vatNumber ? <span className="num" dir="ltr">{buyer.vatNumber}</span> : null} />
+          <DocInfoRow label={<ModernFieldLabel field="city" mode={mode} />} value={buyer.city} />
+          <DocInfoRow label={t('national_address')} value={buyer.address} />
+        </div>
+      </section>
+    );
+  }
+
   const card = cn('border border-gray-200 p-3', style.cardRadius);
   return (
     <div className={cn('grid grid-cols-3 gap-4', style.sectionGap)}>

@@ -23,7 +23,7 @@ export function DocQr({ model }: { model: DocumentModel }) {
   const isClassicV2 = style.composition === 'classic_v2';
   const isMinimalV2 = style.composition === 'minimal_v2';
   const isRetailV2 = style.composition === 'retail_v2';
-  if (style.composition === 'quotation_proposal') {
+  if (style.composition === 'quotation_proposal' || style.composition === 'purchase_order_formal') {
     return <div />;
   }
   const usesV2Labels = isModernV2 || isErpV2 || isClassicV2 || isMinimalV2 || isRetailV2;

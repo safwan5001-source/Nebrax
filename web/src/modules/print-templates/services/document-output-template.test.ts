@@ -660,6 +660,59 @@ describe('تجميد عرض السعر مقابل quotation-proposal', () => {
   });
 });
 
+describe('تجميد أمر الشراء مقابل purchase-order-formal', () => {
+  it('لا يعيد تفسير قالب A4 ولا يضيف alias من فاتورة أو عرض سعر إلى purchase-order-formal', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/modules/print-templates/services/document-output-template.ts'), 'utf8');
+    expect(source).not.toContain('purchase-order-formal');
+    expect(source).not.toMatch(/purchase_order['"]\s*\?\s*['"]purchase-order-formal/);
+    expect(source).not.toMatch(/quotation-proposal['"]\s*\?\s*['"]purchase-order-formal/);
+  });
+
+  it('يثبّت أمر شراء صادر على tax-invoice-classic ولا يتبع تعيين purchase-order-formal الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'purchase_order',
+      isPosted: true,
+      frozenPrint: revision('frozen-po-classic', 'tax-invoice-classic'),
+      livePrint: assignment('live-po-formal', 'purchase-order-formal'),
+      livePdf: assignment('live-po-formal-pdf', 'purchase-order-formal'),
+    });
+    expect(outputs.print?.templateId).toBe('tax-invoice-classic');
+    expect(outputs.pdf?.templateId).toBe('tax-invoice-classic');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('tax-invoice-classic');
+    expect(getTemplate(outputs.print?.templateId).component).not.toBe(getTemplate('purchase-order-formal').component);
+  });
+
+  it('يثبّت أمر شراء صادر على purchase-order-formal ولا يرجع إلى classic الحي', () => {
+    const outputs = resolveDocumentOutputTemplates({
+      documentType: 'purchase_order',
+      isPosted: true,
+      frozenPrint: revision('frozen-po-formal', 'purchase-order-formal'),
+      livePrint: assignment('live-po-classic', 'tax-invoice-classic'),
+    });
+    expect(outputs.print?.templateId).toBe('purchase-order-formal');
+    expect(outputs.pdf?.templateId).toBe('purchase-order-formal');
+    expect(getTemplate(outputs.print?.templateId).id).toBe('purchase-order-formal');
+  });
+
+  it('يجعل مسودة أمر الشراء تتبع التعيين الحي: classic أو purchase-order-formal', () => {
+    const legacyDraft = resolveDocumentOutputTemplates({
+      documentType: 'purchase_order',
+      isPosted: false,
+      livePrint: assignment('draft-po-classic', 'tax-invoice-classic'),
+    });
+    expect(legacyDraft.print?.templateId).toBe('tax-invoice-classic');
+
+    const formalDraft = resolveDocumentOutputTemplates({
+      documentType: 'purchase_order',
+      isPosted: false,
+      livePrint: assignment('draft-po-formal', 'purchase-order-formal'),
+    });
+    expect(formalDraft.print?.templateId).toBe('purchase-order-formal');
+    expect(formalDraft.pdf?.templateId).toBe('purchase-order-formal');
+    expect(formalDraft.pdfSharesPrintRoot).toBe(true);
+  });
+});
+
 describe('resolvedTemplatesEqual', () => {
   it('يميّز تعريفين مختلفين', () => {
     const classic = resolveDocumentOutputTemplates({

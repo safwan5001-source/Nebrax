@@ -237,4 +237,15 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
+  /* Purchase Order Formal فقط: لا تُطبَّق على عرض السعر ولا قوالب الفاتورة. */
+  [data-doc-composition="purchase_order_formal"] thead {
+    display: table-header-group;
+  }
+  [data-doc-composition="purchase_order_formal"] tr,
+  [data-doc-composition="purchase_order_formal"] [data-doc-keep="summary"],
+  [data-doc-composition="purchase_order_formal"] footer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

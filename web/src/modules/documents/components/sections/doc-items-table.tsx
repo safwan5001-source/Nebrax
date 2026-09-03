@@ -59,6 +59,14 @@ import {
   quotationItemsColumnWidthClass,
   quotationItemsValueCellClass,
 } from '../../presentation/quotation-proposal';
+import {
+  PURCHASE_ORDER_FORMAL_ITEMS_HEAD_CLASS,
+  PURCHASE_ORDER_FORMAL_ITEMS_ROW_CLASS,
+  PURCHASE_ORDER_FORMAL_ITEMS_TABLE_CLASS,
+  purchaseOrderItemsCellPadding,
+  purchaseOrderItemsColumnWidthClass,
+  purchaseOrderItemsValueCellClass,
+} from '../../presentation/purchase-order-formal';
 import { ModernColumnHeader } from '../../presentation/modern-bilingual-label';
 
 /**
@@ -100,6 +108,9 @@ function headRow(style: TemplateStyle): { className: string; style?: CSSProperti
   if (style.composition === 'quotation_proposal') {
     return { className: QUOTATION_PROPOSAL_ITEMS_HEAD_CLASS };
   }
+  if (style.composition === 'purchase_order_formal') {
+    return { className: PURCHASE_ORDER_FORMAL_ITEMS_HEAD_CLASS };
+  }
   switch (style.tableHead) {
     case 'soft':
       return { className: 'border-y border-[color:var(--border)] text-black', style: { background: 'var(--doc-brand-soft)' } };
@@ -127,6 +138,7 @@ function tableClassName(style: TemplateStyle): string {
     case 'minimal_v2': return MINIMAL_V2_ITEMS_TABLE_CLASS;
     case 'retail_v2': return RETAIL_V2_ITEMS_TABLE_CLASS;
     case 'quotation_proposal': return QUOTATION_PROPOSAL_ITEMS_TABLE_CLASS;
+    case 'purchase_order_formal': return PURCHASE_ORDER_FORMAL_ITEMS_TABLE_CLASS;
     case 'modern_v2': return MODERN_ITEMS_TABLE_CLASS;
     case 'modern': return 'w-full border-collapse text-[11px] leading-relaxed';
     case 'minimal': return 'w-full border-collapse text-[11px] leading-relaxed';
@@ -153,6 +165,9 @@ function cellPadding(style: TemplateStyle): { head: string; body: string } {
   if (style.composition === 'quotation_proposal') {
     return { head: 'px-2 py-2', body: 'px-2 py-2' };
   }
+  if (style.composition === 'purchase_order_formal') {
+    return { head: 'px-1.5 py-1', body: 'px-1.5 py-1' };
+  }
   switch (style.tableDensity) {
     case 'compact': return { head: 'px-2 py-1.5', body: 'px-2 py-1.5' };
     case 'spacious': return { head: 'px-3 py-2.5', body: 'px-3 py-3' };
@@ -168,6 +183,7 @@ function bodyRowClassName(style: TemplateStyle, index: number): string {
     case 'minimal_v2': return MINIMAL_V2_ITEMS_ROW_CLASS;
     case 'retail_v2': return RETAIL_V2_ITEMS_ROW_CLASS;
     case 'quotation_proposal': return QUOTATION_PROPOSAL_ITEMS_ROW_CLASS;
+    case 'purchase_order_formal': return PURCHASE_ORDER_FORMAL_ITEMS_ROW_CLASS;
     case 'modern_v2': return MODERN_ITEMS_ROW_CLASS;
     case 'modern': return index % 2 ? 'border-b border-[color:var(--border)] bg-[color:var(--doc-brand-soft)]/30' : 'border-b border-[color:var(--border)]';
     case 'minimal': return 'border-b border-[color:var(--border)]';
@@ -208,7 +224,8 @@ export function DocItemsTable({
   const isMinimalV2 = style.composition === 'minimal_v2';
   const isRetailV2 = style.composition === 'retail_v2';
   const isQuotationProposal = style.composition === 'quotation_proposal';
-  const usesV2Labels = isModernV2 || isErpV2 || isClassicV2 || isMinimalV2 || isRetailV2 || isQuotationProposal;
+  const isPurchaseOrderFormal = style.composition === 'purchase_order_formal';
+  const usesV2Labels = isModernV2 || isErpV2 || isClassicV2 || isMinimalV2 || isRetailV2 || isQuotationProposal || isPurchaseOrderFormal;
   const moneyValue = usesV2Labels
     ? (minor: number) => formatModernAmount(minor, model.currency)
     : formatMoney;
@@ -243,13 +260,13 @@ export function DocItemsTable({
   };
 
   const columnWidthClass = (columnId: DocItemsColumnId) => (
-    isQuotationProposal ? quotationItemsColumnWidthClass(columnId) : isRetailV2 ? retailItemsColumnWidthClass(columnId) : isMinimalV2 ? minimalItemsColumnWidthClass(columnId) : isClassicV2 ? classicItemsColumnWidthClass(columnId) : isErpV2 ? erpItemsColumnWidthClass(columnId) : isModernV2 ? modernItemsColumnWidthClass(columnId) : undefined
+    isPurchaseOrderFormal ? purchaseOrderItemsColumnWidthClass(columnId) : isQuotationProposal ? quotationItemsColumnWidthClass(columnId) : isRetailV2 ? retailItemsColumnWidthClass(columnId) : isMinimalV2 ? minimalItemsColumnWidthClass(columnId) : isClassicV2 ? classicItemsColumnWidthClass(columnId) : isErpV2 ? erpItemsColumnWidthClass(columnId) : isModernV2 ? modernItemsColumnWidthClass(columnId) : undefined
   );
   const valueCellClass = (columnId: DocItemsColumnId) => (
-    isQuotationProposal ? quotationItemsValueCellClass(columnId) : isRetailV2 ? retailItemsValueCellClass(columnId) : isMinimalV2 ? minimalItemsValueCellClass(columnId) : isClassicV2 ? classicItemsValueCellClass(columnId) : isErpV2 ? erpItemsValueCellClass(columnId) : isModernV2 ? modernItemsValueCellClass(columnId) : undefined
+    isPurchaseOrderFormal ? purchaseOrderItemsValueCellClass(columnId) : isQuotationProposal ? quotationItemsValueCellClass(columnId) : isRetailV2 ? retailItemsValueCellClass(columnId) : isMinimalV2 ? minimalItemsValueCellClass(columnId) : isClassicV2 ? classicItemsValueCellClass(columnId) : isErpV2 ? erpItemsValueCellClass(columnId) : isModernV2 ? modernItemsValueCellClass(columnId) : undefined
   );
   const v2Padding = (columnId: DocItemsColumnId) => (
-    isQuotationProposal ? quotationItemsCellPadding(columnId) : isRetailV2 ? retailItemsCellPadding(columnId) : isMinimalV2 ? minimalItemsCellPadding(columnId) : isClassicV2 ? classicItemsCellPadding(columnId) : isErpV2 ? erpItemsCellPadding(columnId) : modernItemsCellPadding(columnId)
+    isPurchaseOrderFormal ? purchaseOrderItemsCellPadding(columnId) : isQuotationProposal ? quotationItemsCellPadding(columnId) : isRetailV2 ? retailItemsCellPadding(columnId) : isMinimalV2 ? minimalItemsCellPadding(columnId) : isClassicV2 ? classicItemsCellPadding(columnId) : isErpV2 ? erpItemsCellPadding(columnId) : modernItemsCellPadding(columnId)
   );
 
   const table = (
