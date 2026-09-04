@@ -69,7 +69,7 @@ final class DocumentRetryService
                 }
                 $synchronous = $this->settings->documentProcessingMode() === DocumentExtractionPolicy::MODE_SYNC;
                 if ((! $synchronous && config('queue.default') === 'sync')
-                    || $this->settings->activeConfiguration('document_processing') === []
+                    || $this->settings->documentProcessingIsAuthoritativelyDisabled()
                     || $this->settings->activeConfiguration('malware_scanner') === []) {
                     return $this->rejected($locked, $actor, self::CODE_RUNTIME_UNAVAILABLE, 'الفحص الأمني غير مفعّل حالياً.');
                 }

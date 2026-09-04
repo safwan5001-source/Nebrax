@@ -138,7 +138,7 @@ final class DocumentOperationsService
         $engineEnabled = $policy->enabled();
         $primaryReady = $configuration !== null && $configuration->isOperationallyReady();
         $safetyScanReady = $this->settings->activeConfiguration('malware_scanner') !== []
-            && $this->settings->activeConfiguration('document_processing') !== [];
+            && ! $this->settings->documentProcessingIsAuthoritativelyDisabled();
         $coreReady = ! $networkLocked && $engineEnabled && $primaryReady;
         // ASYNC: Redis مضبوط فعلياً + نبضة عامل. Laravel `!== sync` ليس كافياً.
         $ready = $synchronous

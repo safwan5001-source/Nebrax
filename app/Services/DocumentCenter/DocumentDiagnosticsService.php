@@ -107,7 +107,7 @@ final class DocumentDiagnosticsService
                 'worker_online' => $workerOnline,
                 'heartbeat_at' => $runtime['worker_last_seen_at'] ?? null,
                 'scanner_ready' => $this->settings->activeConfiguration('malware_scanner') !== [],
-                'processing_ready' => $this->settings->activeConfiguration('document_processing') !== [],
+                'processing_ready' => ! $this->settings->documentProcessingIsAuthoritativelyDisabled(),
                 'provider_configured' => $this->settings->documentExtractionPolicy()->enabled(),
                 'provider_network_locked' => ! DocumentProviderNetworkGate::allowsExternalRequests(),
                 'runs' => [

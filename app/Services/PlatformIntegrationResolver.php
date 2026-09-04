@@ -40,6 +40,21 @@ class PlatformIntegrationResolver
             && ($setting === null || ! $setting->enabled);
     }
 
+    /**
+     * "document_processing" يحمل سياسة تنفيذ اختيارية (مهلات/محاولات) لها افتراضات
+     * صلبة في processingPolicy() — لا يحتاج المسار إعداداً غير فارغ ليعمل. التعطيل
+     * المعتبر الوحيد صفٌّ صريح `enabled = false`؛ صفٌّ غائب (كإنتاج لم يُهيَّأ بعد)
+     * أو قراءة متعذرة ليسا تعطيلاً، فلا يُستعمل فراغ configuration بديلاً عن enabled.
+     */
+    public function documentProcessingIsAuthoritativelyDisabled(): bool
+    {
+        $setting = $this->row('document_processing');
+
+        return ! isset($this->unavailable['document_processing'])
+            && $setting !== null
+            && ! $setting->enabled;
+    }
+
     public function activeProvider(string $key): ?string
     {
         $setting = $this->row($key);
