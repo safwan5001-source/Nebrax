@@ -9,6 +9,7 @@ use App\Models\PosCheckoutAttempt;
 use App\Models\PriceList;
 use App\Models\Product;
 use App\Support\PosSettings;
+use App\Support\Settings;
 use App\Services\Pos\CashDrawerService;
 use App\Services\Pos\PosAuditService;
 use App\Services\Pos\PosIdempotencyConflictException;
@@ -172,9 +173,12 @@ class PosService
         // سياسات الكتالوج وسعر الوحدة والخصم خادمية قبل أي فاتورة أو حركة
         // مخزون؛ لا يكفي إخفاؤها في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
         $priceList = $this->customerPriceLists->forPartner($data['partner_id']);
-        $this->assertProductsAllowedForPos($data['items']);
+        $posProducts = $this->assertProductsAllowedForPos($data['items']);
         $this->assertUnitPricesAllowedForPos($data['items'], $priceList);
         $this->assertDiscountsAllowedForPos($data['items']);
+        // نسبة الضريبة مصدرها كتالوج المنتج الخادمي حصراً — القيمة المرسلة من
+        // العميل استرشادية فقط ولا تدخل الحساب المالي مهما طابقت أو خالفت.
+        $data['items'] = $this->withAuthoritativeTaxRates($data['items'], $posProducts);
 
         // تضمن تهيئة المؤسسة الجديدة كتالوجاً تشغيلياً واحداً فقط، ولا تعيد
         // أي وسيلة حذفها مالكها بعد وجود الكتالوج.
@@ -393,22 +397,52 @@ class PosService
         return $sqlState === '23505' || $driverCode === 19 || str_contains(strtolower($e->getMessage()), 'unique');
     }
 
-    /** يرفض المنتج المصنّف خارج سياسة POS، مع إبقاء السطر الوصفي بلا منتج مشروعاً. */
-    private function assertProductsAllowedForPos(array $items): void
+    /**
+     * يرفض المنتج غير النشط أو المصنّف خارج سياسة POS، مع إبقاء السطر الوصفي بلا
+     * منتج مشروعاً. يعيد المنتجات المتحقَّق منها كي تُستعمل لاحقاً كمرجع الضريبة
+     * الخادمي دون استعلام ثانٍ — كتالوج الكاشير (`PosController::products`) يفلتر
+     * على `is_active` أصلاً، فهذا يمنع تجاوزه بمعرّف صريح من سلة قديمة أو طلب مباشر.
+     */
+    private function assertProductsAllowedForPos(array $items): \Illuminate\Support\Collection
     {
         $ids = array_values(array_unique(array_filter(array_column($items, 'product_id'))));
         if ($ids === []) {
-            return;
+            return collect();
         }
 
-        $products = Product::whereIn('id', $ids)->get(['id', 'category_id']);
+        $products = Product::whereIn('id', $ids)->get(['id', 'category_id', 'is_active', 'tax_rate']);
         if ($products->count() !== count($ids)) {
             throw new RuntimeException('تتضمن عملية POS منتجاً غير موجود أو خارج النطاق.');
+        }
+
+        if ($products->contains(fn (Product $product) => ! $product->is_active)) {
+            throw new RuntimeException('يتضمن البيع منتجاً غير نشط لا يمكن بيعه في نقطة البيع.');
         }
 
         if ($products->contains(fn (Product $product) => ! PosSettings::allowsProductCategory($product->category_id))) {
             throw new RuntimeException('يتضمن البيع منتجاً من تصنيف غير مسموح به في إعدادات نقطة البيع.');
         }
+
+        return $products->keyBy('id');
+    }
+
+    /**
+     * تستبدل نسبة الضريبة المرسلة من العميل بنسبة المنتج المخزَّنة خادمياً (أو
+     * الافتراضية للمبيعات للسطر الوصفي بلا منتج)، قبل أي احتساب مالي. تمنع بذلك
+     * تلاعب طلبٍ مباشر أو سلة قديمة بـ`tax_rate` لتقليل الضريبة المحتسبة على
+     * الفاتورة، بلا تغيير في عقد `InvoiceService` أو الفواتير غير المتعلقة بـPOS.
+     */
+    private function withAuthoritativeTaxRates(array $items, \Illuminate\Support\Collection $products): array
+    {
+        $defaultRate = (int) Settings::get('sales', 'default_tax_rate');
+
+        return array_map(function (array $item) use ($products, $defaultRate) {
+            $productId = $item['product_id'] ?? null;
+            $product = is_string($productId) ? $products->get($productId) : null;
+            $item['tax_rate'] = $product ? (int) $product->tax_rate : $defaultRate;
+
+            return $item;
+        }, $items);
     }
 
     /**
