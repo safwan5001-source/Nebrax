@@ -175,7 +175,10 @@ final class GeminiConnectionDiagnostic
     private static function fromSuccessfulResponse(Response $response): ProviderConnectionTestResult
     {
         $payload = $response->json();
-        if (! is_array($payload) || ! self::hasOutputText($payload)) {
+        // Connection success is not extraction success: a ping only needs a
+        // recognizable GenerateContentResponse. Thinking models may return
+        // candidates with finishReason MAX_TOKENS and no visible parts.text.
+        if (! is_array($payload) || ! self::isRecognizableGenerateContentResponse($payload)) {
             return self::failed(self::INVALID_RESPONSE, $response->status());
         }
 
@@ -216,16 +219,39 @@ final class GeminiConnectionDiagnostic
         };
     }
 
-    /** @param array<string, mixed> $data */
-    private static function hasOutputText(array $data): bool
+    /**
+     * A connection test must recognize a legitimate Gemini generateContent body.
+     * It must not require extraction-style visible text.
+     *
+     * Official GenerateContentResponse fields: candidates[], promptFeedback,
+     * usageMetadata, modelVersion, responseId. Candidate.content is optional;
+     * finishReason may be STOP / MAX_TOKENS / SAFETY with empty parts. Empty
+     * candidates are valid only when promptFeedback reports a blocked prompt.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function isRecognizableGenerateContentResponse(array $data): bool
     {
-        foreach ($data['candidates'][0]['content']['parts'] ?? [] as $part) {
-            if (is_array($part) && is_string($part['text'] ?? null) && trim($part['text']) !== '') {
-                return true;
+        if (self::hasCandidateObjects($data['candidates'] ?? null)) {
+            return true;
+        }
+
+        return is_array($data['promptFeedback'] ?? null);
+    }
+
+    private static function hasCandidateObjects(mixed $candidates): bool
+    {
+        if (! is_array($candidates) || $candidates === [] || ! array_is_list($candidates)) {
+            return false;
+        }
+
+        foreach ($candidates as $candidate) {
+            if (! is_array($candidate)) {
+                return false;
             }
         }
 
-        return false;
+        return true;
     }
 
     private static function looksLikeTimeout(Throwable $exception): bool
