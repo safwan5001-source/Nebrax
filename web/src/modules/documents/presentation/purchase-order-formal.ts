@@ -7,8 +7,8 @@
 import type { DocItemsColumnId } from '../types';
 
 export const PURCHASE_ORDER_FORMAL = {
-  logoMaxPx: 31,
-  logoMaxWidthClass: 'max-h-[31px] max-w-[5rem] w-auto shrink-0 object-contain object-start',
+  logoMaxPx: 39,
+  logoMaxWidthClass: 'max-h-[39px] max-w-[6rem] w-auto shrink-0 object-contain object-start',
   totalsMaxClass: 'w-full max-w-[268px]',
 } as const;
 

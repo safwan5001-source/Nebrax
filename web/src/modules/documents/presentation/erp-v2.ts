@@ -7,8 +7,8 @@
 import type { DocItemsColumnId } from '../types';
 
 export const ERP_V2 = {
-  logoMaxPx: 28,
-  logoMaxWidthClass: 'max-h-7 max-w-[4.5rem] w-auto shrink-0 object-contain object-start',
+  logoMaxPx: 36,
+  logoMaxWidthClass: 'max-h-9 max-w-[5.5rem] w-auto shrink-0 object-contain object-start',
   qrSizePx: 64,
   totalsMaxClass: 'w-full max-w-[260px]',
 } as const;
