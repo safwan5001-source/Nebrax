@@ -91,6 +91,15 @@ async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<
   const outer = el.closest<HTMLElement>('.doc-scaler-outer');
   const restore: Array<[HTMLElement, string | null]> = [];
   revealDocumentForCapture(el, restore);
+
+  // تحييد خصائص العرض فقط التي تتحيّد عند الطباعة (print:min-h-0 print:shadow-none)
+  // لكن html2canvas لا يطبّق @media print فتبقى فعّالة بدون هذا التحييد الصريح.
+  // min-h يمنع المحتوى القصير من الانكماش فيُنتج صورة أطول من A4.
+  // shadow يُلتقَط كبكسلات إضافية تدفع الصورة فوق الحد.
+  restore.push([el, el.getAttribute('style')]);
+  el.style.minHeight = 'auto';
+  el.style.boxShadow = 'none';
+
   if (inner) {
     restore.push([inner, inner.getAttribute('style')]);
     inner.style.transform = 'none';
@@ -127,12 +136,18 @@ async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<
     return pdf.output('blob');
   }
 
-  // ورق ثابت (A4/Letter/Legal): نرسم كل صفحة من شريحة raster مستقلة. هذا
-  // يحافظ على الناقل الحالي نفسه، لكنه يفضّل حدود صفوف البنود وكتل المستند
-  // كي لا يمر فاصل A4 عبر صف أو إجماليات عند وجود مستند طويل.
+  // ورق ثابت (A4/Letter/Legal): إذا اتّسع المحتوى في صفحة واحدة يُرسَم كاملاً
+  // بلا تقطيع (تحسين للفواتير القصيرة ومنع صفحات زائدة من أخطاء تقريب بكسل).
+  // وإلا يُقطَّع لشرائح بحدود آمنة عند صفوف الجدول وكتل المستند.
   const ph = paper.heightMm;
   const pdf = new JsPDF({ unit: 'mm', format: [pw, ph], orientation: pw > ph ? 'landscape' : 'portrait' });
   const pageHeightCanvas = (ph * canvas.width) / pw;
+
+  if (canvas.height <= pageHeightCanvas) {
+    pdf.addImage(img, 'PNG', 0, 0, pw, imgH);
+    return pdf.output('blob');
+  }
+
   const slices = getPdfImageSlices(canvas.height, pageHeightCanvas, getSafeCanvasBreaks(el, canvas));
 
   slices.forEach((slice, index) => {
