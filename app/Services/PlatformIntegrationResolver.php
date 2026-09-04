@@ -13,6 +13,9 @@ class PlatformIntegrationResolver
     /** @var array<string, PlatformIntegrationSetting|null> */
     private array $rows = [];
 
+    /** @var array<string, true> Keys whose settings could not be read authoritatively. */
+    private array $unavailable = [];
+
     /** @return array<string, mixed> */
     public function activeConfiguration(string $key): array
     {
@@ -22,6 +25,19 @@ class PlatformIntegrationResolver
         }
 
         return is_array($setting->configuration) ? $setting->configuration : [];
+    }
+
+    /**
+     * A scan-exception admission may bypass the scanner only when its state is
+     * known to be inactive. A missing row is unconfigured; a disabled row is
+     * disabled. Missing tables and read failures remain ambiguous and fail closed.
+     */
+    public function malwareScannerIsAuthoritativelyDisabledOrUnconfigured(): bool
+    {
+        $setting = $this->row('malware_scanner');
+
+        return ! isset($this->unavailable['malware_scanner'])
+            && ($setting === null || ! $setting->enabled);
     }
 
     public function activeProvider(string $key): ?string
@@ -116,6 +132,7 @@ class PlatformIntegrationResolver
             if (! Schema::hasTable('platform_integration_settings')) {
                 foreach ($missing as $key) {
                     $this->rows[$key] = null;
+                    $this->unavailable[$key] = true;
                 }
 
                 return;
@@ -127,10 +144,12 @@ class PlatformIntegrationResolver
                 ->keyBy('integration_key');
             foreach ($missing as $key) {
                 $this->rows[$key] = $found->get($key);
+                unset($this->unavailable[$key]);
             }
         } catch (Throwable) {
             foreach ($missing as $key) {
                 $this->rows[$key] = null;
+                $this->unavailable[$key] = true;
             }
         }
     }

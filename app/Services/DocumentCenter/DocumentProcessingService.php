@@ -28,10 +28,18 @@ class DocumentProcessingService
 
     public function queueSafetyScans(DocumentBatch $batch): int
     {
-        // الفاحص ومعالجة الخلفية يبقيان إلزاميين. تعطيل الفاحص يترك الملفات PENDING
-        // ويمنع الاستخراج — لا يُعلَّم ملف CLEAN دون فحص.
-        if ($this->settings->activeConfiguration('document_processing') === []
-            || $this->settings->activeConfiguration('malware_scanner') === []) {
+        if ($this->settings->activeConfiguration('document_processing') === []) {
+            return 0;
+        }
+
+        // لا يُعلَّم ملف CLEAN دون فحص. عند تعطيل الفاحص أو عدم إعداده بصورة مؤكدة
+        // فقط، يبقى PENDING ويُترك قرار الإرسال للاستخراج لبـوابة admission الصارمة.
+        if ($this->settings->malwareScannerIsAuthoritativelyDisabledOrUnconfigured()) {
+            return app(DocumentExtractionService::class)->queueExtractions($batch);
+        }
+
+        // الإعداد المفعّل الفارغ، أو تعذر قراءة حالة الفاحص، ليسا bypass صالحين.
+        if ($this->settings->activeConfiguration('malware_scanner') === []) {
             return 0;
         }
 
