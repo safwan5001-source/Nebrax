@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\Account;
 use App\Models\Invoice;
+use App\Models\InvoiceLine;
 use App\Models\Partner;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
@@ -426,6 +427,15 @@ class ReturnService
         //  المرحَّل شارحاً لنفسه لا مرهوناً بإعدادٍ قد يتغيّر بعده.
         $restock = $return->restock ?? (bool) Settings::get('inventory', 'restock_sales_returns');
 
+        // مصدر الكمية بوحدة المخزون: عامل التحويل التاريخي **للسطر المصدر
+        // نفسه** لا 1 المفترضة (R2). `unit_factor` لقطةٌ على `InvoiceLine` عند
+        // البيع — ثابتة حتى لو تغيّر قالب وحدات المنتج أو حُذف لاحقاً، فتبقى
+        // صحيحة لمرتجعٍ يصل بعد شهور. استعلامٌ واحد لكل أسطر المستند لا واحد لكل سطر.
+        $sourceLineIds = $return->lines->pluck('source_line_id')->filter()->unique()->values();
+        $sourceLines = $sourceLineIds->isEmpty()
+            ? collect()
+            : InvoiceLine::whereIn('id', $sourceLineIds)->get()->keyBy('id');
+
         $costTotal = 0;
         foreach ($return->lines as $line) {
             $product = $line->product;
@@ -435,9 +445,10 @@ class ReturnService
 
             // التكلفة بمتوسط اليوم في الحالتين — هو الأساس الذي خرجت به.
             $unitCost = $product->avg_cost;
+            $baseQuantity = $this->returnLineBaseQuantity($line, $sourceLines->get($line->source_line_id));
 
             if ($restock) {
-                $this->inventory->applyReceipt($product, $line->quantity, $unitCost, [
+                $this->inventory->applyReceipt($product, $baseQuantity, $unitCost, [
                     'source_type'  => ReturnDocument::class,
                     'source_id'    => $return->id,
                     'warehouse_id' => $return->warehouse_id,
@@ -450,7 +461,7 @@ class ReturnService
             // وتكلفةٍ لا وجود لهما على الرفّ يُفسد المتوسط المتحرك، فتخرج كل
             // تكلفة بضاعة مباعة لاحقة خاطئة وينكسر الثابت 1140 = Σ(كمية × متوسط).
 
-            $costTotal += $line->quantity * $unitCost;
+            $costTotal += $baseQuantity * $unitCost;
         }
 
         $cogsEntryId = null;
@@ -489,6 +500,43 @@ class ReturnService
         $this->recordExternalPosEvidenceIfApplicable($return);
 
         return $return->fresh('lines');
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  R2 — كمية سطر المرتجع بوحدة المخزون
+     * ═══════════════════════════════════════════════════════════════
+     *  `ReturnLine.quantity` بوحدة **البيع** كما طلبها الكاشير (صندوق واحد
+     *  مثلاً)، تماماً كسطر الفاتورة المصدر — لا بوحدة المخزون. المخزون سُجِّل
+     *  عند البيع بوحدته عبر `InvoiceLine::baseQuantity()` (١٢ قطعة للصندوق)؛
+     *  فردّ الكمية للمخزون يجب أن يستعمل **نفس عامل التحويل التاريخي**، وإلا
+     *  أعاد صندوقاً واحداً إلى الرفّ بدل اثني عشر ضعف الرصيد الحقيقي.
+     *
+     *  المصدر وحده الموثوق: `unit_factor` على `InvoiceLine` لقطة عند البيع لا
+     *  تتغيّر لو حُذف قالب الوحدات أو تغيّرت وحدة المنتج لاحقاً — ولا تُشتق من
+     *  حالة المنتج الحالية أو من مدخل العميل في طلب المرتجع (العقد أصلاً لا
+     *  يقبل وحدة أو معاملاً من الواجهة، انظر رأس `StorePosReturnRequest`).
+     */
+    private function returnLineBaseQuantity(ReturnLine $line, ?InvoiceLine $source): int
+    {
+        if ($source === null) {
+            // لا سطر فاتورة مرتبط (مرتجع حرّ عبر API العام بلا `source_line_id`)
+            // — هذا المسار لا يعرف مفهوم وحدة بيع أصلاً؛ الكمية المدخلة هي
+            // كمية المخزون كما كانت دوماً قبل R2، فلا يتغيّر سلوكها.
+            return (int) $line->quantity;
+        }
+
+        if ($source->quantity_numerator !== null || $source->quantity_denominator !== null) {
+            // سطر نسبي (دقة كسرية، كالوقود): `PosReturnService::buildSourceItems`
+            // يحسب الكمية المتبقية من `quantity` الثابتة على ١ لهذه السطور، فلا
+            // ردّ ممكن غير الكل أو لا شيء — تحويل السطر المصدر بالكامل هو نفسه
+            // القيمة الصحيحة الوحيدة الممكنة هنا.
+            return $source->baseQuantity();
+        }
+
+        $factor = max(1, (int) ($source->unit_factor ?? 1));
+
+        return (int) $line->quantity * $factor;
     }
 
     /**

@@ -92,9 +92,16 @@ class PosReturnTest extends TestCase
         return Invoice::with('lines')->findOrFail($response['data']['id']);
     }
 
-    private function returnFromPos(array $auth, string $sessionId, Invoice $invoice, int $quantity, string $paymentType = 'cash')
-    {
+    private function returnFromPos(
+        array $auth,
+        string $sessionId,
+        Invoice $invoice,
+        int $quantity,
+        string $paymentType = 'cash',
+        ?string $idempotencyKey = null,
+    ) {
         return $this->withToken($auth['token'])->postJson('/api/pos/returns', [
+            'idempotency_key' => $idempotencyKey ?? (string) \Illuminate\Support\Str::uuid(),
             'pos_session_id' => $sessionId,
             'original_invoice_id' => $invoice->id,
             'payment_type' => $paymentType,
@@ -280,8 +287,10 @@ class PosReturnTest extends TestCase
         int $replacementPrice,
         array $tenders = [],
         string $surplusRefundMethod = 'credit',
+        ?string $idempotencyKey = null,
     ) {
         return $this->withToken($auth['token'])->postJson('/api/pos/exchanges', [
+            'idempotency_key' => $idempotencyKey ?? (string) \Illuminate\Support\Str::uuid(),
             'pos_session_id' => $sessionId,
             'original_invoice_id' => $original->id,
             'return_items' => [[

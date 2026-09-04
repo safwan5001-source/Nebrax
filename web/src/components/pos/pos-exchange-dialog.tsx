@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, Minus, Plus, Repeat2 } from 'lucide-react';
 import { PosDialog } from '@/components/pos/pos-dialog';
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { PosCheckoutAttemptController } from '@/lib/pos-checkout-attempt';
 
 type SurplusMethod = 'credit' | 'cash';
 type TenderKey = 'cash' | 'card' | 'transfer' | 'credit';
@@ -59,6 +60,9 @@ export function PosExchangeDialog({
   const [quoting, setQuoting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // مفتاح محاولة استبدال ثابت: يبقى نفسه عبر إعادة محاولة فشلت، ولا يتجدد
+  // إلا بعد نجاح أو اختيار فاتورة أخرى (نية منطقية جديدة).
+  const exchangeAttemptRef = useRef(new PosCheckoutAttemptController());
 
   const chosenItems = useMemo(() => detail?.lines
     .filter((line) => (quantities[line.source_line_id] ?? 0) > 0)
@@ -76,6 +80,7 @@ export function PosExchangeDialog({
     if (!open || !sessionId) return;
     let cancelled = false;
     setLoadingInvoices(true); setError(null); setInvoices([]); setSelected(null); setDetail(null); setQuantities({}); setQuote(null); setSurplusMethod('credit'); setTenders({ cash: '', card: '', transfer: '', credit: '' });
+    exchangeAttemptRef.current.reset();
     api<{ data: ReturnableInvoice[] }>(`/pos/returnable-invoices?pos_session_id=${encodeURIComponent(sessionId)}`)
       .then((result) => { if (!cancelled) setInvoices(result.data); })
       .catch((err) => { if (!cancelled) setError(err instanceof ApiError ? err.message : tc('loadFailed')); })
@@ -101,6 +106,8 @@ export function PosExchangeDialog({
   async function chooseInvoice(invoice: ReturnableInvoice) {
     if (!sessionId) return;
     setSelected(invoice); setDetail(null); setQuantities({}); setQuote(null); setError(null); setLoadingDetail(true);
+    // فاتورة أخرى = نية استبدال منطقية جديدة، لا إعادة محاولة لنفس الطلب.
+    exchangeAttemptRef.current.reset();
     try {
       const result = await api<{ data: ReturnableInvoiceDetail }>(`/pos/returnable-invoices/${invoice.id}?pos_session_id=${encodeURIComponent(sessionId)}`);
       setDetail(result.data);
@@ -118,10 +125,14 @@ export function PosExchangeDialog({
   async function submit() {
     if (!sessionId || !selected || !canSubmit) return;
     setSubmitting(true); setError(null);
+    // مفتاح ثابت طوال محاولات هذا الاستبدال: يحمي من استبدال مضاعف (مرتجع +
+    // بديل + تسوية فائض) إن ضاعت الاستجابة الأولى ثم أعاد الكاشير الإرسال.
+    const idempotencyKey = exchangeAttemptRef.current.ensure();
     try {
       const result = await api<{ data: { replacement_invoice: { number: string } } }>('/pos/exchanges', {
         method: 'POST',
         body: {
+          idempotency_key: idempotencyKey,
           pos_session_id: sessionId,
           original_invoice_id: selected.id,
           return_items: chosenItems,
@@ -133,6 +144,7 @@ export function PosExchangeDialog({
           },
         },
       });
+      exchangeAttemptRef.current.resetAfterSuccess();
       onExchanged(result.data.replacement_invoice.number);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));

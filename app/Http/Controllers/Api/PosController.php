@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\QuotePosExchangeRequest;
+use App\Http\Requests\QuotePosReturnRequest;
 use App\Http\Requests\ResumePosHeldSaleRequest;
 use App\Http\Requests\StorePosHeldSaleRequest;
 use App\Http\Requests\StorePosSaleRequest;
@@ -327,7 +328,7 @@ class PosController extends ApiController
     }
 
     /** معاينة مرتجع POS من دون إنشاء مستند أو أثر محاسبي. */
-    public function quoteReturn(StorePosReturnRequest $request): JsonResponse
+    public function quoteReturn(QuotePosReturnRequest $request): JsonResponse
     {
         $data = $request->validated();
         $quote = $this->domain(fn () => $this->returns->quote($data, $request->user()));
@@ -361,10 +362,23 @@ class PosController extends ApiController
         $data = $request->validated();
         $this->assertTenantOwnedAll(Product::class, array_column($data['replacement']['items'], 'product_id'), 'المنتج');
 
-        $result = $this->domain(fn () => $this->exchanges->create($data, $request->user()));
+        try {
+            $result = $this->domain(fn () => $this->exchanges->create($data, $request->user()));
+        } catch (PosIdempotencyConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+
+        $replayed = (bool) ($result['idempotent_replay'] ?? false);
         $exchange = $result['exchange']->load(['originalInvoice', 'returnDocument', 'replacementInvoice']);
 
-        return (new PosExchangeResource($exchange))->response()->setStatusCode(201);
+        $response = (new PosExchangeResource($exchange))->response()->setStatusCode($replayed ? 200 : 201);
+        if ($replayed) {
+            $payload = $response->getData(true);
+            $payload['idempotent_replay'] = true;
+            $response->setData($payload);
+        }
+
+        return $response;
     }
 
     /**
@@ -373,8 +387,20 @@ class PosController extends ApiController
      */
     public function storeReturn(StorePosReturnRequest $request): JsonResponse
     {
-        $return = $this->domain(fn () => $this->returns->create($request->validated(), $request->user()));
+        try {
+            $return = $this->domain(fn () => $this->returns->create($request->validated(), $request->user()));
+        } catch (PosIdempotencyConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
 
-        return (new ReturnResource($return->load('lines.product')))->response()->setStatusCode(201);
+        $replayed = (bool) $return->getAttribute('idempotent_replay');
+        $response = (new ReturnResource($return->load('lines.product')))->response()->setStatusCode($replayed ? 200 : 201);
+        if ($replayed) {
+            $payload = $response->getData(true);
+            $payload['idempotent_replay'] = true;
+            $response->setData($payload);
+        }
+
+        return $response;
     }
 }
