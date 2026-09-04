@@ -131,13 +131,23 @@ class InvoiceController extends ApiController
         return (new InvoiceResource($invoice->load('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision')))->response()->setStatusCode(201);
     }
 
-    public function show(string $id): JsonResponse
+    /**
+     * R3: الوصول المباشر بمعرّف — بما فيه إعادة طباعة/عرض إيصال POS من قائمة
+     * الفواتير الأخيرة — يجب أن يحترم الفرع النشط تماماً كباقي قراءات
+     * الفاتورة (`payments`/`accounting`/`inventory`/`notes`/`zatca` عبر
+     * `visibleInvoice()` أدناه). معرفة UUID وحدها لم تعد تكفي لتجاوز فرعٍ لا
+     * يملك المستخدم صلاحيته — غير المقيَّد (`allowedBranchIds() === null`)
+     * يبقى يرى كل شيء، فلا ينكسر أي تدفّق ERP عابر للفروع مصرَّح به فعلاً.
+     */
+    public function show(Request $request, string $id): JsonResponse
     {
-        return (new InvoiceResource(Invoice::with([
+        $invoice = $this->scopeToActiveBranch(Invoice::with([
             'priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
             'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision',
             'deliveryNoteAllocations.deliveryNote', 'deliveryNoteAllocations.lineLinks',
-        ])->findOrFail($id)))->response();
+        ]), $request)->findOrFail($id);
+
+        return (new InvoiceResource($invoice))->response();
     }
 
     /** مدفوعات الفاتورة للقراءة: مبلغ التخصيص لا مبلغ سند قد يغطي فواتير أخرى. */
@@ -321,9 +331,10 @@ class InvoiceController extends ApiController
         return (new InvoiceResource($posted->load(['priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision', 'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision'])))->response();
     }
 
-    public function zatca(string $id): JsonResponse
+    /** R3: بيانات إيصال ZATCA — نفس منطق `show()` أعلاه، والسبب نفسه. */
+    public function zatca(Request $request, string $id): JsonResponse
     {
-        $invoice = Invoice::findOrFail($id);
+        $invoice = $this->visibleInvoice($request, $id);
 
         return response()->json([
             'qr'            => $invoice->zatca_qr,

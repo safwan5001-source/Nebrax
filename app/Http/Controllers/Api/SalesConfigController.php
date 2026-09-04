@@ -234,14 +234,15 @@ class SalesConfigController extends ApiController
         $data['default_customer'] = $matches->first()->name;
     }
 
-    /** لا يتجاوز بحث الإعداد Tenant/Branch scopes ولا يقبل مورداً فقط. */
+    /**
+     * لا يتجاوز بحث الإعداد Tenant/Branch scopes ولا يقبل مورداً فقط. الشرط
+     * نفسه (`PosSettings::isEligibleCustomer`) يحرس checkout الآن — مرجعٌ واحد.
+     */
     private function findEligiblePosCustomer(string $id): ?Partner
     {
-        return Partner::query()
-            ->whereKey($id)
-            ->where('is_active', true)
-            ->whereIn('type', ['customer', 'both'])
-            ->first();
+        $partner = Partner::query()->whereKey($id)->first();
+
+        return $partner !== null && PosSettings::isEligibleCustomer($partner) ? $partner : null;
     }
 
     /**
