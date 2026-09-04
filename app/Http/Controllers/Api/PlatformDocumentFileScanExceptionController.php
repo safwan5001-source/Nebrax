@@ -25,6 +25,7 @@ class PlatformDocumentFileScanExceptionController extends ApiController
         $admin = $request->user();
         $data = $request->validated();
         $this->assertPassword($admin, $data['current_password']);
+        $this->ensurePersistedActor($admin);
         $exception = PlatformDocumentFileScanException::query()->create([
             'tenant_id' => $data['tenant_id'], 'reason' => trim($data['reason']), 'granted_by' => $admin->id,
             'granted_at' => now('UTC'), 'expires_at' => $data['expires_at'] ?? null,
@@ -53,6 +54,13 @@ class PlatformDocumentFileScanExceptionController extends ApiController
             ]);
         }
         return response()->json(['data' => $this->payload($exception->fresh('tenant:id,name'))]);
+    }
+
+    private function ensurePersistedActor(PlatformAdministrator $admin): void
+    {
+        if (! $admin->exists) {
+            $admin->save();
+        }
     }
 
     private function assertPassword(PlatformAdministrator $admin, string $password): void
