@@ -29,6 +29,11 @@ import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
 import { hydrateAiForm, isGoogleGeminiDirty } from './ai-form';
 import {
+  geminiErrorCodeFromUnknown,
+  geminiDiagnosticMessage,
+  geminiTestNoticeMessage,
+} from './gemini-diagnostics';
+import {
   AI_PROVIDER_KEYS,
   emptyDocumentAiForm,
   payloadFor,
@@ -211,14 +216,14 @@ export default function PlatformIntegrationsPage() {
     setTesting(`ai:${provider}`);
     setNotice(null);
     try {
-      const response = await platformApi<{ data: { ok: boolean; message: string } }>('/platform/integrations/document_ai/test', {
+      const response = await platformApi<{ data: { ok: boolean; message: string; error_code?: string | null } }>('/platform/integrations/document_ai/test', {
         method: 'POST',
         body: { provider },
       });
       setNotice({
         ok: response.data.ok,
         message: provider === 'google_gemini'
-          ? (response.data.ok ? t('connectionSucceeded') : t('connectionFailed'))
+          ? geminiTestNoticeMessage(response.data.ok, response.data.error_code, t)
           : response.data.message,
       });
       try {
@@ -231,7 +236,7 @@ export default function PlatformIntegrationsPage() {
       setNotice({
         ok: false,
         message: provider === 'google_gemini'
-          ? t('connectionFailed')
+          ? geminiDiagnosticMessage(geminiErrorCodeFromUnknown(reason), t)
           : (reason instanceof ApiError ? reason.message : t('testFailed')),
       });
     } finally {
@@ -393,6 +398,7 @@ function AiProviderCard({
 }) {
   const testedAt = typeof configuration.last_tested_at === 'string' ? formatDateTime(configuration.last_tested_at) : null;
   const testStatus = String(configuration.last_test_status ?? 'not_tested');
+  const lastErrorCode = typeof configuration.last_test_error_code === 'string' ? configuration.last_test_error_code : null;
   const geminiActions = onSave !== undefined;
   const testDisabled = geminiActions
     ? busy !== null || testing !== null || Boolean(testBlocked)
@@ -416,6 +422,9 @@ function AiProviderCard({
           {t('lastTest')}: {testStatus === 'passed' ? t('testPassed') : testStatus === 'failed' ? t('testFailedStatus') : t('notTested')}
           {testedAt ? ` · ${testedAt}` : ''}
         </p>
+        {provider === 'google_gemini' && testStatus === 'failed' && lastErrorCode ? (
+          <p className="mt-1 text-xs text-negative" role="status">{geminiDiagnosticMessage(lastErrorCode, t)}</p>
+        ) : null}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
         <div className="space-y-4">

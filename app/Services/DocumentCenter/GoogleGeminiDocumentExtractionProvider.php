@@ -34,12 +34,17 @@ final class GoogleGeminiDocumentExtractionProvider implements DocumentExtraction
 
     public function testConnection(DocumentProviderConfiguration $configuration): ProviderConnectionTestResult
     {
-        $validation = $this->validateConfiguration($configuration);
-        if (! $validation->valid) {
-            return ProviderConnectionTestResult::failed($validation->errors[0]);
+        if ($configuration->apiKey === '') {
+            return GeminiConnectionDiagnostic::failed(GeminiConnectionDiagnostic::API_KEY_MISSING);
+        }
+        if ($configuration->model === '') {
+            return GeminiConnectionDiagnostic::failed(GeminiConnectionDiagnostic::MODEL_MISSING);
+        }
+        if ($configuration->key !== $this->key()) {
+            return GeminiConnectionDiagnostic::failed(GeminiConnectionDiagnostic::CONNECTION_FAILED);
         }
         if (! DocumentProviderNetworkGate::allowsExternalRequests()) {
-            return ProviderConnectionTestResult::failed(DocumentProviderNetworkGate::blockedMessage());
+            return GeminiConnectionDiagnostic::failed(GeminiConnectionDiagnostic::NETWORK_DISABLED);
         }
 
         try {
@@ -47,11 +52,16 @@ final class GoogleGeminiDocumentExtractionProvider implements DocumentExtraction
                 'contents' => [['parts' => [['text' => 'Reply with exactly OK.']]]],
                 'generationConfig' => ['maxOutputTokens' => 16],
             ]);
-            $this->assertSuccessful($response);
 
-            return ProviderConnectionTestResult::passed('نجح اختبار اتصال Google Gemini.');
-        } catch (DocumentProviderException $exception) {
-            return ProviderConnectionTestResult::failed($exception->safeMessage);
+            return GeminiConnectionDiagnostic::redactResult(
+                GeminiConnectionDiagnostic::fromResponse($response),
+                $configuration->apiKey,
+            );
+        } catch (Throwable $exception) {
+            return GeminiConnectionDiagnostic::redactResult(
+                GeminiConnectionDiagnostic::fromThrowable($exception),
+                $configuration->apiKey,
+            );
         }
     }
 
