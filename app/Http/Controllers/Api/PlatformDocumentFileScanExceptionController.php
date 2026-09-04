@@ -9,6 +9,7 @@ use App\Models\PlatformDocumentFileScanException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PlatformDocumentFileScanExceptionController extends ApiController
@@ -29,7 +30,7 @@ class PlatformDocumentFileScanExceptionController extends ApiController
             'granted_at' => now('UTC'), 'expires_at' => $data['expires_at'] ?? null,
         ]);
         PlatformAdministratorAction::query()->create([
-            'platform_administrator_id' => $admin->id, 'tenant_id' => $exception->tenant_id,
+            'id' => (string) Str::uuid(), 'platform_administrator_id' => $admin->id, 'tenant_id' => $exception->tenant_id,
             'action' => PlatformAdministratorAction::ACTION_FILE_SCAN_EXCEPTION_GRANTED,
             'from_value' => null, 'to_value' => json_encode(['reason' => $exception->reason, 'expires_at' => $exception->expires_at?->toIso8601String()], JSON_THROW_ON_ERROR),
         ]);
@@ -45,7 +46,7 @@ class PlatformDocumentFileScanExceptionController extends ApiController
         if ($exception->revoked_at === null) {
             $exception->revoked_at = now('UTC'); $exception->revoked_by = $admin->id; $exception->revocation_reason = trim($data['reason']); $exception->saveQuietly();
             PlatformAdministratorAction::query()->create([
-                'platform_administrator_id' => $admin->id, 'tenant_id' => $exception->tenant_id,
+                'id' => (string) Str::uuid(), 'platform_administrator_id' => $admin->id, 'tenant_id' => $exception->tenant_id,
                 'action' => PlatformAdministratorAction::ACTION_FILE_SCAN_EXCEPTION_REVOKED,
                 'from_value' => json_encode(['reason' => $exception->reason, 'expires_at' => $exception->expires_at?->toIso8601String()], JSON_THROW_ON_ERROR),
                 'to_value' => json_encode(['reason' => $exception->revocation_reason, 'revoked_at' => $exception->revoked_at->toIso8601String()], JSON_THROW_ON_ERROR),
