@@ -19,6 +19,7 @@ use App\Services\DocumentCenter\DocumentRedactionProjector;
 use App\Services\DocumentCenter\DocumentRetentionPlanner;
 use App\Services\DocumentCenter\DocumentRetentionRunner;
 use App\Services\DocumentCenter\DocumentRetryService;
+use App\Services\DocumentCenter\DocumentFileScanAdmissionService;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\DocumentCenter\DocumentWorkflowService;
 use App\Services\EntitlementGrantService;
@@ -100,7 +101,7 @@ class DocumentOperationsGovernanceTest extends TestCase
         $dispatcher->shouldReceive('dispatch')->once()->andThrow(new \RuntimeException('local fake dispatch failure'));
         $this->app->instance(Dispatcher::class, $dispatcher);
 
-        $result = (new DocumentRetryService($settings, app(DocumentStorageService::class), app(DocumentWorkflowService::class)))->retry($run, null);
+        $result = (new DocumentRetryService($settings, app(DocumentStorageService::class), app(DocumentWorkflowService::class), app(DocumentFileScanAdmissionService::class)))->retry($run, null);
 
         $this->assertFalse($result['accepted']);
         $this->assertSame(DocumentRetryService::CODE_DISPATCH_FAILED, $result['code']);

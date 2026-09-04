@@ -44,15 +44,16 @@ class PlatformDocumentFileScanExceptionController extends ApiController
         $admin = $request->user();
         $data = $request->validate(['reason' => ['required', 'string', 'max:500'], 'current_password' => ['required', 'string', 'max:255']]);
         $this->assertPassword($admin, $data['current_password']);
-        if ($exception->revoked_at === null) {
-            $exception->revoked_at = now('UTC'); $exception->revoked_by = $admin->id; $exception->revocation_reason = trim($data['reason']); $exception->saveQuietly();
-            PlatformAdministratorAction::query()->create([
-                'id' => (string) Str::uuid(), 'platform_administrator_id' => $admin->id, 'tenant_id' => $exception->tenant_id,
-                'action' => PlatformAdministratorAction::ACTION_FILE_SCAN_EXCEPTION_REVOKED,
-                'from_value' => json_encode(['reason' => $exception->reason, 'expires_at' => $exception->expires_at?->toIso8601String()], JSON_THROW_ON_ERROR),
-                'to_value' => json_encode(['reason' => $exception->revocation_reason, 'revoked_at' => $exception->revoked_at->toIso8601String()], JSON_THROW_ON_ERROR),
-            ]);
+        if ($exception->revoked_at !== null) {
+            throw ValidationException::withMessages(['exception' => 'لا يمكن إعادة تفعيل الاستثناء أو سحبه مرة أخرى.']);
         }
+        $exception->revoke($admin, $data['reason']);
+        PlatformAdministratorAction::query()->create([
+            'id' => (string) Str::uuid(), 'platform_administrator_id' => $admin->id, 'tenant_id' => $exception->tenant_id,
+            'action' => PlatformAdministratorAction::ACTION_FILE_SCAN_EXCEPTION_REVOKED,
+            'from_value' => json_encode(['reason' => $exception->reason, 'expires_at' => $exception->expires_at?->toIso8601String()], JSON_THROW_ON_ERROR),
+            'to_value' => json_encode(['reason' => $exception->revocation_reason, 'revoked_at' => $exception->revoked_at->toIso8601String()], JSON_THROW_ON_ERROR),
+        ]);
         return response()->json(['data' => $this->payload($exception->fresh('tenant:id,name'))]);
     }
 
