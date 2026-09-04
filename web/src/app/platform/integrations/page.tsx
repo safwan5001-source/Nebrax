@@ -27,9 +27,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
+import { hydrateAiForm, isGoogleGeminiDirty } from './ai-form';
 import {
   AI_PROVIDER_KEYS,
-  emptyAiProvider,
   emptyDocumentAiForm,
   payloadFor,
   type AiProviderKey,
@@ -97,6 +97,7 @@ export default function PlatformIntegrationsPage() {
     document_processing: { ...emptyForm, provider: 'redis' },
   });
   const [aiForm, setAiForm] = useState<DocumentAiFormState>(emptyDocumentAiForm());
+  const [aiFormSnapshot, setAiFormSnapshot] = useState<DocumentAiFormState>(emptyDocumentAiForm());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -111,7 +112,9 @@ export default function PlatformIntegrationsPage() {
       setOverview(response.data);
       setForms((current) => hydrateCoreForms(current, response.data.integrations));
       const ai = response.data.integrations.find((item) => item.key === 'document_ai');
-      setAiForm(hydrateAiForm(ai));
+      const nextAiForm = hydrateAiForm(ai);
+      setAiForm(nextAiForm);
+      setAiFormSnapshot(nextAiForm);
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : t('loadFailed'));
     } finally {
@@ -131,6 +134,7 @@ export default function PlatformIntegrationsPage() {
     () => Object.fromEntries((overview?.integrations ?? []).map((item) => [item.key, item])) as Partial<Record<IntegrationKey, IntegrationSummary>>,
     [overview],
   );
+  const geminiDirty = useMemo(() => isGoogleGeminiDirty(aiForm, aiFormSnapshot), [aiForm, aiFormSnapshot]);
 
   function update(key: CoreIntegrationKey, field: keyof IntegrationFormState, value: string | boolean) {
     setForms((current) => ({ ...current, [key]: { ...current[key], [field]: value } }));
@@ -174,8 +178,10 @@ export default function PlatformIntegrationsPage() {
         body: payloadFor('document_ai', aiForm),
       });
       setOverview(response.data);
-      setAiForm(hydrateAiForm(response.data.integrations.find((item) => item.key === 'document_ai')));
-      setNotice({ ok: true, message: t('saved') });
+      const nextAiForm = hydrateAiForm(response.data.integrations.find((item) => item.key === 'document_ai'));
+      setAiForm(nextAiForm);
+      setAiFormSnapshot(nextAiForm);
+      setNotice({ ok: true, message: t('savedSuccessfully') });
     } catch (reason) {
       setNotice({ ok: false, message: reason instanceof ApiError ? reason.message : t('saveFailed') });
     } finally {
@@ -198,6 +204,10 @@ export default function PlatformIntegrationsPage() {
   }
 
   async function testAiProvider(provider: AiProviderKey) {
+    if (provider === 'google_gemini' && isGoogleGeminiDirty(aiForm, aiFormSnapshot)) {
+      setNotice({ ok: false, message: t('saveBeforeTest') });
+      return;
+    }
     setTesting(`ai:${provider}`);
     setNotice(null);
     try {
@@ -205,10 +215,25 @@ export default function PlatformIntegrationsPage() {
         method: 'POST',
         body: { provider },
       });
-      setNotice(response.data);
-      await load();
+      setNotice({
+        ok: response.data.ok,
+        message: provider === 'google_gemini'
+          ? (response.data.ok ? t('connectionSucceeded') : t('connectionFailed'))
+          : response.data.message,
+      });
+      try {
+        const overviewResponse = await platformApi<OverviewResponse>('/platform/integrations');
+        setOverview(overviewResponse.data);
+      } catch {
+        // Keep the current form; last-test metadata may stay stale until an explicit refresh.
+      }
     } catch (reason) {
-      setNotice({ ok: false, message: reason instanceof ApiError ? reason.message : t('testFailed') });
+      setNotice({
+        ok: false,
+        message: provider === 'google_gemini'
+          ? t('connectionFailed')
+          : (reason instanceof ApiError ? reason.message : t('testFailed')),
+      });
     } finally {
       setTesting(null);
     }
@@ -293,7 +318,24 @@ export default function PlatformIntegrationsPage() {
             </Card>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-              {AI_PROVIDER_KEYS.map((provider) => <AiProviderCard key={provider} provider={provider} form={aiForm.providers[provider]} configuration={summaries.document_ai?.configuration.providers?.[provider] ?? {}} busy={busy} testing={testing} update={(field, value) => updateProvider(provider, field, value)} test={() => testAiProvider(provider)} t={t} />)}
+              {AI_PROVIDER_KEYS.map((provider) => (
+                <AiProviderCard
+                  key={provider}
+                  provider={provider}
+                  form={aiForm.providers[provider]}
+                  configuration={summaries.document_ai?.configuration.providers?.[provider] ?? {}}
+                  busy={busy}
+                  testing={testing}
+                  update={(field, value) => updateProvider(provider, field, value)}
+                  test={() => testAiProvider(provider)}
+                  t={t}
+                  onSave={provider === 'google_gemini' ? saveAi : undefined}
+                  currentPassword={provider === 'google_gemini' ? aiForm.current_password : undefined}
+                  onCurrentPasswordChange={provider === 'google_gemini' ? (value) => updateAi('current_password', value) : undefined}
+                  testBlocked={provider === 'google_gemini' && geminiDirty}
+                  testBlockedReason={provider === 'google_gemini' && geminiDirty ? t('saveBeforeTest') : undefined}
+                />
+              ))}
             </div>
           </section>
         </>}
@@ -320,10 +362,101 @@ function SettingsCard({ title, description, icon: Icon, enabled, configuredAt, o
   return <Card className="flex h-full flex-col"><CardHeader><div className="flex items-start justify-between gap-4"><div className="flex items-start gap-3"><Icon className="mt-0.5 h-5 w-5 text-muted" strokeWidth={1.7} aria-hidden="true" /><div><CardTitle>{title}</CardTitle><p className="mt-1 text-sm leading-relaxed text-muted">{description}</p></div></div><label className="flex cursor-pointer items-center gap-2 text-xs text-text"><input type="checkbox" checked={enabled} onChange={(event) => onEnabled(event.target.checked)} className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" />{enabled ? t('enabled') : t('disabled')}</label></div>{configuredAt && <p className="mt-2 text-xs text-muted">{t('configuredAt', { date: formatDateTime(configuredAt) })}</p>}</CardHeader><CardContent className="flex flex-1 flex-col gap-4"><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div><div className="mt-auto flex flex-wrap justify-end gap-2 border-t border-border pt-4">{actions}</div></CardContent></Card>;
 }
 
-function AiProviderCard({ provider, form, configuration, busy, testing, update, test, t }: { provider: AiProviderKey; form: DocumentAiFormState['providers'][AiProviderKey]; configuration: Record<string, any>; busy: string | null; testing: string | null; update: (field: keyof AiProviderFormState, value: string | boolean) => void; test: () => void; t: Translate }) {
+function AiProviderCard({
+  provider,
+  form,
+  configuration,
+  busy,
+  testing,
+  update,
+  test,
+  t,
+  onSave,
+  currentPassword,
+  onCurrentPasswordChange,
+  testBlocked,
+  testBlockedReason,
+}: {
+  provider: AiProviderKey;
+  form: DocumentAiFormState['providers'][AiProviderKey];
+  configuration: Record<string, any>;
+  busy: string | null;
+  testing: string | null;
+  update: (field: keyof AiProviderFormState, value: string | boolean) => void;
+  test: () => void;
+  t: Translate;
+  onSave?: () => void;
+  currentPassword?: string;
+  onCurrentPasswordChange?: (value: string) => void;
+  testBlocked?: boolean;
+  testBlockedReason?: string;
+}) {
   const testedAt = typeof configuration.last_tested_at === 'string' ? formatDateTime(configuration.last_tested_at) : null;
   const testStatus = String(configuration.last_test_status ?? 'not_tested');
-  return <Card className="flex h-full flex-col"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>{providerLabel(provider, t)}</CardTitle><p className="mt-1 text-sm text-muted">{t('aiProviderDescription')}</p></div><label className="flex cursor-pointer items-center gap-2 text-xs text-text"><input type="checkbox" checked={form.enabled} onChange={(event) => update('enabled', event.target.checked)} className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" />{form.enabled ? t('enabled') : t('disabled')}</label></div><p className="mt-2 text-xs text-muted">{t('lastTest')}: {testStatus === 'passed' ? t('testPassed') : testStatus === 'failed' ? t('testFailedStatus') : t('notTested')}{testedAt ? ` · ${testedAt}` : ''}</p></CardHeader><CardContent className="flex flex-1 flex-col gap-4"><div className="space-y-4"><Field label={t('model')}><Input value={form.model} onChange={(event) => update('model', event.target.value)} dir="ltr" /></Field><SecretField label={t('apiKey')} masked={String(configuration.api_key_masked ?? '')} value={form.api_key} onChange={(value) => update('api_key', value)} /><ToggleField label={t('clearApiKey')} checked={form.clear_api_key} onChange={(value) => update('clear_api_key', value)} /><ToggleField label={t('allowDocumentSending')} checked={form.allow_document_sending} onChange={(value) => update('allow_document_sending', value)} /><Field label={t('connectionTimeout')}><Input type="number" min={5} max={60} value={form.connection_timeout_seconds} onChange={(event) => update('connection_timeout_seconds', event.target.value)} dir="ltr" /></Field><Field label={t('processingTimeout')}><Input type="number" min={15} max={180} value={form.processing_timeout_seconds} onChange={(event) => update('processing_timeout_seconds', event.target.value)} dir="ltr" /></Field><Field label={t('maxAttempts')}><Input type="number" min={1} max={5} value={form.max_attempts} onChange={(event) => update('max_attempts', event.target.value)} dir="ltr" /></Field><Field label={t('monthlyOperationLimit')}><Input type="number" min={1} value={form.monthly_operation_limit} onChange={(event) => update('monthly_operation_limit', event.target.value)} dir="ltr" /></Field><Field label={t('monthlyPageLimit')}><Input type="number" min={1} value={form.monthly_page_limit} onChange={(event) => update('monthly_page_limit', event.target.value)} dir="ltr" /></Field><Field label={t('dataRegion')}><Input value={form.data_region} onChange={(event) => update('data_region', event.target.value)} dir="ltr" /></Field><Field label={t('retentionPolicy')}><Input value={form.retention_policy} onChange={(event) => update('retention_policy', event.target.value)} /></Field></div><div className="mt-auto flex justify-end border-t border-border pt-4"><Button variant="outline" size="sm" onClick={test} disabled={busy !== null || testing !== null}>{testing === `ai:${provider}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t('test')}</Button></div></CardContent></Card>;
+  const geminiActions = onSave !== undefined;
+  const testDisabled = geminiActions
+    ? busy !== null || testing !== null || Boolean(testBlocked)
+    : busy !== null || testing !== null;
+  const hintId = geminiActions ? 'gemini-save-before-test' : undefined;
+
+  return (
+    <Card className="flex h-full flex-col">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>{providerLabel(provider, t)}</CardTitle>
+            <p className="mt-1 text-sm text-muted">{t('aiProviderDescription')}</p>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-text">
+            <input type="checkbox" checked={form.enabled} onChange={(event) => update('enabled', event.target.checked)} className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" />
+            {form.enabled ? t('enabled') : t('disabled')}
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          {t('lastTest')}: {testStatus === 'passed' ? t('testPassed') : testStatus === 'failed' ? t('testFailedStatus') : t('notTested')}
+          {testedAt ? ` · ${testedAt}` : ''}
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col gap-4">
+        <div className="space-y-4">
+          <Field label={t('model')}><Input value={form.model} onChange={(event) => update('model', event.target.value)} dir="ltr" /></Field>
+          <SecretField label={t('apiKey')} masked={String(configuration.api_key_masked ?? '')} value={form.api_key} onChange={(value) => update('api_key', value)} />
+          <ToggleField label={t('clearApiKey')} checked={form.clear_api_key} onChange={(value) => update('clear_api_key', value)} />
+          <ToggleField label={t('allowDocumentSending')} checked={form.allow_document_sending} onChange={(value) => update('allow_document_sending', value)} />
+          <Field label={t('connectionTimeout')}><Input type="number" min={5} max={60} value={form.connection_timeout_seconds} onChange={(event) => update('connection_timeout_seconds', event.target.value)} dir="ltr" /></Field>
+          <Field label={t('processingTimeout')}><Input type="number" min={15} max={180} value={form.processing_timeout_seconds} onChange={(event) => update('processing_timeout_seconds', event.target.value)} dir="ltr" /></Field>
+          <Field label={t('maxAttempts')}><Input type="number" min={1} max={5} value={form.max_attempts} onChange={(event) => update('max_attempts', event.target.value)} dir="ltr" /></Field>
+          <Field label={t('monthlyOperationLimit')}><Input type="number" min={1} value={form.monthly_operation_limit} onChange={(event) => update('monthly_operation_limit', event.target.value)} dir="ltr" /></Field>
+          <Field label={t('monthlyPageLimit')}><Input type="number" min={1} value={form.monthly_page_limit} onChange={(event) => update('monthly_page_limit', event.target.value)} dir="ltr" /></Field>
+          <Field label={t('dataRegion')}><Input value={form.data_region} onChange={(event) => update('data_region', event.target.value)} dir="ltr" /></Field>
+          <Field label={t('retentionPolicy')}><Input value={form.retention_policy} onChange={(event) => update('retention_policy', event.target.value)} /></Field>
+          {geminiActions && onCurrentPasswordChange ? <AdminPasswordField value={currentPassword ?? ''} onChange={onCurrentPasswordChange} /> : null}
+        </div>
+        <div className="mt-auto space-y-3 border-t border-border pt-4">
+          {testBlockedReason ? <p id={hintId} className="text-xs leading-relaxed text-muted" role="status">{testBlockedReason}</p> : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={test}
+              disabled={testDisabled}
+              title={testBlockedReason}
+              aria-describedby={testBlocked ? hintId : undefined}
+            >
+              {testing === `ai:${provider}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}
+              {testing === `ai:${provider}` && geminiActions ? t('testing') : geminiActions ? t('testConnection') : t('test')}
+            </Button>
+            {onSave ? (
+              <Button size="sm" onClick={onSave} disabled={busy !== null || testing !== null}>
+                {busy === 'document_ai' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {busy === 'document_ai' ? t('saving') : t('saveSettings')}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function CardActions({ name, busy, testing, save, test, t }: { name: string; busy: string | null; testing: string | null; save: () => void; test: () => void; t: Translate }) { return <><Button variant="outline" size="sm" onClick={test} disabled={testing !== null || busy !== null}>{testing === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t('test')}</Button><Button size="sm" onClick={save} disabled={busy !== null || testing !== null}>{busy === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t('save')}</Button></>; }
@@ -335,7 +468,5 @@ function Select({ value, onChange, options }: { value: string; onChange: (value:
 function Metric({ label, value }: { label: string; value: string | number }) { return <div><p className="text-xs text-muted">{label}</p><p className="num mt-1 break-all text-sm font-semibold text-text">{value}</p></div>; }
 
 function hydrateCoreForms(current: Record<CoreIntegrationKey, IntegrationFormState>, integrations: IntegrationSummary[]): Record<CoreIntegrationKey, IntegrationFormState> { const next = { ...current }; for (const item of integrations.filter((candidate): candidate is IntegrationSummary & { key: CoreIntegrationKey } => candidate.key !== 'document_ai')) { const configuration = item.configuration; next[item.key] = { ...current[item.key], enabled: item.enabled, provider: item.provider ?? current[item.key].provider, endpoint: String(configuration.endpoint ?? ''), bucket: String(configuration.bucket ?? ''), region: String(configuration.region ?? current[item.key].region), access_key_id: '', secret_access_key: '', use_path_style_endpoint: Boolean(configuration.use_path_style_endpoint ?? true), host: String(configuration.host ?? ''), port: String(configuration.port ?? current[item.key].port), timeout_seconds: String(configuration.timeout_seconds ?? current[item.key].timeout_seconds), max_attempts: String(configuration.max_attempts ?? current[item.key].max_attempts), backoff_seconds: Array.isArray(configuration.backoff_seconds) ? configuration.backoff_seconds.join(',') : current[item.key].backoff_seconds, model: '', api_key: '', current_password: '' }; } return next; }
-function hydrateAiForm(summary?: IntegrationSummary): DocumentAiFormState { const initial = emptyDocumentAiForm(); const configuration = summary?.configuration ?? {}; const providers = configuration.providers ?? {}; return { ...initial, enabled: Boolean(summary?.enabled ?? configuration.engine_enabled ?? false), primary_provider: isAiProvider(configuration.primary_provider) ? configuration.primary_provider : '', fallback_enabled: Boolean(configuration.fallback_enabled ?? false), fallback_providers: Array.isArray(configuration.fallback_providers) ? configuration.fallback_providers.filter(isAiProvider).slice(0, 2) : [], confidence_threshold_percent: String(configuration.confidence_threshold_percent ?? initial.confidence_threshold_percent), default_language: String(configuration.default_language ?? initial.default_language), max_files_per_batch: String(configuration.max_files_per_batch ?? initial.max_files_per_batch), max_pages_per_file: String(configuration.max_pages_per_file ?? initial.max_pages_per_file), max_file_size_bytes: String(configuration.max_file_size_bytes ?? initial.max_file_size_bytes), test_mode: Boolean(configuration.test_mode ?? false), providers: Object.fromEntries(AI_PROVIDER_KEYS.map((provider) => { const item = providers[provider] ?? {}; return [provider, { ...emptyAiProvider(), enabled: Boolean(item.enabled ?? false), model: String(item.model ?? ''), connection_timeout_seconds: String(item.connection_timeout_seconds ?? 15), processing_timeout_seconds: String(item.processing_timeout_seconds ?? 90), max_attempts: String(item.max_attempts ?? 2), allow_document_sending: Boolean(item.allow_document_sending ?? false), monthly_operation_limit: item.monthly_operation_limit ? String(item.monthly_operation_limit) : '', monthly_page_limit: item.monthly_page_limit ? String(item.monthly_page_limit) : '', data_region: String(item.data_region ?? ''), retention_policy: String(item.retention_policy ?? '') }]; })) as Record<AiProviderKey, DocumentAiFormState['providers'][AiProviderKey]>, current_password: '' }; }
 function replaceFallback(current: AiProviderKey[], index: number, value: AiProviderKey | ''): AiProviderKey[] { const next = [...current]; if (value === '') next.splice(index, 1); else next[index] = value; return next.filter((provider, position, providers) => providers.indexOf(provider) === position).slice(0, 2); }
-function isAiProvider(value: unknown): value is AiProviderKey { return typeof value === 'string' && AI_PROVIDER_KEYS.includes(value as AiProviderKey); }
 function providerLabel(provider: AiProviderKey, t: Translate): string { return t(provider === 'openai' ? 'providerOpenai' : provider === 'anthropic' ? 'providerAnthropic' : 'providerGoogleGemini'); }
