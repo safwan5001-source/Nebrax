@@ -27,6 +27,7 @@ class DocumentExtractionService
         private readonly DocumentStorageService $storage,
         private readonly DocumentProcessingService $processing,
         private readonly DocumentWorkflowService $workflow,
+        private readonly DocumentFileScanAdmissionService $scanAdmission,
     ) {
     }
 
@@ -50,8 +51,8 @@ class DocumentExtractionService
         if ($files->isEmpty() || ! $policy->allowsBatchFileCount($files->count())) {
             return 0;
         }
-        if ($files->contains(fn (DocumentFile $file): bool => $file->scan_status !== DocumentScanStatus::CLEAN)) {
-            return 0;
+        foreach ($files as $file) {
+            if (! $this->scanAdmission->authorize($file)) return 0;
         }
         if (! $this->hasReadyPrimaryProvider($policy)) {
             return 0;
@@ -124,7 +125,7 @@ class DocumentExtractionService
         $policy = $this->settings->documentExtractionPolicy();
         // إعادة فحص بوّابة المستأجر داخل العامل: قد يُعطِّل المستأجر المعالجة أو
         // يزيل النوع بين لحظة الجدولة والتشغيل، فنفشل بأمان بلا أي استدعاء للمزود.
-        if (! $policy->enabled() || ! DocumentProviderNetworkGate::allowsExternalRequests() || ! $this->tenantAllowsExtraction($run->batch) || $file->scan_status !== DocumentScanStatus::CLEAN || $file->purged_at !== null) {
+        if (! $policy->enabled() || ! DocumentProviderNetworkGate::allowsExternalRequests() || ! $this->tenantAllowsExtraction($run->batch) || ! $this->scanAdmission->authorize($file) || $file->purged_at !== null) {
             $this->failRun($run, 'extraction_not_permitted', 'لم يعد الاستخراج مسموحاً وفق سياسة المنصة أو المستأجر أو حالة الملف.');
 
             return;

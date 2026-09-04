@@ -1,0 +1,21 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { platformApi } from '@/lib/platform-api';
+
+type Exception = { id:string; tenant_id:string; tenant_name?:string; reason:string; expires_at:string|null; status:'active'|'expired'|'revoked' };
+type Tenant = { id:string; name:string };
+
+export function FileScanExceptions(): JSX.Element {
+ const [items,setItems]=useState<Exception[]>([]); const [tenants,setTenants]=useState<Tenant[]>([]); const [tenantId,setTenantId]=useState(''); const [reason,setReason]=useState(''); const [expiresAt,setExpiresAt]=useState(''); const [password,setPassword]=useState(''); const [busy,setBusy]=useState(false); const [message,setMessage]=useState('');
+ const load=async()=>{const [e,t]=await Promise.all([platformApi<{data:Exception[]}>('/platform/document-file-scan-exceptions'),platformApi<{data:{data?:Tenant[]}|Tenant[]}>('/platform/tenants')]);setItems(e.data);const rows=Array.isArray(t.data)?t.data:(t.data.data??[]);setTenants(rows);if(!tenantId&&rows[0])setTenantId(rows[0].id);};
+ useEffect(()=>{void load().catch(()=>setMessage('تعذر تحميل الاستثناءات / Unable to load exceptions.'));},[]);
+ const grant=async()=>{setBusy(true);setMessage('');try{await platformApi('/platform/document-file-scan-exceptions',{method:'POST',body:{tenant_id:tenantId,reason,expires_at:expiresAt||null,current_password:password}});setReason('');setPassword('');setExpiresAt('');await load();setMessage('تم منح الاستثناء / Exception granted.');}catch(error){setMessage(error instanceof Error?error.message:'تعذر منح الاستثناء / Unable to grant.');}finally{setBusy(false);}};
+ const revoke=async(id:string)=>{const revokeReason=window.prompt('سبب السحب / Revocation reason');if(!revokeReason)return;const currentPassword=window.prompt('كلمة المرور الحالية / Current password');if(!currentPassword)return;setBusy(true);try{await platformApi(`/platform/document-file-scan-exceptions/${id}/revoke`,{method:'POST',body:{reason:revokeReason,current_password:currentPassword}});await load();setMessage('تم سحب الاستثناء / Exception revoked.');}catch(error){setMessage(error instanceof Error?error.message:'تعذر السحب / Unable to revoke.');}finally{setBusy(false);}};
+ return <Card><CardHeader><CardTitle>استثناءات فحص الملفات / File Scan Exceptions</CardTitle><p className="text-sm leading-relaxed text-muted">يسمح هذا الاستثناء بمعالجة ملفات هذا المستأجر دون فحص البرمجيات الضارة. لا يعني أن الملفات آمنة أو اجتازت الفحص. / This exception allows processing without malware scanning; it does not mean files are safe or CLEAN.</p></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 md:grid-cols-4"><select aria-label="Tenant / المستأجر" className="h-10 rounded-md border border-border bg-background px-3 text-sm" value={tenantId} onChange={e=>setTenantId(e.target.value)}>{tenants.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><Input aria-label="Reason / السبب" placeholder="السبب المطلوب / Required reason" value={reason} onChange={e=>setReason(e.target.value)}/><Input aria-label="Expiration / الانتهاء" type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/><Input aria-label="Current password / كلمة المرور الحالية" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></div><div className="flex justify-end"><Button onClick={()=>void grant()} disabled={busy||!tenantId||!reason.trim()||!password}>منح الاستثناء / Grant</Button></div>{message&&<p role="status" className="text-sm text-muted">{message}</p>}<div className="space-y-2">{items.map(item=><div key={item.id} className="flex flex-col gap-2 rounded-md border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium text-text">{item.tenant_name??item.tenant_id} — {item.status}</p><p className="text-sm text-muted">{item.reason}{item.expires_at?` · ${item.expires_at}`:''}</p></div>{item.status==='active'&&<Button variant="outline" size="sm" onClick={()=>void revoke(item.id)} disabled={busy}>سحب / Revoke</Button>}</div>)}</div></CardContent></Card>;
+}
+
+export default FileScanExceptions;

@@ -28,6 +28,7 @@ import { ApiError } from '@/lib/api';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
 import { hydrateAiForm, isGoogleGeminiDirty } from './ai-form';
+import { FileScanExceptions } from './file-scan-exceptions';
 import {
   geminiErrorCodeFromUnknown,
   geminiDiagnosticMessage,
@@ -292,6 +293,7 @@ export default function PlatformIntegrationsPage() {
               <AdminPasswordField value={forms.malware_scanner.current_password} onChange={(value) => update('malware_scanner', 'current_password', value)} />
             </SettingsCard>
 
+            <FileScanExceptions />
             <SettingsCard title={t('processingTitle')} description={t('processingDescription')} icon={ServerCog} enabled={forms.document_processing.enabled} configuredAt={summaries.document_processing?.configured_at} onEnabled={(value) => update('document_processing', 'enabled', value)} actions={<CardActions name="document_processing" busy={busy} testing={testing} save={() => save('document_processing')} test={() => testConnection('document_processing')} t={t} />}>
               <p className="sm:col-span-2 text-xs leading-relaxed text-muted">{aiForm.processing_mode === 'sync' ? t('processingPolicyAsyncOnly') : t('processingPolicyApplies')}</p>
               <Field label={t('maxAttempts')}><Input type="number" min={1} max={5} value={forms.document_processing.max_attempts} onChange={(event) => update('document_processing', 'max_attempts', event.target.value)} dir="ltr" /></Field>
