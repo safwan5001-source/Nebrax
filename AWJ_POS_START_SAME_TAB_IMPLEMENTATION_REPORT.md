@@ -3,7 +3,7 @@
 **PR:** [#635](https://github.com/safwan5001-source/Nebrax/pull/635)  
 **Branch:** `cursor/pos-start-same-tab-af62`  
 **Base SHA:** `2197e2bfffac8cc88517b653a5b4c7a4dd48e7ef` (`origin/main`)  
-**Head SHA:** `13b2c2315e3e0c689fc3d9e86082df60168b9ce5`  
+**Head SHA:** `70e8f17d8d189f47291fd78418866878a700092e` (code `13b2c231` + this report)  
 **PR #631 merge on main:** `7f0cf3c1b5c394758f2a34eb52c75eb78f024f1a` (present; feature not recreated)
 
 Do **not** merge. Do **not** deploy without Safwan’s explicit approval.
@@ -97,7 +97,13 @@ Route `/pos/start` present (`4.07 kB`).
 
 ## CI status
 
-In progress at report time (PHP sqlite/pgsql + Web CI). Subscription is active on `cursor/pos-start-same-tab-af62`. This file will be updated if the head SHA stays current when CI finishes.
+**Green** on head `70e8f17d` (PR #635):
+
+- CI / php artisan test (L11, sqlite) — passed
+- CI / php artisan test (L11, pgsql) — passed
+- Web CI / web build (Next.js) — passed
+
+No backend test changes; PHP jobs are unchanged from `main` besides this frontend-only branch.
 
 ## Risks / remaining issues
 
