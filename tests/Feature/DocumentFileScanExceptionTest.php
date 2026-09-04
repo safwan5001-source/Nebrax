@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\PlatformAdministrator;
 use App\Models\PlatformAdministratorAction;
 use App\Models\PlatformDocumentFileScanException;
+use App\Models\PlatformIntegrationSetting;
+use App\Services\PlatformIntegrationResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
 use LogicException;
 use Tests\TestCase;
@@ -44,5 +47,27 @@ class DocumentFileScanExceptionTest extends TestCase
         $revoked->revocation_reason = 'rewritten';
         $this->expectException(LogicException::class);
         $revoked->save();
+    }
+
+    public function test_only_disabled_or_unconfigured_scanners_are_authoritatively_inactive_for_admission(): void
+    {
+        PlatformIntegrationSetting::create([
+            'integration_key' => 'malware_scanner',
+            'provider' => 'clamav_tcp',
+            'enabled' => true,
+            'configuration' => [],
+        ]);
+        $this->assertFalse(app(PlatformIntegrationResolver::class)->malwareScannerIsAuthoritativelyDisabledOrUnconfigured());
+
+        PlatformIntegrationSetting::query()->where('integration_key', 'malware_scanner')->update(['enabled' => false]);
+        $this->app->forgetInstance(PlatformIntegrationResolver::class);
+        $this->assertTrue(app(PlatformIntegrationResolver::class)->malwareScannerIsAuthoritativelyDisabledOrUnconfigured());
+
+        PlatformIntegrationSetting::query()->where('integration_key', 'malware_scanner')->delete();
+        $this->app->forgetInstance(PlatformIntegrationResolver::class);
+        $this->assertTrue(app(PlatformIntegrationResolver::class)->malwareScannerIsAuthoritativelyDisabledOrUnconfigured());
+
+        Schema::shouldReceive('hasTable')->once()->with('platform_integration_settings')->andReturn(false);
+        $this->assertFalse((new PlatformIntegrationResolver())->malwareScannerIsAuthoritativelyDisabledOrUnconfigured());
     }
 }

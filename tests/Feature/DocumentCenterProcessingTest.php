@@ -6,8 +6,11 @@ use App\Contracts\DocumentSafetyScanner;
 use App\Jobs\DocumentCenter\ScanDocumentFile;
 use App\Models\DocumentBatch;
 use App\Models\DocumentFile;
+use App\Models\DocumentFileScanExceptionAdmission;
 use App\Models\DocumentProcessingRun;
 use App\Models\Branch;
+use App\Models\PlatformAdministrator;
+use App\Models\PlatformDocumentFileScanException;
 use App\Models\PlatformIntegrationSetting;
 use App\Models\Tenant;
 use App\Services\DocumentCenter\DocumentFileScanService;
@@ -149,6 +152,17 @@ class DocumentCenterProcessingTest extends TestCase
     public function scanner_exhaustion_fails_closed_quarantines_the_batch_and_keeps_only_safe_errors(): void
     {
         $auth = $this->authorizedTenant('processing-failed');
+        $admin = PlatformAdministrator::create([
+            'name' => 'Scanner Failure Admin',
+            'email' => 'scanner-failure-admin@nebrax.test',
+            'password' => 'platform-password-123',
+        ]);
+        PlatformDocumentFileScanException::create([
+            'tenant_id' => $auth['tenant_id'],
+            'reason' => 'temporary scanner outage',
+            'granted_by' => $admin->id,
+            'granted_at' => now('UTC'),
+        ]);
         $processingSetting = PlatformIntegrationSetting::where('integration_key', 'document_processing')->firstOrFail();
         $processingSetting->configuration = [
             'max_attempts' => 1,
@@ -193,6 +207,7 @@ class DocumentCenterProcessingTest extends TestCase
         $this->assertStringNotContainsString('raw scanner', (string) $run->error_message_safe);
         $this->assertSame(DocumentScanStatus::FAILED, DocumentFile::findOrFail($job->documentFileId)->scan_status);
         $this->assertSame(DocumentWorkflowStatus::QUARANTINED, DocumentBatch::findOrFail($batch['id'])->status);
+        $this->assertSame(0, DocumentFileScanExceptionAdmission::withoutGlobalScopes()->count());
         $this->assertFalse(app(TenantContext::class)->has());
         $this->assertFalse(app(BranchContext::class)->has());
     }
