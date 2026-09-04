@@ -3,6 +3,7 @@
 **المهمة:** ربط شاشة إعدادات مركز المستندات بالجاهزية الفعلية بعد نجاح اتصال Google Gemini، دون تغيير إعدادات المزود أو بوابة الشبكة.
 **الفرع:** `cursor/document-center-status-wiring-b8de`
 **Base SHA:** `d30a52ab022e39e52da1b9e32df6a5336849d82a` (`main`)
+**Head SHA:** `d6661b7793c1b0ce64125296ba05949482a5e57a`
 **Implementation SHA:** `669593541386873d0480231c816ec6f9a69ed634`
 **PR:** [#639](https://github.com/safwan5001-source/Nebrax/pull/639) — للمراجعة فقط.
 
