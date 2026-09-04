@@ -48,9 +48,12 @@ final class GoogleGeminiDocumentExtractionProvider implements DocumentExtraction
         }
 
         try {
+            // 256 leaves room for Gemini 3.x thinking tokens on a ping.
+            // Do not send thinkingConfig: thinkingBudget vs thinkingLevel differs
+            // by model generation and mixing them returns HTTP 400.
             $response = $this->client($configuration)->post($this->endpoint($configuration), [
                 'contents' => [['parts' => [['text' => 'Reply with exactly OK.']]]],
-                'generationConfig' => ['maxOutputTokens' => 16],
+                'generationConfig' => ['maxOutputTokens' => 256],
             ]);
 
             return GeminiConnectionDiagnostic::redactResult(

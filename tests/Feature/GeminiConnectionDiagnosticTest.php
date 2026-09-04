@@ -7,6 +7,7 @@ use App\Models\PlatformIntegrationSetting;
 use App\Services\DocumentCenter\GeminiConnectionDiagnostic;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -41,6 +42,71 @@ class GeminiConnectionDiagnosticTest extends TestCase
         $this->assertSame('passed', $gemini['last_test_status']);
         $this->assertNull($gemini['last_test_error_code']);
         $this->assertSame(self::GEMINI_SECRET, $gemini['api_key']);
+        Http::assertSent(function (Request $request): bool {
+            $payload = $request->data();
+
+            return ($payload['generationConfig']['maxOutputTokens'] ?? null) === 256
+                && ! array_key_exists('thinkingConfig', $payload['generationConfig'] ?? []);
+        });
+    }
+
+    /** @test */
+    public function a_thinking_model_max_tokens_response_without_visible_text_is_a_successful_connection(): void
+    {
+        $this->assertClassifiedSuccess([
+            'candidates' => [[
+                'content' => ['role' => 'model'],
+                'finishReason' => 'MAX_TOKENS',
+                'index' => 0,
+            ]],
+            'usageMetadata' => [
+                'promptTokenCount' => 8,
+                'candidatesTokenCount' => 0,
+                'thoughtsTokenCount' => 16,
+            ],
+            'modelVersion' => 'gemini-3.8-flash',
+            'error' => ['message' => 'API key not valid: '.self::GEMINI_SECRET],
+        ]);
+    }
+
+    /** @test */
+    public function a_candidate_with_finish_reason_only_is_a_successful_connection(): void
+    {
+        $this->assertClassifiedSuccess([
+            'candidates' => [['finishReason' => 'MAX_TOKENS']],
+            'usageMetadata' => ['thoughtsTokenCount' => 16, 'candidatesTokenCount' => 0],
+        ]);
+    }
+
+    /** @test */
+    public function a_thought_part_without_visible_output_text_is_a_successful_connection(): void
+    {
+        $this->assertClassifiedSuccess([
+            'candidates' => [[
+                'content' => ['parts' => [['thought' => true, 'text' => '']]],
+                'finishReason' => 'STOP',
+            ]],
+        ]);
+    }
+
+    /** @test */
+    public function a_blocked_prompt_feedback_without_candidates_is_a_successful_connection(): void
+    {
+        $this->assertClassifiedSuccess([
+            'promptFeedback' => ['blockReason' => 'SAFETY'],
+        ]);
+    }
+
+    /** @test */
+    public function a_safety_finish_reason_without_output_text_is_a_successful_connection(): void
+    {
+        $this->assertClassifiedSuccess([
+            'candidates' => [[
+                'content' => ['role' => 'model'],
+                'finishReason' => 'SAFETY',
+                'safetyRatings' => [['category' => 'HARM_CATEGORY_HARASSMENT', 'probability' => 'NEGLIGIBLE']],
+            ]],
+        ]);
     }
 
     /** @test */
@@ -127,10 +193,27 @@ class GeminiConnectionDiagnosticTest extends TestCase
     public function a_malformed_gemini_success_body_is_classified_as_invalid_response(): void
     {
         $this->assertClassifiedFailure(
-            Http::response(['promptFeedback' => ['blockReason' => 'SAFETY']], 200),
+            Http::response(['unexpected' => true], 200),
             GeminiConnectionDiagnostic::INVALID_RESPONSE,
             200,
         );
+    }
+
+    /** @test */
+    public function an_empty_or_unrecognizable_2xx_body_is_classified_as_invalid_response(): void
+    {
+        foreach ([
+            Http::response('', 200),
+            Http::response('<html>error</html>', 200),
+            Http::response(['candidates' => 'not-an-array'], 200),
+            Http::response(['candidates' => []], 200),
+        ] as $fake) {
+            $this->assertClassifiedFailure(
+                $fake,
+                GeminiConnectionDiagnostic::INVALID_RESPONSE,
+                200,
+            );
+        }
     }
 
     /** @test */
@@ -315,6 +398,28 @@ class GeminiConnectionDiagnosticTest extends TestCase
         $this->assertArrayNotHasKey('error_code', $response->json('data'));
         $this->assertArrayNotHasKey('http_status', $response->json('data'));
         Http::assertNothingSent();
+    }
+
+    /** @param  array<string, mixed>  $body */
+    private function assertClassifiedSuccess(array $body): void
+    {
+        $token = $this->saveGemini();
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response($body)]);
+
+        $response = $this->withToken($token)->postJson('/api/platform/integrations/document_ai/test', [
+            'provider' => 'google_gemini',
+        ])->assertOk()
+            ->assertJsonPath('data.ok', true)
+            ->assertJsonPath('data.error_code', null);
+
+        $this->assertStringNotContainsString(self::GEMINI_SECRET, $response->getContent());
+        $this->assertStringNotContainsString('API key not valid', $response->getContent());
+
+        $stored = $this->storedGemini();
+        $this->assertSame('passed', $stored['last_test_status']);
+        $this->assertNull($stored['last_test_error_code']);
+        $this->assertSame(self::GEMINI_SECRET, $stored['api_key']);
+        $this->assertStringNotContainsString(self::GEMINI_SECRET, (string) ($stored['last_test_message_safe'] ?? ''));
     }
 
     private function assertClassifiedFailure(mixed $fakeResponse, string $code, int $httpStatus): void
