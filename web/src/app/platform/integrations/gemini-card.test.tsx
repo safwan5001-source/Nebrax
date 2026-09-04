@@ -145,6 +145,7 @@ describe('Gemini save/test UX', () => {
   let overview: ReturnType<typeof makeOverview>;
   let wipeGeminiOnGet: boolean;
   let testOk: boolean;
+  let testErrorCode: string | null;
   let getCount: number;
 
   afterEach(cleanup);
@@ -153,6 +154,7 @@ describe('Gemini save/test UX', () => {
     overview = makeOverview();
     wipeGeminiOnGet = false;
     testOk = true;
+    testErrorCode = null;
     getCount = 0;
     i18nState.map = null;
     router.replace.mockReset();
@@ -172,7 +174,24 @@ describe('Gemini save/test UX', () => {
         return { data: overview };
       }
       if (path === '/platform/integrations/document_ai/test' && method === 'POST') {
-        return { data: { ok: testOk, message: testOk ? 'ok' : 'denied' } };
+        if (!testOk) {
+          const current = overview.integrations.find((item) => item.key === 'document_ai')
+            ?.configuration.providers.google_gemini ?? {};
+          overview = makeOverview({
+            ...current,
+            last_test_status: 'failed',
+            last_tested_at: '2026-09-04T00:00:00Z',
+            last_test_error_code: testErrorCode ?? 'gemini_auth_failed',
+          });
+        }
+        return {
+          data: {
+            ok: testOk,
+            message: testOk ? 'ok' : 'denied',
+            error_code: testOk ? null : (testErrorCode ?? 'gemini_auth_failed'),
+            http_status: testOk ? undefined : 401,
+          },
+        };
       }
       throw new Error(`${method} ${path}`);
     });
@@ -235,9 +254,11 @@ describe('Gemini save/test UX', () => {
     expect(within(geminiCard()).getByDisplayValue('gemini-2.5-pro')).toBeTruthy();
 
     testOk = false;
+    testErrorCode = 'gemini_auth_failed';
     fireEvent.click(within(geminiCard()).getByRole('button', { name: 'testConnection' }));
-    expect(await screen.findByText('connectionFailed')).toBeTruthy();
+    expect(await screen.findByText('geminiErrorAuthFailed')).toBeTruthy();
     expect(within(geminiCard()).getByDisplayValue('gemini-2.5-pro')).toBeTruthy();
+    expect(screen.queryByText('denied')).toBeNull();
   }, 20000);
 
   it.each([
@@ -268,5 +289,36 @@ describe('Gemini save/test UX', () => {
     expect(testButton.getAttribute('title')).toBe(labels.saveBeforeTest);
     expect(within(card).getByText(labels.saveBeforeTest)).toBeTruthy();
     expect(within(card).getByRole('button', { name: labels.saveSettings })).toBeTruthy();
+  }, 15000);
+
+  it.each([
+    ['ar', {
+      aiTitle: 'مزودو الذكاء الاصطناعي',
+      providerGoogleGemini: 'Google Gemini',
+      lastTest: 'آخر اختبار',
+      testFailedStatus: 'فشل',
+      geminiErrorRateLimited: 'تم تجاوز حصة Gemini أو حد الطلبات.',
+    }],
+    ['en', {
+      aiTitle: 'AI Providers',
+      providerGoogleGemini: 'Google Gemini',
+      lastTest: 'Last test',
+      testFailedStatus: 'Failed',
+      geminiErrorRateLimited: 'Gemini quota or rate limit was exceeded.',
+    }],
+  ] as const)('shows a localized Gemini last-test failure reason in %s', async (_locale, labels) => {
+    i18nState.map = { ...labels };
+    overview = makeOverview({
+      last_test_status: 'failed',
+      last_tested_at: '2026-09-04T00:00:00Z',
+      last_test_error_code: 'gemini_rate_limited',
+    });
+    render(<PlatformIntegrationsPage />);
+    await screen.findByText(labels.aiTitle);
+
+    const card = screen.getByRole('heading', { name: labels.providerGoogleGemini }).closest('section') as HTMLElement;
+    expect(within(card).getByText(`${labels.lastTest}: ${labels.testFailedStatus} · formatted`)).toBeTruthy();
+    expect(within(card).getByText(labels.geminiErrorRateLimited)).toBeTruthy();
+    expect(within(card).queryByText('429')).toBeNull();
   }, 15000);
 });

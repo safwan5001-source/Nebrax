@@ -103,6 +103,12 @@ describe('platform integration payloads', () => {
       'testing',
       'connectionSucceeded',
       'connectionFailed',
+      'geminiErrorAuthFailed',
+      'geminiErrorPermissionDenied',
+      'geminiErrorModelUnavailable',
+      'geminiErrorRateLimited',
+      'geminiErrorTimeout',
+      'geminiErrorUpstreamUnavailable',
     ] as const;
 
     for (const key of keys) {
@@ -113,5 +119,17 @@ describe('platform integration payloads', () => {
     expect(en.saveSettings).toBe('Save settings');
     expect(ar.saveBeforeTest).toBe('احفظ التغييرات قبل اختبار الاتصال');
     expect(en.saveBeforeTest).toBe('Save changes before testing');
+    expect(ar.geminiErrorAuthFailed).toBe('مفتاح Gemini غير صالح أو تم رفضه.');
+    expect(en.geminiErrorAuthFailed).toBe('The Gemini API key is invalid or was rejected.');
+    expect(ar.geminiErrorPermissionDenied).toBe('لا يملك المفتاح صلاحية استخدام Gemini API.');
+    expect(en.geminiErrorPermissionDenied).toBe('This API key does not have permission to use the Gemini API.');
+    expect(ar.geminiErrorModelUnavailable).toBe('النموذج المحدد غير متاح لهذا المفتاح.');
+    expect(en.geminiErrorModelUnavailable).toBe('The selected model is not available for this API key.');
+    expect(ar.geminiErrorRateLimited).toBe('تم تجاوز حصة Gemini أو حد الطلبات.');
+    expect(en.geminiErrorRateLimited).toBe('Gemini quota or rate limit was exceeded.');
+    expect(ar.geminiErrorTimeout).toBe('انتهت مهلة الاتصال بـ Gemini.');
+    expect(en.geminiErrorTimeout).toBe('The connection to Gemini timed out.');
+    expect(ar.geminiErrorUpstreamUnavailable).toBe('تعذر الوصول إلى خدمة Gemini مؤقتًا.');
+    expect(en.geminiErrorUpstreamUnavailable).toBe('The Gemini service is temporarily unavailable.');
   });
 });

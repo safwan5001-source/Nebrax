@@ -11,6 +11,8 @@ use App\Models\PlatformRuntimeHeartbeat;
 use App\Services\DocumentCenter\DocumentExtractionProviderRegistry;
 use App\Services\DocumentCenter\DocumentProviderConfiguration;
 use App\Services\DocumentCenter\DocumentStorageService;
+use App\Services\DocumentCenter\GeminiConnectionDiagnostic;
+use App\Services\DocumentCenter\ProviderConnectionTestResult;
 use App\Support\DocumentProcessingStatus;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -121,7 +123,7 @@ class PlatformIntegrationService
         }, 3);
     }
 
-    /** @return array{ok:bool, message:string} */
+    /** @return array{ok:bool, message:string, error_code?:string|null, http_status?:int} */
     public function test(PlatformAdministrator $administrator, string $key, ?string $provider = null): array
     {
         $this->assertKey($key);
@@ -149,7 +151,7 @@ class PlatformIntegrationService
         }
     }
 
-    /** @return array{ok:bool, message:string} */
+    /** @return array{ok:bool, message:string, error_code?:string|null, http_status?:int} */
     private function testDocumentAiProvider(PlatformAdministrator $administrator, ?string $provider): array
     {
         if (! in_array($provider, self::AI_PROVIDER_KEYS, true)) {
@@ -166,24 +168,36 @@ class PlatformIntegrationService
             is_array($configuration['providers'][$provider] ?? null) ? $configuration['providers'][$provider] : [],
         );
         $result = $this->documentProviders->resolve($provider)->testConnection($providerConfiguration);
+        if ($provider === 'google_gemini') {
+            $result = GeminiConnectionDiagnostic::redactResult($result, $providerConfiguration->apiKey);
+        }
 
         if ($setting !== null) {
             $configuration['providers'][$provider] ??= [];
             $configuration['providers'][$provider]['last_test_status'] = $result->ok ? 'passed' : 'failed';
             $configuration['providers'][$provider]['last_tested_at'] = now('UTC')->toIso8601String();
             $configuration['providers'][$provider]['last_test_message_safe'] = mb_substr($result->message, 0, 500);
+            if ($provider === 'google_gemini') {
+                $configuration['providers'][$provider]['last_test_error_code'] = $this->geminiErrorCode($result);
+                $configuration['providers'][$provider]['last_test_http_status'] = $result->httpStatus;
+            }
             $setting->fill([
                 'configuration' => $configuration,
                 'updated_by' => $administrator->id,
             ])->save();
-            $this->audit($administrator, 'document_ai', 'connection_tested', [
+            $changedKeys = [
                 "providers.{$provider}.last_test_status",
                 "providers.{$provider}.last_tested_at",
                 "providers.{$provider}.last_test_message_safe",
-            ]);
+            ];
+            if ($provider === 'google_gemini') {
+                $changedKeys[] = "providers.{$provider}.last_test_error_code";
+                $changedKeys[] = "providers.{$provider}.last_test_http_status";
+            }
+            $this->audit($administrator, 'document_ai', 'connection_tested', $changedKeys);
         }
 
-        return ['ok' => $result->ok, 'message' => $result->message];
+        return $this->connectionTestPayload($provider, $result);
     }
 
     private function updateDocumentAi(PlatformAdministrator $administrator, array $validated): PlatformIntegrationSetting
@@ -254,6 +268,8 @@ class PlatformIntegrationService
                 'last_test_status' => $before['last_test_status'] ?? 'not_tested',
                 'last_tested_at' => $before['last_tested_at'] ?? null,
                 'last_test_message_safe' => $before['last_test_message_safe'] ?? null,
+                'last_test_error_code' => $before['last_test_error_code'] ?? null,
+                'last_test_http_status' => $before['last_test_http_status'] ?? null,
             ];
         }
 
@@ -461,6 +477,38 @@ class PlatformIntegrationService
             'changed_keys' => $changedKeys,
             'occurred_at' => now('UTC'),
         ]);
+    }
+
+    /**
+     * @return array{ok:bool, message:string, error_code?:string|null, http_status?:int}
+     */
+    private function connectionTestPayload(string $provider, ProviderConnectionTestResult $result): array
+    {
+        $payload = [
+            'ok' => $result->ok,
+            'message' => $result->message,
+        ];
+        if ($provider !== 'google_gemini') {
+            return $payload;
+        }
+
+        $payload['error_code'] = $this->geminiErrorCode($result);
+        if ($result->httpStatus !== null) {
+            $payload['http_status'] = $result->httpStatus;
+        }
+
+        return $payload;
+    }
+
+    private function geminiErrorCode(ProviderConnectionTestResult $result): ?string
+    {
+        if ($result->ok) {
+            return null;
+        }
+
+        return is_string($result->errorCode) && GeminiConnectionDiagnostic::isKnown($result->errorCode)
+            ? $result->errorCode
+            : GeminiConnectionDiagnostic::CONNECTION_FAILED;
     }
 
     private function mask(string $value): string
