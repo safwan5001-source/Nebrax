@@ -14,6 +14,7 @@ use App\Models\PlatformAdministrator;
 use App\Models\PlatformIntegrationSetting;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Services\DocumentCenter\DocumentExtractionNormalizer;
 use App\Services\DocumentCenter\DocumentExtractionService;
 use App\Services\DocumentCenter\DocumentFileScanService;
 use App\Services\DocumentCenter\DocumentMatchingContext;
@@ -224,6 +225,165 @@ class DocumentExtractionProviderTest extends TestCase
         $raw = (string) DB::table('platform_integration_settings')->where('integration_key', 'document_ai')->value('configuration');
         $this->assertStringNotContainsString($geminiKey, $raw);
         $this->assertStringNotContainsString($geminiKey, json_encode($result->normalized_payload, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * يحرس عقد Gemini بنيوياً على الطلب الفعلي المُرسَل — لا على استجابة Http::fake
+     * المصطنعة، فلا يبقى انكسار المخطط مخفياً خلفه كما حدث في الإنتاج: كل عقدة
+     * `type` قيمة واحدة لا مصفوفة، `additionalProperties` غائبة تماماً، وكل عقدة
+     * `array` تحمل `items`.
+     *
+     * @test
+     */
+    public function google_gemini_extraction_request_uses_a_single_type_nullable_schema_with_items_on_every_array(): void
+    {
+        $this->configureGeminiProvider();
+        $auth = $this->authorizedTenant('extraction-gemini-schema-shape');
+        $batch = $this->batchWithFile($auth['token']);
+        $this->withToken($auth['token'])->postJson("/api/document-batches/{$batch['id']}/complete")->assertOk();
+        $scanJob = $this->queuedScanJob();
+        $this->bindCleanScanner();
+        $scanJob->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentStorageService::class), app(DocumentSafetyScanner::class), app(DocumentFileScanService::class), app(PlatformIntegrationResolver::class), app(DocumentExtractionService::class));
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [['content' => ['parts' => [['text' => json_encode($this->providerPayload('purchase_invoice'), JSON_THROW_ON_ERROR)]]]]],
+                'usageMetadata' => ['promptTokenCount' => 5, 'candidatesTokenCount' => 3],
+            ]),
+        ]);
+        $this->queuedExtractionJob()->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentExtractionService::class));
+
+        Http::assertSent(function (Request $request): bool {
+            $body = $request->data();
+            $this->assertSame('application/json', $body['generationConfig']['responseMimeType'] ?? null);
+            $this->assertArrayHasKey('responseSchema', $body['generationConfig'] ?? []);
+            $this->assertGeminiSchemaShape($body['generationConfig']['responseSchema']);
+
+            return true;
+        });
+    }
+
+    /**
+     * يثبّت مصفوفة `jsonSchema()` المشتركة كما هي — يستهلكها OpenAI بوضع
+     * `strict: true` (يفرض `additionalProperties: false` وتعبير القابلية للـ
+     * null بمصفوفة `type`) وAnthropic (JSON Schema عادي). أي تعديل لاحق على
+     * `jsonSchema()` نفسها يكسر هذا الاختبار عمداً — الإصلاح الخاص بـGemini في
+     * `geminiResponseSchema()` وحدها.
+     *
+     * @test
+     */
+    public function the_shared_json_schema_still_uses_type_arrays_and_additional_properties_for_openai_and_anthropic(): void
+    {
+        $schema = DocumentExtractionNormalizer::jsonSchema();
+
+        $this->assertFalse($schema['additionalProperties']);
+        $this->assertSame(['string', 'null'], $schema['properties']['document_type']['type']);
+        $this->assertSame(['string', 'null'], $schema['properties']['language']['type']);
+        $this->assertSame(['string', 'null'], $schema['properties']['confidence']['type']);
+    }
+
+    /**
+     * @test
+     */
+    public function gemini_response_schema_never_reintroduces_a_type_array_or_additional_properties_anywhere(): void
+    {
+        $this->assertGeminiSchemaShape(DocumentExtractionNormalizer::geminiResponseSchema());
+    }
+
+    /**
+     * يعيد إنتاج عطل الإنتاج بالضبط: Gemini يرفض طلب الاستخراج الحقيقي
+     * (400/INVALID_ARGUMENT) رغم نجاح اختبار الاتصال. يثبت أن الرمز الآمن
+     * الجديد `provider_request_invalid` يُسجَّل دون تسريب نص Google الأصلي.
+     *
+     * @test
+     */
+    public function a_gemini_invalid_argument_rejection_is_classified_safely_without_leaking_the_upstream_message(): void
+    {
+        $this->configureGeminiProvider();
+        $auth = $this->authorizedTenant('extraction-gemini-invalid-argument');
+        $batch = $this->batchWithFile($auth['token']);
+        $this->withToken($auth['token'])->postJson("/api/document-batches/{$batch['id']}/complete")->assertOk();
+        $scanJob = $this->queuedScanJob();
+        $this->bindCleanScanner();
+        $scanJob->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentStorageService::class), app(DocumentSafetyScanner::class), app(DocumentFileScanService::class), app(PlatformIntegrationResolver::class), app(DocumentExtractionService::class));
+
+        $upstreamMessage = 'Invalid JSON payload received. Unknown name "type" at \'generation_config.response_schema.properties[0].value\': Cannot find field.';
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'error' => ['code' => 400, 'message' => $upstreamMessage, 'status' => 'INVALID_ARGUMENT'],
+            ], 400),
+        ]);
+        $this->queuedExtractionJob()->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentExtractionService::class));
+
+        $attempt = DocumentProviderAttempt::firstOrFail();
+        $this->assertSame('failed', $attempt->status);
+        $this->assertSame('provider_request_invalid', $attempt->error_code);
+        $this->assertStringNotContainsString('Unknown name', (string) $attempt->error_message_safe);
+        $this->assertStringNotContainsString($upstreamMessage, (string) $attempt->error_message_safe);
+        $this->assertSame(0, DocumentExtractionResult::count());
+        $this->assertSame(DocumentWorkflowStatus::FAILED, DocumentBatch::findOrFail($batch['id'])->status);
+    }
+
+    /**
+     * تفضيلٌ آمن: رفضٌ بلا `error.status` معروف يبقى بالرمز العام الحالي —
+     * لا يتغيّر سلوك الأخطاء الآمن القائم إلا لحالة `INVALID_ARGUMENT` المصنَّفة
+     * صراحةً.
+     *
+     * @test
+     */
+    public function a_gemini_rejection_without_a_recognized_google_status_keeps_the_existing_generic_safe_code(): void
+    {
+        $this->configureGeminiProvider();
+        $auth = $this->authorizedTenant('extraction-gemini-unclassified-rejection');
+        $batch = $this->batchWithFile($auth['token']);
+        $this->withToken($auth['token'])->postJson("/api/document-batches/{$batch['id']}/complete")->assertOk();
+        $scanJob = $this->queuedScanJob();
+        $this->bindCleanScanner();
+        $scanJob->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentStorageService::class), app(DocumentSafetyScanner::class), app(DocumentFileScanService::class), app(PlatformIntegrationResolver::class), app(DocumentExtractionService::class));
+
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response('', 400)]);
+        $this->queuedExtractionJob()->handle(app(TenantContext::class), app(BranchContext::class), app(DocumentProcessingService::class), app(DocumentExtractionService::class));
+
+        $this->assertSame('provider_request_rejected', DocumentProviderAttempt::firstOrFail()->error_code);
+    }
+
+    /** @param array<string, mixed> $schema */
+    private function assertGeminiSchemaShape(array $schema, string $path = '$'): void
+    {
+        $this->assertArrayNotHasKey('additionalProperties', $schema, "additionalProperties must never appear in a Gemini responseSchema node ({$path}).");
+        if (array_key_exists('type', $schema)) {
+            $this->assertIsString($schema['type'], "Gemini responseSchema `type` must be a single string, not a union array ({$path}).");
+            if ($schema['type'] === 'array') {
+                $this->assertArrayHasKey('items', $schema, "A Gemini responseSchema array node must declare `items` ({$path}).");
+            }
+        }
+        foreach (($schema['properties'] ?? []) as $name => $property) {
+            if (is_array($property)) {
+                $this->assertGeminiSchemaShape($property, "{$path}.properties.{$name}");
+            }
+        }
+        if (is_array($schema['items'] ?? null)) {
+            $this->assertGeminiSchemaShape($schema['items'], "{$path}.items");
+        }
+    }
+
+    private function configureGeminiProvider(string $apiKey = 'gemini-test-secret'): void
+    {
+        $setting = PlatformIntegrationSetting::query()->where('integration_key', 'document_ai')->firstOrFail();
+        $configuration = $setting->configuration;
+        $configuration['primary_provider'] = 'google_gemini';
+        $configuration['providers']['google_gemini'] = [
+            'enabled' => true,
+            'api_key' => $apiKey,
+            'model' => 'gemini-test',
+            'connection_timeout_seconds' => 15,
+            'processing_timeout_seconds' => 90,
+            'max_attempts' => 1,
+            'allow_document_sending' => true,
+        ];
+        $setting->provider = 'google_gemini';
+        $setting->configuration = $configuration;
+        $setting->save();
     }
 
     /** @test */

@@ -87,7 +87,7 @@ final class GoogleGeminiDocumentExtractionProvider implements DocumentExtraction
                 'generationConfig' => [
                     'maxOutputTokens' => 4096,
                     'responseMimeType' => 'application/json',
-                    'responseSchema' => DocumentExtractionNormalizer::jsonSchema(),
+                    'responseSchema' => DocumentExtractionNormalizer::geminiResponseSchema(),
                 ],
             ]);
             $this->assertSuccessful($response);
@@ -139,8 +139,25 @@ final class GoogleGeminiDocumentExtractionProvider implements DocumentExtraction
         if ($status >= 500 || $status === 408) {
             throw new DocumentProviderException('provider_unavailable', 'خدمة Google Gemini غير متاحة مؤقتاً.', true);
         }
+        if ($this->isInvalidRequestStatus($response)) {
+            throw new DocumentProviderException('provider_request_invalid', 'رفض Google Gemini الطلب بسبب تنسيق أو مخطط غير صالح.', false);
+        }
 
         throw new DocumentProviderException('provider_request_rejected', 'رفض Google Gemini طلب الاستخراج وفق الإعدادات الحالية.', false);
+    }
+
+    /**
+     * تصنيف آمن لا يحمل غير رمز حالة Google الثابت (`error.status`) — لا نص
+     * رسالته، ولا أي جزء من محتوى الطلب أو المستند. يميّز فقط خطأ الطلب
+     * المُشوَّه (`INVALID_ARGUMENT`، كرفض مخطط `responseSchema`) عن غيره من
+     * أسباب الرفض العامة التي تبقى برمزها الحالي.
+     */
+    private function isInvalidRequestStatus(Response $response): bool
+    {
+        $payload = $response->json();
+        $error = is_array($payload) && is_array($payload['error'] ?? null) ? $payload['error'] : [];
+
+        return ($error['status'] ?? null) === 'INVALID_ARGUMENT';
     }
 
     /** @param array<string, mixed> $data */
