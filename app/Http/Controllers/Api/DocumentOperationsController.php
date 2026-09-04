@@ -79,6 +79,8 @@ final class DocumentOperationsController extends ApiController
             // القرار الفعّال لسياسة المستأجر (المعالجة الذكية + مصير الأصل)،
             // مقروءاً من نفس المصدر الذي تراه الخدمات — لا اشتقاق موازٍ.
             'document_intelligence' => DocumentIntelligencePolicy::forTenant()->toArray(),
+            // جاهزية الاستخراج على مستوى المنصة — نفس منطق العمليات، بلا أسرار.
+            'extraction_readiness' => $this->operations->extractionReadiness(),
             'active_holds' => DocumentRetentionHold::query()->where('branch_id', $branchId)->active()->latest()->limit(100)->get()->map(fn (DocumentRetentionHold $hold) => $this->hold($hold)),
             'redactions' => DocumentRedactionOverlay::query()->where('branch_id', $branchId)->latest('redacted_at')->limit(100)->get()->map(fn (DocumentRedactionOverlay $overlay) => [
                 'id' => $overlay->id, 'result_id' => $overlay->document_extraction_result_id, 'field_path' => $overlay->field_path,

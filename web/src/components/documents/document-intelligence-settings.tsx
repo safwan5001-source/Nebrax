@@ -7,6 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { documentTypeTranslationKey } from '@/lib/document-intake-present';
 
 /**
  * إعدادات الذكاء المستندي — تحكّمان **مستقلّان**:
@@ -31,16 +32,6 @@ type Payload = {
   available_retention_modes: string[];
 };
 
-const TYPE_LABEL_KEY: Record<string, string> = {
-  purchase_invoice: 'typePurchaseInvoice',
-  sales_invoice: 'typeSalesInvoice',
-  expense: 'typeExpense',
-  delivery_note: 'typeDeliveryNote',
-  receipt: 'typeReceipt',
-  credit_note: 'typeCreditNote',
-  debit_note: 'typeDebitNote',
-};
-
 const RETENTION_LABEL_KEY: Record<string, string> = {
   document_center_only: 'retentionDocumentCenterOnly',
   record_attachment_only: 'retentionRecordAttachmentOnly',
@@ -50,7 +41,7 @@ const RETENTION_LABEL_KEY: Record<string, string> = {
 
 export function DocumentIntelligenceSettings() {
   const t = useTranslations('documentIntelligence');
-  const tt = useTranslations('documentCenterReview');
+  const typeLabel = useTranslations('documentCenterIntake');
   const [payload, setPayload] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -163,8 +154,8 @@ export function DocumentIntelligenceSettings() {
             <p className="mt-1 text-sm text-muted">{t('allowedTypesHint')}</p>
             <ul className="mt-3 grid gap-2 sm:grid-cols-2">
               {availableTypes.map((type) => {
-                const labelKey = TYPE_LABEL_KEY[type];
-                const label = labelKey ? tt(labelKey) : type;
+                const labelKey = documentTypeTranslationKey(type);
+                const label = labelKey === type ? type : typeLabel(labelKey);
                 return (
                   <li key={type} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
                     <span className="text-sm text-text">{label}</span>

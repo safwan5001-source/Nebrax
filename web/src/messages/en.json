@@ -8000,6 +8000,7 @@
     "statusSafetyPending": "Safety check pending",
     "statusQuarantined": "Quarantined",
     "statusExtractionUnavailable": "Extraction is not activated",
+    "statusExtractionAvailable": "Extraction is activated",
     "statusProcessing": "Processing",
     "statusNeedsReview": "Needs review",
     "statusReady": "Ready for draft",
