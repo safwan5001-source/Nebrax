@@ -39,7 +39,9 @@ const strings = {
       opening_cash_hint: 'المبلغ النقدي المستلم في بداية الوردية',
       submit: 'فتح الجلسة وبدء البيع',
       cancel: 'إلغاء',
-      resuming: 'جلسة بيع مفتوحة — الانتقال إلى نقطة البيع…',
+      resuming: 'توجد جلسة بيع مفتوحة. افتح نقطة البيع في تبويب مخصّص.',
+      open_pos_tab: 'فتح نقطة البيع',
+      popup_blocked: 'منع المتصفح فتح تبويب نقطة البيع تلقائياً. استخدم الزر أدناه.',
       session_closed_remote: 'أُغلقت وردية نقطة البيع من مكان آخر. افتح جلسة جديدة للمتابعة.',
       device_required: 'الجهاز مطلوب.',
       shift_required: 'وردية نقاط البيع مطلوبة.',
@@ -61,7 +63,9 @@ const strings = {
       opening_cash_hint: 'Cash received at the start of the shift',
       submit: 'Open Session & Start Selling',
       cancel: 'Cancel',
-      resuming: 'Open selling session found — continuing to POS…',
+      resuming: 'An open selling session is already available. Open POS in a dedicated tab.',
+      open_pos_tab: 'Open POS',
+      popup_blocked: 'The browser blocked the automatic POS tab. Use the button below.',
       session_closed_remote: 'The POS shift was closed elsewhere. Open a new session to continue.',
       device_required: 'Device is required.',
       shift_required: 'POS shift is required.',
@@ -100,6 +104,7 @@ const shifts = [
 let mine: Array<{ id: string; status: string }> = [];
 const openBodies: unknown[] = [];
 let openImpl: ((body: unknown) => Promise<unknown>) | null = null;
+let posWin: { closed: boolean; close: ReturnType<typeof vi.fn>; location: { replace: ReturnType<typeof vi.fn> } };
 
 function mockApi(url: string, options?: { method?: string; body?: unknown }) {
   if (String(url).startsWith('/pos-sessions?mine=1')) return Promise.resolve({ data: mine });
@@ -110,6 +115,15 @@ function mockApi(url: string, options?: { method?: string; body?: unknown }) {
     return openImpl ? openImpl(options?.body) : Promise.resolve({ data: { id: 'opened', status: 'open' } });
   }
   return Promise.reject(new Error(`unexpected ${url}`));
+}
+
+function mockPosWindow() {
+  posWin = {
+    closed: false,
+    close: vi.fn(function (this: { closed: boolean }) { this.closed = true; }),
+    location: { replace: vi.fn() },
+  };
+  vi.spyOn(window, 'open').mockImplementation(() => posWin as unknown as Window);
 }
 
 async function renderForm() {
@@ -125,6 +139,13 @@ async function fillRequired(user: ReturnType<typeof userEvent.setup>, openingCas
   await user.type(cash, openingCash);
 }
 
+function expectPosTabAssigned() {
+  expect(window.open).toHaveBeenCalledWith('about:blank', 'awj-pos-workspace');
+  expect(posWin.location.replace).toHaveBeenCalledWith('/pos');
+  expect(posWin.close).not.toHaveBeenCalled();
+  expect(replace).not.toHaveBeenCalledWith('/pos');
+}
+
 describe('صفحة فتح جلسة البيع', () => {
   beforeEach(() => {
     locale.current = 'ar';
@@ -135,8 +156,12 @@ describe('صفحة فتح جلسة البيع', () => {
     replace.mockReset();
     api.mockReset();
     api.mockImplementation(mockApi);
+    mockPosWindow();
   });
-  afterEach(() => cleanup());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
 
   it('تعرض العناوين العربية وRTL ولا تدخل POS قبل الفتح', async () => {
     await renderForm();
@@ -147,6 +172,7 @@ describe('صفحة فتح جلسة البيع', () => {
     expect(screen.getByRole('button', { name: 'فتح الجلسة وبدء البيع' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'إلغاء' }).getAttribute('href')).toBe('/dashboard');
     expect(replace).not.toHaveBeenCalledWith('/pos');
+    expect(window.open).not.toHaveBeenCalled();
     expect(openBodies).toHaveLength(0);
   });
 
@@ -165,12 +191,13 @@ describe('صفحة فتح جلسة البيع', () => {
     expect((submit as HTMLButtonElement).disabled).toBe(true);
     fireEvent.submit(submit.closest('form')!);
     expect(openBodies).toHaveLength(0);
+    expect(window.open).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalledWith('/pos');
     expect(screen.queryByRole('option', { name: /Disabled counter/ })).toBeNull();
     expect(screen.queryByRole('option', { name: /Evening/ })).toBeNull();
   });
 
-  it('يرسل pos_shift_id والهللات بما فيها الصفر ولا يرسل shift_id', async () => {
+  it('يرسل pos_shift_id والهللات بما فيها الصفر ولا يرسل shift_id ثم يفتح /pos في تبويب جديد', async () => {
     const user = userEvent.setup();
     await renderForm();
     await fillRequired(user, '0');
@@ -182,7 +209,8 @@ describe('صفحة فتح جلسة البيع', () => {
       pos_shift_id: 'pos-shift-morning',
     });
     expect(JSON.stringify(openBodies[0])).not.toMatch(/(?:^|[^a-z_])shift_id(?:[^a-z_]|$)/);
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/pos'));
+    await waitFor(() => expect(posWin.location.replace).toHaveBeenCalledWith('/pos'));
+    expectPosTabAssigned();
   });
 
   it('يحوّل العهدة 100.50 إلى 10050 هللة', async () => {
@@ -195,6 +223,7 @@ describe('صفحة فتح جلسة البيع', () => {
       pos_device_id: 'device-1',
       pos_shift_id: 'pos-shift-morning',
     }]));
+    await waitFor(() => expect(posWin.location.replace).toHaveBeenCalledWith('/pos'));
   });
 
   it('يمنع الإرسال المزدوج', async () => {
@@ -208,29 +237,42 @@ describe('صفحة فتح جلسة البيع', () => {
     await user.click(submit);
     await waitFor(() => expect(openBodies).toHaveLength(1));
     expect((submit as HTMLButtonElement).disabled).toBe(true);
+    expect(window.open).toHaveBeenCalledTimes(1);
+    expect(posWin.location.replace).not.toHaveBeenCalled();
     release?.({ data: { id: 'opened', status: 'open' } });
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/pos'));
+    await waitFor(() => expect(posWin.location.replace).toHaveBeenCalledWith('/pos'));
+    expect(replace).not.toHaveBeenCalledWith('/pos');
   });
 
-  it('لا يدخل POS عند فشل API', async () => {
+  it('لا يدخل POS عند فشل API ويغلق التبويب النائب', async () => {
     const user = userEvent.setup();
     openImpl = () => Promise.reject(new MockApiError(500, 'تعذر فتح الجلسة'));
     await renderForm();
     await fillRequired(user, '10');
     await user.click(screen.getByRole('button', { name: 'فتح الجلسة وبدء البيع' }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('تعذر فتح الجلسة'));
+    expect(window.open).toHaveBeenCalledWith('about:blank', 'awj-pos-workspace');
+    expect(posWin.close).toHaveBeenCalled();
+    expect(posWin.location.replace).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalledWith('/pos');
+    expect(screen.getByLabelText('جهاز نقطة البيع')).toBeTruthy();
   });
 
-  it('يتبنّى الجلسة المفتوحة القائمة دون POST', async () => {
+  it('يتبنّى الجلسة المفتوحة القائمة دون POST ويعرض رابط تبويب جديد', async () => {
     mine = [{ id: 'open-1', status: 'open' }];
     render(<OpenSellingSessionPage />);
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/pos'));
+    await waitFor(() => expect(screen.getByTestId('pos-resume-selling')).toBeTruthy());
+    const resume = screen.getByTestId('pos-resume-selling');
+    expect(resume.getAttribute('href')).toBe('/pos');
+    expect(resume.getAttribute('target')).toBe('_blank');
+    expect(resume.getAttribute('rel')).toBe('noopener noreferrer');
     expect(openBodies).toHaveLength(0);
+    expect(window.open).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalledWith('/pos');
     expect(screen.queryByRole('button', { name: 'فتح الجلسة وبدء البيع' })).toBeNull();
   });
 
-  it('عند 422 يعيد تبنّي الجلسة القائمة إن وُجدت', async () => {
+  it('عند 422 يعيد تبنّي الجلسة القائمة إن وُجدت ويفتح /pos في التبويب المخصص', async () => {
     const user = userEvent.setup();
     openImpl = () => {
       mine = [{ id: 'open-1', status: 'open' }];
@@ -239,8 +281,21 @@ describe('صفحة فتح جلسة البيع', () => {
     await renderForm();
     await fillRequired(user, '0');
     await user.click(screen.getByRole('button', { name: 'فتح الجلسة وبدء البيع' }));
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/pos'));
+    await waitFor(() => expect(posWin.location.replace).toHaveBeenCalledWith('/pos'));
+    expectPosTabAssigned();
     expect(screen.queryByRole('alert')?.textContent ?? '').not.toContain('لدى الكاشير');
+  });
+
+  it('عند حظر التبويب بعد نجاح الفتح يعرض رابط الاستئناف ولا يفتح POS في نفس التبويب', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    await renderForm();
+    await fillRequired(user, '0');
+    await user.click(screen.getByRole('button', { name: 'فتح الجلسة وبدء البيع' }));
+    await waitFor(() => expect(openBodies).toHaveLength(1));
+    await waitFor(() => expect(screen.getByTestId('pos-resume-selling')).toBeTruthy());
+    expect(screen.getByTestId('pos-popup-blocked')).toBeTruthy();
+    expect(replace).not.toHaveBeenCalledWith('/pos');
   });
 
   it('تعرض سبب الإغلاق عن بُعد دون إنشاء جلسة', async () => {

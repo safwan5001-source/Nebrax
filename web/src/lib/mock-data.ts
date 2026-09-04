@@ -2940,7 +2940,12 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     if (clean === '/pos-sessions/open' && m === 'POST') {
       const input = (body ?? {}) as { opening_balance?: unknown; pos_device_id?: string; pos_shift_id?: string };
       const opening = Number(input.opening_balance);
-      const rejectOpen = (message: string) => Promise.reject(Object.assign(new Error(message), { status: 422 }));
+      const rejectOpen = (message: string, status = 422) => Promise.reject(Object.assign(new Error(message), { status }));
+      // خطاف اختبار محلي فقط (مثل __POS_SESSIONS_FORCE_EMPTY). لا يغيّر معاينة المستخدم ولا عقد الخادم.
+      if (typeof window !== 'undefined'
+        && Boolean((window as Window & { __POS_OPEN_FAIL?: boolean }).__POS_OPEN_FAIL)) {
+        return rejectOpen('تعذر فتح الجلسة', 500);
+      }
       // المحاكي يعكس عقد الخادم للعرض فقط؛ العزل الحقيقي يبقى في API.
       if (!Number.isInteger(opening) || opening < 0) {
         return rejectOpen('الرصيد الافتتاحي لا يكون سالباً.');

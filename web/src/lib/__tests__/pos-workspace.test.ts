@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -8,11 +8,12 @@ import {
   POS_SIDEBAR_LAUNCH_ITEMS,
   POS_START_HREF,
   POS_UNSAVED_EXIT_ACTIONS,
+  POS_WORKSPACE_WINDOW_NAME,
   decidePosUnsavedExit,
   posNavNewTabAnchorProps,
   posReturnToNebraxProps,
+  posSellingNewTabProps,
   posSidebarItemsOpeningInNewTab,
-  posStartNewTabProps,
   posUnsavedExitEndsShift,
 } from '@/lib/pos-workspace';
 
@@ -23,15 +24,20 @@ function source(file: string) {
 }
 
 describe('فتح مساحة POS في تبويب مستقل', () => {
-  it('يعيد href وtarget وrel الدلالية لبدء البيع', () => {
-    expect(posStartNewTabProps()).toEqual({
-      href: '/pos/start',
+  it('يجعل بدء البيع في نفس التبويب و`/pos` في تبويب جديد', () => {
+    expect(posSellingNewTabProps()).toEqual({
+      href: '/pos',
       target: '_blank',
       rel: 'noopener noreferrer',
     });
     expect(POS_START_HREF).toBe('/pos/start');
     expect(POS_NEW_TAB_TARGET).toBe('_blank');
     expect(POS_NEW_TAB_REL).toBe('noopener noreferrer');
+    expect(POS_WORKSPACE_WINDOW_NAME).toBe('awj-pos-workspace');
+
+    const workspace = source('src/lib/pos-workspace.ts');
+    expect(workspace).not.toContain('posStartNewTabProps');
+    expect(workspace).toContain("window.open('about:blank', POS_WORKSPACE_WINDOW_NAME)");
   });
 
   it('يضع target وrel فقط عندما يُطلب تبويب جديد', () => {
@@ -43,14 +49,14 @@ describe('فتح مساحة POS في تبويب مستقل', () => {
     expect(posNavNewTabAnchorProps(undefined)).toEqual({});
   });
 
-  it('يجعل posStart وحده عنصر الشريط الذي يفتح تبويباً جديداً', () => {
-    const newTab = posSidebarItemsOpeningInNewTab();
-    expect(newTab).toEqual([{ key: 'posStart', href: '/pos/start', openInNewTab: true }]);
-    expect(POS_SIDEBAR_LAUNCH_ITEMS.filter((item) => !item.openInNewTab).map((item) => item.href)).toEqual([
-      '/pos/sessions',
-      '/pos/report',
-      '/pos/audit',
-      '/pos/settings',
+  it('لا يفتح أي عنصر شريط في تبويب جديد', () => {
+    expect(posSidebarItemsOpeningInNewTab()).toEqual([]);
+    expect(POS_SIDEBAR_LAUNCH_ITEMS.map((item) => ({ href: item.href, openInNewTab: item.openInNewTab }))).toEqual([
+      { href: '/pos/start', openInNewTab: false },
+      { href: '/pos/sessions', openInNewTab: false },
+      { href: '/pos/report', openInNewTab: false },
+      { href: '/pos/audit', openInNewTab: false },
+      { href: '/pos/settings', openInNewTab: false },
     ]);
   });
 
@@ -61,12 +67,16 @@ describe('فتح مساحة POS في تبويب مستقل', () => {
     expect(sidebar).not.toContain('window.open');
   });
 
-  it('يبقي تخطيط POS مستقلاً عن شريط ERP', () => {
+  it('يبقي تخطيط POS مستقلاً عن شريط ERP ويجعل /pos/start في تخطيط الإدارة', () => {
     const layout = source('src/app/(pos)/layout.tsx');
     expect(layout).not.toContain("from '@/components/layout/sidebar'");
     expect(layout).not.toContain('<Sidebar');
     expect(layout).toContain('100dvh');
     expect(layout).toContain("router.replace('/login')");
+
+    const startPage = source('src/app/(app)/pos/start/page.tsx');
+    expect(startPage).toContain('pos-open-session-page');
+    expect(existsSync(resolve(process.cwd(), 'src/app/(pos)/pos/start/page.tsx'))).toBe(false);
   });
 
   it('يجعل العودة إلى النظام زراً يمر عبر الصفحة دون window.close', () => {

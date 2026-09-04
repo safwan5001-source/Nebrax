@@ -114,7 +114,7 @@ describe('حارس مسار فتح الجلسة في الواجهة', () => {
 
   it('يمنع مسار HR shift_id من بوابة البيع الحديثة', () => {
     const posPage = source('src/app/(pos)/pos/page.tsx');
-    const startPage = source('src/app/(pos)/pos/start/page.tsx');
+    const startPage = source('src/app/(app)/pos/start/page.tsx');
     const helper = source('src/lib/pos-open-session.ts');
     expect(posPage).not.toContain("'/shifts'");
     expect(posPage).not.toContain('shift_id: shiftId');
@@ -122,6 +122,9 @@ describe('حارس مسار فتح الجلسة في الواجهة', () => {
     expect(startPage).toContain('body: parsed.payload');
     expect(startPage).toContain("'/pos-sessions/open'");
     expect(startPage).toContain("'/pos-shifts'");
+    expect(startPage).toContain('openPosSellingWorkspaceWindow');
+    expect(startPage).toContain('revealPosSellingWorkspace');
+    expect(startPage).not.toContain('router.replace');
     expect(startPage).not.toContain("'/shifts'");
     expect(helper).toContain('pos_shift_id');
     expect(helper).toContain('isValidRiyal');

@@ -3,14 +3,21 @@
 import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { api, ApiError, hasApiStatus } from '@/lib/api';
-import { POS_RETURN_HREF, POS_SELLING_HREF, POS_START_HREF } from '@/lib/pos-workspace';
+import {
+  POS_RETURN_HREF,
+  POS_START_HREF,
+  discardPosSellingWorkspace,
+  openPosSellingWorkspaceWindow,
+  posSellingNewTabProps,
+  revealPosSellingWorkspace,
+} from '@/lib/pos-workspace';
 import {
   buildPosSessionOpenPayload,
   canSubmitPosSessionOpen,
@@ -48,17 +55,34 @@ function shiftLabel(shift: PosShift): string {
   return shift.code ? `${shift.name} · ${shift.code}` : shift.name;
 }
 
+function ResumeSellingPanel({ popupBlocked }: { popupBlocked: boolean }) {
+  const t = useTranslations('posOpenSession');
+  return (
+    <div className="space-y-4">
+      {popupBlocked && (
+        <p role="status" data-testid="pos-popup-blocked" className="rounded bg-warning/10 px-3 py-2 text-sm text-warning">
+          {t('popup_blocked')}
+        </p>
+      )}
+      <p className="text-sm text-muted">{t('resuming')}</p>
+      <Button asChild className="min-h-11">
+        <a {...posSellingNewTabProps()} data-testid="pos-resume-selling">{t('open_pos_tab')}</a>
+      </Button>
+    </div>
+  );
+}
+
 function OpenSellingSessionForm() {
   const t = useTranslations('posOpenSession');
   const tc = useTranslations('common');
   const locale = useLocale();
   const rtl = locale === 'ar';
-  const router = useRouter();
   const searchParams = useSearchParams();
   const closedRemote = searchParams.get('reason') === 'closed';
 
   const [ready, setReady] = useState(false);
-  const [resuming, setResuming] = useState(false);
+  const [hasOpenSession, setHasOpenSession] = useState(false);
+  const [popupBlocked, setPopupBlocked] = useState(false);
   const [devices, setDevices] = useState<PosDevice[]>([]);
   const [shifts, setShifts] = useState<PosShift[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -79,13 +103,18 @@ function OpenSellingSessionForm() {
     posShiftId: shiftId,
   }, busy);
 
-  const adoptOpenSession = useCallback(async (): Promise<boolean> => {
+  const enterSellingWorkspace = useCallback((posWin: Window | null) => {
+    setHasOpenSession(true);
+    if (!revealPosSellingWorkspace(posWin)) setPopupBlocked(true);
+  }, []);
+
+  const adoptOpenSession = useCallback(async (posWin: Window | null): Promise<boolean> => {
     const result = await api<{ data: PosSession[] }>('/pos-sessions?mine=1');
     const current = findMyOpenSession(result.data);
     if (!current) return false;
-    router.replace(POS_SELLING_HREF);
+    enterSellingWorkspace(posWin);
     return true;
-  }, [router]);
+  }, [enterSellingWorkspace]);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,8 +127,8 @@ function OpenSellingSessionForm() {
         if (cancelled) return;
         const current = findMyOpenSession(sessions.data);
         if (current) {
-          setResuming(true);
-          router.replace(POS_SELLING_HREF);
+          setHasOpenSession(true);
+          setReady(true);
           return;
         }
         setDevices(deviceResult.data);
@@ -112,7 +141,7 @@ function OpenSellingSessionForm() {
         setReady(true);
       });
     return () => { cancelled = true; };
-  }, [router, tc]);
+  }, [tc]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -128,20 +157,23 @@ function OpenSellingSessionForm() {
       return;
     }
 
+    const posWin = openPosSellingWorkspaceWindow();
     submittingRef.current = true;
     setBusy(true);
     setError(null);
+    setPopupBlocked(false);
     try {
       await api('/pos-sessions/open', { method: 'POST', body: parsed.payload });
-      router.replace(POS_SELLING_HREF);
+      enterSellingWorkspace(posWin);
     } catch (cause) {
       if (hasApiStatus(cause, 422)) {
         try {
-          if (await adoptOpenSession()) return;
+          if (await adoptOpenSession(posWin)) return;
         } catch {
           // نعرض خطأ الفتح الأصلي إن تعذّر التبنّي.
         }
       }
+      discardPosSellingWorkspace(posWin);
       setError(cause instanceof ApiError ? cause.message : tc('saveFailed'));
     } finally {
       submittingRef.current = false;
@@ -168,8 +200,8 @@ function OpenSellingSessionForm() {
               </p>
             )}
 
-            {!ready || resuming ? (
-              <p className="text-sm text-muted">{resuming ? t('resuming') : tc('loading')}</p>
+            {!ready ? (
+              <p className="text-sm text-muted">{tc('loading')}</p>
             ) : loadError ? (
               <div className="space-y-4">
                 <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-sm text-negative">{loadError}</p>
@@ -177,6 +209,8 @@ function OpenSellingSessionForm() {
                   <Link href={POS_START_HREF}>{tc('retry')}</Link>
                 </Button>
               </div>
+            ) : hasOpenSession ? (
+              <ResumeSellingPanel popupBlocked={popupBlocked} />
             ) : (
               <form onSubmit={submit} className="space-y-4">
                 <div className="space-y-1.5">
@@ -255,4 +289,3 @@ export default function OpenSellingSessionPage() {
     </Suspense>
   );
 }
-
