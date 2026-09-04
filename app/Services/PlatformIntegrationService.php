@@ -367,6 +367,22 @@ class PlatformIntegrationService
         ];
     }
 
+    public function documentWorkerOnline(): bool
+    {
+        $lastSeen = PlatformRuntimeHeartbeat::query()
+            ->where('component', 'document-worker')
+            ->value('last_seen_at');
+        if ($lastSeen === null) {
+            return false;
+        }
+
+        $timestamp = $lastSeen instanceof \DateTimeInterface
+            ? $lastSeen
+            : \Carbon\CarbonImmutable::parse((string) $lastSeen);
+
+        return $timestamp->isAfter(now('UTC')->subMinutes(2));
+    }
+
     /** @return array<string, mixed> */
     public function runtime(): array
     {

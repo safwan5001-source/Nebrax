@@ -124,15 +124,15 @@ final class DocumentOperationsService
      */
     public function extractionReadiness(): array
     {
+        $this->settings->prime(['document_ai', 'malware_scanner', 'document_processing']);
         $policy = $this->settings->documentExtractionPolicy();
         $primary = $policy->primaryProvider();
         $configuration = $primary === null ? null : $policy->provider($primary);
         $processingMode = $this->settings->documentProcessingMode();
         $synchronous = $processingMode === DocumentExtractionPolicy::MODE_SYNC;
         $queueAsync = config('queue.default') !== 'sync';
-        $runtime = $this->platform->runtime();
-        $queueConfigured = (bool) ($runtime['queue_configured'] ?? false);
-        $workerOnline = ($runtime['worker_status'] ?? 'offline') === 'online';
+        $queueConfigured = config('queue.default') === 'redis' && filled(config('database.redis.default.url'));
+        $workerOnline = $synchronous ? false : $this->platform->documentWorkerOnline();
         $networkLocked = ! DocumentProviderNetworkGate::allowsExternalRequests();
         $engineEnabled = $policy->enabled();
         $primaryReady = $configuration !== null && $configuration->isOperationallyReady();
