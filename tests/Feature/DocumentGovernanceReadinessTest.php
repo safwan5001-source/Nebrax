@@ -33,7 +33,7 @@ class DocumentGovernanceReadinessTest extends TestCase
         $auth = $this->authorizedTenant('gov-network-locked');
         $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini');
         config()->set('document_center.ai.provider_network_enabled', false);
-        config()->set('queue.default', 'redis');
+        $this->configureRedisQueue();
 
         $readiness = $this->governance($auth['token'])['extraction_readiness'];
 
@@ -41,6 +41,7 @@ class DocumentGovernanceReadinessTest extends TestCase
         $this->assertTrue($readiness['platform_engine_enabled']);
         $this->assertTrue($readiness['primary_provider_ready']);
         $this->assertTrue($readiness['queue_async']);
+        $this->assertTrue($readiness['queue_configured']);
         $this->assertFalse($readiness['ready']);
     }
 
@@ -77,6 +78,7 @@ class DocumentGovernanceReadinessTest extends TestCase
         $readiness = $this->governance($auth['token'])['extraction_readiness'];
 
         $this->assertFalse($readiness['queue_async']);
+        $this->assertFalse($readiness['queue_configured']);
         $this->assertSame('async', $readiness['processing_mode']);
         $this->assertTrue($readiness['queue_required']);
         $this->assertTrue($readiness['worker_required']);
@@ -92,11 +94,12 @@ class DocumentGovernanceReadinessTest extends TestCase
         $auth = $this->authorizedTenant('gov-async-no-worker');
         $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini');
         config()->set('document_center.ai.provider_network_enabled', true);
-        config()->set('queue.default', 'redis');
+        $this->configureRedisQueue();
 
         $readiness = $this->governance($auth['token'])['extraction_readiness'];
 
         $this->assertTrue($readiness['queue_async']);
+        $this->assertTrue($readiness['queue_configured']);
         $this->assertSame('async', $readiness['processing_mode']);
         $this->assertSame('offline', $readiness['worker_status']);
         $this->assertFalse($readiness['ready']);
@@ -109,7 +112,7 @@ class DocumentGovernanceReadinessTest extends TestCase
         $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini');
         $this->seedWorkerHeartbeat();
         config()->set('document_center.ai.provider_network_enabled', true);
-        config()->set('queue.default', 'redis');
+        $this->configureRedisQueue();
 
         $readiness = $this->governance($auth['token'])['extraction_readiness'];
 
@@ -117,8 +120,43 @@ class DocumentGovernanceReadinessTest extends TestCase
         $this->assertTrue($readiness['platform_engine_enabled']);
         $this->assertTrue($readiness['primary_provider_ready']);
         $this->assertTrue($readiness['queue_async']);
+        $this->assertTrue($readiness['queue_configured']);
         $this->assertSame('online', $readiness['worker_status']);
         $this->assertTrue($readiness['ready']);
+    }
+
+    /** @test */
+    public function a_non_redis_queue_driver_is_not_ready_in_async_mode_even_with_a_worker_heartbeat(): void
+    {
+        $auth = $this->authorizedTenant('gov-database-queue');
+        $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini');
+        $this->seedWorkerHeartbeat();
+        config()->set('document_center.ai.provider_network_enabled', true);
+        config()->set('queue.default', 'database');
+
+        $readiness = $this->governance($auth['token'])['extraction_readiness'];
+
+        $this->assertTrue($readiness['queue_async']);
+        $this->assertFalse($readiness['queue_configured']);
+        $this->assertSame('online', $readiness['worker_status']);
+        $this->assertFalse($readiness['ready']);
+    }
+
+    /** @test */
+    public function redis_without_a_url_is_not_ready_in_async_mode_even_with_a_worker_heartbeat(): void
+    {
+        $auth = $this->authorizedTenant('gov-redis-no-url');
+        $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini');
+        $this->seedWorkerHeartbeat();
+        config()->set('document_center.ai.provider_network_enabled', true);
+        config()->set('queue.default', 'redis');
+        config()->set('database.redis.default.url', null);
+
+        $readiness = $this->governance($auth['token'])['extraction_readiness'];
+
+        $this->assertTrue($readiness['queue_async']);
+        $this->assertFalse($readiness['queue_configured']);
+        $this->assertFalse($readiness['ready']);
     }
 
     /** @test */
@@ -217,6 +255,12 @@ class DocumentGovernanceReadinessTest extends TestCase
     private function governance(string $token): array
     {
         return $this->withToken($token)->getJson('/api/document-governance')->assertOk()['data'];
+    }
+
+    private function configureRedisQueue(): void
+    {
+        config()->set('queue.default', 'redis');
+        config()->set('database.redis.default.url', 'redis://127.0.0.1:6379');
     }
 
     private function seedDocumentAi(bool $engineEnabled, ?string $primary, string $processingMode = 'async'): void

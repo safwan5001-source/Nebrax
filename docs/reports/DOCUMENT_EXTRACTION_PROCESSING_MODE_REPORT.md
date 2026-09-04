@@ -27,7 +27,7 @@
 جاهزية الاستخراج واعية بالنمط:
 
 - **SYNC:** شبكة مفتوحة + محرك مفعّل + مزود أساسي جاهز. لا يُشترط طابور ولا عامل.
-- **ASYNC:** الشروط الثلاثة + `queue.default !== 'sync'` + نبضة عامل `online` (إغلاق آمن إن غابت).
+- **ASYNC:** الشروط الثلاثة + طابور Redis مضبوط فعلياً (`queue_configured`: redis + URL، لا مجرد `!== 'sync'`) + نبضة عامل `online`. سائق غير Redis أو غياب URL أو غياب النبضة ⇒ غير جاهز.
 
 إصلاح تشخيصي مرافق: `DocumentDiagnosticsService` يشتق `worker_online` من `runtime.worker_status` بدل مفتاح غير موجود.
 

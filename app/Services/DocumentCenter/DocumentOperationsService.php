@@ -107,6 +107,7 @@ final class DocumentOperationsService
      * لقطة الجاهزية نفسها التي يقرر بها مسار العمليات جدولة الاستخراج
      * (`tenantOverview` → `processing_status`). الأعلام ليست سياسة ثانية.
      * نمط التنفيذ من إعداد المنصة؛ طابور Laravel `sync` ليس نمط التطبيق.
+     * ASYNC جاهز فقط مع Redis مضبوط (`queue_configured`) ونبضة عامل.
      *
      * @return array{
      *     processing_mode: string,
@@ -139,9 +140,10 @@ final class DocumentOperationsService
         $safetyScanReady = $this->settings->activeConfiguration('malware_scanner') !== []
             && $this->settings->activeConfiguration('document_processing') !== [];
         $coreReady = ! $networkLocked && $engineEnabled && $primaryReady;
+        // ASYNC: Redis مضبوط فعلياً + نبضة عامل. Laravel `!== sync` ليس كافياً.
         $ready = $synchronous
             ? $coreReady
-            : $coreReady && $queueAsync && $workerOnline;
+            : $coreReady && $queueConfigured && $workerOnline;
 
         return [
             'processing_mode' => $processingMode,

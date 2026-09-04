@@ -239,6 +239,22 @@ class DocumentExtractionProcessingModeTest extends TestCase
             ->configuration['processing_mode']);
     }
 
+    /** @test */
+    public function an_invalid_processing_mode_is_rejected_on_save_and_the_stored_async_default_is_unchanged(): void
+    {
+        $this->configurePlatform('async');
+        [, $token] = $this->platformToken();
+        $payload = $this->documentAiPayload('async');
+        $payload['processing_mode'] = 'immediate';
+
+        $this->withToken($token)->putJson('/api/platform/integrations/document_ai', $payload)
+            ->assertStatus(422);
+
+        $this->assertSame('async', PlatformIntegrationSetting::query()
+            ->where('integration_key', 'document_ai')->firstOrFail()
+            ->configuration['processing_mode']);
+    }
+
     private function configurePlatform(string $mode): void
     {
         PlatformIntegrationSetting::create([
