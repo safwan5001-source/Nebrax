@@ -610,4 +610,59 @@ class PosCheckoutTest extends TestCase
         // المستأجر B لا يستطيع البيع لعميل المستأجر A، حتى مع جلسة POS تخصه.
         $this->checkout($b['token'], $partnerA, $sessionB, [$this->tender($cashForB, 11500)])->assertNotFound();
     }
+
+    /**
+     * R1: تعطيل المنتج بعد أن حمّلته سلة (أو تكامل) قديمة يجب أن يُرفض خادمياً حتى
+     * لو أرسل الطلب معرّفه صراحةً. فلترة الكتالوج في الواجهة ليست كافية.
+     *
+     * @test
+     */
+    public function it_rejects_a_direct_checkout_referencing_an_inactive_product(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $product = $this->product($auth['token'], 'صنف يُعطَّل', null);
+
+        $this->withToken($auth['token'])->putJson("/api/products/{$product['id']}", [
+            'name' => $product['name'], 'type' => 'good', 'sale_price' => 10000, 'is_active' => false,
+        ])->assertOk();
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)], [$this->productItem($product)])
+            ->assertStatus(422);
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
+    }
+
+    /**
+     * R1: نسبة الضريبة المرسلة من العميل استرشادية فقط — المصدر الوحيد للاحتساب
+     * المالي هو `tax_rate` المخزَّن على المنتج. طلب مباشر يخفّض النسبة إلى صفر
+     * (أو يرفعها) يُصحَّح خادمياً، ولا ينعكس على القيد أو إجمالي الفاتورة.
+     *
+     * @test
+     */
+    public function it_ignores_a_tampered_tax_rate_and_uses_the_products_authoritative_rate(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        // سعر المنتج الافتراضي 15% (Product::$attributes['tax_rate']).
+        $product = $this->product($auth['token'], 'صنف ضريبة موثوقة', null);
+
+        $tampered = ['product_id' => $product['id'], 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 0];
+        // يكفي مبلغ التحصيل ليغطي الإجمالي الصحيح (115.00) لا المتلاعَب به (100.00).
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)], [$tampered])
+            ->assertCreated()
+            ->assertJsonPath('data.total', '115.00');
+
+        $invoice = Invoice::where('pos_session_id', $sessionId)->sole();
+        $line = $invoice->lines()->sole();
+        $this->assertSame(15, $line->tax_rate);
+        $this->assertSame(1500, $line->line_tax);
+        $this->assertSame(11500, $invoice->total);
+    }
 }
