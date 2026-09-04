@@ -3,7 +3,7 @@
 **المهمة:** إعداد منصة `document_extraction.processing_mode` بأضيق نطاق آمن، مع الإبقاء على سياسة فحص البرمجيات الضارة كما هي.
 **الفرع:** `cursor/extraction-processing-mode-b8de`
 **Base SHA:** `61f4dc1e5a93c4dc44d25114e78262750545a36b` (`main`)
-**Head SHA:** `5ce34503542053c1a653dd8b272673b88c06eb85`
+**Head SHA:** `28a8fec77858aa9e29101144b7e8fe0dde30bafd`
 **PR:** [#640](https://github.com/safwan5001-source/Nebrax/pull/640) — للمراجعة فقط.
 
 **NOT MERGED / NOT DEPLOYED**
@@ -37,7 +37,7 @@
 
 ## دلالات التنفيذ الدقيقة
 
-### ASYNC (الافتراض، بلا تغيير سلوكي مقصود)
+### ASYNC (الافتراض)
 
 1. `DocumentFileIntakeService::complete()` ينتقل إلى `received` ثم `queueSafetyScans()`.
 2. إن لم يكن `document_processing` **و** `malware_scanner` مفعّلين: إعادة `0`، الملفات تبقى `PENDING`، لا تشغيل.
@@ -129,10 +129,10 @@
 
 | المجموعة | النتيجة |
 |---|---|
-| مركّز PHP (`DocumentExtractionProcessingModeTest` + `DocumentGovernanceReadinessTest` + فشل إعادة إرسال الحوكمة) | 20 نجح |
-| انحدار مركز المستندات / التكامل / Gemini / العزل | 76 ثم 36 بعد إصلاح الاستعلامات (نجح) |
-| `DocumentCenterPerformanceBaselineTest` | فشل أولاً (34 > 30 استعلاماً) ثم نجح بعد عدم استدعاء `runtime()` الكامل وتحميل صفوف التكامل دفعة واحدة |
-| `php artisan test` كاملاً | **2283 نجح، 1 متخطّى** (16164 assertion) |
+| مركّز PHP (`DocumentExtractionProcessingModeTest` + `DocumentGovernanceReadinessTest`) | 22 نجح |
+| انحدار مركز المستندات / التكامل / Gemini / العزل | 38 نجح |
+| `DocumentCenterPerformanceBaselineTest` | فشل أولاً على `2f0270e6` (34 > 30 استعلاماً) ثم نجح بعد عدم استدعاء `runtime()` الكامل وتحميل صفوف التكامل دفعة واحدة |
+| `php artisan test` كاملاً | **2286 نجح، 1 متخطّى** |
 | Vitest مركّز (تكاملات + إعدادات المستندات) | 11 نجح |
 | `npm test` كاملاً | **222 ملف / 1405 اختبار نجح** |
 | `npm run build` | نجح (Next.js 15.5.19، 150 صفحة) |
@@ -144,8 +144,8 @@
 ## البناء / CI
 
 - لا تعديل على `.github/workflows` أو `render.yaml` أو Railway.
-- CI الحالي عند الدفع: `php artisan test` على sqlite+pgsql، وبناء الواجهة عبر `web-ci.yml`.
-- الاشتراك على CI للفرع `cursor/extraction-processing-mode-b8de` فعّال للمراجعة.
+- CI على رأس الفرع `28a8fec7`: نجح PHP على sqlite وpgsql، ونجح بناء الواجهة.
+- فشل التنقيح الأول `2f0270e6` (حد الاستعلامات) لم يعد على الرأس.
 
 ---
 
@@ -185,7 +185,7 @@ https://github.com/safwan5001-source/Nebrax/pull/640
 
 ## Head SHA
 
-`5ce34503542053c1a653dd8b272673b88c06eb85`
+`28a8fec77858aa9e29101144b7e8fe0dde30bafd`
 
 ## الخطوة التالية الموصى بها
 
