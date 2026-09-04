@@ -3,7 +3,7 @@
 **المهمة:** إصلاح UX حفظ واختبار Google Gemini في منصة التشغيل (بطاقة المزود).
 **الفرع:** `cursor/gemini-integration-save-test-ux-90be`
 **Base SHA:** `46e81e5ba2d41a6d63e6f30fdd43079842797ac7` (`main`)
-**Head SHA:** يُحدَّث بعد دمج هذا التقرير في الـ commit.
+**Head SHA:** `3da1638a8d7c67c320390723894cbe25dce7fc32`
 **PR:** [#634](https://github.com/safwan5001-source/Nebrax/pull/634) — للمراجعة فقط.
 
 **NOT MERGED / NOT DEPLOYED**
