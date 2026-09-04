@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, Minus, Plus, RotateCcw } from 'lucide-react';
 import { PosDialog } from '@/components/pos/pos-dialog';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { PosCheckoutAttemptController } from '@/lib/pos-checkout-attempt';
 
 type RefundMethod = 'cash' | 'credit';
 
@@ -63,6 +64,9 @@ export function PosReturnDialog({
   const [quoting, setQuoting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // مفتاح محاولة مرتجع ثابت لكل فاتورة مختارة: يبقى نفسه عبر إعادة محاولة
+  // فشلت، ولا يتجدد إلا بعد نجاح أو تغيير الفاتورة (نية منطقية جديدة).
+  const returnAttemptRef = useRef(new PosCheckoutAttemptController());
 
   const chosenItems = useMemo(() => detail?.lines
     .filter((line) => (quantities[line.source_line_id] ?? 0) > 0)
@@ -79,6 +83,7 @@ export function PosReturnDialog({
     setLoadingInvoices(true);
     setError(null);
     setSelected(null); setDetail(null); setQuantities({}); setQuote(null); setMethod('cash');
+    returnAttemptRef.current.reset();
     api<{ data: ReturnableInvoice[] }>(`/pos/returnable-invoices?pos_session_id=${encodeURIComponent(sessionId)}`)
       .then((result) => { if (!cancelled) setInvoices(result.data); })
       .catch((err) => { if (!cancelled) setError(err instanceof ApiError ? err.message : tc('loadFailed')); })
@@ -104,6 +109,8 @@ export function PosReturnDialog({
   async function chooseInvoice(invoice: ReturnableInvoice) {
     if (!sessionId) return;
     setSelected(invoice); setDetail(null); setQuantities({}); setQuote(null); setError(null); setLoadingDetail(true);
+    // فاتورة أخرى = نية مرتجع منطقية جديدة، لا إعادة محاولة لنفس الطلب.
+    returnAttemptRef.current.reset();
     try {
       const result = await api<{ data: ReturnableInvoiceDetail }>(`/pos/returnable-invoices/${invoice.id}?pos_session_id=${encodeURIComponent(sessionId)}`);
       setDetail(result.data);
@@ -124,11 +131,15 @@ export function PosReturnDialog({
   async function submit() {
     if (!sessionId || !selected || !hasItems || cashBlocked || quoting) return;
     setSubmitting(true); setError(null);
+    // مفتاح ثابت طوال محاولات هذا المرتجع: يحمي من مرتجع مضاعف إن ضاعت
+    // الاستجابة الأولى ثم أعاد الكاشير الإرسال (double-submit/retry).
+    const idempotencyKey = returnAttemptRef.current.ensure();
     try {
       const result = await api<{ data: { number: string } }>('/pos/returns', {
         method: 'POST',
-        body: { pos_session_id: sessionId, original_invoice_id: selected.id, payment_type: method, items: chosenItems },
+        body: { idempotency_key: idempotencyKey, pos_session_id: sessionId, original_invoice_id: selected.id, payment_type: method, items: chosenItems },
       });
+      returnAttemptRef.current.resetAfterSuccess();
       onReturned(result.data.number);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));

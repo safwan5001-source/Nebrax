@@ -19,6 +19,10 @@ class StorePosReturnRequest extends FormRequest
     public function rules(): array
     {
         return [
+            // R4 — مفتاح محاولة منطقية ثابتة: إعادة الإرسال بنفس المفتاح لا
+            // تنشئ مرتجعاً ثانياً. المصدر السلطوي الوحيد لحماية مرتجع POS من
+            // التكرار عند فقدان الاستجابة ثم إعادة المحاولة.
+            'idempotency_key'    => ['required', 'uuid'],
             'pos_session_id'     => ['required', 'uuid'],
             'original_invoice_id' => ['required', 'uuid'],
             'payment_type'       => ['required', 'in:cash,credit'],

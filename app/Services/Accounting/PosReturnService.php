@@ -2,16 +2,21 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\Branch;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PosExchange;
+use App\Models\PosReturnAttempt;
 use App\Models\PosSession;
 use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
 use App\Models\User;
 use App\Services\Pos\PosAuditService;
+use App\Services\Pos\PosIdempotencyConflictException;
 use App\Support\PosSettings;
+use App\Tenancy\BranchContext;
 use App\Tenancy\BranchScope;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -21,6 +26,15 @@ use RuntimeException;
  * لا يملك هذا المسار منطق قيد أو مخزون مستقلاً: يبني لقطة سطور مرتجعة من
  * فاتورة POS المصدر، ثم يستدعي ReturnService ليُنشئ ويرحّل المستند عبر
  * LedgerService. وظيفته الخاصة هي صحة سياق الجلسة، سياسة رد النقد، وسجل التدقيق.
+ *
+ * ═══════════════════════════════════════════════════════════════
+ *  R4 — idempotency durable على نمط PosService::checkout تماماً
+ * ═══════════════════════════════════════════════════════════════
+ *  `create()` يفعّل الحماية **فقط حين يصل `idempotency_key` في `$data`** —
+ *  مسار الواجهة العامة (`StorePosReturnRequest`) يُلزمه، فيمرّ دوماً. أما
+ *  استدعاء `PosExchangeService` الداخلي فلا يمرّره أصلاً: الاستبدال يحمي
+ *  العملية الذرية الكاملة (مرتجع + بديل) بمرساته الخاصة `PosExchangeAttempt`،
+ *  فحماية مزدوجة هنا كانت ستطلب من العميل مفتاحين لعملية منطقية واحدة.
  */
 class PosReturnService
 {
@@ -64,42 +78,161 @@ class PosReturnService
 
     public function create(array $data, User $actor): ReturnDocument
     {
-        return DB::transaction(function () use ($data, $actor) {
-            $quote = $this->quote($data, $actor);
-            /** @var PosSession $session */
-            $session = $quote['session'];
-            /** @var Invoice $invoice */
-            $invoice = $quote['invoice'];
-            $items = $quote['items'];
+        $idempotencyKey = $data['idempotency_key'] ?? null;
+        if (! is_string($idempotencyKey) || $idempotencyKey === '') {
+            return DB::transaction(fn () => $this->buildAndPostReturn($data, $actor));
+        }
 
-            if ($data['payment_type'] === 'cash' && $quote['cash_block_reason'] !== null) {
-                throw new RuntimeException($quote['cash_block_reason']);
+        $idempotencyKey = $this->requireIdempotencyKey($idempotencyKey);
+        $checksum = $this->returnRequestChecksum($data);
+
+        try {
+            return DB::transaction(function () use ($data, $actor, $idempotencyKey, $checksum) {
+                // مرساة ثابتة لكل فرع: تمنع سباق المفتاح نفسه حتى مع جلسات متوازية.
+                $branchId = app(BranchContext::class)->id();
+                if (! is_string($branchId) || $branchId === '') {
+                    throw new RuntimeException('فرع نقطة البيع غير محدد.');
+                }
+                Branch::query()->whereKey($branchId)->lockForUpdate()->firstOrFail();
+
+                $existing = PosReturnAttempt::query()
+                    ->where('idempotency_key', $idempotencyKey)
+                    ->lockForUpdate()
+                    ->first();
+                if ($existing !== null) {
+                    if (! hash_equals($existing->request_checksum, $checksum)) {
+                        throw new PosIdempotencyConflictException('تم استخدام مفتاح إعادة الطلب مع محتوى مختلف.');
+                    }
+
+                    return $this->replayReturnAttempt($existing);
+                }
+
+                $return = $this->buildAndPostReturn($data, $actor);
+
+                PosReturnAttempt::withWriting(fn () => PosReturnAttempt::create([
+                    'idempotency_key' => $idempotencyKey,
+                    'request_checksum' => $checksum,
+                    'return_id' => $return->id,
+                    'pos_session_id' => $return->pos_session_id,
+                    'created_by' => $actor->id,
+                    'created_at' => now(),
+                ]));
+
+                return $return;
+            });
+        } catch (QueryException $exception) {
+            // سباق متزامن على نفس المفتاح: القيد الفريد يمنع الصف المكرر؛
+            // نعيد المرتجع الفائز بدل 500 كي تبقى إعادة المحاولة Idempotent.
+            if ($this->isUniqueConstraintViolation($exception)) {
+                $existing = PosReturnAttempt::query()
+                    ->where('idempotency_key', $idempotencyKey)
+                    ->first();
+                if ($existing !== null) {
+                    if (! hash_equals($existing->request_checksum, $checksum)) {
+                        throw new PosIdempotencyConflictException('تم استخدام مفتاح إعادة الطلب مع محتوى مختلف.');
+                    }
+
+                    return $this->replayReturnAttempt($existing);
+                }
             }
+            throw $exception;
+        }
+    }
 
-            // Phase 4 — سياسة `refund` (افتراضها «مسموح» يحفظ سلوك كل مستأجر
-            // قائم). تُستهلك قبل إنشاء أي مستند، لا بعده.
-            $this->audit->enforceOperationPolicy($session, $actor, 'refund', $data['approval_id'] ?? null);
+    /** يبني ويرحّل مستند المرتجع — منطق الإنشاء الفعلي، بمعزل عن طبقة idempotency. */
+    private function buildAndPostReturn(array $data, User $actor): ReturnDocument
+    {
+        $quote = $this->quote($data, $actor);
+        /** @var PosSession $session */
+        $session = $quote['session'];
+        /** @var Invoice $invoice */
+        $invoice = $quote['invoice'];
+        $items = $quote['items'];
 
-            $return = $this->returns->create([
-                'type' => 'sales',
-                'partner_id' => $invoice->partner_id,
-                'warehouse_id' => $session->warehouse_id,
-                'pos_session_id' => $session->id,
-                'payment_type' => $data['payment_type'],
-                'tax_inclusive' => $invoice->tax_inclusive,
-                'return_date' => now()->toDateString(),
-                'restock' => $data['restock'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'original_id' => $invoice->id,
-                'original_type' => Invoice::class,
-                'created_by' => $actor->id,
-            ], $items);
+        if ($data['payment_type'] === 'cash' && $quote['cash_block_reason'] !== null) {
+            throw new RuntimeException($quote['cash_block_reason']);
+        }
 
-            $posted = $this->returns->post($return);
-            $this->sessions->recordReturn($session, $posted, $actor);
+        // Phase 4 — سياسة `refund` (افتراضها «مسموح» يحفظ سلوك كل مستأجر
+        // قائم). تُستهلك قبل إنشاء أي مستند، لا بعده.
+        $this->audit->enforceOperationPolicy($session, $actor, 'refund', $data['approval_id'] ?? null);
 
-            return $posted;
-        });
+        $return = $this->returns->create([
+            'type' => 'sales',
+            'partner_id' => $invoice->partner_id,
+            'warehouse_id' => $session->warehouse_id,
+            'pos_session_id' => $session->id,
+            'payment_type' => $data['payment_type'],
+            'tax_inclusive' => $invoice->tax_inclusive,
+            'return_date' => now()->toDateString(),
+            'restock' => $data['restock'] ?? null,
+            'notes' => $data['notes'] ?? null,
+            'original_id' => $invoice->id,
+            'original_type' => Invoice::class,
+            'created_by' => $actor->id,
+        ], $items);
+
+        $posted = $this->returns->post($return);
+        $this->sessions->recordReturn($session, $posted, $actor);
+
+        return $posted;
+    }
+
+    private function replayReturnAttempt(PosReturnAttempt $attempt): ReturnDocument
+    {
+        $return = ReturnDocument::query()->with('lines')->findOrFail($attempt->return_id);
+        $return->setAttribute('idempotent_replay', true);
+
+        return $return;
+    }
+
+    private function requireIdempotencyKey(mixed $key): string
+    {
+        if (! is_string($key) || $key === '' || ! preg_match('/^[0-9a-fA-F-]{36}$/', $key)) {
+            throw new RuntimeException('مفتاح إعادة المحاولة مطلوب ويجب أن يكون UUID صالحاً.');
+        }
+
+        return $key;
+    }
+
+    /**
+     * checksum دلالي مستقر لحمولة المرتجع — لا يشمل الفاعل أو approval_id
+     * (قرار تفويض، لا محتوى العملية المالية نفسها؛ نظير استبعاد `actor` في
+     * `PosService::checkoutRequestChecksum`).
+     */
+    private function returnRequestChecksum(array $data): string
+    {
+        $items = [];
+        foreach ($data['items'] ?? [] as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $items[] = [
+                'source_line_id' => $item['source_line_id'] ?? null,
+                'quantity' => (int) ($item['quantity'] ?? 0),
+            ];
+        }
+        usort($items, fn (array $a, array $b) => strcmp((string) $a['source_line_id'], (string) $b['source_line_id']));
+
+        $payload = [
+            'pos_session_id' => $data['pos_session_id'] ?? null,
+            'original_invoice_id' => $data['original_invoice_id'] ?? null,
+            'payment_type' => $data['payment_type'] ?? null,
+            'restock' => array_key_exists('restock', $data) ? (bool) $data['restock'] : null,
+            'notes' => $data['notes'] ?? null,
+            'items' => $items,
+        ];
+
+        return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+    }
+
+    private function isUniqueConstraintViolation(QueryException $e): bool
+    {
+        $sqlState = (string) ($e->errorInfo[0] ?? '');
+        $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+        // PostgreSQL unique_violation = 23505 · SQLite constraint = 19
+        return $sqlState === '23505' || $driverCode === 19 || str_contains(strtolower($e->getMessage()), 'unique');
     }
 
     private function assertSourceMatchesSession(Invoice $invoice, PosSession $session): void
