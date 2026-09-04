@@ -127,9 +127,9 @@ export const MINIMAL_STYLE: TemplateStyle = {
  */
 export const MINIMAL_V2_STYLE: TemplateStyle = {
   composition: 'minimal_v2',
-  pagePadding: 'p-10',
+  pagePadding: 'p-8',
   cardRadius: 'rounded-none',
-  sectionGap: 'mt-6',
+  sectionGap: 'mt-5',
   tableHead: 'plain',
   tableDensity: 'spacious',
   brandBar: false,

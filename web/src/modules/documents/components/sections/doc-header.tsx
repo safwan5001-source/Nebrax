@@ -304,8 +304,8 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
     const logoHeight = cappedMinimalLogoHeight(seller.logoHeight);
     const invoiceNumberField = isTaxInvoice ? 'number' as const : 'document_number' as const;
     return (
-      <header className="border-b border-[color:var(--border)] pb-5">
-        <div className="flex items-start justify-between gap-10">
+      <header className="border-b border-[color:var(--border)] pb-4">
+        <div className="flex items-start justify-between gap-8">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             {showLogo && seller.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL؛ لا يناسبه next/image

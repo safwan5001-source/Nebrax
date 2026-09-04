@@ -1285,6 +1285,7 @@
     "download_pdf": "Download PDF",
     "preview_label": "Document preview",
     "scenario_single": "Single line",
+    "scenario_three": "3 lines",
     "scenario_five": "5 lines",
     "scenario_twenty": "20 lines",
     "scenario_multipage": "Multi-page",
