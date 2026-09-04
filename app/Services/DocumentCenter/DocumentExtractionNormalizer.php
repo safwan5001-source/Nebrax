@@ -73,7 +73,16 @@ final class DocumentExtractionNormalizer
         ];
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * عقد JSON Schema القياسي — يستهلكه OpenAI (`strict: true`, يفرض
+     * `additionalProperties: false` ووجود كل خاصية في `required`، وتُعبَّر
+     * القابلية للـ null بمصفوفة `type`) وAnthropic (أداة `input_schema` بمخطط
+     * JSON Schema عادي). كلا المزودين يقبل مصفوفات `type` و`additionalProperties`
+     * فلا يُعدَّل هذا العقد — Gemini وحده يحتاج لهجة مختلفة، انظر
+     * `geminiResponseSchema()` أدناه.
+     *
+     * @return array<string, mixed>
+     */
     public static function jsonSchema(): array
     {
         return [
@@ -86,6 +95,31 @@ final class DocumentExtractionNormalizer
                 'confidence' => ['type' => ['string', 'null']],
                 'fields' => ['type' => 'object'],
                 'lines' => ['type' => 'array', 'maxItems' => 200],
+                'warnings' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string']],
+            ],
+        ];
+    }
+
+    /**
+     * نفس عقد `jsonSchema()` منطقياً، بلهجة Gemini `responseSchema` (مجموعة فرعية
+     * من OpenAPI 3.0 لا JSON Schema الكامل): `type` قيمة واحدة لا مصفوفة —
+     * القابلية للـ null عبر `nullable: true` صراحةً — و`additionalProperties`
+     * ليست من مفاتيح هذه اللهجة فلا تُرسَل، وكل عقدة `array` تلزمها `items`
+     * صراحةً. لا يستهلك هذه الدالة إلا GoogleGeminiDocumentExtractionProvider.
+     *
+     * @return array<string, mixed>
+     */
+    public static function geminiResponseSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'required' => ['document_type', 'language', 'confidence', 'fields', 'lines', 'warnings'],
+            'properties' => [
+                'document_type' => ['type' => 'string', 'nullable' => true],
+                'language' => ['type' => 'string', 'nullable' => true],
+                'confidence' => ['type' => 'string', 'nullable' => true],
+                'fields' => ['type' => 'object'],
+                'lines' => ['type' => 'array', 'maxItems' => 200, 'items' => ['type' => 'object']],
                 'warnings' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string']],
             ],
         ];
