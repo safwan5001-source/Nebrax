@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\Branch;
 use App\Models\Invoice;
+use App\Models\Partner;
 use App\Models\PaymentMethod;
 use App\Models\PosCheckoutAttempt;
 use App\Models\PriceList;
@@ -169,6 +170,11 @@ class PosService
             $data['created_by'] ?? null,
             $data['actor'] ?? null,
         );
+
+        // R6 — أهلية العميل خادمية قبل أي فاتورة: منتقي الواجهة ليس مصدر الثقة،
+        // وطلبٌ مباشر بمعرّف مورّد أو عميل معطّل يجب أن يُرفض هنا، لا أن يُقبل
+        // ثم يُفسَّر لاحقاً. الشرط نفسه المستعمل للعميل الافتراضي في إعدادات POS.
+        $this->assertCustomerEligibleForPos($data['partner_id']);
 
         // سياسات الكتالوج وسعر الوحدة والخصم خادمية قبل أي فاتورة أو حركة
         // مخزون؛ لا يكفي إخفاؤها في الواجهة لأن التكامل أو الطلب اليدوي قد يتجاوزه.
@@ -395,6 +401,23 @@ class PosService
 
         // PostgreSQL unique_violation = 23505 · SQLite constraint = 19
         return $sqlState === '23505' || $driverCode === 19 || str_contains(strtolower($e->getMessage()), 'unique');
+    }
+
+    /**
+     * R6 — يرفض عميلاً غير مؤهل لنقطة البيع: معطّل، أو مورّد صرف بلا صفة عميل.
+     * `PosController::checkout()` يتحقق فقط من وجود الطرف ضمن المستأجر
+     * (`Partner::findOrFail`) — لا من أهليته كعميل POS — فهذا التحقق الوحيد
+     * لذلك الشرط، ويشترك في نفس القاعدة مع العميل الافتراضي
+     * (`PosSettings::isEligibleCustomer`، المستعملة أيضاً في
+     * `SalesConfigController::findEligiblePosCustomer`). يُنفَّذ قبل أي قائمة
+     * سعر أو فاتورة، فلا يترك أثراً ماليّاً لطلبٍ بعميل غير صالح.
+     */
+    private function assertCustomerEligibleForPos(string $partnerId): void
+    {
+        $partner = Partner::find($partnerId);
+        if ($partner === null || ! PosSettings::isEligibleCustomer($partner)) {
+            throw new RuntimeException('العميل المحدد غير مؤهل للبيع في نقطة البيع.');
+        }
     }
 
     /**

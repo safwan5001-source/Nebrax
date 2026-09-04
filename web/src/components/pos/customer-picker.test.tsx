@@ -27,8 +27,9 @@ describe('CustomerPickerDialog', () => {
   beforeEach(() => {
     mocks.api.mockResolvedValue({
       data: [
-        { id: 'customer-1', name: 'Walk-in · Cash', type: 'customer' },
-        { id: 'supplier-1', name: 'Supplier', type: 'supplier' },
+        { id: 'customer-1', name: 'Walk-in · Cash', type: 'customer', is_active: true },
+        { id: 'supplier-1', name: 'Supplier', type: 'supplier', is_active: true },
+        { id: 'customer-2', name: 'Inactive Customer', type: 'customer', is_active: false },
       ],
     });
   });
@@ -37,13 +38,14 @@ describe('CustomerPickerDialog', () => {
     vi.clearAllMocks();
   });
 
-  it('يعرض العملاء المسجلين فقط ويعيد مرجع العميل المختار', async () => {
+  it('يعرض العملاء النشطين فقط ويعيد مرجع العميل المختار', async () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
     render(<CustomerPickerDialog open onSelect={onSelect} onClose={onClose} />);
 
     const customer = await screen.findByRole('button', { name: 'Walk-in · Cash' });
     expect(screen.queryByRole('button', { name: 'Supplier' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Inactive Customer' })).toBeNull();
 
     fireEvent.click(customer);
 

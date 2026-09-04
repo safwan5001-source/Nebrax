@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Partner;
 use App\Models\Tenant;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -225,6 +226,18 @@ final class PosSettings
     public static function allowsDiscount(?Tenant $tenant = null): bool
     {
         return self::group($tenant)['allow_discount'] !== false;
+    }
+
+    /**
+     * R6 — الأهلية القانونية لطرف عميل POS: نشط ونوعه عميل أو كلاهما. لا مورّد
+     * صرف، ولا طرف معطّل — بصرف النظر عن مصدر الطلب (منتقي الواجهة أو طلب API
+     * مباشر بمعرّف مصنوع). هذا المرجع الوحيد للشرط: يستعمله كذلك تطبيع العميل
+     * الافتراضي في `SalesConfigController::findEligiblePosCustomer()`، فلا
+     * يوجد شرطان مختلفان لنفس السؤال في الكود.
+     */
+    public static function isEligibleCustomer(Partner $partner): bool
+    {
+        return $partner->is_active && in_array($partner->type, ['customer', 'both'], true);
     }
 
     /** البيع المؤجل سياسة صريحة؛ القيمة غير المعروفة تورّث الإتاحة التاريخية. */

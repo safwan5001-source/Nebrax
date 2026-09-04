@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { api, ApiError } from '@/lib/api';
 
 export interface PosCustomer { id: string; name: string }
-interface Partner { id: string; name: string; type: string; phone?: string | null }
+interface Partner { id: string; name: string; type: string; phone?: string | null; is_active: boolean }
 
 /**
  * منتقي عميل نقطة البيع: بحث في العملاء الحاليين وإضافة صريحة عند الحاجة.
@@ -38,8 +38,10 @@ export function CustomerPickerDialog({
   useEffect(() => {
     if (!open) return;
     setQ(''); setAdding(false); setNewName(''); setNewPhone(''); setError(null);
+    // R6 — الخادم هو الحكم الفعلي عند التحصيل؛ هذا الفلتر تحسين تجربة فقط
+    // كي لا يظهر عميل معطّل أو مورّد صرف في منتقي الكاشير أصلاً.
     api<{ data: Partner[] }>('/partners')
-      .then((r) => setPartners(r.data.filter((p) => ['customer', 'both'].includes(p.type))))
+      .then((r) => setPartners(r.data.filter((p) => p.is_active && ['customer', 'both'].includes(p.type))))
       .catch(() => {});
   }, [open]);
 

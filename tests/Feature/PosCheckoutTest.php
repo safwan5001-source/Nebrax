@@ -665,4 +665,92 @@ class PosCheckoutTest extends TestCase
         $this->assertSame(1500, $line->line_tax);
         $this->assertSame(11500, $invoice->total);
     }
+
+    private function partner(array $auth, string $name, string $type, bool $isActive = true): array
+    {
+        $partner = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => $name, 'type' => $type,
+        ])->assertCreated()['data'];
+
+        if (! $isActive) {
+            \App\Models\Partner::whereKey($partner['id'])->update(['is_active' => false]);
+        }
+
+        return $partner;
+    }
+
+    /**
+     * R6: الأهلية القانونية لعميل POS (نظير `PosSettings::isEligibleCustomer`،
+     * المستعملة أيضاً للعميل الافتراضي في إعدادات POS) — نشط ونوعه عميل أو
+     * كلاهما. طلب مباشر بمعرّف طرف غير مؤهل يُرفض قبل أي فاتورة، بصرف النظر
+     * عمّا يعرضه منتقي الواجهة.
+     *
+     * @test
+     */
+    public function checkout_accepts_an_active_customer_or_both_type_partner(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+
+        $customer = $this->partner($auth, 'عميل نشط', 'customer');
+        $this->checkout($auth['token'], $customer['id'], $sessionId, [$this->tender($cash, 11500)])
+            ->assertCreated();
+
+        $both = $this->partner($auth, 'عميل ومورّد نشط', 'both');
+        $this->checkout($auth['token'], $both['id'], $sessionId, [$this->tender($cash, 11500)])
+            ->assertCreated();
+
+        $this->assertSame(2, Invoice::where('pos_session_id', $sessionId)->count());
+    }
+
+    /** @test */
+    public function checkout_rejects_an_inactive_customer_reached_through_a_direct_request(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $customer = $this->partner($auth, 'عميل معطّل', 'customer', isActive: false);
+
+        $this->checkout($auth['token'], $customer['id'], $sessionId, [$this->tender($cash, 11500)])
+            ->assertStatus(422);
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+        $this->assertSame(0, Payment::where('pos_session_id', $sessionId)->count());
+    }
+
+    /** @test */
+    public function checkout_rejects_an_inactive_both_type_partner(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $both = $this->partner($auth, 'عميل ومورّد معطّل', 'both', isActive: false);
+
+        $this->checkout($auth['token'], $both['id'], $sessionId, [$this->tender($cash, 11500)])
+            ->assertStatus(422);
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+    }
+
+    /**
+     * الحالة الحرجة من التدقيق: مورّد بحت غير معروض أصلاً في منتقي POS، لكن
+     * معرّفه معروف (تسريب، تخمين، أو تكامل خارجي) يجب أن يُرفض السطر الأخير من
+     * الدفاع — الخادم، لا الواجهة.
+     *
+     * @test
+     */
+    public function checkout_rejects_a_supplier_only_partner_via_a_crafted_request(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $supplier = $this->partner($auth, 'مورّد بحت', 'supplier');
+
+        $this->checkout($auth['token'], $supplier['id'], $sessionId, [$this->tender($cash, 11500)])
+            ->assertStatus(422);
+        $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
+    }
 }
