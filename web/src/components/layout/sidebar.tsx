@@ -96,7 +96,7 @@ interface NavItem {
    * `Rbac::allows` نفسها (`hasPermission`)، فلا يظهر رابط يردّ مساره 403.
    */
   permission?: string;
-  /** يفتح الرابط في تبويب جديد (بدء البيع فقط). */
+  /** يفتح الرابط في تبويب جديد. «بدء البيع» يبقى في نفس التبويب. */
   openInNewTab?: boolean;
 }
 

@@ -21,14 +21,32 @@ export async function fillAndSubmitOpenSellingSession(page: Page) {
   await page.getByRole('button', { name: POS_OPEN_SESSION_SUBMIT }).click();
 }
 
-/** يدخل مساحة البيع: يستأنف الجلسة القائمة أو يفتح واحدة عبر /pos/start. */
+/**
+ * يدخل مساحة البيع على نفس كائن الصفحة الذي يستخدمه الاختبار.
+ * فتح الجلسة من `/pos/start` يفتح `/pos` في تبويب جديد؛ نغلق ذلك التبويب
+ * ثم نوجّه صفحة الاختبار إلى `/pos` حتى تبقى مواصفات POS الحالية صالحة.
+ */
 export async function openPosSellingWorkspace(page: Page) {
   await page.goto('/pos', { waitUntil: 'load' });
   const search = page.getByPlaceholder(POS_SEARCH);
   const startTitle = page.getByRole('heading', { name: POS_OPEN_SESSION_TITLE });
-  await expect(search.or(startTitle)).toBeVisible({ timeout: 30_000 });
-  if (await startTitle.isVisible().catch(() => false) && !(await search.isVisible().catch(() => false))) {
-    await fillAndSubmitOpenSellingSession(page);
+  const resume = page.getByTestId('pos-resume-selling');
+  await expect(search.or(startTitle).or(resume)).toBeVisible({ timeout: 30_000 });
+  if (await search.isVisible().catch(() => false)) return;
+
+  if (await resume.isVisible().catch(() => false)) {
+    await page.goto('/pos', { waitUntil: 'load' });
+    await expect(page.getByPlaceholder(POS_SEARCH)).toBeVisible({ timeout: 30_000 });
+    return;
   }
+
+  const popupPromise = page.context().waitForEvent('page');
+  await fillAndSubmitOpenSellingSession(page);
+  const popup = await popupPromise.catch(() => null);
+  if (popup && popup !== page) {
+    await popup.waitForLoadState('domcontentloaded').catch(() => undefined);
+    await popup.close().catch(() => undefined);
+  }
+  await page.goto('/pos', { waitUntil: 'load' });
   await expect(page.getByPlaceholder(POS_SEARCH)).toBeVisible({ timeout: 30_000 });
 }
