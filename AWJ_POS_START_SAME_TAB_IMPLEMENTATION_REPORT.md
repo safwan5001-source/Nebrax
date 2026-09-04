@@ -88,7 +88,19 @@ Covered:
 7. 422 adoption assigns `/pos` on the dedicated tab.
 8. Direct `/pos` no-session guard still `replace`s to `/pos/start` (source assertion on `pos/page.tsx`).
 
-Playwright `pos-dedicated-workspace.spec.ts` was updated for the new contract. It was not executed in this environment (no full Laravel+Next demo stack in this run). Web CI is the production build.
+Playwright Chromium (against `next start` on `:3011`, demo `mockApi`):
+
+```
+npx playwright test e2e/pos-dedicated-workspace.spec.ts --project=desktop --config=playwright.reuse.config.ts
+```
+
+(`playwright.config.ts` `webServer` binds `:3001` which was occupied by a stuck `next dev`; the runner used an already-started production server. Config file was not committed.)
+
+**3 passed (4.2s)** — desktop project:
+
+1. بدء البيع → `/pos/start` same tab with admin sidebar; existing session resume opens `/pos` in a new tab; original stays on `/pos/start`.
+2. Forced-empty form submit opens `/pos` in a new tab; original stays on `/pos/start`.
+3. Forced POST failure stays on `/pos/start` with error; no leftover `/pos` or orphan tab.
 
 ## Build result
 
@@ -111,7 +123,7 @@ No backend test changes; PHP jobs are unchanged from `main` besides this fronten
 - **Existing session on load:** one extra click on the resume control (cannot auto-open a tab without a gesture).
 - **POS tab with no session:** `replace('/pos/start')` now loads admin chrome in that tab (same URL, `(app)` layout). Acceptable per the approved plan; the dedicated `/pos` workspace itself is unchanged.
 - **`pos-cart-snapshot.ts` / legacy `shift_id`:** untouched; still a separate follow-up.
-- Live browser QA of the two-tab flow was not run here (unit tests + production build only).
+- Live browser QA of the two-tab flow: Playwright Chromium **3/3 passed** on `pos-dedicated-workspace.spec.ts`.
 
 ## Confirmation: no backend / accounting / API / database changes
 
