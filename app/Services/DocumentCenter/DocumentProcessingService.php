@@ -2,6 +2,7 @@
 
 namespace App\Services\DocumentCenter;
 
+use App\Contracts\DocumentSafetyScanner;
 use App\Jobs\DocumentCenter\ScanDocumentFile;
 use App\Models\DocumentBatch;
 use App\Models\DocumentFile;
@@ -11,22 +12,31 @@ use App\Support\DocumentProcessingStatus;
 use App\Support\DocumentScanStatus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Throwable;
 
 class DocumentProcessingService
 {
     public const STAGE_SAFETY_SCAN = 'safety_scan';
 
-    public function __construct(private readonly PlatformIntegrationResolver $settings)
-    {
+    public function __construct(
+        private readonly PlatformIntegrationResolver $settings,
+        private readonly DocumentStorageService $storage,
+        private readonly DocumentSafetyScanner $scanner,
+        private readonly DocumentFileScanService $scans,
+    ) {
     }
 
     public function queueSafetyScans(DocumentBatch $batch): int
     {
-        // البنية جاهزة، لكن التشغيل يبقى opt-in. لا ننشئ محاولات معلقة
-        // قبل تفعيل السياسة من منصة الإدارة وتجهيز Queue/Worker فعليين.
-        if (config('queue.default') === 'sync'
-            || $this->settings->activeConfiguration('document_processing') === []
+        // الفاحص ومعالجة الخلفية يبقيان إلزاميين. تعطيل الفاحص يترك الملفات PENDING
+        // ويمنع الاستخراج — لا يُعلَّم ملف CLEAN دون فحص.
+        if ($this->settings->activeConfiguration('document_processing') === []
             || $this->settings->activeConfiguration('malware_scanner') === []) {
+            return 0;
+        }
+
+        $synchronous = $this->settings->documentProcessingMode() === DocumentExtractionPolicy::MODE_SYNC;
+        if (! $synchronous && config('queue.default') === 'sync') {
             return 0;
         }
 
@@ -34,7 +44,7 @@ class DocumentProcessingService
         $batch->files()
             ->where('scan_status', DocumentScanStatus::PENDING->value)
             ->orderBy('created_at')
-            ->each(function (DocumentFile $file) use ($batch, &$dispatched): void {
+            ->each(function (DocumentFile $file) use ($batch, $synchronous, &$dispatched): void {
                 $run = DocumentProcessingRun::query()->firstOrCreate(
                     [
                         'document_file_id' => $file->id,
@@ -53,21 +63,52 @@ class DocumentProcessingService
 
                 $jobUuid = (string) Str::uuid();
                 $run->fill(['job_uuid' => $jobUuid])->save();
-                $policy = $this->settings->processingPolicy();
-                ScanDocumentFile::dispatch(
-                    $run->tenant_id,
-                    $run->branch_id,
-                    $run->id,
-                    $file->id,
-                    $jobUuid,
-                    $policy['backoff_seconds'],
-                    $policy['max_attempts'],
-                    $policy['timeout_seconds'],
-                )->onQueue('documents');
+                if ($synchronous) {
+                    $this->executeSafetyScanSynchronously($run, $file, $jobUuid);
+                } else {
+                    $policy = $this->settings->processingPolicy();
+                    ScanDocumentFile::dispatch(
+                        $run->tenant_id,
+                        $run->branch_id,
+                        $run->id,
+                        $file->id,
+                        $jobUuid,
+                        $policy['backoff_seconds'],
+                        $policy['max_attempts'],
+                        $policy['timeout_seconds'],
+                    )->onQueue('documents');
+                }
                 $dispatched++;
             });
 
         return $dispatched;
+    }
+
+    public function executeSafetyScanSynchronously(DocumentProcessingRun $run, DocumentFile $file, string $jobUuid): void
+    {
+        $claimed = $this->claim($run->id, $jobUuid);
+        if ($claimed === null) {
+            return;
+        }
+
+        try {
+            $scanned = $this->scans->scanAndRecord($file, $this->storage, $this->scanner);
+            $this->succeeded($claimed);
+            if ($scanned->scan_status === DocumentScanStatus::CLEAN) {
+                app(DocumentExtractionService::class)->queueExtractions($scanned->batch);
+            }
+        } catch (Throwable) {
+            $this->failSafetyScanClosed($claimed, $file);
+        }
+    }
+
+    public function failSafetyScanClosed(DocumentProcessingRun $run, DocumentFile $file): void
+    {
+        $this->failed($run);
+        $fresh = $file->fresh();
+        if ($fresh && $fresh->scan_status === DocumentScanStatus::PENDING) {
+            $this->scans->record($fresh, DocumentScanStatus::FAILED, $this->scanner->providerName());
+        }
     }
 
     public function claim(string $runId, string $jobUuid): ?DocumentProcessingRun

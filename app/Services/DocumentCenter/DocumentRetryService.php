@@ -66,7 +66,8 @@ final class DocumentRetryService
                 if ($locked->attempt_count >= $processing['max_attempts']) {
                     return $this->rejected($locked, $actor, self::CODE_LIMIT_REACHED, 'تم بلوغ الحد الآمن لمحاولات الفحص.');
                 }
-                if (config('queue.default') === 'sync'
+                $synchronous = $this->settings->documentProcessingMode() === DocumentExtractionPolicy::MODE_SYNC;
+                if ((! $synchronous && config('queue.default') === 'sync')
                     || $this->settings->activeConfiguration('document_processing') === []
                     || $this->settings->activeConfiguration('malware_scanner') === []) {
                     return $this->rejected($locked, $actor, self::CODE_RUNTIME_UNAVAILABLE, 'الفحص الأمني غير مفعّل حالياً.');
@@ -79,7 +80,8 @@ final class DocumentRetryService
                 $policy = $this->settings->documentExtractionPolicy();
                 $primary = $policy->primaryProvider();
                 $configuration = $primary === null ? null : $policy->provider($primary);
-                if (config('queue.default') === 'sync' || ! $policy->enabled() || $configuration === null || ! $configuration->isOperationallyReady()) {
+                $synchronous = $this->settings->documentProcessingMode() === DocumentExtractionPolicy::MODE_SYNC;
+                if ((! $synchronous && config('queue.default') === 'sync') || ! $policy->enabled() || $configuration === null || ! $configuration->isOperationallyReady()) {
                     return $this->rejected($locked, $actor, self::CODE_RUNTIME_UNAVAILABLE, 'استخراج البيانات غير مفعّل حالياً.');
                 }
                 if ($file->scan_status !== DocumentScanStatus::CLEAN || $batch->status === DocumentWorkflowStatus::QUARANTINED || ! $policy->allowsFile($file->size_bytes, $file->page_count)) {
@@ -114,12 +116,30 @@ final class DocumentRetryService
         }
 
         $fresh = $result['run'];
+        if ($fresh->stage === DocumentExtractionService::STAGE_EXTRACTION) {
+            $batch = $fresh->batch()->firstOrFail();
+            if ($batch->status === DocumentWorkflowStatus::FAILED) {
+                $this->workflow->transition($batch, DocumentWorkflowStatus::QUEUED, 'extraction_retry_queued', 'user', $actor?->id, null, ['stage' => $fresh->stage]);
+            }
+        }
+
+        if ($this->settings->documentProcessingMode() === DocumentExtractionPolicy::MODE_SYNC) {
+            if ($fresh->stage === DocumentExtractionService::STAGE_EXTRACTION) {
+                app(DocumentExtractionService::class)->executeSynchronously($fresh, $fresh->file()->firstOrFail(), (string) $fresh->job_uuid);
+            } else {
+                app(DocumentProcessingService::class)->executeSafetyScanSynchronously($fresh, $fresh->file()->firstOrFail(), (string) $fresh->job_uuid);
+            }
+
+            return [
+                'accepted' => true,
+                'code' => null,
+                'message' => 'تمت إعادة المحاولة.',
+                'run' => $fresh->fresh(),
+            ];
+        }
+
         try {
             if ($fresh->stage === DocumentExtractionService::STAGE_EXTRACTION) {
-                $batch = $fresh->batch()->firstOrFail();
-                if ($batch->status === DocumentWorkflowStatus::FAILED) {
-                    $this->workflow->transition($batch, DocumentWorkflowStatus::QUEUED, 'extraction_retry_queued', 'user', $actor?->id, null, ['stage' => $fresh->stage]);
-                }
                 ExtractDocumentFile::dispatch($fresh->tenant_id, $fresh->branch_id, $fresh->id, $fresh->document_file_id, $fresh->job_uuid)->onQueue('documents');
             } else {
                 $policy = $this->settings->processingPolicy();

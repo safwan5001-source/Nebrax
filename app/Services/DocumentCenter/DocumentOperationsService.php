@@ -106,12 +106,19 @@ final class DocumentOperationsService
     /**
      * لقطة الجاهزية نفسها التي يقرر بها مسار العمليات جدولة الاستخراج
      * (`tenantOverview` → `processing_status`). الأعلام ليست سياسة ثانية.
+     * نمط التنفيذ من إعداد المنصة؛ طابور Laravel `sync` ليس نمط التطبيق.
      *
      * @return array{
+     *     processing_mode: string,
      *     provider_network_locked: bool,
      *     platform_engine_enabled: bool,
      *     primary_provider_ready: bool,
      *     queue_async: bool,
+     *     queue_required: bool,
+     *     queue_configured: bool,
+     *     worker_required: bool,
+     *     worker_status: string,
+     *     safety_scan_ready: bool,
      *     ready: bool
      * }
      */
@@ -120,17 +127,34 @@ final class DocumentOperationsService
         $policy = $this->settings->documentExtractionPolicy();
         $primary = $policy->primaryProvider();
         $configuration = $primary === null ? null : $policy->provider($primary);
+        $processingMode = $this->settings->documentProcessingMode();
+        $synchronous = $processingMode === DocumentExtractionPolicy::MODE_SYNC;
         $queueAsync = config('queue.default') !== 'sync';
+        $runtime = $this->platform->runtime();
+        $queueConfigured = (bool) ($runtime['queue_configured'] ?? false);
+        $workerOnline = ($runtime['worker_status'] ?? 'offline') === 'online';
         $networkLocked = ! DocumentProviderNetworkGate::allowsExternalRequests();
         $engineEnabled = $policy->enabled();
         $primaryReady = $configuration !== null && $configuration->isOperationallyReady();
+        $safetyScanReady = $this->settings->activeConfiguration('malware_scanner') !== []
+            && $this->settings->activeConfiguration('document_processing') !== [];
+        $coreReady = ! $networkLocked && $engineEnabled && $primaryReady;
+        $ready = $synchronous
+            ? $coreReady
+            : $coreReady && $queueAsync && $workerOnline;
 
         return [
+            'processing_mode' => $processingMode,
             'provider_network_locked' => $networkLocked,
             'platform_engine_enabled' => $engineEnabled,
             'primary_provider_ready' => $primaryReady,
             'queue_async' => $queueAsync,
-            'ready' => $queueAsync && ! $networkLocked && $engineEnabled && $primaryReady,
+            'queue_required' => ! $synchronous,
+            'queue_configured' => $queueConfigured,
+            'worker_required' => ! $synchronous,
+            'worker_status' => $synchronous ? 'not_required' : ($workerOnline ? 'online' : 'offline'),
+            'safety_scan_ready' => $safetyScanReady,
+            'ready' => $ready,
         ];
     }
 

@@ -77,8 +77,28 @@ class DocumentGovernanceReadinessTest extends TestCase
         $readiness = $this->governance($auth['token'])['extraction_readiness'];
 
         $this->assertFalse($readiness['queue_async']);
+        $this->assertSame('async', $readiness['processing_mode']);
+        $this->assertTrue($readiness['queue_required']);
+        $this->assertTrue($readiness['worker_required']);
+        $this->assertSame('offline', $readiness['worker_status']);
         $this->assertTrue($readiness['platform_engine_enabled']);
         $this->assertTrue($readiness['primary_provider_ready']);
+        $this->assertFalse($readiness['ready']);
+    }
+
+    /** @test */
+    public function an_async_queue_without_a_worker_heartbeat_is_not_ready(): void
+    {
+        $auth = $this->authorizedTenant('gov-async-no-worker');
+        $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini');
+        config()->set('document_center.ai.provider_network_enabled', true);
+        config()->set('queue.default', 'redis');
+
+        $readiness = $this->governance($auth['token'])['extraction_readiness'];
+
+        $this->assertTrue($readiness['queue_async']);
+        $this->assertSame('async', $readiness['processing_mode']);
+        $this->assertSame('offline', $readiness['worker_status']);
         $this->assertFalse($readiness['ready']);
     }
 
@@ -87,6 +107,7 @@ class DocumentGovernanceReadinessTest extends TestCase
     {
         $auth = $this->authorizedTenant('gov-ready');
         $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini');
+        $this->seedWorkerHeartbeat();
         config()->set('document_center.ai.provider_network_enabled', true);
         config()->set('queue.default', 'redis');
 
@@ -96,7 +117,82 @@ class DocumentGovernanceReadinessTest extends TestCase
         $this->assertTrue($readiness['platform_engine_enabled']);
         $this->assertTrue($readiness['primary_provider_ready']);
         $this->assertTrue($readiness['queue_async']);
+        $this->assertSame('online', $readiness['worker_status']);
         $this->assertTrue($readiness['ready']);
+    }
+
+    /** @test */
+    public function sync_processing_mode_is_ready_without_an_async_queue_or_worker(): void
+    {
+        $auth = $this->authorizedTenant('gov-sync-mode');
+        $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini', processingMode: 'sync');
+        config()->set('document_center.ai.provider_network_enabled', true);
+        config()->set('queue.default', 'sync');
+
+        $readiness = $this->governance($auth['token'])['extraction_readiness'];
+
+        $this->assertSame('sync', $readiness['processing_mode']);
+        $this->assertFalse($readiness['queue_async']);
+        $this->assertFalse($readiness['queue_required']);
+        $this->assertFalse($readiness['worker_required']);
+        $this->assertSame('not_required', $readiness['worker_status']);
+        $this->assertTrue($readiness['ready']);
+        $this->assertArrayNotHasKey('api_key', $readiness);
+        $this->assertArrayNotHasKey('providers', $readiness);
+    }
+
+    /** @test */
+    public function sync_processing_mode_is_not_ready_when_the_network_gate_is_locked(): void
+    {
+        $auth = $this->authorizedTenant('gov-sync-locked');
+        $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini', processingMode: 'sync');
+        config()->set('document_center.ai.provider_network_enabled', false);
+        config()->set('queue.default', 'sync');
+
+        $readiness = $this->governance($auth['token'])['extraction_readiness'];
+
+        $this->assertSame('sync', $readiness['processing_mode']);
+        $this->assertTrue($readiness['provider_network_locked']);
+        $this->assertFalse($readiness['ready']);
+    }
+
+    /** @test */
+    public function sync_processing_mode_is_not_ready_when_the_engine_is_off(): void
+    {
+        $auth = $this->authorizedTenant('gov-sync-engine-off');
+        $this->seedDocumentAi(engineEnabled: false, primary: 'google_gemini', processingMode: 'sync');
+        config()->set('document_center.ai.provider_network_enabled', true);
+        config()->set('queue.default', 'sync');
+
+        $this->assertFalse($this->governance($auth['token'])['extraction_readiness']['ready']);
+    }
+
+    /** @test */
+    public function sync_processing_mode_is_not_ready_when_the_primary_provider_is_unavailable(): void
+    {
+        $auth = $this->authorizedTenant('gov-sync-no-provider');
+        $this->seedDocumentAi(engineEnabled: true, primary: null, processingMode: 'sync');
+        config()->set('document_center.ai.provider_network_enabled', true);
+        config()->set('queue.default', 'sync');
+
+        $readiness = $this->governance($auth['token'])['extraction_readiness'];
+
+        $this->assertFalse($readiness['primary_provider_ready']);
+        $this->assertFalse($readiness['ready']);
+    }
+
+    /** @test */
+    public function an_invalid_stored_processing_mode_fails_closed_to_async(): void
+    {
+        $auth = $this->authorizedTenant('gov-invalid-mode');
+        $this->seedDocumentAi(engineEnabled: true, primary: 'google_gemini', processingMode: 'immediate');
+        config()->set('document_center.ai.provider_network_enabled', true);
+        config()->set('queue.default', 'sync');
+
+        $readiness = $this->governance($auth['token'])['extraction_readiness'];
+
+        $this->assertSame('async', $readiness['processing_mode']);
+        $this->assertFalse($readiness['ready']);
     }
 
     /** @test */
@@ -123,7 +219,7 @@ class DocumentGovernanceReadinessTest extends TestCase
         return $this->withToken($token)->getJson('/api/document-governance')->assertOk()['data'];
     }
 
-    private function seedDocumentAi(bool $engineEnabled, ?string $primary): void
+    private function seedDocumentAi(bool $engineEnabled, ?string $primary, string $processingMode = 'async'): void
     {
         PlatformIntegrationSetting::create([
             'integration_key' => 'document_ai',
@@ -131,6 +227,7 @@ class DocumentGovernanceReadinessTest extends TestCase
             'enabled' => $engineEnabled,
             'configuration' => [
                 'engine_enabled' => $engineEnabled,
+                'processing_mode' => $processingMode,
                 'primary_provider' => $primary,
                 'fallback_enabled' => false,
                 'fallback_providers' => [],
@@ -154,6 +251,17 @@ class DocumentGovernanceReadinessTest extends TestCase
                     ],
                 ],
             ],
+        ]);
+    }
+
+    private function seedWorkerHeartbeat(): void
+    {
+        \App\Models\PlatformRuntimeHeartbeat::create([
+            'component' => 'document-worker',
+            'instance_id' => 'test-worker',
+            'status' => 'online',
+            'metadata' => ['queue' => 'documents'],
+            'last_seen_at' => now('UTC'),
         ]);
     }
 

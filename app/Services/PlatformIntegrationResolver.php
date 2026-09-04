@@ -64,6 +64,28 @@ class PlatformIntegrationResolver
         return $configuration === [] ? DocumentExtractionPolicy::disabled() : new DocumentExtractionPolicy($configuration);
     }
 
+    /**
+     * نمط التنفيذ المخزّن حتى لو كان المحرك متوقفاً. الافتراض الآمن `async`.
+     * لا يُقرأ من إعداد المستأجر.
+     */
+    public function documentProcessingMode(): string
+    {
+        try {
+            if (! Schema::hasTable('platform_integration_settings')) {
+                return DocumentExtractionPolicy::MODE_ASYNC;
+            }
+
+            $setting = PlatformIntegrationSetting::query()
+                ->where('integration_key', 'document_ai')
+                ->first();
+            $configuration = is_array($setting?->configuration) ? $setting->configuration : [];
+
+            return DocumentExtractionPolicy::normalizeMode($configuration['processing_mode'] ?? null);
+        } catch (Throwable) {
+            return DocumentExtractionPolicy::MODE_ASYNC;
+        }
+    }
+
     /** @return list<int> */
     private function backoff(mixed $value): array
     {

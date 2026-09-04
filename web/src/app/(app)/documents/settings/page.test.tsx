@@ -81,10 +81,15 @@ const governancePayload = {
       last_run_at: null,
     },
     extraction_readiness: {
+      processing_mode: 'async',
       provider_network_locked: true,
       platform_engine_enabled: false,
       primary_provider_ready: false,
       queue_async: false,
+      queue_required: true,
+      worker_required: true,
+      worker_status: 'offline',
+      safety_scan_ready: false,
       ready: false,
     },
   },
@@ -100,10 +105,15 @@ const readyGovernancePayload = {
       last_run_at: null,
     },
     extraction_readiness: {
+      processing_mode: 'async',
       provider_network_locked: false,
       platform_engine_enabled: true,
       primary_provider_ready: true,
       queue_async: true,
+      queue_required: true,
+      worker_required: true,
+      worker_status: 'online',
+      safety_scan_ready: true,
       ready: true,
     },
   },
@@ -171,6 +181,44 @@ describe('DocumentSettingsPage permissions', () => {
     expect(screen.queryByText('documentOperations.networkLocked')).toBeNull();
     expect(screen.queryByText('documentOperations.statusExtractionUnavailable')).toBeNull();
     expect(screen.queryByText('documentCenterReview.providerNetworkLocked')).toBeNull();
+  });
+
+  it('shows synchronous extraction as available without treating a missing worker as failure', async () => {
+    api.mockImplementation((path: string) => {
+      if (path === '/document-governance') {
+        return Promise.resolve({
+          data: {
+            policy: readyGovernancePayload.data.policy,
+            extraction_readiness: {
+              processing_mode: 'sync',
+              provider_network_locked: false,
+              platform_engine_enabled: true,
+              primary_provider_ready: true,
+              queue_async: false,
+              queue_required: false,
+              worker_required: false,
+              worker_status: 'not_required',
+              safety_scan_ready: true,
+              ready: true,
+            },
+          },
+        });
+      }
+      if (path.startsWith('/document-operations')) {
+        return Promise.resolve({ data: { summary: {}, retention: { retention_days: 365, enabled: true, purge_mode: 'manual_governed' } } });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<DocumentSettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('documentOperations.statusExtractionAvailable')).toBeTruthy();
+    });
+    expect(screen.getByText('documentOperations.processingModeSync')).toBeTruthy();
+    expect(screen.getByText('documentOperations.workerNotRequired')).toBeTruthy();
+    expect(screen.queryByText('documentOperations.workerOffline')).toBeNull();
+    expect(screen.queryByText('documentOperations.statusExtractionUnavailable')).toBeNull();
   });
 
   it('keeps both timed-retention badges aligned with governance.policy.enabled', async () => {

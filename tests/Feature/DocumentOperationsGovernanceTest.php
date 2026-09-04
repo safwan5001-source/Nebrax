@@ -92,6 +92,7 @@ class DocumentOperationsGovernanceTest extends TestCase
         ]);
         $settings = \Mockery::mock(PlatformIntegrationResolver::class);
         $settings->shouldReceive('processingPolicy')->andReturn(['max_attempts' => 3, 'backoff_seconds' => [1], 'timeout_seconds' => 30]);
+        $settings->shouldReceive('documentProcessingMode')->andReturn('async');
         $settings->shouldReceive('activeConfiguration')->with('document_processing')->andReturn(['enabled' => true]);
         $settings->shouldReceive('activeConfiguration')->with('malware_scanner')->andReturn(['enabled' => true]);
         config()->set('queue.default', 'database');

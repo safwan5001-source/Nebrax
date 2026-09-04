@@ -37,6 +37,7 @@ export function hydrateAiForm(summary?: DocumentAiHydrationSummary): DocumentAiF
   return {
     ...initial,
     enabled: Boolean(summary?.enabled ?? configuration.engine_enabled ?? false),
+    processing_mode: configuration.processing_mode === 'sync' ? 'sync' : 'async',
     primary_provider: isAiProvider(configuration.primary_provider) ? configuration.primary_provider : '',
     fallback_enabled: Boolean(configuration.fallback_enabled ?? false),
     fallback_providers: Array.isArray(configuration.fallback_providers)

@@ -39,6 +39,7 @@ export interface AiProviderFormState {
 
 export interface DocumentAiFormState {
   enabled: boolean;
+  processing_mode: 'sync' | 'async';
   primary_provider: AiProviderKey | '';
   fallback_enabled: boolean;
   fallback_providers: AiProviderKey[];
@@ -69,6 +70,7 @@ export const emptyAiProvider = (): AiProviderFormState => ({
 
 export const emptyDocumentAiForm = (): DocumentAiFormState => ({
   enabled: false,
+  processing_mode: 'async',
   primary_provider: '',
   fallback_enabled: false,
   fallback_providers: [],
@@ -95,6 +97,7 @@ export function payloadFor(key: IntegrationKey, form: IntegrationFormState | Doc
       enabled: ai.enabled,
       provider: ai.primary_provider || undefined,
       primary_provider: ai.primary_provider || undefined,
+      processing_mode: ai.processing_mode === 'sync' ? 'sync' : 'async',
       fallback_enabled: ai.fallback_enabled,
       fallback_providers: ai.fallback_providers,
       confidence_threshold_percent: Number(ai.confidence_threshold_percent),

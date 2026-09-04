@@ -8,6 +8,7 @@ use App\Models\PlatformAdministrator;
 use App\Models\PlatformIntegrationAuditEvent;
 use App\Models\PlatformIntegrationSetting;
 use App\Models\PlatformRuntimeHeartbeat;
+use App\Services\DocumentCenter\DocumentExtractionPolicy;
 use App\Services\DocumentCenter\DocumentExtractionProviderRegistry;
 use App\Services\DocumentCenter\DocumentProviderConfiguration;
 use App\Services\DocumentCenter\DocumentStorageService;
@@ -280,6 +281,9 @@ class PlatformIntegrationService
 
         return [
             'engine_enabled' => (bool) ($validated['enabled'] ?? false),
+            'processing_mode' => DocumentExtractionPolicy::normalizeMode(
+                $validated['processing_mode'] ?? $previous['processing_mode'] ?? null,
+            ),
             'primary_provider' => $this->nullableProvider($validated['primary_provider'] ?? null),
             'fallback_enabled' => (bool) ($validated['fallback_enabled'] ?? false),
             'fallback_providers' => array_slice($fallbacks, 0, 2),
@@ -349,6 +353,7 @@ class PlatformIntegrationService
 
         return [
             'engine_enabled' => (bool) ($configuration['enabled'] ?? false),
+            'processing_mode' => DocumentExtractionPolicy::normalizeMode($configuration['processing_mode'] ?? null),
             'primary_provider' => $legacyProvider,
             'fallback_enabled' => false,
             'fallback_providers' => [],
@@ -369,10 +374,14 @@ class PlatformIntegrationService
             ->where('component', 'document-worker')
             ->first();
         $lastSeen = $heartbeat?->last_seen_at;
+        $processingMode = $this->storedDocumentProcessingMode();
+        $workerRequired = $processingMode === DocumentExtractionPolicy::MODE_ASYNC;
 
         return [
+            'processing_mode' => $processingMode,
             'queue_connection' => (string) config('queue.default', 'sync'),
             'queue_configured' => config('queue.default') === 'redis' && filled(config('database.redis.default.url')),
+            'worker_required' => $workerRequired,
             'worker_status' => $lastSeen?->isAfter(now('UTC')->subMinutes(2)) ? 'online' : 'offline',
             'worker_last_seen_at' => $lastSeen?->toIso8601String(),
             'queued_runs' => DocumentProcessingRun::query()->where('status', DocumentProcessingStatus::QUEUED->value)->count(),
@@ -540,6 +549,16 @@ class PlatformIntegrationService
                 ]);
             }
         }
+    }
+
+    private function storedDocumentProcessingMode(): string
+    {
+        $setting = PlatformIntegrationSetting::query()
+            ->where('integration_key', 'document_ai')
+            ->first();
+        $configuration = is_array($setting?->configuration) ? $setting->configuration : [];
+
+        return DocumentExtractionPolicy::normalizeMode($configuration['processing_mode'] ?? null);
     }
 
     private function nullableProvider(mixed $value): ?string

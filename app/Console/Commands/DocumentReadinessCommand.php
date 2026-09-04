@@ -65,8 +65,10 @@ final class DocumentReadinessCommand extends Command
                 'missing_tables' => $missingTables,
             ],
             'runtime' => [
+                'processing_mode' => $runtime['processing_mode'] ?? 'async',
                 'queue_mode' => $runtime['queue_mode'] ?? 'unknown',
                 'queue_configured' => (bool) ($runtime['queue_configured'] ?? false),
+                'worker_required' => (bool) ($runtime['worker_required'] ?? true),
                 'worker_online' => (bool) ($runtime['worker_online'] ?? false),
                 'scanner_ready' => (bool) ($runtime['scanner_ready'] ?? false),
                 'processing_ready' => (bool) ($runtime['processing_ready'] ?? false),

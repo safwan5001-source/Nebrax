@@ -80,15 +80,8 @@ class ScanDocumentFile implements ShouldBeUnique, ShouldQueue
             }
 
             $file = DocumentFile::query()->whereKey($this->documentFileId)->firstOrFail();
-            $stream = $storage->readStream($file->storage_profile, $file->object_key);
-            try {
-                $decision = $scanner->scan($stream);
-            } finally {
-                fclose($stream);
-            }
-
-            $scannedFile = $scanDecisions->record($file, $decision, $scanner->providerName());
-            if ($decision === DocumentScanStatus::CLEAN && $extraction !== null) {
+            $scannedFile = $scanDecisions->scanAndRecord($file, $storage, $scanner);
+            if ($scannedFile->scan_status === DocumentScanStatus::CLEAN && $extraction !== null) {
                 $extraction->queueExtractions($scannedFile->batch);
             }
             $processing->succeeded($run);

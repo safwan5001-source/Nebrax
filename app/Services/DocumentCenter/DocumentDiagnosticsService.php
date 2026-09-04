@@ -93,14 +93,18 @@ final class DocumentDiagnosticsService
     public function platform(): array
     {
         $runtime = $this->platform->runtime();
+        $workerRequired = (bool) ($runtime['worker_required'] ?? true);
+        $workerOnline = ($runtime['worker_status'] ?? 'offline') === 'online';
         $snapshot = [
             'schema_version' => self::SCHEMA_VERSION,
             'generated_at' => now('UTC')->toIso8601String(),
             'scope' => ['kind' => 'platform'],
             'runtime' => [
+                'processing_mode' => (string) ($runtime['processing_mode'] ?? DocumentExtractionPolicy::MODE_ASYNC),
                 'queue_configured' => (bool) ($runtime['queue_configured'] ?? false),
                 'queue_mode' => config('queue.default') === 'sync' ? 'synchronous' : 'asynchronous',
-                'worker_online' => (bool) ($runtime['worker_online'] ?? false),
+                'worker_required' => $workerRequired,
+                'worker_online' => $workerOnline,
                 'heartbeat_at' => $runtime['worker_last_seen_at'] ?? null,
                 'scanner_ready' => $this->settings->activeConfiguration('malware_scanner') !== [],
                 'processing_ready' => $this->settings->activeConfiguration('document_processing') !== [],
