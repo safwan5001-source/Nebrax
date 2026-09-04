@@ -8001,6 +8001,7 @@
     "statusSafetyPending": "فحص السلامة بانتظار المعالجة",
     "statusQuarantined": "في الحجر الأمني",
     "statusExtractionUnavailable": "استخراج البيانات غير مفعّل",
+    "statusExtractionAvailable": "استخراج البيانات مفعّل",
     "statusProcessing": "قيد المعالجة",
     "statusNeedsReview": "تحتاج مراجعة",
     "statusReady": "جاهزة للمسودة",

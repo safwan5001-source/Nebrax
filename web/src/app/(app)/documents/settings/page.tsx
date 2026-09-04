@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { CircleAlert, Lock, Server, ShieldCheck } from 'lucide-react';
+import { CircleAlert, Lock, Server, ShieldCheck, Unlock } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DocumentOperationsNav } from '@/components/documents/document-operations-nav';
 import { DocumentIntelligenceSettings } from '@/components/documents/document-intelligence-settings';
 
+type ExtractionReadiness = {
+  provider_network_locked: boolean;
+  platform_engine_enabled: boolean;
+  primary_provider_ready: boolean;
+  queue_async: boolean;
+  ready: boolean;
+};
+
 type Governance = {
   policy: { retention_days: number; enabled: boolean; purge_mode: string; policy_source: string; last_run_at: string | null };
+  extraction_readiness?: ExtractionReadiness;
 };
 
 type OperationsSummary = {
@@ -57,6 +66,9 @@ export default function DocumentSettingsPage() {
     void load();
   }, [load]);
 
+  const networkLocked = governance?.extraction_readiness?.provider_network_locked ?? true;
+  const extractionReady = governance?.extraction_readiness?.ready ?? false;
+
   return (
     <div className="space-y-5">
       <header>
@@ -83,11 +95,17 @@ export default function DocumentSettingsPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardContent className="flex gap-3 py-4">
-              <Lock className="mt-0.5 h-5 w-5 text-warning" aria-hidden="true" />
+              {networkLocked
+                ? <Lock className="mt-0.5 h-5 w-5 text-warning" aria-hidden="true" />
+                : <Unlock className="mt-0.5 h-5 w-5 text-primary" aria-hidden="true" />}
               <div>
-                <h2 className="font-medium text-text">{t('providerNetworkLocked')}</h2>
-                <p className="mt-1 text-sm text-muted">{to('statusExtractionUnavailable')}</p>
-                <Badge className="mt-2" tone="warning">{to('retentionDisabled')}</Badge>
+                <h2 className="font-medium text-text">{networkLocked ? to('networkLocked') : to('networkOpen')}</h2>
+                <p className="mt-1 text-sm text-muted">{extractionReady ? to('statusExtractionAvailable') : to('statusExtractionUnavailable')}</p>
+                {governance && (
+                  <Badge className="mt-2" tone={governance.policy.enabled ? 'positive' : 'warning'}>
+                    {governance.policy.enabled ? to('retentionEnabled') : to('retentionDisabled')}
+                  </Badge>
+                )}
               </div>
             </CardContent>
           </Card>

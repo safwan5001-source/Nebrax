@@ -43,6 +43,10 @@ vi.mock('@/components/documents/document-operations-nav', () => ({
   DocumentOperationsNav: () => <nav aria-label="document-operations">nav</nav>,
 }));
 
+vi.mock('@/components/documents/document-intelligence-settings', () => ({
+  DocumentIntelligenceSettings: () => <div>intelligence-settings</div>,
+}));
+
 vi.mock('@/components/ui/button', () => ({
   Button: ({ children, ...props }: React.ComponentProps<'button'>) => <button type="button" {...props}>{children}</button>,
 }));
@@ -75,6 +79,32 @@ const governancePayload = {
       purge_mode: 'soft',
       policy_source: 'platform_policy',
       last_run_at: null,
+    },
+    extraction_readiness: {
+      provider_network_locked: true,
+      platform_engine_enabled: false,
+      primary_provider_ready: false,
+      queue_async: false,
+      ready: false,
+    },
+  },
+};
+
+const readyGovernancePayload = {
+  data: {
+    policy: {
+      retention_days: 365,
+      enabled: true,
+      purge_mode: 'manual_governed',
+      policy_source: 'config_default',
+      last_run_at: null,
+    },
+    extraction_readiness: {
+      provider_network_locked: false,
+      platform_engine_enabled: true,
+      primary_provider_ready: true,
+      queue_async: true,
+      ready: true,
     },
   },
 };
@@ -121,5 +151,42 @@ describe('DocumentSettingsPage permissions', () => {
       expect(screen.getByText('Governance unavailable')).toBeTruthy();
     });
     expect(screen.getByRole('button', { name: 'documentCenterReview.retry' })).toBeTruthy();
+  });
+
+  it('binds network and extraction status from extraction_readiness instead of hardcoded locked copy', async () => {
+    api.mockImplementation((path: string) => {
+      if (path === '/document-governance') return Promise.resolve(readyGovernancePayload);
+      if (path.startsWith('/document-operations')) {
+        return Promise.resolve({ data: { summary: {}, retention: { retention_days: 365, enabled: true, purge_mode: 'manual_governed' } } });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<DocumentSettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('documentOperations.networkOpen')).toBeTruthy();
+    });
+    expect(screen.getByText('documentOperations.statusExtractionAvailable')).toBeTruthy();
+    expect(screen.queryByText('documentOperations.networkLocked')).toBeNull();
+    expect(screen.queryByText('documentOperations.statusExtractionUnavailable')).toBeNull();
+    expect(screen.queryByText('documentCenterReview.providerNetworkLocked')).toBeNull();
+  });
+
+  it('keeps both timed-retention badges aligned with governance.policy.enabled', async () => {
+    api.mockImplementation((path: string) => {
+      if (path === '/document-governance') return Promise.resolve(governancePayload);
+      if (path.startsWith('/document-operations')) {
+        return Promise.reject(new ApiError(403, 'Forbidden'));
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<DocumentSettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('documentOperations.retentionEnabled').length).toBe(2);
+    });
+    expect(screen.queryByText('documentOperations.retentionDisabled')).toBeNull();
   });
 });

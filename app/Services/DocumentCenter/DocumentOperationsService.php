@@ -33,7 +33,7 @@ final class DocumentOperationsService
         $ids = collect($batches->items())->pluck('id')->all();
         $runsByBatch = DocumentProcessingRun::query()->whereIn('document_batch_id', $ids)->get()->groupBy('document_batch_id');
         $retention = $this->retention->effective();
-        $extractionReady = $this->extractionReady();
+        $extractionReady = $this->extractionReadiness()['ready'];
 
         return [
             'summary' => [
@@ -103,17 +103,35 @@ final class DocumentOperationsService
         ];
     }
 
-    private function extractionReady(): bool
+    /**
+     * لقطة الجاهزية نفسها التي يقرر بها مسار العمليات جدولة الاستخراج
+     * (`tenantOverview` → `processing_status`). الأعلام ليست سياسة ثانية.
+     *
+     * @return array{
+     *     provider_network_locked: bool,
+     *     platform_engine_enabled: bool,
+     *     primary_provider_ready: bool,
+     *     queue_async: bool,
+     *     ready: bool
+     * }
+     */
+    public function extractionReadiness(): array
     {
         $policy = $this->settings->documentExtractionPolicy();
         $primary = $policy->primaryProvider();
         $configuration = $primary === null ? null : $policy->provider($primary);
+        $queueAsync = config('queue.default') !== 'sync';
+        $networkLocked = ! DocumentProviderNetworkGate::allowsExternalRequests();
+        $engineEnabled = $policy->enabled();
+        $primaryReady = $configuration !== null && $configuration->isOperationallyReady();
 
-        return config('queue.default') !== 'sync'
-            && DocumentProviderNetworkGate::allowsExternalRequests()
-            && $policy->enabled()
-            && $configuration !== null
-            && $configuration->isOperationallyReady();
+        return [
+            'provider_network_locked' => $networkLocked,
+            'platform_engine_enabled' => $engineEnabled,
+            'primary_provider_ready' => $primaryReady,
+            'queue_async' => $queueAsync,
+            'ready' => $queueAsync && ! $networkLocked && $engineEnabled && $primaryReady,
+        ];
     }
 
     /** @param array{policy:mixed,retention_days:int,enabled:bool,purge_mode:string,last_run:mixed} $effective
