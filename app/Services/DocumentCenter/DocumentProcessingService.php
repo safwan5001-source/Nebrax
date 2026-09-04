@@ -28,7 +28,7 @@ class DocumentProcessingService
 
     public function queueSafetyScans(DocumentBatch $batch): int
     {
-        if ($this->settings->activeConfiguration('document_processing') === []) {
+        if ($this->settings->documentProcessingIsAuthoritativelyDisabled()) {
             return 0;
         }
 
