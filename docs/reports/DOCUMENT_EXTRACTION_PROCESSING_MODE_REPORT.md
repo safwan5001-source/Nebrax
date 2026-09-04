@@ -3,7 +3,7 @@
 **المهمة:** إعداد منصة `document_extraction.processing_mode` بأضيق نطاق آمن، مع الإبقاء على سياسة فحص البرمجيات الضارة كما هي.
 **الفرع:** `cursor/extraction-processing-mode-b8de`
 **Base SHA:** `61f4dc1e5a93c4dc44d25114e78262750545a36b` (`main`)
-**Head SHA:** `24bce661ba2a33de9b1f9f45db2df781aa1cafc9`
+**Head SHA:** `5ce34503542053c1a653dd8b272673b88c06eb85`
 **PR:** [#640](https://github.com/safwan5001-source/Nebrax/pull/640) — للمراجعة فقط.
 
 **NOT MERGED / NOT DEPLOYED**
@@ -185,7 +185,7 @@ https://github.com/safwan5001-source/Nebrax/pull/640
 
 ## Head SHA
 
-`24bce661ba2a33de9b1f9f45db2df781aa1cafc9`
+`5ce34503542053c1a653dd8b272673b88c06eb85`
 
 ## الخطوة التالية الموصى بها
 
