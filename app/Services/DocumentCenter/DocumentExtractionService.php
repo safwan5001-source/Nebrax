@@ -33,7 +33,11 @@ class DocumentExtractionService
     public function queueExtractions(DocumentBatch $batch): int
     {
         $policy = $this->settings->documentExtractionPolicy();
-        if (config('queue.default') === 'sync' || ! $policy->enabled() || ! DocumentProviderNetworkGate::allowsExternalRequests()) {
+        if (! $policy->enabled() || ! DocumentProviderNetworkGate::allowsExternalRequests()) {
+            return 0;
+        }
+        $synchronous = $this->settings->documentProcessingMode() === DocumentExtractionPolicy::MODE_SYNC;
+        if (! $synchronous && config('queue.default') === 'sync') {
             return 0;
         }
         // بوّابة المستأجر (PR #630): لا يُرسَل مستند إلى المزود ما لم يُفعّل المستأجر
@@ -90,14 +94,32 @@ class DocumentExtractionService
         foreach ($created as [$run, $file]) {
             $jobUuid = (string) Str::uuid();
             $run->fill(['job_uuid' => $jobUuid])->save();
-            ExtractDocumentFile::dispatch($run->tenant_id, $run->branch_id, $run->id, $file->id, $jobUuid)
-                ->onQueue('documents');
+            if ($synchronous) {
+                $this->executeSynchronously($run, $file, $jobUuid);
+            } else {
+                ExtractDocumentFile::dispatch($run->tenant_id, $run->branch_id, $run->id, $file->id, $jobUuid)
+                    ->onQueue('documents');
+            }
         }
 
         return count($created);
     }
 
-    public function process(DocumentProcessingRun $run, DocumentFile $file): void
+    public function executeSynchronously(DocumentProcessingRun $run, DocumentFile $file, string $jobUuid): void
+    {
+        $claimed = $this->processing->claim($run->id, $jobUuid);
+        if ($claimed === null) {
+            return;
+        }
+
+        try {
+            $this->process($claimed, $file, 1);
+        } catch (Throwable) {
+            $this->processing->failedExtraction($claimed, 'extraction_worker_failed', 'تعذر إكمال عامل استخراج المستند.');
+        }
+    }
+
+    public function process(DocumentProcessingRun $run, DocumentFile $file, ?int $maxProviderAttemptsThisInvocation = null): void
     {
         $policy = $this->settings->documentExtractionPolicy();
         // إعادة فحص بوّابة المستأجر داخل العامل: قد يُعطِّل المستأجر المعالجة أو
@@ -115,7 +137,9 @@ class DocumentExtractionService
 
         $this->moveBatchToProcessing($run->batch);
         $base64 = $this->base64File($file);
-        $sequence = 0;
+        $sequence = (int) DocumentProviderAttempt::query()
+            ->where('document_processing_run_id', $run->id)
+            ->max('sequence');
 
         foreach ($policy->orderedProviders() as $providerKey) {
             $configuration = $policy->provider($providerKey);
@@ -134,7 +158,11 @@ class DocumentExtractionService
                 continue;
             }
 
-            for ($attemptNumber = 1; $attemptNumber <= $configuration->maxAttempts; $attemptNumber++) {
+            $configuredAttempts = max(1, $configuration->maxAttempts);
+            $attemptBudget = $maxProviderAttemptsThisInvocation === null
+                ? $configuredAttempts
+                : max(1, min($configuredAttempts, $maxProviderAttemptsThisInvocation));
+            for ($attemptNumber = 1; $attemptNumber <= $attemptBudget; $attemptNumber++) {
                 $attempt = DocumentProviderAttempt::create([
                     'document_batch_id' => $run->document_batch_id,
                     'document_file_id' => $file->id,

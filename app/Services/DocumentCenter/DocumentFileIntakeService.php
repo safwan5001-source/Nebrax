@@ -111,7 +111,7 @@ class DocumentFileIntakeService
         );
         $this->processing->queueSafetyScans($completed);
 
-        return $completed;
+        return $completed->fresh() ?? $completed;
     }
 
     private function objectKey(DocumentBatch $batch, string $extension): string

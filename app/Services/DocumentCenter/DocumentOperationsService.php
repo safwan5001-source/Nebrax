@@ -106,31 +106,57 @@ final class DocumentOperationsService
     /**
      * لقطة الجاهزية نفسها التي يقرر بها مسار العمليات جدولة الاستخراج
      * (`tenantOverview` → `processing_status`). الأعلام ليست سياسة ثانية.
+     * نمط التنفيذ من إعداد المنصة؛ طابور Laravel `sync` ليس نمط التطبيق.
+     * ASYNC جاهز فقط مع Redis مضبوط (`queue_configured`) ونبضة عامل.
      *
      * @return array{
+     *     processing_mode: string,
      *     provider_network_locked: bool,
      *     platform_engine_enabled: bool,
      *     primary_provider_ready: bool,
      *     queue_async: bool,
+     *     queue_required: bool,
+     *     queue_configured: bool,
+     *     worker_required: bool,
+     *     worker_status: string,
+     *     safety_scan_ready: bool,
      *     ready: bool
      * }
      */
     public function extractionReadiness(): array
     {
+        $this->settings->prime(['document_ai', 'malware_scanner', 'document_processing']);
         $policy = $this->settings->documentExtractionPolicy();
         $primary = $policy->primaryProvider();
         $configuration = $primary === null ? null : $policy->provider($primary);
+        $processingMode = $this->settings->documentProcessingMode();
+        $synchronous = $processingMode === DocumentExtractionPolicy::MODE_SYNC;
         $queueAsync = config('queue.default') !== 'sync';
+        $queueConfigured = config('queue.default') === 'redis' && filled(config('database.redis.default.url'));
+        $workerOnline = $synchronous ? false : $this->platform->documentWorkerOnline();
         $networkLocked = ! DocumentProviderNetworkGate::allowsExternalRequests();
         $engineEnabled = $policy->enabled();
         $primaryReady = $configuration !== null && $configuration->isOperationallyReady();
+        $safetyScanReady = $this->settings->activeConfiguration('malware_scanner') !== []
+            && $this->settings->activeConfiguration('document_processing') !== [];
+        $coreReady = ! $networkLocked && $engineEnabled && $primaryReady;
+        // ASYNC: Redis مضبوط فعلياً + نبضة عامل. Laravel `!== sync` ليس كافياً.
+        $ready = $synchronous
+            ? $coreReady
+            : $coreReady && $queueConfigured && $workerOnline;
 
         return [
+            'processing_mode' => $processingMode,
             'provider_network_locked' => $networkLocked,
             'platform_engine_enabled' => $engineEnabled,
             'primary_provider_ready' => $primaryReady,
             'queue_async' => $queueAsync,
-            'ready' => $queueAsync && ! $networkLocked && $engineEnabled && $primaryReady,
+            'queue_required' => ! $synchronous,
+            'queue_configured' => $queueConfigured,
+            'worker_required' => ! $synchronous,
+            'worker_status' => $synchronous ? 'not_required' : ($workerOnline ? 'online' : 'offline'),
+            'safety_scan_ready' => $safetyScanReady,
+            'ready' => $ready,
         ];
     }
 

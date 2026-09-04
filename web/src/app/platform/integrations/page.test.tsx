@@ -58,6 +58,7 @@ describe('platform integration payloads', () => {
     expect(payload).toMatchObject({
       enabled: true,
       primary_provider: 'google_gemini',
+      processing_mode: 'async',
       fallback_providers: ['openai', 'anthropic'],
     });
     expect(payload.providers).toMatchObject({
@@ -65,6 +66,15 @@ describe('platform integration payloads', () => {
       openai: { enabled: true, model: 'gpt-test' },
     });
     expect((payload.providers as Record<string, Record<string, unknown>>).openai).not.toHaveProperty('api_key');
+  });
+
+  it('defaults processing mode to async and serializes an explicit sync choice', () => {
+    const ai = emptyDocumentAiForm();
+
+    expect(payloadFor('document_ai', ai).processing_mode).toBe('async');
+
+    ai.processing_mode = 'sync';
+    expect(payloadFor('document_ai', ai).processing_mode).toBe('sync');
   });
 
   it('omits a blank Gemini API key so a later save keeps the stored secret', () => {
@@ -109,12 +119,26 @@ describe('platform integration payloads', () => {
       'geminiErrorRateLimited',
       'geminiErrorTimeout',
       'geminiErrorUpstreamUnavailable',
+      'processingMode',
+      'processingModeSync',
+      'processingModeAsync',
+      'processingModeSyncHelp',
+      'processingModeAsyncHelp',
+      'workerNotRequired',
     ] as const;
 
     for (const key of keys) {
       expect(ar[key]).toBeTruthy();
       expect(en[key]).toBeTruthy();
+      expect(ar[key]).not.toBe(key);
+      expect(en[key]).not.toBe(key);
     }
+    expect(ar.processingMode).toBe('نمط معالجة المستندات');
+    expect(en.processingMode).toBe('Document processing mode');
+    expect(ar.processingModeSync).toBe('متزامن');
+    expect(en.processingModeSync).toBe('Synchronous');
+    expect(ar.processingModeAsync).toBe('خلفي');
+    expect(en.processingModeAsync).toBe('Background');
     expect(ar.saveSettings).toBe('حفظ الإعدادات');
     expect(en.saveSettings).toBe('Save settings');
     expect(ar.saveBeforeTest).toBe('احفظ التغييرات قبل اختبار الاتصال');

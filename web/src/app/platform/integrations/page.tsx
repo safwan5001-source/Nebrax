@@ -57,8 +57,10 @@ interface IntegrationSummary {
 }
 
 interface RuntimeSummary {
+  processing_mode?: 'sync' | 'async';
   queue_connection: string;
   queue_configured: boolean;
+  worker_required?: boolean;
   worker_status: 'online' | 'offline';
   worker_last_seen_at: string | null;
   queued_runs: number;
@@ -291,6 +293,7 @@ export default function PlatformIntegrationsPage() {
             </SettingsCard>
 
             <SettingsCard title={t('processingTitle')} description={t('processingDescription')} icon={ServerCog} enabled={forms.document_processing.enabled} configuredAt={summaries.document_processing?.configured_at} onEnabled={(value) => update('document_processing', 'enabled', value)} actions={<CardActions name="document_processing" busy={busy} testing={testing} save={() => save('document_processing')} test={() => testConnection('document_processing')} t={t} />}>
+              <p className="sm:col-span-2 text-xs leading-relaxed text-muted">{aiForm.processing_mode === 'sync' ? t('processingPolicyAsyncOnly') : t('processingPolicyApplies')}</p>
               <Field label={t('maxAttempts')}><Input type="number" min={1} max={5} value={forms.document_processing.max_attempts} onChange={(event) => update('document_processing', 'max_attempts', event.target.value)} dir="ltr" /></Field>
               <Field label={t('timeout')}><Input type="number" min={10} max={120} value={forms.document_processing.timeout_seconds} onChange={(event) => update('document_processing', 'timeout_seconds', event.target.value)} dir="ltr" /></Field>
               <Field label={t('backoff')}><Input value={forms.document_processing.backoff_seconds} onChange={(event) => update('document_processing', 'backoff_seconds', event.target.value)} dir="ltr" placeholder="30,120,300" /></Field>
@@ -304,6 +307,30 @@ export default function PlatformIntegrationsPage() {
             <Card>
               <CardHeader><div className="flex items-start gap-3"><Bot className="mt-0.5 h-5 w-5 text-muted" strokeWidth={1.7} aria-hidden="true" /><div><CardTitle>{t('aiEngineTitle')}</CardTitle><p className="mt-1 text-sm leading-relaxed text-muted">{t('aiEngineDescription')}</p></div></div></CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-3 rounded-lg border border-border p-4">
+                  <div>
+                    <p className="text-sm font-medium text-text">{t('processingMode')}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-muted">{t('processingModeDescription')}</p>
+                  </div>
+                  <fieldset className="grid gap-3 md:grid-cols-2">
+                    <legend className="sr-only">{t('processingMode')}</legend>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-surface p-3 text-sm text-text">
+                      <input type="radio" name="document-extraction-processing-mode" className="mt-1 h-4 w-4 accent-primary" checked={aiForm.processing_mode === 'sync'} onChange={() => updateAi('processing_mode', 'sync')} />
+                      <span>
+                        <span className="font-medium">{t('processingModeSync')}</span>
+                        <span className="mt-1 block text-xs leading-relaxed text-muted">{t('processingModeSyncHelp')}</span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-surface p-3 text-sm text-text">
+                      <input type="radio" name="document-extraction-processing-mode" className="mt-1 h-4 w-4 accent-primary" checked={aiForm.processing_mode !== 'sync'} onChange={() => updateAi('processing_mode', 'async')} />
+                      <span>
+                        <span className="font-medium">{t('processingModeAsync')}</span>
+                        <span className="mt-1 block text-xs leading-relaxed text-muted">{t('processingModeAsyncHelp')}</span>
+                      </span>
+                    </label>
+                  </fieldset>
+                  {aiForm.processing_mode === 'sync' ? <p className="text-xs leading-relaxed text-muted">{t('processingModeSyncTimeoutNote')}</p> : null}
+                </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <ToggleField label={t('aiEngineEnabled')} checked={aiForm.enabled} onChange={(value) => updateAi('enabled', value)} />
                   <Field label={t('primaryProvider')}><Select value={aiForm.primary_provider} onChange={(value) => updateAi('primary_provider', value as AiProviderKey | '')} options={[["", t('noProvider')] as [string, string], ...AI_PROVIDER_KEYS.map((provider): [string, string] => [provider, providerLabel(provider, t)])]} /></Field>
@@ -358,8 +385,11 @@ function Notice({ notice }: { notice: { ok: boolean; message: string } }) {
 }
 
 function RuntimeCard({ runtime, t }: { runtime: RuntimeSummary; t: Translate }) {
-  const online = runtime.worker_status === 'online';
-  return <Card><CardHeader className="flex flex-row items-center justify-between gap-4"><div><CardTitle>{t('runtimeTitle')}</CardTitle><p className="mt-1 text-sm text-muted">{t('runtimeDescription')}</p></div><span className="flex items-center gap-1.5 text-xs text-text">{online ? <CheckCircle2 className="h-4 w-4 text-positive" /> : <XCircle className="h-4 w-4 text-negative" />}{online ? t('online') : t('offline')}</span></CardHeader><CardContent className="grid grid-cols-2 gap-4 border-t border-border pt-4 sm:grid-cols-5"><Metric label={t('queueDriver')} value={runtime.queue_connection} /><Metric label={t('queued')} value={runtime.queued_runs} /><Metric label={t('running')} value={runtime.running_runs} /><Metric label={t('failed')} value={runtime.failed_runs} /><Metric label={t('lastHeartbeat')} value={runtime.worker_last_seen_at ? formatDateTime(runtime.worker_last_seen_at) : t('never')} /></CardContent></Card>;
+  const mode = runtime.processing_mode === 'sync' ? 'sync' : 'async';
+  const workerRequired = runtime.worker_required !== false && mode === 'async';
+  const workerHealthy = !workerRequired || runtime.worker_status === 'online';
+  const workerLabel = !workerRequired ? t('workerNotRequired') : (runtime.worker_status === 'online' ? t('online') : t('offline'));
+  return <Card><CardHeader className="flex flex-row items-center justify-between gap-4"><div><CardTitle>{t('runtimeTitle')}</CardTitle><p className="mt-1 text-sm text-muted">{t('runtimeDescription')}</p></div><span className="flex items-center gap-1.5 text-xs text-text">{workerHealthy ? <CheckCircle2 className="h-4 w-4 text-positive" /> : <XCircle className="h-4 w-4 text-negative" />}{workerLabel}</span></CardHeader><CardContent className="grid grid-cols-2 gap-4 border-t border-border pt-4 sm:grid-cols-3 lg:grid-cols-6"><Metric label={t('processingMode')} value={mode === 'sync' ? t('processingModeSync') : t('processingModeAsync')} /><Metric label={t('queueWorker')} value={workerLabel} /><Metric label={t('queueDriver')} value={runtime.queue_connection} /><Metric label={t('queued')} value={runtime.queued_runs} /><Metric label={t('running')} value={runtime.running_runs} /><Metric label={t('failed')} value={runtime.failed_runs} /></CardContent></Card>;
 }
 
 function SettingsCard({ title, description, icon: Icon, enabled, configuredAt, onEnabled, actions, children }: { title: string; description: string; icon: typeof Database; enabled: boolean; configuredAt?: string | null; onEnabled: (value: boolean) => void; actions: ReactNode; children: ReactNode }) {

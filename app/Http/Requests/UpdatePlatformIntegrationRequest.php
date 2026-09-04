@@ -41,6 +41,7 @@ class UpdatePlatformIntegrationRequest extends FormRequest
             'document_ai' => $common + [
                 'provider' => ['nullable', Rule::in(['openai', 'anthropic', 'google_gemini'])],
                 'primary_provider' => ['nullable', Rule::in(['openai', 'anthropic', 'google_gemini'])],
+                'processing_mode' => ['sometimes', 'nullable', Rule::in(['sync', 'async'])],
                 'fallback_enabled' => ['required', 'boolean'],
                 'fallback_providers' => ['present', 'array', 'max:2'],
                 'fallback_providers.*' => [Rule::in(['openai', 'anthropic', 'google_gemini']), 'distinct'],

@@ -4,6 +4,10 @@ namespace App\Services\DocumentCenter;
 
 final class DocumentExtractionPolicy
 {
+    public const MODE_SYNC = 'sync';
+
+    public const MODE_ASYNC = 'async';
+
     /** @param array<string, mixed> $configuration */
     public function __construct(private readonly array $configuration)
     {
@@ -14,10 +18,25 @@ final class DocumentExtractionPolicy
         return new self([]);
     }
 
+    public static function normalizeMode(mixed $value): string
+    {
+        return $value === self::MODE_SYNC ? self::MODE_SYNC : self::MODE_ASYNC;
+    }
+
     public function enabled(): bool
     {
         return (bool) ($this->configuration['engine_enabled'] ?? false)
             && $this->primaryProvider() !== null;
+    }
+
+    public function processingMode(): string
+    {
+        return self::normalizeMode($this->configuration['processing_mode'] ?? null);
+    }
+
+    public function processesSynchronously(): bool
+    {
+        return $this->processingMode() === self::MODE_SYNC;
     }
 
     public function primaryProvider(): ?string

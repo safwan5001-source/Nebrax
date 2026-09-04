@@ -11,10 +11,15 @@ import { DocumentOperationsNav } from '@/components/documents/document-operation
 import { DocumentIntelligenceSettings } from '@/components/documents/document-intelligence-settings';
 
 type ExtractionReadiness = {
+  processing_mode?: 'sync' | 'async';
   provider_network_locked: boolean;
   platform_engine_enabled: boolean;
   primary_provider_ready: boolean;
   queue_async: boolean;
+  queue_required?: boolean;
+  worker_required?: boolean;
+  worker_status?: string;
+  safety_scan_ready?: boolean;
   ready: boolean;
 };
 
@@ -68,6 +73,10 @@ export default function DocumentSettingsPage() {
 
   const networkLocked = governance?.extraction_readiness?.provider_network_locked ?? true;
   const extractionReady = governance?.extraction_readiness?.ready ?? false;
+  const readiness = governance?.extraction_readiness;
+  const processingMode = readiness?.processing_mode === 'sync' ? 'sync' : 'async';
+  const workerRequired = readiness?.worker_required !== false && processingMode === 'async';
+  const safetyScanReady = readiness?.safety_scan_ready !== false;
 
   return (
     <div className="space-y-5">
@@ -101,6 +110,11 @@ export default function DocumentSettingsPage() {
               <div>
                 <h2 className="font-medium text-text">{networkLocked ? to('networkLocked') : to('networkOpen')}</h2>
                 <p className="mt-1 text-sm text-muted">{extractionReady ? to('statusExtractionAvailable') : to('statusExtractionUnavailable')}</p>
+                <p className="mt-1 text-sm text-muted">{processingMode === 'sync' ? to('processingModeSync') : to('processingModeAsync')}</p>
+                <p className="mt-1 text-sm text-muted">{workerRequired ? (readiness?.worker_status === 'online' ? to('workerOnline') : to('workerOffline')) : to('workerNotRequired')}</p>
+                {extractionReady && !safetyScanReady ? (
+                  <p className="mt-1 text-sm text-muted">{to('safetyScanPendingNotice')}</p>
+                ) : null}
                 {governance && (
                   <Badge className="mt-2" tone={governance.policy.enabled ? 'positive' : 'warning'}>
                     {governance.policy.enabled ? to('retentionEnabled') : to('retentionDisabled')}

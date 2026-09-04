@@ -2,6 +2,7 @@
 
 namespace App\Services\DocumentCenter;
 
+use App\Contracts\DocumentSafetyScanner;
 use App\Models\DocumentFile;
 use App\Support\DocumentScanStatus;
 use App\Support\DocumentWorkflowStatus;
@@ -13,6 +14,23 @@ class DocumentFileScanService
 {
     public function __construct(private readonly DocumentWorkflowService $workflow)
     {
+    }
+
+    /**
+     * يشغّل الفاحص الفعلي ويسجّل قراره. لا يعلّم الملف CLEAN دون قرار فاصل.
+     */
+    public function scanAndRecord(DocumentFile $file, DocumentStorageService $storage, DocumentSafetyScanner $scanner): DocumentFile
+    {
+        $stream = $storage->readStream($file->storage_profile, $file->object_key);
+        try {
+            $decision = $scanner->scan($stream);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        return $this->record($file, $decision, $scanner->providerName());
     }
 
     public function record(DocumentFile $file, DocumentScanStatus $decision, string $provider): DocumentFile
