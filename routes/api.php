@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\PlatformCommercialCatalogController;
 use App\Http\Controllers\Api\PlatformDashboardController;
 use App\Http\Controllers\Api\PlatformDocumentOperationsController;
 use App\Http\Controllers\Api\PlatformIntegrationController;
+use App\Http\Controllers\Api\PlatformDocumentFileScanExceptionController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformTenantController;
 use App\Http\Controllers\Api\BranchController;
@@ -176,6 +177,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('document-operations', [PlatformDocumentOperationsController::class, 'overview']);
         Route::get('document-usage', [PlatformDocumentOperationsController::class, 'usage']);
         Route::get('document-diagnostics', [PlatformDocumentOperationsController::class, 'diagnostics']);
+        Route::get('document-file-scan-exceptions', [PlatformDocumentFileScanExceptionController::class, 'index']);
     });
     Route::middleware(['auth:sanctum', EnsurePlatformAdministrator::class . ':platform:manage'])
         ->prefix('platform')
@@ -183,6 +185,8 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
             Route::patch('tenants/{tenant}', [PlatformTenantController::class, 'update']);
             Route::put('integrations/{integration}', [PlatformIntegrationController::class, 'update']);
             Route::post('integrations/{integration}/test', [PlatformIntegrationController::class, 'test']);
+            Route::post('document-file-scan-exceptions', [PlatformDocumentFileScanExceptionController::class, 'store']);
+            Route::post('document-file-scan-exceptions/{exception}/revoke', [PlatformDocumentFileScanExceptionController::class, 'revoke'])->whereUuid('exception');
             Route::get('prices', [PlatformSubscriptionController::class, 'prices']);
             Route::post('prices', [PlatformSubscriptionController::class, 'storePrice']);
             Route::post('tenants/{tenant}/subscriptions', [PlatformSubscriptionController::class, 'store']);

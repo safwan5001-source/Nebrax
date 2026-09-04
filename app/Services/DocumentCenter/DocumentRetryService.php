@@ -38,6 +38,7 @@ final class DocumentRetryService
         private readonly PlatformIntegrationResolver $settings,
         private readonly DocumentStorageService $storage,
         private readonly DocumentWorkflowService $workflow,
+        private readonly DocumentFileScanAdmissionService $scanAdmission,
     ) {}
 
     /** @return array{accepted:bool,code:?string,message:string,run:DocumentProcessingRun} */
@@ -84,7 +85,7 @@ final class DocumentRetryService
                 if ((! $synchronous && config('queue.default') === 'sync') || ! $policy->enabled() || $configuration === null || ! $configuration->isOperationallyReady()) {
                     return $this->rejected($locked, $actor, self::CODE_RUNTIME_UNAVAILABLE, 'استخراج البيانات غير مفعّل حالياً.');
                 }
-                if ($file->scan_status !== DocumentScanStatus::CLEAN || $batch->status === DocumentWorkflowStatus::QUARANTINED || ! $policy->allowsFile($file->size_bytes, $file->page_count)) {
+                if (! $this->scanAdmission->authorize($file) || $batch->status === DocumentWorkflowStatus::QUARANTINED || ! $policy->allowsFile($file->size_bytes, $file->page_count)) {
                     return $this->rejected($locked, $actor, self::CODE_NOT_ALLOWED, 'حالة الملف أو المستند لا تسمح بإعادة الاستخراج.');
                 }
                 if ($locked->attempt_count >= $configuration->maxAttempts) {
@@ -181,7 +182,6 @@ final class DocumentRetryService
         return ['accepted' => false, 'code' => self::CODE_DISPATCH_FAILED, 'message' => 'تعذر إرسال إعادة المحاولة؛ يمكنك المحاولة لاحقاً.', 'run' => $failed];
     }
 
-    /** @return array{accepted:false,code:string,message:string,run:DocumentProcessingRun} */
     private function rejected(DocumentProcessingRun $run, ?User $actor, string $code, string $message): array
     {
         $this->event($run, $actor, DocumentGovernanceEvent::ACTION_RETRY_REJECTED, $code);
