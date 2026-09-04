@@ -10,7 +10,7 @@ import { makeDocumentQaModel, type DocumentQaScenario } from '@/modules/document
 import { getDefaultDocumentLayout } from '@/modules/documents/registry/document-types';
 import type { DocumentTypeId } from '@/modules/documents/types';
 
-const SCENARIOS = ['single', 'five', 'twenty', 'multipage', 'long_content'] as const satisfies readonly DocumentQaScenario[];
+const SCENARIOS = ['single', 'three', 'five', 'twenty', 'multipage', 'long_content'] as const satisfies readonly DocumentQaScenario[];
 const DIRECTIONS = ['rtl', 'ltr'] as const;
 const TEMPLATES = [
   { id: 'tax-invoice-classic', labelKey: 'classic' },

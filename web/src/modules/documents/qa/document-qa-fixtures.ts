@@ -1,6 +1,6 @@
 import type { Direction, DocumentLine, DocumentModel, DocumentTypeId } from '../types';
 
-export type DocumentQaScenario = 'single' | 'five' | 'twenty' | 'multipage' | 'long_content';
+export type DocumentQaScenario = 'single' | 'three' | 'five' | 'twenty' | 'multipage' | 'long_content';
 
 export type DocumentQaOptions = {
   /** اختياري للتوافق مع فحوصات المرحلة الأولى؛ الافتراضي فاتورة ضريبية. */
@@ -15,23 +15,48 @@ const LOGO_DATA_URL = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/s
 const STAMP_DATA_URL = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"%3E%3Ccircle cx="60" cy="60" r="51" fill="none" stroke="%231e40af" stroke-width="5"/%3E%3Ctext x="60" y="57" text-anchor="middle" font-family="Arial" font-size="17" fill="%231e40af"%3EQA%3C/text%3E%3Ctext x="60" y="78" text-anchor="middle" font-family="Arial" font-size="12" fill="%231e40af"%3EAPPROVED%3C/text%3E%3C/svg%3E';
 const SIGNATURE_DATA_URL = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="72" viewBox="0 0 200 72"%3E%3Cpath d="M8 49 C35 14, 43 56, 70 29 S105 55, 133 28 S165 48, 193 21" fill="none" stroke="%23111827" stroke-width="3"/%3E%3C/svg%3E';
 
-function lineAt(index: number, direction: DocumentQaOptions['direction']): DocumentLine {
+const REALISTIC_PRODUCTS_AR = [
+  { name: 'دعم تقني شهري', desc: 'صيانة ودعم فني' },
+  { name: 'لابتوب Dell Latitude', desc: 'جهاز محمول للعمل' },
+  { name: 'ترخيص Microsoft 365', desc: 'اشتراك سنوي' },
+  { name: 'طباعة مستندات A4', desc: 'خدمة طباعة مكتبية' },
+  { name: 'استشارة مالية', desc: 'مراجعة ربع سنوية' },
+];
+
+const REALISTIC_PRODUCTS_EN = [
+  { name: 'Monthly IT Support', desc: 'Technical maintenance' },
+  { name: 'Dell Latitude Laptop', desc: 'Business workstation' },
+  { name: 'Microsoft 365 License', desc: 'Annual subscription' },
+  { name: 'A4 Document Printing', desc: 'Office print service' },
+  { name: 'Financial Consulting', desc: 'Quarterly review' },
+];
+
+function lineAt(index: number, direction: DocumentQaOptions['direction'], verbose: boolean): DocumentLine {
   const unitPrice = 12_500 + ((index % 7) * 1_000);
   const quantity = (index % 5) + 1;
   const subtotal = unitPrice * quantity;
   const tax = Math.round(subtotal * 0.15);
   const english = direction === 'ltr';
-  const productName = english
-    ? `Enterprise service line ${index + 1} with an extended descriptive commercial name`
-    : `بند خدمة مؤسسية رقم ${index + 1} باسم تجاري وصفي ممتد للاختبار`;
-  const description = english
-    ? `Detailed line ${index + 1}: recurring operational service, configuration and support coverage for the stated billing period.`
-    : `وصف تفصيلي للبند رقم ${index + 1}: خدمة تشغيلية دورية تشمل الإعداد والدعم للفترة المحاسبية المحددة.`;
+  let productName: string;
+  let description: string;
+  if (verbose) {
+    productName = english
+      ? `Enterprise service line ${index + 1} with an extended descriptive commercial name`
+      : `بند خدمة مؤسسية رقم ${index + 1} باسم تجاري وصفي ممتد للاختبار`;
+    description = english
+      ? `Detailed line ${index + 1}: recurring operational service, configuration and support coverage for the stated billing period.`
+      : `وصف تفصيلي للبند رقم ${index + 1}: خدمة تشغيلية دورية تشمل الإعداد والدعم للفترة المحاسبية المحددة.`;
+  } else {
+    const catalog = english ? REALISTIC_PRODUCTS_EN : REALISTIC_PRODUCTS_AR;
+    const item = catalog[index % catalog.length];
+    productName = item.name;
+    description = item.desc;
+  }
 
   return {
     id: `qa-line-${index + 1}`,
     productName,
-    productCode: `QA-SVC-${String(index + 1).padStart(3, '0')}`,
+    productCode: `SVC-${String(index + 1).padStart(3, '0')}`,
     barcode: `6281000${String(index + 1).padStart(6, '0')}`,
     description,
     quantity,
@@ -43,7 +68,7 @@ function lineAt(index: number, direction: DocumentQaOptions['direction']): Docum
 }
 
 function countForScenario(scenario: DocumentQaScenario): number {
-  return { single: 1, five: 5, twenty: 20, multipage: 40, long_content: 5 }[scenario];
+  return { single: 1, three: 3, five: 5, twenty: 20, multipage: 40, long_content: 5 }[scenario];
 }
 
 function longArabicText(label: string): string {
@@ -61,7 +86,8 @@ function longEnglishText(label: string): string {
 export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
   const type = options.documentType ?? 'tax_invoice';
   const english = options.direction === 'ltr';
-  const lines = Array.from({ length: countForScenario(options.scenario) }, (_, index) => lineAt(index, options.direction));
+  const verbose = options.scenario === 'multipage' || options.scenario === 'long_content' || options.scenario === 'twenty';
+  const lines = Array.from({ length: countForScenario(options.scenario) }, (_, index) => lineAt(index, options.direction, verbose));
   const subtotal = lines.reduce((sum, line) => sum + (line.priceBeforeTax ?? 0), 0);
   const tax = lines.reduce((sum, line) => sum + line.tax, 0);
   const assets = options.showAssets;
@@ -106,7 +132,7 @@ export function makeDocumentQaModel(options: DocumentQaOptions): DocumentModel {
       address: english ? 'King Saud Street, Khobar' : 'شارع الملك سعود، الخبر',
     },
     meta: {
-      number: `${type.toUpperCase()}-QA-${options.scenario.toUpperCase()}-2026-0001`,
+      number: longContent ? `${type.toUpperCase()}-QA-${options.scenario.toUpperCase()}-2026-0001` : 'INV-2026-0847',
       date: '2026-08-26',
       dueDate,
       paymentType,

@@ -175,7 +175,7 @@ describe('Modern V2 visual composition', () => {
   });
 
   it('يثبّت جدول البنود table-fixed ويلف الوصف الطويل ويحترم الأعمدة القابلة للضبط', () => {
-    const model = makeDocumentQaModel({ scenario: 'five', direction: 'rtl', showQr: false, showAssets: false });
+    const model = makeDocumentQaModel({ scenario: 'long_content', direction: 'rtl', showQr: false, showAssets: false });
     const { container } = renderComposition(MODERN_V2_STYLE, model, [
       { key: 'header', visible: true },
       { key: 'items', visible: true, properties: { columns: [{ id: 'product' }, { id: 'description', label: 'بيان البند' }, { id: 'total' }] } },

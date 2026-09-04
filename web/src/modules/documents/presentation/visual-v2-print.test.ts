@@ -89,3 +89,22 @@ describe('عزل قواعد طباعة Purchase Order Formal', () => {
     expect(css).not.toContain('[data-doc-composition="classic"] thead');
   });
 });
+
+describe('تحييد PDF يوازي الطباعة (A4 regression)', () => {
+  it('DocLayout يحمل print:min-h-0 و print:shadow-none (شرط مسار الطباعة)', () => {
+    const layout = readFileSync(resolve(process.cwd(), 'src/modules/documents/components/sections/doc-layout.tsx'), 'utf8');
+    expect(layout).toContain('print:min-h-0');
+    expect(layout).toContain('print:shadow-none');
+  });
+
+  it('مسار PDF يحيّد min-height و box-shadow يدوياً (html2canvas لا يطبّق @media print)', () => {
+    const pdf = readFileSync(resolve(process.cwd(), 'src/lib/pdf.ts'), 'utf8');
+    expect(pdf).toContain("el.style.minHeight = 'auto'");
+    expect(pdf).toContain("el.style.boxShadow = 'none'");
+  });
+
+  it('مسار PDF يتخطّى التقطيع عندما يتّسع المحتوى في صفحة واحدة', () => {
+    const pdf = readFileSync(resolve(process.cwd(), 'src/lib/pdf.ts'), 'utf8');
+    expect(pdf).toContain('canvas.height <= pageHeightCanvas');
+  });
+});

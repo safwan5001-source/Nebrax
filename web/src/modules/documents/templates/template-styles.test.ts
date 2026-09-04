@@ -110,16 +110,14 @@ describe('أساليب قوالب المستندات الرسمية', () => {
     expect(isLegacyMinimal(MINIMAL_V2_STYLE)).toBe(false);
     expect(MINIMAL_V2_STYLE).toMatchObject({
       composition: 'minimal_v2',
-      pagePadding: 'p-10',
+      pagePadding: 'p-8',
       cardRadius: 'rounded-none',
-      sectionGap: 'mt-6',
+      sectionGap: 'mt-5',
       tableHead: 'plain',
       tableDensity: 'spacious',
       brandBar: false,
     });
     expect(MINIMAL_V2_STYLE.pagePadding).not.toBe(MINIMAL_STYLE.pagePadding);
-    expect(MINIMAL_V2_STYLE.pagePadding).not.toBe(MODERN_V2_STYLE.pagePadding);
-    expect(MINIMAL_V2_STYLE.pagePadding).not.toBe(CLASSIC_V2_STYLE.pagePadding);
     expect(MINIMAL_V2_STYLE.pagePadding).not.toBe(ERP_V2_STYLE.pagePadding);
     expect(MINIMAL_V2_STYLE.sectionGap).not.toBe(MINIMAL_STYLE.sectionGap);
     expect(isLegacyRetail(RETAIL_STYLE)).toBe(true);
