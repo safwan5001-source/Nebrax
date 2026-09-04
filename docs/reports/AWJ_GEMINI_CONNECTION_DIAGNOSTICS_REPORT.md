@@ -3,7 +3,7 @@
 **المهمة:** تشخيص آمن لفشل اختبار اتصال Google Gemini في منصة التشغيل.
 **الفرع:** `cursor/gemini-connection-diagnostics-b8de`
 **Base SHA:** `2197e2bfffac8cc88517b653a5b4c7a4dd48e7ef` (`main`)
-**Head SHA:** `e2219718c6676118438ba08975dab73e951314fb`
+**Head SHA:** `973151629f57777249f62b9c23698f4f9cc16588`
 **PR:** [#636](https://github.com/safwan5001-source/Nebrax/pull/636) — للمراجعة فقط.
 
 **NOT MERGED / NOT DEPLOYED**
