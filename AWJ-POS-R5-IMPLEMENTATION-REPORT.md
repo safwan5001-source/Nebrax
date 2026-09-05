@@ -27,7 +27,8 @@ HEAD at session start (fetched fresh; matches PR #649, R3+R6, merged).
 
 ## Head SHA
 
-Recorded at PR creation time (see Git section / PR page).
+`641a8a2` (commit `fix(pos): make receipt server-authoritative (R5)`, pushed to
+`origin/claude/r5-pos-server-authoritative-receipt`).
 
 ## Branch
 
@@ -35,7 +36,7 @@ Recorded at PR creation time (see Git section / PR page).
 
 ## PR Number/Link
 
-Draft PR — number/link recorded after creation (see Git section below).
+Draft PR #651 — https://github.com/safwan5001-source/Nebrax/pull/651
 
 ## Exact Pre-Fix Receipt Data Flow
 
@@ -443,5 +444,5 @@ redundant ZATCA-QR fetch — before merge.
 
 - Branch: `claude/r5-pos-server-authoritative-receipt`
 - Base SHA: `ef4e86132eea922510e47ed38834c07fef050da3`
-- Head SHA: recorded at PR creation time
-- Draft PR: link recorded after creation
+- Head SHA: `641a8a2`
+- Draft PR: https://github.com/safwan5001-source/Nebrax/pull/651
