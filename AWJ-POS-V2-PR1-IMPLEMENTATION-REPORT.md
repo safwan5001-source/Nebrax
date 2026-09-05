@@ -244,8 +244,8 @@ Explicitly not started in this PR:
 - Repository: `safwan5001-source/Nebrax`
 - Branch: `claude/pos-v2-pr1-workspace-foundation`
 - Base SHA: `f1eef8e80adfb926f14ca79bd4b173dc7cea7388`
-- Head SHA: recorded after commit (see PR page)
-- Draft PR: recorded after creation (see PR page)
+- Head SHA: `8652554`
+- Draft PR: #653 — https://github.com/safwan5001-source/Nebrax/pull/653
 
 ## N. Recommended Next Step
 
