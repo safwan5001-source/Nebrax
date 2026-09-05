@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, Banknote, CalendarClock, Check, Landmark, Loader2, User } from 'lucide-react';
+import { ArrowRight, Banknote, CalendarClock, Check, Landmark, Loader2, TriangleAlert, User } from 'lucide-react';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import type { PosCheckoutPhase } from '@/lib/pos-checkout-attempt';
+import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
+import { orderedTenderPayload, simulateTenders, type PosTenderInput } from '@/lib/pos-payment-tender';
 
 export interface PaymentSummaryItem { name: string; qty: number; unitPrice: string; lineTotal: number }
 export interface PosPaymentMethod {
@@ -33,6 +35,8 @@ export function PosPayment({
   error,
   onBack,
   onConfirm,
+  showOnscreenNumericKeypad = false,
+  numericEditorLabels,
 }: {
   totalMinor: number;
   items: PaymentSummaryItem[];
@@ -48,6 +52,17 @@ export function PosPayment({
   error: string | null;
   onBack: () => void;
   onConfirm: (tenders: PosTender[]) => void;
+  /** PR-5: إعداد POS القائم `show_onscreen_numeric_keypad` — نفس مفتاح لوحة أرقام الكمية/السعر/الخصم، مُوسَّع الآن ليشمل مبلغ الدفع أيضاً. */
+  showOnscreenNumericKeypad?: boolean;
+  numericEditorLabels?: {
+    apply: string;
+    backspace: string;
+    cancel: string;
+    clear: string;
+    decimal: string;
+    digit: (digit: string) => string;
+    value: string;
+  };
 }) {
   const t = useTranslations('pos');
   const locale = useLocale();
@@ -70,17 +85,28 @@ export function PosPayment({
     setTenders((current) => ({ ...current, [id]: value }));
   };
 
-  const paidMinor = useMemo(
-    () => Object.values(tenders).reduce((sum, value) => sum + riyalToMinor(value), 0),
-    [tenders],
+  const tenderInputs: PosTenderInput[] = useMemo(
+    () => paymentMethods.map((method) => ({
+      methodId: method.id,
+      amount: riyalToMinor(tenders[method.id] ?? ''),
+      settlementType: method.settlement_type,
+    })),
+    [paymentMethods, tenders],
   );
-  const remainingMinor = Math.max(0, totalMinor - paidMinor);
-  const changeMinor = Math.max(0, paidMinor - totalMinor);
+
+  // PR-5: القيم المرجعية الحقيقية — تحاكي حرفياً حلقة التطبيق في `PosService::checkout`
+  // (وسائل غير نقدية أولاً بحدّ المتبقي، فالنقد أخيراً منه تُشتقّ الفكة). «المدفوع» هنا
+  // هو ما يُطبَّق فعلاً على الفاتورة (لا مجموع كل ما كُتب)، لأن فائض النقد فكةٌ لا سداد،
+  // وفائض وسيلة غير نقدية غير مقبول إطلاقاً لا فكة ولا سداداً.
+  const sim = useMemo(() => simulateTenders(totalMinor, tenderInputs), [totalMinor, tenderInputs]);
+  const paidMinor = totalMinor - sim.remainingMinor;
+  const remainingMinor = sim.remainingMinor;
+  const changeMinor = sim.changeMinor;
   const canConfirm = totalMinor > 0
     && !paymentMethodsLoadError
     && paymentMethods.length > 0
-    && (allowDeferredPayment || paidMinor >= totalMinor);
-  const quick = [totalMinor / 100, 50, 100, 200, 500];
+    && sim.invalidMethodId === null
+    && (allowDeferredPayment || remainingMinor <= 0);
   const selectedMethod = paymentMethods.find((method) => method.id === selectedMethodId) ?? null;
   const locked = paying || offline || checkoutPhase === 'submitting' || checkoutPhase === 'recovering';
 
@@ -88,10 +114,18 @@ export function PosPayment({
     return locale === 'en' ? method.name_en || method.name : method.name;
   }
 
+  // PR-5: «المبلغ بالضبط» يملأ ما تبقّى فعلاً بعد الوسائل الأخرى المُدخَلة —
+  // لا الإجمالي كاملاً كما كان، فلا يُنشئ تلقائياً فائضاً غير صحيح عند تقسيم الدفع.
+  function remainingForMethod(methodId: string): number {
+    const others = tenderInputs.filter((tender) => tender.methodId !== methodId);
+    return Math.max(0, simulateTenders(totalMinor, others).remainingMinor);
+  }
+
+  const quickBase = selectedMethod ? remainingForMethod(selectedMethod.id) / 100 : totalMinor / 100;
+  const quick = [quickBase, 50, 100, 200, 500];
+
   function tenderPayload(): PosTender[] {
-    return paymentMethods
-      .map((method) => ({ payment_method_id: method.id, amount: riyalToMinor(tenders[method.id] ?? '') }))
-      .filter((tender) => tender.amount > 0);
+    return orderedTenderPayload(tenderInputs).map((tender) => ({ payment_method_id: tender.payment_method_id, amount: tender.amount }));
   }
 
   function confirmLabel(): string {
@@ -188,31 +222,55 @@ export function PosPayment({
                 {paymentMethods.map((method) => {
                   const selected = selectedMethodId === method.id;
                   const applied = riyalToMinor(tenders[method.id] ?? '') > 0;
+                  const invalid = sim.invalidMethodId === method.id;
                   const Icon = method.settlement_type === 'cash' ? Banknote : Landmark;
                   return (
                     <div
                       key={method.id}
                       onClick={() => setSelectedMethodId(method.id)}
-                      className={'min-h-12 cursor-pointer rounded-md border bg-surface p-3 touch-manipulation sm:p-3.5 ' + (selected || applied ? 'border-primary bg-primary-soft' : 'border-border')}
+                      className={'min-h-12 cursor-pointer rounded-md border bg-surface p-3 touch-manipulation sm:p-3.5 ' + (invalid ? 'border-negative bg-negative/5' : selected || applied ? 'border-primary bg-primary-soft' : 'border-border')}
                     >
                       <div className="mb-2 flex items-center justify-between">
-                        <Icon className={'h-4 w-4 ' + (selected || applied ? 'text-primary' : 'text-muted')} strokeWidth={1.7} />
-                        {applied && <Check className="h-4 w-4 text-primary" strokeWidth={1.8} aria-hidden />}
+                        <Icon className={'h-4 w-4 ' + (invalid ? 'text-negative' : selected || applied ? 'text-primary' : 'text-muted')} strokeWidth={1.7} />
+                        {invalid ? (
+                          <TriangleAlert className="h-4 w-4 text-negative" strokeWidth={1.8} aria-hidden />
+                        ) : applied ? (
+                          <Check className="h-4 w-4 text-primary" strokeWidth={1.8} aria-hidden />
+                        ) : null}
                       </div>
                       <div className="mb-1.5 truncate text-xs font-semibold sm:text-[13px]" title={label(method)}>{label(method)}</div>
-                      <label className="block">
-                        <span className="sr-only">{t('received_amount')}</span>
-                        <input
-                          aria-label={label(method)}
-                          value={tenders[method.id] ?? ''}
-                          onFocus={() => setSelectedMethodId(method.id)}
-                          onChange={(event) => set(method.id, event.target.value)}
-                          inputMode="decimal"
+                      {showOnscreenNumericKeypad && numericEditorLabels ? (
+                        <PosNumericEditor
+                          allowDecimal
+                          className="min-h-12 w-full text-sm font-bold"
                           disabled={locked}
-                          placeholder="0.00"
-                          className="num min-h-12 w-full rounded-md border border-border bg-background px-2 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+                          inputAriaLabel={label(method)}
+                          labels={numericEditorLabels}
+                          onChange={(value) => set(method.id, value)}
+                          showKeypad
+                          title={t('numeric_keypad_edit_payment_amount')}
+                          value={tenders[method.id] ?? ''}
                         />
-                      </label>
+                      ) : (
+                        <label className="block">
+                          <span className="sr-only">{t('received_amount')}</span>
+                          <input
+                            aria-label={label(method)}
+                            value={tenders[method.id] ?? ''}
+                            onFocus={() => setSelectedMethodId(method.id)}
+                            onChange={(event) => set(method.id, event.target.value)}
+                            inputMode="decimal"
+                            disabled={locked}
+                            placeholder="0.00"
+                            className="num min-h-12 w-full rounded-md border border-border bg-background px-2 py-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+                          />
+                        </label>
+                      )}
+                      {invalid && (
+                        <p className="mt-1.5 text-[11px] font-semibold text-negative" role="alert" data-testid="pos-payment-method-invalid">
+                          {t('payment_bank_amount_exceeds_remaining')}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -224,6 +282,11 @@ export function PosPayment({
             <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-muted">
               <CalendarClock className="me-1.5 inline h-3.5 w-3.5" strokeWidth={1.7} />
               {t('deferred_payment')}
+              {remainingMinor > 0 && (
+                <span className="mt-1 block text-[11px]" data-testid="pos-deferred-remaining-note">
+                  {t('deferred_payment_remaining_note')}
+                </span>
+              )}
             </div>
           ) : (
             <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-text">

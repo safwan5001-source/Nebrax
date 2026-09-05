@@ -2039,6 +2039,8 @@ export default function PosPage() {
           error={error}
           onBack={requestPaymentCancel}
           onConfirm={confirmPayment}
+          showOnscreenNumericKeypad={posCfg.show_onscreen_numeric_keypad}
+          numericEditorLabels={numericEditorLabels}
         />
       ) : workspaceMode === 'invoices' ? (
         selectedInvoiceId ? (
