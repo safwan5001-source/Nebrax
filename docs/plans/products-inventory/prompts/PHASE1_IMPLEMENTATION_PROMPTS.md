@@ -1,6 +1,8 @@
-# Phase 1 — Implementation Handoff Prompts
+# Phase 1 — Claude Code Implementation Handoff Prompts
 
-هذه البرومبتات ليست بديلًا عن ملفات العقود في `phase-1-hardening/`. على المنفذ قراءة العقد المحدد + README + Dependency Map + Acceptance Matrix + التدقيق المغلق، ثم فحص الملفات اللازمة فقط من `main` الحالي. لا يبدأ من الصفر ولا يوسع Scope.
+**Execution agent:** Claude Code only. Cursor is no longer part of the AWJ implementation workflow.
+
+هذه البرومبتات ليست بديلًا عن ملفات العقود في `phase-1-hardening/`. على Claude Code قراءة العقد المحدد + README + Dependency Map + Acceptance Matrix + التدقيق المغلق، ثم فحص الملفات اللازمة فقط من `main` الحالي. لا يبدأ من الصفر ولا يوسع Scope.
 
 ## قالب التقرير الإلزامي لكل مهمة
 
@@ -42,6 +44,6 @@
 
 ---
 
-## قاعدة اختيار الوكيل
+## قاعدة التنفيذ المعتمدة
 
-هذه المهام مصممة لتكون scoped PRs ويمكن تنفيذها في Cursor عندما تكون مستقلة وواضحة. إذا كشف التنفيذ أن PR يحتاج استكشافًا واسعًا أو refactor متعدد الأنظمة، توقف قبل التوسع وارفع ذلك؛ عندها يمكن نقل المهمة إلى Claude Code بقرار منفصل. لا تستخدم Work/Codex تلقائيًا لإعادة تنفيذ/فحص ما يستطيع الوكيل إنجازه واختباره.
+جميع مهام التنفيذ البرمجي في برنامج Products & Inventory تُسلَّم إلى Claude Code. لا يُستخدم Cursor. ChatGPT يبقى طبقة التخطيط، مراجعة تقارير التنفيذ، ضبط Scope، واتخاذ قرار الانتقال بين PRs. لا تستخدم Work/Codex تلقائيًا لإعادة فحص عمل Claude Code؛ استخدمهما فقط إذا ظهر سبب تقني حقيقي لا يستطيع التقرير والاختبارات والأدلة حسمه.
