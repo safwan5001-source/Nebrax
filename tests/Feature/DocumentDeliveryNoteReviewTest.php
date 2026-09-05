@@ -11,8 +11,10 @@ use App\Models\DocumentProviderAttempt;
 use App\Models\DocumentReviewAction;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\DocumentCenter\DocumentReviewReadinessPolicy;
 use App\Services\DocumentCenter\DocumentReviewService;
 use App\Services\DocumentCenter\DocumentWorkflowService;
+use App\Services\DocumentCenter\ReviewedDocumentProjector;
 use App\Services\EntitlementGrantService;
 use App\Support\DocumentProcessingStatus;
 use App\Support\DocumentScanStatus;
@@ -57,19 +59,13 @@ class DocumentDeliveryNoteReviewTest extends TestCase
     }
 
     /** @test */
-    public function document_number_absence_alone_does_not_block_delivery_note_completion(): void
+    public function document_number_is_now_required_and_its_absence_blocks_completion(): void
     {
+        // قرار المالك النهائي: رقم السند أصبح إلزامياً (لم يعد اختيارياً كما
+        // كان في التصميم السابق) — من الخمسة المطلوبة صراحة.
         $fixture = $this->deliveryNoteFixture('delivery-note-no-number', documentNumber: null);
 
-        $completed = app(DocumentReviewService::class)->complete(
-            $fixture['batch'],
-            $fixture['result'],
-            $fixture['version'],
-            'رقم المستند غير متاح، بقية الدليل مكتملة.',
-            $fixture['actor']->id,
-        );
-
-        $this->assertSame(DocumentWorkflowStatus::REVIEWED, $completed->status);
+        $this->assertReadinessRejected($fixture, 'missing document number');
     }
 
     /** @test */
@@ -78,6 +74,18 @@ class DocumentDeliveryNoteReviewTest extends TestCase
         $fixture = $this->deliveryNoteFixture('delivery-note-no-date', documentDate: null);
 
         $this->assertReadinessRejected($fixture, 'missing delivery date');
+    }
+
+    /** @test */
+    public function an_issuer_name_alone_never_satisfies_the_customer_requirement(): void
+    {
+        // نبراس الطموح هو المُصدِر المعتاد لهذه المستندات؛ قبول issuer_name
+        // بديلاً عن recipient_name كان سيمرّر الجاهزية دون استخراج/مراجعة
+        // العميل الحقيقي أصلاً. issuer_name يبقى دليلاً معروضاً وقابلاً
+        // للتعديل، لكنه لا يُرضي شرط العميل مهما كان موجوداً.
+        $fixture = $this->deliveryNoteFixture('delivery-note-issuer-only', issuerName: 'نبراس الطموح', recipientName: null);
+
+        $this->assertReadinessRejected($fixture, 'issuer present but recipient missing');
     }
 
     /** @test */
@@ -104,6 +112,143 @@ class DocumentDeliveryNoteReviewTest extends TestCase
         ]);
 
         $this->assertReadinessRejected($fixture, 'line missing quantity');
+    }
+
+    /** @test */
+    public function a_zero_or_negative_or_non_numeric_quantity_never_satisfies_readiness(): void
+    {
+        // مستأجرٌ واحد يُعاد استخدامه لكل الحالات — حدّ `register` (3 بالدقيقة
+        // لكل IP) لا يتحمّل تسجيلاً منفصلاً لكل قيمة كمية غير صالحة.
+        $auth = $this->registerTenant('delivery-note-bad-qty', 'owner@delivery-note-bad-qty.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        app(BranchContext::class)->set(Branch::query()->where('tenant_id', $auth['tenant_id'])->value('id'));
+        app(EntitlementGrantService::class)->grant(
+            Tenant::findOrFail($auth['tenant_id']), 'document_center.core', EntitlementAccessMode::FULL,
+            EntitlementSourceType::ADDON, now('UTC')->subMinute(), null, 'delivery-note-review-test', (string) Str::uuid(),
+        );
+        $actor = User::query()->where('tenant_id', $auth['tenant_id'])->firstOrFail();
+
+        $cases = ['zero' => '0', 'negative' => '-5', 'non-numeric' => 'غير مقروء', 'empty-string' => ''];
+        foreach ($cases as $label => $badQuantity) {
+            $fixture = $this->deliveryNoteResult($actor, lines: [
+                ['description' => 'ديزل', 'quantity' => $badQuantity],
+            ]);
+
+            $this->assertReadinessRejected($fixture, "non-positive quantity ({$label})");
+        }
+    }
+
+    /** @test */
+    public function signature_stamp_and_noise_lines_without_a_quantity_never_satisfy_readiness_even_when_a_description_exists(): void
+    {
+        // الوصف موجود (الـ normalizer لا يحذف السطر) لكنه لا يحمل كميةً حقيقية
+        // — يجب ألا يُرقّى ضجيجٌ كهذا إلى دليل تجاري صالح لتمرير الجاهزية.
+        $fixture = $this->deliveryNoteFixture('delivery-note-noise-only', lines: [
+            ['description' => 'توقيع المستلم'],
+            ['description' => 'ختم الشركة'],
+        ]);
+
+        $this->assertReadinessRejected($fixture, 'noise lines with no quantity');
+    }
+
+    /** @test */
+    public function a_quantity_only_line_with_no_description_satisfies_readiness_and_is_never_silently_discarded(): void
+    {
+        // سطر بلا وصف (منتج هذا التدفق ثابت = ديزل) يجب أن ينجو من التطبيع
+        // ويُرضي شرط الكمية — لا حذف صامت ولا رفض بسبب غياب وصف لا معنى له هنا.
+        $fixture = $this->deliveryNoteFixture('delivery-note-qty-only-line', lines: [
+            ['description' => null, 'quantity' => '4000'],
+        ]);
+
+        $completed = app(DocumentReviewService::class)->complete(
+            $fixture['batch'],
+            $fixture['result'],
+            $fixture['version'],
+            'سطر بكمية فقط بلا وصف — يكتمل بلا مشكلة.',
+            $fixture['actor']->id,
+        );
+
+        $this->assertSame(DocumentWorkflowStatus::REVIEWED, $completed->status);
+        $this->assertSame('4000', $fixture['result']->fresh()->normalized_payload['lines'][0]['quantity']);
+        $this->assertNull($fixture['result']->fresh()->normalized_payload['lines'][0]['description']);
+    }
+
+    /** @test */
+    public function a_noise_line_coexisting_with_a_real_quantity_line_does_not_block_completion_and_remains_visible(): void
+    {
+        $fixture = $this->deliveryNoteFixture('delivery-note-noise-plus-real', lines: [
+            ['description' => 'توقيع المستلم'],
+            ['quantity' => '1500'],
+        ]);
+
+        $completed = app(DocumentReviewService::class)->complete(
+            $fixture['batch'],
+            $fixture['result'],
+            $fixture['version'],
+            'سطر ضجيج بجانب سطر كمية حقيقي — الإكمال ينجح والسطران يبقيان مرئيين.',
+            $fixture['actor']->id,
+        );
+
+        $this->assertSame(DocumentWorkflowStatus::REVIEWED, $completed->status);
+        $this->assertCount(2, $fixture['result']->fresh()->normalized_payload['lines']);
+    }
+
+    /** @test */
+    public function readiness_gaps_report_every_missing_item_and_disappear_once_corrected(): void
+    {
+        $fixture = $this->deliveryNoteFixture('delivery-note-gaps-api', documentNumber: null, documentDate: null, issuerName: 'نبراس الطموح', recipientName: null, lines: []);
+
+        $gaps = app(DocumentReviewReadinessPolicy::class)->deliveryNoteGaps(
+            $fixture['result']->normalized_payload['fields'],
+            $fixture['result']->normalized_payload['lines'],
+        );
+        $codes = array_column($gaps, 'code');
+
+        $this->assertContains('delivery_note_document_number_missing', $codes);
+        $this->assertContains('delivery_note_document_date_missing', $codes);
+        $this->assertContains('delivery_note_customer_missing', $codes);
+        $this->assertContains('delivery_note_quantity_missing', $codes);
+
+        $review = $this->withToken($fixture['token'])
+            ->getJson("/api/document-batches/{$fixture['batch']->id}/review")
+            ->assertOk()
+            ->json('data');
+        $this->assertSame($codes, array_column($review['readiness_gaps'], 'code'));
+
+        app(DocumentReviewService::class)->change($fixture['batch']->fresh(), $fixture['result'], $fixture['version'], 'fields.recipient_name', 'عميل تجريبي', 'تصحيح اسم العميل.', $fixture['actor']->id);
+        $review = $this->withToken($fixture['token'])
+            ->getJson("/api/document-batches/{$fixture['batch']->id}/review")
+            ->assertOk()
+            ->json('data');
+        $this->assertNotContains('delivery_note_customer_missing', array_column($review['readiness_gaps'], 'code'));
+    }
+
+    /** @test */
+    public function issuer_and_recipient_name_are_human_editable_for_delivery_notes(): void
+    {
+        $fixture = $this->deliveryNoteFixture('delivery-note-edit-customer', recipientName: null);
+
+        $change = app(DocumentReviewService::class)->change(
+            $fixture['batch'],
+            $fixture['result'],
+            $fixture['version'],
+            'fields.recipient_name',
+            'عميل تمّت مراجعته يدوياً',
+            'العميل غير مستخرَج آلياً؛ أُدخل يدوياً بعد المراجعة.',
+            $fixture['actor']->id,
+        );
+
+        $this->assertSame('field', $change->target_type);
+        $this->assertSame('عميل تمّت مراجعته يدوياً', app(ReviewedDocumentProjector::class)->value($fixture['result']->fresh(), 'fields.recipient_name'));
+
+        $completed = app(DocumentReviewService::class)->complete(
+            $fixture['batch']->fresh(),
+            $fixture['result'],
+            $fixture['version'] + 1,
+            'اكتملت المراجعة بعد إدخال العميل يدوياً.',
+            $fixture['actor']->id,
+        );
+        $this->assertSame(DocumentWorkflowStatus::REVIEWED, $completed->status);
     }
 
     /** @test */
@@ -251,8 +396,8 @@ class DocumentDeliveryNoteReviewTest extends TestCase
         string $slug,
         ?string $documentNumber = 'DN-77',
         ?string $documentDate = '2026-08-24',
-        ?string $issuerName = 'مورد تجريبي',
-        ?string $recipientName = null,
+        ?string $issuerName = 'نبراس الطموح',
+        ?string $recipientName = 'عميل تجريبي',
         ?array $lines = null,
     ): array {
         $auth = $this->registerTenant($slug, "owner@{$slug}.test");
@@ -271,6 +416,27 @@ class DocumentDeliveryNoteReviewTest extends TestCase
         );
         $actor = User::query()->where('tenant_id', $auth['tenant_id'])->firstOrFail();
 
+        return [
+            ...$this->deliveryNoteResult($actor, $documentNumber, $documentDate, $issuerName, $recipientName, $lines),
+            'token' => $auth['token'],
+        ];
+    }
+
+    /**
+     * يبني دفعة/دليل سند تسليم تحت مستأجرٍ مسجَّل بالفعل — بلا أي تسجيل جديد.
+     * يُستعمَل مباشرة حين يحتاج اختبار واحد عدة دفعات (كحلقة قيم كمية غير
+     * صالحة) دون استهلاك حدّ `register` (٣ بالدقيقة لكل IP) عدة مرات.
+     *
+     * @return array{batch: DocumentBatch, result: DocumentExtractionResult, actor: User, version: int}
+     */
+    private function deliveryNoteResult(
+        User $actor,
+        ?string $documentNumber = 'DN-77',
+        ?string $documentDate = '2026-08-24',
+        ?string $issuerName = 'نبراس الطموح',
+        ?string $recipientName = 'عميل تجريبي',
+        ?array $lines = null,
+    ): array {
         $batch = DocumentBatch::create(['document_type' => 'delivery_note', 'source_type' => 'manual', 'created_by' => $actor->id]);
         $workflow = app(DocumentWorkflowService::class);
         $batch = $workflow->transition($batch, DocumentWorkflowStatus::RECEIVING, 'review_test_receiving', 'user', $actor->id);
@@ -286,7 +452,9 @@ class DocumentDeliveryNoteReviewTest extends TestCase
             'detected_mime' => 'application/pdf',
             'size_bytes' => 128,
             'page_count' => 1,
-            'sha256' => str_repeat('c', 64),
+            // فريد لكل استدعاء — تحقُّق (tenant_id, branch_id, sha256, size_bytes)
+            // يرفض تكراره حين يُعاد استعمال مستأجر واحد لعدة دفعات في اختبار واحد.
+            'sha256' => hash('sha256', $batch->id),
             'scan_status' => DocumentScanStatus::CLEAN,
             'scanned_at' => now('UTC'),
         ]);
@@ -344,6 +512,6 @@ class DocumentDeliveryNoteReviewTest extends TestCase
             'extracted_at' => now('UTC'),
         ]);
 
-        return ['batch' => $batch, 'result' => $result, 'actor' => $actor, 'version' => $batch->version, 'token' => $auth['token']];
+        return ['batch' => $batch, 'result' => $result, 'actor' => $actor, 'version' => $batch->version];
     }
 }

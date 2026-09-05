@@ -57,4 +57,47 @@ class DocumentExtractionNormalizerTest extends TestCase
         $this->assertSame('printed', $normalized['field_evidence']['issuer_name']['source']);
         $this->assertSame(4100, $normalized['lines'][0]['confidence_basis_points']);
     }
+
+    /** @test */
+    public function a_line_with_a_quantity_but_no_description_is_kept_not_silently_discarded(): void
+    {
+        $payload = [
+            'document_type' => 'delivery_note',
+            'language' => 'ar',
+            'confidence' => '0.9000',
+            'fields' => [],
+            'lines' => [
+                // منتج سند التسليم ثابت (ديزل) — لا يحتاج كل سطر وصفاً نصياً.
+                ['quantity' => '4000'],
+            ],
+            'warnings' => [],
+        ];
+
+        $normalized = DocumentExtractionNormalizer::normalize(json_encode($payload, JSON_THROW_ON_ERROR), 'test_fixture', 'local');
+
+        $this->assertCount(1, $normalized['lines']);
+        $this->assertSame('4000', $normalized['lines'][0]['quantity']);
+        $this->assertNull($normalized['lines'][0]['description']);
+    }
+
+    /** @test */
+    public function a_line_with_neither_description_nor_quantity_is_dropped_as_before(): void
+    {
+        $payload = [
+            'document_type' => 'delivery_note',
+            'language' => 'ar',
+            'confidence' => '0.9000',
+            'fields' => [],
+            'lines' => [
+                ['sku' => null, 'description' => null, 'quantity' => null],
+                ['description' => 'صمام صناعي', 'quantity' => '3'],
+            ],
+            'warnings' => [],
+        ];
+
+        $normalized = DocumentExtractionNormalizer::normalize(json_encode($payload, JSON_THROW_ON_ERROR), 'test_fixture', 'local');
+
+        $this->assertCount(1, $normalized['lines']);
+        $this->assertSame('صمام صناعي', $normalized['lines'][0]['description']);
+    }
 }

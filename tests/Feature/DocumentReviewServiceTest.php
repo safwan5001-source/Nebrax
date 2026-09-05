@@ -102,7 +102,9 @@ class DocumentReviewServiceTest extends TestCase
         }
 
         foreach ([
-            ['target' => 'fields.issuer_name', 'value' => 'غير مسموح'],
+            // subtotal_minor ليس ضمن EDITABLE إطلاقاً — على النقيض من
+            // issuer_name/recipient_name اللذين أصبحا قابلين للتعديل صراحةً.
+            ['target' => 'fields.subtotal_minor', 'value' => 'غير مسموح'],
             ['target' => 'lines.0.unit_price_minor', 'value' => '100.25'],
         ] as $invalid) {
             try {

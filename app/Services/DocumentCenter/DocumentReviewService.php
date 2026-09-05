@@ -28,6 +28,7 @@ final class DocumentReviewService
 
     private const EDITABLE = [
         'fields.document_number' => 'text', 'fields.document_date' => 'date', 'fields.currency' => 'text',
+        'fields.issuer_name' => 'text', 'fields.recipient_name' => 'text',
         'lines.*.quantity' => 'quantity', 'lines.*.unit_price_minor' => 'minor', 'lines.*.discount_minor' => 'minor',
         'lines.*.tax_amount_minor' => 'minor', 'lines.*.total_minor' => 'minor',
     ];
