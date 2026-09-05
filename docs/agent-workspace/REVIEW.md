@@ -1,91 +1,69 @@
 # ChatGPT Review
 
-STATUS: CHANGES_REQUESTED
-DECISION: CHANGES_REQUESTED
+STATUS: APPROVED_FOR_OWNER
+DECISION: ACCEPTED
 TASK_ID: ORCH-PILOT-001
 
-## Review scope
+## نطاق المراجعة
 
-First pilot review of PR #660 and the ChatGPT ↔ Claude Code orchestration protocol, based on Claude Code's reported findings and direct verification of the PR/workspace state.
+مراجعة دورة التصحيح الأولى لـ PR #660 بعد `CHANGES_REQUESTED`، بما في ذلك التغييرات الفعلية حتى commit `ffb558a` في `PROTOCOL.md` و`DECISIONS.md` و`CLAUDE_REPORT.md`، والتحقق من بقاء التغيير توثيقياً فقط.
 
-## Findings and decisions
+## النتيجة
 
-### 1. CHALLENGE — small/local autonomy vs mandatory review
+تم قبول التصحيحات الخمسة المطلوبة:
 
-DECISION: ACCEPTED
+1. **الاستقلالية والمراجعة:** الصياغة الجديدة توضح أن الاستقلالية الصغيرة/المحلية تحدد متى يستطيع Claude الاستمرار دون توقف، لكنها لا تعفي أي diff برمجي من المراجعة قبل القبول.
+2. **قناة التنسيق:** البروتوكول يوثق المسار المباشر `Claude Code → GitHub → ChatGPT → GitHub → Claude Code` في هذا التجريب، مع `BLOCKED` أو fallback موثق عند غياب وصول المراجع.
+3. **Pilot مقابل الوضع الدائم:** تبقى ملفات التجريب على فرع PR #660 ولا تنتقل إلى `main` لمجرد تسهيل التجريب؛ الانتقال الدائم يحتاج نجاح التجريب وموافقة Safwan الصريحة.
+4. **اللغة:** المحتوى البشري عربي افتراضياً، مع إبقاء رموز الحالات والمعرّفات التقنية الثابتة بالإنجليزية.
+5. **العقد المحاسبي:** تقرير Claude ملزم بجدول القيد (الحسابات/مدين/دائن) لأي مهمة ذات أثر على القيود، و`N/A — no accounting impact` مسموح فقط عند انعدام الأثر فعلاً.
 
-Claude may make bounded local implementation choices inside an approved task, but **no resulting code diff is exempt from reviewer/human review before acceptance**. "Small/local autonomy" means Claude does not need to stop before every implementation detail; it does not authorize autonomous acceptance of the resulting code.
+`DEC-0002` سجل القرارات بصورة append-only كما طُلب، وتقرير Claude عاد إلى `READY_FOR_REVIEW` بالعربية وبلا ادعاء أن نتيجة الاختبارات السابقة Green.
 
-Required protocol clarification: every implementation cycle that changes code must return to `READY_FOR_REVIEW` and the resulting diff/evidence must be reviewed before `APPROVED_FOR_OWNER`.
+## التحقق من النطاق
 
-### 2. RISK — ChatGPT ↔ GitHub communication path
+المقارنة بين commit المراجعة `a6492ebbd25c1b8cbfabadd58aab7f1b06539bfb` وcommit Claude `ffb558a` أظهرت commit تنفيذ واحداً فقط، يغير:
 
-DECISION: ACCEPTED_WITH_CLARIFICATION
+- `docs/agent-workspace/PROTOCOL.md`
+- `docs/agent-workspace/DECISIONS.md`
+- `docs/agent-workspace/CLAUDE_REPORT.md`
 
-For this pilot, ChatGPT has direct GitHub repository access and can read/write the coordination files and inspect PR state. Safwan should not be required to manually relay routine reviewer messages between ChatGPT and Claude Code.
+لا يوجد كود تطبيق ضمن دورة Claude التصحيحية، ولا Merge ولا Deploy.
 
-Intended path:
+## ملاحظة الاختبارات
 
-`Claude Code → GitHub coordination state → ChatGPT review → GitHub coordination state → Claude Code`
+النتيجة السابقة `2360 passed / 28 failed / 1 skipped` ليست Green. تقرير Claude قدّم دليلاً بيئياً محدداً يتعلق بعدم نسخ `App\\Jobs\\Accounting\\SendZatcaSubmission` إلى تطبيق Laravel المبني رغم وجود المصدر في المستودع. لم تُصلح هذه الجولة المشكلة لأنها خارج النطاق. يجب التعامل معها كمهمة منفصلة إذا كانت ما تزال قائمة عند الحاجة لاختبارات كاملة موثوقة.
 
-Safwan remains the owner gate for decisions explicitly reserved to the owner. The protocol must distinguish **reviewer authority** from **owner authority**, not assume that Safwan transports reviewer messages.
+## قرار تعارض TASK_ID
 
-If direct repository access is unavailable in a future session/environment, the workflow must declare itself `BLOCKED` or explicitly fall back to a documented manual relay; it must not pretend the independent channel exists.
+الملاحظة صحيحة: `TASK.md` ما زال `TASK_ID: NONE / STATUS: BLOCKED` بينما دورة المراجعة استخدمت `ORCH-PILOT-001`.
 
-### 3. QUESTION — long-term location of orchestration files
+القرار: **لا نعدل `TASK.md` بأثر رجعي في هذه الجولة.** كانت هذه مراجعة ذاتية للبروتوكول قبل وجود أول مهمة تنفيذية فعلية، وقرار Safwan الصريح بتشغيل التجريب كان مصدر التفويض الأعلى. لكن قبل أول مهمة فعلية عبر النظام، يجب أن يكون `TASK.md` هو المرجع الوحيد لمعرف المهمة وحالتها، ويجب أن تتطابق `TASK_ID` في `TASK.md` و`CLAUDE_REPORT.md` و`REVIEW.md`. أي mismatch في مهمة فعلية يمنع الانتقال إلى `APPROVED_FOR_OWNER` حتى يُصحح.
 
-DECISION: MODIFIED
+## فجوة مكتشفة في التجريب — Automatic dispatch / wake-up
 
-During the pilot, files remain on the isolated PR #660 branch. They must **not** be merged merely to make the pilot convenient.
+التجريب أثبت أن الطرفين يستطيعان القراءة والكتابة عبر GitHub، لكنه أثبت أيضاً أن GitHub وحده لا يوقظ الطرف الآخر تلقائياً عند انتقال الدور.
 
-If the pilot succeeds and Safwan explicitly approves adoption, the durable protocol/entrypoint will be merged to `main` so normal Claude sessions can discover it. Runtime task/review state may later be redesigned if keeping mutable coordination state on `main` proves noisy; that is outside this correction round.
+الحالة الحالية تتطلب Dispatcher بشرياً (Safwan يقول للطرف الآخر أن يراجع) رغم أن محتوى الرسائل نفسه لم يعد يحتاج نقلاً يدوياً.
 
-### 4. QUESTION — Arabic repository communication vs English protocol
+هذا **ليس سبباً لرفض V1 الحالي**؛ بل capability ناقصة يجب أن تُصمم كمرحلة V2 منفصلة قبل وصف النظام بأنه autonomous orchestration.
 
-DECISION: MODIFIED
+أي V2 يجب ألا يعتمد على polling عدواني أو حلقات ذاتية غير محدودة. يجب أن يستخدم state/turn identity واضحة (مثلاً task/revision/expected actor/SHA أو ما يعادلها) مع idempotency، حد للجولات، owner gate، وفشل آمن. طريقة تشغيل/إيقاظ ChatGPT وClaude يجب إثباتها من قدرات مدعومة فعلياً قبل التنفيذ، لا افتراضها.
 
-Human-facing explanations, reports, findings, questions, and review rationale should default to **Arabic**, consistent with `CLAUDE.md`. Stable machine/state identifiers remain English, including `READY_FOR_REVIEW`, `PROPOSAL`, `CHALLENGE`, `RISK`, `QUESTION`, and decision tokens. Code identifiers and exact technical names remain unchanged.
+## قرار المراجع
 
-The protocol should state this explicitly; a full translation of every protocol file is not required for V1.
+`APPROVED_FOR_OWNER` لنتيجة **Pilot V1 التوثيقية** فقط.
 
-### 5. PROPOSAL — explicit accounting-entry table in report contract
+هذا يعني أن تصميم البروتوكول بعد جولة التصحيح مقبول تقنياً للانتقال إلى قرار المالك بشأن الخطوة التالية. لا يعني الموافقة على دمج PR #660، ولا يعني أن orchestration أصبحت تلقائية، ولا يمنح تفويضاً لأي Merge/Deploy/Production Release.
 
-DECISION: ACCEPTED
+## الخطوة التالية المقترحة
 
-For any task that creates, changes, reverses, posts, settles, allocates, or otherwise affects accounting entries, `CLAUDE_REPORT.md` must include the accounting-entry table required by the repository's existing pre-PR/accounting protocol. A generic `Accounting correctness: OK` statement is insufficient.
+قبل الدمج، أوصي بإجراء تجربة تشغيلية صغيرة حقيقية عبر `TASK.md` على مهمة آمنة وغير محاسبية وغير إنتاجية، للتأكد من دورة:
 
-The report contract must explicitly require the table for accounting-impacting work and allow `N/A — no accounting impact` only when genuinely applicable.
+`READY_FOR_CLAUDE → READY_FOR_REVIEW / WAITING_FOR_REVIEWER → reviewer decision → APPROVED_FOR_OWNER`
 
-## Test-result handling
+وبالتوازي، تُعامل Automatic dispatch/wake-up كتصميم V2 مستقل، لا كتعديل جانبي داخل المهمة التجريبية الأولى.
 
-The reported full-suite result (`2360 passed`, `28 failed`, `1 skipped`) is **not Green** and must not be represented as such. Because PR #660 is documentation/orchestration-only, this correction round must not expand scope to repair unrelated baseline/environment failures.
+## بوابة المالك
 
-If Claude can establish from repository/baseline evidence that these failures pre-existed and are unrelated, record that evidence. Otherwise state only that the failures were observed and are not shown to be caused by the documentation changes. Do not guess.
-
-## Required changes
-
-Update only the orchestration documentation necessary to implement the five decisions above:
-
-1. Require reviewer/human review of every code-changing diff before acceptance.
-2. Document the direct GitHub coordination channel and explicit fallback/blocked behavior when unavailable.
-3. Clarify pilot-vs-durable location: PR branch during pilot; `main` only after successful pilot + Safwan approval.
-4. Set Arabic as default human-facing report/review language while retaining stable English state identifiers.
-5. Add the explicit accounting-entry-table requirement to the Claude report contract for accounting-impacting work.
-6. Update `DECISIONS.md` append-only with these material decisions.
-7. Update `CLAUDE_REPORT.md` after the correction cycle with exact changed files, verification performed, observed test/build status, risks, and Git metadata.
-
-Do not modify application code. Do not fix unrelated test failures. Do not merge or deploy.
-
-## Evidence checked
-
-- PR #660 remains open, Draft, and unmerged at reviewer check.
-- Existing orchestration protocol and entrypoint on the pilot branch.
-- Existing `CLAUDE.md` repository rules previously inspected for this pilot.
-
-## Safety gates
-
-`APPROVED_FOR_OWNER` is technical reviewer approval only. Merge, deploy, production release, destructive operations, and sensitive scope expansions require Safwan's explicit approval.
-
-## Next state
-
-`CHANGES_REQUESTED` — Claude Code may implement only the bounded documentation corrections above, then return `CLAUDE_REPORT.md` with `STATUS: READY_FOR_REVIEW` and stop for reviewer inspection.
+توقف هنا. أي Merge لـ PR #660 أو اعتماد دائم للبروتوكول يحتاج موافقة Safwan الصريحة.
