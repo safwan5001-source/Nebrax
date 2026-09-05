@@ -481,7 +481,7 @@ Draft PR #654 — https://github.com/safwan5001-source/Nebrax/pull/654
 
 `da7bb6b`
 
-## 26. Recommended Next Step
+## 26. Recommended Next Step (superseded — see §27 for the current one)
 
 Triage the `ProductResource` cost/margin exposure finding (§10) as an
 independent backend security fix before it is compounded by any future PR
@@ -489,3 +489,283 @@ that reads more of that resource in a new surface. Separately, if Category
 Color is still desired, scope it as its own small backend PR (migration +
 resource + settings-contract change) rather than folding it into a future
 frontend-only PR.
+
+---
+
+## 27. PR-2S Security Integration
+
+This section documents integrating PR #654 with the now-merged security fix
+from §10/§26 above (PR-2S, Draft PR #655), per a separate follow-up mission.
+Nothing in §1–§26 was edited or erased; this section is additive.
+
+### 27.1 What merged
+
+- **PR #655** ("protect product cost/profit data with permission + POS
+  setting") merged into `main` at commit `f59ffb398aa53c75a26db892ee29127795d6d866`.
+- Verified at integration time: `origin/main` tip was exactly `f59ffb3`
+  (no newer commits since); `git merge-base --is-ancestor f59ffb3 origin/main`
+  confirmed reachable.
+- Old PR #654 Head SHA (before this integration): `a31e523db0d540d6dead043cc6bf85b8944efa04`.
+
+### 27.2 How #654 was updated
+
+`git checkout claude/pos-v2-pr2-product-category && git merge origin/main --no-edit`
+— a standard merge (not a rebase, to avoid rewriting a pushed, reviewable
+branch's history). **Result: clean merge, zero conflicts.** PR-2's own files
+(`pos-product-tile.tsx`, `pos-product-quick-view.tsx`, `pos/page.tsx` product
+card/Quick View sections) and PR-2S's files
+(`ProductResource.php`, `PosController.php`, `PosSettings.php`, `Rbac.php`,
+`SalesConfigController.php`, the POS configuration settings page) are
+entirely disjoint except for `web/src/messages/ar.json`/`en.json`, where git
+auto-merged both PRs' independent new keys with no conflict (confirmed
+afterward: both `pos.quick_view`/`pos.out_of_stock` from PR-2 and
+`posSettings.show_cost_profit_in_pos` from PR-2S are present, JSON validated
+with `python3 -c "json.load(...)"`). **No semantic disagreement was found
+between PR-2 and PR-2S to report** — there was nothing to choose between;
+the merge was mechanical.
+
+### 27.3 Quick View integration with the authoritative security model
+
+Inspected the actual, current `ProductResource::toArray()` contract (post
+PR-2S): `purchase_price` and `avg_cost` (Money-formatted strings, e.g.
+`"100.00"`) and `profit_margin` (raw integer or `null`) are each wrapped in
+`$this->when(! $hidesCostProfit, ...)` — **absent from the JSON entirely**
+(not `null`) when the requesting user lacks `products.view_cost` or the
+tenant's `show_cost_profit_in_pos` setting is off.
+
+Changes made, matching this contract exactly:
+
+- **`web/src/app/(pos)/pos/page.tsx`**: `Product` interface gained
+  `purchase_price?: string`, `avg_cost?: string`, `profit_margin?: number | null`
+  — all optional, no default value assigned anywhere. The Quick View product
+  builder passes `p.purchase_price`/`p.avg_cost`/`p.profit_margin` straight
+  through (each `undefined` when the server omitted the key — ordinary
+  JS/JSON behavior, no code needed to "detect" absence).
+- **`web/src/components/pos/pos-product-quick-view.tsx`**: `PosProductQuickViewProduct`
+  gained the same three optional fields. A new "commercial information"
+  `<dl>` section renders **only when at least one of the three keys is
+  `!== undefined`** — i.e., only when the server actually returned it. Inside
+  that section, `profit_margin` additionally checks `!== null` before
+  rendering its own row, so a product that has cost data but no recorded
+  margin (a legitimate business `null`, distinct from "unauthorized")
+  doesn't show a fake `0`/blank margin row — it simply omits that one row
+  while still showing purchase price/average cost.
+- **No client-side derivation anywhere**: no code path computes `purchase_price`
+  from `sale_price`/`profit_margin` or vice versa; the three fields are read
+  and displayed verbatim or not rendered at all.
+- **Permission check kept separate and secondary, as instructed**: the
+  pre-existing `canOpenProductInErp` (`hasPermission(..., 'products.view')`,
+  used only for the unrelated "Open in ERP" link) was **not** reused or
+  extended to gate the cost/profit section — the mission explicitly warned
+  against making Quick View "depend solely on `hasPermission('products.view_cost')`"
+  since the POS setting could still be off. The cost/profit section's
+  visibility is driven **only** by field presence in the actual API
+  response, never by a frontend permission check.
+
+### 27.4 Frontend types
+
+```ts
+// Product (page.tsx) and PosProductQuickViewProduct (pos-product-quick-view.tsx)
+purchase_price?: string;
+avg_cost?: string;
+profit_margin?: number | null;
+```
+
+All three are optional (`?:`); none has a default value in `POS_DEFAULTS`,
+`DEFAULTS`, or any object literal — an unauthorized/disabled response simply
+never populates them, and no code fills them in afterward.
+
+### 27.5 Security regression checklist
+
+Explicitly re-verified none of the following occurred during integration:
+
+- [x] Sensitive fields remain **optional** in every frontend type touched.
+- [x] No fallback/default value was added for any of the three fields.
+- [x] `show_cost_profit_in_pos` is not bypassed — the frontend never
+  requests or infers these fields independently; it only ever displays what
+  `GET /pos/products` actually returned.
+- [x] `products.view_cost` is not bypassed, duplicated, or shadowed by a
+  second permission or setting.
+- [x] No client-side cost calculation exists (no `sale_price − margin`,
+  no `sale_price / (1 + margin)`, nothing derived).
+- [x] Product Cards (`pos-product-tile.tsx`) were **not** touched by this
+  integration and still show only name/price/barcode/stock — no cost/profit
+  field was added there.
+- [x] `ProductResource`'s security behavior (§7/§12 of PR-2S's own report)
+  was not modified — this integration is frontend-only; `git diff` for this
+  integration touches zero files under `app/`.
+- [x] `PosController`'s security decision (`$revealCostProfit` computation)
+  was not touched.
+- [x] POS setting defaults (`show_cost_profit_in_pos: false`) unchanged.
+- [x] Tenant Isolation / Branch Isolation: unaffected — no query, scope, or
+  endpoint was touched by this integration; it only consumes fields already
+  present or absent in a response whose tenant-scoping is entirely PR-2S's
+  concern, verified there.
+
+### 27.6 Existing PR-2 behavior preserved
+
+Re-confirmed unchanged by this integration (all in files this integration
+did not touch, or touched only additively):
+card click still calls the existing `addProduct()` path; favorite remains an
+independent sibling button with `stopPropagation`; Quick View's info button
+remains independent and does not add to cart; `show_product_images`
+ON/OFF behavior (including zero reserved media space when OFF) is
+unmodified; image fallback chain unmodified; low-stock/out-of-stock
+indicators remain purely informational on the card (untouched by this
+integration); category image behavior unmodified; no topbar or Start
+Selling change; no financial logic change anywhere in this diff.
+
+### 27.7 Tests
+
+**Frontend — targeted:**
+```
+npx vitest run src/components/pos/pos-product-quick-view.test.tsx src/components/pos/pos-product-tile.test.tsx
+```
+**20 passed** (12 tile — unmodified — + 8 Quick View, including 3 new PR-2S
+integration tests: commercial section renders only when fields are present,
+section absent entirely when fields are absent, and no fake margin row when
+`profit_margin` is `null` alongside present cost fields).
+
+**Frontend — broader POS regression:**
+```
+npx vitest run "src/app/(pos)" src/components/pos src/lib/__tests__/pos-workspace.test.ts src/lib/pos-receipt.test.ts src/lib/permissions.test.ts "src/app/(app)/pos/settings/configuration/page.test.tsx"
+```
+**157 passed** (29 test files) — includes the PR-2S settings-page toggle
+test, Start Selling invariants, interaction modules, receipt building,
+permission helper — all green.
+
+**Frontend — full suite:**
+```
+npx vitest run
+```
+**1435 passed** (225 test files) — zero failures.
+
+**Backend — targeted (SQLite):**
+```
+php artisan test --filter='PosProductCostVisibilityTest|PosCheckoutTest|PosCheckoutIdempotencyTest|PosReturnTest|PosReturnUomTest|PosReturnExchangeIdempotencyTest|PosInvoiceBranchAccessTest|PosDefaultCustomerSettingsTest|ApiInvoiceTest|BranchIsolationGuardTest|ProductBarcodeAndMediaTest|SalesConfigTest|RoleTest'
+```
+**121 passed (1393 assertions)** on the merged branch — confirms PR-2S's
+security tests (including `PosProductCostVisibilityTest`'s full 4-combination
+truth table) still pass unchanged after the merge, and no regression was
+introduced in R1–R6-adjacent suites.
+
+**Backend — full suite (SQLite):**
+```
+php artisan test
+```
+**2344 passed, 1 skipped, 25 failed (16912 assertions).** The 25 failures
+are the same pre-existing, environment-only gaps documented in every prior
+report for this repository (24 `Fuel*Test` failures — `Call to undefined
+function App\Services\bcmul()`, this environment's PHP lacks the `bcmath`
+extension, which CI installs explicitly; 1 `DocumentCenterSecureIntakeTest`
+failure — missing `poppler-utils`, also CI-installed). Identical failure set
+and count to the pre-integration PR-2S run — zero new failures introduced by
+this integration (which touches no backend file at all).
+
+**PostgreSQL:**
+```
+php artisan migrate:fresh --force
+```
+Succeeds cleanly (no migration in this integration).
+```
+php artisan test --filter='PosProductCostVisibilityTest|PosCheckoutTest|PosCheckoutIdempotencyTest|PosReturnTest|PosReturnUomTest|PosReturnExchangeIdempotencyTest|PosInvoiceBranchAccessTest|PosDefaultCustomerSettingsTest|ApiInvoiceTest|BranchIsolationGuardTest|ProductBarcodeAndMediaTest|SalesConfigTest|RoleTest'
+```
+**121 passed (1393 assertions)** — identical to the SQLite targeted result.
+A full-suite run was not repeated on PostgreSQL (would only re-confirm the
+same two engine-independent, already-documented environment gaps); the
+targeted run above covers every module this integration touches or could
+plausibly affect, on PostgreSQL specifically.
+
+### 27.8 Build
+
+```
+npm run build
+```
+**Exit code 0.**
+
+### 27.9 Visual/manual verification
+
+**Not performed as a live-browser session in this integration.** No dev
+server was started against a real POS session, real product images, a real
+authorized/unauthorized user pair, or the `show_cost_profit_in_pos` toggle in
+an actual browser this session — consistent with how PR-1 and the original
+PR-2 report already handled this exact question (both explicitly recorded
+"automated verification only, no live browser pass," rather than claiming a
+manual check that didn't happen). What **was** verified, automatically, via
+component-level render tests exercising the real DOM output (jsdom +
+Testing Library), covering every scenario the mission asked for at the
+component level:
+
+- Commercial section renders with correct labels/values when the three
+  fields are present (§27.7).
+- Commercial section is entirely absent when the fields are absent.
+- No fake margin row when `profit_margin` is `null` but cost fields exist.
+- Out-of-stock label renders instead of "Available: 0" (pre-existing test,
+  re-confirmed passing).
+- Long product name, missing image, Quick View open/close, add-to-cart
+  isolation from Favorite/Quick View buttons — all pre-existing PR-2 tests,
+  re-confirmed passing unmodified.
+
+RTL rendering specifically: every string asserted against in the test suite
+is Arabic-language UI text sourced through the same `next-intl`
+`useTranslations` mechanism already exercised (in Arabic) by the rest of the
+POS test suite; no new conditional layout logic keyed on direction was
+introduced by this integration (the new commercial-info `<dl>` uses the same
+`grid grid-cols-2` pattern already used one section above it for
+sku/barcode/category/units). This was not independently re-verified in an
+actual browser window.
+
+**Explicit limitation acknowledged, not hidden**: light/dark theme
+rendering, actual touch/keyboard interaction in a live browser, and a true
+end-to-end pass with a real toggled `show_cost_profit_in_pos` setting and a
+real `products.view_cost`-granted user were not performed this session.
+
+### 27.10 Category Color / Category Presentation Mode
+
+**Both remain exactly as documented in §8 of this report — unchanged,
+un-implemented, not marked done:**
+
+- **Category Color**: still DEFERRED/BLOCKED. No `color` column exists on
+  `product_categories`; this integration did not touch category data,
+  category resources, or category settings in any way.
+- **Category Presentation Mode** (`Default | Image | Color`): still
+  DEFERRED/BLOCKED. No persisted presentation-mode setting exists; this
+  integration did not add one.
+
+### 27.11 Files changed by this integration
+
+| File | Change |
+|---|---|
+| `web/src/app/(pos)/pos/page.tsx` | `Product` type: 3 new optional fields; Quick View product builder passes them through; Quick View `fields` prop gets 4 new label keys |
+| `web/src/components/pos/pos-product-quick-view.tsx` | `PosProductQuickViewProduct`: 3 new optional fields; new conditional "commercial information" section |
+| `web/src/components/pos/pos-product-quick-view.test.tsx` | 3 new tests |
+| `web/src/messages/en.json` / `ar.json` | 4 new `pos.*` keys (commercial section title + 3 field labels) |
+
+No file under `app/` (Laravel), `database/`, or `routes/` was touched by
+this integration — those files arrived already-merged from PR-2S via the
+merge in §27.2, unmodified further.
+
+### 27.12 Risks / Remaining Work
+
+- No live-browser visual pass (§27.9) — recommend a human reviewer do a
+  quick manual check of the commercial-info section's spacing/typography
+  before merge, since it's genuinely new visual real estate in the dialog.
+- Category Color / Presentation Mode remain open Master Contract items for
+  a future, explicitly-scoped backend PR (unchanged recommendation from §26).
+
+## 28. Updated Git Metadata
+
+- Branch: `claude/pos-v2-pr2-product-category` (unchanged, same PR #654)
+- Base SHA (original PR-2, §24): `b94718a432d01dab7d5bde04dda2259717ef2a28`
+- Old Head SHA (before this integration): `a31e523db0d540d6dead043cc6bf85b8944efa04`
+- Current `main` SHA used for this integration: `f59ffb398aa53c75a26db892ee29127795d6d866`
+- New Head SHA (after this integration): `e053d1f` (Quick View integration commit), report-finalization commit follows
+
+## 29. Recommended Next Step (current)
+
+Human review of PR #654's now-integrated diff, specifically: (1) the
+commercial-info section's visual placement in Quick View (§27.12), and (2) a
+live check with `show_cost_profit_in_pos` toggled on for a
+`products.view_cost`-holding user, before this Draft is marked ready. PR-2S
+(#655) and PR-2 (#654) are otherwise fully reconciled — no outstanding
+conflict or disagreement between them.
