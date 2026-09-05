@@ -342,8 +342,8 @@ mobile category-strip redesign) remain entirely untouched and are not started.
 - Branch: `claude/pos-v2-pr3-cart-interaction`
 - Base SHA: `256896e8cd36820ce3eaf41ed3ef10df249f8391` (confirmed: `main` HEAD at session start,
   matches the PR-2C merge SHA given in the mission brief)
-- PR number/link: recorded after creation (see final chat reply)
-- Head SHA: recorded after commit (see final chat reply)
+- PR number/link: [#658](https://github.com/safwan5001-source/Nebrax/pull/658) (Draft)
+- Head SHA: `d95f8e620142d16b8465ddbdf5a3085c2245ac99`
 
 ## Next Step
 
