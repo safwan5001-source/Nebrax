@@ -102,4 +102,64 @@ describe('PosProductTile', () => {
     expect(screen.queryByTestId('pos-product-barcode')).toBeNull();
     expect(screen.queryByText('W330')).toBeNull();
   });
+
+  it('لا يعرض زر Quick View إن لم يُمرَّر onOpenQuickView (توافق رجعي)', () => {
+    renderTile();
+    expect(screen.queryByRole('button', { name: /Quick view/i })).toBeNull();
+  });
+
+  it('يفتح Quick View دون إضافة المنتج للسلة، ولا يمرّر النقر للبطاقة الرئيسية', () => {
+    const onAdd = vi.fn();
+    const onOpenQuickView = vi.fn();
+    render(
+      <PosProductTile
+        product={product}
+        showImage
+        selected={false}
+        isFavorite={false}
+        availableLabel="Available"
+        favoriteLabel="Favorites"
+        quickViewLabel="Quick view"
+        onAdd={onAdd}
+        onToggleFavorite={vi.fn()}
+        onOpenQuickView={onOpenQuickView}
+        onFocus={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Quick view' }));
+    expect(onOpenQuickView).toHaveBeenCalledOnce();
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('يعرض «نفد المخزون» حين تكون الكمية صفراً أو أقل، ولا يمنع الإضافة', () => {
+    const { onAdd } = renderTile({
+      product: { ...product, quantity_on_hand: 0 },
+      outOfStockLabel: 'Out of stock',
+    });
+    expect(screen.getByTestId('pos-product-stock').textContent).toBe('Out of stock');
+    fireEvent.click(screen.getByRole('button', { name: /Water 330ml/ }));
+    expect(onAdd).toHaveBeenCalledOnce();
+  });
+
+  it('يعرض «مخزون منخفض» حين تصل الكمية إلى حد إعادة الطلب دون نفاده، في سطر مستقل كامل غير مقصوص', () => {
+    renderTile({
+      product: { ...product, quantity_on_hand: 3, reorder_level: 5 },
+      lowStockLabel: 'Low stock',
+    });
+    // سطران مستقلان لا نصّ واحد مدموج — يمنع بتر «Low stock» عند عرض البطاقة
+    // العادي (الثغرة البصرية المكتشفة والمصلَحة هنا).
+    expect(screen.getByText('Available: 3')).toBeTruthy();
+    const lowStockLine = screen.getByTestId('pos-product-low-stock');
+    expect(lowStockLine.textContent).toBe('Low stock');
+    expect(lowStockLine.className).toContain('text-warning');
+    expect(lowStockLine.className).not.toContain('text-negative');
+  });
+
+  it('لا يعرض تنبيه مخزون منخفض فوق حد إعادة الطلب', () => {
+    renderTile({
+      product: { ...product, quantity_on_hand: 12, reorder_level: 5 },
+      lowStockLabel: 'Low stock',
+    });
+    expect(screen.getByTestId('pos-product-stock').textContent).toBe('Available: 12');
+  });
 });
