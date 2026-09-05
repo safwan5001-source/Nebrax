@@ -1,5 +1,6 @@
 'use client';
 
+import type { Ref } from 'react';
 import { useTranslations } from 'next-intl';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,11 @@ interface SearchBarProps {
   placeholder: string;
   className?: string;
   ariaLabel?: string;
+  inputRef?: Ref<HTMLInputElement>;
+  /** اختصار لوحة مفاتيح معلَن وصولياً، مثل `/`. */
+  keyShortcuts?: string;
+  /** ارتفاع/حشوة الحقل — افتراضي `h-10`. الشاشات الكثيفة تمرّر `h-9` دون تغيير الباقي. */
+  inputClassName?: string;
 }
 
 export function SearchBar({
@@ -20,6 +26,9 @@ export function SearchBar({
   placeholder,
   className,
   ariaLabel,
+  inputRef,
+  keyShortcuts,
+  inputClassName,
 }: SearchBarProps) {
   const t = useTranslations('nebrax');
 
@@ -31,12 +40,15 @@ export function SearchBar({
         aria-hidden="true"
       />
       <Input
+        ref={inputRef}
         type="search"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel ?? t('search')}
-        className="h-10 pe-10 ps-9 text-sm"
+        aria-keyshortcuts={keyShortcuts}
+        autoComplete="off"
+        className={cn('h-10 pe-10 ps-9 text-sm', inputClassName)}
       />
       {value ? (
         <Button
