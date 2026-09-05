@@ -51,6 +51,10 @@ export const FUEL_WORKSPACE_NAV_GROUPS: FuelWorkspaceNavGroup[] = [
     ],
   },
   {
+    labelKey: 'reports',
+    items: [{ href: '/fuel-stations/reports', labelKey: 'reports', permissions: ['fuel.reports.view'], appKey: 'fuel_stations.maintenance' }],
+  },
+  {
     labelKey: 'settings',
     items: [{ href: '/fuel-stations/settings', labelKey: 'settings', permissions: ['fuel_stations.view'] }],
   },
