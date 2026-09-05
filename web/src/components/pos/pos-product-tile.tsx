@@ -1,6 +1,6 @@
 'use client';
 
-import { Barcode, Star } from 'lucide-react';
+import { Barcode, Info, Star } from 'lucide-react';
 import { PosProductImage } from '@/components/pos/pos-product-image';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,10 @@ export interface PosProductTileProduct {
   pos_image?: { download_url: string } | null;
   track_inventory: boolean;
   quantity_on_hand: number;
+  /** حد إعادة الطلب من بطاقة المنتج نفسها (نفس عتبة «مخزون منخفض» في قائمة
+   *  المنتجات: `quantity_on_hand <= reorder_level` و`reorder_level > 0`). عرضٌ
+   *  بحت لا يغيّر أهلية الإضافة — الخادم وحده يقرّر عند الترحيل. */
+  reorder_level?: number | null;
 }
 
 /** بطاقة منتج POS: كامل المساحة قابلة للضغط لإضافة الصنف. */
@@ -23,8 +27,12 @@ export function PosProductTile({
   isFavorite,
   availableLabel,
   favoriteLabel,
+  outOfStockLabel,
+  lowStockLabel,
+  quickViewLabel,
   onAdd,
   onToggleFavorite,
+  onOpenQuickView,
   onFocus,
   buttonRef,
 }: {
@@ -34,11 +42,20 @@ export function PosProductTile({
   isFavorite: boolean;
   availableLabel: string;
   favoriteLabel: string;
+  outOfStockLabel?: string;
+  lowStockLabel?: string;
+  quickViewLabel?: string;
   onAdd: () => void;
   onToggleFavorite: () => void;
+  /** اختياري: زر معلومات مستقل يفتح Quick View للقراءة فقط. لا يضيف للسلة. */
+  onOpenQuickView?: () => void;
   onFocus: () => void;
   buttonRef?: (element: HTMLButtonElement | null) => void;
 }) {
+  const outOfStock = product.track_inventory && product.quantity_on_hand <= 0;
+  const lowStock = !outOfStock && product.track_inventory
+    && typeof product.reorder_level === 'number' && product.reorder_level > 0
+    && product.quantity_on_hand <= product.reorder_level;
   return (
     <div className="relative min-w-0">
       <button
@@ -77,8 +94,15 @@ export function PosProductTile({
               </span>
             ) : null}
             {product.track_inventory && (
-              <span className="num block truncate whitespace-nowrap" data-testid="pos-product-stock">
-                {availableLabel}: {product.quantity_on_hand}
+              <span
+                className={cn(
+                  'num block truncate whitespace-nowrap',
+                  outOfStock ? 'font-semibold text-negative' : lowStock ? 'font-semibold text-warning' : undefined,
+                )}
+                data-testid="pos-product-stock"
+              >
+                {outOfStock && outOfStockLabel ? outOfStockLabel : `${availableLabel}: ${product.quantity_on_hand}`}
+                {!outOfStock && lowStock && lowStockLabel ? ` · ${lowStockLabel}` : ''}
               </span>
             )}
           </div>
@@ -100,6 +124,23 @@ export function PosProductTile({
       >
         <Star className="h-4 w-4" strokeWidth={1.7} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
+
+      {onOpenQuickView && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenQuickView();
+          }}
+          className={cn(
+            'absolute start-2 top-2 grid min-h-11 min-w-11 touch-manipulation place-items-center rounded-md border border-border bg-surface/95 text-muted',
+            'hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+          )}
+          aria-label={quickViewLabel}
+        >
+          <Info className="h-4 w-4" strokeWidth={1.7} />
+        </button>
+      )}
     </div>
   );
 }

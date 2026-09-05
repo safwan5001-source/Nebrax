@@ -81,6 +81,8 @@ import {
 } from '@/lib/pos-interaction-policy';
 import { resolvePosDefaultCustomer } from '@/lib/pos-default-customer';
 import { executeCashDrawerAction, type CashDrawerAction, type CashDrawerBridgeResult } from '@/lib/cash-drawer-bridge';
+import { hasPermission } from '@/lib/permissions';
+import { PosProductQuickView, type PosProductQuickViewProduct } from '@/components/pos/pos-product-quick-view';
 
 const WALKIN = 'عميل نقدي (POS)';
 
@@ -151,6 +153,9 @@ interface Product {
   track_inventory: boolean;
   quantity_on_hand: number;
   is_active: boolean;
+  /** حد إعادة الطلب — نفس عتبة «مخزون منخفض» المعتمدة في قائمة المنتجات
+   *  (`ProductListFilters`): `quantity_on_hand <= reorder_level` و`reorder_level > 0`. */
+  reorder_level?: number | null;
 }
 interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null; cash_drawer?: { configured: boolean } }
 interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
@@ -231,6 +236,9 @@ export default function PosPage() {
   const [warehouseId, setWarehouseId] = useState('');
   const [cashier, setCashier] = useState('—');
   const [cashierScope, setCashierScope] = useState<{ userId: string; tenantId: string }>({ userId: '', tenantId: '' });
+  // Quick View «فتح في ERP»: يُقرَّر من صلاحية الخادم نفسها (`/me`) لا بتخمين
+  // واجهة — يطابق فحص `products.view` الذي تحرسه صفحة `/products/{id}` نفسها.
+  const [canOpenProductInErp, setCanOpenProductInErp] = useState(false);
   const [companyName, setCompanyName] = useState('—');
   // الفرع المعروض: الفرع النشط (افتراضه الرئيسي)، وإلا اسم الشركة.
   const { active: activeBranch } = useBranches();
@@ -240,6 +248,8 @@ export default function PosPage() {
   const [cat, setCat] = useState('all');
   const [tab, setTab] = useState('all');
   const [favs, setFavs] = useState<Set<string>>(new Set());
+  /** Quick View: معرّف المنتج المعروض فقط — قراءة بحتة، لا تمسّ السلة أو العميل أو الجلسة. */
+  const [quickViewProductId, setQuickViewProductId] = useState<string | null>(null);
   const [priceErrors, setPriceErrors] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'sale' | 'payment'>('sale');
   const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products');
@@ -523,12 +533,13 @@ export default function PosPage() {
       setWarehouses(active);
       setWarehouseId((current) => current || active.find((warehouse) => warehouse.is_default)?.id || active[0]?.id || '');
     }).catch(() => {});
-    api<{ user?: { id?: string; tenant_id?: string; name?: string }; company?: { name?: string; vat_number?: string | null; cr_number?: string | null } }>('/me')
+    api<{ user?: { id?: string; tenant_id?: string; name?: string; role?: string; permissions?: string[] }; company?: { name?: string; vat_number?: string | null; cr_number?: string | null } }>('/me')
       .then((r) => {
         setCashier(r.user?.name ?? t('cashier'));
         setCashierScope({ userId: r.user?.id ?? '', tenantId: r.user?.tenant_id ?? '' });
         setCompanyName(r.company?.name ?? t('main_branch'));
         if (r.company) setCompany({ name: r.company.name ?? '—', vat_number: r.company.vat_number ?? null, cr_number: r.company.cr_number ?? null });
+        setCanOpenProductInErp(hasPermission(r.user?.permissions, r.user?.role, 'products.view'));
       })
       .catch(() => {});
     api<{ data: Partial<PosConfig> }>('/sales-config/pos')
@@ -1411,14 +1422,19 @@ export default function PosPage() {
                 pos_image: p.pos_image,
                 track_inventory: tracked,
                 quantity_on_hand: p.quantity_on_hand,
+                reorder_level: p.reorder_level ?? null,
               }}
               showImage={posCfg.show_product_images}
               selected={productSelected}
               isFavorite={fav}
               availableLabel={t('available')}
               favoriteLabel={t('tab_favorites')}
+              outOfStockLabel={t('out_of_stock')}
+              lowStockLabel={t('low_stock')}
+              quickViewLabel={t('quick_view')}
               onAdd={() => addProduct(p)}
               onToggleFavorite={() => toggleFav(p.id)}
+              onOpenQuickView={() => setQuickViewProductId(p.id)}
               onFocus={() => {
                 setSelectedIndex(index);
                 focusZone('products', { productIndex: index });
@@ -1884,6 +1900,39 @@ export default function PosPage() {
       />
 
       <PosRecentInvoicesDialog open={recentInvoicesOpen} onClose={() => setRecentInvoicesOpen(false)} />
+
+      <PosProductQuickView
+        open={quickViewProductId !== null}
+        onClose={() => setQuickViewProductId(null)}
+        title={t('quick_view')}
+        product={((): PosProductQuickViewProduct | null => {
+          const p = products.find((item) => item.id === quickViewProductId);
+          if (!p) return null;
+          return {
+            id: p.id,
+            name: p.name,
+            sku: p.sku,
+            barcode: p.barcode,
+            category: p.category,
+            sale_price_label: formatRiyal(p.sale_price),
+            pos_image: p.pos_image,
+            track_inventory: p.track_inventory,
+            quantity_on_hand: p.quantity_on_hand,
+            units: p.pos_units.map((unit) => ({ name: unit.name, factor: unit.factor })),
+          };
+        })()}
+        fields={{
+          sku: t('sku'),
+          barcode: t('barcode'),
+          category: t('categories'),
+          units: t('quick_view_units'),
+          stock: t('quick_view_stock'),
+          outOfStock: t('out_of_stock'),
+          inStock: t('available'),
+        }}
+        openInErpHref={canOpenProductInErp && quickViewProductId ? `/products/${quickViewProductId}` : undefined}
+        openInErpLabel={t('quick_view_open_in_erp')}
+      />
 
       <PosDialog open={openCartsOpen} onClose={() => setOpenCartsOpen(false)} title={t('open_carts')}>
         <div className="space-y-2">
