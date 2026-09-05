@@ -95,6 +95,12 @@ export type ProcessingSummary = {
   diagnostics_url: string;
 };
 
+/** فجوة جاهزية استباقية (اليوم: سند تسليم فقط) — غير قاطعة، للعرض قبل الإكمال. */
+export type ReadinessGap = {
+  code: string;
+  target_key: string | null;
+};
+
 export type LinkedTransaction = {
   link_id: string;
   transaction_type: 'purchase' | 'expense';
@@ -132,6 +138,7 @@ export type DocumentReviewPayload = {
   linked_purchase: LinkedTransaction | null;
   capabilities: ReviewCapabilities;
   review_mode?: 'shell' | 'full';
+  readiness_gaps?: ReadinessGap[];
 };
 
 export type DocumentBatchListItem = {
@@ -172,6 +179,8 @@ export const EDITABLE_HEADER_FIELDS = new Set([
   'document_number',
   'document_date',
   'currency',
+  'issuer_name',
+  'recipient_name',
 ]);
 
 export type MobileReviewSection = 'preview' | 'details' | 'lines' | 'matches' | 'issues' | 'history';

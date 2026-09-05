@@ -28,6 +28,7 @@ use App\Models\User;
 use App\Services\DocumentCenter\DocumentProcessingStatusProjector;
 use App\Services\DocumentCenter\DocumentRedactionProjector;
 use App\Services\DocumentCenter\DocumentReviewerEligibilityService;
+use App\Services\DocumentCenter\DocumentReviewReadinessPolicy;
 use App\Services\DocumentCenter\DocumentReviewService;
 use App\Services\DocumentCenter\ExpenseDocumentDraftBuilder;
 use App\Services\DocumentCenter\ExpenseDraftBuildOptions;
@@ -136,6 +137,7 @@ class DocumentReviewController extends Controller
                 'linked_purchase' => $this->linkedPurchase($batch),
                 'capabilities' => $this->capabilities($request->user(), true),
                 'review_mode' => 'shell',
+                'readiness_gaps' => [],
             ]);
         }
 
@@ -161,6 +163,7 @@ class DocumentReviewController extends Controller
             'linked_purchase' => $this->linkedPurchase($batch),
             'capabilities' => $this->capabilities($request->user(), false),
             'review_mode' => 'full',
+            'readiness_gaps' => $this->readinessGaps($batch, $result),
         ]);
     }
 
@@ -337,6 +340,31 @@ class DocumentReviewController extends Controller
         );
 
         return response()->json(['data' => ['id' => $action->id]]);
+    }
+
+    /**
+     * فجوات جاهزية استباقية غير قاطعة — لسند التسليم فقط حالياً. تُشتقّ من
+     * نفس منطق `DocumentReviewReadinessPolicy::deliveryNoteGaps()` الذي
+     * يستهلكه `complete()` فعلياً، من نسخة **غير محجوبة** (لا overlay
+     * التنقيح) كي تطابق ما سيقرّره الإكمال الفعلي تماماً — لا فجوة زائفة
+     * لحقل محجوب للعرض فقط وهو فعلياً موجود.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function readinessGaps(DocumentBatch $batch, DocumentExtractionResult $result): array
+    {
+        if ($batch->document_type !== 'delivery_note') {
+            return [];
+        }
+
+        $reviewed = app(ReviewedDocumentProjector::class)->project($result);
+        $fields = is_array($reviewed['fields'] ?? null) ? $reviewed['fields'] : [];
+        $gaps = app(DocumentReviewReadinessPolicy::class)->deliveryNoteGaps($fields, $reviewed['lines'] ?? []);
+
+        return collect($gaps)->map(fn (array $gap): array => [
+            'code' => $gap['code'],
+            'target_key' => $gap['target_key'],
+        ])->values()->all();
     }
 
     /** @param array<string, mixed> $original @param array<string, mixed> $reviewed @return array<int, array<string, mixed>> */

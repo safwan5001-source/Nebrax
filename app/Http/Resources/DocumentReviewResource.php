@@ -42,6 +42,7 @@ class DocumentReviewResource extends JsonResource
             'linked_purchase' => $this['linked_purchase'],
             'capabilities' => $this['capabilities'],
             'review_mode' => $this['review_mode'] ?? 'full',
+            'readiness_gaps' => $this['readiness_gaps'] ?? [],
         ];
     }
 }

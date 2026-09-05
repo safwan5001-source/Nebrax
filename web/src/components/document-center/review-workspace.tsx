@@ -15,6 +15,7 @@ import { ExtractedFieldsPanel } from '@/components/document-center/extracted-fie
 import { IssuesWarningsPanel } from '@/components/document-center/issues-warnings-panel';
 import { LineItemsPanel } from '@/components/document-center/line-items-panel';
 import { MatchingPanel, type MatchCommand } from '@/components/document-center/matching-panel';
+import { ReadinessGapsPanel } from '@/components/document-center/readiness-gaps-panel';
 import { PurchaseDraftDialog } from '@/components/document-center/purchase-draft-dialog';
 import { ReviewChangeDialog } from '@/components/document-center/review-change-dialog';
 import { ReviewCommandDialog } from '@/components/document-center/review-command-dialog';
@@ -31,7 +32,7 @@ import {
 } from '@/lib/document-review-access';
 import type { DocumentReviewPayload, MobileReviewSection, ReviewField } from '@/modules/document-center/contract';
 
-type Command = MatchCommand & { scope: 'review' | 'draft' } | null;
+type Command = MatchCommand & { scope: 'review' | 'draft'; hint?: string } | null;
 
 type EditState = {
   fieldLabel: string;
@@ -171,6 +172,7 @@ export function ReviewWorkspace({ batchId }: Props) {
         label: t('completeReview'),
         endpoint: `/document-batches/${batchId}/complete-review`,
         scope: 'review',
+        hint: t('completeReviewReasonHint'),
       })}
     >
       <ShieldCheck className="h-4 w-4" aria-hidden="true" />
@@ -201,6 +203,9 @@ export function ReviewWorkspace({ batchId }: Props) {
               <p className="mt-1 text-sm text-muted">
                 {t('reviewer')}: {review.batch.reviewer?.name ?? t('notAssigned')}
               </p>
+              {review.batch.document_type === 'delivery_note' && (
+                <p className="mt-1 text-sm text-muted">{t('deliveryNoteProductContext')}</p>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={reviewTone(review.batch.status)}>
@@ -222,6 +227,12 @@ export function ReviewWorkspace({ batchId }: Props) {
           </div>
         </CardContent>
       </Card>
+      <ReadinessGapsPanel
+        gaps={review.readiness_gaps ?? []}
+        fields={review.fields}
+        canEdit={canMutateReview}
+        onEdit={(target) => setEdit(target)}
+      />
       <ExtractedFieldsPanel
         fields={review.fields}
         canEdit={canMutateReview}
@@ -337,6 +348,7 @@ export function ReviewWorkspace({ batchId }: Props) {
           endpoint={command.endpoint}
           expectedVersion={review.batch.version}
           payload={command.payload}
+          hint={command.hint}
           staleMessage={t('stale')}
           labels={{
             reason: t('reasonPlaceholder'),

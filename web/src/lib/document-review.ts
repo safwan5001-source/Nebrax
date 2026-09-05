@@ -61,6 +61,24 @@ export function documentFieldTranslationKey(key: string): DocumentReviewTranslat
   return fieldTranslationKeys[key] ?? 'field';
 }
 
+export type ReadinessGapTranslationKey =
+  | 'readinessGap_delivery_note_document_number_missing'
+  | 'readinessGap_delivery_note_document_date_missing'
+  | 'readinessGap_delivery_note_customer_missing'
+  | 'readinessGap_delivery_note_quantity_missing';
+
+const readinessGapTranslationKeys: Record<string, ReadinessGapTranslationKey> = {
+  delivery_note_document_number_missing: 'readinessGap_delivery_note_document_number_missing',
+  delivery_note_document_date_missing: 'readinessGap_delivery_note_document_date_missing',
+  delivery_note_customer_missing: 'readinessGap_delivery_note_customer_missing',
+  delivery_note_quantity_missing: 'readinessGap_delivery_note_quantity_missing',
+};
+
+/** يعيد null لكودٍ غير معروف — لا نص احتياطي مضلِّل لفجوة لم تُعرَّف رسائلها بعد. */
+export function readinessGapTranslationKey(code: string): ReadinessGapTranslationKey | null {
+  return readinessGapTranslationKeys[code] ?? null;
+}
+
 export function lineFieldTranslationKey(key: string): DocumentReviewTranslationKey {
   if (key === 'discount_minor') return 'lineDiscount';
   if (key === 'tax_amount_minor') return 'lineTax';

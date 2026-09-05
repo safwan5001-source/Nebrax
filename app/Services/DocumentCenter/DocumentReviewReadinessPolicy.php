@@ -42,7 +42,10 @@ final class DocumentReviewReadinessPolicy
         $fields = is_array($reviewed['fields'] ?? null) ? $reviewed['fields'] : [];
 
         if ($batch->document_type === 'delivery_note') {
-            $this->assertDeliveryNoteEvidence($fields, $reviewed['lines'] ?? []);
+            $gaps = $this->deliveryNoteGaps($fields, $reviewed['lines'] ?? []);
+            if ($gaps !== []) {
+                throw ValidationException::withMessages(['fields' => $gaps[0]['message']]);
+            }
 
             return;
         }
@@ -89,34 +92,63 @@ final class DocumentReviewReadinessPolicy
     }
 
     /**
-     * حدٌّ أدنى محافظ مبني على العقد القائم: تاريخ ومرجع طرف واحد على الأقل
-     * وسطر واحد على الأقل بكمية لكل سطر. `document_number` اختياري عمداً —
-     * سند التسليم الحقيقي (ADR-009) يولّد رقمه الخاص لاحقاً ولا يعتمد على رقم
-     * الاستخراج. لا فحص مالي ولا مطابقة منتج/وحدة: لا مسودة تستهلكهما لهذا النوع.
+     * حدٌّ أدنى صريح بقرار المالك: رقم السند وتاريخه إلزاميان، والعميل هو
+     * `recipient_name` تحديداً — نبراس الطموح هو المُصدِر المعتاد لهذه
+     * المستندات، فقبول `issuer_name` بديلاً كان سيمرّر جاهزية دون أن يُستخرج
+     * أو يُراجَع العميل الحقيقي أصلاً. `issuer_name` يبقى متاحاً كدليل مُستخرَج
+     * (يُعرض ويمكن تعديله) لكنه لا يُرضي شرط العميل أبداً.
+     *
+     * الكمية: سطرٌ واحد على الأقل بكمية رقمية موجبة فعلياً — لا نص غير فارغ
+     * فقط. سماحية الـ normalizer الجديدة بحفظ سطر بكمية بلا وصف (منتج هذا
+     * التدفّق ثابت = ديزل، فلا يحتاج كل سطر وصفاً) تعني أن أسطراً أخرى قد
+     * تُحفظ لمجرد أنها تحمل وصفاً (كنص توقيع أو ملاحظة اشتبه بها المزوّد
+     * خطأً) دون كمية — لذلك الشرط "سطر واحد يكفي بكمية صحيحة"، لا "كل سطر"،
+     * كي لا يحظر ضجيجٌ لا يحمل كمية إكمالَ مراجعة بها دليل الكمية الحقيقي.
+     * `product = Diesel` سياق عمل لهذا التدفّق لا شرط بيانات — لا حقل مخصص
+     * له ولا مطابقة تُفرض، تفادياً لإدخال يدوي متكرر أو دليل مُلفَّق.
      *
      * @param array<string,mixed> $fields
+     * @return list<array{code:string,target_key:?string,message:string}>
      */
-    private function assertDeliveryNoteEvidence(array $fields, mixed $lines): void
+    public function deliveryNoteGaps(array $fields, mixed $lines): array
     {
+        $gaps = [];
+
+        if (($fields['document_number'] ?? null) === null || $fields['document_number'] === '') {
+            $gaps[] = ['code' => 'delivery_note_document_number_missing', 'target_key' => 'fields.document_number', 'message' => 'Delivery note number is required.'];
+        }
         if (($fields['document_date'] ?? null) === null || $fields['document_date'] === '') {
-            throw ValidationException::withMessages(['fields' => 'Required delivery note evidence is incomplete.']);
+            $gaps[] = ['code' => 'delivery_note_document_date_missing', 'target_key' => 'fields.document_date', 'message' => 'Delivery note date is required.'];
         }
-
-        $issuer = $fields['issuer_name'] ?? null;
         $recipient = $fields['recipient_name'] ?? null;
-        if (($issuer === null || $issuer === '') && ($recipient === null || $recipient === '')) {
-            throw ValidationException::withMessages(['fields' => 'A delivery note requires an identified issuer or recipient.']);
+        if ($recipient === null || $recipient === '') {
+            $gaps[] = ['code' => 'delivery_note_customer_missing', 'target_key' => 'fields.recipient_name', 'message' => 'Delivery note customer (recipient) name is required.'];
         }
 
-        if (! is_array($lines) || $lines === []) {
-            throw ValidationException::withMessages(['lines' => 'A delivery note requires at least one reviewed line.']);
-        }
+        $lines = is_array($lines) ? $lines : [];
+        $hasPositiveQuantityLine = false;
         foreach ($lines as $line) {
-            $quantity = is_array($line) ? ($line['quantity'] ?? null) : null;
-            if ($quantity === null || $quantity === '') {
-                throw ValidationException::withMessages(['lines' => 'Every delivery note line requires a reviewed quantity.']);
+            if (is_array($line) && $this->isPositiveQuantity($line['quantity'] ?? null)) {
+                $hasPositiveQuantityLine = true;
+
+                break;
             }
         }
+        if (! $hasPositiveQuantityLine) {
+            $gaps[] = ['code' => 'delivery_note_quantity_missing', 'target_key' => null, 'message' => 'Delivery note requires at least one line with a positive delivered quantity.'];
+        }
+
+        return $gaps;
+    }
+
+    private function isPositiveQuantity(mixed $value): bool
+    {
+        if (! is_string($value) && ! is_int($value) && ! is_float($value)) {
+            return false;
+        }
+        $text = trim((string) $value);
+
+        return preg_match('/^\d+(?:\.\d+)?$/', $text) === 1 && (float) $text > 0;
     }
 
     /** @param array<string,mixed> $fields */
