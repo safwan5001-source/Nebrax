@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { ChevronLeft, ChevronRight, ReceiptText, RotateCw } from 'lucide-react';
 import { formatDate } from '@/lib/formatting';
 import { Button } from '@/components/ui/button';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import type { LiveTemplateRevision } from '@/modules/print-templates/services/live-template-definition';
@@ -119,77 +120,108 @@ export function PosInvoiceDetails({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-        <div className="mx-auto max-w-3xl space-y-3">
-          {loading && (
-            <div className="space-y-2" data-testid="pos-invoice-details-loading">
-              <div className="h-24 animate-pulse rounded-lg border border-border bg-surface" />
-              <div className="h-40 animate-pulse rounded-lg border border-border bg-surface" />
-            </div>
-          )}
-          {!loading && error && (
-            <div className="space-y-3 rounded-lg border border-negative/30 bg-negative/10 p-3 text-sm text-text" role="alert">
-              <p>{error}</p>
-              <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
-                <RotateCw className="h-4 w-4" strokeWidth={1.7} />
-                {t('retry')}
-              </Button>
-            </div>
-          )}
-
-          {!loading && !error && invoice && (
-            <>
-              <div className="rounded-lg border border-border bg-surface p-3 sm:p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-semibold text-muted">{t('invoice_details_customer')}</div>
-                    <div className="text-sm font-semibold text-text">{invoice.partner?.name ?? t('return_unknown_customer')}</div>
-                  </div>
-                  <div className="text-end">
-                    <div className="text-xs font-semibold text-muted">{t('invoice_details_status')}</div>
-                    <div className="text-sm font-semibold text-text">{t(DOCUMENT_STATUS_KEYS[invoice.status] ?? 'invoice_status_posted')}</div>
-                  </div>
-                  <div className="text-end">
-                    <div className="text-xs font-semibold text-muted">{invoice.invoice_date ? formatDate(invoice.invoice_date, locale) : '—'}</div>
-                    {invoice.payment_status && (
-                      <div className="text-sm font-semibold text-text">{t(PAYMENT_STATUS_KEYS[invoice.payment_status] ?? invoice.payment_status)}</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-lg border border-border bg-surface">
-                <div className="border-b border-border px-3 py-2 text-xs font-semibold text-muted">{t('invoice_details_items')}</div>
-                <div className="divide-y divide-border">
-                  {invoice.lines.map((line) => (
-                    <div key={line.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-text">{line.description ?? line.product_name ?? '—'}</div>
-                        <div className="num mt-0.5 text-xs text-muted">
-                          {line.quantity} {line.unit_name ?? ''} × {formatRiyal(line.unit_price)}
-                          {Number(line.line_discount) > 0 && <span className="text-positive"> · {t('discount')} −{formatRiyal(line.line_discount)}</span>}
-                        </div>
-                      </div>
-                      <div className="num shrink-0 text-sm font-bold text-text">{formatRiyal(line.line_total)}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1.5 rounded-lg border border-border bg-surface p-3 sm:p-4" data-testid="pos-invoice-details-totals">
-                <div className="flex justify-between text-sm"><span className="text-muted">{t('subtotal')}</span><span className="num font-semibold text-text">{formatRiyal(invoice.subtotal)}</span></div>
-                {Number(invoice.discount) > 0 && <div className="flex justify-between text-sm"><span className="text-muted">{t('discount')}</span><span className="num font-semibold text-positive">−{formatRiyal(invoice.discount)}</span></div>}
-                {Number(invoice.shipping) > 0 && <div className="flex justify-between text-sm"><span className="text-muted">{t('invoice_details_shipping')}</span><span className="num font-semibold text-text">{formatRiyal(invoice.shipping)}</span></div>}
-                {Number(invoice.adjustment) !== 0 && <div className="flex justify-between text-sm"><span className="text-muted">{t('invoice_details_adjustment')}</span><span className="num font-semibold text-text">{formatRiyal(invoice.adjustment)}</span></div>}
-                <div className="flex justify-between text-sm"><span className="text-muted">{t('invoice_details_tax')}</span><span className="num font-semibold text-text">{formatRiyal(invoice.tax_amount)}</span></div>
-                <div className="flex items-baseline justify-between border-t border-border pt-2"><span className="text-sm font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal(invoice.total)}</span></div>
-                <div className="flex justify-between text-xs pt-1"><span className="text-muted">{t('invoice_details_paid')}</span><span className="num text-text">{formatRiyal(invoice.paid_amount)}</span></div>
-                {Number(invoice.remaining) > 0 && <div className="flex justify-between text-xs"><span className="text-muted">{t('invoice_details_remaining')}</span><span className="num text-negative">{formatRiyal(invoice.remaining)}</span></div>}
-              </div>
-            </>
-          )}
+      {loading && (
+        <div className="space-y-2 p-3 sm:p-4" data-testid="pos-invoice-details-loading">
+          <div className="h-16 animate-pulse rounded-lg border border-border bg-surface" />
+          <div className="h-40 animate-pulse rounded-lg border border-border bg-surface" />
         </div>
-      </div>
+      )}
+      {!loading && error && (
+        <div className="p-3 sm:p-4">
+          <div className="mx-auto max-w-xl space-y-3 rounded-lg border border-negative/30 bg-negative/10 p-3 text-sm text-text" role="alert">
+            <p>{error}</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+              <RotateCw className="h-4 w-4" strokeWidth={1.7} />
+              {t('retry')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && invoice && (
+        // PR-4 (تصحيح المراجعة): عمود واحد على التابلت/الجوال (كما كان)، وعند
+        // lg+ ينقسم إلى منطقة أصناف رئيسية عريضة + ملخّص مالي مضغوط جانبي —
+        // يستثمر عرض مساحة عمل POS بدل عمود ضيّق وسط شاشة فارغة.
+        <div className="mx-auto grid min-h-0 w-full max-w-6xl flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[1fr_320px]">
+          <div className="min-h-0 space-y-3 overflow-y-auto p-3 sm:p-4 lg:border-e lg:border-border">
+            <div className="rounded-lg border border-border bg-surface p-3 sm:p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold text-muted">{t('invoice_details_customer')}</div>
+                  <div className="text-sm font-semibold text-text">{invoice.partner?.name ?? t('return_unknown_customer')}</div>
+                </div>
+                <div className="text-end">
+                  <div className="text-xs font-semibold text-muted">{t('invoice_details_status')}</div>
+                  <div className="text-sm font-semibold text-text">{t(DOCUMENT_STATUS_KEYS[invoice.status] ?? 'invoice_status_posted')}</div>
+                </div>
+                <div className="text-end">
+                  <div className="text-xs font-semibold text-muted">{invoice.invoice_date ? formatDate(invoice.invoice_date, locale) : '—'}</div>
+                  {invoice.payment_status && (
+                    <div className="text-sm font-semibold text-text">{t(PAYMENT_STATUS_KEYS[invoice.payment_status] ?? invoice.payment_status)}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border border-border bg-surface">
+              <div className="border-b border-border px-3 py-2 text-xs font-semibold text-muted">{t('invoice_details_items')}</div>
+
+              {/* سطح المكتب: جدول كثيف بأعمدة واضحة. الجوال: قائمة مكدّسة —
+                  كما كانت قبل هذا التصحيح، فلا تنكسر على عرض ضيّق. */}
+              <div className="hidden md:block">
+                <Table>
+                  <THead>
+                    <TR>
+                      <TH>{t('invoice_details_items')}</TH>
+                      <TH>{t('quantity')}</TH>
+                      <TH>{t('unit_price')}</TH>
+                      <TH>{t('discount')}</TH>
+                      <TH className="text-end">{t('total')}</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    {invoice.lines.map((line) => (
+                      <TR key={line.id}>
+                        <TD className="max-w-64 truncate font-semibold text-text">{line.description ?? line.product_name ?? '—'}</TD>
+                        <TD className="num text-muted">{line.quantity} {line.unit_name ?? ''}</TD>
+                        <TD className="num text-muted">{formatRiyal(line.unit_price)}</TD>
+                        <TD className="num text-muted">{Number(line.line_discount) > 0 ? `−${formatRiyal(line.line_discount)}` : '—'}</TD>
+                        <TD className="num text-end font-bold text-text">{formatRiyal(line.line_total)}</TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </Table>
+              </div>
+
+              <div className="divide-y divide-border md:hidden">
+                {invoice.lines.map((line) => (
+                  <div key={line.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-text">{line.description ?? line.product_name ?? '—'}</div>
+                      <div className="num mt-0.5 text-xs text-muted">
+                        {line.quantity} {line.unit_name ?? ''} × {formatRiyal(line.unit_price)}
+                        {Number(line.line_discount) > 0 && <span className="text-positive"> · {t('discount')} −{formatRiyal(line.line_discount)}</span>}
+                      </div>
+                    </div>
+                    <div className="num shrink-0 text-sm font-bold text-text">{formatRiyal(line.line_total)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <aside className="space-y-1.5 overflow-y-auto border-t border-border bg-surface p-3 sm:p-4 lg:border-t-0" data-testid="pos-invoice-details-totals">
+            <div className="flex justify-between text-sm"><span className="text-muted">{t('subtotal')}</span><span className="num font-semibold text-text">{formatRiyal(invoice.subtotal)}</span></div>
+            {Number(invoice.discount) > 0 && <div className="flex justify-between text-sm"><span className="text-muted">{t('discount')}</span><span className="num font-semibold text-positive">−{formatRiyal(invoice.discount)}</span></div>}
+            {Number(invoice.shipping) > 0 && <div className="flex justify-between text-sm"><span className="text-muted">{t('invoice_details_shipping')}</span><span className="num font-semibold text-text">{formatRiyal(invoice.shipping)}</span></div>}
+            {Number(invoice.adjustment) !== 0 && <div className="flex justify-between text-sm"><span className="text-muted">{t('invoice_details_adjustment')}</span><span className="num font-semibold text-text">{formatRiyal(invoice.adjustment)}</span></div>}
+            <div className="flex justify-between text-sm"><span className="text-muted">{t('invoice_details_tax')}</span><span className="num font-semibold text-text">{formatRiyal(invoice.tax_amount)}</span></div>
+            <div className="flex items-baseline justify-between border-t border-border pt-2"><span className="text-sm font-semibold text-text">{t('total')}</span><span className="num text-lg font-bold text-text">{formatRiyal(invoice.total)}</span></div>
+            <div className="flex justify-between text-xs pt-1"><span className="text-muted">{t('invoice_details_paid')}</span><span className="num text-text">{formatRiyal(invoice.paid_amount)}</span></div>
+            {Number(invoice.remaining) > 0 && <div className="flex justify-between text-xs"><span className="text-muted">{t('invoice_details_remaining')}</span><span className="num text-negative">{formatRiyal(invoice.remaining)}</span></div>}
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

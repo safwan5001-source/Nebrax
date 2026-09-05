@@ -375,6 +375,154 @@ against a hidden cart.
 - The pre-existing mobile category-strip clipping issue (documented in the PR-2C QA mission)
   remains present and untouched — explicitly out of scope for PR-4.
 
+## UX Review Follow-up — Invoice Density & Receipt Polish
+
+Safwan/ChatGPT reviewed the first implementation (head `7e0fd37d7486a80438247f4fc4074d1bad3d9bdb`):
+architecture/safety and functional direction both passed. This follow-up is a narrow visual/density
+refinement of the same accepted architecture, plus a required diagnosis of the "3 Issues" dev
+indicator visible in every prior screenshot — not a rebuild.
+
+### Review findings acted on
+
+- **Invoice Center desktop**: three large cards floating in a mostly empty 1920px workspace — not
+  dense enough for daily POS use.
+- **Invoice Details desktop**: the whole invoice sat in a narrow centered column, leaving most of
+  the workspace unused.
+- **Receipt Preview**: functionally correct; desktop dialog had more surrounding empty space than
+  the actual 80mm receipt content needed.
+- **"3 Issues" dev indicator**: required diagnosis before Browser QA could be considered final (see
+  below) — this was not touched/suppressed, only diagnosed.
+
+### Daftra reference — what was used and what was deliberately not
+
+Used only as workflow/density lessons: invoice browsing should be dense and operational, important
+fields visible without opening every record, search belongs directly in the workflow, actions easy
+to reach, receipt preview clearly separate from browsing. **Not copied**: Daftra's colors,
+typography, component styling, or visual identity — every new element below reuses AWJ's own
+existing `Table`/`THead`/`TBody`/`TR`/`TH`/`TD` primitives (already used elsewhere in the app for
+dense line-item tables, e.g. invoice/purchase detail pages) and existing color tokens
+(`text-positive`/`text-negative`/`text-muted`). The reference's visible Return/Refund action was
+**not** implemented — that remains PR-6 scope, untouched.
+
+### Invoice Center — desktop changes
+
+Replaced the three-card stack with a real dense table (reusing the existing `Table` primitive) at
+`md:` and above: **رقم الفاتورة / التاريخ | العميل | الحالة | الإجمالي | فتح**, one compact row per
+invoice, hover-highlighted, capped at `max-w-5xl` and centered (not stretched edge-to-edge — a first
+pass at full workspace width left large artificial gaps between columns on a 1920px screen; capping
+the table's own width fixed this while still being far denser than the old cards). Mobile keeps its
+existing compact card list unchanged (per the review: "generally good, do not redesign
+unnecessarily"), now with the same red/green semantic status coloring as desktop.
+
+### Invoice Details — desktop changes
+
+Split into a responsive `lg:grid-cols-[1fr_320px]` layout — main item/document area (customer/
+status/date header + a dense items table) beside a compact, sticky financial summary column
+(subtotal/discount/shipping/adjustment/tax/total/paid/remaining) — mirroring the existing
+`PosPayment` component's own `340px` summary-sidebar pattern already used elsewhere in this exact
+POS shell. Below `lg`, stays single-column exactly as before (tablet/mobile behavior unchanged).
+The whole layout is capped at `max-w-6xl` centered, for the same reason as the Invoice Center table.
+
+**A real regression was caught and fixed during this pass**: the first attempt replaced the item
+list with the `Table` primitive on *all* viewport sizes, including mobile — on a 390px screen this
+overflowed horizontally (the "الإجمالي" column was clipped off-screen), a genuine violation of "do
+not redesign mobile unnecessarily." Fixed by restoring the original stacked-row item list for
+`<md` (byte-for-byte the same markup that existed before this follow-up) and keeping the new table
+only at `md:` and above — verified with a fresh mobile screenshot (see Browser QA).
+
+### Receipt Preview — polish only
+
+`ReceiptDialog`'s dialog width reduced from `max-w-md sm:max-w-lg` to `max-w-sm sm:max-w-md` — the
+only change made. No change to `DocumentView`/`DocumentScaler`/`printDocument`/template resolution,
+58mm/80mm handling, scrolling behavior, or the Print/Copy/Close/print-failure actions added in the
+first PR-4 pass. `receipt-dialog.test.tsx`'s existing dialog-width assertions were updated to match
+the new, intentional values (not weakened — the "not max-w-xs" guard is still asserted).
+
+### "3 Issues" dev indicator — diagnosis
+
+Reproduced live and inspected via the actual browser console (not assumed):
+
+- **Exact message**: `IntlError: INVALID_KEY: Namespace keys can not contain the character "." as
+  this is used to express nesting... Invalid keys: partner.created (at developer.events),
+  product.created (at developer.events), invoice.created (at developer.events)`.
+- **Source**: `web/src/messages/ar.json`/`en.json`, `developer.events` namespace — three keys
+  (`partner.created`, `product.created`, `invoice.created`) contain literal dots, which
+  `next-intl`'s strict development-mode namespace validator rejects.
+- **Introduced by PR-4?** No. These keys are in the unrelated Developer/webhooks documentation
+  section of the message files; PR-4 touched only `pos`-namespace keys. Confirmed via `grep` that
+  these three keys are untouched by any PR-4 commit.
+- **Pre-existing?** Yes — this exact warning, with the same three keys, was independently confirmed
+  present and diagnosed in every prior mission this session (PR-2 visual QA, PR-2C, PR-3, and the
+  first PR-4 pass), always with this identical root cause.
+- **Dev-only?** Yes — the check that throws is `validateMessages`/`initializeConfig` inside
+  `use-intl`'s development build, invoked from `IntlProvider`'s dev-mode path. It renders as a
+  console error and feeds the Next.js dev overlay's issue counter; it is not a runtime exception
+  that crashes or blocks the page (the app continues to render and function normally around it,
+  confirmed by every screenshot in this and prior missions showing a fully working page).
+- **Present in production build?** `npm run build` succeeds with exit code 0 in this and every
+  prior mission — the dev-only strict validator path is not part of the production render loop.
+- **Affects runtime behavior or Browser QA validity?** No. It is a console warning plus a dev-mode
+  visual badge; it does not alter any DOM state, blocks no interaction, and every functional Browser
+  QA scenario in this report (and its predecessor) completed successfully with the badge visible.
+- **Action taken**: none — correctly out of PR-4's scope to fix (unrelated namespace, unrelated
+  module), and the mission explicitly forbids hiding/suppressing it. Documented here per the
+  mission's request instead.
+
+### Tests (this follow-up)
+
+- `receipt-dialog.test.tsx`: updated the existing dialog-size assertions to the new `max-w-sm`/
+  `sm:max-w-md` values (2 lines changed, `not.toContain('max-w-xs')` guard kept).
+- No other test files needed changes — the Invoice Center/Details layout changes are structural
+  Tailwind class changes with no new interactive behavior beyond what existing tests already cover
+  (data fetching, search filter, states) via `pos-invoice-center.test.ts` (unmodified, still green).
+
+| Scope | Result |
+|---|---|
+| Targeted (`receipt-dialog` + `pos-invoice-center` + `pos-responsive`) | 3 files, 21 tests passed |
+| Broader POS frontend suite | 28 files, 144 tests passed |
+| Full frontend suite | 230 files, 1466 tests passed (same count as before this follow-up — no tests added or removed, 0 regressions) |
+| `npm run build` | exit code 0 |
+| Backend targeted (`InvoiceShowIncludesPartnerTest` + `PosInvoiceBranchAccessTest` + `PosRecentInvoicesTest`) | 10/10 passed (143 assertions) — re-run since the `partner` fix remains part of this PR's head |
+
+### Browser QA (this follow-up)
+
+Real Chromium, same live tenant/session/products/customer from the first PR-4 QA pass, with 5 real
+posted POS invoices (created via the real `/pos/checkout` endpoint) for a denser, more realistic
+list.
+
+| # | Scenario | Result | Screenshot |
+|---|---|---|---|
+| A | Desktop RTL light — Invoice Center, 5 invoices | PASS — dense table, capped width, no artificial column gaps | `A-desktop-rtl-invoice-center.png` |
+| B | Desktop LTR light — Invoice Center | PASS — full correct mirror (columns and alignment flip correctly) | `B-desktop-ltr-invoice-center.png` |
+| C | Desktop dark — Invoice Center | PASS — legible, semantic status colors readable | `C-desktop-dark-invoice-center.png` |
+| D | Desktop RTL — Invoice Details | PASS — two-column split, capped width, no longer a narrow column in empty space | `D-desktop-rtl-invoice-details.png` |
+| E | Mobile RTL — Invoice Center | PASS — unchanged card list, now with colored status | `E-mobile-rtl-invoice-center.png` |
+| F | Mobile RTL — Invoice Details | **PASS after fix** — caught and fixed a real horizontal-overflow regression from an intermediate version (see above) | `F-mobile-rtl-invoice-details.png` |
+| G | Receipt Preview desktop | PASS — visibly tighter around the receipt, QR/Print/Copy/Close all intact | `G-desktop-receipt-preview.png` |
+| H | Receipt Preview mobile | PASS — unaffected by the desktop-only width change | `H-mobile-receipt-preview.png` |
+
+**Functional round trip re-verified**: Products (cart with 1 item, customer selected) → Invoice
+Center → Invoice Details → Receipt Preview → close → back to Invoice Details → back to Invoice
+Center → back to Products. Cart line, quantity, total, and selected customer were all confirmed
+identical before and after (`context-check-after-full-roundtrip.png`) — no regression to the
+accepted PR-4 architecture (session/device/branch/held-carts were not touched by this follow-up and
+were not re-verified beyond what the full test suite already covers, per the mission's narrow
+scope).
+
+### Visual review checklist (self-assessed against the mission's list)
+
+Invoice Center desktop: width used appropriately (capped, not stretched) ✓ · dense ✓ · many invoices
+scannable ✓ · no oversized floating cards ✓ · search visible ✓ · invoice number/customer/date/status/
+total all readable with clear hierarchy ✓ · open action obvious ✓ · RTL/LTR alignment intentional ✓ ·
+dark mode clean ✓.
+
+Invoice Details desktop: no narrow-column-in-empty-screen problem ✓ · item rows readable ✓ · totals
+easy to scan ✓ · document/customer/status context clear ✓ · Receipt Preview action obvious ✓ · still
+feels like POS, not an ERP dashboard (no card-per-number, no decorative panels) ✓.
+
+Receipt Preview: visually faithful (untouched rendering pipeline) ✓ · modal no longer unnecessarily
+oversized ✓ · Print/Copy/Close clear ✓ · print-failure state untouched and still truthful ✓.
+
 ## 24. Git Information
 
 - Repository: `safwan5001-source/Nebrax`
@@ -383,8 +531,9 @@ against a hidden cart.
   required base, `main` HEAD at session start — PR-3 merge, #658)
 - PR number/link: [#659](https://github.com/safwan5001-source/Nebrax/pull/659) (Draft)
 - Draft status: Draft, open, not merged (confirmed via `pull_request_read`)
-- Head SHA: `2cbe9b0c344416e257a53afd455d0b05bee66751`
+- Previously reviewed Head SHA: `7e0fd37d7486a80438247f4fc4074d1bad3d9bdb`
+- Head SHA (after this follow-up): recorded after commit (see final chat reply)
 
 ## 25. Next Recommended Step
 
-> ChatGPT/Safwan review of PR-4. No merge or deployment has been performed.
+> ChatGPT/Safwan review of the updated PR #659. No merge or deployment has been performed.

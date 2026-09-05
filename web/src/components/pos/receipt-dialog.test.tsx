@@ -94,8 +94,10 @@ describe('ReceiptDialog', () => {
     render(<ReceiptDialog receipt={receipt('tax-invoice-thermal80')} paperSize="thermal_80" onClose={onClose} />);
 
     const dialog = screen.getByRole('dialog', { name: 'receipt' });
-    expect(dialog.getAttribute('data-class')).toContain('max-w-md');
-    expect(dialog.getAttribute('data-class')).toContain('sm:max-w-lg');
+    // PR-4 (تصحيح المراجعة): تضييق مقصود ليقترب من عرض الإيصال الحراري الفعلي
+    // بدل فراغ محيط زائد — لا يزال أوسع من max-w-xs المرفوض.
+    expect(dialog.getAttribute('data-class')).toContain('max-w-sm');
+    expect(dialog.getAttribute('data-class')).toContain('sm:max-w-md');
     expect(dialog.getAttribute('data-class')).not.toContain('max-w-xs');
 
     const success = screen.getByTestId('pos-receipt-success');

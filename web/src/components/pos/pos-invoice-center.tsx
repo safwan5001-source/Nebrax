@@ -6,16 +6,28 @@ import { CalendarClock, ChevronLeft, ChevronRight, ReceiptText, RotateCw, Search
 import { formatDate, formatDateTime } from '@/lib/formatting';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { cn } from '@/lib/utils';
 import { filterPosCenterInvoices, type PosCenterInvoice } from '@/lib/pos-invoice-center';
+
+const PAYMENT_STATUS_TONE: Record<string, string> = {
+  paid: 'text-positive',
+  unpaid: 'text-negative',
+};
 
 /**
  * PR-4: مركز الفواتير — تطوير لِـ«آخر الفواتير» (كانت نافذة منبثقة تُحيل إلى
  * صفحة ERP خارج نقطة البيع) إلى مساحة عمل حقيقية داخل POS. نفس مصدر البيانات
- * (`GET /pos/recent-invoices`، فواتير POS للفرع النشط فقط) ونفس بنية العنصر،
- * لكن الآن لوحة ثابتة تفتح تفاصيل الفاتورة داخل POS بدل رابط خارجي، مع بحث
- * محلي فوق القائمة المحمَّلة. لا تغيّر السلة النشطة ولا الجلسة ولا العميل.
+ * (`GET /pos/recent-invoices`، فواتير POS للفرع النشط فقط) ونفس بنية العنصر
+ * الأساسية، لكن الآن لوحة ثابتة تفتح تفاصيل الفاتورة داخل POS بدل رابط خارجي،
+ * مع بحث محلي فوق القائمة المحمَّلة. لا تغيّر السلة النشطة ولا الجلسة ولا العميل.
+ *
+ * PR-4 (تصحيح المراجعة): جدول كثيف على سطح المكتب (`Table` الموحّد نفسه
+ * المستخدم في شاشات الفواتير/التقارير) بدل تكديس بطاقات كبيرة في مساحة
+ * فارغة — يستثمر عرض مساحة العمل ويتيح مسحاً بصرياً سريعاً لعدد أكبر من
+ * الفواتير. الجوال يحتفظ ببطاقاته المدمجة كما كانت (كانت مناسبة أصلاً).
  */
 export function PosInvoiceCenter({ onOpenInvoice, onBack }: { onOpenInvoice: (id: string) => void; onBack: () => void }) {
   const t = useTranslations('pos');
@@ -49,6 +61,16 @@ export function PosInvoiceCenter({ onOpenInvoice, onBack }: { onOpenInvoice: (id
     return invoice.created_at ? formatDateTime(value, locale) : formatDate(value, locale);
   }
 
+  function statusLabel(invoice: PosCenterInvoice) {
+    return invoice.payment_status ?? invoice.status;
+  }
+
+  function statusTone(invoice: PosCenterInvoice) {
+    return (invoice.payment_status && PAYMENT_STATUS_TONE[invoice.payment_status]) || 'text-muted';
+  }
+
+  const showEmpty = !loading && !error && (invoices.length === 0 || visible.length === 0);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="pos-invoice-center">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2.5 sm:px-4">
@@ -74,54 +96,93 @@ export function PosInvoiceCenter({ onOpenInvoice, onBack }: { onOpenInvoice: (id
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-        <div className="mx-auto max-w-3xl space-y-2">
-          {loading && Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-20 animate-pulse rounded-lg border border-border bg-surface" />
-          ))}
-          {!loading && error && (
-            <div className="space-y-3 rounded-lg border border-negative/30 bg-negative/10 p-3 text-sm text-text" role="alert">
-              <p>{error}</p>
-              <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
-                <RotateCw className="h-4 w-4" strokeWidth={1.7} />
-                {t('retry')}
-              </Button>
+        {loading && (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="h-11 animate-pulse rounded-md border border-border bg-surface" />
+            ))}
+          </div>
+        )}
+        {!loading && error && (
+          <div className="mx-auto max-w-xl space-y-3 rounded-lg border border-negative/30 bg-negative/10 p-3 text-sm text-text" role="alert">
+            <p>{error}</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+              <RotateCw className="h-4 w-4" strokeWidth={1.7} />
+              {t('retry')}
+            </Button>
+          </div>
+        )}
+        {showEmpty && (
+          <div className="mx-auto max-w-xl rounded-lg border border-dashed border-border bg-surface px-4 py-10 text-center text-sm text-muted" data-testid="pos-invoice-center-empty">
+            {t('recent_invoices_empty')}
+          </div>
+        )}
+
+        {!loading && !error && !showEmpty && (
+          <>
+            {/* سطح المكتب: جدول كثيف — مسح بصري سريع لعدد أكبر من الفواتير.
+                عرض مقيَّد (لا يمتد لعرض مساحة العمل كاملةً) فلا تتباعد
+                الأعمدة تباعداً مصطنعاً في الشاشات الواسعة. */}
+            <div className="hidden md:block">
+              <Table className="mx-auto max-w-5xl">
+                <THead>
+                  <TR>
+                    <TH>{t('invoice_details_title')}</TH>
+                    <TH>{t('invoice_details_customer')}</TH>
+                    <TH>{t('invoice_details_status')}</TH>
+                    <TH className="text-end">{t('total')}</TH>
+                    <TH className="text-end">{t('invoice_center_open')}</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {visible.map((invoice) => (
+                    <TR key={invoice.id}>
+                      <TD className="num font-semibold text-text">
+                        {invoice.number}
+                        <div className="num mt-0.5 text-xs font-normal text-muted">{dateLabel(invoice)}</div>
+                      </TD>
+                      <TD className="max-w-56 truncate text-text">{invoice.customer_name ?? t('return_unknown_customer')}</TD>
+                      <TD className={cn('font-semibold', statusTone(invoice))}>{statusLabel(invoice)}</TD>
+                      <TD className="num text-end font-bold text-text">{formatRiyal(invoice.total)}</TD>
+                      <TD className="text-end">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => onOpenInvoice(invoice.id)}>
+                          {t('invoice_center_open')}
+                        </Button>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
             </div>
-          )}
-          {!loading && !error && invoices.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border bg-surface px-4 py-10 text-center text-sm text-muted" data-testid="pos-invoice-center-empty">
-              {t('recent_invoices_empty')}
+
+            {/* الجوال: بطاقات مدمجة — الأنسب لعرض ضيّق، كما كانت. */}
+            <div className="space-y-2 md:hidden">
+              {visible.map((invoice) => (
+                <article key={invoice.id} className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
+                    <ReceiptText className="h-5 w-5" strokeWidth={1.7} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="num font-semibold text-text">{invoice.number}</span>
+                      <span className={cn('text-xs font-semibold', statusTone(invoice))}>{statusLabel(invoice)}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                      <span className="inline-flex max-w-48 items-center gap-1 truncate"><UserRound className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} />{invoice.customer_name ?? t('return_unknown_customer')}</span>
+                      <span className="inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" strokeWidth={1.7} />{dateLabel(invoice)}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <span className="num font-bold text-text">{formatRiyal(invoice.total)}</span>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => onOpenInvoice(invoice.id)}>
+                      {t('invoice_center_open')}
+                    </Button>
+                  </div>
+                </article>
+              ))}
             </div>
-          )}
-          {!loading && !error && invoices.length > 0 && visible.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border bg-surface px-4 py-10 text-center text-sm text-muted">
-              {t('recent_invoices_empty')}
-            </div>
-          )}
-          {!loading && !error && visible.map((invoice) => (
-            <article key={invoice.id} className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
-                <ReceiptText className="h-5 w-5" strokeWidth={1.7} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="num font-semibold text-text">{invoice.number}</span>
-                  <span className="text-xs text-muted">{invoice.payment_status ?? invoice.status}</span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-                  <span className="inline-flex max-w-48 items-center gap-1 truncate"><UserRound className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} />{invoice.customer_name ?? t('return_unknown_customer')}</span>
-                  <span className="inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" strokeWidth={1.7} />{dateLabel(invoice)}</span>
-                  {invoice.payment_methods.length > 0 && <span>{invoice.payment_methods.join(' · ')}</span>}
-                </div>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-2">
-                <span className="num font-bold text-text">{formatRiyal(invoice.total)}</span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => onOpenInvoice(invoice.id)}>
-                  {t('invoice_center_open')}
-                </Button>
-              </div>
-            </article>
-          ))}
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -124,7 +124,7 @@ export function ReceiptDialog({
   const totalMinor = receipt.model.totals?.total ?? 0;
 
   return (
-    <PosDialog open={!!receipt} onClose={onClose} title={variant === 'preview' ? t('receipt_preview_title') : t('receipt')} className="max-w-md sm:max-w-lg">
+    <PosDialog open={!!receipt} onClose={onClose} title={variant === 'preview' ? t('receipt_preview_title') : t('receipt')} className="max-w-sm sm:max-w-md">
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3" data-testid={variant === 'preview' ? 'pos-receipt-preview' : 'pos-receipt-success'}>
           <div className="min-w-0">
