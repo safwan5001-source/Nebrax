@@ -36,6 +36,8 @@ import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
 import { PosRecentInvoicesDialog } from '@/components/pos/pos-recent-invoices-dialog';
 import { PosCategoryImage } from '@/components/pos/pos-category-image';
+import { PosCategorySwatch } from '@/components/pos/pos-category-swatch';
+import { resolveCategoryVisual } from '@/lib/pos-category-presentation';
 import { cartHasUnsavedData, createPosActiveCart, usePosActiveCarts, type PosCartLine } from '@/components/pos/use-pos-active-carts';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
 import { PosPayment, type PaymentSummaryItem, type PosPaymentMethod, type PosTender } from '@/components/pos/pos-payment';
@@ -104,6 +106,9 @@ interface PosConfig extends PosFeedbackSettings {
   default_payment_method_id: string | null;
   allow_deferred_payment: boolean;
   show_product_images: boolean;
+  /** PR-2C: default|image|color — يُقرأ من `/sales-config/pos`؛ السقوط عند
+   *  غيابه يعود من الخادم نفسه إلى `image` (توافق رجعي)، لا من هذا الثابت. */
+  category_presentation_mode: 'default' | 'image' | 'color';
   cash_drawer_enabled: boolean;
   cash_drawer_driver: string;
   cash_drawer_auto_open_after_cash: boolean;
@@ -127,6 +132,7 @@ const POS_DEFAULTS: PosConfig = {
   default_payment_method_id: null,
   allow_deferred_payment: true,
   show_product_images: true,
+  category_presentation_mode: 'image',
   cash_drawer_enabled: false,
   cash_drawer_driver: 'unavailable',
   cash_drawer_auto_open_after_cash: false,
@@ -148,6 +154,10 @@ interface Product {
   category_id: string | null;
   category: string | null;
   category_image?: { download_url: string } | null;
+  /** PR-2C: لون تعريفي للتصنيف — عرضٌ بحت، يُستهلك فقط حين يختار المستأجر
+   *  صراحةً وضع «لون». غائب عن الاستجابة (لا `null`) حين لا تُحمَّل علاقة
+   *  التصنيف؛ الأمان الفعلي (نمط `#RRGGBB`) مفروضٌ خادمياً لا هنا. */
+  category_color?: string | null;
   tax_rate: number;
   type: string;
   track_inventory: boolean;
@@ -1316,17 +1326,42 @@ export default function PosPage() {
   }));
 
   const CATS = [
-    { key: 'all', label: t('cat_all'), image: null as string | null, icon: LayoutGrid },
+    { key: 'all', label: t('cat_all'), image: null as string | null, color: null as string | null, icon: LayoutGrid },
     ...Array.from(new Map(products
       .filter((product) => product.category_id && product.category)
       .map((product) => [product.category_id as string, {
         key: product.category_id as string,
         label: product.category as string,
         image: product.category_image?.download_url ?? null,
+        color: product.category_color ?? null,
         icon: Package,
       }]))
       .values()),
   ];
+  /**
+   * PR-2C: يقرّر عرض مربّع أيقونة التصنيف حسب `category_presentation_mode`
+   * الفعلي وحده — لا فحص صلاحية هنا. تبويب «الكل» يحتفظ بأيقونته الثابتة
+   * دوماً بصرف النظر عن الوضع؛ ليس تصنيفاً حقيقياً له صورة أو لون.
+   */
+  function renderCategoryVisual(item: { key: string; label: string; image: string | null; color: string | null; icon: typeof LayoutGrid }) {
+    const decision = resolveCategoryVisual(posCfg.category_presentation_mode, {
+      isAllTab: item.key === 'all',
+      image: item.image,
+      color: item.color,
+    });
+    switch (decision.kind) {
+      case 'all-icon': {
+        const Icon = item.icon;
+        return <span className="grid h-full w-full place-items-center bg-primary-soft text-primary"><Icon className="h-5 w-5" strokeWidth={1.7} /></span>;
+      }
+      case 'neutral-icon':
+        return <PosCategoryImage path={null} alt={item.label} />;
+      case 'color':
+        return <PosCategorySwatch color={decision.color} alt={item.label} />;
+      case 'image':
+        return <PosCategoryImage path={decision.path} alt={item.label} />;
+    }
+  }
   const TABS = [
     { key: 'all', label: t('tab_all'), icon: null },
     { key: 'favorites', label: t('tab_favorites'), icon: Star },
@@ -1369,7 +1404,8 @@ export default function PosPage() {
 
       {/* تصنيفات POS على الجوال/التابلت: صور سريعة مع تمرير أفقي، ونفس الفلتر التشغيلي. */}
       <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto px-3 pb-1 touch-pan-x sm:-mx-4 sm:px-4 lg:hidden" aria-label={t('categories')}>
-        {CATS.map(({ key, label, image, icon: Icon }, index) => {
+        {CATS.map((item, index) => {
+          const { key, label } = item;
           const on = cat === key;
           return (
             <button
@@ -1380,11 +1416,7 @@ export default function PosPage() {
               className={'flex w-[76px] shrink-0 touch-manipulation flex-col items-center gap-1.5 rounded-lg border p-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (index === 0 ? 'ms-0 ' : '') + (index === CATS.length - 1 ? 'me-1 ' : '') + (on ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-text')}
             >
               <span className="h-11 w-11 overflow-hidden rounded-md bg-background">
-                {key === 'all' ? (
-                  <span className="grid h-full w-full place-items-center bg-primary-soft text-primary"><Icon className="h-5 w-5" strokeWidth={1.7} /></span>
-                ) : (
-                  <PosCategoryImage path={image} alt={label} />
-                )}
+                {renderCategoryVisual(item)}
               </span>
               <span className="line-clamp-2 min-h-7 text-[10.5px] font-semibold leading-tight">{label}</span>
             </button>
@@ -1729,7 +1761,8 @@ export default function PosPage() {
   const catsPanel = (
     <aside className={POS_DESKTOP_CATEGORIES_CLASS}>
       <h4 className="mb-1 px-1 text-xs font-bold text-muted">{t('categories')}</h4>
-      {CATS.map(({ key, label, image, icon: Icon }) => {
+      {CATS.map((item) => {
+        const { key, label } = item;
         const on = cat === key;
         return (
           <button
@@ -1740,11 +1773,7 @@ export default function PosPage() {
             className={'flex min-h-12 w-full touch-manipulation flex-col items-center gap-2 rounded-lg border p-2 text-center text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'border-primary bg-primary-soft text-primary' : 'border-transparent text-text hover:bg-background')}
           >
             <span className="h-12 w-12 overflow-hidden rounded-md bg-background">
-              {key === 'all' ? (
-                <span className="grid h-full w-full place-items-center bg-primary-soft text-primary"><Icon className="h-5 w-5" strokeWidth={1.7} /></span>
-              ) : (
-                <PosCategoryImage path={image} alt={label} />
-              )}
+              {renderCategoryVisual(item)}
             </span>
             <span className="line-clamp-2 leading-tight">{label}</span>
           </button>

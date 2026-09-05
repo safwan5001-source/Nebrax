@@ -24,6 +24,12 @@ class ProductCategory extends BaseModel implements BranchShareable
     use BranchScoped;
     use SoftDeletes;
 
+    /**
+     * PR-2C: تمثيل آمن وحيد للون التعريفي — `#RRGGBB` صارم. يرفض أي دالة CSS
+     * أو متغيّراً أو نصاً حراً كي لا يتحوّل حقل عرض إلى مسار حقن نمط.
+     */
+    public const COLOR_REGEX = '/^#[0-9A-Fa-f]{6}$/';
+
     protected $fillable = [
         'tenant_id',
         'branch_id',
@@ -34,6 +40,7 @@ class ProductCategory extends BaseModel implements BranchShareable
         'image_original_name',
         'image_mime_type',
         'image_size',
+        'color',
         'is_active',
     ];
 

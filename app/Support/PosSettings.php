@@ -39,6 +39,9 @@ final class PosSettings
     public const INTERACTION_MODE_TOUCH = 'TOUCH';
     public const INTERACTION_MODE_KEYBOARD_MOUSE = 'KEYBOARD_MOUSE';
     public const INTERACTION_MODE_HYBRID = 'HYBRID';
+    public const CATEGORY_PRESENTATION_DEFAULT = 'default';
+    public const CATEGORY_PRESENTATION_IMAGE = 'image';
+    public const CATEGORY_PRESENTATION_COLOR = 'color';
 
     /** أوضاع تفاعل الكاشير المعتمدة — سياسة تشغيل لا أثر مالي. */
     public const INTERACTION_MODES = [
@@ -46,6 +49,13 @@ final class PosSettings
         self::INTERACTION_MODE_TOUCH,
         self::INTERACTION_MODE_KEYBOARD_MOUSE,
         self::INTERACTION_MODE_HYBRID,
+    ];
+
+    /** PR-2C: أوضاع عرض تصنيفات POS المعتمدة — الافتراضي/صورة/لون حصراً. */
+    public const CATEGORY_PRESENTATION_MODES = [
+        self::CATEGORY_PRESENTATION_DEFAULT,
+        self::CATEGORY_PRESENTATION_IMAGE,
+        self::CATEGORY_PRESENTATION_COLOR,
     ];
 
     private const DEFAULTS = [
@@ -101,6 +111,14 @@ final class PosSettings
         // الصلاحية وحدها كشفاً تلقائياً في POS. الافتراض الحامي معطّل: لا يظهر
         // شيء جديد لمستأجر قائم لم يفعّله المالك صراحةً. الأكثر تقييداً يفوز.
         'show_cost_profit_in_pos' => false,
+        // PR-2C: القيمة المخزَّنة **والسقوط الفعلي** لأي مستأجر لم يضبط هذا
+        // المفتاح إطلاقاً — قديماً أو جديداً — هي `image` عمداً، لا `default`.
+        // «صورة» هو السلوك المرئي القائم فعلاً منذ PR-2 (عرض صورة التصنيف متى
+        // وُجدت)؛ فرض `default` هنا كان سيغيّر مظهر شاشة POS لكل مستأجر قائم
+        // بلا قرار صريح منه. القيمة النصية `default` تبقى أحد الخيارات الثلاثة
+        // الصالحة (`CATEGORY_PRESENTATION_MODES`) التي يختارها المالك صراحةً من
+        // شاشة إعدادات POS — وهي مختلفة تماماً عن هذا السقوط الافتراضي الحامي.
+        'category_presentation_mode' => self::CATEGORY_PRESENTATION_IMAGE,
         // لا تتصل السحابة بالطابعة أو USB أبداً. الافتراض يظل unavailable حتى
         // يقترن جهاز POS بجسر محلي موثوق وتفعّله المؤسسة صراحةً.
         'cash_drawer_enabled' => false,
@@ -212,6 +230,20 @@ final class PosSettings
         return in_array($size, [self::RECEIPT_PAPER_THERMAL_58, self::RECEIPT_PAPER_THERMAL_80], true)
             ? $size
             : self::RECEIPT_PAPER_THERMAL_80;
+    }
+
+    /**
+     * وضع عرض تصنيفات POS الصالح فقط؛ قيمة غائبة أو غير معروفة تعود لـ`image`
+     * — السلوك المرئي القائم فعلاً لكل مستأجر لم يضبط شيئاً (انظر تعليق
+     * `DEFAULTS` أعلاه)، لا القيمة الاسمية `default`.
+     */
+    public static function categoryPresentationMode(?Tenant $tenant = null): string
+    {
+        $mode = self::group($tenant)['category_presentation_mode'];
+
+        return in_array($mode, self::CATEGORY_PRESENTATION_MODES, true)
+            ? $mode
+            : self::CATEGORY_PRESENTATION_IMAGE;
     }
 
     /** تطبيق قائمة سعر العميل سياسة POS صريحة؛ الافتراض يحدّث السلة عند الاختيار. */

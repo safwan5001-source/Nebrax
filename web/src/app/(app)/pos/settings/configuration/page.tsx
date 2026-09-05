@@ -40,6 +40,9 @@ interface PosConfig {
   exchange_surplus_policy: 'customer_credit_only' | 'allow_cash_refund';
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   show_product_images: boolean;
+  /** PR-2C: default|image|color — السقوط الفعلي عند غياب الإعداد يأتي من
+   *  الخادم نفسه (`image`، توافق رجعي)؛ هذا الثابت هنا قيمة تحميل أولي فقط. */
+  category_presentation_mode: 'default' | 'image' | 'color';
   /** PR-2S: هذا وحده لا يمنح شيئاً — صلاحية `products.view_cost` هي حدّ الأمان
    *  الحقيقي؛ الإعداد يقيّد فوقها فقط، فمعطَّلاً تبقى التكلفة/الربحية غائبة عن
    *  استجابة POS حتى لمستخدم يملك الصلاحية. */
@@ -139,6 +142,7 @@ const DEFAULTS: PosConfig = {
   exchange_surplus_policy: 'customer_credit_only',
   held_sale_close_policy: 'discard_on_session_close',
   show_product_images: true,
+  category_presentation_mode: 'image',
   show_cost_profit_in_pos: false,
   blind_cash_count_enabled: false,
   audit_operation_policies: {
@@ -503,6 +507,23 @@ export default function PosSettingsPage() {
                   </div>
                   <Switch checked={config.show_product_images} onCheckedChange={(checked) => patch('show_product_images', checked)} aria-labelledby="show_product_images_label" />
                 </div>
+              </div>
+
+              <div className="border-b border-border py-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="category_presentation_mode">{t('category_presentation_mode')}</Label>
+                  <p className="text-xs leading-relaxed text-muted">{t('category_presentation_mode_hint')}</p>
+                </div>
+                <Select
+                  id="category_presentation_mode"
+                  className="mt-2"
+                  value={config.category_presentation_mode}
+                  onChange={(event) => patch('category_presentation_mode', event.target.value as PosConfig['category_presentation_mode'])}
+                >
+                  <option value="default">{t('category_presentation_default')}</option>
+                  <option value="image">{t('category_presentation_image')}</option>
+                  <option value="color">{t('category_presentation_color')}</option>
+                </Select>
               </div>
 
               <div className="border-b border-border py-3">

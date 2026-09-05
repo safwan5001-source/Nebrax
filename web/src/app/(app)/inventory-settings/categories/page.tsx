@@ -29,8 +29,14 @@ interface Category {
   parent_id: string | null;
   is_active: boolean;
   image: CategoryImage | null;
+  /** PR-2C: `#RRGGBB` أو null — يُستهلك فقط حين يختار المستأجر وضع «لون» في POS. */
+  color: string | null;
   products_count?: number;
 }
+
+/** نفس نمط `#RRGGBB` المفروض خادمياً (`ProductCategory::COLOR_REGEX`) — تحقق أولي هنا فقط. */
+const CATEGORY_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
+const NEUTRAL_COLOR_SWATCH = '#94A3B8';
 
 /** صفّ معروض: التصنيف ومستواه في الشجرة (يُحسب عند العرض لا يُخزَّن). */
 interface Node extends Category { depth: number }
@@ -56,6 +62,10 @@ export default function ProductCategoriesPage() {
     imageHint: 'JPG أو PNG أو WebP، بحد أقصى 5 MB. تظهر الصورة أيضاً في نقاط البيع.',
     removeImage: 'إزالة الصورة',
     imagePreview: 'معاينة صورة التصنيف',
+    color: 'لون التصنيف',
+    colorHint: 'يظهر فقط إذا اختار المالك وضع «لون» لعرض التصنيفات في إعدادات نقطة البيع.',
+    colorInvalid: 'صيغة اللون غير صحيحة — استخدم لوناً من المنتقي.',
+    removeColor: 'إزالة اللون',
   } : {
     description: 'Category description',
     descriptionHint: 'A short description that explains the category and its use.',
@@ -63,6 +73,10 @@ export default function ProductCategoriesPage() {
     imageHint: 'JPG, PNG, or WebP up to 5 MB. The image also appears in POS.',
     removeImage: 'Remove image',
     imagePreview: 'Category image preview',
+    color: 'Category color',
+    colorHint: 'Only shown when the owner selects the "Color" category presentation mode in POS settings.',
+    colorInvalid: 'Invalid color format — use the color picker.',
+    removeColor: 'Remove color',
   };
 
   const [rows, setRows] = useState<Category[] | null>(null);
@@ -76,6 +90,7 @@ export default function ProductCategoriesPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
+  const [color, setColor] = useState('');
   const previewUrl = useRef<string | null>(null);
 
   const load = useCallback(() => {
@@ -149,6 +164,10 @@ export default function ProductCategoriesPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    if (color && !CATEGORY_COLOR_PATTERN.test(color)) {
+      setError(ui.colorInvalid);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -156,6 +175,9 @@ export default function ProductCategoriesPage() {
       body.append('name', name.trim());
       body.append('description', description.trim());
       body.append('parent_id', parentId);
+      // فارغ يتحوّل إلى null خادمياً (نفس معاملة parent_id/description) فيمسح
+      // اللون المخزَّن — لا حاجة لعلم remove_color منفصل.
+      body.append('color', color);
       if (imageFile) body.append('image', imageFile);
       if (removeImage) body.append('remove_image', '1');
 
@@ -195,6 +217,7 @@ export default function ProductCategoriesPage() {
     setParentId(row.parent_id ?? '');
     setImageFile(null);
     setRemoveImage(false);
+    setColor(row.color ?? '');
   }
 
   function reset() {
@@ -205,6 +228,7 @@ export default function ProductCategoriesPage() {
     setParentId('');
     setImageFile(null);
     setRemoveImage(false);
+    setColor('');
   }
 
   return (
@@ -280,6 +304,27 @@ export default function ProductCategoriesPage() {
                     )}
                   </div>
                 </div>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="cat-color">{ui.color}</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    id="cat-color"
+                    type="color"
+                    disabled={busy}
+                    value={color && CATEGORY_COLOR_PATTERN.test(color) ? color : NEUTRAL_COLOR_SWATCH}
+                    onChange={(e) => setColor(e.target.value)}
+                    aria-describedby="cat-color-hint"
+                    className="h-10 w-14 shrink-0 cursor-pointer rounded-md border border-border bg-surface p-1 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  {color && (
+                    <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setColor('')}>
+                      <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+                      {ui.removeColor}
+                    </Button>
+                  )}
+                </div>
+                <p id="cat-color-hint" className="text-xs leading-relaxed text-muted">{ui.colorHint}</p>
               </div>
             </div>
 
