@@ -759,7 +759,9 @@ merge in §27.2, unmodified further.
 - Base SHA (original PR-2, §24): `b94718a432d01dab7d5bde04dda2259717ef2a28`
 - Old Head SHA (before this integration): `a31e523db0d540d6dead043cc6bf85b8944efa04`
 - Current `main` SHA used for this integration: `f59ffb398aa53c75a26db892ee29127795d6d866`
-- New Head SHA (after this integration): `e053d1f` (Quick View integration commit), report-finalization commit follows
+- New Head SHA (after this integration): `900a024` (includes the merge commit,
+  the Quick View integration commit `e053d1f`, and this report's own
+  finalization commit)
 
 ## 29. Recommended Next Step (current)
 
