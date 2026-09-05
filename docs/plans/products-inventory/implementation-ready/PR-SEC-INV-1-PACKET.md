@@ -1,6 +1,6 @@
 # Implementation-Ready Packet — PR-SEC-INV-1
 
-**State:** READY AFTER FINAL TEST-PATH CENSUS; implementation not authorized.
+**State:** IMPLEMENTATION-READY; implementation not authorized.
 **Baseline:** main `f73a3f2bb5685e8f9e995e0febe61f81459c2a88`
 **Contract:** `../phase-1-hardening/PR-SEC-INV-1.md`
 
@@ -45,7 +45,14 @@ Likely code changes:
 - `app/Http/Controllers/Api/ApiController.php` (only if central helper added)
 - `app/Http/Controllers/Api/StocktakeController.php`
 - `app/Http/Controllers/Api/StockPermitController.php`
-- targeted API/feature tests for Stocktake/StockPermit authorization.
+- targeted API/feature authorization tests.
+
+Verified regression test anchors:
+- `tests/Feature/StocktakeTest.php` — domain/accounting behavior, including snapshot/open/count/post semantics and posted-document guard. Keep green; do not repurpose as the sole HTTP authorization suite.
+- `tests/Feature/StockPermitTest.php` — receipt/issue/transfer accounting, frozen cost, warehouse distribution and cross-branch transfer behavior. Keep green; do not weaken its ledger invariants.
+- `tests/Feature/ApiInventoryTest.php` — existing API inventory report/movement/tenant-isolation coverage; useful as neighboring API regression, but it does not currently prove direct Stocktake/StockPermit UUID authorization.
+
+Preferred new test placement: add a narrowly named HTTP feature suite such as `tests/Feature/StockDocumentAuthorizationTest.php` (or extend an existing authorization suite only if implementation-time census finds a clearly canonical home). Do not bury the security matrix inside service-only tests because the defect is controller/direct-route authorization.
 
 Inspect-only unless evidence requires change:
 - Stocktake/StockPermit models and services;
@@ -79,6 +86,13 @@ No successful response shape changes. Denied direct access must use the project'
 12. denied count/post/destroy creates no line mutation, document state change, StockMovement, ProductWarehouseStock delta or JournalEntry.
 13. existing double-post/posting tests stay green.
 
+## Required test execution order
+1. new targeted HTTP authorization suite.
+2. `php artisan test --filter=StocktakeTest`.
+3. `php artisan test --filter=StockPermitTest`.
+4. neighboring API authorization/tenant-isolation tests, including `ApiInventoryTest` and canonical RBAC/tenant suites found on implementation baseline.
+5. broader backend suite only after targeted tests pass; do not reduce PostgreSQL coverage if CI normally runs it.
+
 ## Concurrency/accounting/UOM
 No new concurrency mechanism. Existing posting locks remain untouched. No accounting/UOM changes. Security denial occurs before domain service invocation, therefore before any stock/GL effect.
 
@@ -88,6 +102,15 @@ Stop and report rather than expand if:
 - a direct action intentionally supports cross-warehouse access not represented by document warehouse ids;
 - established failure semantics require a project-wide authorization redesign;
 - tests reveal another same structural gap outside Stocktake/StockPermit. Record it separately; do not add it to this PR automatically.
+
+## Definition of Done
+- Every direct Stocktake/StockPermit UUID route in scope is guarded before resource exposure or service mutation.
+- Both source and target warehouses are enforced for transfer permits.
+- Denial has zero stock, document, or GL side effects.
+- Tenant isolation remains unchanged and green.
+- Existing Stocktake/StockPermit accounting invariants remain green.
+- No schema, UOM, accounting, permission-taxonomy or unrelated controller changes.
+- Implementation report records exact tests, results, changed files, branch/PR/Base SHA/Head SHA, risks and next step.
 
 ## Claude Code final handoff requirements
 When owner later authorizes execution, prompt Claude Code to implement only this packet from then-current `main`, first reconciling SHA/code drift. Mandatory final MD Implementation Report. No Merge/Deploy.
