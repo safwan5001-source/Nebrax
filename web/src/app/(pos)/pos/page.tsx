@@ -36,7 +36,8 @@ import { useBranches } from '@/lib/branch';
 import type { Warehouse } from '@/lib/warehouse';
 import { ReceiptDialog, type Receipt } from '@/components/pos/receipt-dialog';
 import { PosTopbar } from '@/components/pos/pos-topbar';
-import { PosRecentInvoicesDialog } from '@/components/pos/pos-recent-invoices-dialog';
+import { PosInvoiceCenter } from '@/components/pos/pos-invoice-center';
+import { PosInvoiceDetails, type InvoiceDetail } from '@/components/pos/pos-invoice-details';
 import { PosCategoryImage } from '@/components/pos/pos-category-image';
 import { PosCategorySwatch } from '@/components/pos/pos-category-swatch';
 import { resolveCategoryVisual } from '@/lib/pos-category-presentation';
@@ -283,7 +284,16 @@ export default function PosPage() {
   const [percentDraft, setPercentDraft] = useState('');
   const [step, setStep] = useState<'sale' | 'payment'>('sale');
   const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products');
+  /**
+   * PR-4: مساحة عمل ثانية حقيقية داخل نفس الصفحة — لا مسار/صفحة منفصلة، فلا
+   * تُفقد السلة/الجلسة/العميل عند التنقّل بينهما (كلاهما يبقى داخل نفس شجرة
+   * المكوّن). `selectedInvoiceId` يقود عرض التفاصيل داخل وضع «الفواتير» فقط.
+   */
+  const [workspaceMode, setWorkspaceMode] = useState<'products' | 'invoices'>('products');
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  /** PR-4: معاينة/إعادة طباعة من مركز الفواتير — منفصلة تماماً عن إيصال نجاح البيع الفوري أعلاه. */
+  const [previewReceipt, setPreviewReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [checkoutPhase, setCheckoutPhase] = useState<PosCheckoutPhase>('idle');
@@ -377,7 +387,6 @@ export default function PosPage() {
   const [heldCount, setHeldCount] = useState(0);
   const [holdBusy, setHoldBusy] = useState(false);
   const [retrieveOpen, setRetrieveOpen] = useState(false);
-  const [recentInvoicesOpen, setRecentInvoicesOpen] = useState(false);
   const [openCartsOpen, setOpenCartsOpen] = useState(false);
   const [cartToClose, setCartToClose] = useState<string | null>(null);
   const [clearCartOpen, setClearCartOpen] = useState(false);
@@ -402,7 +411,6 @@ export default function PosPage() {
     retrieveOpen,
     returnOpen,
     exchangeOpen,
-    recentInvoicesOpen,
     openCartsOpen,
     clearCartOpen,
     noteOpen,
@@ -411,11 +419,13 @@ export default function PosPage() {
     unsavedExitOpen: unsavedExitAction !== null,
     sessionGateOpen: sessionReady && !session,
   }), [
-    pickerOpen, retrieveOpen, returnOpen, exchangeOpen, recentInvoicesOpen,
+    pickerOpen, retrieveOpen, returnOpen, exchangeOpen,
     openCartsOpen, clearCartOpen, noteOpen, sensitiveAction, closeOpen,
     unsavedExitAction, sessionReady, session,
   ]);
-  const dialogOpen = isPosDialogOpen(dialogFlags);
+  // PR-4: وضع «الفواتير» يحجب سكانر الباركود وتنقّل المنتجات/السلة بالكيبورد
+  // تماماً كأي طبقة حاجبة أخرى — لا منتجات ولا سلة مرئية لتفاعل السكانر معها.
+  const dialogOpen = isPosDialogOpen(dialogFlags) || workspaceMode === 'invoices';
 
   // اسم إعداد العميل الافتراضي يبقى fallback لاسم مرجع صحيح فقط؛ غياب المرجع ظاهر ويطلب اختياراً صريحاً قبل التحصيل.
   useEffect(() => {
@@ -988,26 +998,30 @@ export default function PosPage() {
     onExitSearch: () => focusZone('search'),
   });
 
+  // PR-4: اختصارات البيع (عميل/بحث/معلّقة/تعليق/حذف/دفع/سلة جديدة/سلات مفتوحة)
+  // كلها بلا معالج خارج وضع «المنتجات» — لا سلة مرئية يعمل عليها المفتاح، فلا
+  // نترك الاختصار يعمل على حالة غير مرئية. «رجوع» يعود بالكاشير لوضع المنتجات
+  // بدل إلغاء الدفع حين نكون في مركز الفواتير.
   usePosKeyboardShortcuts({
-    customer: () => setPickerOpen(true),
-    search: focusSearch,
-    heldSales: () => setRetrieveOpen(true),
-    holdSale: () => { void holdSale(); },
-    delete: () => {
+    customer: workspaceMode === 'products' ? () => setPickerOpen(true) : undefined,
+    search: workspaceMode === 'products' ? focusSearch : undefined,
+    heldSales: workspaceMode === 'products' ? () => setRetrieveOpen(true) : undefined,
+    holdSale: workspaceMode === 'products' ? () => { void holdSale(); } : undefined,
+    delete: workspaceMode === 'products' ? () => {
       const key = selectedLineKey ?? cart[cart.length - 1]?.key;
       if (key) remove(key);
-    },
-    payment: () => {
+    } : undefined,
+    payment: workspaceMode === 'products' ? () => {
       if (cart.length > 0 && step === 'sale' && !sessionInvalid && online) {
         if (pendingAttempt?.cartId === activeCart.id) {
           checkoutAttemptRef.current.adopt(pendingAttempt.attemptId);
         }
         setStep('payment');
       }
-    },
-    newCart: () => { createCart(); },
-    openCarts: () => setOpenCartsOpen(true),
-    back: step === 'payment' ? requestPaymentCancel : undefined,
+    } : undefined,
+    newCart: workspaceMode === 'products' ? () => { createCart(); } : undefined,
+    openCarts: workspaceMode === 'products' ? () => setOpenCartsOpen(true) : undefined,
+    back: workspaceMode === 'invoices' ? () => setWorkspaceMode('products') : (step === 'payment' ? requestPaymentCancel : undefined),
   }, { step, dialogFlags });
 
   usePosProductNavigation({
@@ -1511,6 +1525,46 @@ export default function PosPage() {
     </section>
   );
 
+  /**
+   * PR-4: معاينة/إعادة طباعة إيصال فاتورة تاريخية من مركز الفواتير. يُبنى
+   * النموذج من `GET /invoices/{id}` وحده — نفس شكل الاستجابة الذي يبنى منه
+   * إيصال البيع الفوري (R5) — لا اشتقاق محلي لأي رقم مالي، ولا سلة، ولا
+   * checkout ثانٍ، ولا تعديل على الفاتورة نفسها. فشل تجهيز النموذج (بيانات
+   * تاريخية ناقصة مثلاً) يظهر كحالة فشل صريحة هنا؛ لا يمسّ حالة السلة الحالية.
+   */
+  function openReceiptPreview(invoice: InvoiceDetail) {
+    if (!invoice.invoice_date) {
+      errorToast(t('receipt_preview_unavailable'));
+      return;
+    }
+    try {
+      const receiptInvoice = buildPosReceiptInvoice({ ...invoice, invoice_date: invoice.invoice_date }, []);
+      const model = buildInvoiceDocumentModel({
+        invoice: receiptInvoice,
+        company,
+        customer: posReceiptCustomer(invoice, invoice.partner?.name ?? walkinName),
+        qr: invoice.zatca?.qr ?? null,
+        footerText: posCfg.receipt_footer,
+      });
+      setPreviewReceipt({
+        model,
+        number: invoice.number,
+        thermalTemplateRevision: invoice.thermal_template_revision ?? null,
+      });
+    } catch {
+      errorToast(t('receipt_preview_unavailable'));
+    }
+  }
+
+  async function copyInvoiceNumber(number: string) {
+    try {
+      await navigator.clipboard.writeText(number);
+      success(t('receipt_copy_done'));
+    } catch {
+      errorToast(t('receipt_copy_failed'));
+    }
+  }
+
   function requestCloseCart(cartId: string) {
     const target = carts.find((cartState) => cartState.id === cartId);
     if (!target) return;
@@ -1936,7 +1990,7 @@ export default function PosPage() {
         heldCount={heldCount}
         onManageSession={() => (session ? (setCountedBal(''), setSessionError(null), setCloseOpen(true)) : router.push('/dashboard'))}
         onOpenHeld={() => setRetrieveOpen(true)}
-        onOpenRecentInvoices={() => setRecentInvoicesOpen(true)}
+        onOpenRecentInvoices={() => { setSelectedInvoiceId(null); setWorkspaceMode('invoices'); }}
         onOpenCashDrawer={() => void openCashDrawer()}
         cashDrawerDisabled={!session || sessionInvalid || !sessionDrawerConfigured || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable' || drawerBusy}
         cashDrawerBusy={drawerBusy}
@@ -1986,6 +2040,19 @@ export default function PosPage() {
           onBack={requestPaymentCancel}
           onConfirm={confirmPayment}
         />
+      ) : workspaceMode === 'invoices' ? (
+        selectedInvoiceId ? (
+          <PosInvoiceDetails
+            invoiceId={selectedInvoiceId}
+            onBack={() => setSelectedInvoiceId(null)}
+            onPreviewReceipt={openReceiptPreview}
+          />
+        ) : (
+          <PosInvoiceCenter
+            onOpenInvoice={setSelectedInvoiceId}
+            onBack={() => setWorkspaceMode('products')}
+          />
+        )
       ) : (
         <>
           {/* ديسكتوب lg+: 3 أعمدة. تابلت md: سلة+منتجات. جوال: تبويب واحد */}
@@ -2013,7 +2080,7 @@ export default function PosPage() {
 
           {/* تنقّل سفلي (جوال فقط) */}
           <nav className={POS_MOBILE_NAV_CLASS}>
-            <button type="button" onClick={() => setRecentInvoicesOpen(true)} className="flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold text-muted touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><MoreHorizontal className="h-5 w-5" strokeWidth={1.8} />{t('nav_more')}</button>
+            <button type="button" onClick={() => { setSelectedInvoiceId(null); setWorkspaceMode('invoices'); }} className="flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold text-muted touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><MoreHorizontal className="h-5 w-5" strokeWidth={1.8} />{t('nav_more')}</button>
             <button type="button" onClick={() => setPickerOpen(true)} className="flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold text-muted touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><Users className="h-5 w-5" strokeWidth={1.8} />{t('nav_customers')}</button>
             <button type="button" onClick={() => setMobileTab('products')} className={'flex min-h-11 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold touch-manipulation ' + (mobileTab === 'products' ? 'text-primary' : 'text-muted')}>
               <LayoutGrid className="h-5 w-5" strokeWidth={1.8} />{t('nav_products')}
@@ -2027,6 +2094,13 @@ export default function PosPage() {
       )}
 
       <ReceiptDialog receipt={receipt} autoPrint={posCfg.print_receipt} paperSize={posCfg.receipt_paper_size} onClose={() => setReceipt(null)} />
+      <ReceiptDialog
+        receipt={previewReceipt}
+        variant="preview"
+        paperSize={posCfg.receipt_paper_size}
+        onClose={() => setPreviewReceipt(null)}
+        onCopy={() => previewReceipt && void copyInvoiceNumber(previewReceipt.number)}
+      />
       <PosReturnDialog
         open={returnOpen}
         sessionId={session?.id ?? null}
@@ -2056,8 +2130,6 @@ export default function PosPage() {
         onResumed={retrieveSale}
         onChanged={refreshHeldCount}
       />
-
-      <PosRecentInvoicesDialog open={recentInvoicesOpen} onClose={() => setRecentInvoicesOpen(false)} />
 
       <PosProductQuickView
         open={quickViewProductId !== null}

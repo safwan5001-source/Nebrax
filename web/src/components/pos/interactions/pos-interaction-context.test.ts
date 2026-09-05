@@ -6,7 +6,6 @@ const closedFlags = {
   retrieveOpen: false,
   returnOpen: false,
   exchangeOpen: false,
-  recentInvoicesOpen: false,
   openCartsOpen: false,
   clearCartOpen: false,
   noteOpen: false,

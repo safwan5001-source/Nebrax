@@ -9,7 +9,6 @@ const closedDialogFlags = {
   retrieveOpen: false,
   returnOpen: false,
   exchangeOpen: false,
-  recentInvoicesOpen: false,
   openCartsOpen: false,
   clearCartOpen: false,
   noteOpen: false,

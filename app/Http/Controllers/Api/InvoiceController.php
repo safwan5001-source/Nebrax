@@ -141,7 +141,13 @@ class InvoiceController extends ApiController
      */
     public function show(Request $request, string $id): JsonResponse
     {
+        // PR-4: `partner` لم تكن محمَّلة هنا فتغيب من الاستجابة (`InvoiceResource`
+        // تستعمل `whenLoaded`) رغم أن الحقل معرَّف في العقد أصلاً — فجوة كانت
+        // تُسقط اسم العميل من إعادة طباعة الإيصال ومركز الفواتير في نقطة البيع
+        // (كلاهما يستهلك هذا المسار نفسه). إضافة العلاقة هنا تُكمل عقداً قائماً
+        // بلا تغيير في الشكل ولا سلوك مالي.
         $invoice = $this->scopeToActiveBranch(Invoice::with([
+            'partner:id,name,vat_number,city',
             'priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
             'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision',
             'deliveryNoteAllocations.deliveryNote', 'deliveryNoteAllocations.lineLinks',

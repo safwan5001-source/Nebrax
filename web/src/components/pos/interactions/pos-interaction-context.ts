@@ -1,13 +1,20 @@
 export type PosFocusZone = 'search' | 'products' | 'cart' | 'payment' | 'dialog';
 export type PosSaleStep = 'sale' | 'payment';
 
-/** أعلام الحوارات/الطبقات التي تحجب اختصارات البيع والتنقل. */
+/**
+ * أعلام الحوارات/الطبقات التي تحجب اختصارات البيع والتنقل.
+ *
+ * PR-4: مساحة عمل «الفواتير» **ليست** حواراً — لا مدخل لها هنا. الصفحة تحجب
+ * سكانر الباركود وتنقّل لوحة المفاتيح للمنتجات/السلة عبر شرط منفصل
+ * (`workspaceMode === 'products'`) عند نقطة الاستهلاك مباشرة، ومعالجات
+ * الاختصارات الحسّاسة (الدفع/الحذف/إلخ) تُمرَّر `undefined` صراحةً خارج وضع
+ * المنتجات بدل توسيع هذا العقد المشترك بحقل خاص بشاشة واحدة.
+ */
 export interface PosDialogFlags {
   pickerOpen: boolean;
   retrieveOpen: boolean;
   returnOpen: boolean;
   exchangeOpen: boolean;
-  recentInvoicesOpen: boolean;
   openCartsOpen: boolean;
   clearCartOpen: boolean;
   noteOpen: boolean;
@@ -22,7 +29,6 @@ export function isPosDialogOpen(flags: PosDialogFlags): boolean {
     || flags.retrieveOpen
     || flags.returnOpen
     || flags.exchangeOpen
-    || flags.recentInvoicesOpen
     || flags.openCartsOpen
     || flags.clearCartOpen
     || flags.noteOpen
