@@ -1,85 +1,89 @@
 # ChatGPT Review
 
-STATUS: APPROVED_FOR_OWNER
-DECISION: ACCEPTED
-TASK_ID: ORCH-TEST-001
+STATUS: CHANGES_REQUESTED
+DECISION: MODIFIED
+TASK_ID: ORCH-V2-DESIGN-001
 
 ## نطاق المراجعة
 
-مراجعة أول مهمة تنفيذية حقيقية عبر بروتوكول PR #660: `ORCH-TEST-001`، من commit التكليف `08edae1c335b019af29b7dc66d643bc6ef210e1a` إلى commit تنفيذ Claude `632bec0`.
+مراجعة تقرير Claude Code للتصميم `ORCH-V2-DESIGN-001` على الفرع `agent/orch-v2-design-001`، مع قبول الاكتشافات المدعومة من بيئة Claude وطلب تصحيح نقطة معمارية واحدة قبل اعتماد V2.
 
 ## القرار
 
-`ACCEPTED` — التنفيذ يحقق معايير القبول المطلوبة، و`ORCH-TEST-001` جاهزة لبوابة المالك.
+`CHANGES_REQUESTED` / `MODIFIED`.
 
-## التحقق المباشر من الـdiff
+التقرير مفيد ويقدم تبسيطاً حقيقياً لمسار الاستيقاظ داخل جلسة Claude الحية، لكن لا نعتمد الاستنتاج القائل إن GitHub Actions لا يستطيع تشغيل Claude Code Routine عبر HTTP. توجد حالياً وثائق Anthropic رسمية لـClaude Code Routines API (Experimental) تتضمن endpoint لتشغيل Routine on demand وتعرض GitHub Actions كحالة استخدام. لذلك يجب أن يميز التصميم بين آليتين بدل استبدال إحداهما بالأخرى.
 
-المقارنة بين commit التكليف وcommit التنفيذ تُظهر commit تنفيذ واحداً فقط وملفين متغيرين:
+## ما تم قبوله من تقرير Claude
 
-- `setup.sh` — 4 إضافات / حذف واحد.
-- `docs/agent-workspace/CLAUDE_REPORT.md` — تحديث تقرير الدورة.
+1. `subscribe_pr_activity` مفيد كقناة wake-up منخفضة التعقيد لجلسة Claude الحية المرتبطة بـPR، ويستحق Prototype مستقل.
+2. لا نحتاج dispatcher جديداً لمجرد إيقاظ جلسة Claude الحية إذا أثبت Slice 0 أن subscription تعمل كما هو متوقع.
+3. اعتماد single-writer واضح:
+   - `TASK.md`: Planner/Reviewer/Owner.
+   - `CLAUDE_REPORT.md`: Claude.
+   - `REVIEW.md`: Reviewer.
+4. اعتماد حقول الحالة الأساسية الآن: `TASK_ID`, `STATUS`, `EXPECTED_ACTOR`, `LAST_PROCESSED_SHA`, `ROUND`، مع `MAX_ROUNDS` ثابت في البروتوكول.
+5. fail-closed عند SHA mismatch، stale/replay، fork/untrusted source، conflict، تجاوز MAX_ROUNDS، أو owner gate.
+6. `APPROVED_FOR_OWNER` و`ESCALATED_TO_OWNER` يوقفان أي automation ولا يعنيان Merge/Deploy.
+7. OpenAI API reviewer، إن أُنشئ مستقبلاً، كيان منفصل عن محادثة ChatGPT التفاعلية الحالية ولا يجوز وصفه بأنه نفس المراجع التفاعلي.
+8. لا نؤتمت reviewer الآن لمسارات AWJ الحساسة؛ الهدف الحالي تقليل النقل/الإيقاظ اليدوي دون إنشاء حلقة autonomous بين وكيلين.
+9. ملاحظة غياب `permissions:` الصريحة في workflows الحالية تستحق مهمة أمنية مستقلة، ولا تُصلح ضمن هذه المهمة.
 
-لم يتغير `SendZatcaSubmission.php` نفسه، ولا migrations، ولا routes، ولا API، ولا منطق محاسبي/ZATCA.
+## التغيير المطلوب
 
-## السبب الجذري
+صحح التقرير/التصميم بحيث يميز صراحة بين:
 
-تم التحقق من السبب من ملفات المستودع نفسها:
+### A. Live-session wake-up
 
-- `setup.sh` بعد الإصلاح يحتوي `app/Jobs/Accounting` في `mkdir -p` ويحتوي سطر النسخ:
-  `cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php app/Jobs/Accounting/`
-- `.github/workflows/ci.yml` كان يحتوي أصلاً `app/Jobs/Accounting` في قائمة الإنشاء وسطر النسخ المكافئ.
+`subscribe_pr_activity`:
+- مناسب عندما توجد جلسة Claude Code حية/مستمرة ومشتركة في PR.
+- يمكن أن يلغي الحاجة إلى GitHub Action لإيقاظ تلك الجلسة في هذا السيناريو.
+- يجب توثيق lifecycle/expiry/ownership/PR-Steward limitations التي تستطيع إثباتها من البيئة، وعدم اعتباره durable trigger قبل إثبات ذلك.
 
-بالتالي يتطابق التشخيص مع الدليل: فجوة assembly كانت في `setup.sh`، بينما CI كان ينسخ المجلد بالفعل. الإصلاح يعيد التطابق بأصغر تغيير مباشر بدلاً من تعديل منطق الوظيفة أو اختبارات ZATCA.
+### B. Durable/on-demand Claude Routine dispatch
 
-## التحقق من معايير القبول
+Claude Code Routines API (Experimental):
+- اعتبره مساراً رسمياً منفصلاً يمكن استدعاؤه عبر HTTP لبدء Routine on demand، بما في ذلك من GitHub Actions، وفق توثيق Anthropic الرسمي الحالي.
+- لا يلزم تنفيذه الآن.
+- سجّل أنه Experimental وأنه يحتاج per-routine bearer token ومتطلبات حساب/Claude Code web المناسبة، وبالتالي يحمل dependency/cost/reliability/security considerations مختلفة عن `subscribe_pr_activity`.
+- لا تفترض أنه نفس الجلسة الحية أو أنه يشارك حالتها الداخلية دون دليل.
 
-1. **Root cause مثبت:** نعم — omission صريح في قائمة `setup.sh` مقارنة بالمسار الموجود فعلاً في المصدر وبـCI.
-2. **أصغر إصلاح آمن:** نعم — إضافة المجلد وسطر النسخ المقابل فقط، مع توضيح أن القائمتين يدويتان ويجب إبقاؤهما متطابقتين.
-3. **الصنف موجود وقابل للتحميل بعد setup:** تقرير Claude يسجل إعادة بناء كاملة ثم `class_exists('App\\Jobs\\Accounting\\SendZatcaSubmission') === true`.
-4. **تحقق مركز:** `ZatcaSubmissionRecoveryTest` أصبح `4/4` ناجحاً مع 27 assertion، بعد أن كان يفشل بسبب `Class not found`.
-5. **لا توسع مادي للنطاق:** نعم.
-6. **لا تغيير في السلوك المحاسبي/ZATCA:** نعم؛ التغيير في assembly script فقط.
-7. **التقرير:** `CLAUDE_REPORT.md` يستخدم `TASK_ID: ORCH-TEST-001` و`STATUS: READY_FOR_REVIEW` ويسجل الملفات والاختبارات والمخاطر وGit state والخطوة التالية.
+النتيجة المطلوبة ليست اختيار أحدهما وإلغاء الآخر، بل توصية متدرجة:
 
-## الاختبارات
+1. Prototype `subscribe_pr_activity` أولاً لأنه أبسط ولا يحتاج بنية تحتية جديدة.
+2. احتفظ بـRoutines API كـdurable fallback/dispatch path إذا احتجنا بدء جلسة جديدة أو wake-up مستقل عن بقاء جلسة حية.
+3. لا نبني GitHub Action/Routine integration قبل نجاح Prototype وتقييم الحاجة الفعلية.
 
-الأدلة المسجلة في تقرير Claude:
+## OpenAI reviewer — القرار المعماري
 
-- `bash setup.sh` من إعادة بناء كاملة: نجح، بما في ذلك `LedgerTest` = `5/5`.
-- `class_exists(...)` للصنف المستهدف: `true`.
-- `ZatcaSubmissionRecoveryTest`: `4/4` ناجح، 27 assertion.
-- Full suite: `2363 passed / 25 failed / 1 skipped`، وليست Green.
+في V2 الحالية **لا نستبدل ChatGPT التفاعلي بوكيل OpenAI API مستقل**.
 
-التحسن من `2360/28/1` إلى `2363/25/1` يتسق مع إزالة إخفاقات الصنف المفقود. لا نعتمد الـ25 المتبقية كجزء من نجاح هذه المهمة، ولا نوسع النطاق لإصلاحها هنا.
+يمكن دراسة API reviewer لاحقاً كمسار منفصل، لكن أي وكيل API يجب أن يحمل هوية مستقلة وصلاحيات محدودة، ولا يجوز له منح Merge/Deploy/Production approval. المهام التي تمس accounting/security/Tenant isolation/Branch isolation/DB/API contracts أو أي قرار مادي تبقى عند human/interactive review gate قبل `APPROVED_FOR_OWNER`.
 
-ملاحظة: وصف مشكلة PDF المتبقية كـfixture محتمل ليس ضرورياً لقبول هذه المهمة، ولا نعتمد سببه النهائي دون مهمة تشخيص مستقلة. غياب `bcmath` موثق في تقرير Claude كسبب بيئي لمجموعة أخرى من الإخفاقات، لكنه أيضاً خارج `ORCH-TEST-001`.
+## Prototype المقترح بعد التصحيح
 
-## السلامة والتوافق
+Slice 0 فقط:
+- PR تجريبي/غير حساس.
+- جلسة Claude تشترك عبر `subscribe_pr_activity`.
+- تعليق/Review event تجريبي.
+- إثبات أن الجلسة استيقظت تلقائياً.
+- لا secrets، لا Actions جديدة، لا كود AWJ، لا Deploy.
 
-- Accounting: لا أثر على القيود أو قواعد المحاسبة.
-- ZATCA: لا تغيير في منطق الإرسال أو الاسترداد؛ فقط أصبح الصنف الموجود أصلاً يصل إلى التطبيق المبني.
-- Data / DB: لا تغيير.
-- Security: لا تغيير ولا أسرار.
-- Tenant / Branch isolation: لا تغيير.
-- API / Backward compatibility: لا تغيير في العقود.
-- Production: لا Deploy ولا Production Release.
+إذا نجح، نقرر بعدها هل Slice 1 documentation/state fields كافية، أو نحتاج اختبار Routines API منفصل.
 
-## نتيجة اختبار البروتوكول نفسه
+## المطلوب من Claude الآن
 
-أول دورة تنفيذية حقيقية نجحت وظيفياً:
+هذه دورة تصميم فقط. لا تنفذ Prototype ولا Actions ولا Routines ولا secrets.
 
-`TASK.md (READY_FOR_CLAUDE) → Claude reads GitHub → diagnosis + implementation + verification → CLAUDE_REPORT.md (READY_FOR_REVIEW) → ChatGPT direct GitHub review → REVIEW.md (APPROVED_FOR_OWNER)`
+حدّث `CLAUDE_REPORT.md` لنفس `TASK_ID: ORCH-V2-DESIGN-001` مع:
+- `STATUS: READY_FOR_REVIEW` عند اكتمال التصحيح.
+- تصحيح الاستنتاج المتعلق بـRoutines API.
+- مقارنة واضحة بين live-session subscription وdurable routine dispatch.
+- architecture recommendation النهائية بعد هذا التعديل.
+- أي Challenge جديد إذا كان لديك دليل رسمي أحدث يتعارض مع ذلك.
 
-وهذا يثبت أن GitHub يعمل كقناة حالة وتكليف ومراجعة بين الطرفين. الفجوة المعروفة ما زالت **automatic wake-up/dispatch**: Safwan اضطر لإيقاظ الطرف التالي، رغم أنه لم يحتج لنقل محتوى المهمة أو التقرير يدوياً. تبقى هذه V2 منفصلة.
+ثم توقف للمراجعة.
 
-## الملاحظة المعمارية المتبقية
+## بوابة السلامة
 
-`setup.sh` و`ci.yml` يحتفظان بقوائم assembly يدوية متوازية؛ إصلاح اليوم صحيح، لكن احتمال drift مستقبلي ما زال موجوداً. لا أطلب refactor أو guard جديداً ضمن هذه المهمة لأن ذلك توسع غير مطلوب. يمكن فتح مهمة مستقلة لاحقاً إذا أردنا مصدر قائمة واحداً أو تحققاً آلياً ضد drift.
-
-## قرار المراجع النهائي
-
-`APPROVED_FOR_OWNER`
-
-`ORCH-TEST-001` مقبولة تقنياً، وكذلك نجحت تجربة V1 في تنفيذ دورة حقيقية ضمن الحدود التي صُممت لها.
-
-هذا **ليس** تصريح Merge أو Deploy. PR #660 يبقى عند بوابة Safwan، وأي دمج أو اعتماد دائم للبروتوكول يحتاج موافقته الصريحة.
+لا Merge، لا Deploy، لا Production Release، لا تغيير secrets/permissions/workflows، ولا تعديل في التطبيق أو accounting/security/API/DB/Tenant/Branch behavior ضمن هذه الدورة.
