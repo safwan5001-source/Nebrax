@@ -4,7 +4,7 @@
 **Last reconciled:** 2026-09-06  
 **Repository:** `safwan5001-source/Nebrax`  
 **Audit basis:** actual `main` source code + AWJ UI screenshots supplied during the audit + prior approved project discussions/decisions + Daftra as a competitive benchmark where explicitly reviewed.  
-**Status:** Working audit record — implementation has **not** started. No merge/deploy/production release is authorized by this document.
+**Status:** **AUDIT CLOSED — READY FOR IMPLEMENTATION PLANNING.** Implementation has **not** started. No merge/deploy/production release is authorized by this document.
 
 ## Governing pre-production data rule
 
@@ -199,7 +199,7 @@ Two confirmed direct generic Product references are missing from that registry:
 
 Required direction: centralized Product Reference Registry/classification rather than duplicated ad-hoc arrays, explicit policy for deletion/deactivation versus inventory-identity mutation, and regression/architecture tests requiring each future generic Product-bearing model to declare its lifecycle classification.
 
-**Census conclusion:** the targeted direct-model census is now reconciled for the known Products & Inventory/business-document model surface. The P1 remains because the registry is structurally manual and the two omissions are confirmed, not because Debit Note or Purchase Order hide additional Product-line models.
+**Census conclusion:** the targeted direct-model census is reconciled for the known Products & Inventory/business-document model surface. The P1 remains because the registry is structurally manual and the two omissions are confirmed, not because Debit Note or Purchase Order hide additional Product-line models.
 
 ---
 
@@ -237,7 +237,7 @@ Implemented: receipt/issue/transfer, draft→posted, source/target warehouses, s
 
 The route layer grants generic `products.view` / `products.manage` plus `inventory.core`. It does not add record-level branch/warehouse middleware. `StockPermitController::index()` applies active/allowed-branch scoping and `store()` validates source/target warehouses, but `show()`, `post()` and `destroy()` load the permit directly by tenant-scoped ID without reasserting the current user's allowed branch/warehouse access.
 
-Tenant isolation remains intact; this finding is specifically **within the same tenant** for users restricted to selected branches/warehouses.
+Tenant isolation remains intact. This is a same-tenant authorization gap for users restricted to selected branches/warehouses. The multi-branch architecture intentionally uses explicit filtering for these accounting/inventory documents; therefore the fix is explicit record authorization, not blindly converting them to `BranchScoped` (which could break cross-branch transfer/accounting semantics).
 
 Required invariant:
 
@@ -299,11 +299,13 @@ Implementation must choose an explicit correctness policy: movement freeze/cutof
 
 ## 17. Delivery Notes and POS held sales
 
-### Delivery Notes — PASS for stock/GL ownership
+### Delivery Notes — PASS for stock/GL ownership and branch isolation
 
 Delivery Note is operational/non-financial under current design; confirm does not issue inventory or create GL. Lines snapshot `unit_name`/`unit_factor`; confirm revalidates current factor and fails closed if semantics changed.
 
-Direct `DeliveryNoteLine.product_id` is part of the Product lifecycle P1 census gap.
+Unlike Stocktake/StockPermit, `DeliveryNote` uses `BranchScoped`, so its index and direct `findOrFail()` detail/mutation paths inherit the active-branch Global Scope. No analogous direct-ID branch gap was found in this reviewed path.
+
+Direct `DeliveryNoteLine.product_id` remains part of the Product lifecycle P1 census gap.
 
 ### POS Held Sales — P2 live-reference integrity
 
@@ -418,10 +420,10 @@ Preserve Product Quick View cost authorization, negative-stock enforcement, hist
 
 ---
 
-## 23. Current confirmed P1 list
+## 23. Final confirmed P1 list
 
-1. **Central Sensitive Cost Authorization & Data Redaction — read + write + import/export + inference**
-2. **Same-tenant Branch/Warehouse Record Authorization — Stocktake + Stock Permit detail/mutation paths**
+1. **Same-tenant Branch/Warehouse Record Authorization — Stocktake + Stock Permit detail/mutation paths**
+2. **Central Sensitive Cost Authorization & Data Redaction — read + write + import/export + inference**
 3. **Minimum Sale Price after Invoice/Header Discount**
 4. **Purchase Return UOM / Historical Base Quantity**
 5. **Purchase Return Inventory Valuation / GL Reconciliation**
@@ -435,6 +437,7 @@ Preserve Product Quick View cost authorization, negative-stock enforcement, hist
 ### Confirmed PASS items
 
 - Tenant global isolation for reviewed Stocktake / Stock Permit / Inventory Opening records
+- Delivery Note direct-ID branch isolation through `BranchScoped`
 - Purchase Return negative-stock enforcement
 - Stock Permit/Transfer operational negative-stock enforcement
 - Stock Permit creation tenant/source/target warehouse/Product isolation
@@ -458,7 +461,7 @@ Preserve Product Quick View cost authorization, negative-stock enforcement, hist
 
 ---
 
-## 24. Confirmed P2/P3 backlog
+## 24. Final P2/P3 backlog
 
 ### P2
 
@@ -470,14 +473,14 @@ Media migration package; quantity-tier pricing; intelligent replenishment; bundl
 
 ---
 
-## 25. Provisional PR sequence
+## 25. Final implementation sequence
 
-No implementation is authorized by this record.
+No implementation is authorized by this record; this is the approved planning order from the audit.
 
 1. **PR-SEC-INV-1 — Same-tenant Stocktake/Stock Permit Branch-Warehouse Authorization**
-2. **PR-PRICE-1 — Minimum Sale Price after all economically applicable discounts**
-3. **PR-INV-1 — Centralize Product & Inventory Cost Authorization**
-4. **PR-INV-2 — Purchase Returns Hardening**
+2. **PR-INV-1 — Centralize Product & Inventory Cost Authorization**
+3. **PR-PRICE-1 — Minimum Sale Price after all economically applicable discounts**
+4. **PR-INV-2 — Purchase Returns Hardening (UOM/base quantity + valuation/GL together)**
 5. **PR-INV-3 — Stock Permit UOM / Base Quantity**
 6. **PR-INV-4 — Stocktake Concurrent Reconciliation**
 7. **PR-UOM-1 — In-use UOM Mutation Safety + Live Reference Integrity + Tenant Barcode Namespace**
@@ -493,7 +496,7 @@ No implementation is authorized by this record.
 17. Bundles
 18. Manufacturing deferred
 
-Security PR is first because it is a narrow authorization boundary with no accounting redesign. The remaining ordering may be adjusted at formal closure if final evidence changes dependencies.
+The narrow authorization boundary is first. Central cost authorization follows because it is a broad security surface across reads/writes/import/export. Accounting/UOM correctness follows before expansion features.
 
 ---
 
@@ -513,11 +516,21 @@ Additional standing DoD:
 
 ---
 
-## 27. Daftra benchmark position
+## 27. Daftra benchmark — final reconciliation
 
-Daftra remains benchmark, not source of truth. Preserve MATCH / HARDEN / ADOPT-IMPROVE / INTENTIONALLY DIFFERENT / NEEDS DECISION.
+Daftra remains a competitive benchmark, never a source of truth or automatic requirements list.
 
-Key preserved conclusion: AWJ intentionally keeps Product Catalog Import as Master Data only; opening quantity/value/accounting belongs to Inventory Opening. Serial/Lot/Expiry is a real P2 competitive gap. Cost hiding is a real permission domain, with AWJ targeting stronger centralized backend enforcement.
+**MATCH / already present in AWJ:** product catalog/master data; categories/brands; warehouses; inventory balances/movements; opening inventory workflow; stocktake foundation; stock permits/transfers; price lists; import/export foundation; POS integration; negative-stock policy foundation; alternate barcode/UOM backend foundations.
+
+**HARDEN rather than copy:** cost visibility/authorization, minimum-sale-price enforcement, purchase-return inventory correctness, stocktake concurrency, stock-permit UOM semantics, in-use UOM mutation and barcode namespace integrity. AWJ should solve these with stronger backend/accounting invariants rather than merely reproduce competitor UX.
+
+**ADOPT / IMPROVE after hardening:** richer multiple-UOM/barcode Product UX, warehouse-aware Inventory Workspace, low-stock/reorder workflow, stock requests/approvals, durable large imports, movement drilldown, Serial/Lot/Expiry and reservations/available quantity.
+
+**INTENTIONALLY DIFFERENT:** Product Catalog Import remains Master Data only. Opening quantity/value/accounting belongs to Inventory Opening. Moving-average cost remains global per Product under the current architecture; warehouse quantity remains per warehouse. Alternative-UOM selling price is explicit and is not mechanically derived from quantity factor.
+
+**NEEDS DECISION:** weighted barcode semantics; Product Variants/Attributes scope; production barcode reuse after soft deletion; later advanced replenishment/automatic purchasing policy.
+
+No remaining Daftra observation is treated as an audit blocker merely because AWJ does not currently copy it.
 
 ---
 
@@ -529,7 +542,7 @@ Product catalog; categories/brands; warehouses; per-warehouse balances; stock mo
 
 ### Hardening before expansion
 
-Same-tenant branch/warehouse record authorization; minimum-price final economics; centralized cost authorization; purchase-return UOM/valuation; stock-permit UOM; stocktake concurrency; in-use UOM mutation; barcode namespace; complete Product lifecycle reference/identity protection.
+Same-tenant branch/warehouse record authorization; centralized cost authorization; minimum-price final economics; purchase-return UOM/valuation; stock-permit UOM; stocktake concurrency; in-use UOM mutation; barcode namespace; complete Product lifecycle reference/identity protection.
 
 ### Completion after hardening
 
@@ -537,31 +550,31 @@ Multiple-UOM/barcode UX/workbook; durable imports; warehouse-aware inventory wor
 
 ---
 
-## 29. Audit continuation / closure checklist
+## 29. Formal audit closure
 
-Before formal closure:
+**Decision: AUDIT CLOSED — READY FOR IMPLEMENTATION PLANNING.**
 
-1. reconcile any remaining same-tenant branch/warehouse record-access edge cases discovered outside Stocktake/Stock Permit
-2. reconcile remaining Daftra benchmark areas with evidence
-3. perform final P1/P2/P3 and PR-order reconciliation without starting implementation
-4. make the explicit formal close/no-close decision
+Closure basis:
 
-Completed closure items:
+- targeted generic Product-reference census/classification reconciled; confirmed omissions are `InventoryOpeningLine` and `DeliveryNoteLine`
+- Debit Note / Purchase Order candidate false positives resolved against the current model surface
+- cost read/write/import/export/route policy census reconciled
+- Inventory Settings boundary reconciled
+- barcode namespace/concurrency invariant defined at implementation-contract level without premature physical-schema overdesign
+- Stocktake/Stock Permit same-tenant record authorization confirmed and bounded
+- Delivery Note checked as an adjacent operational direct-ID path and found protected by `BranchScoped`; the multi-branch architecture confirms `BelongsToBranch` is intentionally explicit for accounting-style documents rather than a universal Global Scope
+- Stocktake stale-snapshot correctness issue confirmed
+- Daftra benchmark reconciled into MATCH / HARDEN / ADOPT-IMPROVE / INTENTIONALLY DIFFERENT / NEEDS DECISION
+- final P1/P2/P3 and implementation order reconciled
 
-- targeted generic Product-reference census and lifecycle classification reconciled; confirmed omissions are InventoryOpeningLine and DeliveryNoteLine
-- Debit Note / Purchase Order candidate false positives resolved against current model surface
-- cost route/write/export policy census reconciled
-- reviewed Inventory Settings boundary reconciled
-- barcode namespace/concurrency invariant fixed at implementation-contract level; physical schema intentionally deferred to implementation review
-- Stocktake/Stock Permit same-tenant record authorization confirmed as P1
+Closure means the discovery/audit phase is complete enough to start scoped remediation PRs. It does **not** mean the P1 findings are fixed, and it does not authorize Merge, Deploy or Production Release.
 
-This record is the living working source of truth. Confirmed findings must be updated here rather than held only in chat.
+Reopen this audit only if implementation uncovers evidence that materially changes an invariant, introduces a new Product/Inventory domain reference, or invalidates one of the confirmed findings. Normal implementation details should be handled in their scoped PR rather than reopening broad discovery.
 
 ---
 
 ## 30. Standing conclusion
 
 > **Do not rebuild AWJ inventory core.**  
-> **Complete and harden the existing Products & Inventory architecture.**
-
-Formal audit closure has not yet been declared.
+> **Complete and harden the existing Products & Inventory architecture.**  
+> **Audit closed; proceed through scoped remediation PRs in the final sequence above.**
