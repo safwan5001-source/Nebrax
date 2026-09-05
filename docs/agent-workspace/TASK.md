@@ -1,46 +1,83 @@
 # Active Agent Task
 
-TASK_ID: NONE
-STATUS: BLOCKED
+TASK_ID: ORCH-TEST-001
+STATUS: READY_FOR_CLAUDE
 OWNER: Safwan
 PLANNER_REVIEWER: ChatGPT
 IMPLEMENTER: Claude Code
 
-> No implementation task is currently authorized through this workspace. ChatGPT replaces this template with a scoped task before setting `STATUS: READY_FOR_CLAUDE`.
+## العنوان
 
-## Objective
+إصلاح عدم تطابق Laravel app المبني بواسطة Claude setup مع مصدر المستودع — `SendZatcaSubmission` كحالة إثبات.
 
-Not assigned.
+## الهدف
 
-## Context / latest confirmed state
+شخّص وأصلح **بأصغر تغيير آمن** سبب عدم وصول `App\Jobs\Accounting\SendZatcaSubmission` من مصدر المستودع إلى Laravel app المبني بواسطة بيئة Claude/setup، ثم أثبت أن آلية التجميع/النسخ أصبحت تحافظ على الملف المطلوب بصورة صحيحة.
 
-Not assigned. Start from the latest confirmed implementation report/handoff when a task is created; do not re-audit the whole repository without need.
+هذه أول مهمة تنفيذية حقيقية لاختبار بروتوكول ChatGPT ↔ Claude Code. نجاح البروتوكول جزء من الهدف، لكن لا يجوز اختراع تعديل شكلي فقط لإكمال الدورة؛ يجب أن يعالج التغيير سبباً حقيقياً ومثبتاً في setup/build fidelity.
 
-## In scope
+## السياق / آخر حالة مؤكدة
 
-- Not assigned.
+- خلال مراجعة PR #660، شغّل Claude مجموعة اختبارات كاملة وأبلغ: `2360 passed / 28 failed / 1 skipped`؛ هذه النتيجة **ليست Green**.
+- قدّم Claude دليلاً أن `app/Jobs/Accounting/SendZatcaSubmission.php` موجود في مصدر المستودع، بينما تطبيق Laravel المبني في بيئة الجلسة `/home/user/nibras-app/app/Jobs/` لم يكن يحوي مجلد `Accounting`.
+- الاستنتاج السابق يشير إلى فجوة في `setup.sh`/آلية بناء Laravel app، لكنه ليس تفويضاً لافتراض أن الحل هو مجرد نسخ ملف أو مجلد بعينه. افحص آلية setup الفعلية وحدد السبب الجذري بأدلة من المستودع.
+- لا تبدأ تدقيقاً عاماً للمشروع. افحص فقط setup/build assembly والمسارات الضرورية لإثبات السبب والإصلاح.
 
-## Out of scope
+## داخل النطاق
 
+- فحص `.claude/hooks/session-start.sh` وأي `setup.sh`/سكريبت أو manifest أو قائمة نسخ يستدعيها مباشرة لبناء Laravel app.
+- فحص المسار المصدر لـ `SendZatcaSubmission` والمسار الناتج في التطبيق المبني بقدر ما يلزم للتشخيص.
+- إصلاح أصغر سبب جذري مثبت يجعل build/setup يعكس ملفات المصدر المطلوبة بصورة صحيحة.
+- إضافة/تعديل تحقق أو اختبار مخصص يمنع تكرار نفس فئة فجوة assembly إذا كان ذلك مناسباً وبسيطاً ضمن النطاق.
+- تحديث `CLAUDE_REPORT.md` في نهاية الدورة وفق عقد البروتوكول، مع `TASK_ID: ORCH-TEST-001`.
+
+## خارج النطاق
+
+- تغيير منطق `SendZatcaSubmission` نفسه أو أي منطق ZATCA/محاسبي.
+- إصلاح الـ28 test failures واحداً واحداً أو معالجة مشكلات أخرى غير ناتجة عن سبب setup المحدد.
+- Refactoring عام لآلية البناء أو بنية Laravel.
+- migrations أو schema/database changes.
+- API contract changes.
+- تغييرات security أو Tenant/Branch isolation.
+- تغييرات UI/UX.
 - Merge.
 - Deploy / production release.
-- Unrelated refactoring or fixes.
-- Unapproved accounting, API, database, security, tenant-isolation, branch-isolation, or product-policy changes.
+- أي تعديل غير ضروري لإثبات إصلاح setup fidelity.
 
-## Acceptance criteria
+## معايير القبول
 
-- Not assigned.
+1. السبب الجذري موثق بدليل من ملفات/أوامر المستودع، لا بالتخمين.
+2. التغيير هو أصغر إصلاح آمن للسبب الجذري، وليس patch خاصاً يخفي العَرَض فقط إذا كانت المشكلة فئوية.
+3. بعد تشغيل setup/build من حالة مناسبة، `App\Jobs\Accounting\SendZatcaSubmission` موجود وقابل للتحميل في Laravel app الناتج.
+4. يوجد تحقق مركز يثبت أن المسار/الفئة التي كانت مفقودة لم تعد مفقودة.
+5. إذا كشف التشخيص أن الإصلاح الصحيح أوسع مادياً من هذا النطاق، لا توسع التنفيذ: استخدم `PROPOSAL` أو `CHALLENGE` أو `RISK` وارجع إلى `WAITING_FOR_REVIEWER`.
+6. لا يحدث أي تغيير في السلوك المحاسبي/ZATCA نفسه.
+7. `CLAUDE_REPORT.md` يذكر بدقة الملفات المتغيرة، الأوامر/الاختبارات ونتائجها، Build/CI إن شُغّل، المخاطر والمتبقي، Branch/PR/Base SHA/Head SHA، والخطوة التالية.
 
-## Required verification
+## التحقق المطلوب
 
-- Focused tests related to the change.
-- Broader tests proportional to risk.
-- Financial/security/tenant/branch-isolation changes must retain strong regression coverage.
+ابدأ بالأضيق ثم وسّع فقط بقدر ما يلزم:
 
-## Material decision gate
+1. أثبت الحالة قبل الإصلاح أو أثبت السبب من آلية assembly الحالية إذا كانت إعادة إنتاج الحالة السابقة مكلفة بلا فائدة.
+2. شغّل setup/build المتأثر بعد الإصلاح من حالة نظيفة/مناسبة تكفي لإثبات أن الملف يصل إلى التطبيق الناتج.
+3. تحقق أن PHP/Laravel يستطيع تحميل `App\Jobs\Accounting\SendZatcaSubmission` من التطبيق المبني.
+4. شغّل الاختبار/الاختبارات المركزة التي كانت تفشل بسبب غياب الصنف، إن أمكن تحديدها دون توسيع النطاق.
+5. لا يلزم تحويل جميع الإخفاقات الـ28 إلى Green إذا كانت هناك إخفاقات أخرى مستقلة. إذا شغّلت suite أوسع، سجّل النتيجة الحقيقية ولا تسمّها Green إلا إذا كانت كذلك.
 
-If repository evidence suggests a better approach or contradicts an assumption, do **not** silently follow this task. Update `CLAUDE_REPORT.md` with `TYPE: PROPOSAL`, `RISK`, `QUESTION`, or `CHALLENGE`, set the task interaction state to `WAITING_FOR_REVIEWER`, and pause only the affected material decision.
+## بوابة القرار المادي
 
-## Owner gates
+إذا أظهر دليل المستودع أن المشكلة ليست مجرد omission/fidelity في setup، أو أن الإصلاح الصحيح يتطلب تغييراً معمارياً/محاسبياً/API/DB/security/isolation أو refactor واسع، **توقف عن الجزء المتأثر**. حدّث `CLAUDE_REPORT.md` بـ `TYPE: PROPOSAL` أو `RISK` أو `QUESTION` أو `CHALLENGE`، واستخدم `STATUS: WAITING_FOR_REVIEWER`، مع الدليل والبدائل والتوصية والقرار المطلوب.
 
-No merge, deploy, production release, destructive operation, or sensitive scope expansion without Safwan's explicit approval.
+لا تعامل اقتراحك على أنه موافق عليه تلقائياً.
+
+## قواعد دورة الـPilot
+
+- اقرأ `PROTOCOL.md` و`DECISIONS.md` قبل التنفيذ.
+- هذا `TASK.md` هو مصدر `TASK_ID` والحالة لهذه المهمة؛ يجب أن يتطابق `TASK_ID` في التقرير والمراجعة.
+- الاستقلالية المحلية لا تعفي أي diff من المراجعة.
+- عند الانتهاء، ادفع التغييرات المصرح بها وتقرير Claude إلى **نفس فرع PR #660**، واضبط التقرير إلى `STATUS: READY_FOR_REVIEW` ثم توقف.
+- لا تعتمد على Safwan لنقل محتوى المراجعة بين الطرفين؛ GitHub هو قناة الحالة المشتركة في هذا التجريب.
+
+## بوابات المالك
+
+لا Merge، ولا Deploy، ولا Production Release، ولا destructive operation، ولا تغيير حساس خارج النطاق بدون موافقة Safwan الصريحة.
