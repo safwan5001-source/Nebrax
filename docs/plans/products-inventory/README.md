@@ -2,7 +2,8 @@
 
 **Status:** PLANNING — no implementation authorized  
 **Audit source:** `docs/audits/AWJ_PRODUCTS_INVENTORY_AUDIT_2026-09-05.md`  
-**Data policy:** `docs/audits/AWJ_PRE_PRODUCTION_DATA_POLICY.md`
+**Data policy:** `docs/audits/AWJ_PRE_PRODUCTION_DATA_POLICY.md`  
+**Implementation agent:** **Claude Code**
 
 هذه الحزمة تحوّل التدقيق المغلق إلى برنامج تنفيذ مضبوط قبل بدء أي PR برمجي. التدقيق هو مصدر الحقائق المؤكدة؛ هذه الحزمة هي مصدر ترتيب التنفيذ والعقود والاعتماديات ومعايير القبول.
 
@@ -16,6 +17,9 @@
 - لا Merge/Deploy/Production Release دون موافقة صفوان الصريحة.
 - كل PR صغير ومحدد؛ لا refactor جانبي ولا توسيع scope.
 - أي قرار لم يحسمه التدقيق يبقى `NEEDS DECISION` ولا يختاره المنفذ من نفسه.
+- التنفيذ البرمجي لهذا البرنامج يُسلّم إلى Claude Code؛ Cursor غير مستخدم في workflow الحالي.
+- ChatGPT مسؤول عن التخطيط، ضبط Scope، مراجعة Implementation Reports، وتحديد الخطوة التالية.
+- لا يُستخدم Work/Codex لإعادة فحص عمل Claude Code تلقائيًا؛ فقط عند وجود سبب تقني حقيقي.
 
 ## المراحل
 
@@ -38,9 +42,9 @@ Multiple UOM/Barcode completion → durable imports → warehouse Inventory Work
 
 Media migration package, quantity-tier pricing, intelligent replenishment, bundles. Manufacturing/BOM remains deferred.
 
-## تنفيذ الوكلاء
+## تنفيذ Claude Code
 
-كل ملف PR في `phase-1-hardening/` هو العقد الهندسي. ملفه المقابل في `prompts/` هو handoff تنفيذي، ولا يجوز أن يغيّر العقد. يجب على Cursor/Claude Code في النهاية إنتاج Implementation Report بصيغة MD يتضمن: ما تم، الملفات المتغيرة، الاختبارات ونتائجها، Build/CI، المخاطر والمتبقي، Branch/PR/Base SHA/Head SHA إن توفرت، والخطوة التالية.
+كل ملف PR في `phase-1-hardening/` هو العقد الهندسي. ملفه المقابل في `prompts/` هو handoff تنفيذي، ولا يجوز أن يغيّر العقد. يجب على Claude Code في نهاية كل مهمة إنتاج Implementation Report بصيغة MD يتضمن: ما تم، الملفات المتغيرة، الاختبارات ونتائجها، Build/CI، المخاطر والمتبقي، Branch/PR/Base SHA/Head SHA إن توفرت، والخطوة التالية.
 
 ## بوابة الانتقال
 
