@@ -33,11 +33,14 @@ echo "▶ 4/6  دمج ملفات النواة وطبقة الـ API..."
 # نسخ النماذج والخدمات والـ migrations فوق المشروع
 cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
-mkdir -p app/Contracts app/Models/Concerns app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
+# قائمة المجلدات هنا يدوية ويجب أن تبقى مطابقة لقائمة .github/workflows/ci.yml
+# (كلاهما ينسخ من نفس النواة بمنطق مستقل) — نسيان مجلد هنا لا يظهر في CI فيمر بصمت.
+mkdir -p app/Contracts app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
          app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature routes docs/openapi
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
 cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php app/Jobs/DocumentCenter/
+cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php app/Jobs/Accounting/
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/"*.php            app/Services/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
