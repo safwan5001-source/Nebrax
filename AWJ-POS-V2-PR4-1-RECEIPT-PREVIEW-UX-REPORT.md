@@ -249,7 +249,7 @@ database schema was added or changed.
 - Branch: `claude/pos-v2-pr4-1-receipt-preview-ux`
 - Base: latest `main` at session start — PR-4 merge commit `afb7b0152f52c20fa907cd000a4fc27a45341dc5` (#659, confirmed via `git log`/`git pull`)
 - PR: created as Draft (see final chat reply for URL/number)
-- Head SHA: recorded after commit (see final chat reply)
+- Head SHA: `30e713ce4d222cc37bfaca7c1c844df62fc7b1eb`
 
 ## Risks / Remaining
 
