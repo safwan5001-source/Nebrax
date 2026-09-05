@@ -156,6 +156,15 @@ interface Product {
   /** حد إعادة الطلب — نفس عتبة «مخزون منخفض» المعتمدة في قائمة المنتجات
    *  (`ProductListFilters`): `quantity_on_hand <= reorder_level` و`reorder_level > 0`. */
   reorder_level?: number | null;
+  /**
+   * PR-2S: **اختيارية بلا قيمة افتراضية عمداً** — الخادم يحذفها كلياً من
+   * الاستجابة (لا `null`) لمستخدم لا يملك صلاحية `products.view_cost` أو
+   * حين إعداد `show_cost_profit_in_pos` معطّل. `undefined` هنا يعني «غير
+   * مُصرَّح»، لا «صفر». لا تُشتق هذه القيم من غيرها في الواجهة أبداً.
+   */
+  purchase_price?: string;
+  avg_cost?: string;
+  profit_margin?: number | null;
 }
 interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null; cash_drawer?: { configured: boolean } }
 interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
@@ -1919,6 +1928,12 @@ export default function PosPage() {
             track_inventory: p.track_inventory,
             quantity_on_hand: p.quantity_on_hand,
             units: p.pos_units.map((unit) => ({ name: unit.name, factor: unit.factor })),
+            // PR-2S: تُمرَّر فقط إن وُجدت فعلاً في استجابة الخادم لهذا المنتج —
+            // `p.purchase_price` تكون `undefined` (لا `null`) حين يحذفها الخادم
+            // لغياب الصلاحية أو تعطيل الإعداد؛ لا قيمة افتراضية هنا مهما كانت.
+            purchase_price: p.purchase_price,
+            avg_cost: p.avg_cost,
+            profit_margin: p.profit_margin,
           };
         })()}
         fields={{
@@ -1929,6 +1944,10 @@ export default function PosPage() {
           stock: t('quick_view_stock'),
           outOfStock: t('out_of_stock'),
           inStock: t('available'),
+          commercialSection: t('quick_view_commercial_section'),
+          purchasePrice: t('quick_view_purchase_price'),
+          avgCost: t('quick_view_avg_cost'),
+          profitMargin: t('quick_view_profit_margin'),
         }}
         openInErpHref={canOpenProductInErp && quickViewProductId ? `/products/${quickViewProductId}` : undefined}
         openInErpLabel={t('quick_view_open_in_erp')}

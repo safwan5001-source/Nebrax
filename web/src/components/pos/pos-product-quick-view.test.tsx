@@ -16,6 +16,10 @@ const fields = {
   stock: 'Stock',
   outOfStock: 'Out of stock',
   inStock: 'Available',
+  commercialSection: 'Commercial information',
+  purchasePrice: 'Purchase price',
+  avgCost: 'Average cost',
+  profitMargin: 'Profit margin %',
 };
 
 const product = {
@@ -89,6 +93,44 @@ describe('PosProductQuickView', () => {
     );
     const link = screen.getByRole('link', { name: /Open in ERP/ });
     expect(link.getAttribute('href')).toBe('/products/p1');
+  });
+
+  it('يعرض التكلفة/سعر الشراء/الهامش فقط حين تصل فعلاً من استجابة الخادم (PR-2S)', () => {
+    render(
+      <PosProductQuickView
+        open
+        onClose={vi.fn()}
+        product={{ ...product, purchase_price: '10.00', avg_cost: '9.50', profit_margin: 50 }}
+        title="Product details"
+        fields={fields}
+      />,
+    );
+    expect(screen.getByText('Commercial information')).toBeTruthy();
+    expect(screen.getByText('10.00')).toBeTruthy();
+    expect(screen.getByText('9.50')).toBeTruthy();
+    expect(screen.getByText('50')).toBeTruthy();
+  });
+
+  it('لا يعرض قسم المعلومات التجارية إطلاقاً حين تغيب الحقول من الاستجابة (غير مُصرَّح)', () => {
+    render(
+      <PosProductQuickView open onClose={vi.fn()} product={product} title="Product details" fields={fields} />,
+    );
+    expect(screen.queryByText('Commercial information')).toBeNull();
+  });
+
+  it('لا يعرض صفاً وهمياً للهامش حين تكون القيمة null رغم وجود حقول تكلفة أخرى', () => {
+    render(
+      <PosProductQuickView
+        open
+        onClose={vi.fn()}
+        product={{ ...product, purchase_price: '10.00', profit_margin: null }}
+        title="Product details"
+        fields={fields}
+      />,
+    );
+    expect(screen.getByText('Commercial information')).toBeTruthy();
+    expect(screen.getByText('10.00')).toBeTruthy();
+    expect(screen.queryByText('Profit margin %')).toBeNull();
   });
 
   it('لا يعرض شيئاً حين لا يوجد منتج (لم يُحمَّل بعد أو أُغلق)', () => {

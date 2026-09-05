@@ -16,15 +16,24 @@ export interface PosProductQuickViewProduct {
   track_inventory: boolean;
   quantity_on_hand: number;
   units: ReadonlyArray<{ name: string; factor: number }>;
+  /**
+   * PR-2S: غائبة كلياً عن استجابة `/pos/products` — لا `null`، لا صفر — ما لم
+   * يجتمع للمستخدم صلاحية `products.view_cost` **وإعداد** `show_cost_profit_in_pos`
+   * معاً على الخادم. الغياب هنا يعني «غير مُصرَّح»، لا «القيمة صفر». لا تُشتق
+   * هذه القيم من سعر البيع أو من بعضها هنا مهما بدا ذلك ممكناً حسابياً — أي
+   * اشتقاق كهذا يُعيد نفس الثغرة الأمنية التي أُغلقت خادمياً في PR-2S.
+   */
+  purchase_price?: string;
+  avg_cost?: string;
+  profit_margin?: number | null;
 }
 
 /**
  * معاينة منتج للقراءة فقط داخل POS. لا تُنشئ أو تعدّل شيئاً — لا سلة، لا سعراً،
- * لا مخزوناً. تعرض فقط ما يصل بالفعل من كتالوج POS نفسه (`/pos/products`)؛
- * لا تعرض التكلفة أو سعر الشراء أو هامش الربح مهما توفّرت في الكائن الخام —
- * هذه بيانات حسّاسة يُقرّر كشفها من صلاحية الخادم لا من إخفاء الواجهة (انظر
- * تنبيه الأمان في تقرير PR-2: `ProductResource` يعيدها اليوم دون حارس صلاحية
- * مخصّص، وإصلاح ذلك تغيير خلفي خارج نطاق هذا PR).
+ * لا مخزوناً. تعرض فقط ما يصل بالفعل من كتالوج POS نفسه (`/pos/products`).
+ * قسم «معلومات تجارية» (تكلفة/سعر شراء/هامش) يظهر فقط حين يعيدها الخادم فعلاً؛
+ * الخادم وحده — عبر صلاحية `products.view_cost` وإعداد `show_cost_profit_in_pos`
+ * معاً (PR-2S) — يقرر ذلك. لا فحص صلاحية هنا، ولا قيمة احتياطية أو محسوبة.
  */
 export function PosProductQuickView({
   open,
@@ -47,6 +56,10 @@ export function PosProductQuickView({
     stock: string;
     outOfStock: string;
     inStock: string;
+    commercialSection: string;
+    purchasePrice: string;
+    avgCost: string;
+    profitMargin: string;
   };
   /** يُمرَّر فقط حين يتوفر مسار ERP حقيقي لهذا المنتج؛ لا رابط وهمي. */
   openInErpHref?: string;
@@ -103,6 +116,32 @@ export function PosProductQuickView({
             </div>
           )}
         </dl>
+
+        {(product.purchase_price !== undefined || product.avg_cost !== undefined || product.profit_margin !== undefined) && (
+          <div className="space-y-2 border-t border-border pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">{fields.commercialSection}</p>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+              {product.purchase_price !== undefined && (
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted">{fields.purchasePrice}</dt>
+                  <dd className="num truncate text-text">{product.purchase_price}</dd>
+                </div>
+              )}
+              {product.avg_cost !== undefined && (
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted">{fields.avgCost}</dt>
+                  <dd className="num truncate text-text">{product.avg_cost}</dd>
+                </div>
+              )}
+              {product.profit_margin !== undefined && product.profit_margin !== null && (
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted">{fields.profitMargin}</dt>
+                  <dd className="num truncate text-text">{product.profit_margin}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        )}
 
         {openInErpHref && (
           <Link
