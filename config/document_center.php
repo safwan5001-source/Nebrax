@@ -23,6 +23,15 @@ return [
         'provider_network_enabled' => filter_var(env('DOCUMENT_AI_PROVIDER_NETWORK_ENABLED', false), FILTER_VALIDATE_BOOL),
     ],
 
+    'processing' => [
+        // حد مستقل لعدد دورات إعادة المحاولة اليدوية المقبولة لكل document_processing_run —
+        // لا علاقة له بميزانية محاولات المزوّد داخل الدورة الواحدة (providers.*.max_attempts
+        // أو document_processing.max_attempts). يُشتقّ من عدّ أحداث retry_queued الدائمة في
+        // document_governance_events، فلا حاجة لعمود/جدول إضافي. افتراض متحفّظ يحمي من
+        // استنزاف المزوّد الخارجي دون تجميد المستأجر عند عطل مؤقت قصير.
+        'manual_retry_max_cycles' => (int) env('DOCUMENT_MANUAL_RETRY_MAX_CYCLES', 3),
+    ],
+
     'intake' => [
         'max_file_kilobytes' => (int) env('DOCUMENT_MAX_FILE_KB', 20480),
         'max_files_per_batch' => (int) env('DOCUMENT_MAX_FILES_PER_BATCH', 10),
