@@ -471,7 +471,7 @@ browser this session.
 
 ## 23. Draft PR Number/Link
 
-Recorded after creation (see below).
+Draft PR #654 — https://github.com/safwan5001-source/Nebrax/pull/654
 
 ## 24. Base SHA
 
@@ -479,7 +479,7 @@ Recorded after creation (see below).
 
 ## 25. Head SHA
 
-Recorded after commit (see below).
+`da7bb6b`
 
 ## 26. Recommended Next Step
 
