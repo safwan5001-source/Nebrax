@@ -22,6 +22,15 @@ class InvoiceResource extends JsonResource
             ] : null),
             'number'         => $this->number,
             'partner_id'     => $this->partner_id,
+            // R5: لقطة عرض فقط (لا تُستهلك محاسبياً) — تتيح لواجهات مثل إيصال
+            // POS الفوري عرض اسم العميل من هذا التمثيل وحده، بلا اعتماد على
+            // حالة عميل جانب العميل. تظهر فقط حين تُحمَّل العلاقة صراحة.
+            'partner'        => $this->whenLoaded('partner', fn () => $this->partner ? [
+                'id'         => $this->partner->id,
+                'name'       => $this->partner->name,
+                'vat_number' => $this->partner->vat_number,
+                'city'       => $this->partner->city,
+            ] : null),
             'payment_type'   => $this->payment_type,
             'zatca_document_type' => $this->zatca_document_type,
             'status'         => $this->status,
