@@ -40,6 +40,8 @@ const strings: Record<string, string> = {
   allow_discount_hint: 'Discount hint.',
   show_product_images: 'Show product images',
   show_product_images_hint: 'Image hint.',
+  show_cost_profit_in_pos: 'Show cost and profitability in POS',
+  show_cost_profit_in_pos_hint: 'Cost/profit hint.',
   apply_customer_price_list: 'Apply price list',
   apply_customer_price_list_hint: 'Price list hint.',
   allow_unit_price_override: 'Allow override',
@@ -151,6 +153,7 @@ const settings = {
   exchange_surplus_policy: 'customer_credit_only',
   held_sale_close_policy: 'discard_on_session_close',
   show_product_images: true,
+  show_cost_profit_in_pos: false,
   sound_enabled: true,
   cash_drawer_driver: 'local_bridge',
   cash_drawer_enabled: true,
@@ -344,6 +347,19 @@ describe('صفحة تهيئة POS بعد توحيد UX', () => {
     const saved = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
     expect(saved).toMatchObject({ show_onscreen_numeric_keypad: true, allow_discount: true });
     expect(saved).not.toHaveProperty('cash_drawer_enabled');
+  });
+
+  it('يعرض إظهار التكلفة/الربحية معطّلاً افتراضياً ويحفظه دون المساس بضوابط أخرى (PR-2S)', async () => {
+    await renderLoaded({ show_cost_profit_in_pos: false });
+    const costSwitch = screen.getByRole('switch', { name: 'Show cost and profitability in POS' });
+    expect(costSwitch.getAttribute('aria-checked')).toBe('false');
+
+    fireEvent.click(costSwitch);
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => expect(api.mock.calls.some(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')).toBe(true));
+    const saved = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
+    expect(saved).toMatchObject({ show_cost_profit_in_pos: true, allow_discount: true });
   });
 
   it('يعطل ضوابط الإيصال الثانوية دون فقد قيمتها عند إيقاف الطباعة', async () => {

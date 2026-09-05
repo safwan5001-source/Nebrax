@@ -3977,6 +3977,8 @@
     "allow_discount_hint": "The cashier shows the discount action only when enabled; user permissions and discount limits still apply.",
     "show_product_images": "Show product images",
     "show_product_images_hint": "Show product images inside POS product cards. When disabled, cards switch to a denser text-only layout.",
+    "show_cost_profit_in_pos": "Show cost and profitability in POS",
+    "show_cost_profit_in_pos_hint": "Lets users with the product cost permission see purchase price, cost, and margin inside POS. This setting alone never grants access — it only further restricts it. Off by default.",
     "apply_customer_price_list": "Apply the customer price list and reprice the cart",
     "apply_customer_price_list_hint": "When the selected customer has an active price list, the cashier reprices the cart from it and the server records it on the invoice. When disabled, the product base price is used.",
     "allow_unit_price_override": "Allow editing the unit price in the cashier",

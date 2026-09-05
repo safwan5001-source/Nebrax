@@ -23,6 +23,7 @@ use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
 use App\Support\Money;
 use App\Support\PosSettings;
+use App\Support\Rbac;
 use App\Services\Accounting\PosService;
 use App\Services\Accounting\PosExchangeService;
 use App\Services\Accounting\PosCustomerPriceListResolver;
@@ -70,7 +71,13 @@ class PosController extends ApiController
             ->get();
         $catalogUnits = $this->customerPriceLists->catalogUnitsFor($priceList, $products);
 
-        $products->each(function (Product $product) use ($catalogUnits): void {
+        // PR-2S: كشف تكلفة/ربحية المنتج في POS يحتاج الصلاحية **والإعداد** معاً؛
+        // الإعداد وحده لا يمنح شيئاً، والأكثر تقييداً يفوز دائماً.
+        $revealCostProfit = Rbac::allows($request->user()?->role ?? '', 'products.view_cost')
+            && PosSettings::showsCostProfitInPos();
+
+        $products->each(function (Product $product) use ($catalogUnits, $revealCostProfit): void {
+            $product->setAttribute('pos_hides_cost_profit', ! $revealCostProfit);
             // قيم عرض عابرة للكتالوج؛ لا تعدّل المنتج المخزن ولا تعيد تفسير
             // فاتورة تاريخية. الوحدة الأساسية متاحة دائماً، والبديلة لا تظهر
             // إلا بسعر صريح من قائمة العميل النشطة.

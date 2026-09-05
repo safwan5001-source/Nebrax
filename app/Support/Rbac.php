@@ -94,6 +94,13 @@ class Rbac
             'pos.investigations.view', 'pos.investigations.create', 'pos.investigations.manage',
             'pos.investigations.assign', 'pos.investigations.resolve', 'pos.investigations.export',
             'pos.cctv.bookmark.manage',
+            // PR-2S: كشف تكلفة/ربحية المنتج داخل POS سلطة مستقلة عن `products.view`/
+            // `products.manage` العامتين — الأخيرتان تديران الكتالوج، لا حساسية
+            // تجارية. صلاحية واحدة تغطي التكلفة والربحية معاً عمداً: الهامش المخزَّن
+            // (`profit_margin`) يكشف التكلفة حسابياً بدلالة سعر البيع الظاهر دائماً
+            // (`هامش = (سعر−تكلفة)/تكلفة`)، فمنح الربحية دون التكلفة ثغرة لا سياسة.
+            // owner/admin يملكانها عبر `*`؛ لا تُضاف لـaccountant/staff تلقائياً.
+            'products.view_cost',
             'apps.view', 'apps.manage',
             // إدارة المطوّرين (PR-7.5): عرض/إدارة عملاء الـ API ومفاتيحها واشتراكات
             // الـ Webhooks وسجلّ التسليم — سطح إدارة داخليّ للمستأجر. المالك/المدير
