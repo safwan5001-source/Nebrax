@@ -48,6 +48,22 @@ describe('العودة للنظام في شريط POS', () => {
   });
 });
 
+describe('مصطلح الجلسة في شريط POS', () => {
+  it('يسمّي إجراء إدارة الجلسة باسمها الصحيح لا «الوردية»، ويعرض رقم الجلسة بالتسمية ذاتها', () => {
+    renderIntl(
+      <PosTopbar
+        cashier="كاشير"
+        branch="الفرع الرئيسي"
+        session={{ number: 'PS-1', pos_device: null }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'إدارة الجلسة' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'إدارة الوردية' })).toBeNull();
+    expect(screen.getByTitle('الجلسة')).toBeTruthy();
+  });
+});
+
 describe('فيض شريط POS على الجوال', () => {
   it('يستدعي نفس callbacks الفواتير الأخيرة والمعلّقة من قائمة الإجراءات الإضافية', () => {
     const onOpenRecentInvoices = vi.fn();

@@ -149,13 +149,16 @@ export function PosTopbar({
           {heldCount > 0 && <span className="num grid min-w-5 place-items-center rounded bg-primary px-1.5 py-0.5 text-[11px] font-bold text-white">{heldCount}</span>}
         </button>
 
+        {/* هذا زر «الجلسة» (POS Session) لا «الوردية» (Shift) — مفهومان منفصلان
+            (انظر `pos-workspace.ts`). الوردية شرط تنظيمي لبدء البيع، والجلسة
+            هي الكيان التشغيلي الذي يُفتح ويُغلق من هنا. */}
         <button
           type="button"
           onClick={onManageSession}
           className="hidden min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:inline-flex"
         >
           <Power className="h-4 w-4" strokeWidth={1.7} />
-          <span>{t('manage_shift')}</span>
+          <span>{t('manage_session')}</span>
         </button>
 
         <Dropdown
@@ -182,7 +185,7 @@ export function PosTopbar({
             </DropdownItem>
           </div>
           <div className="lg:hidden">
-            <DropdownItem icon={Power} onClick={onManageSession}>{t('manage_shift')}</DropdownItem>
+            <DropdownItem icon={Power} onClick={onManageSession}>{t('manage_session')}</DropdownItem>
           </div>
           {warehouses.length > 0 && (
             <label className="mx-1 my-1.5 flex items-center gap-2 rounded px-2 py-2 text-sm text-text hover:bg-primary-soft">
