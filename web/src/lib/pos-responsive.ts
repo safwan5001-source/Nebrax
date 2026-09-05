@@ -10,8 +10,13 @@
  * هذه القيم تخص التخطيط فقط وتستخدم Design Tokens الموجودة في النظام.
  */
 
+/**
+ * PR-3: توسيع عمود السلة على lg/xl فقط — التابلت (md) يبقى كما هو حرفياً.
+ * المساحة تُستعاد من الفراغ الأفقي غير المستغل بين المنتجات والسلة، لا من
+ * تضييق شبكة المنتجات (تبقى `minmax(0,1fr)` مرنة). لا تغيير على الجوال.
+ */
 export const POS_SALE_GRID_CLASS =
-  'grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)_104px] xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)_148px]';
+  'grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)_104px] xl:grid-cols-[minmax(400px,480px)_minmax(0,1fr)_148px]';
 
 export const POS_MOBILE_NAV_CLASS =
   'grid min-h-16 shrink-0 grid-cols-4 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden';

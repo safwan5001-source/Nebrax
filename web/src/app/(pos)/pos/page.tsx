@@ -29,6 +29,8 @@ import {
   posProductsPaneClass,
 } from '@/lib/pos-responsive';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
+import { discountMinorFromPercent, discountPercentFromMinor, type PosDiscountMode } from '@/lib/pos-discount';
+import { cn } from '@/lib/utils';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { useBranches } from '@/lib/branch';
 import type { Warehouse } from '@/lib/warehouse';
@@ -270,6 +272,12 @@ export default function PosPage() {
   /** Quick View: معرّف المنتج المعروض فقط — قراءة بحتة، لا تمسّ السلة أو العميل أو الجلسة. */
   const [quickViewProductId, setQuickViewProductId] = useState<string | null>(null);
   const [priceErrors, setPriceErrors] = useState<Record<string, string>>({});
+  /**
+   * PR-3: وضع إدخال الخصم لكل سطر — حالة واجهة محلية بحتة، لا تُحفظ ولا تُستعاد
+   * مع السلة. المبلغ المعتمد يبقى `line.discount` دوماً (انظر `pos-discount.ts`).
+   */
+  const [discountMode, setDiscountMode] = useState<Record<string, PosDiscountMode>>({});
+  const [percentDraft, setPercentDraft] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'sale' | 'payment'>('sale');
   const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products');
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -1546,6 +1554,9 @@ export default function PosPage() {
         updateCarts((current) => current.map((cartState) => cartState.id === target.id
           ? { ...cartState, items: cartState.items.filter((line) => line.key !== action.line?.key) }
           : cartState));
+        const removedKey = action.line.key;
+        setDiscountMode((current) => { const { [removedKey]: _removed, ...rest } = current; return rest; });
+        setPercentDraft((current) => { const { [removedKey]: _removed, ...rest } = current; return rest; });
       } else if (action.type === 'payment_cancelled') {
         await recordCartForensics('payment_cancelled', {
           reason_code: reason.code, reason_note: reason.note,
@@ -1567,6 +1578,8 @@ export default function PosPage() {
             ? { ...cartState, items: [], customer: null, note: '', taxInclusive: systemTaxInclusive }
             : cartState));
           setPriceErrors({});
+          setDiscountMode({});
+          setPercentDraft({});
         } else {
           closeCart(target.id);
         }
@@ -1579,7 +1592,9 @@ export default function PosPage() {
   }
 
   const cartPanel = (
-    <aside className="flex min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">
+    // PR-3: `w-full` ضروري — الأب Flex ولا يمدّد عرض الابن تلقائياً؛ بدونه
+    // يبقى العمود متقلّصاً على عرض محتواه فلا يظهر التوسيع الفعلي لعمود الشبكة.
+    <aside className="flex w-full min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">
       <div className="border-b border-border p-3">
         <div className="hidden items-center gap-1 overflow-x-auto pb-2 md:flex" role="tablist" aria-label={t('open_carts')}>
           {carts.map((cartState) => {
@@ -1637,7 +1652,11 @@ export default function PosPage() {
         {cart.length === 0 && <PosCartEmptyState message={t('empty_cart')} />}
         {cart.map((line) => {
           const units = line.productId ? products.find((product) => product.id === line.productId)?.pos_units ?? [] : [];
-          const lineSelected = policy.allowKeyboardPowerMode && keyboardActive && activeZone === 'cart' && selectedLineKey === line.key;
+          // PR-3: التحديد البصري يظهر في كل أوضاع التفاعل (لمس/ماوس/كيبورد) — لم
+          // يعد مقصوراً على وضع الكيبورد المتقدّم؛ منطق التحديد نفسه لم يتغيّر.
+          const lineSelected = selectedLineKey === line.key;
+          const lineDiscountMode: PosDiscountMode = discountMode[line.key] ?? 'fixed';
+          const lineGross = lineCalc(line).gross;
           return (
             <PosCartLineFrame
               key={line.key}
@@ -1681,19 +1700,64 @@ export default function PosPage() {
                       </label>
                     )}
                     {posCfg.allow_discount && (
-                      <label className="flex items-center gap-1 text-xs text-muted">
+                      <div className="flex items-center gap-1 text-xs text-muted">
                         {t('discount')}
-                        <PosNumericEditor
-                          allowDecimal
-                          className="h-11 w-16 px-2 text-xs"
-                          inputAriaLabel={t('discount')}
-                          labels={numericEditorLabels}
-                          onChange={(value) => setDiscount(line.key, value)}
-                          showKeypad={posCfg.show_onscreen_numeric_keypad}
-                          title={t('numeric_keypad_edit_discount')}
-                          value={line.discount}
-                        />
-                      </label>
+                        <div className="flex overflow-hidden rounded border border-border" role="group" aria-label={t('discount_mode')}>
+                          <button
+                            type="button"
+                            aria-pressed={lineDiscountMode === 'fixed'}
+                            onClick={() => setDiscountMode((current) => ({ ...current, [line.key]: 'fixed' }))}
+                            className={cn(
+                              'min-h-11 px-2 text-xs font-semibold',
+                              lineDiscountMode === 'fixed' ? 'bg-primary text-white' : 'bg-background text-muted hover:text-text',
+                            )}
+                          >
+                            {t('discount_mode_fixed')}
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={lineDiscountMode === 'percent'}
+                            onClick={() => {
+                              setDiscountMode((current) => ({ ...current, [line.key]: 'percent' }));
+                              const pct = discountPercentFromMinor(lineGross, riyalToMinor(line.discount));
+                              setPercentDraft((current) => ({ ...current, [line.key]: pct > 0 ? String(Math.round(pct * 100) / 100) : '' }));
+                            }}
+                            className={cn(
+                              'min-h-11 border-s border-border px-2 text-xs font-semibold',
+                              lineDiscountMode === 'percent' ? 'bg-primary text-white' : 'bg-background text-muted hover:text-text',
+                            )}
+                          >
+                            {t('discount_mode_percent')}
+                          </button>
+                        </div>
+                        {lineDiscountMode === 'percent' ? (
+                          <PosNumericEditor
+                            allowDecimal
+                            className="h-11 w-16 px-2 text-xs"
+                            inputAriaLabel={t('discount_mode_percent')}
+                            labels={numericEditorLabels}
+                            onChange={(value) => {
+                              setPercentDraft((current) => ({ ...current, [line.key]: value }));
+                              const amountMinor = discountMinorFromPercent(lineGross, Number(value));
+                              setDiscount(line.key, (amountMinor / 100).toFixed(2));
+                            }}
+                            showKeypad={posCfg.show_onscreen_numeric_keypad}
+                            title={t('numeric_keypad_edit_discount')}
+                            value={percentDraft[line.key] ?? ''}
+                          />
+                        ) : (
+                          <PosNumericEditor
+                            allowDecimal
+                            className="h-11 w-16 px-2 text-xs"
+                            inputAriaLabel={t('discount')}
+                            labels={numericEditorLabels}
+                            onChange={(value) => setDiscount(line.key, value)}
+                            showKeypad={posCfg.show_onscreen_numeric_keypad}
+                            title={t('numeric_keypad_edit_discount')}
+                            value={line.discount}
+                          />
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
