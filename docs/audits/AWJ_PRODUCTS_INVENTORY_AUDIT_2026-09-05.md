@@ -6,6 +6,10 @@
 **Audit basis:** actual `main` source code + AWJ UI screenshots supplied during the audit + prior approved project discussions/decisions + Daftra as a competitive benchmark where explicitly reviewed.  
 **Status:** Working audit record — implementation has **not** started. No merge/deploy/production release is authorized by this document.
 
+## Governing pre-production data rule
+
+The project-wide policy in `docs/audits/AWJ_PRE_PRODUCTION_DATA_POLICY.md` governs this audit: all current tenants and business data are test/demo data and are not preservation constraints. Do not weaken the intended production design or add compatibility complexity solely to preserve them. Clean schema/default/constraint changes and deliberate test-data reset are acceptable before first real production data. This does **not** relax Tenant Isolation, accounting correctness, inventory integrity, security, intended API/domain contracts, idempotency, or explicit merge/deploy approval requirements.
+
 ---
 
 ## 1. Executive conclusion
@@ -37,7 +41,8 @@ The highest priority is to close correctness/security/integrity gaps before addi
 11. Quantity truth is warehouse/subledger state; Product Master edits are not stock adjustments.
 12. Moving Average Cost remains global per product under the current architecture.
 13. Live operational references must remain valid or fail closed when UOM/catalog structures change.
-14. No Merge/Deploy/Production Release without explicit approval.
+14. Current pre-production test/demo data is disposable and must not force a weaker production design.
+15. No Merge/Deploy/Production Release without explicit approval.
 
 ---
 
@@ -89,11 +94,13 @@ Alternate barcode backend/API is real. POS excludes stale alternate barcodes who
 
 Alternate-barcode creation checks both primary and alternate barcode namespaces. However, Product primary barcode validation and Product Import live-conflict checks query only `Product.barcode`; they do not consistently include `ProductBarcode.code`.
 
+The original Product schema enforces tenant-wide SKU uniqueness but does not define tenant-wide DB uniqueness for the primary `products.barcode`. `ProductBarcode` is explicitly company-wide because scanner resolution has no branch context. Controller/request checks therefore cannot be the final concurrency boundary.
+
 Required invariant:
 
 > `Primary Barcode ∪ Alternate Barcodes` is unique within the tenant.
 
-Must cover Product create/update/import, alternate-barcode writes and future barcode workbook import, including concurrency/DB enforcement where appropriate.
+Must cover Product create/update/import, alternate-barcode writes and future barcode workbook import, including atomic/concurrency-safe enforcement. Because current data is disposable pre-production data, implementation may adopt the cleanest canonical namespace/constraint model rather than preserve experimental duplicates.
 
 ---
 
@@ -165,6 +172,8 @@ Opening inventory is currently base-unit oriented; multi-UOM opening is P2.
 
 DB restrictive references remain a final safety line, but the business service can incorrectly report a product as deletable.
 
+`ProductActivity.product_id`, alternate barcodes and product media require classification rather than blind addition to deletion blockers: they are product-owned/audit children, and creation activity exists even for a newly-created otherwise-unused product. The target registry must distinguish business/historical blockers, inventory-identity blockers, owned children and unrelated domains.
+
 ### P1 — Inventory identity mutation guard incomplete
 
 `assertInventoryIdentityCanChange()` does not include `InventoryOpeningLine`. A Draft Inventory Opening can therefore reference a product before stock movements exist while `type` / `track_inventory` can still change.
@@ -194,6 +203,8 @@ Tenant setting `inventory.allow_negative_stock` exists. Sales/Invoice COGS conve
 **PASS:** Stock Permit/Transfer source availability enforcement is warehouse-aware in reviewed paths.
 
 **PASS:** Purchase Return negative-stock enforcement. This does not close its separate UOM/base-quantity and valuation P1s.
+
+Existing demo-tenant values are not a compatibility requirement; choose and enforce the intended production default before real customer data exists.
 
 ---
 
@@ -328,7 +339,9 @@ POS itself is comparatively strong: cost/profit exposure requires both cost perm
 
 Reviewed settings include negative-stock policy, show stock quantities, restock sales returns, and Serial/batch/expiry coming-soon surface.
 
-Remaining settings audit: verify semantic consistency/defaults and scoping for negative stock, stock visibility, restock behavior and future default-warehouse/warehouse-required policy. Do not infer implementation from UI labels alone.
+**PASS — current route/settings boundary:** Inventory Settings are tenant-level; read is protected by `products.view`, update by `company.manage`. Unsupported detailed tracking cannot currently be enabled through the backend. Existing demo-tenant settings are not preservation constraints under the governing pre-production policy.
+
+Future default-warehouse/warehouse-required policy remains P2 unless a current correctness dependency proves otherwise.
 
 ---
 
@@ -392,6 +405,7 @@ Preserve Product Quick View cost authorization, negative-stock enforcement, hist
 - Inventory export scalability/chunking for current 50k target
 - Product Update prohibits `initial_quantity`
 - Product Catalog Import excludes quantity/avg-cost/opening-stock/stock-movement writes
+- Inventory Settings tenant-level route authorization and unsupported detailed-tracking fail-closed behavior
 
 ---
 
@@ -433,7 +447,7 @@ No implementation is authorized by this record.
 
 ## 26. Definition of Done
 
-As applicable: tenant isolation; branch/warehouse correctness; base-UOM invariants; accounting/subledger reconciliation; authorized/unauthorized tests; historical snapshots; transaction/rollback behavior; backward compatibility; source metadata; backend/UI authorization consistency; documented tests/build/CI.
+As applicable: tenant isolation; branch/warehouse correctness; base-UOM invariants; accounting/subledger reconciliation; authorized/unauthorized tests; historical snapshots; transaction/rollback behavior; backward compatibility for intended product contracts (not preservation of disposable pre-production data); source metadata; backend/UI authorization consistency; documented tests/build/CI.
 
 Additional standing DoD:
 
@@ -477,9 +491,11 @@ Before formal closure:
 1. complete generic Product-reference census beyond confirmed `InventoryOpeningLine` / `DeliveryNoteLine` omissions
 2. finish any remaining cost-write/export endpoint/route policy census
 3. verify remaining tenant/branch/warehouse scoping edge cases, especially post/update paths
-4. verify Product & Inventory settings semantics/defaults/scoping
+4. finalize barcode namespace/concurrency production invariant
 5. reconcile remaining Daftra benchmark areas with evidence
 6. finalize P1/P2/P3 mapping and PR order without starting implementation
+
+Inventory Settings route/settings boundary is reconciled for the current reviewed surface; future default-warehouse policy remains backlog rather than a closure blocker.
 
 This record is the living working source of truth. Confirmed findings must be updated here rather than held only in chat.
 
